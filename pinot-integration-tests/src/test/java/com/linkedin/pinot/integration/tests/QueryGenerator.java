@@ -52,9 +52,18 @@ public class QueryGenerator {
   private List<String> _booleanOperators = Arrays.asList("OR", "AND");
   private List<PredicateGenerator> _predicateGenerators = Arrays.asList(new ComparisonOperatorPredicateGenerator(),
       new InPredicateGenerator(), new BetweenPredicateGenerator());
-  private static final Random RANDOM = new Random();
+  private static final long RANDOM_SEED = -1L;
+  private static final Random RANDOM;
   private final String _pqlTableName;
   private final String _h2TableName;
+
+  static {
+    if (RANDOM_SEED == -1L) {
+      RANDOM = new Random();
+    } else {
+      RANDOM = new Random(RANDOM_SEED);
+    }
+  }
 
   public QueryGenerator(final List<File> avroFiles, final String pqlTableName, String h2TableName) {
     _pqlTableName = pqlTableName;
@@ -122,7 +131,11 @@ public class QueryGenerator {
           if (avroValue == null) {
             continue;
           } else {
-            value = "'" + avroValue.toString().replace("'", "''") + "'";
+            if (avroValue instanceof Number) {
+              value = avroValue.toString();
+            } else {
+              value = "'" + avroValue.toString().replace("'", "''") + "'";
+            }
           }
 
           values.add(value);
@@ -172,26 +185,33 @@ public class QueryGenerator {
   }
 
   private class StringQueryFragment implements QueryFragment {
-    private String querySql;
+    private String pql;
+    private String hql;
 
     private StringQueryFragment(String querySql) {
-      this.querySql = querySql;
+      pql = querySql;
+      hql = querySql;
+    }
+
+    public StringQueryFragment(String pql, String hql) {
+      this.pql = pql;
+      this.hql = hql;
     }
 
     @Override
     public String generatePql() {
-      return querySql;
+      return pql;
     }
 
     @Override
     public String generateH2Sql() {
-      return querySql;
+      return hql;
     }
   }
 
   private class LimitQueryFragment extends StringQueryFragment {
     private LimitQueryFragment(int limit) {
-      super(0 <= limit ? "LIMIT " + limit : "");
+      super(0 <= limit ? "LIMIT " + limit : "", "LIMIT 10000");
     }
   }
 
@@ -232,7 +252,22 @@ public class QueryGenerator {
 
     @Override
     public String generateH2Sql() {
-      return generatePql();
+      if (_predicates.isEmpty()) {
+        return "";
+      } else if (_predicates.size() == 1) {
+        return " WHERE " + _predicates.get(0).generateH2Sql();
+      }
+
+      String h2sql = " WHERE ";
+
+      // One less than the number of predicates
+      int operatorCount = _operators.size();
+      for (int i = 0; i < operatorCount; i++) {
+        h2sql += _predicates.get(i).generateH2Sql() + " " + _operators.get(i).generateH2Sql() + " ";
+      }
+
+      h2sql += _predicates.get(operatorCount).generateH2Sql();
+      return h2sql;
     }
   }
 
@@ -284,7 +319,6 @@ public class QueryGenerator {
       }
 
       // Generate a predicate
-      // FIXME We should generate a predicate that's specific enough to have a limited number of results
       QueryFragment predicate = generatePredicate();
 
       // Generate a result limit between 0 and 5000 as negative numbers mean no limit
@@ -292,6 +326,31 @@ public class QueryGenerator {
       LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 
       return new SelectionQuery(projectionColumns, new OrderByQueryFragment(orderByColumns), predicate, limit);
+    }
+  }
+
+  private class ValueQueryFragment implements QueryFragment {
+    private String pql;
+    private String hql;
+
+    public ValueQueryFragment(String value) {
+      hql = value;
+
+      if (!value.startsWith("'")) {
+        pql = "'" + value + "'";
+      } else {
+        pql = value;
+      }
+    }
+
+    @Override
+    public String generatePql() {
+      return pql;
+    }
+
+    @Override
+    public String generateH2Sql() {
+      return hql;
     }
   }
 
@@ -369,12 +428,12 @@ public class QueryGenerator {
       if (_groupColumns.isEmpty()) {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
           queries.add(joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName,
-              _predicate.generatePql(), _limit.generatePql()));
+              _predicate.generateH2Sql(), _limit.generateH2Sql()));
         }
       } else {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
           queries.add(joinWithSpaces("SELECT", joinWithCommas(_groupColumns) + ",", aggregateColumnAndFunction, "FROM",
-              _h2TableName, _predicate.generatePql(), "GROUP BY", joinWithCommas(_groupColumns), _limit.generatePql()));
+              _h2TableName, _predicate.generateH2Sql(), "GROUP BY", joinWithCommas(_groupColumns), _limit.generateH2Sql()));
         }
       }
       return queries;
@@ -417,6 +476,9 @@ public class QueryGenerator {
         }
       }
 
+      // FIXME Always only one aggregation function
+      aggregationColumnsAndFunctions = Collections.singletonList(aggregationColumnsAndFunctions.get(0));
+
       // Generate a predicate
       QueryFragment predicate = generatePredicate();
 
@@ -429,7 +491,7 @@ public class QueryGenerator {
   }
 
   private interface PredicateGenerator {
-    public QueryFragment generatePredicate(String columnName);
+    QueryFragment generatePredicate(String columnName);
   }
 
   private class ComparisonOperatorPredicateGenerator implements PredicateGenerator {
@@ -438,8 +500,11 @@ public class QueryGenerator {
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      return new StringQueryFragment(columnName + " " + pickRandom(_comparisonOperators) + " "
-          + pickRandom(columnValues));
+      ValueQueryFragment value = new ValueQueryFragment(pickRandom(columnValues));
+      String comparisonOperator = pickRandom(_comparisonOperators);
+      return new StringQueryFragment(
+          columnName + " " + comparisonOperator + " " + value.generatePql(),
+          columnName + " " + comparisonOperator + " " + value.generateH2Sql());
     }
   }
 
@@ -449,13 +514,19 @@ public class QueryGenerator {
       List<String> columnValues = _columnToValueList.get(columnName);
 
       int inValueCount = RANDOM.nextInt(10) + 1;
-      List<String> inValueList = new ArrayList<String>(inValueCount);
+      List<String> pqlInValueList = new ArrayList<String>(inValueCount);
+      List<String> h2InValueList = new ArrayList<String>(inValueCount);
       for (int i = 0; i < inValueCount; i++) {
-        inValueList.add(pickRandom(columnValues));
+        ValueQueryFragment value = new ValueQueryFragment(pickRandom(columnValues));
+        pqlInValueList.add(value.generatePql());
+        h2InValueList.add(value.generateH2Sql());
       }
-      String inValues = StringUtil.join(", ", inValueList.toArray(new String[inValueList.size()]));
+      String pqlInValues = StringUtil.join(", ", pqlInValueList.toArray(new String[pqlInValueList.size()]));
+      String h2InValues = StringUtil.join(", ", h2InValueList.toArray(new String[h2InValueList.size()]));
 
-      return new StringQueryFragment(columnName + " IN (" + inValues + ")");
+      return new StringQueryFragment(
+          columnName + " IN (" + pqlInValues + ")",
+          columnName + " IN (" + h2InValues + ")");
     }
   }
 
@@ -463,8 +534,11 @@ public class QueryGenerator {
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      return new StringQueryFragment(columnName + " BETWEEN " + pickRandom(columnValues) + " AND "
-          + pickRandom(columnValues));
+      ValueQueryFragment leftValue = new ValueQueryFragment(pickRandom(columnValues));
+      ValueQueryFragment rightValue = new ValueQueryFragment(pickRandom(columnValues));
+      return new StringQueryFragment(
+          columnName + " BETWEEN " + leftValue.generatePql() + " AND " + rightValue.generatePql(),
+          columnName + " BETWEEN " + leftValue.generateH2Sql() + " AND " + rightValue.generateH2Sql());
     }
   }
 

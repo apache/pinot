@@ -15,19 +15,25 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,12 +52,15 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -73,6 +82,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
   private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
   private static final boolean BATCH_KAFKA_MESSAGES = true;
+  protected static final boolean GATHER_FAILED_QUERIES = true;
+  private int failedQueryCount = 0;
+  private int queryCount = 0;
 
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
@@ -80,6 +92,50 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected abstract int getGeneratedQueryCount();
   protected File queriesFile;
+
+  private class NullableStringComparator implements Comparator<String> {
+    @Override
+    public int compare(String left, String right) {
+      if (left == null) {
+        if (right == null) {
+          return 0;
+        } else {
+          return -1;
+        }
+      } else {
+        if (right == null) {
+          return 1;
+        } else {
+          return left.compareTo(right);
+        }
+      }
+    }
+  }
+
+  @BeforeMethod
+  public void resetQueryCounts() {
+    failedQueryCount = 0;
+    queryCount = 0;
+  }
+
+  @AfterMethod
+  public void checkFailedQueryCount() {
+    if (GATHER_FAILED_QUERIES && failedQueryCount != 0) {
+      File file = new File(getClass().getSimpleName() + "-failed.txt");
+      PrintWriter out = null;
+      try {
+        out = new PrintWriter(new FileWriter(file, true));
+        out.println("# " + failedQueryCount + "/" + queryCount + " queries did not match with H2");
+        out.close();
+      } catch (IOException e) {
+        LOGGER.warn("Failed to write to failed queries file", e);
+      } finally {
+        IOUtils.closeQuietly(out);
+      }
+    }
+
+    Assert.assertTrue(failedQueryCount == 0, "Queries have failed during this test.");
+  }
 
   protected void runNoH2ComparisonQuery(String pqlQuery) throws Exception {
     JSONObject ret = postQuery(pqlQuery);
@@ -94,11 +150,35 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       System.out.println("**********************************");
       throw e;
     }
+  }
 
+  private void saveFailedQuery(String pqlQuery, List<String> sqlQueries, String... messages) {
+    failedQueryCount++;
+
+    File file = new File(getClass().getSimpleName() + "-failed.txt");
+    PrintWriter out = null;
+    try {
+      out = new PrintWriter(new FileWriter(file, true));
+      for (String message : messages) {
+        out.print("# ");
+        out.println(message);
+        LOGGER.warn(message);
+      }
+      out.print(pqlQuery);
+      out.print("\t");
+      out.println(StringUtil.join("\t", sqlQueries.toArray(new String[sqlQueries.size()])));
+      out.println();
+      out.close();
+    } catch (IOException e) {
+      LOGGER.warn("Failed to write to failed queries file", e);
+    } finally {
+      IOUtils.closeQuietly(out);
+    }
   }
 
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
     try {
+      queryCount++;
       Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 
       // Run the query
@@ -120,10 +200,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           // Strip decimals
           bqlValue = bqlValue.replaceAll("\\..*", "");
           sqlValue = sqlValue.replaceAll("\\..*", "");
+        }
 
-          LOGGER.info("bql value: " + bqlValue);
-          LOGGER.info("sql value: " + sqlValue);
-          Assert.assertEquals(bqlValue, sqlValue, "Values did not match for query " + pqlQuery);
+        LOGGER.info("bql value: " + bqlValue);
+        LOGGER.info("sql value: " + sqlValue);
+        if (GATHER_FAILED_QUERIES) {
+          if (!EqualityUtils.isEqual(bqlValue, sqlValue)) {
+            saveFailedQuery(pqlQuery, sqlQueries,
+                "Values did not match for query " + pqlQuery + ", expected " + sqlValue + ", got " + bqlValue);
+          }
         } else {
           Assert.assertEquals(bqlValue, sqlValue, "Values did not match for query " + pqlQuery);
         }
@@ -135,12 +220,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           if (groupByResults.length() != 0) {
             int groupKeyCount = groupByResults.getJSONObject(0).getJSONArray("group").length();
 
-            Map<String, String> actualValues = new HashMap<String, String>();
+            Map<String, String> actualValues = new TreeMap<String, String>(new NullableStringComparator());
             for (int resultIndex = 0; resultIndex < groupByResults.length(); ++resultIndex) {
               JSONArray group = groupByResults.getJSONObject(resultIndex).getJSONArray("group");
-              String pinotGroupKey = "";
-              for (int groupKeyIndex = 0; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-                pinotGroupKey += group.getString(groupKeyIndex) + "\t";
+              String pinotGroupKey = group.getString(0);
+              for (int groupKeyIndex = 1; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
+                pinotGroupKey += "\t" + group.getString(groupKeyIndex);
               }
 
               actualValues.put(pinotGroupKey, Integer.toString((int) Double.parseDouble(groupByResults.getJSONObject(
@@ -148,35 +233,83 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
 
             // Grouped result, build correct values and iterate through to compare both
-            Map<String, String> correctValues = new HashMap<String, String>();
+            Map<String, String> correctValues = new TreeMap<String, String>(new NullableStringComparator());
             LOGGER.info("Trying to execute sql query: " + sqlQueries.get(aggregationGroupIndex));
             statement.execute(sqlQueries.get(aggregationGroupIndex));
             ResultSet rs = statement.getResultSet();
             LOGGER.info("Trying to get result from sql: " + rs);
             rs.beforeFirst();
             while (rs.next()) {
-              String h2GroupKey = "";
-              for (int groupKeyIndex = 0; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-                h2GroupKey += rs.getString(groupKeyIndex + 1) + "\t";
+              String h2GroupKey = rs.getString(1);
+              for (int groupKeyIndex = 1; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
+                h2GroupKey += "\t" + rs.getString(groupKeyIndex + 1);
               }
               correctValues.put(h2GroupKey, rs.getString(groupKeyCount + 1));
             }
             LOGGER.info("Trying to compare result from bql: " + actualValues);
             LOGGER.info("Trying to compare result from sql: " + correctValues);
-            Assert.assertEquals(actualValues, correctValues, "Values did not match while running query : " + pqlQuery
-                + ", sql query: " + sqlQueries.get(aggregationGroupIndex));
+
+            if (correctValues.size() < 10000) {
+              // Check that Pinot results are contained in the SQL results
+              Set<String> pinotKeys = actualValues.keySet();
+              for (String pinotKey : pinotKeys) {
+                if (GATHER_FAILED_QUERIES) {
+                  if (!correctValues.containsKey((pinotKey))) {
+                    saveFailedQuery(pqlQuery, sqlQueries,
+                        "Result group '" + pinotKey + "' returned by Pinot was not returned by H2 for query " +
+                            pqlQuery,
+                        "Bql values: " + actualValues,
+                        "Sql values: " + correctValues);
+                    break;
+                  } else if (!EqualityUtils.isEqual(actualValues.get(pinotKey), correctValues.get(pinotKey))) {
+                    saveFailedQuery(pqlQuery, sqlQueries,
+                        "Results differ between Pinot and H2 for query " + pqlQuery + ", expected " +
+                            correctValues.get(pinotKey) + ", got " + actualValues.get(pinotKey) + " for group " +
+                            pinotKey,
+                        "Bql values: " + actualValues,
+                        "Sql values: " + correctValues);
+                    break;
+                  }
+                } else {
+                  Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey +
+                      "' returned by Pinot was not returned by H2 for query " + pqlQuery);
+                  Assert.assertEquals(actualValues.get(pinotKey), correctValues.get(pinotKey),
+                      "Results differ between Pinot and H2 for query " + pqlQuery + " and group " + pinotKey);
+                }
+              }
+            } else {
+              LOGGER.warn("SQL query returned more than 10k rows, skipping comparison");
+              queryCount--;
+            }
           } else {
             // No records in group by, check that the result set is empty
             statement.execute(sqlQueries.get(aggregationGroupIndex));
             ResultSet rs = statement.getResultSet();
-            Assert.assertTrue(rs.isLast(), "Pinot did not return any results while results were expected for query "
-                + pqlQuery);
-          }
+            rs.beforeFirst();
+            int rowCount = 0;
+            while (rs.next()) {
+              rowCount++;
+            }
 
+            if(rowCount != 0) {
+              // Resultset not empty, while Pinot has no results
+              if (GATHER_FAILED_QUERIES) {
+                saveFailedQuery(pqlQuery, sqlQueries,
+                    "Pinot did not return any results while " + rowCount + " rows were expected for query " + pqlQuery);
+              } else {
+                Assert.fail("Pinot did not return any results while " + rowCount + " results were expected for query "
+                    + pqlQuery);
+              }
+            }
+          }
         }
       }
     } catch (JSONException exception) {
-      Assert.fail("Query did not return valid JSON while running query " + pqlQuery);
+      if (GATHER_FAILED_QUERIES) {
+        saveFailedQuery(pqlQuery, sqlQueries, "Query did not return valid JSON while running query " + pqlQuery);
+      } else {
+        Assert.fail("Query did not return valid JSON while running query " + pqlQuery);
+      }
     }
     System.out.println();
   }
@@ -364,6 +497,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         // TODO: handle exception
       }
 
+    }
+  }
+
+  @Test
+  public void testGeneratedQueries() throws Exception {
+    QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
+    for (int i = 0; i < queries.length; i++) {
+      queries[i] = _queryGenerator.generateQuery();
+    }
+
+    for (QueryGenerator.Query query : queries) {
+      System.out.println(query.generatePql());
+      runQuery(query.generatePql(), query.generateH2Sql());
     }
   }
 

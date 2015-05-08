@@ -76,7 +76,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Unpack data
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(RealtimeClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
+            "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
     final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);

@@ -107,7 +107,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Unpack the Avro files
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
+            "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
 
