@@ -131,6 +131,9 @@ public class IntermediateResultsBlock implements Block {
     if (_selectionResult != null) {
       return getSelectionResultDataTable();
     }
+    if (_processingExceptions != null && _processingExceptions.size() > 0) {
+      return getExceptionsDataTable();
+    }
     throw new UnsupportedOperationException("Cannot get DataTable from IntermediateResultBlock!");
   }
 
@@ -139,7 +142,16 @@ public class IntermediateResultsBlock implements Block {
     dataTable.getMetadata().put(NUM_DOCS_SCANNED, _numDocsScanned + "");
     dataTable.getMetadata().put(TIME_USED_MS, _timeUsedMs + "");
     dataTable.getMetadata().put(TOTAL_DOCS, _totalDocs + "");
+    if (_processingExceptions != null && _processingExceptions.size() > 0) {
+      for (int i = 0; i < _processingExceptions.size(); ++i) {
+        dataTable.addException(_processingExceptions.get(i));
+      }
+    }
     return dataTable;
+  }
+
+  public DataTable getExceptionsDataTable() {
+    return attachMetadataToDataTable(new DataTable());
   }
 
   private DataTable getSelectionResultDataTable() throws Exception {

@@ -25,9 +25,25 @@ import junit.framework.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 
+
 public class TestDataTableBuilder {
+
+  @Test
+  public void testException() throws Exception {
+    Exception exception = new UnsupportedOperationException("msg 0");
+    ProcessingException processingException = QueryException.EXECUTION_TIMEOUT_ERROR.deepCopy();
+    processingException.setMessage(exception.toString());
+    DataTable dataTable = new DataTable();
+    dataTable.addException(processingException);
+    byte[] bytes = dataTable.toBytes();
+    DataTable desDataTable = new DataTable(bytes);
+    String exceptionMsg = desDataTable.getMetadata().get("Exception" + QueryException.EXECUTION_TIMEOUT_ERROR.getErrorCode());
+    org.testng.Assert.assertEquals(exceptionMsg, exception.toString());
+  }
 
   @Test
   public void testSimple() throws Exception {
@@ -60,63 +76,63 @@ public class TestDataTableBuilder {
       for (int colId = 0; colId < schema.columnNames.length; colId++) {
         final DataType type = columnTypes[colId];
         switch (type) {
-        case BOOLEAN:
-          final boolean bool = r.nextBoolean();
-          boolArr[rowId] = bool;
-          builder.setColumn(colId, bool);
-          break;
-        case CHAR:
-          final char ch = (char) (r.nextInt(26) + 'a');
-          cArr[rowId] = ch;
-          builder.setColumn(colId, ch);
-          break;
-        case BYTE:
-          final byte b = (byte) (r.nextInt((int) Math.pow(2, 8)));
-          bArr[rowId] = b;
-          builder.setColumn(colId, b);
+          case BOOLEAN:
+            final boolean bool = r.nextBoolean();
+            boolArr[rowId] = bool;
+            builder.setColumn(colId, bool);
+            break;
+          case CHAR:
+            final char ch = (char) (r.nextInt(26) + 'a');
+            cArr[rowId] = ch;
+            builder.setColumn(colId, ch);
+            break;
+          case BYTE:
+            final byte b = (byte) (r.nextInt((int) Math.pow(2, 8)));
+            bArr[rowId] = b;
+            builder.setColumn(colId, b);
 
-          break;
-        case SHORT:
-          final short s = (short) (r.nextInt((int) Math.pow(2, 16)));
-          sArr[rowId] = s;
-          builder.setColumn(colId, s);
+            break;
+          case SHORT:
+            final short s = (short) (r.nextInt((int) Math.pow(2, 16)));
+            sArr[rowId] = s;
+            builder.setColumn(colId, s);
 
-          break;
-        case INT:
-          final int i = (r.nextInt());
-          iArr[rowId] = i;
-          builder.setColumn(colId, i);
+            break;
+          case INT:
+            final int i = (r.nextInt());
+            iArr[rowId] = i;
+            builder.setColumn(colId, i);
 
-          break;
-        case LONG:
-          final long l = (r.nextLong());
-          lArr[rowId] = l;
-          builder.setColumn(colId, l);
+            break;
+          case LONG:
+            final long l = (r.nextLong());
+            lArr[rowId] = l;
+            builder.setColumn(colId, l);
 
-          break;
-        case FLOAT:
-          final float f = (r.nextFloat());
-          fArr[rowId] = f;
-          builder.setColumn(colId, f);
-          break;
-        case DOUBLE:
-          final double d = (r.nextDouble());
-          dArr[rowId] = d;
-          builder.setColumn(colId, d);
-          break;
-        case STRING:
-          final String str = new BigInteger(130, r).toString(32);
-          strArr[rowId] = str;
-          builder.setColumn(colId, str);
-          break;
-        case OBJECT:
-          final A obj = new A(r.nextInt());
-          oArr[rowId] = obj;
-          builder.setColumn(colId, obj);
+            break;
+          case FLOAT:
+            final float f = (r.nextFloat());
+            fArr[rowId] = f;
+            builder.setColumn(colId, f);
+            break;
+          case DOUBLE:
+            final double d = (r.nextDouble());
+            dArr[rowId] = d;
+            builder.setColumn(colId, d);
+            break;
+          case STRING:
+            final String str = new BigInteger(130, r).toString(32);
+            strArr[rowId] = str;
+            builder.setColumn(colId, str);
+            break;
+          case OBJECT:
+            final A obj = new A(r.nextInt());
+            oArr[rowId] = obj;
+            builder.setColumn(colId, obj);
 
-          break;
-        default:
-          break;
+            break;
+          default:
+            break;
         }
       }
       builder.finishRow();
@@ -133,6 +149,7 @@ public class TestDataTableBuilder {
         fArr, lArr, dArr, strArr, oArr);
 
   }
+
   @Test
   public void testStringArray() throws Exception {
     DataType[] columnTypes = new DataType[] { DataType.STRING_ARRAY };
@@ -168,6 +185,7 @@ public class TestDataTableBuilder {
     }
 
   }
+
   @Test
   public void testIntArray() throws Exception {
     DataType[] columnTypes = new DataType[] { DataType.INT_ARRAY };
@@ -256,62 +274,62 @@ public class TestDataTableBuilder {
   private void validate(DataType type, DataTable dataTable, Object[] arr,
       int rowId, int colId) {
     switch (type) {
-    case BOOLEAN:
-      Assert.assertEquals(arr[rowId], dataTable.getBoolean(rowId, colId));
-      break;
-    case CHAR:
-      Assert.assertEquals(arr[rowId], dataTable.getChar(rowId, colId));
-      break;
-    case BYTE:
-      Assert.assertEquals(arr[rowId], dataTable.getByte(rowId, colId));
-      break;
-    case SHORT:
-      Assert.assertEquals(arr[rowId], dataTable.getShort(rowId, colId));
-      break;
-    case INT:
-      Assert.assertEquals(arr[rowId], dataTable.getInt(rowId, colId));
-      break;
-    case LONG:
-      Assert.assertEquals(arr[rowId], dataTable.getLong(rowId, colId));
-      break;
-    case FLOAT:
-      Assert.assertEquals(arr[rowId], dataTable.getFloat(rowId, colId));
-      break;
-    case DOUBLE:
-      Assert.assertEquals(arr[rowId], dataTable.getDouble(rowId, colId));
-      break;
-    case STRING:
-      Assert.assertEquals(arr[rowId], dataTable.getString(rowId, colId));
-      break;
-    case BYTE_ARRAY:
-      byte[] expectedByteArray = (byte[]) arr[rowId];
-      byte[] actualByteArray = (byte[]) dataTable.getByteArray(rowId, colId);
-      Assert.assertEquals(expectedByteArray.length, actualByteArray.length);
-      Assert.assertTrue(Arrays.equals(expectedByteArray, actualByteArray));
-      break;
-    case CHAR_ARRAY:
-      char[] expectedCharArray = (char[]) arr[rowId];
-      char[] actualChartArray = (char[]) dataTable.getCharArray(rowId, colId);
-      Assert.assertEquals(expectedCharArray.length, actualChartArray.length);
-      Assert.assertTrue(Arrays.equals(expectedCharArray, actualChartArray));
-      break;
-    case INT_ARRAY:
-      int[] expectedIntArray = (int[]) arr[rowId];
-      int[] actualIntArray = (int[]) dataTable.getIntArray(rowId, colId);
-      Assert.assertEquals(expectedIntArray.length, actualIntArray.length);
-      Assert.assertTrue(Arrays.equals(expectedIntArray, actualIntArray));
-      break;
-    case STRING_ARRAY:
-      String[] expectedStringArray = (String[]) arr[rowId];
-      String[] actualStringArray = (String[]) dataTable.getStringArray(rowId, colId);
-      Assert.assertEquals(expectedStringArray.length, actualStringArray.length);
-      Assert.assertTrue(Arrays.equals(expectedStringArray, actualStringArray));
-      break;
-    case OBJECT:
-      Assert.assertEquals(arr[rowId], dataTable.getObject(rowId, colId));
-      break;
-    default:
-      break;
+      case BOOLEAN:
+        Assert.assertEquals(arr[rowId], dataTable.getBoolean(rowId, colId));
+        break;
+      case CHAR:
+        Assert.assertEquals(arr[rowId], dataTable.getChar(rowId, colId));
+        break;
+      case BYTE:
+        Assert.assertEquals(arr[rowId], dataTable.getByte(rowId, colId));
+        break;
+      case SHORT:
+        Assert.assertEquals(arr[rowId], dataTable.getShort(rowId, colId));
+        break;
+      case INT:
+        Assert.assertEquals(arr[rowId], dataTable.getInt(rowId, colId));
+        break;
+      case LONG:
+        Assert.assertEquals(arr[rowId], dataTable.getLong(rowId, colId));
+        break;
+      case FLOAT:
+        Assert.assertEquals(arr[rowId], dataTable.getFloat(rowId, colId));
+        break;
+      case DOUBLE:
+        Assert.assertEquals(arr[rowId], dataTable.getDouble(rowId, colId));
+        break;
+      case STRING:
+        Assert.assertEquals(arr[rowId], dataTable.getString(rowId, colId));
+        break;
+      case BYTE_ARRAY:
+        byte[] expectedByteArray = (byte[]) arr[rowId];
+        byte[] actualByteArray = (byte[]) dataTable.getByteArray(rowId, colId);
+        Assert.assertEquals(expectedByteArray.length, actualByteArray.length);
+        Assert.assertTrue(Arrays.equals(expectedByteArray, actualByteArray));
+        break;
+      case CHAR_ARRAY:
+        char[] expectedCharArray = (char[]) arr[rowId];
+        char[] actualChartArray = (char[]) dataTable.getCharArray(rowId, colId);
+        Assert.assertEquals(expectedCharArray.length, actualChartArray.length);
+        Assert.assertTrue(Arrays.equals(expectedCharArray, actualChartArray));
+        break;
+      case INT_ARRAY:
+        int[] expectedIntArray = (int[]) arr[rowId];
+        int[] actualIntArray = (int[]) dataTable.getIntArray(rowId, colId);
+        Assert.assertEquals(expectedIntArray.length, actualIntArray.length);
+        Assert.assertTrue(Arrays.equals(expectedIntArray, actualIntArray));
+        break;
+      case STRING_ARRAY:
+        String[] expectedStringArray = (String[]) arr[rowId];
+        String[] actualStringArray = (String[]) dataTable.getStringArray(rowId, colId);
+        Assert.assertEquals(expectedStringArray.length, actualStringArray.length);
+        Assert.assertTrue(Arrays.equals(expectedStringArray, actualStringArray));
+        break;
+      case OBJECT:
+        Assert.assertEquals(arr[rowId], dataTable.getObject(rowId, colId));
+        break;
+      default:
+        break;
     }
   }
 
@@ -322,39 +340,39 @@ public class TestDataTableBuilder {
       for (int colId = 0; colId < schema.columnNames.length; colId++) {
         final DataType type = schema.columnTypes[colId];
         switch (type) {
-        case BOOLEAN:
-          Assert.assertEquals(boolArr[rowId],
-              dataTable.getBoolean(rowId, colId));
-          break;
-        case CHAR:
-          Assert.assertEquals(cArr[rowId], dataTable.getChar(rowId, colId));
-          break;
-        case BYTE:
-          Assert.assertEquals(bArr[rowId], dataTable.getByte(rowId, colId));
-          break;
-        case SHORT:
-          Assert.assertEquals(sArr[rowId], dataTable.getShort(rowId, colId));
-          break;
-        case INT:
-          Assert.assertEquals(iArr[rowId], dataTable.getInt(rowId, colId));
-          break;
-        case LONG:
-          Assert.assertEquals(lArr[rowId], dataTable.getLong(rowId, colId));
-          break;
-        case FLOAT:
-          Assert.assertEquals(fArr[rowId], dataTable.getFloat(rowId, colId));
-          break;
-        case DOUBLE:
-          Assert.assertEquals(dArr[rowId], dataTable.getDouble(rowId, colId));
-          break;
-        case STRING:
-          Assert.assertEquals(strArr[rowId], dataTable.getString(rowId, colId));
-          break;
-        case OBJECT:
-          Assert.assertEquals(oArr[rowId], dataTable.getObject(rowId, colId));
-          break;
-        default:
-          break;
+          case BOOLEAN:
+            Assert.assertEquals(boolArr[rowId],
+                dataTable.getBoolean(rowId, colId));
+            break;
+          case CHAR:
+            Assert.assertEquals(cArr[rowId], dataTable.getChar(rowId, colId));
+            break;
+          case BYTE:
+            Assert.assertEquals(bArr[rowId], dataTable.getByte(rowId, colId));
+            break;
+          case SHORT:
+            Assert.assertEquals(sArr[rowId], dataTable.getShort(rowId, colId));
+            break;
+          case INT:
+            Assert.assertEquals(iArr[rowId], dataTable.getInt(rowId, colId));
+            break;
+          case LONG:
+            Assert.assertEquals(lArr[rowId], dataTable.getLong(rowId, colId));
+            break;
+          case FLOAT:
+            Assert.assertEquals(fArr[rowId], dataTable.getFloat(rowId, colId));
+            break;
+          case DOUBLE:
+            Assert.assertEquals(dArr[rowId], dataTable.getDouble(rowId, colId));
+            break;
+          case STRING:
+            Assert.assertEquals(strArr[rowId], dataTable.getString(rowId, colId));
+            break;
+          case OBJECT:
+            Assert.assertEquals(oArr[rowId], dataTable.getObject(rowId, colId));
+            break;
+          default:
+            break;
         }
       }
     }
@@ -376,6 +394,5 @@ public class TestDataTableBuilder {
     public int hashCode() {
       return new Integer(i).hashCode();
     }
-
   }
 }

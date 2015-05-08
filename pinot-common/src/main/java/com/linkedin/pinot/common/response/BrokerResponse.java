@@ -35,7 +35,7 @@ import com.linkedin.pinot.common.exception.QueryException;
 public class BrokerResponse {
   private long _totalDocs = 0;
   private long _numDocsScanned = 0;
-  private long _timeUsedMs;
+  private long _timeUsedMs = 0;
   private List<JSONObject> _aggregationResults;
   private List<ResponseStatistics> _segmentStatistics;
   private List<ProcessingException> _exceptions;
@@ -62,8 +62,6 @@ public class BrokerResponse {
     _segmentStatistics = new ArrayList<ResponseStatistics>();
     _exceptions = new ArrayList<ProcessingException>();
     _traceInfo = new HashMap<String, String>();
-    _timeUsedMs = Long.MIN_VALUE;
-
   }
 
   public long getTotalDocs() {

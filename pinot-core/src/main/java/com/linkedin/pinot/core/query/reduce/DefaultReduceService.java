@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
-import com.linkedin.pinot.common.Utils;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,7 +23,11 @@ import java.util.Map;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.AggregationResult;
@@ -41,9 +43,6 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -123,8 +122,24 @@ public class DefaultReduceService implements ReduceService {
     if (instanceResponseMap == null || instanceResponseMap.size() == 0) {
       return BrokerResponse.EMPTY_RESULT;
     }
-    for (ServerInstance serverInstance : instanceResponseMap.keySet()) {
+    for (ServerInstance serverInstance : instanceResponseMap.keySet().toArray(new ServerInstance[instanceResponseMap.size()])) {
       DataTable instanceResponse = instanceResponseMap.get(serverInstance);
+      if (instanceResponse == null) {
+        continue;
+      }
+      if (instanceResponse.getDataSchema() == null && instanceResponse.getMetadata() != null) {
+        for (String key : instanceResponse.getMetadata().keySet()) {
+          if (key.startsWith("Exception")) {
+            ProcessingException processingException = new ProcessingException();
+            processingException.setErrorCode(Integer.parseInt(key.substring(9)));
+            processingException.setMessage(instanceResponse.getMetadata().get(key));
+            brokerResponse.addToExceptions(processingException);
+          }
+        }
+        instanceResponseMap.remove(serverInstance);
+        continue;
+      }
+
       // reduceOnNumDocsScanned
       brokerResponse.setNumDocsScanned(brokerResponse.getNumDocsScanned()
           + Long.parseLong(instanceResponse.getMetadata().get(NUM_DOCS_SCANNED)));
@@ -135,35 +150,40 @@ public class DefaultReduceService implements ReduceService {
         brokerResponse.setTimeUsedMs(Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)));
       }
     }
+    try {
 
-    if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null)
-        && (brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
-      // Reduce DataTable for selection query.
-      JSONObject selectionRet = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
-      brokerResponse.setSelectionResults(selectionRet);
-      return brokerResponse;
-    }
-    if (brokerRequest.isSetAggregationsInfo()) {
-      if (!brokerRequest.isSetGroupBy()) {
-        List<List<Serializable>> aggregationResultsList =
-            getShuffledAggregationResults(brokerRequest, instanceResponseMap);
-        brokerResponse.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
-      } else {
-        // Reduce DataTable for aggregation groupby query.
-        //        GroupByAggregationService groupByAggregationService =
-        //            new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-        //        brokerResponse.setAggregationResults(reduceOnAggregationGroupByResults(groupByAggregationService,
-        //            instanceResponseMap));
-
-        AggregationGroupByOperatorService aggregationGroupByOperatorService =
-            new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-        brokerResponse.setAggregationResults(reduceOnAggregationGroupByOperatorResults(
-            aggregationGroupByOperatorService, instanceResponseMap));
-
+      if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null)
+          && (brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
+        // Reduce DataTable for selection query.
+        JSONObject selectionRet = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
+        brokerResponse.setSelectionResults(selectionRet);
+        return brokerResponse;
       }
+      if (brokerRequest.isSetAggregationsInfo()) {
+        if (!brokerRequest.isSetGroupBy()) {
+          List<List<Serializable>> aggregationResultsList =
+              getShuffledAggregationResults(brokerRequest, instanceResponseMap);
+          brokerResponse.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
+        } else {
+          // Reduce DataTable for aggregation groupby query.
+          //        GroupByAggregationService groupByAggregationService =
+          //            new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+          //        brokerResponse.setAggregationResults(reduceOnAggregationGroupByResults(groupByAggregationService,
+          //            instanceResponseMap));
+
+          AggregationGroupByOperatorService aggregationGroupByOperatorService =
+              new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+          brokerResponse.setAggregationResults(reduceOnAggregationGroupByOperatorResults(
+              aggregationGroupByOperatorService, instanceResponseMap));
+
+        }
+        return brokerResponse;
+      }
+
+    } catch (Exception e) {
+      brokerResponse.addToExceptions(QueryException.getException(QueryException.BROKER_GATHER_ERROR, e));
       return brokerResponse;
     }
-
     throw new UnsupportedOperationException(
         "Should not reach here, the query has no attributes of selection or aggregation!");
   }
@@ -226,6 +246,9 @@ public class DefaultReduceService implements ReduceService {
     for (ServerInstance serverInstance : instanceResponseMap.keySet()) {
       DataTable instanceResponse = instanceResponseMap.get(serverInstance);
       aggregationResultSchema = instanceResponse.getDataSchema();
+      if (aggregationResultSchema == null) {
+        continue;
+      }
       // Shuffle AggregationResults
       for (int rowId = 0; rowId < instanceResponse.getNumberOfRows(); ++rowId) {
         for (int colId = 0; colId < brokerRequest.getAggregationsInfoSize(); ++colId) {

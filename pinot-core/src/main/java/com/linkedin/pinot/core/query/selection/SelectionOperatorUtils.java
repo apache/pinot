@@ -53,8 +53,8 @@ import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SortedSingleValueBlock;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -120,6 +120,12 @@ public class SelectionOperatorUtils {
 
   public static Collection<Serializable[]> merge(Collection<Serializable[]> rowEventsSet1,
       Collection<Serializable[]> rowEventsSet2, int maxRowSize) {
+    if (rowEventsSet1 == null) {
+      return rowEventsSet2;
+    }
+    if (rowEventsSet2 == null) {
+      return rowEventsSet1;
+    }
     final Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
     while (rowEventsSet1.size() < maxRowSize && iterator.hasNext()) {
       final Serializable[] row = iterator.next();
@@ -130,15 +136,10 @@ public class SelectionOperatorUtils {
 
   public static Collection<Serializable[]> reduce(Map<ServerInstance, DataTable> selectionResults, int maxRowSize) {
     Collection<Serializable[]> rowEventsSet = new ArrayList<Serializable[]>();
-
     for (final DataTable dt : selectionResults.values()) {
-      for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
+      for (int rowId = 0; rowId < Math.min(dt.getNumberOfRows(), maxRowSize); ++rowId) {
         final Serializable[] row = extractRowFromDataTable(dt, rowId);
-        if (rowEventsSet.size() < maxRowSize) {
-          rowEventsSet.add(row);
-        } else {
-          break;
-        }
+        rowEventsSet.add(row);
       }
     }
     return rowEventsSet;
@@ -202,7 +203,7 @@ public class SelectionOperatorUtils {
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
-  public static Serializable[] collectRowFromBlockValSets(int docId, Block[] blocks, DataSchema dataSchema) throws Exception {
+  public static Serializable[] collectRowFromBlockValSets(int docId, Block[] blocks, DataSchema dataSchema) {
 
     final Serializable[] row = new Serializable[dataSchema.size()];
     int j = 0;

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
-import com.linkedin.pinot.common.Utils;
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayPriorityQueue;
 
@@ -31,7 +30,10 @@ import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
@@ -40,8 +42,6 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.utils.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -91,7 +91,9 @@ public class AggregationGroupByOperatorService {
     List<Map<String, Serializable>> reducedResult = null;
     for (DataTable toBeReducedGroupByResults : instanceResponseMap.values()) {
       if (reducedResult == null) {
-        reducedResult = transformDataTableToGroupByResult(toBeReducedGroupByResults);
+        if (toBeReducedGroupByResults != null) {
+          reducedResult = transformDataTableToGroupByResult(toBeReducedGroupByResults);
+        }
       } else {
         List<Map<String, Serializable>> toBeReducedResult =
             transformDataTableToGroupByResult(toBeReducedGroupByResults);
@@ -109,12 +111,14 @@ public class AggregationGroupByOperatorService {
         }
       }
     }
-    for (int i = 0; i < reducedResult.size(); ++i) {
-      Map<String, Serializable> functionLevelReducedResult = reducedResult.get(i);
-      for (String key : functionLevelReducedResult.keySet()) {
-        if (functionLevelReducedResult.get(key) != null) {
-          functionLevelReducedResult.put(key,
-              _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
+    if (reducedResult != null) {
+      for (int i = 0; i < reducedResult.size(); ++i) {
+        Map<String, Serializable> functionLevelReducedResult = reducedResult.get(i);
+        for (String key : functionLevelReducedResult.keySet()) {
+          if (functionLevelReducedResult.get(key) != null) {
+            functionLevelReducedResult.put(key,
+                _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
+          }
         }
       }
     }
@@ -123,7 +127,9 @@ public class AggregationGroupByOperatorService {
 
   public List<JSONObject> renderGroupByOperators(List<Map<String, Serializable>> finalAggregationResult) {
     try {
-
+      if (finalAggregationResult == null || finalAggregationResult.size() != _aggregationFunctionList.size()) {
+        return null;
+      }
       List<JSONObject> retJsonResultList = new ArrayList<JSONObject>();
       for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
         DecimalFormat df = DEFAULT_FORMAT_STRING_MAP.get(_aggregationFunctionList.get(i).aggregateResultDataType());

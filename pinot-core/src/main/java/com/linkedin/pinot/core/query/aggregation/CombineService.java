@@ -41,7 +41,14 @@ public class CombineService {
 
   public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge) {
-
+    // Sanity check
+    if (blockToMerge == null) {
+      return;
+    }
+    if (mergedBlock == null) {
+      mergedBlock = blockToMerge;
+      return;
+    }
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
     // Combine TotalDocs
@@ -83,6 +90,13 @@ public class CombineService {
 
   private static List<Map<String, Serializable>> combineAggregationGroupByResults1(BrokerRequest brokerRequest,
       List<Map<String, Serializable>> list1, List<Map<String, Serializable>> list2) {
+    if (list1 == null) {
+      return list2;
+    }
+    if (list2 == null) {
+      return list1;
+    }
+
     for (int i = 0; i < list1.size(); ++i) {
       list1.set(i, mergeTwoGroupedResults(brokerRequest.getAggregationsInfo().get(i), list1.get(i), list2.get(i)));
     }
@@ -93,6 +107,13 @@ public class CombineService {
 
   private static Map<String, Serializable> mergeTwoGroupedResults(AggregationInfo aggregationInfo,
       Map<String, Serializable> map1, Map<String, Serializable> map2) {
+    if (map1 == null) {
+      return map2;
+    }
+    if (map2 == null) {
+      return map1;
+    }
+
     AggregationFunction aggregationFunction = AggregationFunctionFactory.get(aggregationInfo, true);
     for (String key : map2.keySet()) {
       if (map1.containsKey(key)) {
@@ -106,7 +127,12 @@ public class CombineService {
 
   private static List<Serializable> combineAggregationResults(BrokerRequest brokerRequest,
       List<Serializable> aggregationResult1, List<Serializable> aggregationResult2) {
-
+    if (aggregationResult1 == null) {
+      return aggregationResult2;
+    }
+    if (aggregationResult2 == null) {
+      return aggregationResult1;
+    }
     List<List<Serializable>> aggregationResultsList = new ArrayList<List<Serializable>>();
 
     for (int i = 0; i < brokerRequest.getAggregationsInfoSize(); ++i) {

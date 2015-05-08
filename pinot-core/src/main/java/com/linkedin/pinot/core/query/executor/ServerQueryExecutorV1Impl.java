@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
@@ -101,8 +102,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public DataTable processQuery(final InstanceRequest instanceRequest) {
     DataTable instanceResponse;
+    long start = System.currentTimeMillis();
     try {
-      long start = System.currentTimeMillis();
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.info("Incoming query is :" + brokerRequest);
       final List<IndexSegment> queryableSegmentDataManagerList = _serverMetrics.timePhase(brokerRequest,
@@ -127,6 +128,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
               getResourceTimeOut(instanceRequest.getQuery()));
         }
       });
+
       if (_printQueryPlan) {
         LOGGER.debug("***************************** Query Plan for Request " + instanceRequest.getRequestId() + "***********************************");
         globalQueryPlan.print();
@@ -142,21 +144,28 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       });
       instanceResponse = globalQueryPlan.getInstanceResponse();
       long end = System.currentTimeMillis();
-      LOGGER.info("Searching Instance for Request Id - " + instanceRequest.getRequestId() + ", browse took: " + (end - start));
-      LOGGER.debug("InstanceResponse for Request Id - " + instanceRequest.getRequestId() + " : " + instanceResponse.toString());
+      LOGGER.info("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(), (end - start));
+      LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), instanceResponse.toString());
       instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
+      return instanceResponse;
     } catch (Exception e) {
       _serverMetrics.addMeteredValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error(e.getMessage(), e);
-      instanceResponse = null;
+      instanceResponse = new DataTable();
+      instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      long end = System.currentTimeMillis();
+      LOGGER.info("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(), (end - start));
+      LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), instanceResponse.toString());
+      instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
+      instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
+      return instanceResponse;
     } finally {
       if (_instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName()) != null) {
         _instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
             .returnSegmentReaders(instanceRequest.getSearchSegments());
       }
     }
-    return instanceResponse;
   }
 
   private List<IndexSegment> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {

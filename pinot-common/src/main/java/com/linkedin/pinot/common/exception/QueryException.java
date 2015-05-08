@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.common.exception;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import com.linkedin.pinot.common.response.ProcessingException;
 
 
@@ -52,4 +55,15 @@ public class QueryException {
     UNKNOWN_ERROR.setMessage("UnknownError");
   }
 
+  public static ProcessingException getException(ProcessingException processingException, Exception exception, int sizeOfStackTraceToTruncate) {
+    ProcessingException retProcessingException = QueryException.FUTURE_CALL_ERROR.deepCopy();
+    StringWriter sw = new StringWriter(sizeOfStackTraceToTruncate);
+    exception.printStackTrace(new PrintWriter(sw));
+    retProcessingException.setMessage(sw.toString());
+    return retProcessingException;
+  }
+
+  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
+    return getException(processingException, exception, 1000);
+  }
 }

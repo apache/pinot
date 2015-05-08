@@ -18,14 +18,11 @@ package com.linkedin.pinot.core.operator.query;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
@@ -82,44 +79,28 @@ public class MSelectionOnlyOperator implements Operator {
 
     long numDocsScanned = 0;
     ProjectionBlock projectionBlock = null;
-    try {
-      while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-        int j = 0;
-        for (int i = 0; i < _dataSchema.size(); ++i) {
-          _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
-        }
-        BlockDocIdIterator blockDocIdIterator = projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator();
-        int docId;
-        while ((docId = blockDocIdIterator.next()) != Constants.EOF && _rowEvents.size() < _limitDocs) {
-          numDocsScanned++;
-          _rowEvents.add(SelectionOperatorUtils.collectRowFromBlockValSets(docId, _blocks, _dataSchema));
-        }
+    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
+      int j = 0;
+      for (int i = 0; i < _dataSchema.size(); ++i) {
+        _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
-
-      final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-      resultBlock.setSelectionResult(_rowEvents);
-      resultBlock.setSelectionDataSchema(_dataSchema);
-      resultBlock.setNumDocsScanned(numDocsScanned);
-      resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
-      final long endTime = System.currentTimeMillis();
-      resultBlock.setTimeUsedMs(endTime - startTime);
-      LOGGER.debug("Time spent in MSelectionOnlyOperator:" + (endTime - startTime));
-      return resultBlock;
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while processing selection operator", e);
-      final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-
-      List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
-      ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
-      exception.setMessage(e.getMessage());
-      processingExceptions.add(exception);
-
-      resultBlock.setExceptionsList(processingExceptions);
-      resultBlock.setNumDocsScanned(0);
-      resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
-      resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
-      return resultBlock;
+      BlockDocIdIterator blockDocIdIterator = projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator();
+      int docId;
+      while ((docId = blockDocIdIterator.next()) != Constants.EOF && _rowEvents.size() < _limitDocs) {
+        numDocsScanned++;
+        _rowEvents.add(SelectionOperatorUtils.collectRowFromBlockValSets(docId, _blocks, _dataSchema));
+      }
     }
+
+    final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+    resultBlock.setSelectionResult(_rowEvents);
+    resultBlock.setSelectionDataSchema(_dataSchema);
+    resultBlock.setNumDocsScanned(numDocsScanned);
+    resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
+    final long endTime = System.currentTimeMillis();
+    resultBlock.setTimeUsedMs(endTime - startTime);
+    LOGGER.debug("Time spent in MSelectionOnlyOperator:" + (endTime - startTime));
+    return resultBlock;
 
   }
 

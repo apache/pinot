@@ -77,7 +77,6 @@ public class QueriesSentinelTest {
   private final String AVRO_DATA = "data/mirror-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "QueriesSentinelTest");
   private static AvroQueryGenerator AVRO_QUERY_GENERATOR;
-  private static FileBasedInstanceDataManager INSTANCE_DATA_MANAGER;
   private static QueryExecutor QUERY_EXECUTOR;
   private static TestingServerPropertiesBuilder CONFIG_BUILDER;
   private String segmentName;

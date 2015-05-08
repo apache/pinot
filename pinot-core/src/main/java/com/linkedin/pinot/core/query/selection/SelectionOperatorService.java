@@ -173,6 +173,12 @@ public class SelectionOperatorService {
 
   public Collection<Serializable[]> merge(Collection<Serializable[]> rowEventsSet1,
       Collection<Serializable[]> rowEventsSet2) {
+    if (rowEventsSet1 == null) {
+      return rowEventsSet2;
+    }
+    if (rowEventsSet2 == null) {
+      return rowEventsSet1;
+    }
     if (_doOrdering) {
       PriorityQueue<Serializable[]> queue1 = (PriorityQueue<Serializable[]>) rowEventsSet1;
       PriorityQueue<Serializable[]> queue2 = (PriorityQueue<Serializable[]>) rowEventsSet2;

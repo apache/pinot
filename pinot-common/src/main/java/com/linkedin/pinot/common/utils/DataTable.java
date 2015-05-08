@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -29,11 +28,14 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 
 
 /**
@@ -90,7 +92,6 @@ public class DataTable {
     fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
     variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
     columnOffsets = computeColumnOffsets(schema);
-
   }
 
   /**
@@ -107,54 +108,57 @@ public class DataTable {
    * @return
    */
   private int[] computeColumnOffsets(DataSchema schema) {
+    if (schema == null) {
+      return null;
+    }
     final int[] columnOffsets = new int[schema.columnNames.length];
     for (int i = 0; i < schema.columnNames.length; i++) {
       final DataType type = schema.columnTypes[i];
       columnOffsets[i] = rowSizeInBytes;
       switch (type) {
-      case BOOLEAN:
-        rowSizeInBytes += 1;
-        break;
-      case BYTE:
-        rowSizeInBytes += 1;
-        break;
-      case CHAR:
-        rowSizeInBytes += 2;
-        break;
-      case SHORT:
-        rowSizeInBytes += 2;
-        break;
-      case INT:
-        rowSizeInBytes += 4;
-        break;
-      case LONG:
-        rowSizeInBytes += 8;
-        break;
-      case FLOAT:
-        rowSizeInBytes += 8;
-        break;
-      case DOUBLE:
-        rowSizeInBytes += 8;
-        break;
-      case STRING:
-        rowSizeInBytes += 4;
-        break;
-      case OBJECT:
-        rowSizeInBytes += 8;
-        break;
-      case BYTE_ARRAY:
-      case CHAR_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case FLOAT_ARRAY:
-      case SHORT_ARRAY:
-      case DOUBLE_ARRAY:
-      case STRING_ARRAY:
-        rowSizeInBytes += 8;
-        break;
+        case BOOLEAN:
+          rowSizeInBytes += 1;
+          break;
+        case BYTE:
+          rowSizeInBytes += 1;
+          break;
+        case CHAR:
+          rowSizeInBytes += 2;
+          break;
+        case SHORT:
+          rowSizeInBytes += 2;
+          break;
+        case INT:
+          rowSizeInBytes += 4;
+          break;
+        case LONG:
+          rowSizeInBytes += 8;
+          break;
+        case FLOAT:
+          rowSizeInBytes += 8;
+          break;
+        case DOUBLE:
+          rowSizeInBytes += 8;
+          break;
+        case STRING:
+          rowSizeInBytes += 4;
+          break;
+        case OBJECT:
+          rowSizeInBytes += 8;
+          break;
+        case BYTE_ARRAY:
+        case CHAR_ARRAY:
+        case INT_ARRAY:
+        case LONG_ARRAY:
+        case FLOAT_ARRAY:
+        case SHORT_ARRAY:
+        case DOUBLE_ARRAY:
+        case STRING_ARRAY:
+          rowSizeInBytes += 8;
+          break;
 
-      default:
-        throw new RuntimeException("Unsupported datatype:" + type);
+        default:
+          throw new RuntimeException("Unsupported datatype:" + type);
       }
     }
     return columnOffsets;
@@ -195,24 +199,24 @@ public class DataTable {
     input.get(metadataBytes);
     metadata = (Map<String, String>) deserialize(metadataBytes);
 
-    // READ METADATA
+    // READ SCHEMA
     final byte[] schemaBytes = new byte[schemaLength];
     input.position(schemaStart);
     input.get(schemaBytes);
     schema = deserialize(schemaBytes);
     columnOffsets = computeColumnOffsets(schema);
 
-    // READ METADATA
+    // READ FIXED SIZE DATA BYTES 
     fixedSizeDataBytes = new byte[fixedDataLength];
     input.position(fixedDataStart);
     input.get(fixedSizeDataBytes);
     fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
 
+    // READ VARIABLE SIZE DATA BYTES 
     variableSizeDataBytes = new byte[variableDataLength];
     input.position(variableDataStart);
     input.get(variableSizeDataBytes);
     variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
-
   }
 
   public DataTable() {
@@ -260,19 +264,31 @@ public class DataTable {
 
     // datatable
     out.writeInt(baseOffset);
-    out.writeInt(fixedSizeDataBytes.length);
-    baseOffset += fixedSizeDataBytes.length;
+    if (fixedSizeDataBytes == null) {
+      out.writeInt(0);
+    } else {
+      out.writeInt(fixedSizeDataBytes.length);
+      baseOffset += fixedSizeDataBytes.length;
+    }
 
     // variable data
     out.writeInt(baseOffset);
-    out.writeInt(variableSizeDataBytes.length);
+    if (variableSizeDataBytes == null) {
+      out.writeInt(0);
+    } else {
+      out.writeInt(variableSizeDataBytes.length);
+    }
 
     // write them
     out.write(dictionaryBytes);
     out.write(metadataBytes);
     out.write(schemaBytes);
-    out.write(fixedSizeDataBytes);
-    out.write(variableSizeDataBytes);
+    if (fixedSizeDataBytes != null) {
+      out.write(fixedSizeDataBytes);
+    }
+    if (variableSizeDataBytes != null) {
+      out.write(variableSizeDataBytes);
+    }
     return baos.toByteArray();
   }
 
@@ -536,6 +552,7 @@ public class DataTable {
     }
     return ret;
   }
+
   /**
    *
    * @param rowId
@@ -596,6 +613,9 @@ public class DataTable {
    */
   @Override
   public String toString() {
+    if (schema == null) {
+      return metadata.toString();
+    }
     final StringBuilder b = new StringBuilder();
     b.append(schema.toString());
     b.append("\n");
@@ -606,55 +626,62 @@ public class DataTable {
       for (int colId = 0; colId < numCols; colId++) {
         final DataType type = schema.columnTypes[colId];
         switch (type) {
-        case BOOLEAN:
-          b.append(fixedSizeData.get());
-          break;
-        case BYTE:
-          b.append(fixedSizeData.get());
-          break;
-        case CHAR:
-          b.append(fixedSizeData.getChar());
-          break;
-        case SHORT:
-          b.append(fixedSizeData.getShort());
-          break;
-        case INT:
-          b.append(fixedSizeData.getInt());
-          break;
-        case LONG:
-          b.append(fixedSizeData.getLong());
-          break;
-        case FLOAT:
-          b.append(fixedSizeData.getFloat());
-          break;
-        case DOUBLE:
-          b.append(fixedSizeData.getDouble());
-          break;
-        case STRING:
-          b.append(fixedSizeData.getInt());
-          break;
-        case OBJECT:
-          b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
-              fixedSizeData.getInt()));
-          break;
-        case BYTE_ARRAY:
-        case CHAR_ARRAY:
-        case SHORT_ARRAY:
-        case INT_ARRAY:
-        case LONG_ARRAY:
-        case FLOAT_ARRAY:
-        case DOUBLE_ARRAY:
-        case STRING_ARRAY:
-          b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
-              fixedSizeData.getInt()));
-          break;
-        default:
-          throw new RuntimeException("Unsupported datatype:" + type);
+          case BOOLEAN:
+            b.append(fixedSizeData.get());
+            break;
+          case BYTE:
+            b.append(fixedSizeData.get());
+            break;
+          case CHAR:
+            b.append(fixedSizeData.getChar());
+            break;
+          case SHORT:
+            b.append(fixedSizeData.getShort());
+            break;
+          case INT:
+            b.append(fixedSizeData.getInt());
+            break;
+          case LONG:
+            b.append(fixedSizeData.getLong());
+            break;
+          case FLOAT:
+            b.append(fixedSizeData.getFloat());
+            break;
+          case DOUBLE:
+            b.append(fixedSizeData.getDouble());
+            break;
+          case STRING:
+            b.append(fixedSizeData.getInt());
+            break;
+          case OBJECT:
+            b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
+                fixedSizeData.getInt()));
+            break;
+          case BYTE_ARRAY:
+          case CHAR_ARRAY:
+          case SHORT_ARRAY:
+          case INT_ARRAY:
+          case LONG_ARRAY:
+          case FLOAT_ARRAY:
+          case DOUBLE_ARRAY:
+          case STRING_ARRAY:
+            b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
+                fixedSizeData.getInt()));
+            break;
+          default:
+            throw new RuntimeException("Unsupported datatype:" + type);
         }
         b.append("\t");
       }
       b.append("\n");
     }
     return b.toString();
+  }
+
+  public void addException(ProcessingException exception) {
+    if (metadata == null) {
+      metadata = new HashMap<String, String>();
+    }
+    metadata.put("Exception" + exception.getErrorCode(), exception.getMessage());
   }
 }

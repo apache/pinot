@@ -17,6 +17,8 @@ package com.linkedin.pinot.core.operator;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -99,35 +101,65 @@ public class MCombineOperator implements Operator {
 
   @Override
   public Block nextBlock() {
-    long start = System.currentTimeMillis();
+    final long startTime = System.currentTimeMillis();
     if (_isParallel) {
-      long queryEndTime = System.currentTimeMillis() + _timeOutMs;
+      final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
+      final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<Block>(_operators.size());
 
-      @SuppressWarnings("rawtypes")
-      List<Future> blocks = new ArrayList<Future>();
+      // Submit operators.
       for (final Operator operator : _operators) {
-        blocks.add(_executorService.submit(new Callable<Block>() {
+        _executorService.submit(new Runnable() {
           @Override
-          public Block call() throws Exception {
-            return operator.nextBlock();
+          public void run() {
+            Block retBlock;
+            try {
+              retBlock = operator.nextBlock();
+            } catch (Exception e) {
+              retBlock = new IntermediateResultsBlock(e);
+            }
+            if (blockingQueue != null) {
+              blockingQueue.offer(retBlock);
+            }
           }
-        }));
+        });
       }
-      LOGGER.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - start));
-      try {
-        _mergedBlock =
-            (IntermediateResultsBlock) blocks.get(0).get(queryEndTime - System.currentTimeMillis(),
-                TimeUnit.MILLISECONDS);
-        LOGGER.debug("Got response from operator 0 after: " + (System.currentTimeMillis() - start));
+      LOGGER.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
 
-        for (int i = 1; i < blocks.size(); ++i) {
-          IntermediateResultsBlock blockToMerge =
-              (IntermediateResultsBlock) blocks.get(i).get(queryEndTime - System.currentTimeMillis(),
-                  TimeUnit.MILLISECONDS);
-          LOGGER.debug("Got response from operator " + i + " after: " + (System.currentTimeMillis() - start));
-          CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock, blockToMerge);
-          LOGGER.debug("Merged response from operator " + i + " after: " + (System.currentTimeMillis() - start));
-        }
+      // Submit merger job:
+      Future<IntermediateResultsBlock> mergedBlockFuture =
+          _executorService.submit(new Callable<IntermediateResultsBlock>() {
+            @Override
+            public IntermediateResultsBlock call() throws Exception {
+              int mergedBlocksNumber = 0;
+              IntermediateResultsBlock mergedBlock = null;
+              while ((queryEndTime > System.currentTimeMillis()) && (mergedBlocksNumber < _operators.size())) {
+                if (mergedBlock == null) {
+                  mergedBlock = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                  if (mergedBlock != null) {
+                    mergedBlocksNumber++;
+                  }
+                  LOGGER.debug("Got response from operator 0 after: {}", (System.currentTimeMillis() - startTime));
+                } else {
+                  IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                  if (blockToMerge != null) {
+                    try {
+                      LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber, (System.currentTimeMillis() - startTime));
+                      CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                      LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber, (System.currentTimeMillis() - startTime));
+                    } catch (Exception e) {
+                      mergedBlock.getExceptions().add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                    }
+                    mergedBlocksNumber++;
+                  }
+                }
+              }
+              return mergedBlock;
+            }
+          });
+
+      // Get merge results.
+      try {
+        _mergedBlock = mergedBlockFuture.get(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         LOGGER.error("InterruptedException ", e);
         if (_mergedBlock == null) {
@@ -137,9 +169,7 @@ public class MCombineOperator implements Operator {
         if (exceptions == null) {
           exceptions = new ArrayList<ProcessingException>();
         }
-        ProcessingException exception = QueryException.FUTURE_CALL_ERROR.deepCopy();
-        exception.setMessage(e.getMessage());
-        exceptions.add(exception);
+        exceptions.add(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
         _mergedBlock.setExceptionsList(exceptions);
       } catch (ExecutionException e) {
         LOGGER.error("Execution Exception", e);
@@ -150,9 +180,7 @@ public class MCombineOperator implements Operator {
         if (exceptions == null) {
           exceptions = new ArrayList<ProcessingException>();
         }
-        ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
-        exception.setMessage(e.getMessage());
-        exceptions.add(exception);
+        exceptions.add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
         _mergedBlock.setExceptionsList(exceptions);
       } catch (TimeoutException e) {
         LOGGER.error("TimeoutException ", e);
@@ -163,11 +191,10 @@ public class MCombineOperator implements Operator {
         if (exceptions == null) {
           exceptions = new ArrayList<ProcessingException>();
         }
-        ProcessingException exception = QueryException.EXECUTION_TIMEOUT_ERROR.deepCopy();
-        exception.setMessage(e.getMessage());
-        exceptions.add(exception);
+        exceptions.add(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
         _mergedBlock.setExceptionsList(exceptions);
       }
+
     } else {
       for (Operator operator : _operators) {
         if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOrderByOperator) || (operator instanceof MSelectionOnlyOperator)
@@ -189,7 +216,7 @@ public class MCombineOperator implements Operator {
       trimToSize(_brokerRequest, _mergedBlock);
     }
     long end = System.currentTimeMillis();
-    LOGGER.info("Time spent in MCombineOperator:" + (end - start));
+    LOGGER.info("Time spent in MCombineOperator:" + (end - startTime));
 
     return _mergedBlock;
   }
