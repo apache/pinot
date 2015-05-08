@@ -1,5 +1,6 @@
 $(document).ready(function() {
     var hash = parseHashParameters(window.location.hash)
+    var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
 
     var options = {
       mode: hash['timeSeriesMode'] ? hash['timeSeriesMode'] : 'same',
@@ -7,12 +8,12 @@ $(document).ready(function() {
         $('body').css('cursor', 'progress')
         var path = parsePath(window.location.pathname)
         var baselineDiff = path.currentMillis - path.baselineMillis
-        var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
         path.currentMillis = item.datapoint[0] + aggregateMillis
         path.baselineMillis = item.datapoint[0] + aggregateMillis - baselineDiff
         window.location.pathname = getDashboardPath(path)
       },
-      legendContainer: $("#metric-time-series-legend")
+      legendContainer: $("#metric-time-series-legend"),
+      aggregateMillis: aggregateMillis
     }
 
     var path = parsePath(window.location.pathname)

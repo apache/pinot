@@ -131,18 +131,24 @@ function getFlotViewType(metricViewType) {
  * @return A pathname suitable for getting the time series from the parsed path
  */
 function getFlotPath(path, options) {
-    var path = "/flot"
-        + "/" + getFlotViewType(path.metricViewType)
-        + "/" + path.collection
-        + "/" + path.metricFunction
-        + "/" + path.baselineMillis
-        + "/" + path.currentMillis
+    var viewType = getFlotViewType(path.metricViewType)
 
-    if (options && options.windowMillis) {
-        path += "/" + options.windowMillis
+    if (viewType == 'TIME_SERIES_OVERLAY') {
+        return '/flot'
+            + '/' + viewType
+            + '/' + path.collection
+            + '/' + path.metricFunction
+            + '/' + (parseInt(path.baselineMillis) + options.aggregateMillis)
+            + '/' + path.currentMillis
+            + '/' + options.windowMillis
+    } else {
+        return '/flot'
+            + '/' + viewType
+            + '/' + path.collection
+            + '/' + path.metricFunction
+            + '/' + path.baselineMillis
+            + '/' + path.currentMillis
     }
-
-    return path
 }
 
 function parseDimensionValues(queryString) {

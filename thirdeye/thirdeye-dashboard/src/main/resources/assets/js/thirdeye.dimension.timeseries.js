@@ -1,5 +1,6 @@
 $(document).ready(function() {
     var containers = {}
+    var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
 
     $("#dimension-time-series-area").find('.dimension-time-series-placeholder').each(function(i, container) {
         var containerObj = $(container)
@@ -69,7 +70,8 @@ $(document).ready(function() {
             // Change window location
             var newQuery = encodeDimensionValues(dimensionValues)
             window.location.search = newQuery
-        }
+        },
+        aggregateMillis: aggregateMillis
     }
 
     var path = parsePath(window.location.pathname)
@@ -87,20 +89,6 @@ $(document).ready(function() {
             renderTimeSeries(container.plot, container.tooltip, optionsCopy)
         })
     }
-
-/*
-    $(".dimension-time-series-button-mode").click(function() {
-        var mode = $(this).attr('mode')
-        var hash = parseHashParameters(window.location.hash)
-        hash['dimensionTimeSeriesMode'] = mode
-        window.location.hash = encodeHashParameters(hash)
-
-        if (options.mode != mode) {
-            options.mode = mode
-            plotAllSeries()
-        }
-    })
-    */
 
     // split button
     $(".dimension-time-series-button-mode").click(function(event) {
