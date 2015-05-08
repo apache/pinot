@@ -21,7 +21,11 @@ var URLUTILS = {
 
   forFabricsList: function() {
     return '/fabrics';
-  }
+  },
+
+  forAuthInfo: function() {
+    return '/authinfo';
+  },
 };
 
 function validateAjaxCall(data, callback) {

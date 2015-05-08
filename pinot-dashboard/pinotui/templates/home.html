@@ -49,6 +49,10 @@
     </ul>
     <ul class="right">
       <li><a href="#/console">Query Console</a> </li>
+      <li class="has-form" ng-if="auth.enabled">
+        <a ng-if="auth.authed" href="/logout" class="button expand">Log Out ({{auth.username}})</a>
+        <a ng-if="!auth.authed" href="/login" class="button expand">Log In</a>
+      </li>
     </ul>
   </section>
 </nav>

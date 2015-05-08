@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.6
 
 import os
-from flask import Blueprint, Flask, jsonify, request, send_from_directory
+from flask import Blueprint, Flask, jsonify, request, send_from_directory, g
 
 from pinot_resource import PinotResource
 from pinot_fabric import PinotFabric
@@ -90,6 +90,29 @@ def list_fabrics():
 @pinotui.route('/pinot_static/<path:filename>')
 def get_static(filename):
   return send_from_directory(os.path.join(os.path.dirname(__file__), 'static'), filename)
+
+
+@pinotui.route('/authinfo')
+def authinfo():
+
+  try:
+    # Hack to pull details from the mppy wrapper
+    is_authenticated = g.identity._is_authenticated
+
+    try:
+      username = g.identity.get_username()
+    except:
+      username = None
+
+    return jsonify(dict(
+      success=True,
+      supported=True,
+      authed=is_authenticated,
+      username=username
+    ))
+
+  except:
+    return jsonify(dict(success=True, supported=False))
 
 
 @pinotui.route('/')
