@@ -372,7 +372,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
       @Override
       public boolean hasDictionary() {
-        return dictionary != null || getFieldType() != FieldType.METRIC;
+        return dictionary != null;
       }
 
       @Override
