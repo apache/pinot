@@ -86,7 +86,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
         final String[] inValues = ((InPredicate) predicate).getInRange();
         for (final String value : inValues) {
           final int index = dictionary.indexOf(value);
-          System.out.println(index);
           if (index >= 0) {
             dictIds.add(index);
           }
