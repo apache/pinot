@@ -162,8 +162,14 @@ $(document).ready(function() {
         $("#sidenav-time").val(timeString)
     }
 
-    // Select the first metric
-    $($(".sidenav-metric")[0]).attr('checked', 'checked')
+    // Select the first metric if none selected
+    var oneChecked = false
+    $(".sidenav-metric").each(function(i, elt) {
+        oneChecked = oneChecked || $(elt).attr('checked') == 'checked'
+    })
+    if (!oneChecked) {
+      $($(".sidenav-metric")[0]).attr('checked', 'checked')
+    }
 
     $("#sidenav-submit").click(function(event) {
         event.preventDefault()
