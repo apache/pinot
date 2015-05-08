@@ -60,23 +60,23 @@ var pinotApp = angular.module('pinotApp', ['ngRoute']);
 pinotApp.config(function($routeProvider) {
   $routeProvider
     .when('/', {
-      templateUrl: '/static/js/templates/fabric_list.html',
+      templateUrl: '/pinot_static/js/templates/fabric_list.html',
       controller: 'homeController'
     })
     .when('/fabric/:fabricName', {
-      templateUrl: '/static/js/templates/cluster_list.html',
+      templateUrl: '/pinot_static/js/templates/cluster_list.html',
       controller: 'fabricController'
     })
     .when('/resource/:fabricName/:clusterName', {
-      templateUrl: '/static/js/templates/cluster_profile.html',
+      templateUrl: '/pinot_static/js/templates/cluster_profile.html',
       controller: 'resourceController'
     })
     .when('/segments/:fabricName/:clusterName/:tableName', {
-      templateUrl: '/static/js/templates/table_segments.html',
+      templateUrl: '/pinot_static/js/templates/table_segments.html',
       controller: 'segmentViewController'
     })
     .when('/console', {
-      templateUrl: '/static/js/templates/query_console.html',
+      templateUrl: '/pinot_static/js/templates/query_console.html',
       controller: 'consoleController'
     })
 });

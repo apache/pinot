@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.6
 
 import os
-from flask import Blueprint, Flask, jsonify, request
+from flask import Blueprint, Flask, jsonify, request, send_from_directory
 
 from pinot_resource import PinotResource
 from pinot_fabric import PinotFabric
@@ -83,6 +83,13 @@ def list_fabrics():
     return jsonify(dict(success=True, fabrics=config.get_fabrics()))
   except PinotException as e:
     return jsonify(dict(success=False, error_message='Failed getting fabrics: {0}'.format(e)))
+
+
+# Store our blueprint's static content in a different path to not conflict with
+# tools team's static
+@pinotui.route('/pinot_static/<path:filename>')
+def get_static(filename):
+  return send_from_directory(os.path.join(os.path.dirname(__file__), 'static'), filename)
 
 
 @pinotui.route('/')
