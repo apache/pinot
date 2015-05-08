@@ -150,7 +150,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         RealtimeSegmentConverter conveter =
             new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(),
                 schema, segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata
-                    .getSegmentName());
+                    .getSegmentName(), null);
         try {
           LOGGER.info("Trying to build segment!");
           conveter.build();

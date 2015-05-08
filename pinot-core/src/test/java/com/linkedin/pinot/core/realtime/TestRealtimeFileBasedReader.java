@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -46,6 +48,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
 public class TestRealtimeFileBasedReader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestRealtimeFileBasedReader.class);
 
   private static final String AVRO_DATA = "data/mirror-mv.avro";
   private static String filePath;
@@ -92,7 +95,8 @@ public class TestRealtimeFileBasedReader {
     }
 
     RealtimeSegmentConverter conveter =
-        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "mirror", "seomg-segment");
+        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "mirror", "seomg-segment",
+            null);
     conveter.build();
 
     offlineSegment = Loaders.IndexSegment.load(new File("/tmp/realtime").listFiles()[0], ReadMode.mmap);
@@ -121,8 +125,18 @@ public class TestRealtimeFileBasedReader {
         while (realtimeValIterator.hasNext()) {
           int offlineDicId = offlineValIterator.nextIntVal();
           int realtimeDicId = realtimeValIterator.nextIntVal();
-          Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId),
-              realtimeMetadata.getDictionary().get(realtimeDicId));
+          try {
+            Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId), realtimeMetadata.getDictionary()
+                .get(realtimeDicId));
+          } catch (AssertionError e) {
+            LOGGER.info("column : {}", spec.getName());
+            LOGGER.info("realtimeDicId : {}, rawValue : {}", realtimeDicId,
+                realtimeMetadata.getDictionary().get(realtimeDicId));
+            LOGGER.info("offlineDicId : {}, rawValue : {}", offlineDicId,
+                offlineMetadata.getDictionary().get(offlineDicId));
+            throw e;
+          }
+
         }
         Assert.assertEquals(offlineValIterator.hasNext(), realtimeValIterator.hasNext());
       }

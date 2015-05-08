@@ -16,12 +16,19 @@
 package com.linkedin.pinot.core.realtime.impl;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
+import org.roaringbitmap.IntIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -51,6 +58,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class);
+
   private SegmentMetadataImpl _segmentMetadata;
   private final Schema dataSchema;
 
@@ -340,6 +349,162 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   @Override
   public void destroy() {
     throw new UnsupportedOperationException("not implemented");
+  }
+
+  private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(final String columnToSortOn) {
+    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final MutableDictionaryReader dictionary = dictionaryMap.get(columnToSortOn);
+    final IntIterator[] intIterators = new IntIterator[dictionary.length()];
+
+    final List<String> rawValues = new ArrayList<String>();
+    for (int i = 0; i < dictionary.length(); i++) {
+      rawValues.add((String) dictionary.get(i));
+    }
+
+    long start = System.currentTimeMillis();
+    Collections.sort(rawValues);
+
+    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+
+    for (int i = 0; i < rawValues.size(); i++) {
+      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+    }
+    return intIterators;
+  }
+
+  private IntIterator[] getSortedBitmapIntIteratorsForIntegerColumn(final String columnToSortOn) {
+    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final MutableDictionaryReader dictionary = dictionaryMap.get(columnToSortOn);
+    final IntIterator[] intIterators = new IntIterator[dictionary.length()];
+
+    final List<Integer> rawValues = new ArrayList<Integer>();
+    for (int i = 0; i < dictionary.length(); i++) {
+      rawValues.add((Integer) dictionary.get(i));
+    }
+
+    long start = System.currentTimeMillis();
+    Collections.sort(rawValues);
+
+    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+
+    for (int i = 0; i < rawValues.size(); i++) {
+      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+    }
+    return intIterators;
+  }
+
+  private IntIterator[] getSortedBitmapIntIteratorsForLongColumn(final String columnToSortOn) {
+    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final MutableDictionaryReader dictionary = dictionaryMap.get(columnToSortOn);
+    final IntIterator[] intIterators = new IntIterator[dictionary.length()];
+
+    final List<Long> rawValues = new ArrayList<Long>();
+    for (int i = 0; i < dictionary.length(); i++) {
+      rawValues.add((Long) dictionary.get(i));
+    }
+
+    long start = System.currentTimeMillis();
+    Collections.sort(rawValues);
+
+    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+
+    for (int i = 0; i < rawValues.size(); i++) {
+      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+    }
+    return intIterators;
+  }
+
+  private IntIterator[] getSortedBitmapIntIteratorsForFloatColumn(final String columnToSortOn) {
+    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final MutableDictionaryReader dictionary = dictionaryMap.get(columnToSortOn);
+    final IntIterator[] intIterators = new IntIterator[dictionary.length()];
+
+    final List<Float> rawValues = new ArrayList<Float>();
+    for (int i = 0; i < dictionary.length(); i++) {
+      rawValues.add((Float) dictionary.get(i));
+    }
+
+    long start = System.currentTimeMillis();
+    Collections.sort(rawValues);
+
+    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+
+    for (int i = 0; i < rawValues.size(); i++) {
+      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+    }
+    return intIterators;
+  }
+
+  private IntIterator[] getSortedBitmapIntIteratorsForDoubleColumn(final String columnToSortOn) {
+    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final MutableDictionaryReader dictionary = dictionaryMap.get(columnToSortOn);
+    final IntIterator[] intIterators = new IntIterator[dictionary.length()];
+
+    final List<Double> rawValues = new ArrayList<Double>();
+    for (int i = 0; i < dictionary.length(); i++) {
+      rawValues.add((Double) dictionary.get(i));
+    }
+
+    long start = System.currentTimeMillis();
+    Collections.sort(rawValues);
+
+    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+
+    for (int i = 0; i < rawValues.size(); i++) {
+      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+    }
+    return intIterators;
+  }
+
+  public Iterator<Integer> getSortedDocIdIteratorOnColumn(final String columnToSortOn) {
+    IntIterator[] iterators = null;
+
+    switch (dataSchema.getFieldSpecFor(columnToSortOn).getDataType()) {
+      case INT:
+        iterators = getSortedBitmapIntIteratorsForIntegerColumn(columnToSortOn);
+        break;
+      case LONG:
+        iterators = getSortedBitmapIntIteratorsForLongColumn(columnToSortOn);
+        break;
+      case FLOAT:
+        iterators = getSortedBitmapIntIteratorsForFloatColumn(columnToSortOn);
+        break;
+      case DOUBLE:
+        iterators = getSortedBitmapIntIteratorsForDoubleColumn(columnToSortOn);
+        break;
+      case STRING:
+      case BOOLEAN:
+        iterators = getSortedBitmapIntIteratorsForStringColumn(columnToSortOn);
+        break;
+      default:
+        iterators = null;
+        break;
+    }
+
+    final IntIterator[] intIterators = iterators;
+
+    return new Iterator<Integer>() {
+      int arrayIndex = 0;
+
+      @Override
+      public boolean hasNext() {
+        return intIterators[intIterators.length - 1].hasNext();
+      }
+
+      @Override
+      public Integer next() {
+        if (intIterators[arrayIndex].hasNext()) {
+          return intIterators[arrayIndex].next();
+        }
+        arrayIndex += 1;
+        return intIterators[arrayIndex].next();
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException("remove not supported");
+      }
+    };
   }
 
   @Override

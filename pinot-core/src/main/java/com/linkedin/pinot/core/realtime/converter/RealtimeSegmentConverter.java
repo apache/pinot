@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.realtime.converter;
 
 import java.io.File;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
@@ -38,9 +37,10 @@ public class RealtimeSegmentConverter {
   private String resourceName;
   private String tableName;
   private String segmentName;
+  private String sortedColumn;
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String resourceName, String tableName, String segmentName) {
+      String resourceName, String tableName, String segmentName, String sortedColumn) {
     realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
     if (new File(outputPath).exists()) {
@@ -65,11 +65,18 @@ public class RealtimeSegmentConverter {
 
     newSchema.addSchema(newTimeSpec.getName(), newTimeSpec);
     this.dataSchema = newSchema;
+    this.sortedColumn = sortedColumn;
   }
 
   public void build() throws Exception {
     // lets create a record reader
-    RecordReader reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema);
+    RecordReader reader;
+
+    if (sortedColumn == null) {
+      reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema);
+    } else {
+      reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema, sortedColumn);
+    }
     FieldExtractor extractor = FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
 
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(dataSchema);

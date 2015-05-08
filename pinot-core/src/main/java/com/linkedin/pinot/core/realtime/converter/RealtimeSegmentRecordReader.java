@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.realtime.converter;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import com.linkedin.pinot.common.data.Schema;
@@ -30,11 +31,20 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   private Schema dataSchema;
   private List<String> columns;
   int counter = 0;
+  private final Iterator<Integer> docIdIterator;
 
   public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema) {
     this.realtimeSegment = rtSegment;
     this.dataSchema = schema;
     columns = new ArrayList<String>();
+    this.docIdIterator = null;
+  }
+
+  public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema, String sortedColumn) {
+    this.realtimeSegment = rtSegment;
+    this.dataSchema = schema;
+    columns = new ArrayList<String>();
+    this.docIdIterator = realtimeSegment.getSortedDocIdIteratorOnColumn(sortedColumn);
   }
 
   @Override
@@ -51,7 +61,10 @@ public class RealtimeSegmentRecordReader implements RecordReader {
 
   @Override
   public boolean hasNext() {
-    return counter < realtimeSegment.getAggregateDocumentCount();
+    if (docIdIterator == null) {
+      return counter < realtimeSegment.getAggregateDocumentCount();
+    }
+    return docIdIterator.hasNext();
   }
 
   @Override
@@ -61,9 +74,13 @@ public class RealtimeSegmentRecordReader implements RecordReader {
 
   @Override
   public GenericRow next() {
-    GenericRow row = realtimeSegment.getRawValueRowAt(counter);
-    counter++;
-    return row;
+    if (docIdIterator == null) {
+      GenericRow row = realtimeSegment.getRawValueRowAt(counter);
+      counter++;
+      return row;
+    }
+    int docId = docIdIterator.next();
+    return realtimeSegment.getRawValueRowAt(docId);
   }
 
   @Override
