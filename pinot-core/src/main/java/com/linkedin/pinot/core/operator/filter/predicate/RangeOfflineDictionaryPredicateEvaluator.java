@@ -49,5 +49,6 @@ public class RangeOfflineDictionaryPredicateEvaluator extends AbstractPredicateE
     for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
       matchingIds[counter++] = i;
     }
+
   }
 }

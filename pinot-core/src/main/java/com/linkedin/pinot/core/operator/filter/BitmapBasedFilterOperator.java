@@ -15,11 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,17 +27,11 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.common.predicate.NotInPredicate;
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
-import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
@@ -65,74 +55,12 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
     Block dataSourceBlock = dataSource.nextBlock();
     Dictionary dictionary = dataSource.getDictionary();
-    List<ImmutableRoaringBitmap> bitmapList = new ArrayList<ImmutableRoaringBitmap>();
-    switch (predicate.getType()) {
-      case EQ:
-        final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
-        if (valueToLookUP < 0) {
-          bitmapList.add(new MutableRoaringBitmap());
-        } else {
-          bitmapList.add(invertedIndex.getImmutable(valueToLookUP));
-        }
-        break;
-      case NEQ:
-        final int neq = dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
-        //TODO:Better to create a MutableRoaringBitmap of all 1 bits and xor with the one for neq, but we dont the size ??
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (i != neq) {
-            bitmapList.add(invertedIndex.getImmutable(i));
-          }
-        }
-        break;
-      case IN:
-        final String[] inValues = ((InPredicate) predicate).getInRange();
-        for (final String value : inValues) {
-          final int index = dictionary.indexOf(value);
-          if (index >= 0) {
-            bitmapList.add(invertedIndex.getImmutable(index));
-          }
-        }
-        break;
-      case NOT_IN:
-        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
-        final List<Integer> notInIds = new ArrayList<Integer>();
-        for (final String notInValue : notInValues) {
-          notInIds.add(new Integer(dictionary.indexOf(notInValue)));
-        }
-
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (!notInIds.contains(new Integer(i))) {
-            bitmapList.add(invertedIndex.getImmutable(i));
-          }
-        }
-        break;
-      case RANGE:
-        if (dictionary instanceof ImmutableDictionaryReader) {
-          int[] rangeStartEndIndex =
-              RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
-          int rangeStartIndex = rangeStartEndIndex[0];
-          int rangeEndIndex = rangeStartEndIndex[1];
-          LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
-
-          for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-            ImmutableRoaringBitmap immutable = invertedIndex.getImmutable(i);
-            bitmapList.add(immutable);
-          }
-        } else {
-          List<Integer> dicIds =
-              RangePredicateEvaluator.get().evalRangeDicIdsFromMutableDictionary((MutableDictionaryReader) dictionary,
-                  (RangePredicate) predicate);
-          for (Integer id : dicIds) {
-            bitmapList.add(invertedIndex.getImmutable(id));
-          }
-        }
-
-        break;
-      case REGEX:
-        throw new UnsupportedOperationException("Regex not supported");
+    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
+    int[] dictionaryIds = evaluator.getDictionaryIds();
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[dictionaryIds.length];
+    for (int i = 0; i < dictionaryIds.length; i++) {
+      bitmaps[i] = invertedIndex.getImmutable(dictionaryIds[i]);
     }
-    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[bitmapList.size()];
-    bitmapList.toArray(bitmaps);
     bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(), bitmaps);
     return bitmapBlock;
   }

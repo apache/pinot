@@ -8,27 +8,36 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class EqualsPredicateEvaluator implements PredicateEvaluator {
 
-  private int equalsMatchDicId;
+  private int[] equalsMatchDicId;
+  private int index;
 
   public EqualsPredicateEvaluator(EqPredicate predicate, Dictionary dictionary) {
-    equalsMatchDicId = dictionary.indexOf(predicate.getEqualsValue());
+    index = dictionary.indexOf(predicate.getEqualsValue());
+    if (index >= 0) {
+      equalsMatchDicId = new int[1];
+      equalsMatchDicId[0] = index;
+    } else {
+      equalsMatchDicId = new int[0];
+    }
   }
 
   @Override
   public boolean apply(int dicId) {
-    return (dicId == equalsMatchDicId);
+    return (dicId == index);
   }
 
   @Override
   public boolean apply(int[] dicIds) {
+    if (index < 0) {
+      return false;
+    }
     Arrays.sort(dicIds);
-    int index = Arrays.binarySearch(dicIds, equalsMatchDicId);
-    return index >= 0;
+    int i = Arrays.binarySearch(dicIds, index);
+    return i >= 0;
   }
 
   @Override
   public int[] getDictionaryIds() {
-    return new int[] { equalsMatchDicId };
+    return equalsMatchDicId;
   }
-
 }

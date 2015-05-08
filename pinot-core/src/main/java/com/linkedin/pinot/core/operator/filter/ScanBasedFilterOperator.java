@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,17 +27,11 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.common.predicate.NotInPredicate;
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
-import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
@@ -65,80 +54,15 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     Predicate predicate = getPredicate();
     Dictionary dictionary = dataSource.getDictionary();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    List<Integer> dictIds = new ArrayList<Integer>();
-    switch (predicate.getType()) {
-      case EQ:
-        final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
-        if (valueToLookUP >= 0) {
-          dictIds.add(valueToLookUP);
-        }
-        break;
-      case NEQ:
-        //TODO:Optimization needed
-        final int neq = dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (i != neq) {
-            dictIds.add(i);
-          }
-        }
-        break;
-      case IN:
-        final String[] inValues = ((InPredicate) predicate).getInRange();
-        for (final String value : inValues) {
-          final int index = dictionary.indexOf(value);
-          if (index >= 0) {
-            dictIds.add(index);
-          }
-        }
-        break;
-      case NOT_IN:
-        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
-        final List<Integer> notInIds = new ArrayList<Integer>();
-        for (final String notInValue : notInValues) {
-          notInIds.add(new Integer(dictionary.indexOf(notInValue)));
-        }
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (!notInIds.contains(new Integer(i))) {
-            dictIds.add(i);
-          }
-        }
-        break;
-      case RANGE:
-        if (dictionary instanceof ImmutableDictionaryReader) {
-          int[] rangeStartEndIndex =
-              RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
-          int rangeStartIndex = rangeStartEndIndex[0];
-          int rangeEndIndex = rangeStartEndIndex[1];
-          LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
-
-          for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-            dictIds.add(i);
-          }
-        } else {
-          dictIds =
-              RangePredicateEvaluator.get().evalRangeDicIdsFromMutableDictionary((MutableDictionaryReader) dictionary,
-                  (RangePredicate) predicate);
-          Collections.sort(dictIds);
-        }
-        break;
-      default:
-        throw new UnsupportedOperationException("Regex not supported");
-    }
     BlockDocIdSet docIdSet;
-    int[] dictIdsArray = new int[dictIds.size()];
-    for (int i = 0; i < dictIds.size(); i++) {
-      dictIdsArray[i] = dictIds.get(i);
-    }
     Block nextBlock = dataSource.nextBlock();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info("dict ids matched:{}", Arrays.toString(dictIdsArray));
-    }
+    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     if (dataSourceMetadata.isSingleValue()) {
-      docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, dictIdsArray);
+      docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
     } else {
-      docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, dictIdsArray);
+      docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
     }
 
     return new ScanBlock(docIdSet);

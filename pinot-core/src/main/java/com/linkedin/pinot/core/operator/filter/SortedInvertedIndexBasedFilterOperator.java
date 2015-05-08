@@ -20,7 +20,6 @@ import java.util.List;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,15 +32,9 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.common.predicate.NotInPredicate;
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
-import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -70,60 +63,11 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Dictionary dictionary = dataSource.getDictionary();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
-
-    switch (predicate.getType()) {
-      case EQ:
-        final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
-        if (valueToLookUP >= 0) {
-          int[] minMax = invertedIndex.getMinMaxRangeFor(valueToLookUP);
-          pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
-        }
-        break;
-      case NEQ:
-        final int neq = dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (i != neq) {
-            int[] minMax = invertedIndex.getMinMaxRangeFor(i);
-            pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
-          }
-        }
-        break;
-      case IN:
-        final String[] inValues = ((InPredicate) predicate).getInRange();
-        for (final String value : inValues) {
-          final int index = dictionary.indexOf(value);
-          if (index >= 0) {
-            int[] minMax = invertedIndex.getMinMaxRangeFor(index);
-            pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
-          }
-        }
-        break;
-      case NOT_IN:
-        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
-        final List<Integer> notInIds = new ArrayList<Integer>();
-        for (final String notInValue : notInValues) {
-          notInIds.add(new Integer(dictionary.indexOf(notInValue)));
-        }
-
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (!notInIds.contains(new Integer(i))) {
-            int[] minMax = invertedIndex.getMinMaxRangeFor(i);
-            pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
-          }
-        }
-        break;
-      case RANGE:
-        int[] rangeStartEndIndex = RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
-        int rangeStartIndex = rangeStartEndIndex[0];
-        int rangeEndIndex = rangeStartEndIndex[1];
-        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
-        for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-          int[] minMax = invertedIndex.getMinMaxRangeFor(i);
-          pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
-        }
-        break;
-      case REGEX:
-        throw new UnsupportedOperationException("Regex not supported");
+    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
+    int[] dictionaryIds = evaluator.getDictionaryIds();
+    for (int i = 0; i < dictionaryIds.length; i++) {
+      int[] minMax = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
+      pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
     }
     LOGGER.info("Creating a Sorted Block with pairs: {}", pairs);
     sortedBlock = new SortedBlock(pairs);
