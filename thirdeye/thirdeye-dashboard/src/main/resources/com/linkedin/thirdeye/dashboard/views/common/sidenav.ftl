@@ -2,12 +2,16 @@
     <h3 class="uk-panel-title"><a href="/">ThirdEye</a></h3>
     <ul class="uk-nav uk-nav-side">
         <li>
-            <dl id="sidenav-metadata" class="uk-description-list-horizontal">
-                <dt>Min Time</dt>
-                <dd id="sidenav-min-time" millis="${earliestDataTime.millis?c}">${earliestDataTime}</dd>
-                <dt>Max Time</dt>
-                <dd id="sidenav-max-time" millis="${latestDataTime.millis?c}">${latestDataTime}</dd>
-            </dl>
+            <table id="sidenav-metadata" class="uk-table">
+              <tr>
+                <td class="sidenav-metadata-key">Min Time</td>
+                <td id="sidenav-min-time" millis="${earliestDataTime.millis?c}">${earliestDataTime}</td>
+              </tr>
+              <tr>
+                <td class="sidenav-metadata-key">Max Time</td>
+                <td id="sidenav-max-time" millis="${latestDataTime.millis?c}">${latestDataTime}</td>
+              </tr>
+            </table>
         </li>
         <li>
             <form id="sidenav-time-input-form" class="uk-form uk-form-stacked">

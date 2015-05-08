@@ -75,6 +75,15 @@
     margin-left: 5%;
 }
 
+#sidenav-metadata td {
+    border-bottom: 0px;
+    padding-left: 0px;
+}
+
+.sidenav-metadata-key {
+    font-weight: bold;
+}
+
 /* Metric */
 
 .metric-table-down-cell {
