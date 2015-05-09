@@ -42,6 +42,7 @@ import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
+import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.InvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
@@ -136,8 +137,8 @@ public class FilterPlanNode implements PlanNode {
           //if the column is sorted use sorted inverted index based implementation
           baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
         } else {
-          //baseFilterOperator = new BitmapBasedFilterOperator(ds);
-          baseFilterOperator = new ScanBasedFilterOperator(ds);
+          baseFilterOperator = new BitmapBasedFilterOperator(ds);
+          //baseFilterOperator = new ScanBasedFilterOperator(ds);
         }
       } else {
         baseFilterOperator = new ScanBasedFilterOperator(ds);

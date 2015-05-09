@@ -180,6 +180,27 @@ public class AvroQueryGenerator {
       for (final String column : cardinalityCountsMap.keySet()) {
         Object value = record.get(column);
 
+        if (value == null) {
+          switch (schema.getField(column).schema().getType()) {
+            case INT:
+              value = 0;
+              break;
+            case FLOAT:
+              value = 0F;
+              break;
+            case LONG:
+              value = 0L;
+              break;
+            case DOUBLE:
+              value = 0D;
+              break;
+            case STRING:
+            case BOOLEAN:
+              value = "null";
+              break;
+          }
+        }
+
         if (value instanceof Utf8) {
           value = ((Utf8) value).toString();
         }
@@ -261,8 +282,8 @@ public class AvroQueryGenerator {
           bld.append("limit 0");
           String queryString = bld.toString();
           if (!queryString.contains("null")) {
-            aggregationQueries.add(new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap
-                .get(column).get(entry))));
+            aggregationQueries.add(new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap.get(
+                column).get(entry))));
           }
         }
       }
