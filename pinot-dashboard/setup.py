@@ -21,7 +21,7 @@ setup(
     'pep8==1.5.7',
     'pyflakes==0.8.1',
     'PyYAML==3.11',
-    'requests==2.5.3',
+    'requests',
     'Werkzeug==0.10.1',
     'addict==0.4.0',
   ],
