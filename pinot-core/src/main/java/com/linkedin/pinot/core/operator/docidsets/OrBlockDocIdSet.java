@@ -84,7 +84,7 @@ public final class OrBlockDocIdSet implements BlockDocIdSet {
     return new BlockDocIdIterator() {
       final PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(docIdIterators.length,
           new Pairs.AscendingIntPairComparator());
-      final boolean[] exists = new boolean[docIdIterators.length];
+      final boolean[] iteratorIsInQueue = new boolean[docIdIterators.length];
       int currentDocId = 0;
 
       @Override
@@ -92,35 +92,44 @@ public final class OrBlockDocIdSet implements BlockDocIdSet {
         if (currentDocId == Constants.EOF) {
           return Constants.EOF;
         }
+
         long start = System.nanoTime();
+
+        // Remove iterators that are before the target document id from the queue
         Iterator<IntPair> iterator = queue.iterator();
         while (iterator.hasNext()) {
           IntPair pair = iterator.next();
           if (pair.getA() < targetDocId) {
             iterator.remove();
-            exists[pair.getB()] = false;
+            iteratorIsInQueue[pair.getB()] = false;
           }
         }
+
+        // Advance all iterators that are not in the queue to the target document id
         for (int i = 0; i < docIdIterators.length; i++) {
-          if (!exists[i]) {
+          if (!iteratorIsInQueue[i]) {
             int next = docIdIterators[i].advance(targetDocId);
             if (next != Constants.EOF) {
               queue.add(new IntPair(next, i));
             }
-            exists[i] = true;
+            iteratorIsInQueue[i] = true;
           }
         }
+
+        // Consume the first element, removing other iterators pointing to the same document id
         if (queue.size() > 0) {
           IntPair pair = queue.remove();
-          exists[pair.getB()] = false;
+          iteratorIsInQueue[pair.getB()] = false;
           currentDocId = pair.getA();
+
           while (queue.size() > 0 && queue.peek().getA() == currentDocId) {
             IntPair remove = queue.remove();
-            exists[remove.getB()] = false;
+            iteratorIsInQueue[remove.getB()] = false;
           }
         } else {
           currentDocId = Constants.EOF;
         }
+
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
         return currentDocId;
@@ -129,26 +138,32 @@ public final class OrBlockDocIdSet implements BlockDocIdSet {
       @Override
       public int next() {
         long start = System.nanoTime();
+
+        // Grab the next value from each iterator, if it's not in the queue
         for (int i = 0; i < docIdIterators.length; i++) {
-          if (!exists[i]) {
+          if (!iteratorIsInQueue[i]) {
             int next = docIdIterators[i].next();
             if (next != Constants.EOF) {
               queue.add(new IntPair(next, i));
             }
-            exists[i] = true;
+            iteratorIsInQueue[i] = true;
           }
         }
+
+        // Consume the first element, removing other iterators pointing to the same document id
         if (queue.size() > 0) {
           IntPair pair = queue.remove();
-          exists[pair.getB()] = false;
+          iteratorIsInQueue[pair.getB()] = false;
           currentDocId = pair.getA();
+
           while (queue.size() > 0 && queue.peek().getA() == currentDocId) {
             pair = queue.remove();
-            exists[pair.getB()] = false;
+            iteratorIsInQueue[pair.getB()] = false;
           }
         } else {
           currentDocId = Constants.EOF;
         }
+
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
         return currentDocId;
