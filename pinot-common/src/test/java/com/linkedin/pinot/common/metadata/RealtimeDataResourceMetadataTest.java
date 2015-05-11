@@ -76,6 +76,11 @@ public class RealtimeDataResourceMetadataTest {
     List<String> tableList = new ArrayList<String>();
     tableList.add("testTable");
     record.setListField(Helix.DataSource.TABLE_NAME, tableList);
+    List<String> sortedColumnList = new ArrayList<String>();
+    sortedColumnList.add("sortColumn0");
+    sortedColumnList.add("sortColumn1");
+    sortedColumnList.add("sortColumn2");
+    record.setListField(Helix.DataSource.SORTED_COLUMN_LIST, sortedColumnList);
     record.setSimpleField(Helix.DataSource.TIME_COLUMN_NAME, "daysSinceEpoch");
     record.setSimpleField(Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
     record.setIntField(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, 6);
@@ -93,6 +98,11 @@ public class RealtimeDataResourceMetadataTest {
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = new RealtimeDataResourceZKMetadata();
     realtimeDataResourceZKMetadata.setResourceName("testResource");
     realtimeDataResourceZKMetadata.addToTableList("testTable");
+    List<String> sortedColumnList = new ArrayList<String>();
+    sortedColumnList.add("sortColumn0");
+    sortedColumnList.add("sortColumn1");
+    sortedColumnList.add("sortColumn2");
+    realtimeDataResourceZKMetadata.setSortedColumns(sortedColumnList);
     realtimeDataResourceZKMetadata.setTimeColumnName("daysSinceEpoch");
     realtimeDataResourceZKMetadata.setTimeType("daysSinceEpoch");
     realtimeDataResourceZKMetadata.setNumDataInstances(6);

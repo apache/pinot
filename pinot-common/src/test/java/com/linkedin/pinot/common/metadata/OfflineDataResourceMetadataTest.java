@@ -53,6 +53,11 @@ public class OfflineDataResourceMetadataTest {
     List<String> tableList = new ArrayList<String>();
     tableList.add("testTable");
     record.setListField(Helix.DataSource.TABLE_NAME, tableList);
+    List<String> sortedColumnList = new ArrayList<String>();
+    sortedColumnList.add("sortColumn0");
+    sortedColumnList.add("sortColumn1");
+    sortedColumnList.add("sortColumn2");
+    record.setListField(Helix.DataSource.SORTED_COLUMN_LIST, sortedColumnList);
     record.setSimpleField(Helix.DataSource.TIME_COLUMN_NAME, "daysSinceEpoch");
     record.setSimpleField(Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
     record.setIntField(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, 6);
@@ -71,6 +76,11 @@ public class OfflineDataResourceMetadataTest {
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = new OfflineDataResourceZKMetadata();
     offlineDataResourceZKMetadata.setResourceName("testResource");
     offlineDataResourceZKMetadata.addToTableList("testTable");
+    List<String> sortedColumnList = new ArrayList<String>();
+    sortedColumnList.add("sortColumn0");
+    sortedColumnList.add("sortColumn1");
+    sortedColumnList.add("sortColumn2");
+    offlineDataResourceZKMetadata.setSortedColumns(sortedColumnList);
     offlineDataResourceZKMetadata.setTimeColumnName("daysSinceEpoch");
     offlineDataResourceZKMetadata.setTimeType("daysSinceEpoch");
     offlineDataResourceZKMetadata.setNumDataInstances(6);

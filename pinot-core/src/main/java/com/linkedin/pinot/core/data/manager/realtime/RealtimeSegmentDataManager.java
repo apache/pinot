@@ -74,6 +74,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private Thread indexingThread;
   private long timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
   private long numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
+  private final String sortedColumn;
 
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final RealtimeDataResourceZKMetadata resourceMetadata, InstanceZKMetadata instanceMetadata,
@@ -97,6 +98,19 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       }
     }
     this.schema = resourceMetadata.getDataSchema();
+    if (resourceMetadata.getSortedColumns().isEmpty()) {
+      LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column");
+      this.sortedColumn = null;
+    } else {
+      String firstSortedColumn = resourceMetadata.getSortedColumns().get(0);
+      if (this.schema.isExisted(firstSortedColumn)) {
+        LOGGER.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata.", firstSortedColumn);
+        this.sortedColumn = firstSortedColumn;
+      } else {
+        LOGGER.warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema.", firstSortedColumn);
+        this.sortedColumn = null;
+      }
+    }
     this.segmentMetatdaZk = segmentMetadata;
     this.segmentName = segmentMetadata.getSegmentName();
 
@@ -150,7 +164,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         RealtimeSegmentConverter conveter =
             new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(),
                 schema, segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata
-                    .getSegmentName(), null);
+                    .getSegmentName(), sortedColumn);
         try {
           LOGGER.info("Trying to build segment!");
           conveter.build();

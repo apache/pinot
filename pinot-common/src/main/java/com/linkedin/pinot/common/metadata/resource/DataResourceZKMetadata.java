@@ -27,6 +27,7 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
@@ -46,6 +47,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
   private String _brokerTag;
   private int _numBrokerInstance;
   private Map<String, String> _metadata = new HashMap<String, String>();
+  private List<String> _sortedColumnList = new ArrayList<String>();
 
   public DataResourceZKMetadata() {
     _retentionTimeUnit = TimeUnit.DAYS;
@@ -65,6 +67,9 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     _brokerTag = znRecord.getSimpleField(Helix.DataSource.BROKER_TAG_NAME);
     _numBrokerInstance = znRecord.getIntField(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, -1);
     _metadata = znRecord.getMapField(Helix.DataSource.METADATA);
+    if (znRecord.getListFields().containsKey(Helix.DataSource.SORTED_COLUMN_LIST)) {
+      _sortedColumnList.addAll(znRecord.getListField(Helix.DataSource.SORTED_COLUMN_LIST));
+    }
   }
 
   public String getResourceName() {
@@ -159,6 +164,15 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     _numBrokerInstance = numBrokerInstance;
   }
 
+  public List<String> getSortedColumns() {
+    return _sortedColumnList;
+  }
+
+  public void setSortedColumns(List<String> sortedColumns) {
+    _sortedColumnList.clear();
+    _sortedColumnList.addAll(sortedColumns);
+  }
+
   public Map<String, String> getMetadata() {
     return _metadata;
   }
@@ -212,6 +226,17 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     } else {
       return false;
     }
+    if (getSortedColumns().size() == resourceMetadata.getSortedColumns().size()) {
+      if (!getSortedColumns().isEmpty()) {
+        for (int i = 0; i < getSortedColumns().size(); ++i) {
+          if (!getSortedColumns().get(i).equals(resourceMetadata.getSortedColumns().get(i))) {
+            return false;
+          }
+        }
+      }
+    } else {
+      return false;
+    }
     if (getMetadata().size() == resourceMetadata.getMetadata().size()) {
       if (!getMetadata().isEmpty()) {
         for (String key : getMetadata().keySet()) {
@@ -249,6 +274,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _retentionTimeValue);
     result = hashCodeOf(result, _brokerTag);
     result = hashCodeOf(result, _numBrokerInstance);
+    result = hashCodeOf(result, _sortedColumnList);
     result = hashCodeOf(result, _metadata);
     return result;
   }
@@ -259,6 +285,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     znRecord.setSimpleField(Helix.DataSource.RESOURCE_NAME, _resourceName);
     znRecord.setEnumField(Helix.DataSource.RESOURCE_TYPE, _resourceType);
     znRecord.setListField(Helix.DataSource.TABLE_NAME, _tableList);
+    znRecord.setListField(Helix.DataSource.SORTED_COLUMN_LIST, _sortedColumnList);
     znRecord.setSimpleField(Helix.DataSource.TIME_COLUMN_NAME, _timeColumnName);
     znRecord.setSimpleField(Helix.DataSource.TIME_TYPE, _timeType);
     znRecord.setIntField(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, _numDataInstances);

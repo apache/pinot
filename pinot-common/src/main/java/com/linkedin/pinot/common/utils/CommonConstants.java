@@ -80,6 +80,7 @@ public class CommonConstants {
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
       public static final String STREAM_PREFIX = "stream";
+      public static final String SORTED_COLUMN_LIST = "sortedColumnList";
 
       public static enum SegmentAssignmentStrategy {
         RandomAssignmentStrategy,
