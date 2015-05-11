@@ -18,14 +18,18 @@ package com.linkedin.pinot.index.writer;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSkipListSCMVWriter;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthSingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.util.CustomBitSet;
 
-public class TestFixedByteWidthSingleColumnMultiValueWriter {
+
+public class FixedByteWidthSingleColumnMultiValueWriterTest {
   @Test
   public void testSingleColMultiValue() throws Exception {
 
@@ -65,4 +69,6 @@ public class TestFixedByteWidthSingleColumnMultiValueWriter {
     dis.close();
     file.delete();
   }
+  
+
 }

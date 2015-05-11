@@ -24,7 +24,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 
-public class TestFixedBitRowColDataWriterReader {
+public class FixedBitRowColDataWriterReaderTest {
   @Test
   public void testSiingleColUnsigned() throws Exception {
     int maxBits = 1;

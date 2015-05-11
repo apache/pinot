@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthSingleColumnMultiValueReader;
 
-public class TestFixedByteWidthSingleColumnMultiValueReader {
+public class FixedByteWidthSingleColumnMultiValueReaderTest {
 
   @Test
   public void testSingleColMultiValue() throws Exception {

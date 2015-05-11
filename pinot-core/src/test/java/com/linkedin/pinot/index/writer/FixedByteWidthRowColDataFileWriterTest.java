@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 
 @Test
-public class TestFixedByteWidthRowColDataFileWriter {
+public class FixedByteWidthRowColDataFileWriterTest {
   @Test
   public void testSingleCol() throws Exception {
 

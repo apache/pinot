@@ -78,6 +78,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
   private FixedByteWidthRowColDataFileReader headerSectionReader;
   private FixedBitWidthRowColDataFileReader dataSectionReader;
   private int rows;
+  private int totalNumValues;
 
   /**
    * @param file
@@ -130,7 +131,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
     // the last two entries in the header (start index, length)
     final int startIndex = headerSectionReader.getInt(numDocs - 1, 0);
     final int length = headerSectionReader.getInt(numDocs - 1, 1);
-    final int totalNumValues = startIndex + length;
+    totalNumValues = startIndex + length;
     final int dataSizeInBytes = ((totalNumValues * columnSizeInBits) + 7) / 8;
     ByteBuffer dataBuffer;
 
@@ -143,6 +144,10 @@ public class FixedBitCompressedMVForwardIndexReader implements
     }
     dataSectionReader =  FixedBitWidthRowColDataFileReader.forByteBuffer(dataBuffer,
         totalNumValues, 1, new int[] { columnSizeInBits }, signed);
+  }
+
+  public int getTotalNumValues() {
+    return totalNumValues;
   }
 
   public int length() {

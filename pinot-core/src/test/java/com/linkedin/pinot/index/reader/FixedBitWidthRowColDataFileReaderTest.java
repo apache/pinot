@@ -28,8 +28,8 @@ import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileRead
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 @Test
-public class TestFixedBitWidthRowColDataFileReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestFixedBitWidthRowColDataFileReader.class);
+public class FixedBitWidthRowColDataFileReaderTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthRowColDataFileReaderTest.class);
   boolean debug = false;
 
   @Test

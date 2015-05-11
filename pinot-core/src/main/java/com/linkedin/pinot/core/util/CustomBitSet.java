@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.util;
 
 import java.nio.ByteBuffer;
 
+
 /**
  *
  * Util class to store bit set, provides additional utility over java bit set by
@@ -26,6 +27,14 @@ public final class CustomBitSet {
 
   private final int nrBytes;
   private final ByteBuffer buf;
+  private final static int[] bitCountArray = new int[256];
+  private final static int IGNORED_ZEROS_COUNT = Integer.SIZE - Byte.SIZE;
+
+  static {
+    for (int i = 0; i < 256; i++) {
+      bitCountArray[i] = Integer.bitCount(i);
+    }
+  }
 
   private CustomBitSet(final int nrBytes) {
     if (nrBytes < 1) {
@@ -40,8 +49,7 @@ public final class CustomBitSet {
     this.buf = buffer;
   }
 
-  public static CustomBitSet withByteBuffer(final int numBytes,
-      ByteBuffer byteBuffer) {
+  public static CustomBitSet withByteBuffer(final int numBytes, ByteBuffer byteBuffer) {
     return new CustomBitSet(numBytes, byteBuffer);
   }
 
@@ -126,6 +134,91 @@ public final class CustomBitSet {
     }
     sb.append("]");
     return sb.toString();
+  }
+
+  /**
+   * Finds the index of the Nth bit set after the startIndex, the bit at startIndex is excluded
+   * @param startIndex
+   * @param n
+   * @return
+   */
+  public int findNthBitSetAfter(int startBitIndex, int n) {
+    startBitIndex = startBitIndex + 1;
+    int bytePosition = startBitIndex / 8;
+    int bitPosition = startBitIndex % 8;
+    if (bytePosition > nrBytes) {
+      return -1;
+    }
+    int currentByte = (buf.get(bytePosition) << bitPosition) & 0xFF;
+    int index = startBitIndex;
+    if (bitCountArray[currentByte] < n) {
+      int count = bitCountArray[currentByte];
+      do {
+        bytePosition = bytePosition + 1;
+        if (bytePosition >= nrBytes) {
+          return -1;
+        }
+        currentByte = buf.get(bytePosition) & 0xFF;
+        if (bitCountArray[currentByte] + count >= n) {
+          break;
+        }
+        count = count + bitCountArray[currentByte];
+      } while (true);
+      index = bytePosition * 8 - 1;
+      for (int i = 0; i < n - count; i++) {
+        index = nextSetBit(index);
+      }
+    } else {
+      return Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT + index;
+    }
+    return index;
+
+  }
+
+  public int nextSetBit(int index) {
+    index = index + 1;
+    int bytePosition = index / 8;
+    int bitPosition = index % 8;
+
+    if (bytePosition > nrBytes) {
+      return -1;
+    }
+
+    // Assuming index 3
+    // --- IGNORED_ZEROS_COUNT --
+    //                             index
+    //                               v
+    // 00000000 00000000 00000000 00000010
+    int currentByte = (buf.get(bytePosition) << bitPosition) & 0xFF;
+
+    if (currentByte != 0) {
+      return Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT + index;
+    }
+
+    int bytesSkipped = 0;
+    // Skip whole bytes
+    while (currentByte == 0) {
+      bytesSkipped++;
+
+      if (bytePosition + bytesSkipped >= nrBytes) {
+        return -1;
+      }
+      currentByte = buf.get(bytePosition + bytesSkipped) & 0xFF;
+    }
+
+    int zerosCount = Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT;
+
+    return zerosCount + (bytePosition + bytesSkipped) * 8;
+
+  }
+
+  public boolean isBitSet(int index) {
+    final int byteToCheck = index >>> 3;
+    assert (byteToCheck < nrBytes);
+    byte b = buf.get(byteToCheck);
+    //    System.out.println(Integer.toBinaryString((b & 0xFF) + 0x100).substring(1));
+    final int offset = (7 - index % 8);
+    return ((b & (1 << offset)) != 0);
   }
 
 }

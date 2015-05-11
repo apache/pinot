@@ -19,13 +19,18 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Random;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
+
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
-public class TestFixedBitWidthSingleColumnMultiValueWriter {
+
+public class FixedBitSkipListSCMVWriterTest {
   @Test
   public void testSingleColMultiValue() throws Exception {
     int maxBits = 2;
@@ -46,13 +51,20 @@ public class TestFixedBitWidthSingleColumnMultiValueWriter {
         }
         totalNumValues += numValues;
       }
-      FixedBitWidthSingleColumnMultiValueWriter writer = new FixedBitWidthSingleColumnMultiValueWriter(
-          file, rows, totalNumValues, maxBits);
-      CustomBitSet bitSet = CustomBitSet
-          .withBitLength(totalNumValues * maxBits);
+      FixedBitSkipListSCMVWriter writer = new FixedBitSkipListSCMVWriter(file, rows, totalNumValues, maxBits);
+      CustomBitSet bitSet = CustomBitSet.withBitLength(totalNumValues * maxBits);
+      int numChunks = writer.getNumChunks();
+      int[] chunkOffsets = new int[numChunks];
+      int chunkId = 0;
+      int offset = 0;
       int index = 0;
       for (int i = 0; i < rows; i++) {
         writer.setIntArray(i, data[i]);
+        if (i % writer.getRowsPerChunk() == 0) {
+          chunkOffsets[chunkId] = offset;
+          chunkId = chunkId + 1;
+        }
+        offset += data[i].length;
         for (int j = 0; j < data[i].length; j++) {
           int value = data[i][j];
           for (int bitPos = maxBits - 1; bitPos >= 0; bitPos--) {
@@ -64,33 +76,44 @@ public class TestFixedBitWidthSingleColumnMultiValueWriter {
         }
       }
       writer.close();
-      // verify header
-      DataInputStream dis = new DataInputStream(new FileInputStream(file));
-      int totalLength = 0;
-      for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(dis.readInt(), totalLength);
-        Assert.assertEquals(dis.readInt(), data[i].length);
-        totalLength += data[i].length;
-      }
-      dis.close();
-
-      // verify data
-      byte[] byteArray = bitSet.toByteArray();
+      System.out.println("chunkOffsets:" + Arrays.toString(chunkOffsets));
+      //start validating the file
       RandomAccessFile raf = new RandomAccessFile(file, "r");
-      // Header contains 1 row for each doc and each row contains 2 ints
-      int headerSize = rows * 2 * 4;
-      int dataLength = (int) raf.length() - headerSize;
-      byte[] b = new byte[dataLength];
+
+      Assert.assertEquals(raf.length(), writer.getTotalSize());
+      DataInputStream dis = new DataInputStream(new FileInputStream(file));
+      for (int i = 0; i < numChunks; i++) {
+        Assert.assertEquals(dis.readInt(), chunkOffsets[i]);
+      }
+      int numBytesForBitmap = (totalNumValues + 7) / 8;
+      Assert.assertEquals(writer.getBitsetSize(), numBytesForBitmap);
+      byte[] bitsetBytes = new byte[numBytesForBitmap];
+      dis.read(bitsetBytes);
+      CustomBitSet customBit = CustomBitSet.withByteBuffer(numBytesForBitmap, ByteBuffer.wrap(bitsetBytes));
+      offset = 0;
+      System.out.println(customBit);
+      for (int i = 0; i < rows; i++) {
+        Assert.assertTrue(customBit.isBitSet(offset));
+        offset += data[i].length;
+      }
+      byte[] byteArray = bitSet.toByteArray();
+      System.out.println("raf.length():" + raf.length());
+      System.out.println("getTotalSize:" + writer.getTotalSize());
+      System.out.println("getRawDataSize:" + writer.getRawDataSize());
+      System.out.println("getBitsetSize:" + writer.getBitsetSize());
+      System.out.println("getChunkOffsetHeaderSize:" + writer.getChunkOffsetHeaderSize());
+
+      int dataLength = (int) (writer.getTotalSize() - writer.getChunkOffsetHeaderSize() - numBytesForBitmap);
+      byte[] rawData = new byte[dataLength];
       // read the data segment that starts after the header.
-      raf.seek(headerSize);
-      raf.read(b, 0, dataLength);
-      Assert.assertEquals(byteArray.length, b.length);
-      Assert.assertEquals(byteArray, b);
+      dis.read(rawData);
+      Assert.assertEquals(rawData.length, byteArray.length);
+      Assert.assertEquals(rawData, byteArray);
       raf.close();
+      dis.close();
       file.delete();
       System.out.println("END test maxBit:" + maxBits);
       maxBits = maxBits + 1;
     }
-
   }
 }

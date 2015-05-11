@@ -25,7 +25,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
-public class TestFixedBitWidthRowColDataFileWriter {
+public class FixedBitWidthRowColDataFileWriterTest {
 
   @Test
   public void testSingleColUnsigned() throws Exception {
