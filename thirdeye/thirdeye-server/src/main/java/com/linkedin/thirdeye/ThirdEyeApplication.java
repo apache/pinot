@@ -12,15 +12,10 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
-import com.linkedin.thirdeye.managed.ThirdEyeKafkaConsumerManager;
+import com.linkedin.thirdeye.managed.KafkaConsumerManager;
 import com.linkedin.thirdeye.query.ThirdEyeQueryExecutor;
 import com.linkedin.thirdeye.resource.*;
-import com.linkedin.thirdeye.task.KafkaStartTask;
-import com.linkedin.thirdeye.task.KafkaStopTask;
-import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
-import com.linkedin.thirdeye.task.ViewMetricIndexTask;
-import com.linkedin.thirdeye.task.ViewTreeTask;
-import com.linkedin.thirdeye.task.RestoreTask;
+import com.linkedin.thirdeye.task.*;
 
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
@@ -73,8 +68,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     ExecutorService parallelQueryExecutor =
             environment.lifecycle()
                        .executorService("parallel_query_executor")
-                       .minThreads(Runtime.getRuntime().availableProcessors())
-                       .maxThreads(Runtime.getRuntime().availableProcessors())
+                       .minThreads(Runtime.getRuntime().availableProcessors() / 2)
+                       .maxThreads(Runtime.getRuntime().availableProcessors() / 2)
                        .build();
 
     ScheduledExecutorService anomalyDetectionTaskScheduler =
@@ -82,22 +77,15 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                        .scheduledExecutorService("anomaly_detection_task_scheduler")
                        .build();
 
-    ExecutorService kafkaConsumerExecutor =
-            environment.lifecycle()
-                       .executorService("kafka_consumer_executor")
-                       .minThreads(Runtime.getRuntime().availableProcessors())
-                       .maxThreads(Runtime.getRuntime().availableProcessors())
-                       .build();
-
-    ScheduledExecutorService kafkaPersistScheduler
-        = environment.lifecycle().scheduledExecutorService("kafka_persist_scheduler").build();
-
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
     final DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir);
 
-    final ThirdEyeKafkaConsumerManager kafkaConsumerManager
-            = new ThirdEyeKafkaConsumerManager(starTreeManager, rootDir, kafkaConsumerExecutor, kafkaPersistScheduler, environment.metrics());
+    final KafkaConsumerManager kafkaConsumerManager = new KafkaConsumerManager(
+        rootDir,
+        starTreeManager,
+        dataUpdateManager,
+        environment.metrics());
 
     final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
             new AnomalyDetectionTaskManager(starTreeManager,
@@ -193,8 +181,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ViewTreeTask(starTreeManager));
     environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
     environment.admin().addTask(new ViewMetricIndexTask(rootDir));
-    environment.admin().addTask(new KafkaStartTask(kafkaConsumerManager));
-    environment.admin().addTask(new KafkaStopTask(kafkaConsumerManager));
+    environment.admin().addTask(new KafkaTask(kafkaConsumerManager));
   }
 
   public static class Config extends Configuration

@@ -8,7 +8,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DatumWriter;
-import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serializer;
@@ -80,7 +79,7 @@ public class KafkaLoadTool
 
       // Encode
       baos.reset();
-      encoder = EncoderFactory.get().binaryEncoder(baos, encoder);
+      encoder = new BinaryEncoder(baos);
       datumWriter.write(record, encoder);
       encoder.flush();
       byte[] bytes = baos.toByteArray();

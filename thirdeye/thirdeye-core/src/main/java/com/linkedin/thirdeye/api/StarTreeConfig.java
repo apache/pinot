@@ -37,21 +37,21 @@ public final class StarTreeConfig
 
   public StarTreeConfig() {}
 
-  private StarTreeConfig(String collection,
-                         String recordStoreFactoryClass,
-                         Properties recordStoreFactoryConfig,
-                         String anomalyDetectionFunctionClass,
-                         Properties anomalyDetectionFunctionConfig,
-                         String anomalyHandlerClass,
-                         Properties anomalyHandlerConfig,
-                         String anomalyDetectionMode,
-                         List<DimensionSpec> dimensions,
-                         List<MetricSpec> metrics,
-                         TimeSpec time,
-                         JoinSpec joinSpec,
-                         RollupSpec rollup,
-                         SplitSpec split,
-                         boolean fixed)
+  public StarTreeConfig(String collection,
+                        String recordStoreFactoryClass,
+                        Properties recordStoreFactoryConfig,
+                        String anomalyDetectionFunctionClass,
+                        Properties anomalyDetectionFunctionConfig,
+                        String anomalyHandlerClass,
+                        Properties anomalyHandlerConfig,
+                        String anomalyDetectionMode,
+                        List<DimensionSpec> dimensions,
+                        List<MetricSpec> metrics,
+                        TimeSpec time,
+                        JoinSpec joinSpec,
+                        RollupSpec rollup,
+                        SplitSpec split,
+                        boolean fixed)
   {
     this.collection = collection;
     this.recordStoreFactoryClass = recordStoreFactoryClass;

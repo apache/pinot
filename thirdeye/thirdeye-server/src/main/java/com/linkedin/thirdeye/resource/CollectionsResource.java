@@ -14,6 +14,7 @@ import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
 
 import io.dropwizard.lifecycle.Managed;
@@ -154,7 +155,7 @@ public class CollectionsResource implements Managed
 
     if (!configFile.exists())
     {
-      FileUtils.copyInputStreamToFile(new ByteArrayInputStream(configBytes), configFile);
+      IOUtils.copy(new ByteArrayInputStream(configBytes), new FileOutputStream(configFile));
     }
     else
     {
@@ -177,7 +178,7 @@ public class CollectionsResource implements Managed
       throw new WebApplicationException(Response.Status.BAD_REQUEST);
     }
 
-    return FileUtils.readFileToByteArray(kafkaConfigFile);
+    return IOUtils.toByteArray(new FileInputStream(kafkaConfigFile));
   }
 
   @POST
@@ -196,7 +197,7 @@ public class CollectionsResource implements Managed
 
     File configFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
 
-    FileUtils.copyInputStreamToFile(new ByteArrayInputStream(kafkaConfigBytes), configFile);
+    IOUtils.copy(new ByteArrayInputStream(kafkaConfigBytes), new FileOutputStream(configFile));
 
     return Response.ok().build();
   }

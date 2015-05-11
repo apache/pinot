@@ -17,6 +17,7 @@ public class ToolsLauncher
     TOOLS.add(new ToolSpec(MetricIndexViewer.class, "Reads a metric index file"));
     TOOLS.add(new ToolSpec(KafkaLoadTool.class, "Loads an Avro data file into Kafka"));
     TOOLS.add(new ToolSpec(BufferViewer.class, "Views the contents of a leaf buffer"));
+    TOOLS.add(new ToolSpec(StandAloneKafkaConsumer.class, "Consumes data from Kafka and writes into server dir"));
   }
 
   public static void main(String[] args) throws Exception

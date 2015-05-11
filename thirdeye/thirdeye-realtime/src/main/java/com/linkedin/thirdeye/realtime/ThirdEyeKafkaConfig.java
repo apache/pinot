@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 public class ThirdEyeKafkaConfig
 {
   private static final String DEFAULT_DECODER_CLASS = ThirdEyeKafkaDecoderAvroImpl.class.getCanonicalName();
-  private static final TimeGranularity DEFAULT_PERSIST_INTERVAL = new TimeGranularity(5, TimeUnit.MINUTES);
+  private static final TimeGranularity DEFAULT_PERSIST_INTERVAL = new TimeGranularity(15, TimeUnit.MINUTES);
   private static final String DEFAULT_GROUP_ID = "THIRDEYE";
   private static final DateTime DEFAULT_START_TIME = new DateTime(0);
 

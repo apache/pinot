@@ -28,4 +28,9 @@ public class TimeGranularity
   {
     return unit;
   }
+
+  @Override
+  public String toString() {
+    return size + "-" + unit;
+  }
 }
