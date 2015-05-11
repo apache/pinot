@@ -27,22 +27,22 @@ public class AbstractPredicateEvaluator implements PredicateEvaluator {
   }
 
   @Override
-  public boolean apply(int dicId) {
-    return Arrays.binarySearch(matchingIds, dicId) >= 0;
+  public boolean apply(int dictionaryId) {
+    return Arrays.binarySearch(matchingIds, dictionaryId) >= 0;
   }
 
   @Override
-  public boolean apply(int[] dicIds) {
-    if (dicIds.length < matchingIds.length) {
-      for (int i = 0; i < dicIds.length; i++) {
-        int index = Arrays.binarySearch(matchingIds, dicIds[i]);
+  public boolean apply(int[] dictionaryIds) {
+    if (dictionaryIds.length < matchingIds.length) {
+      for (int i = 0; i < dictionaryIds.length; i++) {
+        int index = Arrays.binarySearch(matchingIds, dictionaryIds[i]);
         if (index >= 0) {
           return true;
         }
       }
     } else {
       for (int i = 0; i < matchingIds.length; i++) {
-        int index = Arrays.binarySearch(dicIds, matchingIds[i]);
+        int index = Arrays.binarySearch(dictionaryIds, matchingIds[i]);
         if (index >= 0) {
           return true;
         }

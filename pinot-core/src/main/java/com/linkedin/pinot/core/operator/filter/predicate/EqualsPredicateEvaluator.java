@@ -37,17 +37,17 @@ public class EqualsPredicateEvaluator implements PredicateEvaluator {
   }
 
   @Override
-  public boolean apply(int dicId) {
-    return (dicId == index);
+  public boolean apply(int dictionaryId) {
+    return (dictionaryId == index);
   }
 
   @Override
-  public boolean apply(int[] dicIds) {
+  public boolean apply(int[] dictionaryIds) {
     if (index < 0) {
       return false;
     }
-    Arrays.sort(dicIds);
-    int i = Arrays.binarySearch(dicIds, index);
+    Arrays.sort(dictionaryIds);
+    int i = Arrays.binarySearch(dictionaryIds, index);
     return i >= 0;
   }
 

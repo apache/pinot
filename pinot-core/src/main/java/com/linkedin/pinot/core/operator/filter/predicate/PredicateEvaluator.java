@@ -22,14 +22,14 @@ public interface PredicateEvaluator {
    * @param dicId
    * @return
    */
-  public boolean apply(int dicId);
+  public boolean apply(int dictionaryId);
 
   /**
    *
    * @param dicIds
    * @return
    */
-  public boolean apply(int[] dicIds);
+  public boolean apply(int[] dictionaryIds);
 
   /**
    *
