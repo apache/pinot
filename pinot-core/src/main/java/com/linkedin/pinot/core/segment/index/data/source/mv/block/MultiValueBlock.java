@@ -25,21 +25,21 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class MultiValueBlock implements Block {
 
-  private final FixedBitCompressedMVForwardIndexReader mVReader;
+  private final FixedBitSkipListSCMVReader mVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
 
-  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
-      ImmutableDictionaryReader dict, ColumnMetadata metadata) {
+  public MultiValueBlock(BlockId id, FixedBitSkipListSCMVReader multiValueReader, ImmutableDictionaryReader dict,
+      ColumnMetadata metadata) {
     mVReader = multiValueReader;
     this.id = id;
     dictionary = dict;
@@ -103,7 +103,7 @@ public class MultiValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId >= mVReader.length()) {
+            if (docId >= columnMetadata.getTotalDocs()) {
               return false;
             }
             counter = docId;
@@ -112,7 +112,7 @@ public class MultiValueBlock implements Block {
 
           @Override
           public int size() {
-            return mVReader.length();
+            return columnMetadata.getTotalDocs();
           }
 
           @Override
@@ -128,7 +128,7 @@ public class MultiValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter < mVReader.length());
+            return (counter < columnMetadata.getTotalDocs());
           }
 
           @Override

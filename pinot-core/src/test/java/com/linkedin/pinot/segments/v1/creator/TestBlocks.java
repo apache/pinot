@@ -39,6 +39,7 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -204,7 +205,7 @@ public class TestBlocks {
       Predicate p = new EqPredicate(spec.getName(), Lists.newArrayList(e.toString()));
 
       Block invertedIndexBlock =
-          new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) indexReader,
+          new MultiValueBlock(new BlockId(0), (FixedBitSkipListSCMVReader) indexReader,
               (ImmutableDictionaryReader) dic, columnMetadata);
 
       invertedIndexBlock.applyPredicate(p);

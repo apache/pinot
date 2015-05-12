@@ -22,7 +22,7 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
@@ -32,7 +32,7 @@ public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreato
   private final File forwardIndexFile;
   private final FieldSpec spec;
   private int maxNumberOfBits = 0;
-  private FixedBitWidthSingleColumnMultiValueWriter mVWriter;
+  private FixedBitSkipListSCMVWriter mVWriter;
 
   public MultiValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
       int totalNumberOfValues, boolean hasNulls) throws Exception {
@@ -41,8 +41,7 @@ public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreato
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
     maxNumberOfBits = SingleValueUnsortedForwardIndexCreator.getNumOfBits(cardinality);
-    mVWriter =
-        new FixedBitWidthSingleColumnMultiValueWriter(forwardIndexFile, numDocs, totalNumberOfValues, maxNumberOfBits);
+    mVWriter = new FixedBitSkipListSCMVWriter(forwardIndexFile, numDocs, totalNumberOfValues, maxNumberOfBits);
   }
 
   @Override

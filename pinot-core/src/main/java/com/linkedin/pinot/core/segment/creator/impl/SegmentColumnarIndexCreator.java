@@ -26,6 +26,7 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SORTED;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_DOCS;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DIMENSIONS;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.METRICS;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.RESOURCE_NAME;
@@ -240,6 +241,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
           String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
+
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
+          String.valueOf(indexCreationInfoMap.get(column).getTotalNumberOfEntries()));
 
     }
 

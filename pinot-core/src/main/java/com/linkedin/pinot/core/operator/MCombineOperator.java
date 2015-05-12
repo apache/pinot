@@ -115,6 +115,7 @@ public class MCombineOperator implements Operator {
             try {
               retBlock = operator.nextBlock();
             } catch (Exception e) {
+              LOGGER.error("exception in the MCombine operator ", e);
               retBlock = new IntermediateResultsBlock(e);
             }
             if (blockingQueue != null) {
@@ -123,7 +124,8 @@ public class MCombineOperator implements Operator {
           }
         });
       }
-      LOGGER.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
+      LOGGER
+          .debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
 
       // Submit merger job:
       Future<IntermediateResultsBlock> mergedBlockFuture =
@@ -134,20 +136,27 @@ public class MCombineOperator implements Operator {
               IntermediateResultsBlock mergedBlock = null;
               while ((queryEndTime > System.currentTimeMillis()) && (mergedBlocksNumber < _operators.size())) {
                 if (mergedBlock == null) {
-                  mergedBlock = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                  mergedBlock =
+                      (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
+                          TimeUnit.MILLISECONDS);
                   if (mergedBlock != null) {
                     mergedBlocksNumber++;
                   }
                   LOGGER.debug("Got response from operator 0 after: {}", (System.currentTimeMillis() - startTime));
                 } else {
-                  IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                  IntermediateResultsBlock blockToMerge =
+                      (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
+                          TimeUnit.MILLISECONDS);
                   if (blockToMerge != null) {
                     try {
-                      LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber, (System.currentTimeMillis() - startTime));
+                      LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber,
+                          (System.currentTimeMillis() - startTime));
                       CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
-                      LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber, (System.currentTimeMillis() - startTime));
+                      LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber,
+                          (System.currentTimeMillis() - startTime));
                     } catch (Exception e) {
-                      mergedBlock.getExceptions().add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                      mergedBlock.getExceptions().add(
+                          QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
                     }
                     mergedBlocksNumber++;
                   }
@@ -197,8 +206,9 @@ public class MCombineOperator implements Operator {
 
     } else {
       for (Operator operator : _operators) {
-        if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOrderByOperator) || (operator instanceof MSelectionOnlyOperator)
-            || (operator instanceof MAggregationGroupByOperator) || (operator instanceof MCombineOperator)) {
+        if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOrderByOperator)
+            || (operator instanceof MSelectionOnlyOperator) || (operator instanceof MAggregationGroupByOperator)
+            || (operator instanceof MCombineOperator)) {
           IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
           if (_mergedBlock == null) {
             _mergedBlock = block;

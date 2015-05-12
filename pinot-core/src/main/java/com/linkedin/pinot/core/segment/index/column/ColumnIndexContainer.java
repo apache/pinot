@@ -21,13 +21,13 @@ import java.io.IOException;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -96,9 +96,9 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    FixedBitCompressedMVForwardIndexReader fwdIndexReader =
-        new FixedBitCompressedMVForwardIndexReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getBitsPerElement(),
-            mode == ReadMode.mmap);
+    FixedBitSkipListSCMVReader fwdIndexReader =
+        new FixedBitSkipListSCMVReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
+            metadata.getBitsPerElement(), false, mode == ReadMode.mmap);
 
     BitmapInvertedIndexReader invertedIndex = null;
 

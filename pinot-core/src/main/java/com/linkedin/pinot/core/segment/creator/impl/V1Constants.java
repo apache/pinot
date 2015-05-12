@@ -123,6 +123,7 @@ public class V1Constants {
       public static final String IS_SINGLE_VALUED = "isSingleValues";
       public static final String MAX_MULTI_VALUE_ELEMTS = "maxNumberOfMultiValues";
 
+      public static final String TOTAL_NUMBER_OF_ENTRIES = "totalNumberOfEntries";
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 
       public static String getKeyFor(String column, String key) {

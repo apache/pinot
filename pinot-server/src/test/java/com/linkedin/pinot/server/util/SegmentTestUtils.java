@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -29,13 +30,15 @@ public class SegmentTestUtils {
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
       TimeUnit timeUnit, String clusterName, String tableName) throws IOException {
-    SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(inputAvro));
+    Schema schema = AvroUtils.extractSchemaFromAvro(inputAvro);
+    SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(schema);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeUnitForSegment(timeUnit);
-    if (inputAvro.getName().endsWith("gz"))
+    if (inputAvro.getName().endsWith("gz")) {
       segmentGenSpec.setInputFileFormat(FileFormat.GZIPPED_AVRO);
-    else
+    } else {
       segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
+    }
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setResourceName(clusterName);
     segmentGenSpec.setTableName(tableName);

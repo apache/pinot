@@ -37,8 +37,8 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  * RAWDATA This simply has the actual multi valued data stored in sequence of int's. The number of ints is equal to the totalNumberOfValues
  * We divide all the documents into groups refered to as CHUNK. Each CHUNK will
  * - Have the same number of documents.
- * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up. 
- * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section 
+ * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up.
+ * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section
  * @author kgopalak
  *
  */
@@ -63,9 +63,11 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   private int totalSize;
   private int totalNumValues;
   private int docsPerChunk;
+  private int numDocs;
 
   public FixedBitSkipListSCMVReader(File file, int numDocs, int totalNumValues, int columnSizeInBits, boolean signed,
       boolean isMmap) throws Exception {
+    this.numDocs = numDocs;
     this.totalNumValues = totalNumValues;
     float averageValuesPerDoc = totalNumValues / numDocs;
     this.docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
@@ -165,12 +167,13 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   }
 
   private int computeStartOffset(int row) {
+
     int chunkId = row / docsPerChunk;
     int chunkIdOffset = chunkOffsetsReader.getInt(chunkId, 0);
     if (row % docsPerChunk == 0) {
       return chunkIdOffset;
     }
-    int rowOffSetStart = customBitSet.findNthBitSetAfter(chunkIdOffset , row - chunkId * docsPerChunk);
+    int rowOffSetStart = customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
     return rowOffSetStart;
   }
 

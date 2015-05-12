@@ -91,9 +91,7 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   public DataSource getDataSource(String columnName, Predicate p) {
-    final DataSource d = new ColumnDataSourceImpl(indexContainerMap.get(columnName));
-    d.setPredicate(p);
-    return d;
+    throw new UnsupportedOperationException("cannot ask for a data source with a predicate");
   }
 
   @Override

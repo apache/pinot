@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -47,6 +49,8 @@ import com.linkedin.pinot.core.util.CrcUtils;
  */
 
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 
   SegmentGeneratorConfig config;
   RecordReader recordReader;

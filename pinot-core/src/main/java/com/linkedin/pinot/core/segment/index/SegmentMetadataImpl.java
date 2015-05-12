@@ -305,9 +305,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _segmentMetadataPropertiesConfiguration.getBoolean(
             V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), true);
 
+    final int totalNumberOfEntries =
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES));
+
     return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
         fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls, hasDictionary,
-        segmentTimeUnit);
+        segmentTimeUnit, totalNumberOfEntries);
 
   }
 

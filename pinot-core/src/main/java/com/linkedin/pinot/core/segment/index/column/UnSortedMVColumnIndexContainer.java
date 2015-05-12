@@ -16,10 +16,10 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
@@ -27,17 +27,17 @@ public class UnSortedMVColumnIndexContainer extends ColumnIndexContainer {
 
   private final String column;
   private final ColumnMetadata columnMetadata;
-  private final FixedBitCompressedMVForwardIndexReader indexReader;
+  private final FixedBitSkipListSCMVReader indexReader;
   private final ImmutableDictionaryReader dictionary;
   private final BitmapInvertedIndexReader invertedIndexReader;
 
   public UnSortedMVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedBitCompressedMVForwardIndexReader indexReader, ImmutableDictionaryReader dictionary) {
+      FixedBitSkipListSCMVReader indexReader, ImmutableDictionaryReader dictionary) {
     this(column, columnMetadata, indexReader, dictionary, null);
   }
 
   public UnSortedMVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedBitCompressedMVForwardIndexReader indexReader, ImmutableDictionaryReader dictionary,
+      FixedBitSkipListSCMVReader indexReader, ImmutableDictionaryReader dictionary,
       BitmapInvertedIndexReader invertedIndex) {
     this.column = column;
     this.columnMetadata = columnMetadata;

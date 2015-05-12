@@ -194,6 +194,10 @@ public class AvroRecordReader implements RecordReader {
     if (arr == null) {
       return new Object[] { getDefaultNullValue(spec) };
     }
+    if (arr.size() == 0) {
+      return new Object[] { getDefaultNullValue(spec) };
+    }
+
     final Object[] ret = new Object[arr.size()];
     final Iterator iterator = arr.iterator();
     int i = 0;

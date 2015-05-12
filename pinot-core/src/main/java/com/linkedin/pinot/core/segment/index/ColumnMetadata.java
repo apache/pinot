@@ -18,14 +18,15 @@ package com.linkedin.pinot.core.segment.index;
 import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,11 +51,12 @@ public class ColumnMetadata {
   private final boolean containsNulls;
   private final TimeUnit timeunit;
   private final boolean hasDictionary;
+  private final int totalNumberOfEntries;
 
-
-
-  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
-      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary, TimeUnit timeunit) {
+  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement,
+      int stringColumnMaxLength, FieldType fieldType, boolean isSorted, boolean hasInvertedIndex,
+      boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary, TimeUnit timeunit,
+      int totalNumberOfEntries) {
 
     this.columnName = columnName;
     this.cardinality = cardinality;
@@ -70,6 +72,11 @@ public class ColumnMetadata {
     this.containsNulls = hasNulls;
     this.timeunit = timeunit;
     this.hasDictionary = hasDictionary;
+    this.totalNumberOfEntries = totalNumberOfEntries;
+  }
+
+  public int getTotalNumberOfEntries() {
+    return totalNumberOfEntries;
   }
 
   public int getMaxNumberOfMultiValues() {
