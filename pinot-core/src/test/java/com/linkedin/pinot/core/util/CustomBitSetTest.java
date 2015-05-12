@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.core.util;
 
+import com.linkedin.pinot.core.indexsegment.utils.BitUtils;
+import java.util.BitSet;
+import java.util.Iterator;
+import java.util.Random;
+import java.util.TreeSet;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -48,6 +53,89 @@ public class CustomBitSetTest {
     System.out.println(customBitSet.findNthBitSetAfter(0, 1));
     System.out.println(customBitSet.findNthBitSetAfter(100, 1));
 
+  }
+
+  @Test
+  public void testTurnOffNthLeftmostBits() {
+    for(int value = 0; value < 256; ++value) {
+      for(int bitsToTurnOff = 0; bitsToTurnOff < 8; ++bitsToTurnOff) {
+        byte[] values = new byte[1];
+        values[0] = (byte) value;
+        BitSet bitSet = BitSet.valueOf(values);
+
+        // Turn off the bits in the bitSet
+        int bitsToTurnOffInBitSet = bitsToTurnOff;
+        while (0 < bitsToTurnOffInBitSet && !bitSet.isEmpty()) {
+          bitSet.flip(bitSet.previousSetBit(7));
+          bitsToTurnOffInBitSet--;
+        }
+
+        values = bitSet.toByteArray();
+        int actual = BitUtils.turnOffNthLeftmostSetBits(value, bitsToTurnOff);
+        if (values.length == 0) {
+          Assert.assertEquals(actual, 0, "Value " + Integer.toBinaryString(value) + " with " + bitsToTurnOff +
+              " bits to turn off => " + Integer.toBinaryString(actual));
+        } else {
+          Assert.assertEquals(actual, values[0] & 0xFF, "Value " + Integer.toBinaryString(value) + " with " +
+              bitsToTurnOff + " bits to turn off => " + Integer.toBinaryString(actual));
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testFindNthBitSetRandom() {
+    final int ITERATIONS = 100000;
+    final int LENGTH = 256;
+    final int MAX_BITS_ON = 32;
+
+    Random random = new Random();
+    for (int i = 0; i < ITERATIONS; i++) {
+      CustomBitSet customBitSet = CustomBitSet.withBitLength(LENGTH);
+      TreeSet<Integer> bitsOn = new TreeSet<Integer>();
+      int bitsToTurnOn = random.nextInt(MAX_BITS_ON);
+      while (bitsOn.size() < bitsToTurnOn) {
+        bitsOn.add(random.nextInt(LENGTH));
+      }
+      TreeSet<Integer> bitsOnCopy = new TreeSet<Integer>(bitsOn);
+
+      for (Integer indexOfBitToTurnOn : bitsOn) {
+        customBitSet.setBit(indexOfBitToTurnOn);
+      }
+
+      int startSearchIndex = random.nextInt(LENGTH);
+
+      // Discard all bits before or at the search index
+      Iterator<Integer> bitsOnIterator = bitsOn.iterator();
+      while (bitsOnIterator.hasNext()) {
+        Integer next = bitsOnIterator.next();
+        if (next <= startSearchIndex) {
+          bitsOnIterator.remove();
+        }
+      }
+
+      // Discard all bits set on before the search ahead limit
+      int nthBitToFind = random.nextInt(MAX_BITS_ON / 2) + 1;
+      for (int j = 0; j < nthBitToFind - 1 && !bitsOn.isEmpty(); j++) {
+        bitsOn.pollFirst();
+      }
+
+      // Check the result against the expected index
+      int expectedIndex;
+      if (bitsOn.isEmpty()) {
+        expectedIndex = -1;
+      } else {
+        expectedIndex = bitsOn.pollFirst();
+      }
+
+      int nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
+      if (nthBitSetAfter != expectedIndex) {
+        System.out.println("Bits set " + bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
+        nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
+      }
+      Assert.assertEquals(nthBitSetAfter, expectedIndex, "Bits set " +
+          bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
+    }
   }
 
   @Test

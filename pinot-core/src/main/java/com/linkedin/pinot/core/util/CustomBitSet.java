@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.util;
 
+import com.linkedin.pinot.core.indexsegment.utils.BitUtils;
 import java.nio.ByteBuffer;
 
 
@@ -137,50 +138,60 @@ public final class CustomBitSet {
   }
 
   /**
-   * Finds the index of the Nth bit set after the startIndex, the bit at startIndex is excluded
-   * @param startIndex
-   * @param n
+   * Finds the index of the Nth bit set after the startBitIndex, the bit at startBitIndex is excluded
+   * @param startBitIndex The index from which to start the search
+   * @param n The
    * @return
    */
   public int findNthBitSetAfter(int startBitIndex, int n) {
-    startBitIndex = startBitIndex + 1;
-    int bytePosition = startBitIndex / 8;
-    int bitPosition = startBitIndex % 8;
-    if (bytePosition > nrBytes) {
+    int searchStartBitIndex = startBitIndex + 1;
+
+    int bytePosition = searchStartBitIndex / 8;
+    int bitPosition = searchStartBitIndex % 8;
+    if (bytePosition >= nrBytes) {
       return -1;
     }
-    int currentByte = (buf.get(bytePosition) << bitPosition) & 0xFF;
-    int index = startBitIndex;
-    if (bitCountArray[currentByte] < n) {
-      int count = bitCountArray[currentByte];
-      do {
-        bytePosition = bytePosition + 1;
-        if (bytePosition >= nrBytes) {
-          return -1;
-        }
-        currentByte = buf.get(bytePosition) & 0xFF;
-        if (bitCountArray[currentByte] + count >= n) {
-          break;
-        }
-        count = count + bitCountArray[currentByte];
-      } while (true);
-      index = bytePosition * 8 - 1;
-      for (int i = 0; i < n - count; i++) {
-        index = nextSetBit(index);
-      }
-    } else {
-      return Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT + index;
-    }
-    return index;
 
+    int currentByte = (buf.get(bytePosition) << bitPosition) & 0xFF;
+    int numberOfBitsOnInCurrentByte = bitCountArray[currentByte];
+    int numberOfBitsToSkip = n - 1;
+
+    // Is the bit we're looking for in the current byte?
+    if (n <= numberOfBitsOnInCurrentByte) {
+      currentByte = BitUtils.turnOffNthLeftmostSetBits(currentByte, numberOfBitsToSkip);
+      return Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT + startBitIndex + 1;
+    }
+
+    // Skip whole bytes until we bit we're looking for is in the current byte
+    while (numberOfBitsOnInCurrentByte <= numberOfBitsToSkip) {
+      numberOfBitsToSkip -= numberOfBitsOnInCurrentByte;
+      bytePosition++;
+      if (bytePosition >= nrBytes) {
+        return -1;
+      }
+      currentByte = buf.get(bytePosition) & 0xFF;
+      numberOfBitsOnInCurrentByte = bitCountArray[currentByte];
+    }
+
+    int currentBitPosition = nextSetBit(bytePosition * 8);
+    while(0 < numberOfBitsToSkip && currentBitPosition != -1) {
+      currentBitPosition = nextSetBit(currentBitPosition + 1);
+      numberOfBitsToSkip--;
+    }
+    return currentBitPosition;
   }
 
+  /**
+   * Obtains the index of the first bit set at the current index position or after.
+   * @param index Index of the bit to search from, inclusive.
+   * @return The index of the first bit set at or after the given index, or -1 if there are no bits set after the search
+   * index.
+   */
   public int nextSetBit(int index) {
-    index = index + 1;
     int bytePosition = index / 8;
     int bitPosition = index % 8;
 
-    if (bytePosition > nrBytes) {
+    if (bytePosition >= nrBytes) {
       return -1;
     }
 
@@ -209,7 +220,16 @@ public final class CustomBitSet {
     int zerosCount = Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT;
 
     return zerosCount + (bytePosition + bytesSkipped) * 8;
+  }
 
+  /**
+   * Obtains the index of the first bit set after the current index position.
+   * @param index Index of the bit to search from, exclusive.
+   * @return The index of the first bit set after the given index, or -1 if there are no bits set after the search
+   * index.
+   */
+  public int nextSetBitAfter(int index) {
+    return nextSetBit(index + 1);
   }
 
   public boolean isBitSet(int index) {

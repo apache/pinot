@@ -46,4 +46,24 @@ public class BitUtils {
       return makeLong(buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
     }
   }
+
+  /**
+   * Turns off the nth leftmost set bits, for example turning the 3 leftmost set bits of 11001010 would return 00000010.
+   * @param value The value for which to turn off the leftmost set bits.
+   * @param bitsToTurnOffCount The number of bits to turn off
+   * @return The value with the nth leftmost bits turned off.
+   */
+  public static int turnOffNthLeftmostSetBits(int value, int bitsToTurnOffCount) {
+    // Turn off the bitsToTurnOffCount rightmost bits to skip by flipping the bit order, turning off the leftmost bits
+    // in a loop, then flipping the word back in place and counting the number of leading zeroes
+    if (0 < bitsToTurnOffCount) {
+      int reversedByte = (Integer.reverse(value) >>> 24) & 0xFF;
+      for (int i = 0; i < bitsToTurnOffCount; i++) {
+        reversedByte = reversedByte & (reversedByte - 1);
+      }
+      value = (Integer.reverse(reversedByte) >>> 24) & 0xFF;
+    }
+
+    return value;
+  }
 }
