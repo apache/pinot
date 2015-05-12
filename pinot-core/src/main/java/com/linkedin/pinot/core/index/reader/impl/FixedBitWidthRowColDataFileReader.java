@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -55,6 +56,7 @@ public class FixedBitWidthRowColDataFileReader {
   private int rowSizeInBits;
   private ByteBuffer byteBuffer;
   private int[] colSizesInBits;
+  private boolean ownsByteBuffer;
 
   /**
    * used to get the actual value val - offset. offset is non zero if the values
@@ -167,12 +169,12 @@ public class FixedBitWidthRowColDataFileReader {
     init(rows, cols, columnSizesInBits, signed);
     file = new RandomAccessFile(dataFile, "rw");
     if (isMmap) {
-      byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0,
-          totalSizeInBytes);
+      byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes);
     } else {
       byteBuffer = ByteBuffer.allocate(totalSizeInBytes);
       file.getChannel().read(byteBuffer);
     }
+    ownsByteBuffer = true;
     customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
   }
 
@@ -190,6 +192,7 @@ public class FixedBitWidthRowColDataFileReader {
   private FixedBitWidthRowColDataFileReader(ByteBuffer buffer, int rows,
       int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
     this.byteBuffer = buffer;
+    ownsByteBuffer = false;
     init(rows, cols, columnSizesInBits, signed);
     customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
   }
@@ -278,6 +281,9 @@ public class FixedBitWidthRowColDataFileReader {
 
   public void close() {
     IOUtils.closeQuietly(file);
+    if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+    }
   }
 
   public boolean open() {

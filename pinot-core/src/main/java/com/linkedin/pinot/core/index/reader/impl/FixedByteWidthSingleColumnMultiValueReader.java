@@ -130,13 +130,9 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
 
   @Override
   public void close() {
-    try {
-      if (raf != null) {
-        raf.close();
-      }
-    } catch (IOException e) {
-      LOGGER.error("Caught exception while closing reader", e);
-    }
+    IOUtils.closeQuietly(raf);
+    headerSectionReader.close();
+    dataSectionReader.close();
   }
 
   @Override

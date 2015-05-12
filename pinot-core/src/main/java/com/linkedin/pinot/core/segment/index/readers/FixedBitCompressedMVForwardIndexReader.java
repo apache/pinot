@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -23,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +81,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
   private FixedBitWidthRowColDataFileReader dataSectionReader;
   private int rows;
   private int totalNumValues;
+  private ByteBuffer dataBuffer;
 
   /**
    * @param file
@@ -133,7 +136,6 @@ public class FixedBitCompressedMVForwardIndexReader implements
     final int length = headerSectionReader.getInt(numDocs - 1, 1);
     totalNumValues = startIndex + length;
     final int dataSizeInBytes = ((totalNumValues * columnSizeInBits) + 7) / 8;
-    ByteBuffer dataBuffer;
 
     if (isMMap) {
       dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
@@ -163,14 +165,8 @@ public class FixedBitCompressedMVForwardIndexReader implements
 
   @Override
   public void close() throws IOException{
-    try {
-      if (raf != null) {
-        raf.close();
-      }
-    } catch (final IOException e) {
-      LOGGER.error("Caught exception while closing reader", e);
-      throw e;
-    }
+    IOUtils.closeQuietly(raf);
+    MmapUtils.unloadByteBuffer(dataBuffer);
   }
 
   @Override

@@ -67,6 +67,7 @@ public class SortedSVColumnIndexContainer extends ColumnIndexContainer {
   public boolean unload() throws Exception {
     indexFileReader.close();
     dictionaryReader.close();
+    forwardIndexReader.close();
     return true;
   }
 
