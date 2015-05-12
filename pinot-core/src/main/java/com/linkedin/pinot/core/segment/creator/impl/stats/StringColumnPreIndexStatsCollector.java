@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeSet;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -41,7 +41,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   public StringColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    stringSet = new TreeSet<String>();
+    stringSet = new HashSet<String>();
   }
 
   @Override
@@ -112,7 +112,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     sealed = true;
     sortedStringList = new String[stringSet.size()];
     stringSet.toArray(sortedStringList);
+
     Arrays.sort(sortedStringList);
+
     if (sortedStringList.length == 0) {
       min = null;
       max = null;

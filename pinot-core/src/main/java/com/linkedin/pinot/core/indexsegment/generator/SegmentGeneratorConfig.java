@@ -45,7 +45,6 @@ public class SegmentGeneratorConfig {
   private static String SEGMENT_START_TIME = "segment.start.time";
   private static String SEGMENT_END_TIME = "segment.end.time";
   private static String SEGMENT_TIME_UNIT = "segment.time.unit";
-
   private static String SEGMENT_CREATION_TIME = "segment.creation.time";
   private static final String DATA_INPUT_FORMAT = "data.input.format";
   private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
@@ -64,6 +63,7 @@ public class SegmentGeneratorConfig {
 
   private Map<String, Object> properties;
   private Schema schema;
+  private boolean createInvertedIndex = false;
 
   /*
    *
@@ -81,9 +81,18 @@ public class SegmentGeneratorConfig {
   }
 
   public String getSegmentNamePostfix() {
-    if (properties.containsKey(SEGMENT_NAME_POSTFIX))
+    if (properties.containsKey(SEGMENT_NAME_POSTFIX)) {
       return properties.get(SEGMENT_NAME_POSTFIX).toString();
+    }
     return null;
+  }
+
+  public void setCreateInvertedIndex(boolean create) {
+    this.createInvertedIndex = create;
+  }
+
+  public boolean createInvertedIndexEnabled() {
+    return this.createInvertedIndex;
   }
 
   public void setSegmentName(String segmentName) {
@@ -156,9 +165,11 @@ public class SegmentGeneratorConfig {
 
   public Map<String, String> getAllCustomKeyValuePair() {
     final Map<String, String> customConfigs = new HashMap<String, String>();
-    for (String key : properties.keySet())
-      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX))
+    for (String key : properties.keySet()) {
+      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX)) {
         customConfigs.put(key, properties.get(key).toString());
+      }
+    }
     return customConfigs;
   }
 
@@ -238,8 +249,9 @@ public class SegmentGeneratorConfig {
 
   public List<String> getProjectedColumns() {
     List<String> ret = new ArrayList<String>();
-    for (FieldSpec spec : schema.getAllFieldSpecs())
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
       ret.add(spec.getName());
+    }
     return ret;
   }
 

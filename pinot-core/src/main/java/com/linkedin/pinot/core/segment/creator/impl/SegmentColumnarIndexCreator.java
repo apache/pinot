@@ -142,10 +142,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 indexCreationInfo.hasNulls()));
       }
 
-      invertedIndexCreatorMap.put(
-          column,
-          new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
-              .getFieldSpecFor(column)));
+      if (config.createInvertedIndexEnabled()) {
+        invertedIndexCreatorMap.put(
+            column,
+            new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
+                .getFieldSpecFor(column)));
+      }
     }
   }
 
@@ -154,7 +156,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final String column : dictionaryCreatorMap.keySet()) {
       Object dictionaryIndex = dictionaryCreatorMap.get(column).indexOf(row.getValue(column));
       forwardIndexCreatorMap.get(column).index(docIdCounter, dictionaryIndex);
-      invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+      if (config.createInvertedIndexEnabled()) {
+        invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+      }
     }
     docIdCounter++;
   }
@@ -168,7 +172,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void seal() throws ConfigurationException, IOException {
     for (final String column : forwardIndexCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).close();
-      invertedIndexCreatorMap.get(column).seal();
+      if (config.createInvertedIndexEnabled()) {
+        invertedIndexCreatorMap.get(column).seal();
+      }
       dictionaryCreatorMap.get(column).close();
     }
     writeMetadata();

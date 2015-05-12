@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
 import java.util.Arrays;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -32,14 +32,14 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   private Float min = Float.MAX_VALUE;
   private Float max = Float.MIN_VALUE;
-  private final SortedSet<Float> floatSet;
+  private final Set<Float> floatSet;
   private Float[] sortedFloatList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public FloatColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    floatSet = new TreeSet<Float>();
+    floatSet = new HashSet<Float>();
   }
 
   @Override
@@ -101,6 +101,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     sealed = true;
     sortedFloatList = new Float[floatSet.size()];
     floatSet.toArray(sortedFloatList);
+
     Arrays.sort(sortedFloatList);
 
     if (sortedFloatList.length == 0) {

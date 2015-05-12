@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
@@ -61,6 +62,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   int totalDocs;
   File tempIndexDir;
   String segmentName;
+  long totalRecordReadTime = 0;
+  long totalIndexTime = 0;
+  long totalStatsCollectorTime = 0;
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
@@ -102,7 +106,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     totalDocs = 0;
     while (recordReader.hasNext()) {
       totalDocs++;
-      statsCollector.collectRow(recordReader.next());
+      long start = System.currentTimeMillis();
+      GenericRow row = recordReader.next();
+      long stop = System.currentTimeMillis();
+      statsCollector.collectRow(row);
+      long stop1 = System.currentTimeMillis();
+      totalRecordReadTime += (stop - start);
+      totalStatsCollectorTime += (stop1 - stop);
     }
 
     buildIndexCreationInfo();
@@ -114,7 +124,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader.rewind();
 
     while (recordReader.hasNext()) {
-      indexCreator.indexRow(recordReader.next());
+      long start = System.currentTimeMillis();
+      GenericRow row = recordReader.next();
+      long stop = System.currentTimeMillis();
+      indexCreator.indexRow(row);
+      long stop1 = System.currentTimeMillis();
+      totalRecordReadTime += (stop - start);
+      totalIndexTime += (stop1 - stop);
     }
 
     recordReader.close();
@@ -160,6 +176,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc);
+
+    LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
+    LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
+    LOGGER.info("Driver, indexing time : {}", totalIndexTime);
   }
 
   public void ovveriteSegmentName(String segmentName) {

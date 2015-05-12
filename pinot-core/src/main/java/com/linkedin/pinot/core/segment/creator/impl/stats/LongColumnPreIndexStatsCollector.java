@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
 import java.util.Arrays;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -32,14 +32,14 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
   private Long min = null;
   private Long max = null;
-  private final SortedSet<Long> longSet;
+  private final Set<Long> longSet;
   private Long[] sortedLongList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public LongColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    longSet = new TreeSet<Long>();
+    longSet = new HashSet<Long>();
   }
 
   @Override
@@ -102,6 +102,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     sealed = true;
     sortedLongList = new Long[longSet.size()];
     longSet.toArray(sortedLongList);
+
     Arrays.sort(sortedLongList);
 
     if (sortedLongList.length == 0) {

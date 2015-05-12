@@ -167,7 +167,6 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   }
 
   private int computeStartOffset(int row) {
-
     int chunkId = row / docsPerChunk;
     int chunkIdOffset = chunkOffsetsReader.getInt(chunkId, 0);
     if (row % docsPerChunk == 0) {
