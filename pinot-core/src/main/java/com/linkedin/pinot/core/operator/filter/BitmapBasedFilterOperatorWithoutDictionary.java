@@ -79,7 +79,7 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
       return Double.longBitsToDouble(bitsValue + 1);
     }
     if (bitsValue == Long.MIN_VALUE) {
-      return Double.longBitsToDouble(1);
+      return Double.longBitsToDouble(1L);
     }
     return Double.longBitsToDouble(bitsValue - 1);
 
