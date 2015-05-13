@@ -596,11 +596,11 @@
             <email>pinot-core@linkedin.com</email>
           </properties>
           <excludes>
+            <exclude>**/*.txt</exclude>
+            <exclude>**/*.log</exclude>
+            <exclude>**/target/**/*.*</exclude>
             <exclude>**/resources/**/*.*</exclude>
-            <exclude>**/resources/**/*.js</exclude>
-            <exclude>**/resources/**/*.css</exclude>
-            <exclude>**/resources/**/*.txt</exclude>
-            <exclude>**/resources/**/*.yml</exclude>
+            <!-- Stuff that's generated through Avro -->
             <exclude>**/com/linkedin/pinot/common/request/*.*</exclude>
             <exclude>**/com/linkedin/pinot/common/response/*.*</exclude>
             <exclude>pinot-dashboard/**/*.*</exclude>
