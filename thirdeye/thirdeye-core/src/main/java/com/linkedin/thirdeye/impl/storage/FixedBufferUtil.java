@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
 
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,7 +162,9 @@ public class FixedBufferUtil
 
     // Tree
     File starTreeFile = new File(outputDir, StarTreeConstants.TREE_FILE_NAME);
-    FileUtils.copyInputStreamToFile(starTree, starTreeFile);
+    OutputStream fos = new FileOutputStream(starTreeFile);
+    IOUtils.copy(starTree, fos);
+    fos.close();
 
     // Dictionaries
     File combinedDictionaryFile = new File(dimensionStore, fileId + StarTreeConstants.DICT_FILE_SUFFIX);
