@@ -135,11 +135,14 @@ public class SelectionOperatorUtils {
   }
 
   public static Collection<Serializable[]> reduce(Map<ServerInstance, DataTable> selectionResults, int maxRowSize) {
-    Collection<Serializable[]> rowEventsSet = new ArrayList<Serializable[]>();
+    Collection<Serializable[]> rowEventsSet = new ArrayList<Serializable[]>(maxRowSize);
     for (final DataTable dt : selectionResults.values()) {
-      for (int rowId = 0; rowId < Math.min(dt.getNumberOfRows(), maxRowSize); ++rowId) {
+      for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
         final Serializable[] row = extractRowFromDataTable(dt, rowId);
         rowEventsSet.add(row);
+        if (rowEventsSet.size() == maxRowSize) {
+          return rowEventsSet;
+        }
       }
     }
     return rowEventsSet;
