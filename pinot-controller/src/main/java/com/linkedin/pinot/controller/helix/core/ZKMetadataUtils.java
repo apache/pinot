@@ -15,8 +15,11 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -41,6 +44,7 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
 
 public class ZKMetadataUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataUtils.class);
+  private static final String METADATA_SORTED_COLUMNS = "metadata.sorted.columns";
 
   public static OfflineDataResourceZKMetadata getOfflineDataResourceMetadata(DataResource resource) {
     OfflineDataResourceZKMetadata offlineDataResourceMetadata = new OfflineDataResourceZKMetadata();
@@ -64,6 +68,7 @@ public class ZKMetadataUtils {
       }
     }
     offlineDataResourceMetadata.setMetadata(metadataMap);
+    offlineDataResourceMetadata.setSortedColumns(getSortedColumnsFromMetadata(metadataMap));
     try {
       offlineDataResourceMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
       offlineDataResourceMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
@@ -72,6 +77,18 @@ public class ZKMetadataUtils {
     }
 
     return offlineDataResourceMetadata;
+  }
+
+  private static List<String> getSortedColumnsFromMetadata(Map<String, String> metadataMap) {
+    if (metadataMap.containsKey(METADATA_SORTED_COLUMNS)) {
+      String sortedColumnsString = metadataMap.get(METADATA_SORTED_COLUMNS);
+      try {
+        return Arrays.asList(sortedColumnsString.split(","));
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception when split the sorted columns : {}", sortedColumnsString);
+      }
+    }
+    return new ArrayList<String>();
   }
 
   public static RealtimeDataResourceZKMetadata getRealtimeDataResourceMetadata(DataResource resource) {
@@ -104,6 +121,7 @@ public class ZKMetadataUtils {
           resource.getMetadata().get(fieldName).textValue());
     }
     realtimeDataResourceMetadata.setMetadata(metadataMap);
+    realtimeDataResourceMetadata.setSortedColumns(getSortedColumnsFromMetadata(metadataMap));
     realtimeDataResourceMetadata.setDataSchema(Schema.getSchemaFromMap(schemaMap));
     switch (realtimeDataResourceMetadata.getStreamType()) {
       case kafka:
@@ -183,6 +201,7 @@ public class ZKMetadataUtils {
           resource.getMetadata().get(fieldName).textValue());
     }
     offlineDataResourceZKMetadata.setMetadata(metadataMap);
+    offlineDataResourceZKMetadata.setSortedColumns(getSortedColumnsFromMetadata(metadataMap));
     try {
       offlineDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
       offlineDataResourceZKMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
@@ -218,6 +237,7 @@ public class ZKMetadataUtils {
           resource.getMetadata().get(fieldName).textValue());
     }
     realtimeDataResourceZKMetadata.setMetadata(metadataMap);
+    realtimeDataResourceZKMetadata.setSortedColumns(getSortedColumnsFromMetadata(metadataMap));
     if (schemaMap.size() > 0) {
       realtimeDataResourceZKMetadata.setDataSchema(Schema.getSchemaFromMap(schemaMap));
     }
