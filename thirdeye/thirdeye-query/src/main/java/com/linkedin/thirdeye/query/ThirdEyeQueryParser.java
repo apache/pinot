@@ -207,6 +207,12 @@ public class ThirdEyeQueryParser implements
       case BETWEEN_END:
         query.setEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(stringValue.getValue()));
         return;
+      case SELECT_ITEM:
+        query.addMetricName(stringValue.getValue());
+        return;
+      case GROUP_BY:
+        query.addGroupByColumn(stringValue.getValue());
+        return;
     }
     throw new IllegalStateException("Invalid SQL: " + sql);
   }

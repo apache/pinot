@@ -104,6 +104,29 @@ public class TestThirdEyeQueryParser {
     Assert.assertEquals(query.getDerivedMetrics().get(0).getClass(), ThirdEyeRatioFunction.class);
   }
 
+  @Test
+  public void testValid_withDots_metricName() throws Exception {
+    query = parse("SELECT 'root.m1' FROM collection WHERE time BETWEEN '2015-01-07' AND '2015-01-08'");
+    Assert.assertEquals(query.getCollection(), "collection");
+    Assert.assertEquals(query.getStart(), start);
+    Assert.assertEquals(query.getEnd(), end);
+    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("root.m1"));
+    Assert.assertTrue(query.getDimensionValues().isEmpty());
+    Assert.assertTrue(query.getFunctions().isEmpty());
+  }
+
+  @Test
+  public void testValid_withDots_groupBy() throws Exception {
+    query = parse("SELECT 'root.m2' FROM collection WHERE time BETWEEN '2015-01-07' AND '2015-01-08' GROUP BY 'root.m1'");
+    Assert.assertEquals(query.getCollection(), "collection");
+    Assert.assertEquals(query.getStart(), start);
+    Assert.assertEquals(query.getEnd(), end);
+    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("root.m2"));
+    Assert.assertTrue(query.getDimensionValues().isEmpty());
+    Assert.assertTrue(query.getFunctions().isEmpty());
+    Assert.assertEquals(query.getGroupByColumns(), ImmutableList.of("root.m1"));
+  }
+
   // Negative
 
   @Test(expectedExceptions = IllegalStateException.class)

@@ -64,7 +64,7 @@ public class SqlUtils {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
       if ("!".equals(entry.getValue())) {
-        components.add(entry.getKey());
+        components.add(String.format("'%s'", entry.getKey()));
       }
     }
     if (components.isEmpty()) {

@@ -29,6 +29,6 @@ public class TestSqlUtils {
   public void testGetGroupByClause() {
     Map<String, String> dimensionValues = ImmutableSortedMap.of("A", "A1", "B", "B1", "C", "!", "D", "!");
     String groupByClause = SqlUtils.getDimensionGroupByClause(dimensionValues);
-    Assert.assertEquals(groupByClause, "GROUP BY C,D");
+    Assert.assertEquals(groupByClause, "GROUP BY 'C','D'");
   }
 }
