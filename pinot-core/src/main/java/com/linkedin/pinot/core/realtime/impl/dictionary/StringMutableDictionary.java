@@ -110,21 +110,21 @@ public class StringMutableDictionary extends MutableDictionaryReader {
     String stringToCompare = getString(indexOfValueToCompare);
 
     if (includeLower) {
-      if (lower.compareTo(stringToCompare) < 0) {
+      if (lower.compareTo(stringToCompare) > 0) {
         ret = false;
       }
     } else {
-      if (lower.compareTo(stringToCompare) <= 0) {
+      if (lower.compareTo(stringToCompare) >= 0) {
         ret = false;
       }
     }
 
     if (includeUpper) {
-      if (upper.compareTo(stringToCompare) > 0) {
+      if (upper.compareTo(stringToCompare) < 0) {
         ret = false;
       }
     } else {
-      if (upper.compareTo(stringToCompare) >= 0) {
+      if (upper.compareTo(stringToCompare) <= 0) {
         ret = false;
       }
     }

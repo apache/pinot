@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -63,6 +62,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -82,7 +82,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
   private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
   private static final boolean BATCH_KAFKA_MESSAGES = true;
-  protected static final boolean GATHER_FAILED_QUERIES = true;
+  protected static final boolean GATHER_FAILED_QUERIES = false;
   private int failedQueryCount = 0;
   private int queryCount = 0;
 
@@ -183,6 +183,20 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
       // Run the query
       JSONObject response = postQuery(pqlQuery);
+      if (response.getJSONArray("exceptions").length() > 0) {
+        String processingException = (String) response.getJSONArray("exceptions").get(0);
+        // Ignore all the PQL parsing error.
+        if (processingException.contains("ProcessingException(errorCode:350,")) {
+          return;
+        }
+        if (GATHER_FAILED_QUERIES) {
+          saveFailedQuery(pqlQuery, sqlQueries,
+              "Got exceptions in pql query " + pqlQuery + ", got " + response);
+        } else {
+          Assert.fail("Got exceptions in pql query: " + pqlQuery);
+        }
+      }
+
       if (response.has("aggregationResults") && response.getJSONArray("aggregationResults").length() != 0) {
         JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
         JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
@@ -215,8 +229,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           }
         } else if (firstAggregationResult.has("groupByResult")) {
           // Load values from the query result
-          for (int aggregationGroupIndex = 0; aggregationGroupIndex < aggregationResultsArray.length();
-              aggregationGroupIndex++) {
+          for (int aggregationGroupIndex = 0; aggregationGroupIndex < aggregationResultsArray.length(); aggregationGroupIndex++) {
             JSONArray groupByResults =
                 aggregationResultsArray.getJSONObject(aggregationGroupIndex).getJSONArray("groupByResult");
             if (groupByResults.length() != 0) {
@@ -519,7 +532,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String[] queries =
         new String[] { "select count(*) from 'myresource.mytable'", "select sum(DepDelay) from 'myresource.mytable'",
             // "select count(DepDelay) from 'myresource.mytable'",
-        "select min(DepDelay) from 'myresource.mytable'", "select max(DepDelay) from 'myresource.mytable'", "select avg(DepDelay) from 'myresource.mytable'", "select Carrier, count(*) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier TOP 100", "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum TOP 100", "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
+            "select min(DepDelay) from 'myresource.mytable'", "select max(DepDelay) from 'myresource.mytable'", "select avg(DepDelay) from 'myresource.mytable'", "select Carrier, count(*) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier TOP 100", "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum TOP 100", "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
         // "select distinctCount(Carrier) from 'myresource.mytable' where TailNum = 'D942DN' TOP 100"
         };
     return queries;

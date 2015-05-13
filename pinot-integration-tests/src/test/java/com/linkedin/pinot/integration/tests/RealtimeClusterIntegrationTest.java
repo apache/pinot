@@ -155,6 +155,12 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     super.testHardcodedQuerySet();
   }
 
+  @Override
+  @Test
+  public void testGeneratedQueries() throws Exception {
+    super.testGeneratedQueries();
+  }
+
   @Test
   public void testSingleQuery() throws Exception {
     String query;

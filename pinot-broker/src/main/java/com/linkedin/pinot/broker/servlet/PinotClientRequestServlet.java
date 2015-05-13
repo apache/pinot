@@ -15,16 +15,13 @@
  */
 package com.linkedin.pinot.broker.servlet;
 
-import antlr.RecognitionException;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
 import java.util.concurrent.Callable;
+
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -36,6 +33,10 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -92,36 +93,36 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
-
+    final long startTime = System.nanoTime();
+    final BrokerRequest brokerRequest;
     try {
-      final long startTime = System.nanoTime();
-
       final JSONObject compiled = requestCompiler.compile(pql);
-      final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
-
-      brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.QUERIES, 1);
-
-      final long requestCompilationTime = System.nanoTime() - startTime;
-      brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION,
-          requestCompilationTime);
-
-      final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION,
-          new Callable<BrokerResponse>() {
-        @Override
-        public BrokerResponse call()
-            throws Exception {
-          final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
-          return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
-        }
-      });
-
-      LOGGER.info("Broker Response : " + resp);
-      return resp;
-    } catch (RecognitionException re) {
-      LOGGER.warn("Malformed or unrecognized query " + pql, re);
+      brokerRequest = convertToBrokerRequest(compiled);
+    } catch (Exception e) {
+      BrokerResponse brokerResponse = new BrokerResponse();
+      brokerResponse.setExceptions(Arrays.asList(QueryException.getException(QueryException.PQL_PARSING_ERROR, e)));
       brokerMetrics.addMeteredValue(null, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      throw re;
+      return brokerResponse;
     }
+
+    brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.QUERIES, 1);
+
+    final long requestCompilationTime = System.nanoTime() - startTime;
+    brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION,
+        requestCompilationTime);
+
+    final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION,
+        new Callable<BrokerResponse>() {
+          @Override
+          public BrokerResponse call()
+              throws Exception {
+            final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
+            return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
+          }
+        });
+
+    LOGGER.info("Broker Response : " + resp);
+    return resp;
   }
 
   private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {

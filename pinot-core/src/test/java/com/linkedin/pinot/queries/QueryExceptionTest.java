@@ -181,6 +181,6 @@ public class QueryExceptionTest {
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is {}", brokerResponse);
-    Assert.assertTrue(brokerResponse.getExceptionsSize() == 0);
+    Assert.assertEquals(brokerResponse.getExceptionsSize(), 1);
   }
 }

@@ -121,7 +121,7 @@ public class BitmapDocIdSet implements BlockDocIdSet {
       this.startDocId = startDocId;
     }
     //<docId Counter, postinglist Id> Int Pair
-    PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(raw.length, new Pairs.AscendingIntPairComparator());
+    PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(Math.max(1, raw.length), new Pairs.AscendingIntPairComparator());
     boolean[] exists = new boolean[raw.length];
     int counter = 0;
 
