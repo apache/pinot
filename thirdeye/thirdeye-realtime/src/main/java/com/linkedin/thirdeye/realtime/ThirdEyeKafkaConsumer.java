@@ -236,28 +236,31 @@ public class ThirdEyeKafkaConsumer {
     @Override
     public void run() {
       String collection = starTreeConfig.getCollection();
-      try {
-        long currentTime = System.currentTimeMillis();
-        TimeGranularity scheduleGranularity = kafkaConfig.getPersistInterval();
-        String schedule = String.format("KAFKA-%d-%s", scheduleGranularity.getSize(), scheduleGranularity.getUnit());
-        DateTime minTime = new DateTime(stats.getLastPersistTimeMillis().get(), DateTimeZone.UTC);
-        DateTime maxTime = new DateTime(currentTime, DateTimeZone.UTC);
+      long currentTime = System.currentTimeMillis();
+      DateTime minTime = new DateTime(stats.getLastPersistTimeMillis().get(), DateTimeZone.UTC);
+      DateTime maxTime = new DateTime(currentTime, DateTimeZone.UTC);
+      TimeGranularity scheduleGranularity = kafkaConfig.getPersistInterval();
+      String schedule = String.format("KAFKA-%d-%s", scheduleGranularity.getSize(), scheduleGranularity.getUnit());
 
-        LOG.info("Beginning persist data from {} to {} for {}", minTime, maxTime, collection);
-        lock.writeLock().lock();
-        try {
-          // Write to disk
-          dataUpdateManager.persistTree(collection, schedule, minTime, maxTime, starTree);
-          starTree.clear();
-          stats.getLastPersistTimeMillis().set(currentTime);
-          LOG.info("Successfully persisted data from {} to {} for {}", minTime, maxTime, collection);
-          // TODO: We may want to periodically wipe the tree structure as well
-          consumer.commitOffsets();
-        } finally {
-          lock.writeLock().unlock();
-        }
+      LOG.info("Beginning persist data from {} to {} for {}", minTime, maxTime, collection);
+      lock.writeLock().lock();
+      try {
+        // Write to disk
+        LOG.info("Locked {} to persist data...", lock);
+        dataUpdateManager.persistTree(collection, schedule, minTime, maxTime, starTree);
+        LOG.info("Clearing existing star tree metrics...");
+        starTree.clear();
+        LOG.info("Updating last persist time to {}", currentTime);
+        stats.getLastPersistTimeMillis().set(currentTime);
+        // TODO: We may want to periodically wipe the tree structure as well
+        LOG.info("Committing offsets to Kafka for {}", collection);
+        consumer.commitOffsets();
+        LOG.info("Successfully persisted data from {} to {} for {}", minTime, maxTime, collection);
       } catch (Exception e) {
-        LOG.error("Could not persist star tree", collection, e);
+        LOG.error("Could not persist star tree for {}", collection, e);
+      } finally {
+        lock.writeLock().unlock();
+        LOG.info("Unlocked {}", lock);
       }
     }
   }

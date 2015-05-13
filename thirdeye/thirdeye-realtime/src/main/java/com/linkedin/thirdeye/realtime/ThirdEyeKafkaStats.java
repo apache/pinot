@@ -13,6 +13,7 @@ public class ThirdEyeKafkaStats {
   public static final String RECORDS_SKIPPED_EXPIRED = "recordsSkippedExpired";
   public static final String BYTES_READ = "bytesRead";
   public static final String LAST_PERSIST_TIME_MILLIS = "lastPersistTimeMillis";
+  public static final String TIME_SINCE_LAST_PERSIST_MILLIS = "timeSinceLastPersistMillis";
   public static final String LAST_CONSUMED_RECORD_TIME_MILLIS = "lastConsumedRecordTimeMillis";
   public static final String DATA_TIME_MILLIS = "dataTimeMillis";
   public static final String DATA_LAG_MILLIS = "dataLagMillis";
@@ -62,7 +63,7 @@ public class ThirdEyeKafkaStats {
     metricRegistry.remove(bytesReadName);
     this.bytesRead = metricRegistry.meter(bytesReadName);
 
-    String lastPersistTimeMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
+    final String lastPersistTimeMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
         collection,
         topic,
         LAST_PERSIST_TIME_MILLIS);
@@ -107,6 +108,18 @@ public class ThirdEyeKafkaStats {
       @Override
       public Long getValue() {
         return System.currentTimeMillis() - dataTimeMillis.get();
+      }
+    });
+
+    final String timeSinceLastPersistMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
+        collection,
+        topic,
+        TIME_SINCE_LAST_PERSIST_MILLIS);
+    metricRegistry.remove(timeSinceLastPersistMillisName);
+    metricRegistry.register(timeSinceLastPersistMillisName, new Gauge<Long>() {
+      @Override
+      public Long getValue() {
+        return System.currentTimeMillis() - lastPersistTimeMillis.get();
       }
     });
   }

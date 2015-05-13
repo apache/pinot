@@ -265,12 +265,13 @@ public class DataUpdateManager {
             DimensionDictionary dictionary = new DimensionDictionary(node.getRecordStore().getForwardIndex());
             FixedBufferUtil.createLeafBufferFiles(leafBufferDir, node.getId().toString(), starTree.getConfig(), records, dictionary);
           } catch (Exception e) {
-            throw new IllegalStateException("Error creating leaf buffer files for " + node.getId(), e);
+            LOGGER.error("Error creating leaf buffer files for {}", node.getId(), e);
           }
         }
       });
 
       // Create tree output stream
+      LOGGER.info("Serializing star tree");
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
       ObjectOutputStream oos = new ObjectOutputStream(baos);
       oos.writeObject(starTree.getRoot());
@@ -282,8 +283,10 @@ public class DataUpdateManager {
       FixedBufferUtil.combineDataFiles(treeStream, leafBufferDir, segmentBufferDir);
 
       // Create index metadata
+      File metadataFile = new File(segmentBufferDir, StarTreeConstants.METADATA_FILE_NAME);
+      LOGGER.info("Creating index metadata {}", metadataFile);
       IndexMetadata metadata = new IndexMetadata(minDataTime.get(), maxDataTime.get());
-      OutputStream metadataStream = new FileOutputStream(new File(segmentBufferDir, StarTreeConstants.METADATA_FILE_NAME));
+      OutputStream metadataStream = new FileOutputStream(metadataFile);
       metadata.toProperties().store(metadataStream, "This segment was created via DataUpdateManager#persistTree");
       metadataStream.close();
 
@@ -303,6 +306,7 @@ public class DataUpdateManager {
       }
 
       // Remove tmp dir
+      LOGGER.info("Removing tmp directory {}", tmpDir);
       FileUtils.forceDelete(tmpDir);
     } finally {
       lock.unlock();
