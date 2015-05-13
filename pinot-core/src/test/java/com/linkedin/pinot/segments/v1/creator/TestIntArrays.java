@@ -23,6 +23,7 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.testng.Assert;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -99,7 +100,7 @@ public class TestIntArrays {
         final FixedBitCompressedSVForwardIndexReader svHeapReader = (FixedBitCompressedSVForwardIndexReader) heapArray;
         final FixedBitCompressedSVForwardIndexReader mvMmapReader = (FixedBitCompressedSVForwardIndexReader) mmapArray;
         for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
-          AssertJUnit.assertEquals(svHeapReader.getInt(i), mvMmapReader.getInt(i));
+          Assert.assertEquals(mvMmapReader.getInt(i), svHeapReader.getInt(i));
         }
       } else {
         final FixedBitCompressedMVForwardIndexReader svHeapReader = (FixedBitCompressedMVForwardIndexReader) heapArray;
@@ -107,7 +108,8 @@ public class TestIntArrays {
         for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
           final int[] i_1 = new int[1000];
           final int[] j_i = new int[1000];
-          AssertJUnit.assertEquals(svHeapReader.getIntArray(i, i_1), mvMmapReader.getIntArray(i, j_i));
+          Assert.assertEquals(mvMmapReader.getIntArray(i, j_i), svHeapReader.getIntArray(i, i_1));
+
         }
       }
     }

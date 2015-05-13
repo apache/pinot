@@ -16,6 +16,7 @@
 package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.util.TestUtils;
+
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,7 +32,7 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.io.FileUtils;
-import org.testng.AssertJUnit;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -142,30 +143,30 @@ public class TestDictionaries {
       switch (((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
         case BOOLEAN:
         case STRING:
-          AssertJUnit.assertEquals(heapDictionary instanceof StringDictionary, true);
-          AssertJUnit.assertEquals(mmapDictionary instanceof StringDictionary, true);
+          Assert.assertEquals(true, heapDictionary instanceof StringDictionary);
+          Assert.assertEquals(true, mmapDictionary instanceof StringDictionary);
           break;
         case DOUBLE:
-          AssertJUnit.assertEquals(heapDictionary instanceof DoubleDictionary, true);
-          AssertJUnit.assertEquals(mmapDictionary instanceof DoubleDictionary, true);
+          Assert.assertEquals(true, heapDictionary instanceof DoubleDictionary);
+          Assert.assertEquals(true, mmapDictionary instanceof DoubleDictionary);
           break;
         case FLOAT:
-          AssertJUnit.assertEquals(heapDictionary instanceof FloatDictionary, true);
-          AssertJUnit.assertEquals(mmapDictionary instanceof FloatDictionary, true);
+          Assert.assertEquals(true, heapDictionary instanceof FloatDictionary);
+          Assert.assertEquals(true, mmapDictionary instanceof FloatDictionary);
           break;
         case LONG:
-          AssertJUnit.assertEquals(heapDictionary instanceof LongDictionary, true);
-          AssertJUnit.assertEquals(mmapDictionary instanceof LongDictionary, true);
+          Assert.assertEquals(true, heapDictionary instanceof LongDictionary);
+          Assert.assertEquals(true, mmapDictionary instanceof LongDictionary);
           break;
         case INT:
-          AssertJUnit.assertEquals(heapDictionary instanceof IntDictionary, true);
-          AssertJUnit.assertEquals(mmapDictionary instanceof IntDictionary, true);
+          Assert.assertEquals(true, heapDictionary instanceof IntDictionary);
+          Assert.assertEquals(true, mmapDictionary instanceof IntDictionary);
           break;
       }
 
-      AssertJUnit.assertEquals(heapDictionary.length(), mmapDictionary.length());
+      Assert.assertEquals(mmapDictionary.length(), heapDictionary.length());
       for (int i = 0; i < heapDictionary.length(); i++) {
-        AssertJUnit.assertEquals(heapDictionary.get(i), mmapDictionary.get(i));
+        Assert.assertEquals(mmapDictionary.get(i), heapDictionary.get(i));
       }
     }
   }
@@ -184,10 +185,10 @@ public class TestDictionaries {
       final List<Object> list = Arrays.asList(uniques.toArray());
       Collections.shuffle(list);
       for (final Object entry : list) {
-        AssertJUnit.assertEquals(heapDictionary.indexOf(entry), mmapDictionary.indexOf(entry));
+        Assert.assertEquals(mmapDictionary.indexOf(entry), heapDictionary.indexOf(entry));
         if (!column.equals("pageKey")) {
-          AssertJUnit.assertEquals(heapDictionary.indexOf(entry) < 0, false);
-          AssertJUnit.assertEquals(mmapDictionary.indexOf(entry) < 0, false);
+          Assert.assertEquals(false, heapDictionary.indexOf(entry) < 0);
+          Assert.assertEquals(false, mmapDictionary.indexOf(entry) < 0);
         }
       }
     }

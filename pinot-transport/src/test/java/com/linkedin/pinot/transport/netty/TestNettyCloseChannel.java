@@ -31,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
@@ -70,7 +71,7 @@ public class TestNettyCloseChannel {
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
-    AssertJUnit.assertTrue("connected", connected);
+    Assert.assertTrue(connected, "connected");
     Thread.sleep(1000);
     String request = "dummy request";
     LOGGER.info("Sending the request !!");
@@ -82,8 +83,8 @@ public class TestNettyCloseChannel {
     clientConn.close();
     serverConn.shutdownGracefully();
     AssertJUnit.assertNull(serverResp);
-    AssertJUnit.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
-    AssertJUnit.assertTrue("Got Exception", serverRespFuture.getError() != null);
+    Assert.assertFalse(serverRespFuture.isCancelled(), "Is Cancelled");
+    Assert.assertTrue(serverRespFuture.getError() != null, "Got Exception");
     serverConn.shutdownGracefully();
     System.out.println(metric);
   }
@@ -108,7 +109,7 @@ public class TestNettyCloseChannel {
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
-    AssertJUnit.assertTrue("connected", connected);
+    Assert.assertTrue(connected, "connected");
     Thread.sleep(1000);
     String request = "dummy request";
     LOGGER.info("Sending the request !!");
@@ -117,8 +118,8 @@ public class TestNettyCloseChannel {
     clientConn.close();
     serverConn.shutdownGracefully();
     AssertJUnit.assertNull(serverResp);
-    AssertJUnit.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
-    AssertJUnit.assertTrue("Got Exception", serverRespFuture.getError() != null);
+    Assert.assertFalse(serverRespFuture.isCancelled(), "Is Cancelled");
+    Assert.assertTrue(serverRespFuture.getError() != null, "Got Exception");
     System.out.println(metric);
   }
 

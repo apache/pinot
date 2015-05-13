@@ -26,6 +26,7 @@ import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
@@ -65,7 +66,7 @@ public class TestNettySingleConnectionInteg {
       LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
       LOGGER.info("Client connected !!");
-      AssertJUnit.assertTrue("connected", connected);
+      Assert.assertTrue(connected, "connected");
       Thread.sleep(1000);
       String request = "dummy request";
       LOGGER.info("Sending the request !!");
@@ -75,8 +76,8 @@ public class TestNettySingleConnectionInteg {
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);
-      AssertJUnit.assertEquals("Response Check at client", response, gotResponse);
-      AssertJUnit.assertEquals("Request Check at server", request, handler.getRequest());
+      Assert.assertEquals(gotResponse, response, "Response Check at client");
+      Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
       System.out.println(metric);
     } finally {
       if (null != clientConn) {
@@ -108,7 +109,7 @@ public class TestNettySingleConnectionInteg {
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
-    AssertJUnit.assertTrue("connected", connected);
+    Assert.assertTrue(connected, "connected");
     Thread.sleep(1000);
     String request = "dummy request";
     LOGGER.info("Sending the request !!");
@@ -117,7 +118,7 @@ public class TestNettySingleConnectionInteg {
     latch.countDown();
     ByteBuf serverResp = serverRespFuture.getOne();
     AssertJUnit.assertNull(serverResp);
-    AssertJUnit.assertTrue("Is Cancelled", serverRespFuture.isCancelled());
+    Assert.assertTrue(serverRespFuture.isCancelled(), "Is Cancelled");
     clientConn.close();
     serverConn.shutdownGracefully();
   }
@@ -141,7 +142,7 @@ public class TestNettySingleConnectionInteg {
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
-    AssertJUnit.assertTrue("connected", connected);
+    Assert.assertTrue(connected, "connected");
     Thread.sleep(1000);
     String request = "dummy request";
     LOGGER.info("Sending the request !!");
@@ -159,11 +160,11 @@ public class TestNettySingleConnectionInteg {
     byte[] b2 = new byte[serverResp.readableBytes()];
     serverResp.readBytes(b2);
     String gotResponse = new String(b2);
-    AssertJUnit.assertEquals("Response Check at client", response, gotResponse);
-    AssertJUnit.assertEquals("Request Check at server", request, handler.getRequest());
+    Assert.assertEquals(gotResponse, response, "Response Check at client");
+    Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
     clientConn.close();
     serverConn.shutdownGracefully();
-    AssertJUnit.assertTrue("GotException ", gotException);
+    Assert.assertTrue(gotException, "GotException ");
   }
 
   private String generatePayload(String prefix, int numBytes) {
@@ -199,7 +200,7 @@ public class TestNettySingleConnectionInteg {
       LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
       LOGGER.info("Client connected !!");
-      AssertJUnit.assertTrue("connected", connected);
+      Assert.assertTrue(connected, "connected");
       Thread.sleep(1000);
       String request_prefix = "request_";
       String request = generatePayload(request_prefix, 1024 * 1024 * 2);
@@ -210,8 +211,8 @@ public class TestNettySingleConnectionInteg {
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);
-      AssertJUnit.assertEquals("Response Check at client", response, gotResponse);
-      AssertJUnit.assertEquals("Request Check at server", request, handler.getRequest());
+      Assert.assertEquals(gotResponse, response, "Response Check at client");
+      Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
     } finally {
       if (null != clientConn) {
         clientConn.close();
@@ -244,7 +245,7 @@ public class TestNettySingleConnectionInteg {
       LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
       LOGGER.info("Client connected !!");
-      AssertJUnit.assertTrue("connected", connected);
+      Assert.assertTrue(connected, "connected");
       Thread.sleep(1000);
       for (int i = 0; i < 10000; i++) {
         String request = "dummy request :" + i;
@@ -261,8 +262,8 @@ public class TestNettySingleConnectionInteg {
         byte[] b2 = new byte[serverResp.readableBytes()];
         serverResp.readBytes(b2);
         String gotResponse = new String(b2);
-        AssertJUnit.assertEquals("Response Check at client", response, gotResponse);
-        AssertJUnit.assertEquals("Request Check at server", request, handler.getRequest());
+        Assert.assertEquals(gotResponse, response, "Response Check at client");
+        Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
       }
     } finally {
       if (null != clientConn) {
@@ -298,7 +299,7 @@ public class TestNettySingleConnectionInteg {
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
-    AssertJUnit.assertTrue("connected", connected);
+    Assert.assertTrue(connected, "connected");
     Thread.sleep(1000);
     try {
       for (int i = 0; i < 100; i++) {
@@ -314,8 +315,8 @@ public class TestNettySingleConnectionInteg {
         byte[] b2 = new byte[serverResp.readableBytes()];
         serverResp.readBytes(b2);
         String gotResponse = new String(b2);
-        AssertJUnit.assertEquals("Response Check at client", response, gotResponse);
-        AssertJUnit.assertEquals("Request Check at server", request, handler.getRequest());
+        Assert.assertEquals(gotResponse, response, "Response Check at client");
+        Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
       }
     } finally {
       if (null != clientConn) {

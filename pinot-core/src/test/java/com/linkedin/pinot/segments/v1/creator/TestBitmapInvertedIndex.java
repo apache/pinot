@@ -16,6 +16,7 @@
 package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.util.TestUtils;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +26,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.io.FileUtils;
-import org.testng.AssertJUnit;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -61,14 +62,14 @@ public class TestBitmapInvertedIndex {
         }
         final int dicId = heapSegment.getDictionaryFor(column).indexOf(entry);
         // make sure that docId for dicId exist in the inverted index
-        AssertJUnit.assertEquals(heapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId), true);
+        Assert.assertEquals(true, heapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
         final int size = heapSegment.getDictionaryFor(column).length();
         for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
           if (i == dicId) {
             continue;
           }
           // make sure that docId for dicId does not exist in the inverted index
-          AssertJUnit.assertEquals(heapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId), false);
+          Assert.assertEquals(false, heapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
         }
       }
       ++docId;
@@ -93,14 +94,14 @@ public class TestBitmapInvertedIndex {
         }
         final int dicId = mmapSegment.getDictionaryFor(column).indexOf(entry);
         // make sure that docId for dicId exist in the inverted index
-        AssertJUnit.assertEquals(mmapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId), true);
+        Assert.assertEquals(true, mmapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
         final int size = mmapSegment.getDictionaryFor(column).length();
         for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
           if (i == dicId) {
             continue;
           }
           // make sure that docId for dicId does not exist in the inverted index
-          AssertJUnit.assertEquals(mmapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId), false);
+          Assert.assertEquals(false, mmapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
         }
       }
       ++docId;

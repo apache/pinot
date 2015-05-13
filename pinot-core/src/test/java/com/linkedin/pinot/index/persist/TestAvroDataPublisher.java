@@ -115,18 +115,18 @@ public class TestAvroDataPublisher {
       if (avroDataPublisher.hasNext()) {
         final GenericRow recordRow = avroDataPublisher.next();
         // System.out.println(recordRow);
-        AssertJUnit.assertEquals(2, recordRow.getFieldNames().length);
+        Assert.assertEquals(recordRow.getFieldNames().length, 2);
         for (final String column : recordRow.getFieldNames()) {
           final String valueFromJson = obj.get(column).toString();
           final String valueFromAvro = recordRow.getValue(column).toString();
           if (cnt > 1) {
-            AssertJUnit.assertEquals(valueFromJson, valueFromAvro);
+            Assert.assertEquals(valueFromAvro, valueFromJson);
           }
         }
       }
       cnt++;
     }
-    AssertJUnit.assertEquals(cnt, 10000);
+    Assert.assertEquals(10000, cnt);
   }
 
   @Test
@@ -169,6 +169,6 @@ public class TestAvroDataPublisher {
       }
       cnt++;
     }
-    AssertJUnit.assertEquals(cnt, 28949);
+    Assert.assertEquals(28949, cnt);
   }
 }
