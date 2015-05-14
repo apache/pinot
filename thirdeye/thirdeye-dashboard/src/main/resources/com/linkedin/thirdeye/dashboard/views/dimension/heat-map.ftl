@@ -25,7 +25,7 @@
                  stats-names='${heatMap.statsNamesJson}'>
                 <#list heatMap.cells as cell>
                     <div class='dimension-view-heat-map-cell'
-                         value='${cell.value}'
+                         value='${cell.value?html}'
                          stats='${cell.statsJson}'></div>
                 </#list>
             </div>
