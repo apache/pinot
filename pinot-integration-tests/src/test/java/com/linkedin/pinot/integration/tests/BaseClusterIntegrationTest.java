@@ -179,6 +179,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
     try {
+      // TODO Use Pinot client API for this
       queryCount++;
       Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 

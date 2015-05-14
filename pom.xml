@@ -566,7 +566,7 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
-              <skip>true</skip>
+              <skip>false</skip>
             </configuration>
           </execution>
         </executions>
