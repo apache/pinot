@@ -16,25 +16,23 @@
 package com.linkedin.pinot.core.operator.blocks;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.OrBlockDocIdSet;
 
 
-public class OrBlock implements Block {
+public class OrBlock extends BaseFilterBlock {
 
-  final List<BlockDocIdSet> blockDocIdSets;
+  final List<FilterBlockDocIdSet> blockDocIdSets;
   public OrBlockDocIdSet orBlockDocIdSet;
 
-  public OrBlock(List<BlockDocIdSet> blockDocIdSets) {
+  public OrBlock(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.blockDocIdSets = blockDocIdSets;
   }
 
@@ -49,7 +47,7 @@ public class OrBlock implements Block {
   }
 
   @Override
-  public BlockDocIdSet getBlockDocIdSet() {
+  public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
     orBlockDocIdSet = new OrBlockDocIdSet(blockDocIdSets);
     return orBlockDocIdSet;
   }

@@ -21,12 +21,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 
 
-public class SortedDocIdSet implements BlockDocIdSet {
+public class SortedDocIdSet implements FilterBlockDocIdSet {
 
   private final List<Pair<Integer, Integer>> pairs;
   public final AtomicLong timeMeasure = new AtomicLong(0);
@@ -37,6 +37,7 @@ public class SortedDocIdSet implements BlockDocIdSet {
     this.pairs = pairs;
   }
 
+  @Override
   public int getMinDocId() {
     if (pairs.size() > 0) {
       return pairs.get(0).getLeft();
@@ -45,6 +46,7 @@ public class SortedDocIdSet implements BlockDocIdSet {
     }
   }
 
+  @Override
   public int getMaxDocId() {
     if (pairs.size() > 0) {
       return pairs.get(pairs.size() - 1).getRight();

@@ -20,14 +20,14 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 
 
-public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
+public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private BlockMetadata blockMetadata;
   private BlockValSetBlockDocIdIterator blockValSetBlockDocIdIterator;
@@ -38,10 +38,12 @@ public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
     blockValSetBlockDocIdIterator = new BlockValSetBlockDocIdIterator(blockValSet, blockMetadata, dictIds);
   }
 
+  @Override
   public int getMinDocId() {
     return blockMetadata.getStartDocId();
   }
 
+  @Override
   public int getMaxDocId() {
     return blockMetadata.getEndDocId();
   }

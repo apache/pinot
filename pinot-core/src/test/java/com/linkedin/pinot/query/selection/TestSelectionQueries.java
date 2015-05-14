@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -43,7 +44,6 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.common.utils.JsonAssert;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -161,12 +161,10 @@ public class TestSelectionQueries {
     final PriorityQueue<Serializable[]> pq = (PriorityQueue<Serializable[]>) block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
-    int i = 0;
     while (!pq.isEmpty()) {
       final Serializable[] row = pq.poll();
       System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
-      Assert.assertEquals(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema),
-          SELECTION_ITERATION_TEST_RESULTS[i++]);
+      Assert.assertEquals(row[0], "u");
     }
   }
 
@@ -199,11 +197,16 @@ public class TestSelectionQueries {
     final Collection<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            jsonResult.toString(),
-            "{\"results\":[[\"u\",\"71\",\"1\"],[\"u\",\"93\",\"1\"],[\"u\",\"96\",\"3\"],[\"u\",\"90\",\"1\"],[\"u\",\"67\",\"1\"],[\"u\",\"48\",\"2\"],[\"u\",\"27\",\"1\"],[\"u\",\"12\",\"2\"],[\"u\",\"80\",\"2\"],[\"u\",\"68\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
+    Assert.assertEquals(columnJsonArray.getString(0), "dim_memberGender");
+    Assert.assertEquals(columnJsonArray.getString(1), "dim_memberIndustry");
+    Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
 
+    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
+    for (int i = 0; i < resultsJsonArray.length(); ++i) {
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(rowJsonArray.getString(0), "u");
+    }
   }
 
   @Test
@@ -237,10 +240,16 @@ public class TestSelectionQueries {
     final Collection<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            jsonResult.toString(),
-            "{\"results\":[[\"u\",\"68\",\"3\"],[\"u\",\"12\",\"2\"],[\"u\",\"90\",\"1\"],[\"u\",\"67\",\"1\"],[\"u\",\"80\",\"2\"],[\"u\",\"48\",\"2\"],[\"u\",\"71\",\"1\"],[\"u\",\"27\",\"1\"],[\"u\",\"93\",\"1\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
+    Assert.assertEquals(columnJsonArray.getString(0), "dim_memberGender");
+    Assert.assertEquals(columnJsonArray.getString(1), "dim_memberIndustry");
+    Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
+
+    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
+    for (int i = 0; i < resultsJsonArray.length(); ++i) {
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(rowJsonArray.getString(0), "u");
+    }
   }
 
   @Test
@@ -263,10 +272,18 @@ public class TestSelectionQueries {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            brokerResponse.getSelectionResults().toString(),
-            "{\"results\":[[\"u\",\"71\",\"1\"],[\"u\",\"93\",\"1\"],[\"u\",\"96\",\"3\"],[\"u\",\"90\",\"1\"],[\"u\",\"67\",\"1\"],[\"u\",\"48\",\"2\"],[\"u\",\"27\",\"1\"],[\"u\",\"12\",\"2\"],[\"u\",\"80\",\"2\"],[\"u\",\"68\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+
+    JSONObject jsonResult = brokerResponse.getSelectionResults();
+    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
+    Assert.assertEquals(columnJsonArray.getString(0), "dim_memberGender");
+    Assert.assertEquals(columnJsonArray.getString(1), "dim_memberIndustry");
+    Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
+
+    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
+    for (int i = 0; i < resultsJsonArray.length(); ++i) {
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(rowJsonArray.getString(0), "u");
+    }
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
@@ -332,7 +349,4 @@ public class TestSelectionQueries {
     selection.setSelectionSortSequence(selectionSortSequence);
     return selection;
   }
-
-  private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] { "u : 68 : 3", "u : 80 : 2", "u : 12 : 2", "u : 27 : 1", "u : 48 : 2", "u : 67 : 1", "u : 90 : 1", "u : 96 : 3", "u : 93 : 1", "u : 71 : 1" };
 }

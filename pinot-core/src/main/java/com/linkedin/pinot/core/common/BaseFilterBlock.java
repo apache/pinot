@@ -13,33 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package com.linkedin.pinot.core.common;
 
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.core.common.BaseFilterBlock;
-import com.linkedin.pinot.core.common.BlockId;
+public abstract class BaseFilterBlock implements Block {
 
-public class InvertedIndexBasedFilterOperator extends BaseFilterOperator{
-
-  private DataSource dataSource;
-
-  public InvertedIndexBasedFilterOperator(DataSource dataSource){
-    this.dataSource = dataSource;
-  }
-  
   @Override
-  public boolean open() {
-    return true;
+  public boolean applyPredicate(Predicate predicate) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
-    throw new UnsupportedOperationException("Skipping to a block Id is not supported yet");
+  public final BlockDocIdSet getBlockDocIdSet() {
+    return getFilteredBlockDocIdSet();
+  }
+
+  public abstract FilterBlockDocIdSet getFilteredBlockDocIdSet();
+
+  @Override
+  public BlockValSet getBlockValueSet() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public boolean close() {
-    return true;
+  public BlockDocIdValueSet getBlockDocIdValueSet() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BlockMetadata getMetadata() {
+    throw new UnsupportedOperationException();
   }
 
 }

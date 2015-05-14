@@ -15,19 +15,18 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 
 
-public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
+public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private BlockValSetBasedDocIdIterator blockValSetBlockDocIdIterator;
   private BlockMetadata blockMetadata;

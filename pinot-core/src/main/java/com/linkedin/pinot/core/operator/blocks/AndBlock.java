@@ -17,22 +17,22 @@ package com.linkedin.pinot.core.operator.blocks;
 
 import java.util.List;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.AndBlockDocIdSet;
 
 
-public class AndBlock implements Block {
+public class AndBlock extends BaseFilterBlock {
 
-  final List<BlockDocIdSet> blockDocIdSets;
+  final List<FilterBlockDocIdSet> blockDocIdSets;
   public AndBlockDocIdSet andBlockDocIdSet;
 
-  public AndBlock(List<BlockDocIdSet> blockDocIdSets) {
+  public AndBlock(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.blockDocIdSets = blockDocIdSets;
   }
 
@@ -47,7 +47,7 @@ public class AndBlock implements Block {
   }
 
   @Override
-  public BlockDocIdSet getBlockDocIdSet() {
+  public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
     andBlockDocIdSet = new AndBlockDocIdSet(blockDocIdSets);
     return andBlockDocIdSet;
   }

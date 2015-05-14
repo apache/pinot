@@ -23,59 +23,49 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 
 
-public final class OrBlockDocIdSet implements BlockDocIdSet {
+public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
   /**
    * 
    */
   private final BlockDocIdIterator[] docIdIterators;
   final public AtomicLong timeMeasure = new AtomicLong(0);
-  private List<BlockDocIdSet> docIdSets;
-  private int maxDocId;
-  private int minDocId;
+  private List<FilterBlockDocIdSet> docIdSets;
+  private int maxDocId = Integer.MIN_VALUE;
+  private int minDocId = Integer.MAX_VALUE;
 
-  public OrBlockDocIdSet(List<BlockDocIdSet> blockDocIdSets) {
+  public OrBlockDocIdSet(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.docIdSets = blockDocIdSets;
     final BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
     for (int srcId = 0; srcId < blockDocIdSets.size(); srcId++) {
       docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
     }
     this.docIdIterators = docIdIterators;
-    minDocId = Integer.MAX_VALUE;
-    maxDocId = Integer.MIN_VALUE;
-    for (BlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      if (blockDocIdSet instanceof SortedDocIdSet) {
-        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) blockDocIdSet;
-        minDocId = Math.min(minDocId, sortedDocIdSet.getMinDocId());
-        maxDocId = Math.max(maxDocId, sortedDocIdSet.getMaxDocId());
-      } else if (blockDocIdSet instanceof AndBlockDocIdSet) {
-        AndBlockDocIdSet andBlockDocIdSet = (AndBlockDocIdSet) blockDocIdSet;
-        minDocId = Math.min(minDocId, andBlockDocIdSet.getMinDocId());
-        maxDocId = Math.max(maxDocId, andBlockDocIdSet.getMaxDocId());
-      }
+    updateMinMaxRange();
+  }
+
+  private void updateMinMaxRange() {
+    for (FilterBlockDocIdSet blockDocIdSet : docIdSets) {
+      minDocId = Math.min(minDocId, blockDocIdSet.getMinDocId());
+      maxDocId = Math.max(maxDocId, blockDocIdSet.getMaxDocId());
     }
-    for (BlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      if (blockDocIdSet instanceof SortedDocIdSet) {
-        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) blockDocIdSet;
-        sortedDocIdSet.setStartDocId(minDocId);
-        sortedDocIdSet.setEndDocId(maxDocId);
-      } else if (blockDocIdSet instanceof OrBlockDocIdSet) {
-        OrBlockDocIdSet orBlockDocIdSet = (OrBlockDocIdSet) blockDocIdSet;
-        orBlockDocIdSet.setStartDocId(minDocId);
-        orBlockDocIdSet.setEndDocId(maxDocId);
-      } else if (blockDocIdSet instanceof ScanBasedSingleValueDocIdSet) {
-        ScanBasedSingleValueDocIdSet scanBasedSingleValueDocIdSet = (ScanBasedSingleValueDocIdSet) blockDocIdSet;
-        scanBasedSingleValueDocIdSet.setStartDocId(minDocId);
-        scanBasedSingleValueDocIdSet.setEndDocId(maxDocId);
-      } else if (blockDocIdSet instanceof ScanBasedMultiValueDocIdSet) {
-        ScanBasedMultiValueDocIdSet scanBasedMultiValueDocIdSet = (ScanBasedMultiValueDocIdSet) blockDocIdSet;
-        scanBasedMultiValueDocIdSet.setStartDocId(minDocId);
-        scanBasedMultiValueDocIdSet.setEndDocId(maxDocId);
-      }
+    for (FilterBlockDocIdSet blockDocIdSet : docIdSets) {
+      blockDocIdSet.setStartDocId(minDocId);
+      blockDocIdSet.setEndDocId(maxDocId);
     }
+  }
+
+  @Override
+  public int getMaxDocId() {
+    return maxDocId;
+  }
+
+  @Override
+  public int getMinDocId() {
+    return minDocId;
   }
 
   @Override
@@ -182,37 +172,16 @@ public final class OrBlockDocIdSet implements BlockDocIdSet {
     return (T) this.docIdSets;
   }
 
+  @Override
   public void setStartDocId(int startDocId) {
-    for (BlockDocIdSet blockDocIdSet : docIdSets) {
-      if (blockDocIdSet instanceof ScanBasedSingleValueDocIdSet) {
-        ScanBasedSingleValueDocIdSet scanBasedSingleValueDocIdSet = (ScanBasedSingleValueDocIdSet) blockDocIdSet;
-        scanBasedSingleValueDocIdSet.setStartDocId(startDocId);
-      }
-      if (blockDocIdSet instanceof ScanBasedMultiValueDocIdSet) {
-        ScanBasedMultiValueDocIdSet scanBasedMultiValueDocIdSet = (ScanBasedMultiValueDocIdSet) blockDocIdSet;
-        scanBasedMultiValueDocIdSet.setStartDocId(startDocId);
-      }
-      if (blockDocIdSet instanceof BitmapDocIdSet) {
-        BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) blockDocIdSet;
-        bitmapDocIdSet.setStartDocId(startDocId);
-      }
-    }
+    minDocId = Math.min(minDocId, startDocId);
+    updateMinMaxRange();
   }
 
+  @Override
   public void setEndDocId(int endDocId) {
-    for (BlockDocIdSet blockDocIdSet : docIdSets) {
-      if (blockDocIdSet instanceof ScanBasedSingleValueDocIdSet) {
-        ScanBasedSingleValueDocIdSet scanBasedSingleValueDocIdSet = (ScanBasedSingleValueDocIdSet) blockDocIdSet;
-        scanBasedSingleValueDocIdSet.setEndDocId(endDocId);
-      }
-      if (blockDocIdSet instanceof ScanBasedMultiValueDocIdSet) {
-        ScanBasedMultiValueDocIdSet scanBasedMultiValueDocIdSet = (ScanBasedMultiValueDocIdSet) blockDocIdSet;
-        scanBasedMultiValueDocIdSet.setEndDocId(endDocId);
-      }
-      if (blockDocIdSet instanceof BitmapDocIdSet) {
-        BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) blockDocIdSet;
-        bitmapDocIdSet.setEndDocId(endDocId);
-      }
-    }
+    maxDocId = Math.max(maxDocId, endDocId);
+    updateMinMaxRange();
   }
+
 }

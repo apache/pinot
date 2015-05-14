@@ -18,14 +18,15 @@ package com.linkedin.pinot.core.operator.filter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
@@ -50,11 +51,11 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
     Predicate predicate = getPredicate();
     Dictionary dictionary = dataSource.getDictionary();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    BlockDocIdSet docIdSet;
+    FilterBlockDocIdSet docIdSet;
     Block nextBlock = dataSource.nextBlock();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
@@ -74,11 +75,11 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     return true;
   }
 
-  public static class ScanBlock implements Block {
+  public static class ScanBlock extends BaseFilterBlock {
 
-    private BlockDocIdSet docIdSet;
+    private FilterBlockDocIdSet docIdSet;
 
-    public ScanBlock(BlockDocIdSet docIdSet) {
+    public ScanBlock(FilterBlockDocIdSet docIdSet) {
       this.docIdSet = docIdSet;
     }
 
@@ -92,10 +93,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
       throw new UnsupportedOperationException("applypredicate not supported in " + this.getClass());
     }
 
-    @Override
-    public BlockDocIdSet getBlockDocIdSet() {
-      return docIdSet;
-    }
+
 
     @Override
     public BlockValSet getBlockValueSet() {
@@ -110,6 +108,11 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     @Override
     public BlockMetadata getMetadata() {
       throw new UnsupportedOperationException("getMetadata not supported in " + this.getClass());
+    }
+
+    @Override
+    public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
+      return docIdSet;
     }
 
   }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -49,12 +50,19 @@ public abstract class BaseFilterOperator implements Operator {
   }
 
   @Override
-  public final Block nextBlock() {
+  public final BaseFilterBlock nextBlock() {
+    return nextBlock(new BlockId(0));
+  }
+
+  @Override
+  public final BaseFilterBlock nextBlock(BlockId blockId) {
     if (nextBlockCallCounter > 0) {
       return null;
     }
-    Block nextBlock = nextBlock(new BlockId(0));
+    Block nextBlock = nextFilterBlock(new BlockId(0));
     nextBlockCallCounter = nextBlockCallCounter + 1;
-    return nextBlock;
+    return (BaseFilterBlock) nextBlock;
   }
+
+  public abstract BaseFilterBlock nextFilterBlock(BlockId blockId);
 }

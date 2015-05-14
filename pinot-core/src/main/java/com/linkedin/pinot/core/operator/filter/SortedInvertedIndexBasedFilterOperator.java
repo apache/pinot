@@ -23,14 +23,14 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -57,7 +57,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
     Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
     Dictionary dictionary = dataSource.getDictionary();
@@ -81,7 +81,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     return true;
   }
 
-  public static class SortedBlock implements Block {
+  public static class SortedBlock extends BaseFilterBlock {
 
     private List<Pair<Integer, Integer>> pairs;
     private SortedDocIdSet sortedDocIdSet;
@@ -101,7 +101,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     }
 
     @Override
-    public BlockDocIdSet getBlockDocIdSet() {
+    public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
       sortedDocIdSet = new SortedDocIdSet(pairs);
       return sortedDocIdSet;
     }

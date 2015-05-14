@@ -254,13 +254,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               ResultSet rs = statement.getResultSet();
               LOGGER.info("Trying to get result from sql: " + rs);
               rs.beforeFirst();
-              while (rs.next()) {
-                String h2GroupKey = rs.getString(1);
-                for (int groupKeyIndex = 1; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-                  h2GroupKey += "\t" + rs.getString(groupKeyIndex + 1);
+              try {
+                while (rs.next()) {
+                  String h2GroupKey = rs.getString(1);
+                  for (int groupKeyIndex = 1; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
+                    h2GroupKey += "\t" + rs.getString(groupKeyIndex + 1);
+                  }
+                  correctValues.put(h2GroupKey, rs.getString(groupKeyCount + 1));
                 }
-                correctValues.put(h2GroupKey, rs.getString(groupKeyCount + 1));
+              } catch (Exception e) {
+                LOGGER.error("Catch exception when constructing H2 results for group by query", e);
               }
+              LOGGER.info("Trying to get result from sql: " + correctValues.toString());
               LOGGER.info("Trying to compare result from bql: " + actualValues);
               LOGGER.info("Trying to compare result from sql: " + correctValues);
 
@@ -530,10 +535,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected String[] getHardCodedQuerySet() {
     String[] queries =
-        new String[] { "select count(*) from 'myresource.mytable'", "select sum(DepDelay) from 'myresource.mytable'",
-            // "select count(DepDelay) from 'myresource.mytable'",
+        new String[] {
+            "SELECT sum(OriginAirportSeqID) FROM 'myresource.mytable'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 9",
+            "SELECT sum(CarrierDelay) FROM 'myresource.mytable'  WHERE      CRSDepTime < '1047' OR DestWac = '84'   LIMIT 16",
+            "SELECT sum(CarrierDelay) FROM 'myresource.mytable'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 16",
+            "select count(*) from 'myresource.mytable'", "select sum(DepDelay) from 'myresource.mytable'",
+            "select count(DepDelay) from 'myresource.mytable'",
             "select min(DepDelay) from 'myresource.mytable'", "select max(DepDelay) from 'myresource.mytable'", "select avg(DepDelay) from 'myresource.mytable'", "select Carrier, count(*) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier TOP 100", "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum TOP 100", "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
-        // "select distinctCount(Carrier) from 'myresource.mytable' where TailNum = 'D942DN' TOP 100"
+            "select distinctCount(Carrier) from 'myresource.mytable' where TailNum = 'D942DN' TOP 100"
         };
     return queries;
   }

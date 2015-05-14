@@ -16,15 +16,15 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.OrBlock;
 
@@ -48,11 +48,11 @@ public class OrOperator extends BaseFilterOperator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
-    List<BlockDocIdSet> blockDocIdSets = new ArrayList<BlockDocIdSet>();
+  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
+    List<FilterBlockDocIdSet> blockDocIdSets = new ArrayList<FilterBlockDocIdSet>();
     for (Operator operator : operators) {
       Block block = operator.nextBlock();
-      BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
+      FilterBlockDocIdSet blockDocIdSet = (FilterBlockDocIdSet) block.getBlockDocIdSet();
       blockDocIdSets.add(blockDocIdSet);
     }
     orBlock = new OrBlock(blockDocIdSets);

@@ -27,12 +27,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 
 
-public class BitmapDocIdSet implements BlockDocIdSet {
+public class BitmapDocIdSet implements FilterBlockDocIdSet {
 
   final private ImmutableRoaringBitmap[] raw;
   public final AtomicLong timeMeasure = new AtomicLong(0);
@@ -63,10 +63,12 @@ public class BitmapDocIdSet implements BlockDocIdSet {
     bitmapBasedBlockIdSetIterator.setEndDocId(blockMetadata.getEndDocId());
   }
 
+  @Override
   public int getMinDocId() {
     return blockMetadata.getStartDocId();
   }
 
+  @Override
   public int getMaxDocId() {
     return blockMetadata.getEndDocId();
   }

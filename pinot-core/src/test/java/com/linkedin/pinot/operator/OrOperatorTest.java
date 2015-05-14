@@ -27,16 +27,15 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 
 
@@ -48,8 +47,8 @@ public class OrOperatorTest {
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
     ;
     List<Operator> operators = new ArrayList<Operator>();
-    operators.add(makeOperator(list1));
-    operators.add(makeOperator(list2));
+    operators.add(makeFilterOperator(list1));
+    operators.add(makeFilterOperator(list2));
     final OrOperator orOperator = new OrOperator(operators);
 
     orOperator.open();
@@ -68,17 +67,17 @@ public class OrOperatorTest {
     }
     orOperator.close();
   }
-  
+
   @Test
   public void testIntersectionForThreeLists() {
     int[] list1 = new int[] { 2, 3, 6, 10, 15, 16, 28 };
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
-    int[] list3 = new int[] { 1,2, 3, 6, 30 };
+    int[] list3 = new int[] { 1, 2, 3, 6, 30 };
 
     List<Operator> operators = new ArrayList<Operator>();
-    operators.add(makeOperator(list1));
-    operators.add(makeOperator(list2));
-    operators.add(makeOperator(list3));
+    operators.add(makeFilterOperator(list1));
+    operators.add(makeFilterOperator(list2));
+    operators.add(makeFilterOperator(list3));
 
     final OrOperator orOperator = new OrOperator(operators);
 
@@ -100,42 +99,47 @@ public class OrOperatorTest {
     orOperator.close();
   }
 
-  private Operator makeOperator(final int[] list) {
-
-    return new Operator() {
+  public BaseFilterOperator makeFilterOperator(final int[] list) {
+    return new BaseFilterOperator() {
       boolean alreadyInvoked = false;
 
       @Override
       public boolean open() {
-        return true;
+        // TODO Auto-generated method stub
+        return false;
       }
 
       @Override
-      public Block nextBlock() {
+      public boolean close() {
+        // TODO Auto-generated method stub
+        return false;
+      }
+
+      @Override
+      public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+
         if (alreadyInvoked) {
           return null;
         }
         alreadyInvoked = true;
-        return new Block() {
+
+        return new BaseFilterBlock() {
 
           @Override
           public BlockId getId() {
+            // TODO Auto-generated method stub
             return null;
           }
 
           @Override
-          public boolean applyPredicate(Predicate predicate) {
-            return false;
-          }
-
-          @Override
-          public BlockDocIdSet getBlockDocIdSet() {
-            return new BlockDocIdSet() {
-              int counter = 0;
+          public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
+            return new FilterBlockDocIdSet() {
 
               @Override
               public BlockDocIdIterator iterator() {
+
                 return new BlockDocIdIterator() {
+                  int counter = 0;
 
                   @Override
                   public int advance(int targetDocId) {
@@ -169,37 +173,36 @@ public class OrOperatorTest {
 
               @Override
               public <T> T getRaw() {
+                // TODO Auto-generated method stub
                 return null;
+              }
+
+              @Override
+              public void setStartDocId(int startDocId) {
+                // TODO Auto-generated method stub
+
+              }
+
+              @Override
+              public void setEndDocId(int endDocId) {
+                // TODO Auto-generated method stub
+
+              }
+
+              @Override
+              public int getMinDocId() {
+                // TODO Auto-generated method stub
+                return 0;
+              }
+
+              @Override
+              public int getMaxDocId() {
+                // TODO Auto-generated method stub
+                return 0;
               }
             };
           }
-
-          @Override
-          public BlockValSet getBlockValueSet() {
-            return null;
-          }
-
-          @Override
-          public BlockDocIdValueSet getBlockDocIdValueSet() {
-            return null;
-          }
-
-          @Override
-          public BlockMetadata getMetadata() {
-            return null;
-          }
         };
-      }
-
-      @Override
-      public Block nextBlock(BlockId BlockId) {
-        return null;
-      }
-
-      @Override
-      public boolean close() {
-        // TODO Auto-generated method stub
-        return false;
       }
     };
   }

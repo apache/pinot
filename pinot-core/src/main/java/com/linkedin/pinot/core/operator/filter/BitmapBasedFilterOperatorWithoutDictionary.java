@@ -23,13 +23,14 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
@@ -98,7 +99,7 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
     Predicate predicate = getPredicate();
     RealtimeInvertedIndex invertedIndex = (RealtimeInvertedIndex) dataSource.getInvertedIndex();
     Block dataSourceBlock = dataSource.nextBlock();
@@ -187,7 +188,7 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
     return true;
   }
 
-  public static class BitmapBlock implements Block {
+  public static class BitmapBlock extends BaseFilterBlock {
 
     private final ImmutableRoaringBitmap[] bitmaps;
     private BitmapDocIdSet bitmapDocIdSet;
@@ -209,7 +210,7 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
     }
 
     @Override
-    public BlockDocIdSet getBlockDocIdSet() {
+    public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
       bitmapDocIdSet = new BitmapDocIdSet(blockMetadata, bitmaps);
       return bitmapDocIdSet;
     }

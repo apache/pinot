@@ -23,12 +23,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 
 
-public final class AndBlockDocIdSet implements BlockDocIdSet {
+public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   /**
    * 
    */
@@ -38,11 +38,11 @@ public final class AndBlockDocIdSet implements BlockDocIdSet {
   boolean reachedEnd = false;
   int currentDocId = Constants.EOF;
   public final AtomicLong timeMeasure = new AtomicLong(0);
-  private List<BlockDocIdSet> blockDocIdSets;
-  private int minDocId;
-  private int maxDocId;
+  private List<FilterBlockDocIdSet> blockDocIdSets;
+  private int minDocId = Integer.MIN_VALUE;
+  private int maxDocId = Integer.MAX_VALUE;
 
-  public AndBlockDocIdSet(List<BlockDocIdSet> blockDocIdSets) {
+  public AndBlockDocIdSet(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.blockDocIdSets = blockDocIdSets;
     final int[] docIdPointers = new int[blockDocIdSets.size()];
     final BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
@@ -52,37 +52,17 @@ public final class AndBlockDocIdSet implements BlockDocIdSet {
     Arrays.fill(docIdPointers, -1);
     this.docIdIterators = docIdIterators;
     this.docIdPointers = docIdPointers;
-    minDocId = Integer.MIN_VALUE;
-    maxDocId = Integer.MAX_VALUE;
-    for (BlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      if (blockDocIdSet instanceof SortedDocIdSet) {
-        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) blockDocIdSet;
-        minDocId = Math.max(minDocId, sortedDocIdSet.getMinDocId());
-        maxDocId = Math.min(maxDocId, sortedDocIdSet.getMaxDocId());
-      } else if (blockDocIdSet instanceof AndBlockDocIdSet) {
-        AndBlockDocIdSet andBlockDocIdSet = (AndBlockDocIdSet) blockDocIdSet;
-        minDocId = Math.max(minDocId, andBlockDocIdSet.getMinDocId());
-        maxDocId = Math.min(maxDocId, andBlockDocIdSet.getMaxDocId());
-      }
+    updateMinMaxRange();
+  }
+
+  private void updateMinMaxRange() {
+    for (FilterBlockDocIdSet blockDocIdSet : blockDocIdSets) {
+      minDocId = Math.max(minDocId, blockDocIdSet.getMinDocId());
+      maxDocId = Math.min(maxDocId, blockDocIdSet.getMaxDocId());
     }
-    for (BlockDocIdSet blockDocIdSet : blockDocIdSets) {
-      if (blockDocIdSet instanceof SortedDocIdSet) {
-        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) blockDocIdSet;
-        sortedDocIdSet.setStartDocId(minDocId);
-        sortedDocIdSet.setEndDocId(maxDocId);
-      } else if (blockDocIdSet instanceof OrBlockDocIdSet) {
-        OrBlockDocIdSet orBlockDocIdSet = (OrBlockDocIdSet) blockDocIdSet;
-        orBlockDocIdSet.setStartDocId(minDocId);
-        orBlockDocIdSet.setEndDocId(maxDocId);
-      } else if (blockDocIdSet instanceof ScanBasedSingleValueDocIdSet) {
-        ScanBasedSingleValueDocIdSet scanBasedSingleValueDocIdSet = (ScanBasedSingleValueDocIdSet) blockDocIdSet;
-        scanBasedSingleValueDocIdSet.setStartDocId(minDocId);
-        scanBasedSingleValueDocIdSet.setEndDocId(maxDocId);
-      } else if (blockDocIdSet instanceof ScanBasedMultiValueDocIdSet) {
-        ScanBasedMultiValueDocIdSet scanBasedMultiValueDocIdSet = (ScanBasedMultiValueDocIdSet) blockDocIdSet;
-        scanBasedMultiValueDocIdSet.setStartDocId(minDocId);
-        scanBasedMultiValueDocIdSet.setEndDocId(maxDocId);
-      }
+    for (FilterBlockDocIdSet blockDocIdSet : blockDocIdSets) {
+      blockDocIdSet.setStartDocId(minDocId);
+      blockDocIdSet.setEndDocId(maxDocId);
     }
   }
 
@@ -184,13 +164,25 @@ public final class AndBlockDocIdSet implements BlockDocIdSet {
     return (T) this.blockDocIdSets;
   }
 
+  @Override
   public int getMinDocId() {
     return minDocId;
   }
 
+  @Override
   public int getMaxDocId() {
-    // TODO Auto-generated method stub
     return maxDocId;
   }
 
+  @Override
+  public void setStartDocId(int startDocId) {
+    minDocId = Math.max(minDocId, startDocId);
+    updateMinMaxRange();
+  }
+
+  @Override
+  public void setEndDocId(int endDocId) {
+    maxDocId = Math.min(maxDocId, endDocId);
+    updateMinMaxRange();
+  }
 }

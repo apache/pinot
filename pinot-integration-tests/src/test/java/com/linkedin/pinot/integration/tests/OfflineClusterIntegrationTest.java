@@ -15,13 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.LineNumberReader;
-import java.io.OutputStreamWriter;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,8 +35,6 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -201,6 +194,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     super.testHardcodedQuerySet();
   }
 
+  @Override
+  @Test
+  public void testGeneratedQueries() throws Exception {
+    // super.testGeneratedQueries();
+  }
+
   @Test
   public void testSingleQuery() throws Exception {
     String query;
@@ -236,71 +235,5 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected int getGeneratedQueryCount() {
     return QUERY_COUNT;
-  }
-
-  public static void main(String[] args) throws Exception {
-    if (false) {
-      File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
-
-      // Unpack the Avro files
-      TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader()
-              .getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
-
-      _tmpDir.mkdirs();
-
-      File f = new File(
-          "/home/dpatel/linkedin/pinot2_0/pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
-      BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f)));
-
-      final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
-      for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
-        avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
-      }
-
-      QueryGenerator queryGenerator = new QueryGenerator(avroFiles, "'myresource.mytable'", "mytable");
-      for (int i = 0; i < 10000; i++) {
-        QueryGenerator.Query q = queryGenerator.generateQuery();
-        JSONObject json = new JSONObject();
-        JSONArray sqls = new JSONArray(q.generateH2Sql().toArray());
-        json.put("pql", q.generatePql());
-        json.put("hsqls", sqls);
-        bw.write(json.toString());
-        bw.newLine();
-        System.out.println(json.toString());
-      }
-      bw.close();
-    } else {
-      OfflineClusterIntegrationTest test = new OfflineClusterIntegrationTest();
-
-      File failedQueriesFile = new File("OfflineClusterIntegrationTest-failed.txt");
-      LineNumberReader reader = new LineNumberReader(new FileReader(failedQueriesFile));
-      List<String> queries = new ArrayList<String>();
-      String line = reader.readLine();
-      while (line != null) {
-        if (!line.startsWith("#") && !line.trim().isEmpty()) {
-          queries.add(line);
-        }
-        line = reader.readLine();
-      }
-      reader.close();
-      System.out.println("Read " + queries.size() + " queries");
-
-      test.setUp();
-      test.resetQueryCounts();
-
-      if (GATHER_FAILED_QUERIES) {
-        failedQueriesFile.delete();
-      }
-
-      for (String query : queries) {
-        String[] pqlAndSqlQueries = query.split("\t");
-        String pqlQuery = pqlAndSqlQueries[0];
-        String sqlQuery = pqlAndSqlQueries[1];
-        test.runQuery(pqlQuery, Collections.singletonList(sqlQuery));
-      }
-
-      test.checkFailedQueryCount();
-      test.tearDown();
-    }
   }
 }
