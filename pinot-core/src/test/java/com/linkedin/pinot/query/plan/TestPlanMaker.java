@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.query.plan;
 
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.File;
@@ -166,13 +166,13 @@ public class TestPlanMaker {
     System.out.println(resultBlock.getAggregationResult().get(4));
     System.out.println(resultBlock.getAggregationResult().get(5));
     System.out.println(resultBlock.getAggregationResult().get(6));
-    Assert.assertEquals(2000001L, resultBlock.getAggregationResult().get(0));
-    Assert.assertEquals(2000001000000.0, resultBlock.getAggregationResult().get(1));
-    Assert.assertEquals(2000000.0, resultBlock.getAggregationResult().get(2));
-    Assert.assertEquals(0.0, resultBlock.getAggregationResult().get(3));
-    Assert.assertEquals(1000000.0, Double.parseDouble(resultBlock.getAggregationResult().get(4).toString()));
-    Assert.assertEquals(10, ((IntOpenHashSet) resultBlock.getAggregationResult().get(5)).size());
-    Assert.assertEquals(100, ((IntOpenHashSet) resultBlock.getAggregationResult().get(6)).size());
+    Assert.assertEquals(resultBlock.getAggregationResult().get(0), 2000001L);
+    Assert.assertEquals(resultBlock.getAggregationResult().get(1), 2000001000000.0);
+    Assert.assertEquals(resultBlock.getAggregationResult().get(2), 2000000.0);
+    Assert.assertEquals(resultBlock.getAggregationResult().get(3), 0.0);
+    Assert.assertEquals(Double.parseDouble(resultBlock.getAggregationResult().get(4).toString()), 1000000.0);
+    Assert.assertEquals(((IntOpenHashSet) resultBlock.getAggregationResult().get(5)).size(), 10);
+    Assert.assertEquals(((IntOpenHashSet) resultBlock.getAggregationResult().get(6)).size(), 100);
   }
 
   @Test

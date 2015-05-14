@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.query.aggregation;
 
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.Serializable;
@@ -77,14 +77,14 @@ public class TestSimpleAggregationFunctions {
       List<Serializable> aggregationResults = getLongValues(i);
       List<Serializable> combinedResults = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
 
-      assertEquals((long) (((i - 1) * i) / 2), combinedResults.get(0));
+      assertEquals(combinedResults.get(0), (long) (((i - 1) * i) / 2));
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getLongValues(i);
       Serializable reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals((long) ((i - 1) * i) / 2, reduceResults);
+      assertEquals(reduceResults, (long) ((i - 1) * i) / 2);
     }
   }
 
@@ -99,14 +99,14 @@ public class TestSimpleAggregationFunctions {
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getDoubleValues(i);
       List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
-      assertEquals((double) ((i - 1) * i) / 2, combinedResult.get(0));
+      assertEquals(combinedResult.get(0), (double) ((i - 1) * i) / 2);
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getDoubleValues(i);
       Serializable reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals((double) ((i - 1) * i) / 2, reduceResults);
+      assertEquals(reduceResults, (double) ((i - 1) * i) / 2);
     }
   }
 
@@ -127,7 +127,7 @@ public class TestSimpleAggregationFunctions {
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getDoubleValues(i);
       Serializable reduceResult = aggregationFunction.reduce(combinedResults);
-      assertEquals(0.0, reduceResult);
+      assertEquals(reduceResult, 0.0);
     }
   }
 
@@ -142,14 +142,14 @@ public class TestSimpleAggregationFunctions {
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getDoubleValues(i);
       List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
-      assertEquals((double) i - 1, combinedResult.get(0));
+      assertEquals(combinedResult.get(0), (double) i - 1);
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getDoubleValues(i);
       Serializable reduceResult = aggregationFunction.reduce(combinedResults);
-      assertEquals((double) i - 1, reduceResult);
+      assertEquals(reduceResult, (double) i - 1);
     }
   }
 
@@ -172,7 +172,7 @@ public class TestSimpleAggregationFunctions {
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getAvgPairValues(i);
       Serializable reduceResult = aggregationFunction.reduce(combinedResults);
-      assertEquals(1.0, reduceResult);
+      assertEquals(reduceResult, 1.0);
     }
   }
 
@@ -187,14 +187,14 @@ public class TestSimpleAggregationFunctions {
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getIntOpenHashSets(i);
       List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
-      assertEquals(i, ((IntOpenHashSet) (combinedResult.get(0))).size());
+      assertEquals(((IntOpenHashSet) (combinedResult.get(0))).size(), i);
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getIntOpenHashSets(i);
       int reduceSize = (Integer) aggregationFunction.reduce(combinedResults);
-      assertEquals(i, reduceSize);
+      assertEquals(reduceSize, i);
     }
   }
 

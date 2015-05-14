@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.query.planner;
 
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
