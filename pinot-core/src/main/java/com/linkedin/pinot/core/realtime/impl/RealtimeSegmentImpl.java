@@ -220,7 +220,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String metric : dataSchema.getMetricNames()) {
       FixedByteSingleColumnSingleValueReaderWriter readerWriter =
           (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric);
-      readerWriter.setInt(docId, dictionaryMap.get(metric).indexOf(row.getValue(metric)));
+      int dicId = dictionaryMap.get(metric).indexOf(row.getValue(metric));
+      readerWriter.setInt(docId, dicId);
+      rawRowToDicIdMap.put(metric, dicId);
     }
 
     int timeDicId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
@@ -232,8 +234,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // lets update the inverted index now
     // metrics
     for (String metric : dataSchema.getMetricNames()) {
-      invertedIndexMap.get(metric).add(row.getValue(metric), docId);
+      invertedIndexMap.get(metric).add(rawRowToDicIdMap.get(metric), docId);
     }
+
     //dimension
     for (String dimension : dataSchema.getDimensionNames()) {
       if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {

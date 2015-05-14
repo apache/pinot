@@ -18,12 +18,10 @@ package com.linkedin.pinot.core.realtime;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -32,20 +30,21 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -105,20 +104,26 @@ public class TestRealtimeSegment {
 
   @Test
   public void testMetricPredicate() throws Exception {
-    DataSource ds = segment.getDataSource("count");
+    DataSource ds1 = segment.getDataSource("count");
+
+    BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("1");
     Predicate predicate = new EqPredicate("count", rhs);
-    ds.setPredicate(predicate);
-    Block b = ds.nextBlock();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) b.getBlockValueSet().iterator();
-    MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) b.getBlockDocIdSet().getRaw();
-    Iterator<Integer> iterator = mutableRoaringBitmap.iterator();
+    op.setPredicate(predicate);
+
+    Block b = op.nextBlock();
+    BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
+
+    DataSource ds2 = segment.getDataSource("count");
+
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) ds2.nextBlock().getBlockValueSet().iterator();
+    int docId = iterator.next();
     int counter = 0;
-    while (iterator.hasNext()) {
-      int docId = iterator.next();
-      Assert.assertEquals(docId, counter);
-      Assert.assertEquals(blockValIterator.nextDoubleVal(), 1.0);
+    while (docId != Constants.EOF) {
+      blockValIterator.skipTo(docId);
+      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 1);
+      docId = iterator.next();
       counter++;
     }
     Assert.assertEquals(counter, 100000);
@@ -126,20 +131,24 @@ public class TestRealtimeSegment {
 
   @Test
   public void testNoMatchFilteringMetricPredicate() throws Exception {
-    DataSource ds = segment.getDataSource("count");
+    DataSource ds1 = segment.getDataSource("count");
+
+    BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1);
     List<String> rhs = new ArrayList<String>();
     rhs.add("1");
     Predicate predicate = new NEqPredicate("count", rhs);
-    ds.setPredicate(predicate);
-    Block b = ds.nextBlock();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) b.getBlockValueSet().iterator();
-    MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) b.getBlockDocIdSet().getRaw();
-    Iterator<Integer> iterator = mutableRoaringBitmap.iterator();
+
+    op.setPredicate(predicate);
+    Block b = op.nextBlock();
+    BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
+
     int counter = 0;
-    while (iterator.hasNext()) {
+    int docId = iterator.next();
+    while (docId != Constants.EOF) {
       // shouldn't reach here.
       Assert.assertTrue(false);
-      Assert.assertTrue(Double.compare(blockValIterator.nextDoubleVal(), 1.0) != 0);
+      docId = iterator.next();
+      counter++;
     }
     Assert.assertEquals(counter, 0);
   }
