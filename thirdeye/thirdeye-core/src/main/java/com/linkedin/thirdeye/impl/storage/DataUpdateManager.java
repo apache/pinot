@@ -97,6 +97,13 @@ public class DataUpdateManager {
       LOGGER.info("Unlocked collection {} using lock {} for data delete", collection, lock);
     }
   }
+  public void updateData(String collection,
+                         String schedule,
+                         DateTime minTime,
+                         DateTime maxTime,
+                         byte[] data) throws Exception {
+    updateData(collection, schedule, minTime, maxTime, new ByteArrayInputStream(data));
+  }
 
   /**
    * Loads a data segment.
@@ -116,7 +123,7 @@ public class DataUpdateManager {
                          String schedule,
                          DateTime minTime,
                          DateTime maxTime,
-                         byte[] data) throws Exception {
+                         InputStream data) throws Exception {
     Lock lock = collectionLocks.get(collection);
     if (lock == null) {
       collectionLocks.putIfAbsent(collection, new ReentrantLock());
@@ -143,7 +150,9 @@ public class DataUpdateManager {
         // Extract into tmp dir
         FileUtils.forceMkdir(tmpDir);
         File tarGzFile = new File(tmpDir, "data.tar.gz");
-        IOUtils.write(data, new FileOutputStream(tarGzFile));
+        OutputStream os = new FileOutputStream(tarGzFile);
+        IOUtils.copy(data, os);
+        os.close();
         TarGzCompressionUtils.unTar(tarGzFile, tmpDir);
         LOGGER.info("Extracted data into {}", tmpDir);
 

@@ -231,7 +231,7 @@ public class CollectionsResource implements Managed
                            @PathParam("minTime") long minTimeMillis,
                            @PathParam("maxTime") long maxTimeMillis,
                            @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule,
-                           byte[] dataBytes) throws Exception
+                           InputStream dataBytes) throws Exception
   {
     DateTime minTime = new DateTime(minTimeMillis, DateTimeZone.UTC);
     DateTime maxTime = new DateTime(maxTimeMillis, DateTimeZone.UTC);
