@@ -283,17 +283,27 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
                           "Result group '" + pinotKey + "' returned by Pinot was not returned by H2 for query " +
                               pqlQuery, "Bql values: " + actualValues, "Sql values: " + correctValues);
                       break;
-                    } else if (!EqualityUtils.isEqual(actualValues.get(pinotKey), correctValues.get(pinotKey))) {
-                      saveFailedQuery(pqlQuery, sqlQueries,
-                          "Results differ between Pinot and H2 for query " + pqlQuery + ", expected " +
-                              correctValues.get(pinotKey) + ", got " + actualValues.get(pinotKey) + " for group " +
-                              pinotKey, "Bql values: " + actualValues, "Sql values: " + correctValues);
-                      break;
+                    } else {
+                      double actualValue = Double.parseDouble(actualValues.get(pinotKey));
+                      double correctValue = Double.parseDouble(correctValues.get(pinotKey));
+                      if (1.0 < Math.abs(actualValue - correctValue)) {
+                        saveFailedQuery(pqlQuery, sqlQueries,
+                            "Results differ between Pinot and H2 for query " + pqlQuery + ", expected " +
+                                correctValue + ", got " + actualValue + " for group " +
+                                pinotKey, "Bql values: " + actualValues, "Sql values: " + correctValues);
+                        break;
+                      }
                     }
                   } else {
                     Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey +
                         "' returned by Pinot was not returned by H2 for query " + pqlQuery);
-                    Assert.assertTrue(Math.abs(Double.parseDouble(actualValues.get(pinotKey)) - Double.parseDouble(correctValues.get(pinotKey))) < 1);
+                    Assert.assertEquals(
+                        Double.parseDouble(actualValues.get(pinotKey)),
+                        Double.parseDouble(correctValues.get(pinotKey)),
+                        1.0d,
+                        "Results differ between Pinot and H2 for query " + pqlQuery + ", expected " +
+                            correctValues.get(pinotKey) + ", got " + actualValues.get(pinotKey) + " for group " +
+                            pinotKey + "\nBql values: " + actualValues + "\nSql values: " + correctValues);
                   }
                 }
               } else {

@@ -482,6 +482,9 @@ public class QueryGenerator {
         }
       } else {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+          if (aggregateColumnAndFunction.startsWith("avg(")) {
+            aggregateColumnAndFunction = aggregateColumnAndFunction.replace("avg(", "avg(cast(").replace(")", " as double))");
+          }
           queries.add(joinWithSpaces("SELECT", joinWithCommas(_groupColumns) + ",", aggregateColumnAndFunction, "FROM",
               _h2TableName, _predicate.generateH2Sql(), "GROUP BY", joinWithCommas(_groupColumns), _limit.generateH2Sql()));
         }

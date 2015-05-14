@@ -56,7 +56,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
 
   private static final int SEGMENT_COUNT = 12;
-  private static final int QUERY_COUNT = 1000;
+  private static final int QUERY_COUNT = 10000;
 
   protected void startCluster() {
     startZk();
