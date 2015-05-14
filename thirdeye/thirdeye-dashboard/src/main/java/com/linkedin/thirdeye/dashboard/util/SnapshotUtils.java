@@ -255,6 +255,10 @@ public class SnapshotUtils {
     Map<String, Number[]> baseline = new HashMap<>(queryResult.getData().size());
     Map<String, Number[]> current = new HashMap<>(queryResult.getData().size());
     for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
+      if (entry.getValue().isEmpty()) {
+        continue; // No data
+      }
+
       // Find current / baseline time
       List<Long> times = new ArrayList<>(entry.getValue().size());
       for (String timeString : entry.getValue().keySet()) {

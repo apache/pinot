@@ -30,6 +30,10 @@ public class QueryCache {
         .build(new QueryCacheLoader(httpClient, objectMapper));
   }
 
+  public void clear() {
+    cache.invalidateAll();
+  }
+
   public QueryResult getQueryResult(String serverUri, String sql) throws Exception {
     return cache.get(new QuerySpec(serverUri, sql));
   }

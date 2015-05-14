@@ -8,8 +8,8 @@ $(document).ready(function() {
         $('body').css('cursor', 'progress')
         var path = parsePath(window.location.pathname)
         var baselineDiff = path.currentMillis - path.baselineMillis
-        path.currentMillis = item.datapoint[0] + aggregateMillis
-        path.baselineMillis = item.datapoint[0] + aggregateMillis - baselineDiff
+        path.currentMillis = item.datapoint[0]
+        path.baselineMillis = item.datapoint[0] - baselineDiff
         window.location.pathname = getDashboardPath(path)
       },
       legendContainer: $("#metric-time-series-legend"),

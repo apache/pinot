@@ -44,7 +44,7 @@ public class QueryResource {
     try {
       result = queryExecutor.executeQuery(sql);
     } catch (IllegalArgumentException|IllegalStateException e) {
-      LOGGER.error("Malformed SQL {}", sql);
+      LOGGER.error("Malformed SQL {}", sql, e);
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception e) {
       LOGGER.error("Exception executing SQL {}", sql);

@@ -178,10 +178,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
-    environment.admin().addTask(new ViewTreeTask(starTreeManager));
-    environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
-    environment.admin().addTask(new ViewMetricIndexTask(rootDir));
     environment.admin().addTask(new KafkaTask(kafkaConsumerManager));
+    environment.admin().addTask(new MergeTask(starTreeManager, dataUpdateManager));
   }
 
   public static class Config extends Configuration

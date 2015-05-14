@@ -53,7 +53,18 @@ public class DataCache {
   }
 
   public List<SegmentDescriptor> getSegmentDescriptors(String serverUri, String collection) throws Exception {
-    return segments.get(serverUri + "/collections/" + URLEncoder.encode(collection, ENCODING) + "/segments");
+    String cacheKey = serverUri + "/collections/" + URLEncoder.encode(collection, ENCODING) + "/segments";
+    List<SegmentDescriptor> descriptors = segments.get(cacheKey);
+    if (descriptors.isEmpty()) {
+      segments.invalidate(cacheKey); // don't cache when there is no data
+    }
+    return descriptors;
+  }
+
+  public void clear() {
+    schemas.invalidateAll();
+    collections.invalidateAll();
+    segments.invalidateAll();
   }
 
   private static class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {

@@ -19,7 +19,7 @@
     <div id="dimension-heat-map-data">
         <#list dimensionView.view.heatMaps as heatMap>
             <div class="dimension-view-heat-map"
-                 id='dimension-view-heat-map-${heatMap.metric}-${heatMap.dimension}'
+                 id='dimension-view-heat-map-${heatMap.metric}-${heatMap.dimension?replace(".", "-")}'
                  metric='${heatMap.metric}'
                  dimension='${heatMap.dimension}'
                  stats-names='${heatMap.statsNamesJson}'>

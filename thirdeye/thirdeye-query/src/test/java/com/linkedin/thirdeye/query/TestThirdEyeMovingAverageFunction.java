@@ -36,7 +36,7 @@ public class TestThirdEyeMovingAverageFunction {
     Assert.assertEquals(derived.getSchema().getNames().size(), 1);
 
     for (Long time : derived.getTimeWindowSet()) {
-      Assert.assertEquals(derived.get(time, "L"), 1.0);
+      Assert.assertEquals(derived.get(time, "L").doubleValue(), 1.0, 0.001);
     }
   }
 

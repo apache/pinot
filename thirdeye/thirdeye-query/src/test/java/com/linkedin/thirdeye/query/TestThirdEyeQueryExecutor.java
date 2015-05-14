@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -53,6 +54,7 @@ public class TestThirdEyeQueryExecutor {
     when(starTreeManager.getCollections()).thenReturn(ImmutableSet.of(config.getCollection()));
     when(starTreeManager.getConfig(config.getCollection())).thenReturn(config);
     when(starTreeManager.getStarTrees(config.getCollection())).thenReturn(ImmutableMap.of(new File("dummy"), starTree));
+    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn(new IndexMetadata(0L, Long.MAX_VALUE));
 
     executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     queryExecutor = new ThirdEyeQueryExecutor(executorService, starTreeManager);

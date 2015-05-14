@@ -1,23 +1,33 @@
 package com.linkedin.thirdeye.realtime;
 
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.NumberUtils;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import org.apache.avro.generic.GenericRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Properties;
+
+/**
+ * TODO: The logic to parse / extract derived dimension values should probably be somewhere else,
+ * but we can put it in here for now until we refactor (maybe into a thirdeye-avro module that
+ * can be used by both thirdeye-realtime and thirdeye-bootstrap).
+ */
 public class ThirdEyeAvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeAvroUtils.class);
   private static final String NAME_SEPARATOR = "\\.";
   private static final String NULL_DIMENSION_VALUE = "";
+  private static final String INVALID_DIMENSION_VALUE = "INVALID";
   private static final String AUTO_METRIC_COUNT = "__COUNT";
+
+  private enum TernaryOperators {
+    EQ,
+    LT,
+    LE,
+    GT,
+    GE
+  }
 
   private static String getRecordValue(String fieldName, GenericRecord record) {
     String[] fieldNames = fieldName.split(NAME_SEPARATOR);
@@ -49,12 +59,83 @@ public class ThirdEyeAvroUtils {
     return NumberUtils.valueOf(metricStr, metricSpec.getType());
   }
 
+  // Attempt to group into email domains
+  private static String parseEmailDomain(String emailAddress, Properties normalize) {
+    if (!emailAddress.contains("@")) {
+      return INVALID_DIMENSION_VALUE;
+    }
+
+    String[] tokens = emailAddress.split("@");
+    if (tokens.length != 2) {
+      return INVALID_DIMENSION_VALUE;
+    }
+
+    // Rudimentary normalization
+    String domain = tokens[1];
+    if (normalize != null) {
+      for (String pattern : normalize.stringPropertyNames()) {
+        if (domain.toLowerCase().contains(pattern)) {
+          return normalize.getProperty(pattern);
+        }
+      }
+    }
+
+    return domain;
+  }
+
+  /**
+   * Returns a new value based on some condition.
+   *
+   * @param dimensionValue
+   *  An integral numeric dimension value
+   * @param config
+   *  Contains a "condition", "operator" (LT, LE, GT, GE, EQ), "true" value if true, "false" value if false
+   */
+  private static String parseTernaryValue(String dimensionValue, Properties config) {
+    String trueValue = config.getProperty("trueValue");
+    if (trueValue == null) {
+      throw new IllegalArgumentException("Ternary operator must provide true value");
+    }
+
+    String falseValue = config.getProperty("falseValue");
+    if (falseValue == null) {
+      throw new IllegalArgumentException("Ternary operator must provide false value");
+    }
+
+    TernaryOperators operator = TernaryOperators.valueOf(config.getProperty("operator"));
+    long value = Long.valueOf(dimensionValue);
+    long conditionValue = Long.valueOf(config.getProperty("condition"));
+    switch (operator) {
+      case EQ: return value == conditionValue ? trueValue : falseValue;
+      case LT: return value < conditionValue ? trueValue : falseValue;
+      case LE: return value <= conditionValue ? trueValue : falseValue;
+      case GT: return value > conditionValue ? trueValue : falseValue;
+      case GE: return value >= conditionValue ? trueValue : falseValue;
+    }
+
+    throw new IllegalStateException("Could not apply " + config + " to value " + dimensionValue);
+  }
+
   public static StarTreeRecord convert(StarTreeConfig config, GenericRecord record) {
     // Dimensions
     String[] dimensionValues = new String[config.getDimensions().size()];
     for (int i = 0; i < config.getDimensions().size(); i++) {
-      String dimensionName = config.getDimensions().get(i).getName();
-      dimensionValues[i] = getRecordValue(dimensionName, record);
+      DimensionSpec dimensionSpec = config.getDimensions().get(i);
+      String dimensionValue = getRecordValue(dimensionSpec.getName(), record);
+      if (!NULL_DIMENSION_VALUE.equals(dimensionValue) && dimensionSpec.getType() != null) {
+        switch (dimensionSpec.getType()) {
+          case EMAIL_DOMAIN:
+            dimensionValue = parseEmailDomain(dimensionValue, dimensionSpec.getConfig());
+            break;
+          case TERNARY:
+            dimensionValue = parseTernaryValue(dimensionValue, dimensionSpec.getConfig());
+            break;
+          case IP_GEO:
+            dimensionValue = ThirdEyeIPUtils.getCountry(dimensionValue);
+            break;
+        }
+      }
+      dimensionValues[i] = dimensionValue;
     }
     DimensionKey dimensionKey = new DimensionKey(dimensionValues);
 

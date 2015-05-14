@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.query;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import org.joda.time.DateTime;
 
 import java.util.*;
@@ -41,6 +42,7 @@ public class ThirdEyeQueryExecutor {
 
     // Offset for moving average
     long startOffset = 0;
+    long collectionWindowMillis = 0;
     for (ThirdEyeFunction function : query.getFunctions()) {
       if (function instanceof ThirdEyeMovingAverageFunction) {
         ThirdEyeMovingAverageFunction movingAverageFunction = (ThirdEyeMovingAverageFunction) function;
@@ -49,13 +51,35 @@ public class ThirdEyeQueryExecutor {
         if (windowMillis > startOffset) {
           startOffset = windowMillis;
         }
+      } else if (function instanceof ThirdEyeAggregateFunction) {
+        ThirdEyeAggregateFunction aggregateFunction = (ThirdEyeAggregateFunction) function;
+        TimeGranularity window = aggregateFunction.getWindow();
+        collectionWindowMillis = TimeUnit.MILLISECONDS.convert(window.getSize(), window.getUnit());
       }
     }
 
     // Time
     long startTime = dateTimeToCollectionTime(config, new DateTime(query.getStart().getMillis() - startOffset));
-    long endTime = dateTimeToCollectionTime(config, query.getEnd()) - 1; // time from query is exclusive
+    long endTime = dateTimeToCollectionTime(config, query.getEnd());
+
+    // Align to aggregation boundary
+    if (collectionWindowMillis > 0) {
+      long collectionWindow = dateTimeToCollectionTime(config, new DateTime(collectionWindowMillis));
+      startTime = (startTime / collectionWindow) * collectionWindow;
+      endTime = (endTime / collectionWindow + 1) * collectionWindow; // include everything in that window
+    }
+
     final TimeRange timeRange = new TimeRange(startTime, endTime);
+
+    // Determine which trees we need to query
+    Set<UUID> treeIds = new HashSet<>();
+    for (StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
+      IndexMetadata indexMetadata = starTreeManager.getIndexMetadata(starTree.getRoot().getId());
+      TimeRange treeTimeRange = new TimeRange(indexMetadata.getMinDataTime(), indexMetadata.getMaxDataTime());
+      if (!timeRange.isDisjoint(treeTimeRange)) {
+        treeIds.add(starTree.getRoot().getId());
+      }
+    }
 
     // For all group by dimensions add those as fixed
     if (!query.getGroupByColumns().isEmpty()) {
@@ -66,6 +90,10 @@ public class ThirdEyeQueryExecutor {
 
         final Set<Future<Set<String>>> dimensionSetFutures = new HashSet<>();
         for (final StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
+          if (!treeIds.contains(starTree.getRoot().getId())) {
+            continue;
+          }
+
           dimensionSetFutures.add(executorService.submit(new Callable<Set<String>>() {
             @Override
             public Set<String> call() throws Exception {
@@ -87,6 +115,7 @@ public class ThirdEyeQueryExecutor {
         for (Future<Set<String>> future : dimensionSetFutures) {
           dimensionSet.addAll(future.get());
         }
+        dimensionSet.remove(StarTreeConstants.STAR);  // never represent this one
 
         for (String dimensionValue : dimensionSet) {
           query.addDimensionValue(groupByColumn, dimensionValue);
@@ -103,7 +132,7 @@ public class ThirdEyeQueryExecutor {
     // Metrics
     Map<StarTree, Map<DimensionKey, Future<MetricTimeSeries>>> timeSeriesFutures = new HashMap<>();
     for (final StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
-      if (timeRange.isDisjoint(fromStats(starTree.getStats()))) {
+      if (!treeIds.contains(starTree.getRoot().getId())) {
         continue;
       }
 
@@ -118,63 +147,39 @@ public class ThirdEyeQueryExecutor {
       }
     }
 
-    // Aggregate across all trees and apply functions
-    for (Map<DimensionKey, Future<MetricTimeSeries>> treeResult : timeSeriesFutures.values()) {
-      for (Map.Entry<DimensionKey, Future<MetricTimeSeries>> entry : treeResult.entrySet()) {
-        MetricTimeSeries timeSeries = entry.getValue().get();
-        // Compute aggregate functions
-        for (ThirdEyeFunction function : query.getFunctions()) {
-          timeSeries = function.apply(config, query, timeSeries);
+    // Merge results
+    Map<DimensionKey, MetricTimeSeries> mergedResults = new HashMap<>();
+    for (Map<DimensionKey, Future<MetricTimeSeries>> resultMap : timeSeriesFutures.values()) {
+      for (Map.Entry<DimensionKey, Future<MetricTimeSeries>> entry : resultMap.entrySet()) {
+        MetricTimeSeries additionalSeries = entry.getValue().get();
+        MetricTimeSeries currentSeries = mergedResults.get(entry.getKey());
+        if (currentSeries == null) {
+          currentSeries = new MetricTimeSeries(additionalSeries.getSchema());
+          mergedResults.put(entry.getKey(), currentSeries);
         }
-        // Add derived metrics
-        for (ThirdEyeFunction function : query.getDerivedMetrics()) {
-          timeSeries = function.apply(config, query, timeSeries);
-        }
-        // Convert to milliseconds
-        timeSeries = TO_MILLIS.apply(config, query, timeSeries);
-        result.addData(entry.getKey(), timeSeries);
-        result.setMetrics(timeSeries.getSchema().getNames()); // multiple calls should be idempotent
+        currentSeries.aggregate(additionalSeries);
       }
+    }
+
+    // Aggregate across all trees and apply functions
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : mergedResults.entrySet()) {
+      MetricTimeSeries timeSeries = entry.getValue();
+      // Compute aggregate functions
+      for (ThirdEyeFunction function : query.getFunctions()) {
+        timeSeries = function.apply(config, query, timeSeries);
+      }
+      // Add derived metrics
+      for (ThirdEyeFunction function : query.getDerivedMetrics()) {
+        timeSeries = function.apply(config, query, timeSeries);
+      }
+      // Convert to milliseconds
+      timeSeries = TO_MILLIS.apply(config, query, timeSeries);
+      result.addData(entry.getKey(), timeSeries);
+      result.setMetrics(timeSeries.getSchema().getNames()); // multiple calls should be idempotent
     }
 
     return result;
   }
-
-  /*
-  private static void getGroupByValues(StarTreeNode node,
-                                       String groupByDimension,
-                                       Multimap<String, String> dimensionValues,
-                                       Set<String> collector) {
-    if (node.isLeaf()) {
-      // Just find all at this leaf
-      collector.addAll(node.getRecordStore().getDimensionValues(groupByDimension));
-    } else if (node.getChildDimensionName().equals(groupByDimension)) {
-      // Get all the children (we are done here, since these are all that's fixed)
-      for (StarTreeNode child : node.getChildren()) {
-        collector.add(child.getDimensionValue());
-      }
-      collector.add(StarTreeConstants.OTHER);
-    } else if (dimensionValues == null || dimensionValues.get(node.getChildDimensionName()) == null) {
-      // Traverse to star node (not fixed)
-      getGroupByValues(node.getStarNode(), groupByDimension, dimensionValues, collector);
-    } else {
-      // Traverse
-      boolean includeOther = false;
-      Collection<String> values = dimensionValues.get(node.getChildDimensionName());
-      for (String value : values) {
-        StarTreeNode child = node.getChild(value);
-        if (child == null) {
-          includeOther = true;
-        } else {
-          getGroupByValues(child, groupByDimension, dimensionValues, collector);
-        }
-      }
-      if (includeOther) {
-        getGroupByValues(node.getOtherNode(), groupByDimension, dimensionValues, collector);
-      }
-    }
-  }
-  */
 
   private static long dateTimeToCollectionTime(StarTreeConfig config, DateTime dateTime) {
     TimeGranularity bucket = config.getTime().getBucket();

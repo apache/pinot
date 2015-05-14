@@ -1,9 +1,12 @@
 package com.linkedin.thirdeye.api;
 
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public interface StarTreeManager
 {
@@ -15,6 +18,11 @@ public interface StarTreeManager
 
   /** @return a map of data directory to star tree index for a collection */
   Map<File, StarTree> getStarTrees(String collection);
+
+  /**
+   * Returns the index metadata for a data segment.
+   */
+  IndexMetadata getIndexMetadata(UUID treeId);
 
   StarTreeConfig getConfig(String collection);
 

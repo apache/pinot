@@ -138,7 +138,7 @@ function getFlotPath(path, options) {
             + '/' + viewType
             + '/' + path.collection
             + '/' + path.metricFunction
-            + '/' + (parseInt(path.baselineMillis) + options.aggregateMillis)
+            + '/' + path.baselineMillis
             + '/' + path.currentMillis
             + '/' + options.windowMillis
     } else {
@@ -194,7 +194,7 @@ function renderFunnel(container, options) {
         endMillis = path.baselineMillis
     }
 
-    path.baselineMillis = endMillis - options.aggregateMillis
+    path.baselineMillis = endMillis
     path.currentMillis = endMillis
 
     var url = getFlotPath(path, options)
@@ -433,7 +433,7 @@ function extractHeatMapData(rawData) {
 
     rawData.find('.dimension-view-heat-map').each(function(i, heatMap) {
         var heatMapObj = $(heatMap)
-        var id = heatMapObj.attr('metric') + '-' + heatMapObj.attr('dimension')
+        var id = heatMapObj.attr('metric') + '-' + heatMapObj.attr('dimension').split('.').join('-')
         data[id] = []
 
         // Get stats name mapping

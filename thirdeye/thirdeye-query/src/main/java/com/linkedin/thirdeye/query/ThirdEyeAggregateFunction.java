@@ -15,10 +15,18 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
     this.window = window;
   }
 
+  public TimeGranularity getWindow() {
+    return window;
+  }
+
   @Override
   public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
     Set<String> metricNames = new HashSet<>(query.getMetricNames());
     MetricTimeSeries aggregate = ThirdEyeFunctionUtils.copyBlankSeriesSame(new ArrayList<String>(metricNames), timeSeries.getSchema());
+
+    if (timeSeries.getTimeWindowSet().isEmpty()) {
+      return aggregate;
+    }
 
     // Convert window to collection time
     long collectionWindow = config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
@@ -29,21 +37,17 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
           + config.getTime().getBucket().getSize() + " " + config.getTime().getBucket().getUnit());
     }
 
-    List<Long> sortedTimes = new ArrayList<>(timeSeries.getTimeWindowSet());
-    Collections.sort(sortedTimes);
+    Long minTime = Collections.min(timeSeries.getTimeWindowSet());
+    Long maxTime = Collections.max(timeSeries.getTimeWindowSet());
 
-    long timeRange = sortedTimes.get(sortedTimes.size() - 1) - sortedTimes.get(0) + 1; // inclusive
-    if (timeRange % collectionWindow != 0) {
-      throw new IllegalArgumentException("timeRange % collectionWindow != 0! " +
-          "timeRange=" + timeRange + ", collectionWindow=" + collectionWindow);
-    }
-
-    for (int i = 0; i < sortedTimes.size(); i += collectionWindow) {
-      long time = sortedTimes.get(i);
-      for (int j = i; j < i + collectionWindow; j++) {
+    for (long i = minTime; i < maxTime; i += collectionWindow) {
+      long alignedTime = (i / collectionWindow) * collectionWindow;
+      for (long j = i; j < i + collectionWindow; j++) {
         for (String metricName : metricNames) {
-          Number metricValue = timeSeries.get(sortedTimes.get(j), metricName);
-          aggregate.increment(time, metricName, metricValue);
+          Number metricValue = timeSeries.get(j, metricName);
+          if (metricValue != null) {
+            aggregate.increment(alignedTime, metricName, metricValue);
+          }
         }
       }
     }

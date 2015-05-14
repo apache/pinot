@@ -39,10 +39,4 @@ public class TestThirdEyeAggregateFunction {
       Assert.assertEquals(derived.get(i, "D"), 4.0);
     }
   }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testInvalid_notCongruent() {
-    new ThirdEyeAggregateFunction(
-        ImmutableList.of("L", "D"), new TimeGranularity(5, TimeUnit.HOURS)).apply(config, query, timeSeries);
-  }
 }

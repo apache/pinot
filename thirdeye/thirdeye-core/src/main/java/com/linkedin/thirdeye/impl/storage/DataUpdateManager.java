@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.impl.storage;
 
 import com.linkedin.thirdeye.api.*;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryHashMapImpl;
 import com.linkedin.thirdeye.impl.TarGzCompressionUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -21,6 +24,7 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -321,5 +325,172 @@ public class DataUpdateManager {
       lock.unlock();
       LOGGER.info("Unlocked collection {} using lock {} for persist tree", collection, lock);
     }
+  }
+
+  /**
+   * Returns a merged tree with all dimensions and data.
+   *
+   * @param starTrees
+   *  A collection of star trees all with the same configuration.
+   */
+  public StarTree mergeTrees(Collection<StarTree> starTrees) throws Exception {
+    // Create the merged tree structure
+    StarTreeConfig baseConfig = starTrees.iterator().next().getConfig();
+    StarTreeConfig inMemoryConfig = new StarTreeConfig(baseConfig.getCollection(),
+        StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
+        new Properties(),
+        baseConfig.getAnomalyDetectionFunctionClass(),
+        baseConfig.getAnomalyDetectionFunctionConfig(),
+        baseConfig.getAnomalyHandlerClass(),
+        baseConfig.getAnomalyHandlerConfig(),
+        baseConfig.getAnomalyDetectionMode(),
+        baseConfig.getDimensions(),
+        baseConfig.getMetrics(),
+        baseConfig.getTime(),
+        baseConfig.getJoinSpec(),
+        baseConfig.getRollup(),
+        baseConfig.getSplit(),
+        false);
+    final StarTree mergedTree = new StarTreeImpl(inMemoryConfig);
+    mergedTree.open();
+
+    // Add all records to the merged tree
+    for (StarTree starTree : starTrees) {
+      starTree.eachLeaf(new StarTreeCallback() {
+        @Override
+        public void call(StarTreeNode node) {
+          for (StarTreeRecord record : node.getRecordStore()) {
+            mergedTree.add(record);
+          }
+        }
+      });
+    }
+
+    return mergedTree;
+  }
+
+  /**
+   * Performs in-memory roll-up on a star tree, and returns the rolled up tree.
+   */
+  public StarTree rollUp(final StarTree starTree) throws Exception {
+    if (starTree.getConfig().getRollup() == null) {
+      LOGGER.warn("Rollup is null, will just use same tree");
+      return starTree;
+    }
+
+    RollupSpec rollup = starTree.getConfig().getRollup();
+    Constructor<?> constructor = Class.forName(rollup.getFunctionClass()).getConstructor(Map.class);
+    final RollupThresholdFunction threshold = (RollupThresholdFunction) constructor.newInstance(rollup.getFunctionConfig());
+    LOGGER.info("Rolling up using function {}", threshold);
+
+    // Iterate over all dimension combinations, split into those below / above threshold
+    final Map<DimensionKey, MetricTimeSeries> aboveThreshold = new HashMap<>();
+    final Map<DimensionKey, MetricTimeSeries> belowThreshold = new HashMap<>();
+    starTree.eachLeaf(new StarTreeCallback() {
+      @Override
+      public void call(StarTreeNode node) {
+        for (StarTreeRecord record : node.getRecordStore()) {
+          if (threshold.isAboveThreshold(record.getMetricTimeSeries())) {
+            updateMap(aboveThreshold, record.getDimensionKey(), record.getMetricTimeSeries());
+          } else {
+            updateMap(belowThreshold, record.getDimensionKey(), record.getMetricTimeSeries());
+          }
+        }
+      }
+    });
+    LOGGER.info("Above threshold = {}, below threshold = {}", aboveThreshold.size(), belowThreshold.size());
+
+    // Get mapping of dimension name to position
+    Map<String, Integer> nameToPosition = new HashMap<>();
+    for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++) {
+      DimensionSpec dimensionSpec = starTree.getConfig().getDimensions().get(i);
+      nameToPosition.put(dimensionSpec.getName(), i);
+    }
+
+    // Generate aggregates for all combinations for those below threshold
+    LOGGER.info("Generating aggregates for all combinations below threshold...");
+    Map<DimensionKey, MetricTimeSeries> allCombinations = new HashMap<>();
+    Map<DimensionKey, Set<DimensionKey>> allOptions = new HashMap<>();
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : belowThreshold.entrySet()) {
+      String[] oldValues = entry.getKey().getDimensionValues();
+      for (String dimensionName : rollup.getOrder()) {
+        // Aggregate
+        String[] newValues = Arrays.copyOf(oldValues, oldValues.length);
+        int idx = nameToPosition.get(dimensionName);
+        newValues[idx] = StarTreeConstants.OTHER;
+        DimensionKey newKey = new DimensionKey(newValues);
+        updateMap(allCombinations, newKey, entry.getValue());
+
+        // Record option
+        Set<DimensionKey> options = allOptions.get(entry.getKey());
+        if (options == null) {
+          options = new HashSet<>();
+          allOptions.put(entry.getKey(), options);
+        }
+        options.add(newKey);
+      }
+    }
+
+    // Find combination with least others that passes the threshold and select that
+    LOGGER.info("Selecting combination with least others for all combinations below threshold...");
+    Map<DimensionKey, MetricTimeSeries> selectedCombinations = new HashMap<>();
+
+    // Add all other record
+    String[] allOther = new String[starTree.getConfig().getDimensions().size()];
+    Arrays.fill(allOther, StarTreeConstants.OTHER);
+    DimensionKey allOtherKey = new DimensionKey(allOther);
+    MetricSchema metricSchema = MetricSchema.fromMetricSpecs(starTree.getConfig().getMetrics());
+    selectedCombinations.put(allOtherKey, new MetricTimeSeries(metricSchema));
+
+    for (Map.Entry<DimensionKey, Set<DimensionKey>> entry : allOptions.entrySet()) {
+      DimensionKey selected = null;
+      int minOther = Integer.MAX_VALUE;
+      for (DimensionKey option : entry.getValue()) {
+        // Count others
+        int numOther = 0;
+        for (int i = 0; i < option.getDimensionValues().length; i++) {
+          if (StarTreeConstants.OTHER.equals(option.getDimensionValues()[i])) {
+            numOther++;
+          }
+        }
+
+        // Apply threshold function
+        MetricTimeSeries rollUpSeries = allCombinations.get(option);
+        if (numOther < minOther && threshold.isAboveThreshold(rollUpSeries)) {
+          minOther = numOther;
+          selected = option;
+        }
+      }
+
+      // Just use all others if can't find combination
+      if (selected == null) {
+        selected = allOtherKey;
+      }
+
+      // Add the record's raw values to the aggregate for selected key
+      MetricTimeSeries rawTimeSeries = belowThreshold.get(entry.getKey());
+      updateMap(selectedCombinations, selected, rawTimeSeries);
+    }
+
+    // Create new star tree from both
+    LOGGER.info("Creating rolled up star tree...");
+    StarTree rolledUpTree = new StarTreeImpl(starTree.getConfig());
+    rolledUpTree.open();
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : aboveThreshold.entrySet()) {
+      rolledUpTree.add(new StarTreeRecordImpl(starTree.getConfig(), entry.getKey(), entry.getValue()));
+    }
+
+    return rolledUpTree;
+  }
+
+  private static void updateMap(Map<DimensionKey, MetricTimeSeries> map,
+                                DimensionKey key,
+                                MetricTimeSeries timeSeries) {
+    MetricTimeSeries series = map.get(key);
+    if (series == null) {
+      series = new MetricTimeSeries(timeSeries.getSchema());
+      map.put(key, series);
+    }
+    series.aggregate(timeSeries);
   }
 }

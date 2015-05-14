@@ -20,6 +20,9 @@ $(document).ready(function() {
             return cell.value + '<br/>' + (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
         },
         backgroundColor: function(cell) {
+            if (cell.stats['baseline_cdf_value'] == null) {
+                return '#ffffff'
+            }
             return 'rgba(136, 138, 252, ' + cell.stats['baseline_cdf_value'].toFixed(3) + ')'
         },
         groupBy: 'METRIC'

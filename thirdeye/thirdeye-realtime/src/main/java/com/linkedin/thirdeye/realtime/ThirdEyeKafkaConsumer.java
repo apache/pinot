@@ -247,7 +247,8 @@ public class ThirdEyeKafkaConsumer {
       try {
         // Write to disk
         LOG.info("Locked {} to persist data...", lock);
-        dataUpdateManager.persistTree(collection, schedule, minTime, maxTime, starTree);
+        StarTree rolledUpTree = dataUpdateManager.rollUp(starTree);
+        dataUpdateManager.persistTree(collection, schedule, minTime, maxTime, rolledUpTree);
         LOG.info("Clearing existing star tree metrics...");
         starTree.clear();
         LOG.info("Updating last persist time to {}", currentTime);

@@ -142,7 +142,7 @@ $(document).ready(function() {
     // Load existing date / time
     if (path.currentMillis) {
         var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
-        var currentDateTime = moment(parseInt(path.currentMillis) - aggregateMillis)
+        var currentDateTime = moment(parseInt(path.currentMillis))
         var dateString = currentDateTime.format("YYYY-MM-DD")
         var timeString = currentDateTime.format("HH:mm")
         $("#sidenav-date").val(dateString)
@@ -234,15 +234,6 @@ $(document).ready(function() {
         var aggregateSize = parseInt($("#sidenav-aggregate-size").val())
         var aggregateUnit = $("#sidenav-aggregate-unit").val()
         var aggregateMillis = toMillis(aggregateSize, aggregateUnit)
-
-        if ((currentMillisUTC - baselineMillisUTC) % aggregateMillis != 0) {
-            errorMessage.html("Time range is not divisible by aggregation unit")
-            errorAlert.fadeIn(100)
-            return
-        }
-
-        // Include an aggregation window past the current
-        currentMillisUTC += aggregateMillis
 
         // Metric function
         var metricFunction = metrics.join(",")

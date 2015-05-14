@@ -66,14 +66,6 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
 
     Set<Long> times = getTimes(timeRange);
 
-    for (Long time : times)
-    {
-      for (MetricSpec metricSpec : config.getMetrics())
-      {
-        timeSeries.set(time, metricSpec.getName(), 0);
-      }
-    }
-
     for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet())
     {
       TimeRange bufferTimeRange = entry.getKey();
