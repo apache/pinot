@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.realtime.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -139,6 +140,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
     columnIndexReaderWriterMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
         V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
+
   }
 
   @Override
@@ -367,18 +369,20 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     final MutableDictionaryReader dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
-    final List<Integer> rawValues = new ArrayList<Integer>();
+    int[] rawValuesArr = new int[dictionary.length()];
+
     for (int i = 0; i < dictionary.length(); i++) {
-      rawValues.add((Integer) dictionary.get(i));
+      rawValuesArr[i] = (Integer) dictionary.get(i);
     }
 
+    Arrays.sort(rawValuesArr);
+
     long start = System.currentTimeMillis();
-    Collections.sort(rawValues);
 
     LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
 
-    for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+    for (int i = 0; i < rawValuesArr.length; i++) {
+      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
     }
     return intIterators;
   }

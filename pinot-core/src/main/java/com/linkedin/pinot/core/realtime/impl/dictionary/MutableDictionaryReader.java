@@ -32,7 +32,6 @@ public abstract class MutableDictionaryReader implements Dictionary {
   public MutableDictionaryReader(FieldSpec spec) {
     this.spec = spec;
     this.dictionaryIdBiMap = HashBiMap.<Integer, Object> create();
-    dictionaryIdBiMap.put(0, spec.getDefaultNullValue());
     dictionaryIdGenerator = new AtomicInteger(-1);
   }
 

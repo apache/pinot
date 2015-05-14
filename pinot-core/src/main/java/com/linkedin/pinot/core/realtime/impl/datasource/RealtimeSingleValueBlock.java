@@ -88,7 +88,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId > max) {
+            if (docId >= max) {
               return false;
             }
             counter = docId;
@@ -116,8 +116,9 @@ public class RealtimeSingleValueBlock implements Block {
             if (!hasNext()) {
               return Constants.EOF;
             }
-
-            return reader.getInt(counter++);
+            int ret = reader.getInt(counter);
+            counter++;
+            return ret;
           }
 
           @Override

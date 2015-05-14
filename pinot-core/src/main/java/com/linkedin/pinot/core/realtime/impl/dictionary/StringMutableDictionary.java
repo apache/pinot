@@ -29,17 +29,10 @@ public class StringMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public void index(Object rawValue) {
-    if (rawValue == null) {
-      hasNull = true;
-      return;
-    }
-
     if (rawValue instanceof Object[]) {
       for (Object o : (Object[]) rawValue) {
-        if (o != null) {
-          addToDictionaryBiMap(o.toString());
-          updateMinMax(o.toString());
-        }
+        addToDictionaryBiMap(o.toString());
+        updateMinMax(o.toString());
       }
       return;
     }
