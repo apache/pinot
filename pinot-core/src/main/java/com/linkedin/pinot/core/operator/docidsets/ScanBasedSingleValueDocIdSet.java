@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -26,16 +28,13 @@ import com.linkedin.pinot.core.common.Constants;
 
 
 public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
-
   private final BlockValSet blockValSet;
-  private int[] dictIds;
   private BlockValSetBasedDocIdIterator blockValSetBlockDocIdIterator;
   private BlockMetadata blockMetadata;
 
   public ScanBasedSingleValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, int... dictIds) {
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    this.dictIds = dictIds;
     blockValSetBlockDocIdIterator = new BlockValSetBasedDocIdIterator(blockValSet, blockMetadata, dictIds);
   }
 
@@ -71,12 +70,15 @@ public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
   public static class BlockValSetBasedDocIdIterator implements BlockDocIdIterator {
     int currentDocId = -1;
     BlockSingleValIterator valueIterator;
-    private int[] dictIds;
+    private Set<Integer> dictIdSet;
     private int startDocId;
     private int endDocId;
 
     public BlockValSetBasedDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      this.dictIds = dictIds;
+      this.dictIdSet = new HashSet<Integer>(Math.max(1, dictIds.length));
+      for (int dictId : dictIds) {
+        dictIdSet.add(dictId);
+      }
       valueIterator = (BlockSingleValIterator) blockValSet.iterator();
       setStartDocId(blockMetadata.getStartDocId());
       setEndDocId(blockMetadata.getEndDocId());
@@ -116,8 +118,7 @@ public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
     public int next() {
       while (valueIterator.hasNext() && currentDocId <= endDocId) {
         int next = valueIterator.nextIntVal();
-        int dictIdIndex = Arrays.binarySearch(dictIds, next);
-        if (dictIdIndex >= 0) {
+        if (dictIdSet.contains(next)) {
           return currentDocId++;
         }
         currentDocId = currentDocId + 1;

@@ -273,4 +273,21 @@ public class QueriesSentinelTest {
     final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
   }
+
+  @Test
+  public void testRangeQuery() throws RecognitionException, Exception {
+    String query = "select count(*) from mirror where viewerId in ('24516187', '159470367', '4823449', '4421992', '85417', '13599286', '228392479')";
+    LOGGER.info("running  : " + query);
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
+    instanceRequest.setSearchSegments(new ArrayList<String>());
+    instanceRequest.getSearchSegments().add(segmentName);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    instanceResponseMap.clear();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getInt("value"), 14);
+  }
 }

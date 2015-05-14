@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -68,13 +70,16 @@ public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
   public static class BlockValSetBlockDocIdIterator implements BlockDocIdIterator {
     BlockMultiValIterator valueIterator;
     int counter = 0;
-    private int[] dictIds;
+    private Set<Integer> dictIdSet;
     final int[] intArray;
     private int startDocId;
     private int endDocId;
 
     public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      this.dictIds = dictIds;
+      this.dictIdSet = new HashSet<Integer>(Math.max(1, dictIds.length));
+      for (int dictId : dictIds) {
+        dictIdSet.add(dictId);
+      }
       valueIterator = (BlockMultiValIterator) blockValSet.iterator();
       this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
       Arrays.fill(intArray, 0);
@@ -117,21 +122,10 @@ public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
       while (valueIterator.hasNext() && counter <= endDocId) {
         int length = valueIterator.nextIntVal(intArray);
         boolean found = false;
-        if (dictIds.length < length) {
-          for (int i = 0; i < dictIds.length; i++) {
-            int dictIdIndex = Arrays.binarySearch(intArray, 0, length, dictIds[i]);
-            if (dictIdIndex >= 0) {
-              found = true;
-              break;
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            int dictIdIndex = Arrays.binarySearch(dictIds, intArray[i]);
-            if (dictIdIndex >= 0) {
-              found = true;
-              break;
-            }
+        for (int i = 0; i < length; i++) {
+          if (dictIdSet.contains(intArray[i])) {
+            found = true;
+            break;
           }
         }
         if (found) {
