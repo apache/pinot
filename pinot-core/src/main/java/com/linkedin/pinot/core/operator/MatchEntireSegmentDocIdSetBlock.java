@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.block.query;
+package com.linkedin.pinot.core.operator;
 
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -26,34 +25,41 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 
 
-public class MatchEntireSegmentBlock implements Block {
+public class MatchEntireSegmentDocIdSetBlock extends DocIdSetBlock {
+
   private final int _totalDocs;
 
-  public MatchEntireSegmentBlock(int totalDocs) {
+  public MatchEntireSegmentDocIdSetBlock(int totalDocs) {
+    super(null, totalDocs);
     _totalDocs = totalDocs;
+  }
+
+  public int[] getDocIdSet() {
+    throw new UnsupportedOperationException();
+  }
+
+  public int getSearchableLength() {
+    return _totalDocs;
   }
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    return false;
+    return true;
   }
 
   @Override
   public BlockId getId() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockDocIdValueSet getBlockDocIdValueSet() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -63,42 +69,40 @@ public class MatchEntireSegmentBlock implements Block {
       @Override
       public BlockDocIdIterator iterator() {
         return new BlockDocIdIterator() {
-
-          private int _currentDoc = 0;
+          int _pos = -1;
 
           @Override
           public int advance(int targetDocId) {
-            return _currentDoc = targetDocId;
+            _pos = targetDocId;
+            return _pos;
           }
 
           @Override
           public int next() {
-            if (_currentDoc < _totalDocs) {
-              return _currentDoc++;
-            } else {
+            _pos++;
+            if (_pos >= _totalDocs) {
               return Constants.EOF;
             }
+            return _pos;
           }
 
           @Override
           public int currentDocId() {
-            return _currentDoc;
+            return _pos;
           }
         };
       }
 
       @Override
       public Object getRaw() {
-        // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
       }
     };
   }
 
   @Override
   public BlockMetadata getMetadata() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
 }

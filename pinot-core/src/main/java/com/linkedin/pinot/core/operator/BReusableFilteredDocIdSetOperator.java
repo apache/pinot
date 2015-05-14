@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import com.linkedin.pinot.core.block.query.MatchEntireSegmentBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
@@ -62,14 +61,20 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
   @Override
   public Block nextBlock() {
     if (!inited) {
+      inited = true;
+      _currentDoc = 0;
       if (_filterOperators == null) {
-        _currentBlock = new MatchEntireSegmentBlock(_docSize);
+        _currentBlock = new MatchEntireSegmentDocIdSetBlock(_docSize);
+        _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
+        return _currentBlock;
       } else {
         _currentBlock = _filterOperators.nextBlock();
       }
       _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
-      _currentDoc = 0;
-      inited = true;
+    }
+    if (_filterOperators == null) {
+      _currentBlock = null;
+      return _currentBlock;
     }
     _pos = 0;
     getNextDoc();
