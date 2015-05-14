@@ -77,24 +77,29 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
       return BlockUtils.emptyBlockDocIdSetIterator();
     }
     return new BlockDocIdIterator() {
-      int counter = pairs.get(0).getLeft();
-      int arrayPointer = 0;
+      int pairPointer = 0;
+      int counter = pairs.get(0).getLeft() - 1;
 
       @Override
       public int advance(int targetDocId) {
-        if (targetDocId > pairs.get(pairs.size() - 1).getRight()) {
+        if (pairPointer == pairs.size() || targetDocId > pairs.get(pairs.size() - 1).getRight()) {
+          pairPointer = pairs.size();
           return (counter = Constants.EOF);
         }
         long start = System.nanoTime();
 
-        for (int i = 0; i < pairs.size(); i++) {
-          if (pairs.get(i).getLeft() > targetDocId) {
-            counter = pairs.get(i).getLeft();
+        while (pairPointer < pairs.size()) {
+          if (pairs.get(pairPointer).getLeft() > targetDocId) {
+            counter = pairs.get(pairPointer).getLeft();
             break;
-          } else if (targetDocId >= pairs.get(i).getLeft() && targetDocId <= pairs.get(i).getRight()) {
+          } else if (targetDocId >= pairs.get(pairPointer).getLeft() && targetDocId <= pairs.get(pairPointer).getRight()) {
             counter = targetDocId;
             break;
           }
+          pairPointer++;
+        }
+        if (pairPointer == pairs.size()) {
+          counter = Constants.EOF;
         }
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
@@ -103,20 +108,23 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
 
       @Override
       public int next() {
-        if (counter > pairs.get(pairs.size() - 1).getRight()) {
+        if (pairPointer == pairs.size() || counter > pairs.get(pairs.size() - 1).getRight()) {
+          pairPointer = pairs.size();
           return (counter = Constants.EOF);
         }
         long start = System.nanoTime();
-        for (int i = 0; i < pairs.size(); i++) {
-          if (counter >= pairs.get(i).getLeft() && counter <= pairs.get(i).getRight()) {
-            break;
+        counter = counter + 1;
+        if (pairPointer < pairs.size() && counter > pairs.get(pairPointer).getRight()) {
+          pairPointer++;
+          if (pairPointer == pairs.size()) {
+            counter = Constants.EOF;
+          } else {
+            counter = pairs.get(pairPointer).getLeft();
           }
         }
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
-        int ret = counter;
-        counter = counter + 1;
-        return ret;
+        return counter;
       }
 
       @Override

@@ -99,6 +99,42 @@ public class OrOperatorTest {
     orOperator.close();
   }
 
+  @Test
+  public void testComplex() {
+    int[] list1 = new int[] { 2, 3, 6, 10, 15, 16, 28 };
+    int[] list2 = new int[] { 3, 6, 8, 20, 28 };
+    int[] list3 = new int[] { 1, 2, 3, 6, 30 };
+    
+    TreeSet<Integer> set = new TreeSet<Integer>();
+    set.addAll(Lists.newArrayList(ArrayUtils.toObject(list1)));
+    set.addAll(Lists.newArrayList(ArrayUtils.toObject(list2)));
+    set.addAll(Lists.newArrayList(ArrayUtils.toObject(list3)));
+    Iterator<Integer> expectedIterator = set.iterator();
+    
+    List<Operator> operators = new ArrayList<Operator>();
+    operators.add(makeFilterOperator(list1));
+    operators.add(makeFilterOperator(list2));
+
+    final OrOperator orOperator1 = new OrOperator(operators);
+    List<Operator> operators1 = new ArrayList<Operator>();
+    operators1.add(orOperator1);
+    operators1.add(makeFilterOperator(list3));
+
+    final OrOperator orOperator = new OrOperator(operators1);
+
+    orOperator.open();
+    BaseFilterBlock block;
+    while ((block = orOperator.nextBlock()) != null) {
+      final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
+      final BlockDocIdIterator iterator = blockDocIdSet.iterator();
+      int docId;
+      while ((docId = iterator.next()) != Constants.EOF) {
+        System.out.println(docId);
+        Assert.assertEquals(expectedIterator.next().intValue(), docId);
+      }
+    }
+    orOperator.close();
+  }
   public BaseFilterOperator makeFilterOperator(final int[] list) {
     return new BaseFilterOperator() {
       boolean alreadyInvoked = false;

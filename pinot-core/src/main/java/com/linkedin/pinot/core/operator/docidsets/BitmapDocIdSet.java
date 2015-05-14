@@ -125,7 +125,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
     //<docId Counter, postinglist Id> Int Pair
     PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(Math.max(1, raw.length), new Pairs.AscendingIntPairComparator());
     boolean[] exists = new boolean[raw.length];
-    int counter = 0;
+    int counter = -1;
 
     @Override
     public int advance(int targetDocId) {
@@ -134,6 +134,9 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
         targetDocId = startDocId;
       } else if (targetDocId > endDocId) {
         counter = Constants.EOF;
+      }
+      if (counter == Constants.EOF) {
+        return counter;
       }
       Iterator<IntPair> iterator = queue.iterator();
       //remove everything from the queue that is less than targetDocId
@@ -161,7 +164,11 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
           exists[i] = true;
         }
       }
-      removeFirstFromQueue();
+      if (queue.size() > 0) {
+        counter = queue.peek().getA();
+      } else {
+        counter = Constants.EOF;
+      }
       long end = System.nanoTime();
       timeMeasure.addAndGet(end - start);
       return counter;
@@ -170,11 +177,19 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
     @Override
     public int next() {
       long start = System.nanoTime();
+      if (counter == Constants.EOF) {
+        return counter;
+      }
+      while (queue.size() > 0 && queue.peek().getA() <= counter) {
+        IntPair pair = queue.remove();
+        exists[pair.getB()] = false;
+      }
+      counter++;
       for (int i = 0; i < iterators.length; i++) {
         if (!exists[i]) {
           while (iterators[i].hasNext()) {
             int next = iterators[i].next();
-            if (next >= startDocId && next <= endDocId) {
+            if (next >= startDocId && next <= endDocId && next >= counter) {
               queue.add(new IntPair(next, i));
               break;
             }
@@ -185,24 +200,14 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
           exists[i] = true;
         }
       }
-      removeFirstFromQueue();
-      long end = System.nanoTime();
-      timeMeasure.addAndGet(end - start);
-      return counter;
-    }
-
-    private void removeFirstFromQueue() {
       if (queue.size() > 0) {
-        IntPair pair = queue.remove();
-        exists[pair.getB()] = false;
-        counter = pair.getA();
-        while (queue.size() > 0 && queue.peek().getA() == counter) {
-          pair = queue.remove();
-          exists[pair.getB()] = false;
-        }
+        counter = queue.peek().getA();
       } else {
         counter = Constants.EOF;
       }
+      long end = System.nanoTime();
+      timeMeasure.addAndGet(end - start);
+      return counter;
     }
 
     @Override

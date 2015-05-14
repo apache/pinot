@@ -124,10 +124,10 @@ public class SegmentDictionaryCreator implements Closeable {
           final int padding = stringColumnMaxLength - toWrite.length();
 
           final StringBuilder bld = new StringBuilder();
+          bld.append(toWrite);
           for (int j = 0; j < padding; j++) {
             bld.append(V1Constants.Str.STRING_PAD_CHAR);
           }
-          bld.append(toWrite);
           revised[i] = bld.toString();
         }
         Arrays.sort(revised);
@@ -175,10 +175,10 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         final StringBuilder bld = new StringBuilder();
+        bld.append(e.toString());
         for (int i = 0; i < (stringColumnMaxLength - ((String) e).length()); i++) {
           bld.append(V1Constants.Str.STRING_PAD_CHAR);
         }
-        bld.append(e.toString());
         return new Integer(searchableByteBuffer.binarySearch(0, bld.toString()));
       default:
         break;
@@ -218,10 +218,10 @@ public class SegmentDictionaryCreator implements Closeable {
       case BOOLEAN:
         for (int i = 0; i < multiValues.length; i++) {
           final StringBuilder bld = new StringBuilder();
+          bld.append(multiValues[i].toString());
           for (int j = 0; j < (stringColumnMaxLength - ((String) multiValues[i]).length()); j++) {
             bld.append(V1Constants.Str.STRING_PAD_CHAR);
           }
-          bld.append(multiValues[i].toString());
           ret[i] = searchableByteBuffer.binarySearch(0, bld.toString());
         }
         break;

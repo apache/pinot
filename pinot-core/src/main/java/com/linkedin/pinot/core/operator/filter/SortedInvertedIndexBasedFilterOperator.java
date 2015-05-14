@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -61,10 +62,10 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
     Dictionary dictionary = dataSource.getDictionary();
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     int[] dictionaryIds = evaluator.getDictionaryIds();
+    Arrays.sort(dictionaryIds);
     for (int i = 0; i < dictionaryIds.length; i++) {
       int[] minMax = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
       pairs.add(ImmutablePair.of(minMax[0], minMax[1]));

@@ -197,7 +197,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   @Test
   public void testGeneratedQueries() throws Exception {
-    // super.testGeneratedQueries();
+    super.testGeneratedQueries();
   }
 
   @Test

@@ -90,6 +90,9 @@ public class MSelectionOnlyOperator implements Operator {
         numDocsScanned++;
         _rowEvents.add(SelectionOperatorUtils.collectRowFromBlockValSets(docId, _blocks, _dataSchema));
       }
+      if (_rowEvents.size() == _limitDocs) {
+        break;
+      }
     }
 
     final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();

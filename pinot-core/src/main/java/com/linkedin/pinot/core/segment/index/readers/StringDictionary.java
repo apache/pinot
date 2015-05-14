@@ -43,10 +43,10 @@ public class StringDictionary extends ImmutableDictionaryReader {
     final String lookup = rawValue.toString();
     final int differenceInLength = lengthofMaxEntry - lookup.length();
     final StringBuilder bld = new StringBuilder();
+    bld.append(lookup);
     for (int i = 0; i < differenceInLength; i++) {
       bld.append(V1Constants.Str.STRING_PAD_CHAR);
     }
-    bld.append(lookup);
     return stringIndexOf(bld.toString());
   }
 

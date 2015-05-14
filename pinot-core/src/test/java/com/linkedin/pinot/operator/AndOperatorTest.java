@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
+import com.linkedin.pinot.core.operator.filter.OrOperator;
 
 
 public class AndOperatorTest {
@@ -82,11 +83,68 @@ public class AndOperatorTest {
     andOperator.close();
   }
 
+  @Test
   public void testComplex() {
+    int[] list1 = new int[] { 2, 3, 6, 10, 15, 16, 28 };
+    int[] list2 = new int[] { 3, 6, 8, 20, 28 };
+    int[] list3 = new int[] { 1, 2, 3, 6, 30 };
 
+    List<Operator> operators = new ArrayList<Operator>();
+    operators.add(makeFilterOperator(list1));
+    operators.add(makeFilterOperator(list2));
+
+    final AndOperator andOperator1 = new AndOperator(operators);
+    List<Operator> operators1 = new ArrayList<Operator>();
+    operators1.add(andOperator1);
+    operators1.add(makeFilterOperator(list3));
+
+    final AndOperator andOperator = new AndOperator(operators1);
+
+    andOperator.open();
+    BaseFilterBlock block;
+    while ((block = andOperator.nextBlock()) != null) {
+      final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
+      final BlockDocIdIterator iterator = blockDocIdSet.iterator();
+      int docId;
+      while ((docId = iterator.next()) != Constants.EOF) {
+        System.out.println(docId);
+      }
+    }
+    andOperator.close();
+  }
+
+  @Test
+  public void testComplexWithOr() {
+    int[] list1 = new int[] { 2, 3, 6, 10, 15, 16, 28 };
+    int[] list2 = new int[] { 3, 6, 8, 20, 28 };
+    int[] list3 = new int[] { 1, 2, 3, 6, 30 };
+
+    List<Operator> operators = new ArrayList<Operator>();
+    operators.add(makeFilterOperator(list3));
+    operators.add(makeFilterOperator(list2));
+
+    final OrOperator orOperator = new OrOperator(operators);
+    List<Operator> operators1 = new ArrayList<Operator>();
+    operators1.add(orOperator);
+    operators1.add(makeFilterOperator(list1));
+
+    final AndOperator andOperator = new AndOperator(operators1);
+
+    andOperator.open();
+    BaseFilterBlock block;
+    while ((block = andOperator.nextBlock()) != null) {
+      final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
+      final BlockDocIdIterator iterator = blockDocIdSet.iterator();
+      int docId;
+      while ((docId = iterator.next()) != Constants.EOF) {
+        System.out.println(docId);
+      }
+    }
+    andOperator.close();
   }
 
   public BaseFilterOperator makeFilterOperator(final int[] list) {
+
     return new BaseFilterOperator() {
       boolean alreadyInvoked = false;
 
@@ -153,7 +211,7 @@ public class AndOperatorTest {
 
                   @Override
                   public int currentDocId() {
-                    return 0;
+                    return counter;
                   }
                 };
               }
@@ -178,14 +236,12 @@ public class AndOperatorTest {
 
               @Override
               public int getMinDocId() {
-                // TODO Auto-generated method stub
-                return 0;
+                return list[0];
               }
 
               @Override
               public int getMaxDocId() {
-                // TODO Auto-generated method stub
-                return 0;
+                return list[list.length - 1];
               }
             };
           }

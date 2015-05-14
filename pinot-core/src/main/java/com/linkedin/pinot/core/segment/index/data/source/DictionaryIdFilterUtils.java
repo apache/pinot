@@ -144,7 +144,7 @@ public class DictionaryIdFilterUtils {
 
         for (final String value : inValues) {
           final int index = dictionary.indexOf(value);
-          if (index >= 0) {
+          if ((index >= 0) && (!ret.contains(index))) {
             ret.add(index);
           }
         }

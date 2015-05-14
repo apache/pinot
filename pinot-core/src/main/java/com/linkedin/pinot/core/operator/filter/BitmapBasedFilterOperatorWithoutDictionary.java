@@ -16,7 +16,10 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -124,7 +127,8 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
         break;
       case IN:
         String[] inRangeStrings = ((InPredicate) predicate).getInRange();
-        for (String rawValueInString : inRangeStrings) {
+        Set<String> inRangeStringSet = new HashSet<String>(Arrays.asList(inRangeStrings));
+        for (String rawValueInString : inRangeStringSet) {
           MutableRoaringBitmap bitmap = invertedIndex.getDocIdSetFor(getNumberObjectFromString(rawValueInString));
           if (bitmap != null) {
             bitmapList.add(bitmap);
