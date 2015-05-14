@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.google.common.util.concurrent.MoreExecutors;
@@ -462,11 +461,11 @@ public class TestScatterGather {
     Assert.assertEquals(response, "response_2_0");
 
     //No  response from 4th server
-    AssertJUnit.assertNull("No response from 4th server", v.get(serverInstance4));
+    Assert.assertNull(v.get(serverInstance4), "No response from 4th server");
 
     Map<ServerInstance, Throwable> errorMap = fut.getError();
     Assert.assertEquals(errorMap.size(), 1, "One error");
-    AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
+    Assert.assertNotNull(errorMap.get(serverInstance4), "Server4 returned timeout");
     System.out.println("Error is :" + errorMap.get(serverInstance4));
 
     Thread.sleep(3000);
@@ -578,11 +577,11 @@ public class TestScatterGather {
     Assert.assertEquals(response, "response_2_0");
 
     //No  response from 4th server
-    AssertJUnit.assertNull("No response from 4th server", v.get(serverInstance4));
+    Assert.assertNull(v.get(serverInstance4), "No response from 4th server");
 
     Map<ServerInstance, Throwable> errorMap = fut.getError();
     Assert.assertEquals(errorMap.size(), 1, "One error");
-    AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
+    Assert.assertNotNull(errorMap.get(serverInstance4), "Server4 returned timeout");
     System.out.println("Error is :" + errorMap.get(serverInstance4));
 
     Thread.sleep(3000);

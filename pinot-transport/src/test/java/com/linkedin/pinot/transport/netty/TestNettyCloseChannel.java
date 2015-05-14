@@ -32,7 +32,6 @@ import java.util.concurrent.CountDownLatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
@@ -82,7 +81,7 @@ public class TestNettyCloseChannel {
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
-    AssertJUnit.assertNull(serverResp);
+    Assert.assertNull(serverResp);
     Assert.assertFalse(serverRespFuture.isCancelled(), "Is Cancelled");
     Assert.assertTrue(serverRespFuture.getError() != null, "Got Exception");
     serverConn.shutdownGracefully();
@@ -117,7 +116,7 @@ public class TestNettyCloseChannel {
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
-    AssertJUnit.assertNull(serverResp);
+    Assert.assertNull(serverResp);
     Assert.assertFalse(serverRespFuture.isCancelled(), "Is Cancelled");
     Assert.assertTrue(serverRespFuture.getError() != null, "Got Exception");
     System.out.println(metric);

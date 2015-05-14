@@ -25,7 +25,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
-import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;

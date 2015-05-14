@@ -27,7 +27,6 @@ import java.util.concurrent.CountDownLatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
@@ -117,7 +116,7 @@ public class TestNettySingleConnectionInteg {
     serverRespFuture.cancel(false);
     latch.countDown();
     ByteBuf serverResp = serverRespFuture.getOne();
-    AssertJUnit.assertNull(serverResp);
+    Assert.assertNull(serverResp);
     Assert.assertTrue(serverRespFuture.isCancelled(), "Is Cancelled");
     clientConn.close();
     serverConn.shutdownGracefully();

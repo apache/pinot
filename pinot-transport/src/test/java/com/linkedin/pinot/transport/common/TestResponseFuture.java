@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.Checkable;
@@ -72,8 +71,8 @@ public class TestResponseFuture {
       runner.waitForDone();
       Assert.assertTrue(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -92,8 +91,8 @@ public class TestResponseFuture {
       runner.waitForDone();
       Assert.assertTrue(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -111,8 +110,8 @@ public class TestResponseFuture {
       runner.waitForDone();
       Assert.assertTrue(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -130,8 +129,8 @@ public class TestResponseFuture {
       runner.waitForDone();
       Assert.assertTrue(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -151,7 +150,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
       Assert.assertEquals(runner.getError(), expectedError, "Error");
       executor.shutdown();
     }
@@ -172,7 +171,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
       Assert.assertEquals(runner.getError(), expectedError, "Error");
       executor.shutdown();
     }
@@ -194,7 +193,7 @@ public class TestResponseFuture {
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
       Assert.assertEquals(runner.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -215,7 +214,7 @@ public class TestResponseFuture {
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
       Assert.assertEquals(runner.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -236,7 +235,7 @@ public class TestResponseFuture {
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
       Assert.assertEquals(runner.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -257,7 +256,7 @@ public class TestResponseFuture {
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
       Assert.assertEquals(runner.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -278,7 +277,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
       Assert.assertEquals(runner.getError(), expectedError, "Error");
       executor.shutdown();
     }
@@ -300,7 +299,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
       Assert.assertEquals(runner.getError(), expectedError, "Error");
       executor.shutdown();
     }
@@ -322,8 +321,8 @@ public class TestResponseFuture {
       runner.waitForDone();
       Assert.assertTrue(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -338,8 +337,8 @@ public class TestResponseFuture {
       runner.waitForDone();
       Assert.assertTrue(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -358,7 +357,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
       Assert.assertEquals(runner.getError(), expectedError, "Error");
       executor.shutdown();
     }
@@ -376,7 +375,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", runner.getMessage());
+      Assert.assertNull(runner.getMessage(), "No Reponse :");
       Assert.assertEquals(runner.getError(), expectedError, "Error");
       executor.shutdown();
     }
@@ -397,7 +396,7 @@ public class TestResponseFuture {
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
       Assert.assertEquals(runner.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
 
@@ -415,7 +414,7 @@ public class TestResponseFuture {
       Assert.assertFalse(runner.isCancelled(), "Cancelled ?");
       Assert.assertTrue(runner.isDone(), "Is Done ? ");
       Assert.assertEquals(runner.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", runner.getError());
+      Assert.assertNull(runner.getError(), "No Error :");
       executor.shutdown();
     }
   }
@@ -435,8 +434,8 @@ public class TestResponseFuture {
       Assert.assertTrue(listener.isCancelled(), "Cancelled ?");
       Assert.assertEquals(listener.getNumRuns(), 1, "Num Runs of listener");
       Assert.assertTrue(listener.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", listener.getMessage());
-      AssertJUnit.assertNull("No Error :", listener.getError());
+      Assert.assertNull(listener.getMessage(), "No Reponse :");
+      Assert.assertNull(listener.getError(), "No Error :");
       listener.close();
     }
 
@@ -451,8 +450,8 @@ public class TestResponseFuture {
       Assert.assertTrue(listener.isCancelled(), "Cancelled ?");
       Assert.assertEquals(listener.getNumRuns(), 1, "Num Runs of listener");
       Assert.assertTrue(listener.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", listener.getMessage());
-      AssertJUnit.assertNull("No Error :", listener.getError());
+      Assert.assertNull(listener.getMessage(), "No Reponse :");
+      Assert.assertNull(listener.getError(), "No Error :");
       listener.close();
     }
 
@@ -468,7 +467,7 @@ public class TestResponseFuture {
       Assert.assertFalse(listener.isCancelled(), "Cancelled ?");
       Assert.assertEquals(listener.getNumRuns(), 1, "Num Runs of listener");
       Assert.assertTrue(listener.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", listener.getMessage());
+      Assert.assertNull(listener.getMessage(), "No Reponse :");
       Assert.assertEquals(listener.getError(), expectedError, "Error");
     }
 
@@ -484,7 +483,7 @@ public class TestResponseFuture {
       Assert.assertFalse(listener.isCancelled(), "Cancelled ?");
       Assert.assertEquals(listener.getNumRuns(), 1, "Num Runs of listener");
       Assert.assertTrue(listener.isDone(), "Is Done ? ");
-      AssertJUnit.assertNull("No Reponse :", listener.getMessage());
+      Assert.assertNull(listener.getMessage(), "No Reponse :");
       Assert.assertEquals(listener.getError(), expectedError, "Error");
     }
 
@@ -501,7 +500,7 @@ public class TestResponseFuture {
       Assert.assertEquals(listener.getNumRuns(), 1, "Num Runs of listener");
       Assert.assertTrue(listener.isDone(), "Is Done ? ");
       Assert.assertEquals(listener.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", listener.getError());
+      Assert.assertNull(listener.getError(), "No Error :");
       listener.close();
     }
 
@@ -518,7 +517,7 @@ public class TestResponseFuture {
       Assert.assertEquals(listener.getNumRuns(), 1, "Num Runs of listener");
       Assert.assertTrue(listener.isDone(), "Is Done ? ");
       Assert.assertEquals(listener.getMessage(), message, "Response Check:");
-      AssertJUnit.assertNull("No Error :", listener.getError());
+      Assert.assertNull(listener.getError(), "No Error :");
       listener.close();
     }
   }

@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 
@@ -73,17 +72,17 @@ public class TestSelectingFuture {
     runner.waitForDone();
     Assert.assertFalse(runner.isCancelled(), "Composite Cancelled ?");
     Assert.assertTrue(runner.isDone(), "Composite Is Done ? ");
-    AssertJUnit.assertNull("Composite No Error :", runner.getError());
+    Assert.assertNull(runner.getError(), "Composite No Error :");
     Assert.assertEquals(runner.getMessage(), expectedMessage, "Response");
     Assert.assertFalse(futureList.get(0).isCancelled(), "First response not cancelled");
     Assert.assertTrue(futureList.get(1).isCancelled(), "Second response cancelled");
     Assert.assertTrue(futureList.get(2).isCancelled(), "Third response cancelled");
-    AssertJUnit.assertNull(futureList.get(0).getError());
-    AssertJUnit.assertNull(futureList.get(1).getError());
-    AssertJUnit.assertNull(futureList.get(2).getError());
+    Assert.assertNull(futureList.get(0).getError());
+    Assert.assertNull(futureList.get(1).getError());
+    Assert.assertNull(futureList.get(2).getError());
     Assert.assertEquals(futureList.get(0).getOne(), runner.getMessage());
-    AssertJUnit.assertNull(futureList.get(1).get());
-    AssertJUnit.assertNull(futureList.get(2).get());
+    Assert.assertNull(futureList.get(1).get());
+    Assert.assertNull(futureList.get(2).get());
     executor.shutdown();
   }
 
@@ -127,7 +126,7 @@ public class TestSelectingFuture {
     runner.waitForDone();
     Assert.assertFalse(runner.isCancelled(), "Composite Cancelled ?");
     Assert.assertTrue(runner.isDone(), "Composite Is Done ? ");
-    AssertJUnit.assertNull("Composite No Message :", runner.getMessage());
+    Assert.assertNull(runner.getMessage(), "Composite No Message :");
     Assert.assertEquals(runner.getError(), expectedError, "Error");
     Assert.assertFalse(futureList.get(0).isCancelled(), "First response not cancelled");
     Assert.assertFalse(futureList.get(1).isCancelled(), "Second response not cancelled");
@@ -135,9 +134,9 @@ public class TestSelectingFuture {
     Assert.assertNotNull(futureList.get(0).getError());
     Assert.assertNotNull(futureList.get(1).getError());
     Assert.assertEquals(futureList.get(2).getError().get("key_2"), runner.getError());
-    AssertJUnit.assertNull(futureList.get(0).get());
-    AssertJUnit.assertNull(futureList.get(1).get());
-    AssertJUnit.assertNull(futureList.get(2).get());
+    Assert.assertNull(futureList.get(0).get());
+    Assert.assertNull(futureList.get(1).get());
+    Assert.assertNull(futureList.get(2).get());
     executor.shutdown();
   }
 
@@ -192,17 +191,17 @@ public class TestSelectingFuture {
     runner.waitForDone();
     Assert.assertFalse(runner.isCancelled(), "Composite Cancelled ?");
     Assert.assertTrue(runner.isDone(), "Composite Is Done ? ");
-    AssertJUnit.assertNull("Composite No Error :", runner.getError());
+    Assert.assertNull(runner.getError(), "Composite No Error :");
     Assert.assertEquals(runner.getMessage(), expectedMessage, "Response");
     Assert.assertFalse(futureList.get(0).isCancelled(), "First response not cancelled");
     Assert.assertFalse(futureList.get(1).isCancelled(), "Second response not cancelled");
     Assert.assertTrue(futureList.get(2).isCancelled(), "Third response cancelled");
     Assert.assertNotNull(futureList.get(0).getError());
-    AssertJUnit.assertNull(futureList.get(1).getError());
-    AssertJUnit.assertNull(futureList.get(2).getError());
-    AssertJUnit.assertNull(futureList.get(0).get());
+    Assert.assertNull(futureList.get(1).getError());
+    Assert.assertNull(futureList.get(2).getError());
+    Assert.assertNull(futureList.get(0).get());
     Assert.assertEquals(futureList.get(1).getOne(), runner.getMessage());
-    AssertJUnit.assertNull(futureList.get(2).get());
+    Assert.assertNull(futureList.get(2).get());
     executor.shutdown();
   }
 
