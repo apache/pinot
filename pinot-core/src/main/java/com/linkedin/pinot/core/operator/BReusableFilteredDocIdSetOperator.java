@@ -39,14 +39,14 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
   private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
   private final int _maxSizeOfdocIdSet;
-  private final int[] _docIds;
+  private final int[] _docIdArray;
   private int _pos = 0;
   private int _searchableDocIdSize = 0;
   boolean inited = false;
 
   public BReusableFilteredDocIdSetOperator(Operator filterOperators, int docSize, int maxSizeOfdocIdSet) {
     _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
-    _docIds = new int[_maxSizeOfdocIdSet];
+    _docIdArray = new int[_maxSizeOfdocIdSet];
     _filterOperators = filterOperators;
     _docSize = docSize;
 
@@ -60,6 +60,9 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
 
   @Override
   public Block nextBlock() {
+    if (_currentDoc == Constants.EOF) {
+      return null;
+    }
     if (!inited) {
       inited = true;
       _currentDoc = 0;
@@ -79,17 +82,17 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
     _pos = 0;
     getNextDoc();
     while (_currentDoc != Constants.EOF) {
-      _docIds[_pos++] = _currentDoc;
+      _docIdArray[_pos++] = _currentDoc;
       if (_pos == _maxSizeOfdocIdSet) {
         _searchableDocIdSize = _pos;
-        _currentDocIdSetBlock = new DocIdSetBlock(_docIds, _pos);
+        _currentDocIdSetBlock = new DocIdSetBlock(_docIdArray, _pos);
         return _currentDocIdSetBlock;
       }
       getNextDoc();
     }
     if (_pos > 0) {
       _searchableDocIdSize = _pos;
-      _currentDocIdSetBlock = new DocIdSetBlock(_docIds, _pos);
+      _currentDocIdSetBlock = new DocIdSetBlock(_docIdArray, _pos);
       return _currentDocIdSetBlock;
     }
     _currentDocIdSetBlock = null;
@@ -110,6 +113,9 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
   }
 
   private int getNextDoc() {
+    if (_currentDoc == Constants.EOF) {
+      return _currentDoc;
+    }
     while ((_currentBlockDocIdIterator == null) || ((_currentDoc = _currentBlockDocIdIterator.next()) == Constants.EOF)) {
       if (_filterOperators != null) {
         _currentBlock = _filterOperators.nextBlock();

@@ -124,8 +124,8 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
     }
     //<docId Counter, postinglist Id> Int Pair
     PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(Math.max(1, raw.length), new Pairs.AscendingIntPairComparator());
-    boolean[] exists = new boolean[raw.length];
-    int counter = -1;
+    boolean[] iteratorIsInQueue = new boolean[raw.length];
+    int currentDocId = -1;
 
     @Override
     public int advance(int targetDocId) {
@@ -133,10 +133,10 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
       if (targetDocId < startDocId) {
         targetDocId = startDocId;
       } else if (targetDocId > endDocId) {
-        counter = Constants.EOF;
+        currentDocId = Constants.EOF;
       }
-      if (counter == Constants.EOF) {
-        return counter;
+      if (currentDocId == Constants.EOF) {
+        return currentDocId;
       }
       Iterator<IntPair> iterator = queue.iterator();
       //remove everything from the queue that is less than targetDocId
@@ -144,12 +144,12 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
         IntPair pair = iterator.next();
         if (pair.getA() < targetDocId) {
           iterator.remove();
-          exists[pair.getB()] = false;
+          iteratorIsInQueue[pair.getB()] = false;
         }
       }
       //move the pointer until its great than or equal to targetDocId
       for (int i = 0; i < iterators.length; i++) {
-        if (!exists[i]) {
+        if (!iteratorIsInQueue[i]) {
           int next;
           while (iterators[i].hasNext()) {
             next = iterators[i].next();
@@ -161,35 +161,35 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
               break;
             }
           }
-          exists[i] = true;
+          iteratorIsInQueue[i] = true;
         }
       }
       if (queue.size() > 0) {
-        counter = queue.peek().getA();
+        currentDocId = queue.peek().getA();
       } else {
-        counter = Constants.EOF;
+        currentDocId = Constants.EOF;
       }
       long end = System.nanoTime();
       timeMeasure.addAndGet(end - start);
-      return counter;
+      return currentDocId;
     }
 
     @Override
     public int next() {
       long start = System.nanoTime();
-      if (counter == Constants.EOF) {
-        return counter;
+      if (currentDocId == Constants.EOF) {
+        return currentDocId;
       }
-      while (queue.size() > 0 && queue.peek().getA() <= counter) {
+      while (queue.size() > 0 && queue.peek().getA() <= currentDocId) {
         IntPair pair = queue.remove();
-        exists[pair.getB()] = false;
+        iteratorIsInQueue[pair.getB()] = false;
       }
-      counter++;
+      currentDocId++;
       for (int i = 0; i < iterators.length; i++) {
-        if (!exists[i]) {
+        if (!iteratorIsInQueue[i]) {
           while (iterators[i].hasNext()) {
             int next = iterators[i].next();
-            if (next >= startDocId && next <= endDocId && next >= counter) {
+            if (next >= startDocId && next <= endDocId && next >= currentDocId) {
               queue.add(new IntPair(next, i));
               break;
             }
@@ -197,22 +197,22 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
               break;
             }
           }
-          exists[i] = true;
+          iteratorIsInQueue[i] = true;
         }
       }
       if (queue.size() > 0) {
-        counter = queue.peek().getA();
+        currentDocId = queue.peek().getA();
       } else {
-        counter = Constants.EOF;
+        currentDocId = Constants.EOF;
       }
       long end = System.nanoTime();
       timeMeasure.addAndGet(end - start);
-      return counter;
+      return currentDocId;
     }
 
     @Override
     public int currentDocId() {
-      return counter;
+      return currentDocId;
     }
   }
 }

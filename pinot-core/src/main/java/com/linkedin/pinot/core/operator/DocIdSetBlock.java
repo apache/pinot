@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import java.util.Arrays;
-
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -30,16 +28,16 @@ import com.linkedin.pinot.core.common.Predicate;
 
 public class DocIdSetBlock implements Block {
 
-  private final int[] _docIdSet;
+  private final int[] _docIdArray;
   private final int _searchableLength;
 
   public DocIdSetBlock(int[] docIdSet, int searchableLength) {
-    _docIdSet = docIdSet;
+    _docIdArray = docIdSet;
     _searchableLength = searchableLength;
   }
 
   public int[] getDocIdSet() {
-    return _docIdSet;
+    return _docIdArray;
   }
 
   public int getSearchableLength() {
@@ -73,28 +71,25 @@ public class DocIdSetBlock implements Block {
       @Override
       public BlockDocIdIterator iterator() {
         return new BlockDocIdIterator() {
-          int _pos = 0;
+          int _pos = -1;
 
           @Override
           public int advance(int targetDocId) {
-            _pos = Arrays.binarySearch(_docIdSet, targetDocId);
-            if (_pos < 0) {
-              _pos = (_pos + 1) * -1;
-            }
-            return _docIdSet[_pos];
+            throw new UnsupportedOperationException("Not support advance in DocIdSetBlock()");
           }
 
           @Override
           public int next() {
+            _pos++;
             if (_pos == _searchableLength) {
               return Constants.EOF;
             }
-            return _docIdSet[_pos++];
+            return _docIdArray[_pos];
           }
 
           @Override
           public int currentDocId() {
-            return _docIdSet[_pos];
+            return _docIdArray[_pos];
           }
         };
       }

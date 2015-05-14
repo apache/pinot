@@ -71,7 +71,7 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
 
   public static class BlockValSetBlockDocIdIterator implements BlockDocIdIterator {
     BlockMultiValIterator valueIterator;
-    int counter = 0;
+    int currentDocId = -1;
     private Set<Integer> dictIdSet;
     final int[] intArray;
     private int startDocId;
@@ -95,8 +95,6 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
      */
     public void setStartDocId(int startDocId) {
       this.startDocId = startDocId;
-      valueIterator.skipTo(startDocId);
-      counter = startDocId;
     }
 
     /**
@@ -109,19 +107,30 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
 
     @Override
     public int advance(int targetDocId) {
-      if (targetDocId < startDocId) {
-        valueIterator.skipTo(startDocId);
-        counter = startDocId;
-      } else {
-        valueIterator.skipTo(targetDocId);
-        counter = targetDocId;
+      if (currentDocId == Constants.EOF) {
+        return currentDocId;
       }
-      return next();
+      if (targetDocId < startDocId) {
+        targetDocId = startDocId;
+      } else if (targetDocId > endDocId) {
+        currentDocId = Constants.EOF;
+      }
+      if (currentDocId >= targetDocId) {
+        return currentDocId;
+      } else {
+        currentDocId = targetDocId - 1;
+        valueIterator.skipTo(targetDocId);
+        return next();
+      }
     }
 
     @Override
     public int next() {
-      while (valueIterator.hasNext() && counter <= endDocId) {
+      if (currentDocId == Constants.EOF) {
+        return currentDocId;
+      }
+      while (valueIterator.hasNext() && currentDocId <= endDocId) {
+        currentDocId = currentDocId + 1;
         int length = valueIterator.nextIntVal(intArray);
         boolean found = false;
         for (int i = 0; i < length; i++) {
@@ -131,16 +140,16 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
           }
         }
         if (found) {
-          return counter;
+          return currentDocId;
         }
-        counter = counter + 1;
       }
-      return (counter = Constants.EOF);
+      currentDocId = Constants.EOF;
+      return Constants.EOF;
     }
 
     @Override
     public int currentDocId() {
-      return counter;
+      return currentDocId;
     }
   };
 

@@ -89,8 +89,6 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
      */
     public void setStartDocId(int startDocId) {
       this.startDocId = startDocId;
-      valueIterator.skipTo(startDocId);
-      currentDocId = startDocId;
     }
 
     /**
@@ -103,25 +101,36 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
 
     @Override
     public int advance(int targetDocId) {
-      if (targetDocId < startDocId) {
-        valueIterator.skipTo(startDocId);
-        currentDocId = startDocId;
-      } else {
-        valueIterator.skipTo(targetDocId);
-        currentDocId = targetDocId;
+      if (currentDocId == Constants.EOF) {
+        return currentDocId;
       }
-      return next();
+      if (targetDocId < startDocId) {
+        targetDocId = startDocId;
+      } else if (targetDocId > endDocId) {
+        currentDocId = Constants.EOF;
+      }
+      if (currentDocId >= targetDocId) {
+        return currentDocId;
+      } else {
+        currentDocId = targetDocId - 1;
+        valueIterator.skipTo(targetDocId);
+        return next();
+      }
     }
 
     @Override
     public int next() {
-      while (valueIterator.hasNext() && currentDocId <= endDocId) {
-        int next = valueIterator.nextIntVal();
-        if (dictIdSet.contains(next)) {
-          return currentDocId++;
-        }
-        currentDocId = currentDocId + 1;
+      if (currentDocId == Constants.EOF) {
+        return currentDocId;
       }
+      while (valueIterator.hasNext() && currentDocId <= endDocId) {
+        currentDocId = currentDocId + 1;
+        int dictIdForCurrentDoc = valueIterator.nextIntVal();
+        if (dictIdSet.contains(dictIdForCurrentDoc)) {
+          return currentDocId;
+        }
+      }
+      currentDocId = Constants.EOF;
       return Constants.EOF;
     }
 

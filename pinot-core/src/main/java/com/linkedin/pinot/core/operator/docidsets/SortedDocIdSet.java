@@ -78,58 +78,66 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
     }
     return new BlockDocIdIterator() {
       int pairPointer = 0;
-      int counter = pairs.get(0).getLeft() - 1;
+      int currentDocId = -1;
 
       @Override
       public int advance(int targetDocId) {
         if (pairPointer == pairs.size() || targetDocId > pairs.get(pairs.size() - 1).getRight()) {
           pairPointer = pairs.size();
-          return (counter = Constants.EOF);
+          return (currentDocId = Constants.EOF);
         }
         long start = System.nanoTime();
 
+        if (currentDocId >= targetDocId) {
+          return currentDocId;
+        }
+        // couter < targetDocId
         while (pairPointer < pairs.size()) {
           if (pairs.get(pairPointer).getLeft() > targetDocId) {
-            counter = pairs.get(pairPointer).getLeft();
+            // targetDocId in the gap between two valid pairs.
+            currentDocId = pairs.get(pairPointer).getLeft();
             break;
           } else if (targetDocId >= pairs.get(pairPointer).getLeft() && targetDocId <= pairs.get(pairPointer).getRight()) {
-            counter = targetDocId;
+            // targetDocId in the future valid pair.
+            currentDocId = targetDocId;
             break;
           }
           pairPointer++;
         }
         if (pairPointer == pairs.size()) {
-          counter = Constants.EOF;
+          currentDocId = Constants.EOF;
         }
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
-        return counter;
+        return currentDocId;
       }
 
       @Override
       public int next() {
-        if (pairPointer == pairs.size() || counter > pairs.get(pairs.size() - 1).getRight()) {
+        if (pairPointer == pairs.size() || currentDocId > pairs.get(pairs.size() - 1).getRight()) {
           pairPointer = pairs.size();
-          return (counter = Constants.EOF);
+          return (currentDocId = Constants.EOF);
         }
         long start = System.nanoTime();
-        counter = counter + 1;
-        if (pairPointer < pairs.size() && counter > pairs.get(pairPointer).getRight()) {
+        currentDocId = currentDocId + 1;
+        if (pairPointer < pairs.size() && currentDocId > pairs.get(pairPointer).getRight()) {
           pairPointer++;
           if (pairPointer == pairs.size()) {
-            counter = Constants.EOF;
+            currentDocId = Constants.EOF;
           } else {
-            counter = pairs.get(pairPointer).getLeft();
+            currentDocId = pairs.get(pairPointer).getLeft();
           }
+        } else if (currentDocId < pairs.get(pairPointer).getLeft()) {
+          currentDocId = pairs.get(pairPointer).getLeft();
         }
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
-        return counter;
+        return currentDocId;
       }
 
       @Override
       public int currentDocId() {
-        return counter;
+        return currentDocId;
       }
     };
   }

@@ -75,14 +75,19 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
       final PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(docIdIterators.length,
           new Pairs.AscendingIntPairComparator());
       final boolean[] iteratorIsInQueue = new boolean[docIdIterators.length];
-      int currentDocId = 0;
+      int currentDocId = -1;
 
       @Override
       public int advance(int targetDocId) {
         if (currentDocId == Constants.EOF) {
           return Constants.EOF;
         }
-
+        if (targetDocId < getMinDocId()) {
+          targetDocId = getMinDocId();
+        } else if (targetDocId > getMaxDocId()) {
+          currentDocId = Constants.EOF;
+          return currentDocId;
+        }
         long start = System.nanoTime();
 
         // Remove iterators that are before the target document id from the queue
@@ -98,24 +103,17 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
         // Advance all iterators that are not in the queue to the target document id
         for (int i = 0; i < docIdIterators.length; i++) {
           if (!iteratorIsInQueue[i]) {
-            int next = docIdIterators[i].advance(targetDocId);
-            if (next != Constants.EOF) {
-              queue.add(new IntPair(next, i));
+            int nextDocId = docIdIterators[i].advance(targetDocId);
+            if (nextDocId != Constants.EOF) {
+              queue.add(new IntPair(nextDocId, i));
             }
             iteratorIsInQueue[i] = true;
           }
         }
 
-        // Consume the first element, removing other iterators pointing to the same document id
+        // Return the first element
         if (queue.size() > 0) {
-          IntPair pair = queue.remove();
-          iteratorIsInQueue[pair.getB()] = false;
-          currentDocId = pair.getA();
-
-          while (queue.size() > 0 && queue.peek().getA() == currentDocId) {
-            IntPair remove = queue.remove();
-            iteratorIsInQueue[remove.getB()] = false;
-          }
+          currentDocId = queue.peek().getA();
         } else {
           currentDocId = Constants.EOF;
         }
@@ -129,31 +127,33 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
       public int next() {
         long start = System.nanoTime();
 
+        if (currentDocId == Constants.EOF) {
+          return currentDocId;
+        }
+        while (queue.size() > 0 && queue.peek().getA() <= currentDocId) {
+          IntPair pair = queue.remove();
+          iteratorIsInQueue[pair.getB()] = false;
+        }
+        currentDocId++;
         // Grab the next value from each iterator, if it's not in the queue
         for (int i = 0; i < docIdIterators.length; i++) {
           if (!iteratorIsInQueue[i]) {
-            int next = docIdIterators[i].next();
-            if (next != Constants.EOF) {
-              queue.add(new IntPair(next, i));
+            int nextDocId = docIdIterators[i].advance(currentDocId);
+            if (nextDocId != Constants.EOF) {
+              if (!(nextDocId <= getMaxDocId() && nextDocId >= getMinDocId() && nextDocId >= currentDocId)) {
+                throw new RuntimeException("next Doc : " + nextDocId + " should never crossing the range : [ " + getMinDocId() + ", " + getMaxDocId() + " ]");
+              }
+              queue.add(new IntPair(nextDocId, i));
             }
             iteratorIsInQueue[i] = true;
           }
         }
 
-        // Consume the first element, removing other iterators pointing to the same document id
         if (queue.size() > 0) {
-          IntPair pair = queue.remove();
-          iteratorIsInQueue[pair.getB()] = false;
-          currentDocId = pair.getA();
-
-          while (queue.size() > 0 && queue.peek().getA() == currentDocId) {
-            pair = queue.remove();
-            iteratorIsInQueue[pair.getB()] = false;
-          }
+          currentDocId = queue.peek().getA();
         } else {
           currentDocId = Constants.EOF;
         }
-
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
         return currentDocId;
