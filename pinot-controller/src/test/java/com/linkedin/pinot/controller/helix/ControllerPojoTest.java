@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.StreamType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.core.ZKMetadataUtils;
+import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 
 
 public class ControllerPojoTest {

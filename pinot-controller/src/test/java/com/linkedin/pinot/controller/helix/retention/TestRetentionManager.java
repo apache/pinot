@@ -48,8 +48,8 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -37,8 +38,8 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;

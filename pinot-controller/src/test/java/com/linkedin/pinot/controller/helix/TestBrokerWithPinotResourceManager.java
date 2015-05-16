@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
@@ -31,10 +32,10 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 

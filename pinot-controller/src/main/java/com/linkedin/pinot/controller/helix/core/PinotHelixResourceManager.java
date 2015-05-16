@@ -55,6 +55,8 @@ import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 

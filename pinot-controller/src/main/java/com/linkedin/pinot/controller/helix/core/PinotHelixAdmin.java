@@ -44,6 +44,7 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 
 
 /**

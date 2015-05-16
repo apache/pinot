@@ -54,8 +54,8 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
