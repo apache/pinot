@@ -44,6 +44,7 @@ import kafka.producer.ProducerConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
@@ -82,6 +83,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
   private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
   private static final boolean BATCH_KAFKA_MESSAGES = true;
+  private static final int MAX_MULTIVALUE_CARDINALITY = 5;
   protected static final boolean GATHER_FAILED_QUERIES = false;
   private int failedQueryCount = 0;
   private int queryCount = 0;
@@ -342,25 +344,45 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       Schema schema = dataFileReader.getSchema();
       List<Schema.Field> fields = schema.getFields();
       List<String> columnNamesAndTypes = new ArrayList<String>(fields.size());
+      int columnCount = 0;
       for (Schema.Field field : fields) {
-        try {
-          List<Schema> types = field.schema().getTypes();
-          String columnNameAndType;
-          String typeName = types.get(0).getName();
+        String fieldName = field.name();
+        Schema.Type fieldType = field.schema().getType();
+        switch (fieldType) {
+          case UNION:
+            List<Schema> types = field.schema().getTypes();
+            String columnNameAndType;
+            String typeName = types.get(0).getName();
 
-          if (typeName.equalsIgnoreCase("int")) {
-            typeName = "bigint";
-          }
+            if (typeName.equalsIgnoreCase("int")) {
+              typeName = "bigint";
+            }
 
-          if (types.size() == 1) {
-            columnNameAndType = field.name() + " " + typeName + " not null";
-          } else {
-            columnNameAndType = field.name() + " " + typeName;
-          }
+            if (types.size() == 1) {
+              columnNameAndType = field.name() + " " + typeName + " not null";
+            } else {
+              columnNameAndType = field.name() + " " + typeName;
+            }
 
-          columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
-        } catch (Exception e) {
-          // Happens if the field is not a union, skip the field
+            columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
+            ++columnCount;
+            break;
+          case ARRAY:
+            String elementTypeName = field.schema().getElementType().getName();
+
+            if (elementTypeName.equalsIgnoreCase("int")) {
+              elementTypeName = "bigint";
+            }
+
+            elementTypeName = elementTypeName.replace("string", "varchar(128)");
+
+            for (int i = 0; i < MAX_MULTIVALUE_CARDINALITY; i++) {
+              columnNamesAndTypes.add(field.name() + i + " " + elementTypeName);
+            }
+            ++columnCount;
+            break;
+          default:
+            throw new AssertionError("Don't know how to handle field " + fieldName + " of type " + fieldType);
         }
       }
 
@@ -384,12 +406,30 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         GenericRecord record = null;
         while (dataFileReader.hasNext()) {
           record = dataFileReader.next(record);
-          for (int i = 0; i < columnNamesAndTypes.size(); i++) {
-            Object value = record.get(i);
-            if (value instanceof Utf8) {
-              value = value.toString();
+          int jdbcIndex = 1;
+          for (int avroIndex = 0; avroIndex < columnCount; ++avroIndex) {
+            Object value = record.get(avroIndex);
+            if (value instanceof GenericData.Array) {
+              GenericData.Array array = (GenericData.Array) value;
+              for (int i = 0; i < MAX_MULTIVALUE_CARDINALITY; i++) {
+                if (i < array.size()) {
+                  value = array.get(i);
+                  if (value instanceof Utf8) {
+                    value = value.toString();
+                  }
+                } else {
+                  value = null;
+                }
+                statement.setObject(jdbcIndex, value);
+                ++jdbcIndex;
+              }
+            } else {
+              if (value instanceof Utf8) {
+                value = value.toString();
+              }
+              statement.setObject(jdbcIndex, value);
+              ++jdbcIndex;
             }
-            statement.setObject(i + 1, value);
           }
           statement.execute();
         }
@@ -528,6 +568,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Test
   public void testGeneratedQueries() throws Exception {
     QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
+    _queryGenerator.setSkipMultivaluePredicates(true);
+    for (int i = 0; i < queries.length; i++) {
+      queries[i] = _queryGenerator.generateQuery();
+    }
+
+    for (QueryGenerator.Query query : queries) {
+      System.out.println(query.generatePql());
+      runQuery(query.generatePql(), query.generateH2Sql());
+    }
+  }
+
+
+  @Test
+  public void testGeneratedQueriesWithMultivalues() throws Exception {
+    QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
+    _queryGenerator.setSkipMultivaluePredicates(false);
     for (int i = 0; i < queries.length; i++) {
       queries[i] = _queryGenerator.generateQuery();
     }
