@@ -15,8 +15,12 @@
  */
 package com.linkedin.pinot.common.metadata.resource;
 
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,11 +31,6 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
-
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 public abstract class DataResourceZKMetadata implements ZKMetadata {
@@ -47,6 +46,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
   private int _numBrokerInstance;
   private Map<String, String> _metadata = new HashMap<String, String>();
   private List<String> _sortedColumnList = new ArrayList<String>();
+  private String _serverTenant;
 
   public DataResourceZKMetadata() {
     _retentionTimeUnit = TimeUnit.DAYS;
@@ -63,6 +63,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     _retentionTimeUnit = znRecord.getEnumField(Helix.DataSource.RETENTION_TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     _retentionTimeValue = znRecord.getIntField(Helix.DataSource.RETENTION_TIME_VALUE, -1);
     _brokerTag = znRecord.getSimpleField(Helix.DataSource.BROKER_TAG_NAME);
+    _serverTenant = znRecord.getSimpleField(Helix.DataSource.SERVER_TENANT);
     _numBrokerInstance = znRecord.getIntField(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, -1);
     _metadata = znRecord.getMapField(Helix.DataSource.METADATA);
     if (znRecord.getListFields().containsKey(Helix.DataSource.SORTED_COLUMN_LIST)) {
@@ -159,6 +160,14 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     _sortedColumnList.addAll(sortedColumns);
   }
 
+  public String getServerTenant() {
+    return _serverTenant;
+  }
+
+  public void setServerTenant(String serverTenant) {
+    _serverTenant = serverTenant;
+  }
+
   public Map<String, String> getMetadata() {
     return _metadata;
   }
@@ -191,6 +200,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
         isEqual(_numBrokerInstance, resourceMetadata._numBrokerInstance) &&
         isEqual(_retentionTimeUnit, resourceMetadata._retentionTimeUnit) &&
         isEqual(_retentionTimeValue, resourceMetadata._retentionTimeValue) &&
+        isEqual(_serverTenant, resourceMetadata._serverTenant) &&
         isEqual(_brokerTag, resourceMetadata._brokerTag);
 
     if (!simpleFieldsMatch) {
@@ -243,6 +253,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _retentionTimeUnit);
     result = hashCodeOf(result, _retentionTimeValue);
     result = hashCodeOf(result, _brokerTag);
+    result = hashCodeOf(result, _serverTenant);
     result = hashCodeOf(result, _numBrokerInstance);
     result = hashCodeOf(result, _sortedColumnList);
     result = hashCodeOf(result, _metadata);
@@ -262,6 +273,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     znRecord.setEnumField(Helix.DataSource.RETENTION_TIME_UNIT, _retentionTimeUnit);
     znRecord.setIntField(Helix.DataSource.RETENTION_TIME_VALUE, _retentionTimeValue);
     znRecord.setSimpleField(Helix.DataSource.BROKER_TAG_NAME, _brokerTag);
+    znRecord.setSimpleField(Helix.DataSource.SERVER_TENANT, _serverTenant);
     znRecord.setIntField(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, _numBrokerInstance);
     znRecord.setMapField(Helix.DataSource.METADATA, _metadata);
     return znRecord;

@@ -190,11 +190,12 @@ public class PinotHelixAdmin {
     instanceList.retainAll(liveInstances);
     return instanceList;
   }
+
   /**
    * Computes the server nodes that are untagged and free to be used.
    * @return
    */
-  private List<String> getOnlineUnTaggedServerInstanceList() {
+  public List<String> getOnlineUnTaggedServerInstanceList() {
     final List<String> instanceList =
         _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     //why only live instances

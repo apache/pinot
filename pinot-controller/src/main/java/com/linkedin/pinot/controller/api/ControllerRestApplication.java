@@ -34,6 +34,7 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotTenantServerResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PqlQueryResource;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -61,6 +62,12 @@ public class ControllerRestApplication extends Application {
   public Restlet createInboundRoot() {
     final Router router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
+
+    router.attach("/tenants", PinotTenantServerResource.class);
+    router.attach("/tenants/", PinotTenantServerResource.class);
+    router.attach("/tenants/{tenantName}", PinotTenantServerResource.class);
+    router.attach("/tenants/{tenantName}/", PinotTenantServerResource.class);
+    router.attach("/tenants/{tenantName}/instances", PinotTenantServerResource.class);
 
     router.attach("/dataresources", PinotDataResource.class);
     router.attach("/dataresources/", PinotDataResource.class);

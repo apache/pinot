@@ -73,6 +73,7 @@ public class CommonConstants {
       public static final String PUSH_FREQUENCY = "pushFrequency";
       public static final String SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
       public static final String BROKER_TAG_NAME = "brokerTagName";
+      public static final String SERVER_TENANT = "serverTenant";
       public static final String NUMBER_OF_BROKER_INSTANCES = "numberOfBrokerInstances";
       public static final String REQUEST_TYPE = "requestType";
       public static final String METADATA = "metadata";

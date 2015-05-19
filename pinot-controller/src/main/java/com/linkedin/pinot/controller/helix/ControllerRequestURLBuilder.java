@@ -56,6 +56,54 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances/");
   }
 
+  public String forTenantCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants/");
+  }
+
+  public String forBrokerTenantCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants?type=broker");
+  }
+
+  public String forServerTenantCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants?type=server");
+  }
+
+  public String forTenantCreate(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "instances");
+  }
+
+  public String forServerTenantCreate(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "instances?type=server");
+  }
+
+  public String forBrokerTenantCreate(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "instances?type=broker");
+  }
+
+  public String forTenantGet() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants");
+  }
+
+  public String forTenantGet(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName);
+  }
+
+  public String forBrokerTenantGet(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "?type=broker");
+  }
+
+  public String forServerTenantGet(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "?type=server");
+  }
+
+  public String forBrokerTenantDelete(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "?type=broker");
+  }
+
+  public String forServerTenantDelete(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "?type=server");
+  }
+
   public String forInstanceBulkCreate() {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", "bulkAdd");
   }
@@ -64,4 +112,5 @@ public class ControllerRequestURLBuilder {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forResourceCreate());
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
   }
+
 }

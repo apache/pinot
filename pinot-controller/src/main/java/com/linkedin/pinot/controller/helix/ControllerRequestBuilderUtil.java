@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,11 +30,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
-import static com.linkedin.pinot.common.utils.CommonConstants.*;
+import com.linkedin.pinot.common.utils.CommonConstants.Broker;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSourceRequestType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.api.pojos.Tenant;
 
 
 /**
@@ -224,4 +231,13 @@ public class ControllerRequestBuilderUtil {
     }
   }
 
+  public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances) throws JSONException {
+    Tenant tenant = new Tenant(TenantRole.BROKER, tenantName, numberOfInstances, -1, -1);
+    return tenant.toJSON();
+  }
+
+  public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances, int offlineInstances, int realtimeInstances) throws JSONException {
+    Tenant tenant = new Tenant(TenantRole.SERVER, tenantName, numberOfInstances, offlineInstances, realtimeInstances);
+    return tenant.toJSON();
+  }
 }
