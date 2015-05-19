@@ -58,7 +58,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private final Object _globalLock = new Object();
 
   public HelixInstanceDataManager() {
-    //LOGGER.info("InstanceDataManager is a Singleton");
   }
 
   public synchronized void init(HelixInstanceDataManagerConfig instanceDataManagerConfig)
