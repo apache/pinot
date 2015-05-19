@@ -251,9 +251,8 @@ public class TestRealtimeResourceDataManager {
 
   private static RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
     RealtimeSegmentZKMetadata realtimeSegmentMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentMetadata.setSegmentName("testResource_R_testTable_1000_groupId0_part0");
+    realtimeSegmentMetadata.setSegmentName("testResource_R_1000_groupId0_part0");
     realtimeSegmentMetadata.setResourceName("testResource");
-    realtimeSegmentMetadata.setTableName("testTable");
     realtimeSegmentMetadata.setSegmentType(SegmentType.REALTIME);
     realtimeSegmentMetadata.setIndexVersion("v1");
     realtimeSegmentMetadata.setStartTime(1000);
@@ -270,7 +269,6 @@ public class TestRealtimeResourceDataManager {
       IOException {
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = new RealtimeDataResourceZKMetadata();
     realtimeDataResourceZKMetadata.setResourceName("testResource");
-    realtimeDataResourceZKMetadata.addToTableList("testTable");
     realtimeDataResourceZKMetadata.setTimeColumnName("daysSinceEpoch");
     realtimeDataResourceZKMetadata.setTimeType("daysSinceEpoch");
     realtimeDataResourceZKMetadata.setNumDataInstances(6);

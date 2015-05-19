@@ -39,52 +39,15 @@ import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
 
 public class TestSegmentPruner {
 
-  @Test
-  public void testTableNameSegmentPruner() throws ConfigurationException {
-    final Configuration segmentPrunerConfig = new PropertiesConfiguration();
-    segmentPrunerConfig.addProperty("class", "TableNameSegmentPruner");
-    segmentPrunerConfig.addProperty("TableNameSegmentPruner.id", "0");
-    final SegmentPrunerService segmentPrunerService =
-        new SegmentPrunerServiceImpl(new SegmentPrunerConfig(segmentPrunerConfig));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror", "mirrorTest")));
-    Assert.assertFalse(segmentPrunerService
-        .prune(getIndexSegment("mirror", "mirror"), getBrokerRequest("mirror", null)));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirror"), getBrokerRequest("mirror", "")));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest2"),
-        getBrokerRequest("mirror", "*")));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror", "mirrorTest,mirrorTest1,mirrorTest2")));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest1"),
-        getBrokerRequest("mirror", "mirrorTest,mirrorTest1,mirrorTest2")));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest2"),
-        getBrokerRequest("mirror", "mirrorTest,mirrorTest1,mirrorTest2")));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "default"),
-        getBrokerRequest("mirror", "default,mirrorTest,mirrorTest1,mirrorTest2")));
-
-    Assert.assertTrue(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror", null)));
-    Assert.assertTrue(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror", "")));
-    Assert.assertTrue(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror", "mirrorTest1")));
-    Assert.assertTrue(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror1", null)));
-    Assert.assertTrue(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
-        getBrokerRequest("mirror1", "default")));
-
-  }
-
-  private BrokerRequest getBrokerRequest(String resourceName, String tableName) {
+  private BrokerRequest getBrokerRequest(String resourceName) {
     final BrokerRequest brokerRequest = new BrokerRequest();
     final QuerySource querySource = new QuerySource();
     querySource.setResourceName(resourceName);
-    querySource.setTableName(tableName);
     brokerRequest.setQuerySource(querySource);
     return brokerRequest;
   }
 
-  private IndexSegment getIndexSegment(final String resourceName, final String tableName) {
+  private IndexSegment getIndexSegment(final String resourceName) {
     return new IndexSegment() {
 
       @Override
@@ -125,11 +88,6 @@ public class TestSegmentPruner {
           public Duration getTimeGranularity() {
             // TODO Auto-generated method stub
             return null;
-          }
-
-          @Override
-          public String getTableName() {
-            return tableName;
           }
 
           @Override

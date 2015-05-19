@@ -86,9 +86,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Create a data resource
     createResource();
 
-    // Add table to resource
-    addTableToOfflineResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
-
     // Unpack the Avro files
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
@@ -113,13 +110,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "myresource", "mytable");
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "myresource");
 
     // Initialize query generator
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'myresource.mytable'", "mytable");
+        _queryGenerator = new QueryGenerator(avroFiles, "'myresource'", "mytable");
       }
     });
 
@@ -203,14 +200,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
 
   }
 

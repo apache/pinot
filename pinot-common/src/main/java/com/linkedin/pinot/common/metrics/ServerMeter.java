@@ -48,7 +48,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   }
 
   /**
-   * Returns true if the metric is global (not attached to a particular table or resource)
+   * Returns true if the metric is global (not attached to a particular resource)
    *
    * @return true if the metric is global
    */

@@ -145,12 +145,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
         final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
         segmentName =
-            SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), minTimeValue, maxTimeValue,
+            SegmentNameBuilder.buildBasic(config.getResourceName(), minTimeValue, maxTimeValue,
                 config.getSegmentNamePostfix());
       } else {
         segmentName =
-            SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(),
-                config.getSegmentNamePostfix());
+            SegmentNameBuilder.buildBasic(config.getResourceName(), config.getSegmentNamePostfix());
       }
     }
 

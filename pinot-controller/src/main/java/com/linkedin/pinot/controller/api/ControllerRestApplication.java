@@ -65,10 +65,8 @@ public class ControllerRestApplication extends Application {
     router.attach("/dataresources", PinotDataResource.class);
     router.attach("/dataresources/", PinotDataResource.class);
     router.attach("/dataresources/{resourceName}", PinotDataResource.class);
-    router.attach("/dataresources/{resourceName}/{tableName}", PinotDataResource.class);
 
     router.attach("/dataresources/{resourceName}/segments", PinotSegment.class);
-    router.attach("/dataresources/{resourceName}/{tableName}/segments", PinotSegment.class);
     router.attach("/dataresources/{resourceName}/segments/{segmentName}", PinotSegment.class);
 
     router.attach("/instances", PinotInstance.class);

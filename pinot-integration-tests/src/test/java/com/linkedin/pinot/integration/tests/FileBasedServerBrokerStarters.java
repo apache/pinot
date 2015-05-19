@@ -15,15 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
-import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.pruner.DataSchemaSegmentPruner;
-import com.linkedin.pinot.core.query.pruner.TableNameSegmentPruner;
-import com.linkedin.pinot.core.query.pruner.TimeSegmentPruner;
-import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Iterator;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -32,8 +23,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.pruner.DataSchemaSegmentPruner;
+import com.linkedin.pinot.core.query.pruner.TimeSegmentPruner;
 import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.server.starter.ServerInstance;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -116,12 +115,11 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",
         StringUtil.join(",",
             TimeSegmentPruner.class.getSimpleName(),
-            DataSchemaSegmentPruner.class.getSimpleName(),
-            TableNameSegmentPruner.class.getSimpleName()));
+            DataSchemaSegmentPruner.class.getSimpleName()));
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.TimeSegmentPruner.id", "0");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
     serverConfiguration
-    .addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
+        .addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
     serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class", SimpleRequestHandlerFactory.class.getName());
     serverConfiguration.addProperty("pinot.server.netty.port", SERVER_PORT);
     serverConfiguration.setDelimiterParsingDisabled(false);
@@ -173,7 +171,6 @@ public class FileBasedServerBrokerStarters {
       LOGGER.error("Caught exception", e);
     }
   }
-
 
   public void startAll() throws Exception {
     final PropertiesConfiguration broker = brokerProperties();

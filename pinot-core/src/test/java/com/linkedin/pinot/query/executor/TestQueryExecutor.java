@@ -110,7 +110,7 @@ public class TestQueryExecutor {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim" + i,
-              TimeUnit.DAYS, "midas", "testTable");
+              TimeUnit.DAYS, "midas");
       config.setSegmentNamePostfix(String.valueOf(i));
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -131,14 +131,12 @@ public class TestQueryExecutor {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-
 
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
@@ -158,7 +156,6 @@ public class TestQueryExecutor {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -185,7 +182,6 @@ public class TestQueryExecutor {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -212,7 +208,6 @@ public class TestQueryExecutor {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());

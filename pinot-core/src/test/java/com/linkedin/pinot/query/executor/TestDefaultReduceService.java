@@ -115,7 +115,7 @@ public class TestDefaultReduceService {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim" + i,
-              TimeUnit.DAYS, "midas", "testTable");
+              TimeUnit.DAYS, "midas");
       config.setSegmentNamePostfix(String.valueOf(i));
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -135,7 +135,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -143,7 +143,6 @@ public class TestDefaultReduceService {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.addToSearchSegments(segment.getSegmentName());
     }
-
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
@@ -170,7 +169,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -203,7 +202,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -235,7 +234,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -267,7 +266,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -300,7 +299,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -333,7 +332,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -366,7 +365,7 @@ public class TestDefaultReduceService {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
+
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());

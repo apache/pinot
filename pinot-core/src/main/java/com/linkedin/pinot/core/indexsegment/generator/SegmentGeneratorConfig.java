@@ -123,14 +123,6 @@ public class SegmentGeneratorConfig {
     return properties.get(MetadataKeys.Segment.RESOURCE_NAME).toString();
   }
 
-  public void setTableName(String tableName) {
-    properties.put(MetadataKeys.Segment.TABLE_NAME, tableName);
-  }
-
-  public String getTableName() {
-    return properties.get(MetadataKeys.Segment.TABLE_NAME).toString();
-  }
-
   public String getDimensions() {
     return getQualifyingDimensions(FieldType.DIMENSION);
   }

@@ -95,7 +95,7 @@ public class TestRealtimeFileBasedReader {
     }
 
     RealtimeSegmentConverter conveter =
-        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "mirror", "seomg-segment",
+        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "seomg-segment",
             null);
     conveter.build();
 

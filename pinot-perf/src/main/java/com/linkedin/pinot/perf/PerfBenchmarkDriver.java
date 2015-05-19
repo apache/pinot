@@ -243,13 +243,11 @@ public class PerfBenchmarkDriver {
     int numInstances = 1;
     int numReplicas = 1;
     String resourceName = "mirrorProfileViewOfflineEvents1";
-    String tableName = "default";
     String segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
     // create a DataResource
     DataResource dataResource =
-        createDataResource(numInstances, numReplicas, resourceName, tableName, segmentAssignmentStrategy);
+        createDataResource(numInstances, numReplicas, resourceName, segmentAssignmentStrategy);
     controllerStarter.getHelixResourceManager().handleCreateNewDataResource(dataResource);
-    controllerStarter.getHelixResourceManager().handleAddTableToDataResource(dataResource);
   }
 
   public void uploadIndexSegments() throws Exception {
@@ -288,13 +286,12 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  public DataResource createDataResource(int numInstances, int numReplicas, String resourceName, String tableName,
+  public DataResource createDataResource(int numInstances, int numReplicas, String resourceName,
       String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, tableName);
     props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "daysSinceEpoch");
     props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "DAYS");
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));

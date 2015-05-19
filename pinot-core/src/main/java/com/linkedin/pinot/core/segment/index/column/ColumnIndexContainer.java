@@ -38,13 +38,13 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 
 public abstract class ColumnIndexContainer {
 
-  public static ColumnIndexContainer init(String segmentTableName, String column, File indexDir,
+  public static ColumnIndexContainer init(String column, File indexDir,
       ColumnMetadata metadata, IndexLoadingConfigMetadata indexLoadingConfigMetadata, ReadMode mode) throws Exception {
 
     boolean loadInverted = false;
     if (indexLoadingConfigMetadata != null) {
-      if (indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName) != null) {
-        loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName).contains(column);
+      if (indexLoadingConfigMetadata.getLoadingInvertedIndexColumns() != null) {
+        loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns().contains(column);
       }
     }
 

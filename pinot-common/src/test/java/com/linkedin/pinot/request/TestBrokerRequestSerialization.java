@@ -54,7 +54,6 @@ public class TestBrokerRequestSerialization {
     // Populate Query source
     QuerySource s = new QuerySource();
     s.setResourceName("dummy");
-    s.setTableName("dummy");
     req.setQuerySource(s);
 
     req.setDuration("dummy");

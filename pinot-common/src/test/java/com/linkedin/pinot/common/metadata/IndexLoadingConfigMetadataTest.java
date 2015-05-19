@@ -28,30 +28,24 @@ import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 
 
 public class IndexLoadingConfigMetadataTest {
-  private final static String PREFIX_OF_KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns.";
+  private final static String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
 
   @Test
   public void testInvertedIndexConfig() {
     Configuration resourceMetadata = getTestResourceMetadata();
     IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(resourceMetadata);
-    for (int i = 0; i < 10; ++i) {
-      String tableName = "table" + i;
-      System.out.println("Testing for " + tableName);
-      Set<String> loadingInvertedIndexColumns = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(tableName);
-      System.out.println("loadingInvertedIndexColumns for table - " + tableName + " is " + Arrays.toString(loadingInvertedIndexColumns.toArray(new String[0])));
-      Assert.assertEquals(i + 1, loadingInvertedIndexColumns.size());
-      for (int j = 0; j < i + 1; ++j) {
-        String columnName = "col" + j;
-        System.out.println("\tTesting for " + columnName);
-        Assert.assertEquals(true, indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(tableName, columnName));
-      }
-      for (int j = i + 1; j < 10; ++j) {
-        String columnName = "col" + j;
-        System.out.println("\tTesting for " + columnName);
-        Assert.assertEquals(false, indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(tableName, columnName));
-      }
-    }
+    Set<String> loadingInvertedIndexColumns = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns();
 
+    System.out.println("loadingInvertedIndexColumns is " + Arrays.toString(loadingInvertedIndexColumns.toArray(new String[0])));
+    Assert.assertEquals(10, loadingInvertedIndexColumns.size());
+    for (int j = 0; j < 10; ++j) {
+      String columnName = "col" + j;
+      Assert.assertEquals(true, indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(columnName));
+    }
+    for (int j = 10; j < 20; ++j) {
+      String columnName = "col" + j;
+      Assert.assertEquals(false, indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(columnName));
+    }
   }
 
   private Configuration getTestResourceMetadata() {
@@ -63,8 +57,8 @@ public class IndexLoadingConfigMetadataTest {
       } else {
         columnNames += (", col" + i);
       }
-      resourceMetadata.addProperty(PREFIX_OF_KEY_OF_LOADING_INVERTED_INDEX + "table" + i, columnNames);
     }
+    resourceMetadata.addProperty(KEY_OF_LOADING_INVERTED_INDEX, columnNames);
     return resourceMetadata;
   }
 }

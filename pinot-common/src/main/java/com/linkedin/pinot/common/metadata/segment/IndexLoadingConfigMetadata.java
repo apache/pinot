@@ -16,58 +16,39 @@
 package com.linkedin.pinot.common.metadata.segment;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
 
 
 /**
- * This is per table index loading configs.
+ * This is resource level index loading configs.
  *
  */
 public class IndexLoadingConfigMetadata {
 
-  private final static String PREFIX_OF_KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
-  private final Map<String, Set<String>> _tableToloadingInvertedIndexColumnMap = new HashMap<String, Set<String>>();
+  private final static String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
+  private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
 
   public IndexLoadingConfigMetadata(Configuration resourceDataManagerConfig) {
-    Iterator<String> keyIter = resourceDataManagerConfig.getKeys(PREFIX_OF_KEY_OF_LOADING_INVERTED_INDEX);
-    while (keyIter.hasNext()) {
-      String key = keyIter.next();
-      String tableName = key.substring(PREFIX_OF_KEY_OF_LOADING_INVERTED_INDEX.length() + 1);
-      List<String> valueOfLoadingInvertedIndexConfig = resourceDataManagerConfig.getList(key, null);
-      if ((valueOfLoadingInvertedIndexConfig != null) && (!valueOfLoadingInvertedIndexConfig.isEmpty())) {
-        initLoadingInvertedIndexColumnSet(tableName, valueOfLoadingInvertedIndexConfig.toArray(new String[0]));
-      }
+    List<String> valueOfLoadingInvertedIndexConfig = resourceDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
+    if ((valueOfLoadingInvertedIndexConfig != null) && (!valueOfLoadingInvertedIndexConfig.isEmpty())) {
+      initLoadingInvertedIndexColumnSet(valueOfLoadingInvertedIndexConfig.toArray(new String[0]));
     }
   }
 
-  public void initLoadingInvertedIndexColumnSet(String tableName, String[] columnCollections) {
-    _tableToloadingInvertedIndexColumnMap.put(tableName, new HashSet<String>(Arrays.asList(columnCollections)));
+  public void initLoadingInvertedIndexColumnSet(String[] columnCollections) {
+    _loadingInvertedIndexColumnSet.addAll(Arrays.asList(columnCollections));
   }
 
-  public Set<String> getLoadingInvertedIndexColumns(String tableName) {
-    return _tableToloadingInvertedIndexColumnMap.get(tableName);
+  public Set<String> getLoadingInvertedIndexColumns() {
+    return _loadingInvertedIndexColumnSet;
   }
 
-  public boolean isLoadingInvertedIndexForColumn(String tableName, String columnName) {
-    if (_tableToloadingInvertedIndexColumnMap.containsKey(tableName)) {
-      return _tableToloadingInvertedIndexColumnMap.get(tableName).contains(columnName);
-    } else {
-      return false;
-    }
+  public boolean isLoadingInvertedIndexForColumn(String columnName) {
+    return _loadingInvertedIndexColumnSet.contains(columnName);
   }
 
-  public boolean containsTable(String tableName) {
-    return _tableToloadingInvertedIndexColumnMap.containsKey(tableName);
-  }
-
-  public int size() {
-    return _tableToloadingInvertedIndexColumnMap.size();
-  }
 }

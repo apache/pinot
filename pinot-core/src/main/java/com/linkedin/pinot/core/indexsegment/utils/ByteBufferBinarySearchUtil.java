@@ -233,7 +233,7 @@ public class ByteBufferBinarySearchUtil {
    */
   public int binarySearch(int col, String value) {
     final int rows = mmappedDataFile.getNumberOfRows();
-    if (rows == 0 || mmappedDataFile.getColumnSizes()[col] < value.length()) {
+    if (rows == 0) {
       return -1;
     }
 

@@ -37,7 +37,7 @@ public class TestPQL {
   @Test
   public void simpleTestTwo() throws Exception {
     final String st4 =
-        "SELECT min(DivReachedDest), count(DivReachedDest), avg(DepDelayMinutes), min(DepDelayMinutes) FROM 'myresource.mytable'  WHERE OriginCityName IN ('Dothan, AL', 'Kansas City, MO', 'Grand Junction, CO', 'Worcester, MA', 'Fresno, CA', 'Tallahassee, FL', 'Beaumont/Port Arthur, TX', 'Myrtle Beach, SC', 'Gainesville, FL', 'Charlottesville, VA') GROUP BY riginCityMarketID LIMIT 8";
+        "SELECT min(DivReachedDest), count(DivReachedDest), avg(DepDelayMinutes), min(DepDelayMinutes) FROM 'myresource'  WHERE OriginCityName IN ('Dothan, AL', 'Kansas City, MO', 'Grand Junction, CO', 'Worcester, MA', 'Fresno, CA', 'Tallahassee, FL', 'Beaumont/Port Arthur, TX', 'Myrtle Beach, SC', 'Gainesville, FL', 'Charlottesville, VA') GROUP BY riginCityMarketID LIMIT 8";
 
     final JSONObject compiled = _compiler.compile(st4);
 
@@ -51,7 +51,7 @@ public class TestPQL {
 
   @Test
   public void simpleTestFilter() throws Exception {
-    final String st4 = "SELECT DepDelay, Origin FROM 'myresource.mytable'  WHERE DestCityName > 'Houston, TX'  LIMIT 1";
+    final String st4 = "SELECT DepDelay, Origin FROM 'myresource'  WHERE DestCityName > 'Houston, TX'  LIMIT 1";
 
     final JSONObject compiled = _compiler.compile(st4);
 

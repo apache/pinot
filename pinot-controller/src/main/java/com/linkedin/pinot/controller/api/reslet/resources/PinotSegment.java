@@ -66,21 +66,14 @@ public class PinotSegment extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
       if (resourceName != null && segmentName == null) {
         final JSONArray segmentsArray = new JSONArray();
         final JSONObject ret = new JSONObject();
         ret.put("resource", resourceName);
 
-        if (tableName == null) {
-          for (final String segmentId : manager.getAllSegmentsForResource(resourceName)) {
-            segmentsArray.put(segmentId);
-          }
-        } else {
-          for (final String segmentId : manager.getAllSegmentsForTable(resourceName, tableName)) {
-            segmentsArray.put(segmentId);
-          }
+        for (final String segmentId : manager.getAllSegmentsForResource(resourceName)) {
+          segmentsArray.put(segmentId);
         }
 
         ret.put("segments", segmentsArray);

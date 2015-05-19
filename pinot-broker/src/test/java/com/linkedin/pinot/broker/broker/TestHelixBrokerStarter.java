@@ -100,16 +100,6 @@ public class TestHelixBrokerStarter {
     final DataResource resource = createOfflineClusterConfig(1, 1, dataResource, "BalanceNumSegmentAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
 
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE,
-        CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, dataResource);
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, "testTable");
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, CommonConstants.Helix.ResourceType.OFFLINE.name());
-
-    final DataResource addTableResource = DataResource.fromMap(props);
-    _pinotResourceManager.handleAddTableToDataResource(addTableResource);
-
     for (int i = 1; i <= 5; i++) {
       addOneSegment(dataResource);
       Thread.sleep(2000);
@@ -213,7 +203,6 @@ public class TestHelixBrokerStarter {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
     props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "days");
     props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -264,30 +253,9 @@ public class TestHelixBrokerStarter {
   }
 
   private void addOneSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName, "testTable");
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
     _pinotResourceManager.addSegment(segmentMetadata, "http://localhost:something");
   }
 
-  public static void main(String[] args) throws IOException {
-    final List<HelixBrokerStarter> pinotHelixStarters = new ArrayList<HelixBrokerStarter>();
-    final Configuration pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
-
-    HelixBrokerStarter pinotHelixBrokerStarter;
-    try {
-      pinotHelixProperties.addProperty("instanceId", "localhost_111");
-      pinotHelixBrokerStarter = new HelixBrokerStarter("sprintDemoCluster", "dpatel-ld:2181", pinotHelixProperties);
-    } catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
-
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-    while (true) {
-      String command = br.readLine();
-      if (command.equals("exit")) {
-
-      }
-    }
-  }
 }

@@ -116,7 +116,7 @@ public class TestPlanMaker {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "dim1",
-            TimeUnit.DAYS, "test", "testTable");
+            TimeUnit.DAYS, "test");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -140,7 +140,7 @@ public class TestPlanMaker {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim1",
-              TimeUnit.DAYS, "test", "testTable");
+              TimeUnit.DAYS, "test");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);

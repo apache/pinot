@@ -49,7 +49,6 @@ public class ZKMetadataUtils {
   public static OfflineDataResourceZKMetadata getOfflineDataResourceMetadata(DataResource resource) {
     OfflineDataResourceZKMetadata offlineDataResourceMetadata = new OfflineDataResourceZKMetadata();
     offlineDataResourceMetadata.setResourceName(resource.getResourceName());
-    offlineDataResourceMetadata.addToTableList(resource.getTableName());
     offlineDataResourceMetadata.setTimeColumnName(resource.getTimeColumnName());
     offlineDataResourceMetadata.setTimeType(resource.getTimeType());
     offlineDataResourceMetadata.setNumDataInstances(resource.getNumberOfDataInstances());
@@ -94,7 +93,6 @@ public class ZKMetadataUtils {
   public static RealtimeDataResourceZKMetadata getRealtimeDataResourceMetadata(DataResource resource) {
     RealtimeDataResourceZKMetadata realtimeDataResourceMetadata = new RealtimeDataResourceZKMetadata();
     realtimeDataResourceMetadata.setResourceName(resource.getResourceName());
-    realtimeDataResourceMetadata.addToTableList(resource.getTableName());
     realtimeDataResourceMetadata.setTimeColumnName(resource.getTimeColumnName());
     realtimeDataResourceMetadata.setTimeType(resource.getTimeType());
     realtimeDataResourceMetadata.setNumDataInstances(resource.getNumberOfDataInstances());
@@ -154,7 +152,6 @@ public class ZKMetadataUtils {
   public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata, SegmentMetadata segmentMetadata) {
     offlineSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
     offlineSegmentZKMetadata.setResourceName(segmentMetadata.getResourceName());
-    offlineSegmentZKMetadata.setTableName(segmentMetadata.getTableName());
     offlineSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
     offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
 

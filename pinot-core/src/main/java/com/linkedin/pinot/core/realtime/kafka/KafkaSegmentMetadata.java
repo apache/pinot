@@ -42,12 +42,6 @@ public class KafkaSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public String getTableName() {
-    // TODO Auto-generated method stub
-    return null;
-  }
-
-  @Override
   public String getIndexType() {
     // TODO Auto-generated method stub
     return null;

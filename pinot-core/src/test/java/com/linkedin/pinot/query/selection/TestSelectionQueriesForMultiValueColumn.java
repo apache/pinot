@@ -112,7 +112,7 @@ public class TestSelectionQueriesForMultiValueColumn {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.DAYS, "test", "testTable");
+            TimeUnit.DAYS, "test");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -137,7 +137,7 @@ public class TestSelectionQueriesForMultiValueColumn {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "daysSinceEpoch", TimeUnit.DAYS, "test", "testTable");
+              "daysSinceEpoch", TimeUnit.DAYS, "test");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);

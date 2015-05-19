@@ -34,7 +34,6 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
@@ -55,7 +54,7 @@ public class RetentionManager {
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private final Map<String, RetentionStrategy> _tableDeletionStrategy = new HashMap<String, RetentionStrategy>();
+  private final Map<String, RetentionStrategy> _resourceDeletionStrategy = new HashMap<String, RetentionStrategy>();
   private final Map<String, List<SegmentZKMetadata>> _segmentMetadataMap = new HashMap<String, List<SegmentZKMetadata>>();
   private final Object _lock = new Object();
 
@@ -124,11 +123,7 @@ public class RetentionManager {
       List<SegmentZKMetadata> segmentZKMetadataList = _segmentMetadataMap.get(resourceName);
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         RetentionStrategy deletionStrategy;
-        if (_tableDeletionStrategy.containsKey(resourceName + "." + segmentZKMetadata.getTableName())) {
-          deletionStrategy = _tableDeletionStrategy.get(resourceName + "." + segmentZKMetadata.getTableName());
-        } else {
-          deletionStrategy = _tableDeletionStrategy.get(resourceName + ".*");
-        }
+        deletionStrategy = _resourceDeletionStrategy.get(resourceName);
         if (deletionStrategy == null) {
           LOGGER.info("No Retention strategy found for segment: " + segmentZKMetadata.getSegmentName());
           continue;
@@ -149,14 +144,14 @@ public class RetentionManager {
   private void updateDeletionStrategiesForEntireCluster() {
     List<String> resourceNames = _pinotHelixResourceManager.getAllPinotResourceNames();
     for (String resourceName : resourceNames) {
-      _tableDeletionStrategy.putAll(retrieveDeletionStrategiesForResource(resourceName));
+      _resourceDeletionStrategy.putAll(retrieveDeletionStrategiesForResource(resourceName));
     }
   }
 
   /**
    *
    * @param resourceName
-   * @return tableName to RetentionStrategy mapping
+   * @return resourceName to RetentionStrategy mapping
    */
   private Map<String, RetentionStrategy> retrieveDeletionStrategiesForResource(String resourceName) {
 
@@ -172,59 +167,38 @@ public class RetentionManager {
   }
 
   private Map<String, RetentionStrategy> handleOfflineDeletionStrategy(String resourceName) {
-    Map<String, RetentionStrategy> tableToDeletionStrategyMap = new HashMap<String, RetentionStrategy>();
+    Map<String, RetentionStrategy> resourceToDeletionStrategyMap = new HashMap<String, RetentionStrategy>();
 
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
         ZKMetadataProvider.getOfflineResourceZKMetadata(_pinotHelixResourceManager.getPropertyStore(), resourceName);
 
     if (offlineDataResourceZKMetadata.getPushFrequency().equalsIgnoreCase(REFRESH)) {
       LOGGER.info("Resource: " + resourceName + " is a fresh only data resource.");
-      return tableToDeletionStrategyMap;
+      return resourceToDeletionStrategyMap;
     } else {
       try {
         TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(offlineDataResourceZKMetadata.getRetentionTimeUnit(),
             offlineDataResourceZKMetadata.getRetentionTimeValue());
-        tableToDeletionStrategyMap.put(resourceName + ".*", timeRetentionStrategy);
+        resourceToDeletionStrategyMap.put(resourceName, timeRetentionStrategy);
       } catch (Exception e) {
         LOGGER.error("Error creating TimeRetentionStrategy for resource: " + resourceName + ", Exception: " + e);
       }
-
-      for (String key : offlineDataResourceZKMetadata.getMetadata().keySet()) {
-        if (key.endsWith("." + CommonConstants.Helix.DataSource.PUSH_FREQUENCY)) {
-          String tableName = key.split(".", 2)[0];
-          if (!offlineDataResourceZKMetadata.getMetadata().get(key).equalsIgnoreCase(REFRESH)) {
-            LOGGER.info("Resource.table - " + resourceName + "." + tableName + " is a fresh only data table.");
-          } else {
-            if (offlineDataResourceZKMetadata.getMetadata().containsKey(tableName + "." + CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT) &&
-                offlineDataResourceZKMetadata.getMetadata().containsKey(tableName + "." + CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE)) {
-              try {
-                TimeRetentionStrategy timeRetentionStrategy =
-                    new TimeRetentionStrategy(offlineDataResourceZKMetadata.getMetadata().get(tableName + "." + CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT),
-                        offlineDataResourceZKMetadata.getMetadata().get(tableName + "." + CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE));
-                tableToDeletionStrategyMap.put(resourceName + "." + tableName, timeRetentionStrategy);
-              } catch (Exception e) {
-                LOGGER.error("Error creating TimeRetentionStrategy for resource.table: " + resourceName + "." + tableName + ", Exception: " + e);
-              }
-            }
-          }
-        }
-      }
-      return tableToDeletionStrategyMap;
+      return resourceToDeletionStrategyMap;
     }
   }
 
   private Map<String, RetentionStrategy> handleRealtimeDeletionStrategy(String resourceName) {
-    Map<String, RetentionStrategy> tableToDeletionStrategyMap = new HashMap<String, RetentionStrategy>();
+    Map<String, RetentionStrategy> resourceToDeletionStrategyMap = new HashMap<String, RetentionStrategy>();
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
         ZKMetadataProvider.getRealtimeResourceZKMetadata(_pinotHelixResourceManager.getPropertyStore(), resourceName);
     try {
       TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(realtimeDataResourceZKMetadata.getRetentionTimeUnit(),
           realtimeDataResourceZKMetadata.getRetentionTimeValue());
-      tableToDeletionStrategyMap.put(resourceName + ".*", timeRetentionStrategy);
+      resourceToDeletionStrategyMap.put(resourceName, timeRetentionStrategy);
     } catch (Exception e) {
       LOGGER.error("Error creating TimeRetentionStrategy for resource: " + resourceName + ", Exception: " + e);
     }
-    return tableToDeletionStrategyMap;
+    return resourceToDeletionStrategyMap;
   }
 
   private void updateSegmentMetadataForEntireCluster() {

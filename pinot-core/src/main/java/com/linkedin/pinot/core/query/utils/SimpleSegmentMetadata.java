@@ -28,12 +28,9 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 
 public class SimpleSegmentMetadata implements SegmentMetadata {
 
-  private static final String SEGMENT_SIZE = "segment.size";
-  private static final String SEGMENT_RESOURCE_NAME = "segment.resource.name";
-  private static final String SEGMENT_TABLE_NAME = "segment.table.name";
+  private static final String SEGMENT_SIZE = "segment.size"; 
 
   private String _resourceName;
-  private String _tableName;
   private String _indexType;
   private Duration _timeGranularity;
   private Interval _interval;
@@ -44,20 +41,19 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private long _size;
   private String _segmentName;
 
-  public SimpleSegmentMetadata(String resourceName, String tableName) {
-    init(resourceName, tableName, new Schema());
+  public SimpleSegmentMetadata(String resourceName) {
+    init(resourceName, new Schema());
   }
 
-  public SimpleSegmentMetadata(String resourceName, String tableName, Schema schema) {
-    init(resourceName, tableName, schema);
+  public SimpleSegmentMetadata(String resourceName, Schema schema) {
+    init(resourceName, schema);
   }
 
   public SimpleSegmentMetadata() {
   }
 
-  private void init(String resourceName, String tableName, Schema schema) {
+  private void init(String resourceName, Schema schema) {
     _resourceName = resourceName;
-    _tableName = tableName;
     _schema = schema;
     _crc = System.currentTimeMillis() + "";
     _segmentName = "SimpleSegment-" + _crc;
@@ -66,11 +62,6 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public String getResourceName() {
     return _resourceName;
-  }
-
-  @Override
-  public String getTableName() {
-    return _tableName;
   }
 
   @Override
@@ -114,8 +105,6 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   public static SegmentMetadata load(Configuration properties) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata();
-    //segmentMetadata.setResourceName(properties.getString(SEGMENT_RESOURCE_NAME, "defaultResource"));
-    //    /segmentMetadata.setTableName(properties.getString(SEGMENT_TABLE_NAME, "defaultTable"));
     ((SimpleSegmentMetadata) segmentMetadata).setSize(properties.getLong(SEGMENT_SIZE, 0));
     return segmentMetadata;
   }
@@ -127,7 +116,6 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   @Override
   public String getIndexDir() {
-    // TODO Auto-generated method stub
     return null;
   }
 
@@ -138,13 +126,11 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   @Override
   public Map<String, String> toMap() {
-    // TODO Auto-generated method stub
     return new HashMap<String, String>();
   }
 
   @Override
   public long getIndexCreationTime() {
-    // TODO Auto-generated method stub
     return 0;
   }
 
@@ -165,7 +151,6 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   @Override
   public boolean close() {
-    // nothing to close here
     return true;
   }
 }

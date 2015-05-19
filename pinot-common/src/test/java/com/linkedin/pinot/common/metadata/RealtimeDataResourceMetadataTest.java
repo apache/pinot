@@ -73,9 +73,6 @@ public class RealtimeDataResourceMetadataTest {
     record.setSimpleFields(fieldMap);
     record.setSimpleField(Helix.DataSource.RESOURCE_NAME, "testResource");
     record.setEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.REALTIME);
-    List<String> tableList = new ArrayList<String>();
-    tableList.add("testTable");
-    record.setListField(Helix.DataSource.TABLE_NAME, tableList);
     List<String> sortedColumnList = new ArrayList<String>();
     sortedColumnList.add("sortColumn0");
     sortedColumnList.add("sortColumn1");
@@ -97,7 +94,6 @@ public class RealtimeDataResourceMetadataTest {
   private RealtimeDataResourceZKMetadata getTestRealtimeDataResourceZKMetadata() {
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = new RealtimeDataResourceZKMetadata();
     realtimeDataResourceZKMetadata.setResourceName("testResource");
-    realtimeDataResourceZKMetadata.addToTableList("testTable");
     List<String> sortedColumnList = new ArrayList<String>();
     sortedColumnList.add("sortColumn0");
     sortedColumnList.add("sortColumn1");

@@ -72,7 +72,6 @@ public class TestValidationManager {
   public void testPushTimePersistence() throws Exception {
 
     String testResourceName = "testResource";
-    String testTableName = "testTable";
 
     Thread.sleep(1000);
 
@@ -80,12 +79,12 @@ public class TestValidationManager {
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
 
     DataResource dataResource =
-        new DataResource("create", testResourceName, Helix.ResourceType.OFFLINE.toString(), testTableName, "timestamp",
+        new DataResource("create", testResourceName, Helix.ResourceType.OFFLINE.toString(), "timestamp",
             "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy", "broker_"
                 + testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
 
-    DummyMetadata metadata = new DummyMetadata(testResourceName, testTableName);
+    DummyMetadata metadata = new DummyMetadata(testResourceName);
 
     _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
 
@@ -229,7 +228,6 @@ public class TestValidationManager {
 
   private class DummyMetadata implements SegmentMetadata {
     private String _resourceName;
-    private String _tableName;
     private String _indexType;
     private Duration _timeGranularity;
     private Interval _interval;
@@ -245,10 +243,9 @@ public class TestValidationManager {
     private int _totalDocs;
     private String _indexDir;
 
-    public DummyMetadata(String resourceName, String tableName) {
+    public DummyMetadata(String resourceName) {
       _resourceName = resourceName;
-      _tableName = tableName;
-      _segmentName = resourceName + "_" + tableName + "_" + System.currentTimeMillis();
+      _segmentName = resourceName + "_" + System.currentTimeMillis();
       _crc = System.currentTimeMillis() + "";
     }
 
@@ -318,15 +315,6 @@ public class TestValidationManager {
 
     public void setResourceName(String resourceName) {
       _resourceName = resourceName;
-    }
-
-    @Override
-    public String getTableName() {
-      return _tableName;
-    }
-
-    public void setTableName(String tableName) {
-      _tableName = tableName;
     }
 
     @Override

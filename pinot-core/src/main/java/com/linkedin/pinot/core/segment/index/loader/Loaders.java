@@ -45,7 +45,7 @@ public class Loaders {
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();
 
       for (String column : metadata.getColumnMetadataMap().keySet()) {
-        indexContainerMap.put(column, ColumnIndexContainer.init(metadata.getTableName(), column, indexDir,
+        indexContainerMap.put(column, ColumnIndexContainer.init(column, indexDir,
             metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata, readMode));
       }
       return new IndexSegmentImpl(indexDir, metadata, indexContainerMap);

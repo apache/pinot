@@ -33,34 +33,32 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
+
 /**
  * Class to implement CreateSegment command.
  *
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-dataDir", required=true, metaVar="<string>", usage="Directory containing the data.")
+  @Option(name = "-dataDir", required = true, metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
 
-  @Option(name="-resourceName", required=true, metaVar="<string>", usage="Name of the resource.")
+  @Option(name = "-resourceName", required = true, metaVar = "<string>", usage = "Name of the resource.")
   private String _resourceName;
 
-  @Option(name="-tableName", required=true, metaVar="<string>", usage="Name of the table.")
-  private String _tableName;
-
-  @Option(name="-segmentName", required=true, metaVar="<string>", usage="Name of the segment.")
+  @Option(name = "-segmentName", required = true, metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
 
-  @Option(name="-schemaFile", required=false, metaVar="<string>", usage="File containing schema for data.")
+  @Option(name = "-schemaFile", required = false, metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile;
 
-  @Option(name="-outDir", required=true, metaVar="<string>", usage="Name of output directory.")
+  @Option(name = "-outDir", required = true, metaVar = "<string>", usage = "Name of output directory.")
   private String _outDir;
 
-  @Option(name="-overwrite", required=false, metaVar="<string>", usage="Overwrite existing output directory.")
+  @Option(name = "-overwrite", required = false, metaVar = "<string>", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   boolean _help = false;
 
   public boolean getHelp() {
@@ -82,11 +80,6 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     return this;
   }
 
-  public CreateSegmentCommand setTableName(String tableName) {
-    _tableName = tableName;
-    return this;
-  }
-
   public CreateSegmentCommand setSegmentName(String segmentName) {
     _segmentName = segmentName;
     return this;
@@ -105,7 +98,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Override
   public String toString() {
     return ("CreateSegmentCommand -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
-        " -resourceName " + _resourceName + " -tableName " + _tableName + " -segmentName " +
+        " -resourceName " + _resourceName + " -segmentName " +
         _segmentName + " -outDir " + _outDir);
   }
 
@@ -125,7 +118,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       throw new RuntimeException("Data directory " + _dataDir + " not found.");
     }
 
-    File [] files = dir.listFiles(new FilenameFilter() {
+    File[] files = dir.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
         return name.endsWith("avro");
@@ -137,7 +130,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     }
 
     // Make sure output directory does not already exist, or can be overwritten.
-    File odir = new File (_outDir);
+    File odir = new File(_outDir);
     if (odir.exists()) {
       if (!_overwrite) {
         throw new IOException("Error: Output directory already exists.");
@@ -153,7 +146,6 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     } else {
       schema = AvroUtils.extractSchemaFromAvro(files[0]);
     }
-
 
     ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
@@ -172,7 +164,6 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
             config.setIndexOutputDir(_outDir);
             config.setResourceName(_resourceName);
-            config.setTableName(_tableName);
 
             config.setTimeColumnName(schema.getTimeColumnName());
             config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());

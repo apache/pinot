@@ -39,11 +39,6 @@ public interface SegmentMetadata {
   /**
    * @return
    */
-  public String getTableName();
-
-  /**
-   * @return
-   */
   public String getIndexType();
 
   /**

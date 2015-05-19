@@ -117,7 +117,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     // Create a data resource
-    createHybridResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
+    createHybridResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
         KAFKA_TOPIC, avroFiles.get(0), 3000, "DAYS");
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
@@ -143,13 +143,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "myresource", "mytable");
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "myresource");
 
     // Initialize query generator
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'myresource.mytable'", "mytable");
+        _queryGenerator = new QueryGenerator(avroFiles, "'myresource'", "mytable");
       }
     });
 
@@ -211,7 +211,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       Thread.sleep(5000L);
 
       // Run the query
-      JSONObject response = postQuery("select count(*) from 'myresource.mytable'");
+      JSONObject response = postQuery("select count(*) from 'myresource'");
       JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
       JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
       String pinotValue = firstAggregationResult.getString("value");
@@ -256,14 +256,14 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'myresource' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
   }
 
   @Override
@@ -275,6 +275,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   @Test
   public void testGeneratedQueries() throws Exception {
-     super.testGeneratedQueries();
+    super.testGeneratedQueries();
   }
 }

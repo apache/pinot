@@ -77,9 +77,7 @@ public class TestDictionaries {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
-            TimeUnit.DAYS, "test", "testTable");
-
-
+            TimeUnit.DAYS, "test");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -136,11 +134,11 @@ public class TestDictionaries {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
-    for (final String column : ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+    for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
       final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
 
-      switch (((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
+      switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
         case BOOLEAN:
         case STRING:
           Assert.assertEquals(true, heapDictionary instanceof StringDictionary);
@@ -176,7 +174,7 @@ public class TestDictionaries {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
-    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
       final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);

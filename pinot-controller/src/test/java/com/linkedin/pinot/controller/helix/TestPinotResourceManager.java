@@ -15,14 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
@@ -34,6 +29,7 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -42,7 +38,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 public class TestPinotResourceManager {
@@ -86,9 +81,6 @@ public class TestPinotResourceManager {
 
     _pinotResourceManager.handleCreateNewDataResource(resource);
 
-    final DataResource addTableResource = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
-        TEST_RESOURCE_NAME, "testTable");
-    _pinotResourceManager.handleAddTableToDataResource(addTableResource);
   }
 
   @AfterTest
@@ -136,7 +128,7 @@ public class TestPinotResourceManager {
   }
 
   private void addOneSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName, "testTable");
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
     _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }

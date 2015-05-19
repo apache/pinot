@@ -125,7 +125,8 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit, int instanceCount, int replicaCount, int brokerCount)
+  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit, int instanceCount,
+      int replicaCount, int brokerCount)
       throws Exception {
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, instanceCount, replicaCount);
     if (timeColumnName != null && timeColumnType != null) {
@@ -173,7 +174,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void createRealtimeResource(String resourceName, String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile)
+  protected void createRealtimeResource(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile)
       throws Exception {
     // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
     Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);
@@ -207,7 +208,7 @@ public abstract class ClusterTest extends ControllerTest {
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
 
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateRealtimeResourceJSON(resourceName, tableName, 1, 1);
+    JSONObject payload = ControllerRequestBuilderUtil.buildCreateRealtimeResourceJSON(resourceName, 1, 1);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
     }
@@ -218,7 +219,7 @@ public abstract class ClusterTest extends ControllerTest {
     Assert.assertEquals(_success, new JSONObject(res).getString("status"));
   }
 
-  protected void createHybridResource(String resourceName, String tableName, String timeColumnName,
+  protected void createHybridResource(String resourceName, String timeColumnName,
       String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile, int retentionTimeValue, String retentionTimeUnit)
       throws Exception {
     // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
@@ -253,7 +254,7 @@ public abstract class ClusterTest extends ControllerTest {
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
 
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateHybridResourceJSON(resourceName, tableName, 1, 1);
+    JSONObject payload = ControllerRequestBuilderUtil.buildCreateHybridResourceJSON(resourceName, 1, 1);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
     }
@@ -264,17 +265,6 @@ public abstract class ClusterTest extends ControllerTest {
     payload.put("metadata", metadata);
     String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
-            payload.toString());
-    Assert.assertEquals(_success, new JSONObject(res).getString("status"));
-  }
-
-  protected void addTableToOfflineResource(String resourceName, String tableName, String timeColumnName, String timeColumnType) throws Exception {
-    JSONObject payload = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(resourceName, tableName).toJSON();
-    if (timeColumnName != null && timeColumnType != null) {
-      payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
-    }
-    String res =
-        sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
     Assert.assertEquals(_success, new JSONObject(res).getString("status"));
   }

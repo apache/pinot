@@ -117,13 +117,7 @@ public class RequestConverter {
     final QuerySource source = new QuerySource();
     if (requestJSON.has(COLLECTION)) {
       final String collection = requestJSON.getString(COLLECTION);
-      if (collection.contains(".")) {
-        source.setResourceName(collection.substring(0, collection.indexOf(".")));
-        source.setTableName(collection.substring(collection.indexOf(".") + 1, collection.length()));
-      } else {
-        source.setResourceName(collection);
-        source.setTableName(collection);
-      }
+      source.setResourceName(collection);
     }
 
     req.setQuerySource(source);

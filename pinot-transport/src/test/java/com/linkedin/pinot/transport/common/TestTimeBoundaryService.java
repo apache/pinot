@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.transport.common;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.common.utils.ZkUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -32,6 +30,7 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -120,7 +119,6 @@ public class TestTimeBoundaryService {
       offlineSegmentZKMetadata.setPushTime(i + 5);
       offlineSegmentZKMetadata.setResourceName(resourceName);
       offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
-      offlineSegmentZKMetadata.setTableName(resourceName);
       ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
     }
   }

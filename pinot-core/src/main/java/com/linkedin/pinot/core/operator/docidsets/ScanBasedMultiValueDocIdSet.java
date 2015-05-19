@@ -78,15 +78,23 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
     private int endDocId;
 
     public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      this.dictIdSet = new HashSet<Integer>(Math.max(1, dictIds.length));
-      for (int dictId : dictIds) {
-        dictIdSet.add(dictId);
+      if (dictIds.length > 0) {
+        this.dictIdSet = new HashSet<Integer>(dictIds.length);
+        for (int dictId : dictIds) {
+          dictIdSet.add(dictId);
+        }
+        this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
+        Arrays.fill(intArray, 0);
+        setStartDocId(blockMetadata.getStartDocId());
+        setEndDocId(blockMetadata.getEndDocId());
+      } else {
+        this.dictIdSet = null;
+        this.intArray = new int[0];
+        setStartDocId(Constants.EOF);
+        setEndDocId(Constants.EOF);
+        currentDocId = Constants.EOF;
       }
       valueIterator = (BlockMultiValIterator) blockValSet.iterator();
-      this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
-      Arrays.fill(intArray, 0);
-      setStartDocId(blockMetadata.getStartDocId());
-      setEndDocId(blockMetadata.getEndDocId());
     }
 
     /**

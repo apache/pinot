@@ -74,13 +74,20 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
     private int endDocId;
 
     public BlockValSetBasedDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      this.dictIdSet = new HashSet<Integer>(Math.max(1, dictIds.length));
-      for (int dictId : dictIds) {
-        dictIdSet.add(dictId);
+      if (dictIds.length < 1) {
+        this.dictIdSet = null;
+        currentDocId = Constants.EOF;
+        setStartDocId(Constants.EOF);
+        setEndDocId(Constants.EOF);
+      } else {
+        this.dictIdSet = new HashSet<Integer>(dictIds.length);
+        for (int dictId : dictIds) {
+          dictIdSet.add(dictId);
+        }
+        setStartDocId(blockMetadata.getStartDocId());
+        setEndDocId(blockMetadata.getEndDocId());
       }
       valueIterator = (BlockSingleValIterator) blockValSet.iterator();
-      setStartDocId(blockMetadata.getStartDocId());
-      setEndDocId(blockMetadata.getEndDocId());
     }
 
     /**

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.common.metrics;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -24,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.QuerySource;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 
@@ -41,8 +38,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected final String _metricPrefix;
 
   protected final MetricsRegistry _metricsRegistry;
-
-  private static final Set<String> registeredTables = new HashSet<String>();
 
   private final Class _clazz;
 
@@ -80,15 +75,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * Builds a complete metric name, of the form prefix.resource.table.metric
+   * Builds a complete metric name, of the form prefix.resource.metric
    *
    * @param request The broker request containing all the information
    * @param metricName The metric name to register
    * @return The complete metric name
    */
   private String buildMetricName(BrokerRequest request, String metricName) {
-    return _metricPrefix + request.getQuerySource().getResourceName() + "." + request.getQuerySource().getTableName()
-        + "." + metricName;
+    return _metricPrefix + request.getQuerySource().getResourceName() + "." + metricName;
   }
 
   /**
@@ -140,42 +134,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     for (M meter : meters) {
       if (meter.isGlobal()) {
         addMeteredValue(null, meter, 0);
-      }
-    }
-  }
-
-  /**
-   * Ensures that all metrics for a table are registered.
-   */
-  public void ensureTableIsRegistered(final String resourceName, final String tableName) {
-    final String completeResourceName = resourceName + "." + tableName;
-
-    synchronized (registeredTables) {
-      if (!registeredTables.contains(completeResourceName)) {
-        registeredTables.add(completeResourceName);
-
-        BrokerRequest dummyRequest = new BrokerRequest();
-        QuerySource dummyQuerySource = new QuerySource();
-        dummyRequest.setQuerySource(dummyQuerySource);
-        dummyQuerySource.setResourceName(resourceName);
-        dummyQuerySource.setTableName(tableName);
-
-        // Register all query phases
-        QP[] queryPhases = getQueryPhases();
-        for (QP queryPhase : queryPhases) {
-          final String fullTimerName = buildMetricName(dummyRequest, queryPhase.getQueryPhaseName());
-          final MetricName metricName = new MetricName(_clazz, fullTimerName);
-
-          MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-        }
-
-        // Register all non global meters
-        M[] meters = getMeters();
-        for (M meter : meters) {
-          if (!meter.isGlobal()) {
-            addMeteredValue(dummyRequest, meter, 0);
-          }
-        }
       }
     }
   }

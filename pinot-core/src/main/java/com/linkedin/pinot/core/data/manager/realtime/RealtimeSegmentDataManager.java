@@ -163,7 +163,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         // lets convert the segment now
         RealtimeSegmentConverter conveter =
             new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(),
-                schema, segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata
+                schema, segmentMetadata.getResourceName(), segmentMetadata
                     .getSegmentName(), sortedColumn);
         try {
           LOGGER.info("Trying to build segment!");
@@ -180,7 +180,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           swap();
           RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
           metadaToOverrite.setResourceName(segmentMetadata.getResourceName());
-          metadaToOverrite.setTableName(segmentMetadata.getTableName());
           metadaToOverrite.setSegmentName(segmentMetadata.getSegmentName());
           metadaToOverrite.setSegmentType(SegmentType.OFFLINE);
           metadaToOverrite.setStatus(Status.DONE);

@@ -37,7 +37,6 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 public abstract class DataResourceZKMetadata implements ZKMetadata {
   private String _resourceName;
   private ResourceType _resourceType = null;
-  private List<String> _tableList = new ArrayList<String>();
   private String _timeColumnName;
   private String _timeType;
   private int _numDataInstances;
@@ -57,7 +56,6 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
   public DataResourceZKMetadata(ZNRecord znRecord) {
     _resourceName = znRecord.getSimpleField(Helix.DataSource.RESOURCE_NAME);
     _resourceType = znRecord.getEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.class, ResourceType.OFFLINE);
-    _tableList = znRecord.getListField(Helix.DataSource.TABLE_NAME);
     _timeColumnName = znRecord.getSimpleField(Helix.DataSource.TIME_COLUMN_NAME);
     _timeType = znRecord.getSimpleField(Helix.DataSource.TIME_TYPE);
     _numDataInstances = znRecord.getIntField(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, -1);
@@ -86,18 +84,6 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
 
   protected void setResourceType(ResourceType resourceType) {
     _resourceType = resourceType;
-  }
-
-  public List<String> getTableList() {
-    return _tableList;
-  }
-
-  public void setTableList(List<String> tableList) {
-    _tableList = tableList;
-  }
-
-  public void addToTableList(String newTableToAdd) {
-    _tableList.add(newTableToAdd);
   }
 
   public String getTimeColumnName() {
@@ -211,21 +197,6 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
       return false;
     }
 
-    if (getTableList().size() == resourceMetadata.getTableList().size()) {
-      if (!getTableList().isEmpty()) {
-        String[] tableArray1 = getTableList().toArray(new String[0]);
-        String[] tableArray2 = resourceMetadata.getTableList().toArray(new String[0]);
-        Arrays.sort(tableArray1);
-        Arrays.sort(tableArray2);
-        for (int i = 0; i < tableArray1.length; ++i) {
-          if (!tableArray1[i].equals(tableArray2[i])) {
-            return false;
-          }
-        }
-      }
-    } else {
-      return false;
-    }
     if (getSortedColumns().size() == resourceMetadata.getSortedColumns().size()) {
       if (!getSortedColumns().isEmpty()) {
         for (int i = 0; i < getSortedColumns().size(); ++i) {
@@ -265,7 +236,6 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
   public int hashCode() {
     int result = hashCodeOf(_resourceName);
     result = hashCodeOf(result, _resourceType);
-    result = hashCodeOf(result, _tableList);
     result = hashCodeOf(result, _timeColumnName);
     result = hashCodeOf(result, _timeType);
     result = hashCodeOf(result, _numDataInstances);
@@ -284,7 +254,6 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     ZNRecord znRecord = new ZNRecord(_resourceName);
     znRecord.setSimpleField(Helix.DataSource.RESOURCE_NAME, _resourceName);
     znRecord.setEnumField(Helix.DataSource.RESOURCE_TYPE, _resourceType);
-    znRecord.setListField(Helix.DataSource.TABLE_NAME, _tableList);
     znRecord.setListField(Helix.DataSource.SORTED_COLUMN_LIST, _sortedColumnList);
     znRecord.setSimpleField(Helix.DataSource.TIME_COLUMN_NAME, _timeColumnName);
     znRecord.setSimpleField(Helix.DataSource.TIME_TYPE, _timeType);

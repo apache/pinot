@@ -21,6 +21,8 @@ import java.util.Map;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -31,8 +33,6 @@ import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -46,7 +46,6 @@ public class DataResource {
   private final String requestType;
   private final String resourceName;
   private final String resourceType;
-  private final String tableName;
   private final String timeColumnName;
   private final String timeType;
   private final int numberOfDataInstances;
@@ -72,7 +71,6 @@ public class DataResource {
   public DataResource(@JsonProperty(Helix.DataSource.REQUEST_TYPE) String requestType,
       @JsonProperty(Helix.DataSource.RESOURCE_NAME) String resourceName,
       @JsonProperty(Helix.DataSource.RESOURCE_TYPE) String resourceType,
-      @JsonProperty(Helix.DataSource.TABLE_NAME) String tableName,
       @JsonProperty(Helix.DataSource.TIME_COLUMN_NAME) String timeColumnName,
       @JsonProperty(Helix.DataSource.TIME_TYPE) String timeType,
       @JsonProperty(Helix.DataSource.NUMBER_OF_DATA_INSTANCES) int numberOfDataInstances,
@@ -88,7 +86,6 @@ public class DataResource {
     this.requestType = requestType;
     this.resourceName = resourceName;
     this.resourceType = resourceType;
-    this.tableName = tableName;
     this.timeColumnName = timeColumnName;
     this.timeType = timeType;
     this.numberOfDataInstances = numberOfDataInstances;
@@ -139,10 +136,6 @@ public class DataResource {
     }
   }
 
-  public String getTableName() {
-    return tableName;
-  }
-
   public String getTimeColumnName() {
     return timeColumnName;
   }
@@ -189,14 +182,6 @@ public class DataResource {
     return requestType.equalsIgnoreCase(Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE_CONFIG);
   }
 
-  public boolean isDataTableAdd() {
-    return requestType.equalsIgnoreCase(Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
-  }
-
-  public boolean isDataTableRemove() {
-    return requestType.equalsIgnoreCase(Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE);
-  }
-
   public boolean isBrokerResourceUpdate() {
     return requestType.equalsIgnoreCase(Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
   }
@@ -207,7 +192,6 @@ public class DataResource {
       return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
           props.get(Helix.DataSource.RESOURCE_NAME),
           props.get(Helix.DataSource.RESOURCE_TYPE),
-          props.get(Helix.DataSource.TABLE_NAME),
           props.get(Helix.DataSource.TIME_COLUMN_NAME),
           props.get(Helix.DataSource.TIME_TYPE), Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
@@ -223,25 +207,16 @@ public class DataResource {
         .get(Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
           props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
-          props.get(Helix.DataSource.TABLE_NAME), null, null, Integer.parseInt(props
+          null, null, Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_COPIES)), null, null, null, null, null, -1, null);
     }
     if (Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE.equalsIgnoreCase(props
         .get(Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
-          props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
-          props.get(Helix.DataSource.TABLE_NAME), null, null, -1, -1, null, null, null, null,
+          props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE), null, null, -1, -1, null, null, null, null,
           props.get(Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), null);
-    }
-    if (CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE.equalsIgnoreCase(
-        props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE))) {
-      return new DataResource(
-          props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE),
-          props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
-          props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
-          null, null, -1, -1, null, null, null, null, null, -1, null);
     }
     throw new UnsupportedOperationException("Don't support Request type: "
         + props.get(Helix.DataSource.REQUEST_TYPE));
@@ -299,7 +274,7 @@ public class DataResource {
         && incomingDS.getRetentionTimeUnit().equals(retentionTimeUnit)
         && incomingDS.getRetentionTimeValue().equals(retentionTimeValue)
         && incomingDS.getSegmentAssignmentStrategy().equals(segmentAssignmentStrategy)
-        && incomingDS.getTableName().equals(tableName) && incomingDS.getTimeColumnName().equals(timeColumnName)
+        && incomingDS.getTimeColumnName().equals(timeColumnName)
         && incomingDS.getTimeType().equals(timeType) && incomingDS.getBrokerTagName().equals(brokerTagName)) {
       return true;
     }
@@ -317,7 +292,6 @@ public class DataResource {
         retentionTimeUnit,
         retentionTimeValue,
         segmentAssignmentStrategy,
-        tableName,
         timeColumnName,
         timeType,
         brokerTagName);
@@ -363,7 +337,6 @@ public class DataResource {
     ret.put(Helix.DataSource.REQUEST_TYPE, requestType);
     ret.put(Helix.DataSource.RESOURCE_NAME, resourceName);
     ret.put(Helix.DataSource.RESOURCE_TYPE, resourceType);
-    ret.put(Helix.DataSource.TABLE_NAME, tableName);
     ret.put(Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
     ret.put(Helix.DataSource.TIME_TYPE, timeType);
     ret.put(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
@@ -384,7 +357,6 @@ public class DataResource {
     bld.append(Helix.DataSource.REQUEST_TYPE + " : " + requestType + "\n");
     bld.append(Helix.DataSource.RESOURCE_NAME + " : " + resourceName + "\n");
     bld.append(Helix.DataSource.RESOURCE_TYPE + " : " + resourceType + "\n");
-    bld.append(Helix.DataSource.TABLE_NAME + " : " + tableName + "\n");
     bld.append(Helix.DataSource.TIME_COLUMN_NAME + " : " + timeColumnName + "\n");
     bld.append(Helix.DataSource.TIME_TYPE + " : " + timeType + "\n");
     bld.append(Helix.DataSource.NUMBER_OF_DATA_INSTANCES + " : " + numberOfDataInstances + "\n");
@@ -404,7 +376,6 @@ public class DataResource {
     ret.put(Helix.DataSource.REQUEST_TYPE, requestType);
     ret.put(Helix.DataSource.RESOURCE_NAME, resourceName);
     ret.put(Helix.DataSource.RESOURCE_TYPE, resourceType);
-    ret.put(Helix.DataSource.TABLE_NAME, tableName);
     ret.put(Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
     ret.put(Helix.DataSource.TIME_TYPE, timeType);
     ret.put(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
@@ -421,11 +392,10 @@ public class DataResource {
   }
 
   public static void main(String[] args) throws JSONException {
-    final ObjectMapper mapper = new ObjectMapper();
     JSONObject metadata = new JSONObject();
     metadata.put("d2.name", "xlntBetaPinot");
     DataResource dataResource =
-        new DataResource("requestType", "resourceName", "resourceType", "tableName", "timeColumnName", "timeType", 1, 2,
+        new DataResource("requestType", "resourceName", "resourceType", "timeColumnName", "timeType", 1, 2,
             "retentionTimeUnit", "rentionTimeValue", "pushFrequency", "segmentAssignmentStrategy", "brokerTagName", 3,
             null);
     System.out.println(dataResource);
@@ -438,7 +408,6 @@ public class DataResource {
       final Map<String, String> ret = new HashMap<String, String>();
       ret.put(Helix.DataSource.RESOURCE_NAME, resourceName);
       ret.put(Helix.DataSource.RESOURCE_TYPE, resourceType);
-      ret.put(Helix.DataSource.TABLE_NAME, tableName);
       ret.put(Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
       ret.put(Helix.DataSource.TIME_TYPE, timeType);
       ret.put(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
@@ -491,7 +460,7 @@ public class DataResource {
   private void setMetaToConfigMap(Map<String, String> ret) {
     if (metadata != null) {
       System.out.println(metadata);
-      for (Iterator iterator = metadata.fieldNames(); iterator.hasNext();) {
+      for (Iterator<?> iterator = metadata.fieldNames(); iterator.hasNext();) {
         String key = (String) iterator.next();
         System.out.println("key : " + key + " : value : " + metadata.get(key));
         ret.put(Helix.DataSource.METADATA + "." + key, metadata.get(key).textValue());

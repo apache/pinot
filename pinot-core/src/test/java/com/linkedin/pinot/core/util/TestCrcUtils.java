@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Dec 4, 2014
@@ -79,7 +80,7 @@ public class TestCrcUtils {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
-            "daysSinceEpoch", TimeUnit.DAYS, "mirror", "mirror");
+            "daysSinceEpoch", TimeUnit.DAYS, "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

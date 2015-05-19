@@ -24,6 +24,7 @@ import org.kohsuke.args4j.Option;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 
+
 /**
  * Class for command to upload data into Pinot.
  *
@@ -31,16 +32,16 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
  *
  */
 public class UploadDataCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-controllerHost", required=true, metaVar="<string>", usage="Hostname for controller.")
+  @Option(name = "-controllerHost", required = true, metaVar = "<string>", usage = "Hostname for controller.")
   private String _controllerHost = null;
 
-  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number for controller.")
+  @Option(name = "-controllerPort", required = true, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = null;
 
-  @Option(name="-segmentDir", required=true, metaVar="<string>", usage="Path to segment directory.")
+  @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -68,30 +69,30 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
-public UploadDataCommand setControllerPort(String controllerPort) {
-  _controllerPort = controllerPort;
-  return this;
-}
+  public UploadDataCommand setControllerPort(String controllerPort) {
+    _controllerPort = controllerPort;
+    return this;
+  }
 
-public UploadDataCommand setSegmentDir(String segmentDir) {
-  _segmentDir = segmentDir;
-  return this;
-}
+  public UploadDataCommand setSegmentDir(String segmentDir) {
+    _segmentDir = segmentDir;
+    return this;
+  }
 
   @Override
   public boolean execute() throws Exception {
     File dir = new File(_segmentDir);
-    File [] files = dir.listFiles();
+    File[] files = dir.listFiles();
 
     for (File file : files) {
-      if (!file.isDirectory()) continue;
+      if (!file.isDirectory()) {
+        continue;
+      }
 
       String srcDir = file.getAbsolutePath();
 
-      String outFile = file.getAbsolutePath() + ".tar.gz";
+      String outFile = TarGzCompressionUtils.createTarGzOfDirectory(srcDir);
       File tgzFile = new File(outFile);
-
-      TarGzCompressionUtils.createTarGzOfDirectory(srcDir, outFile);
       FileUploadUtils.sendFile(_controllerHost, _controllerPort, tgzFile.getName(),
           new FileInputStream(tgzFile), tgzFile.length());
 

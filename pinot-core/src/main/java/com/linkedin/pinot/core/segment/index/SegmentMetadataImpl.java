@@ -57,7 +57,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
   private final File _metadataFile;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
-  private Schema _segmentDataSchema;
   private String _segmentName;
   private final Set<String> _allColumns;
   private final Schema _schema;
@@ -94,8 +93,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         Long.toString(offlineSegmentZKMetadata.getStartTime()));
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
         Long.toString(offlineSegmentZKMetadata.getEndTime()));
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
-        offlineSegmentZKMetadata.getTableName());
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME,
         offlineSegmentZKMetadata.getResourceName());
 
@@ -129,8 +126,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         Long.toString(segmentMetadata.getStartTime()));
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
         Long.toString(segmentMetadata.getEndTime()));
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
-        segmentMetadata.getTableName());
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME,
         segmentMetadata.getResourceName());
 
@@ -239,8 +234,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
     }
 
-    _segmentDataSchema = new Schema();
-
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
 
     for (final String column : _allColumns) {
@@ -329,11 +322,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getTableName() {
-    return (String) _segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME);
-  }
-
-  @Override
   public String getIndexType() {
     return IndexType.COLUMNAR.toString();
   }
@@ -389,7 +377,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     ret.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, getResourceName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
     ret.put(V1Constants.VERSION, getVersion());
-    ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");

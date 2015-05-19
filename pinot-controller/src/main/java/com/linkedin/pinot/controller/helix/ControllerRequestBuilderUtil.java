@@ -44,26 +44,23 @@ public class ControllerRequestBuilderUtil {
   public static JSONObject buildCreateOfflineResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName,
-            "BalanceNumSegmentAssignmentStrategy");
+        createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
   }
 
-  public static JSONObject buildCreateRealtimeResourceJSON(String resourceName, String tableName, int numInstances, int numReplicas)
+  public static JSONObject buildCreateRealtimeResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName, tableName,
-            "BalanceNumSegmentAssignmentStrategy");
+        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
   }
 
-  public static JSONObject buildCreateHybridResourceJSON(String resourceName, String tableName, int numInstances, int numReplicas)
+  public static JSONObject buildCreateHybridResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName, tableName,
-            "BalanceNumSegmentAssignmentStrategy");
+        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
   }
@@ -108,7 +105,6 @@ public class ControllerRequestBuilderUtil {
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
-    props.put(DataSource.TABLE_NAME, resourceName);
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -123,12 +119,11 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static DataResource createRealtimeClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String tableName, String segmentAssignmentStrategy) {
+      String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.REALTIME.toString());
-    props.put(DataSource.TABLE_NAME, tableName);
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -143,12 +138,11 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static DataResource createHybridClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String tableName, String segmentAssignmentStrategy) {
+      String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.HYBRID.toString());
-    props.put(DataSource.TABLE_NAME, tableName);
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -168,7 +162,6 @@ public class ControllerRequestBuilderUtil {
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_DATA_RESOURCE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
-    props.put(DataSource.TABLE_NAME, resourceName);
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
     props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
     return DataResource.fromMap(props);
@@ -179,20 +172,8 @@ public class ControllerRequestBuilderUtil {
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_BROKER_RESOURCE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
-    props.put(DataSource.TABLE_NAME, resourceName);
     props.put(DataSource.BROKER_TAG_NAME, resourceName);
     props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createOfflineClusterAddTableToResource(String resourceName, String tableName) {
-    final Map<String, String> props = new HashMap<String, String>();
-
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
-    props.put(DataSource.TABLE_NAME, tableName);
-
     return DataResource.fromMap(props);
   }
 

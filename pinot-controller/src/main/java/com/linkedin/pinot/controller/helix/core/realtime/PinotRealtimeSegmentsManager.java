@@ -84,17 +84,13 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         List<String> instancesInResource =
             pinotClusterManager.getHelixAdmin().getInstancesInClusterWithTag(pinotClusterManager.getHelixClusterName(),
                 resource);
-        RealtimeDataResourceZKMetadata realtimeDRMetadata =
-            pinotClusterManager.getRealtimeDataResourceZKMetadata(resource);
-        String tableName = realtimeDRMetadata.getTableList().get(0);
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
           String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, tableName, instanceId, groupId,
+          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, instanceId, groupId,
               partitionId, String.valueOf(System.currentTimeMillis())));
         }
-
       } else {
         Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
         instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getHelixAdmin().getInstancesInClusterWithTag(
@@ -112,10 +108,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
           String partitionId = instanceZKMetadata.getPartition(resource);
-          RealtimeDataResourceZKMetadata realtimeDRMetadata =
-              pinotClusterManager.getRealtimeDataResourceZKMetadata(resource);
-          String tableName = realtimeDRMetadata.getTableList().get(0);
-          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, tableName, instanceId, groupId,
+          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, instanceId, groupId,
               partitionId, String.valueOf(System.currentTimeMillis())));
         }
       }
@@ -126,13 +119,11 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
     // new lets add the new segments
     for (String segmentId : listOfSegmentsToAdd) {
       String resourceName = SegmentNameBuilder.Realtime.extractResourceName(segmentId);
-      String tableName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
       String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(segmentId);
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
         // create realtime segment metadata
         RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
         realtimeSegmentMetadataToAdd.setResourceName(BrokerRequestUtils.getHybridResourceName(resourceName));
-        realtimeSegmentMetadataToAdd.setTableName(tableName);
         realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
         realtimeSegmentMetadataToAdd.setSegmentName(segmentId);

@@ -71,7 +71,7 @@ public class TestChunkIndexCreationDriverImpl {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(
-            "/tmp/mirrorTwoDotO"), "daysSinceEpoch", TimeUnit.DAYS, "mirror", "mirror");
+            "/tmp/mirrorTwoDotO"), "daysSinceEpoch", TimeUnit.DAYS, "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

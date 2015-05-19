@@ -102,9 +102,6 @@ public class TestSegmentAssignmentStrategy {
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalNumInstances, numRelicas,
             RESOURCE_NAME_RANDOM, "RandomAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
-    final DataResource addTableResourceRandom = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
-        RESOURCE_NAME_RANDOM, "testTable");
-    _pinotResourceManager.handleAddTableToDataResource(addTableResourceRandom);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
       addOneSegment(RESOURCE_NAME_RANDOM);
@@ -137,9 +134,6 @@ public class TestSegmentAssignmentStrategy {
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalInstances, numRelicas,
             RESOURCE_NAME_BALANCED, "BalanceNumSegmentAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
-    final DataResource addTableResourceBalanced = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
-        RESOURCE_NAME_BALANCED, "testTable");
-    _pinotResourceManager.handleAddTableToDataResource(addTableResourceBalanced);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
       addOneSegment(RESOURCE_NAME_BALANCED);
@@ -172,7 +166,7 @@ public class TestSegmentAssignmentStrategy {
   }
 
   private void addOneSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName, "testTable");
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
     _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }

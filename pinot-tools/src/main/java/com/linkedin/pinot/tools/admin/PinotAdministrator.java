@@ -27,7 +27,6 @@ import org.kohsuke.args4j.spi.SubCommands;
 import com.linkedin.pinot.tools.admin.command.Command;
 import com.linkedin.pinot.tools.admin.command.CreateResourceCommand;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
-import com.linkedin.pinot.tools.admin.command.CreateTableCommand;
 import com.linkedin.pinot.tools.admin.command.GenerateDataCommand;
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
 import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
@@ -37,6 +36,7 @@ import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
 import com.linkedin.pinot.tools.admin.command.UploadDataCommand;
 
+
 /**
  * Class to implement Pinot Administrator, that provides the following commands:
  *
@@ -44,24 +44,23 @@ import com.linkedin.pinot.tools.admin.command.UploadDataCommand;
  */
 public class PinotAdministrator {
   // @formatter:off
-  @Argument(handler = SubCommandHandler.class, metaVar="<subCommand>")
+  @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
-    @SubCommand(name = "GenerateData",    impl = GenerateDataCommand.class),
-    @SubCommand(name = "CreateSegment",   impl = CreateSegmentCommand.class),
-    @SubCommand(name = "CreateResource",  impl = CreateResourceCommand.class),
-    @SubCommand(name = "CreateTable",     impl = CreateTableCommand.class),
-    @SubCommand(name = "StartServer",     impl = StartServerCommand.class),
-    @SubCommand(name = "StartBroker",     impl = StartBrokerCommand.class),
-    @SubCommand(name = "StartController", impl = StartControllerCommand.class),
-    @SubCommand(name = "UploadData",      impl = UploadDataCommand.class),
-    @SubCommand(name = "PostQuery",       impl = PostQueryCommand.class),
-    @SubCommand(name = "StartZookeeper",  impl = StartZookeeperCommand.class),
-    @SubCommand(name = "StopProcess",     impl = StopProcessCommand.class)
+      @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
+      @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
+      @SubCommand(name = "CreateResource", impl = CreateResourceCommand.class),
+      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
+      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
+      @SubCommand(name = "StartController", impl = StartControllerCommand.class),
+      @SubCommand(name = "UploadData", impl = UploadDataCommand.class),
+      @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
+      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
+      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class)
   })
   Command _subCommand;
   // @formatter:on
 
-  @Option(name="-help", required=false, help=true)
+  @Option(name = "-help", required = false, help = true)
   boolean help = false;
 
   public void execute(String[] args) throws Exception {
@@ -91,13 +90,13 @@ public class PinotAdministrator {
     System.out.println("Usage: pinot-admin.sh <subCommand>");
     System.out.println("Valid subCommands are:");
 
-    Class <PinotAdministrator> obj = PinotAdministrator.class;
+    Class<PinotAdministrator> obj = PinotAdministrator.class;
 
     for (Field f : obj.getDeclaredFields()) {
       if (f.isAnnotationPresent(SubCommands.class)) {
         SubCommands subCommands = f.getAnnotation(SubCommands.class);
 
-        for(SubCommand subCommand : subCommands.value()) {
+        for (SubCommand subCommand : subCommands.value()) {
           System.out.println("\t" + subCommand.name());
         }
       }

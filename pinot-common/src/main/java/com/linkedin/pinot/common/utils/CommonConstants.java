@@ -64,7 +64,6 @@ public class CommonConstants {
     public static class DataSource {
       public static final String RESOURCE_NAME = "resourceName";
       public static final String RESOURCE_TYPE = "resourceType";
-      public static final String TABLE_NAME = "tableName";
       public static final String TIME_COLUMN_NAME = "timeColumnName";
       public static final String TIME_TYPE = "timeType";
       public static final String NUMBER_OF_DATA_INSTANCES = "numberOfDataInstances";
@@ -140,8 +139,6 @@ public class CommonConstants {
       public static final String EXPAND_DATA_RESOURCE = "expandDataResource";
       public static final String UPDATE_DATA_RESOURCE_CONFIG = "updateDataResourceConfig";
       public static final String UPDATE_BROKER_RESOURCE = "updateBrokerResource";
-      public static final String ADD_TABLE_TO_RESOURCE = "addTableToResource";
-      public static final String REMOVE_TABLE_FROM_RESOURCE = "removeTableFromResource";
     }
 
     public static class Instance {
@@ -233,7 +230,6 @@ public class CommonConstants {
 
     public static final String SEGMENT_NAME = "segment.name";
     public static final String RESOURCE_NAME = "segment.resource.name";
-    public static final String TABLE_NAME = "segment.table.name";
     public static final String SEGMENT_TYPE = "segment.type";
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String START_TIME = "segment.start.time";

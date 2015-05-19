@@ -52,7 +52,7 @@ public class HelixStarterTest {
     INDEX_DIR.mkdirs();
   }
 
-  private void setupSegment(File segmentDir, String resourceName, String tableName) throws Exception {
+  private void setupSegment(File segmentDir, String resourceName) throws Exception {
     System.out.println(getClass().getClassLoader().getResource(AVRO_DATA));
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
@@ -62,7 +62,7 @@ public class HelixStarterTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, TimeUnit.DAYS,
-            resourceName, tableName);
+            resourceName);
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -83,13 +83,13 @@ public class HelixStarterTest {
     final DataManager instanceDataManager = serverInstance.getInstanceDataManager();
     final File segmentDir0 = new File(INDEX_DIR.getAbsolutePath() + "/segment0");
     System.out.println(segmentDir0);
-    setupSegment(segmentDir0, "mirror", "testTable");
+    setupSegment(segmentDir0, "mirror");
     final File segmentDir1 = new File(INDEX_DIR.getAbsolutePath() + "/segment1");
     System.out.println(segmentDir1);
-    setupSegment(segmentDir1, "resource0", "testTable");
+    setupSegment(segmentDir1, "resource0");
     final File segmentDir2 = new File(INDEX_DIR.getAbsolutePath() + "/segment2");
     System.out.println(segmentDir2);
-    setupSegment(segmentDir2, "resource1", "testTable");
+    setupSegment(segmentDir2, "resource1");
 
     instanceDataManager.addSegment(_columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segmentDir0
         .listFiles()[0].getAbsolutePath()));

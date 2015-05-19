@@ -40,20 +40,19 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 
 
 public class SegmentTestUtils {
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      String timeColumn, TimeUnit timeUnit, String clusterName, String tableName) throws FileNotFoundException,
+      String timeColumn, TimeUnit timeUnit, String clusterName) throws FileNotFoundException,
       IOException {
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
@@ -63,7 +62,6 @@ public class SegmentTestUtils {
     segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setResourceName(clusterName);
-    segmentGenSpec.setTableName(tableName);
     segmentGenSpec.setIndexOutputDir(outputDir.getAbsolutePath());
     return segmentGenSpec;
   }

@@ -55,7 +55,7 @@ public class TestBitmapInvertedIndex {
     int docId = 0;
     while (reader.hasNext()) {
       final GenericRecord rec = reader.next();
-      for (final String column : ((SegmentMetadataImpl)heapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+      for (final String column : ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
         Object entry = rec.get(column);
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();
@@ -87,7 +87,7 @@ public class TestBitmapInvertedIndex {
     int docId = 0;
     while (reader.hasNext()) {
       final GenericRecord rec = reader.next();
-      for (final String column : ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+      for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
         Object entry = rec.get(column);
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();
@@ -123,7 +123,7 @@ public class TestBitmapInvertedIndex {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
-            TimeUnit.DAYS, "test", "testTable");
+            TimeUnit.DAYS, "test");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);

@@ -89,7 +89,6 @@ public class V1Constants {
     public static class Segment {
       public static final String SEGMENT_NAME = "segment.name";
       public static final String RESOURCE_NAME = "segment.resource.name";
-      public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
       public static final String UNKNOWN_COLUMNS = "segment.unknown.column.names";

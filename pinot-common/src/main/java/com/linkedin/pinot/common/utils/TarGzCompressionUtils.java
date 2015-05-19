@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TarGzCompressionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
+  private static final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
 
   /**
    * Creates a tar.gz file at the specified path with the contents of the
@@ -56,15 +57,18 @@ public class TarGzCompressionUtils {
    *          The path to the directory to create an archive of
    * @param archivePath
    *          The path to the archive to create
-   *
+   * @return tarGzPath
    * @throws IOException
    *           If anything goes wrong
    */
-  public static void createTarGzOfDirectory(String directoryPath, String tarGzPath) throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath) throws IOException {
     FileOutputStream fOut = null;
     BufferedOutputStream bOut = null;
     GzipCompressorOutputStream gzOut = null;
     TarArchiveOutputStream tOut = null;
+    if (!tarGzPath.endsWith(TAR_GZ_FILE_EXTENTION)) {
+      tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENTION;
+    }
 
     try {
       fOut = new FileOutputStream(new File(tarGzPath));
@@ -81,6 +85,16 @@ public class TarGzCompressionUtils {
       bOut.close();
       fOut.close();
     }
+    return tarGzPath;
+  }
+
+  public static String createTarGzOfDirectory(String directoryPath) throws IOException {
+    String tarGzPath = directoryPath.substring(0);
+    while (tarGzPath.endsWith("/")) {
+      tarGzPath = tarGzPath.substring(0, tarGzPath.length() - 1);
+    }
+    tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENTION;
+    return createTarGzOfDirectory(directoryPath, tarGzPath);
   }
 
   /**

@@ -137,11 +137,10 @@ public class ValidationMetrics {
    * Updates the gauge for the number of missing segments.
    *
    * @param resource The resource for which the gauge is updated
-   * @param tableName The table name for which the gauge is updated
    * @param missingSegmentCount The number of missing segments
    */
-  public void updateMissingSegmentsGauge(final String resource, final String tableName, final int missingSegmentCount) {
-    final String fullGaugeName = makeGaugeName(resource, tableName, "missingSegmentCount");
+  public void updateMissingSegmentsGauge(final String resource, final int missingSegmentCount) {
+    final String fullGaugeName = makeGaugeName(resource, "missingSegmentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, missingSegmentCount);
   }
 
@@ -149,14 +148,13 @@ public class ValidationMetrics {
    * Updates the gauge for the offline segment delay.
    *
    * @param resource The resource for which the gauge is updated
-   * @param tableName The table name for which the gauge is updated
    * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or Long.MIN_VALUE
    *                               if there is no such time.
    */
-  public void updateOfflineSegmentDelayGauge(final String resource, final String tableName, final long lastOfflineSegmentTime) {
-    final String fullGaugeName = makeGaugeName(resource, tableName, "offlineSegmentDelayMillis");
+  public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
+    final String fullGaugeName = makeGaugeName(resource, "offlineSegmentDelayMillis");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastOfflineSegmentTime);
-    final String fullGaugeNameHours = makeGaugeName(resource, tableName, "offlineSegmentDelayHours");
+    final String fullGaugeNameHours = makeGaugeName(resource, "offlineSegmentDelayHours");
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastOfflineSegmentTime);
   }
 
@@ -164,19 +162,18 @@ public class ValidationMetrics {
    * Updates the gauge for the last push time.
    *
    * @param resource The resource for which the gauge is updated
-   * @param tableName The table name for which the gauge is updated
    * @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
    *                           such time.
    */
-  public void updateLastPushTimeGauge(final String resource, final String tableName, final long lastPushTimeMillis) {
-    final String fullGaugeName = makeGaugeName(resource, tableName, "lastPushTimeDelayMillis");
+  public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
+    final String fullGaugeName = makeGaugeName(resource, "lastPushTimeDelayMillis");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastPushTimeMillis);
-    final String fullGaugeNameHours = makeGaugeName(resource, tableName, "lastPushTimeDelayHours");
+    final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
 
-  private String makeGaugeName(final String resource, final String tableName, final String gaugeName) {
-    return "pinot.controller." + resource + "." + tableName + "." + gaugeName;
+  private String makeGaugeName(final String resource, final String gaugeName) {
+    return "pinot.controller." + resource + "." + gaugeName;
   }
 
   private MetricName makeMetricName(final String gaugeName) {

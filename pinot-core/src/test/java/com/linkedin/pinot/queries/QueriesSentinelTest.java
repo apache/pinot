@@ -248,7 +248,7 @@ public class QueriesSentinelTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
-            "segment"), "daysSinceEpoch", TimeUnit.DAYS, resource, resource);
+            "segment"), "daysSinceEpoch", TimeUnit.DAYS, resource);
 
     final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 

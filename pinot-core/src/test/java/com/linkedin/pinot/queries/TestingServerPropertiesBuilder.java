@@ -63,7 +63,7 @@ public class TestingServerPropertiesBuilder {
   pinot.server.instance.segment.metadata.loader.class=com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader
 
   # query executor parameters
-  pinot.server.query.executor.pruner.class=TimeSegmentPruner,DataSchemaSegmentPruner,TableNameSegmentPruner
+  pinot.server.query.executor.pruner.class=TimeSegmentPruner,DataSchemaSegmentPruner
   pinot.server.query.executor.pruner.TimeSegmentPruner.id=0
   pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id=1
   pinot.server.query.executor.class=com.linkedin.pinot.core.query.executor.ServerQueryExecutor
@@ -110,8 +110,6 @@ public class TestingServerPropertiesBuilder {
       config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, resource, "numQueryExecutorThreads"), "50");
     }
 
-    config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "pruner.class"),
-        "TableNameSegmentPruner");
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "class"),
         "com.linkedin.pinot.core.query.executor.ServerQueryExecutor");
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "timeout"), "150000");

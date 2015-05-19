@@ -72,7 +72,6 @@ public class TestRetentionManager {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private String _testResourceName = "testResource";
-  private String _testTableName = "testTable";
 
   private RetentionManager _retentionManager;
 
@@ -90,7 +89,7 @@ public class TestRetentionManager {
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     _helixZkManager = _pinotHelixResourceManager.getHelixZkManager();
     DataResource dataResource =
-        new DataResource("create", _testResourceName, Helix.ResourceType.OFFLINE.toString(), _testTableName,
+        new DataResource("create", _testResourceName, Helix.ResourceType.OFFLINE.toString(),
             "timestamp", "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy",
             "broker_" + _testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
@@ -419,7 +418,6 @@ public class TestRetentionManager {
         ret.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, getResourceName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
         ret.put(V1Constants.VERSION, getVersion());
-        ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");
@@ -448,11 +446,6 @@ public class TestRetentionManager {
       @Override
       public Duration getTimeGranularity() {
         return _timeGranularity;
-      }
-
-      @Override
-      public String getTableName() {
-        return "testTable";
       }
 
       @Override

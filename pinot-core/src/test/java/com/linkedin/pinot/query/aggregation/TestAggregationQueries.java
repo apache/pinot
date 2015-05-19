@@ -111,7 +111,7 @@ public class TestAggregationQueries {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
-            TimeUnit.DAYS, "test", "testTable");
+            TimeUnit.DAYS, "test");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -136,7 +136,7 @@ public class TestAggregationQueries {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day",
-              TimeUnit.DAYS, "test", "testTable");
+              TimeUnit.DAYS, "test");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);

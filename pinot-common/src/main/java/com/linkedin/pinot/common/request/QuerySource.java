@@ -33,7 +33,8 @@ import javax.annotation.Generated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@SuppressWarnings({"cast", "rawtypes", "serial", "unchecked"})
+
+@SuppressWarnings({ "cast", "rawtypes", "serial", "unchecked" })
 /**
  * AUTO GENERATED: DO NOT EDIT
  * Query source
@@ -43,9 +44,8 @@ import org.slf4j.LoggerFactory;
 public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySource._Fields>, java.io.Serializable, Cloneable, Comparable<QuerySource> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("QuerySource");
 
-  private static final org.apache.thrift.protocol.TField RESOURCE_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("resourceName", org.apache.thrift.protocol.TType.STRING, (short)1);
-  private static final org.apache.thrift.protocol.TField TABLE_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("tableName", org.apache.thrift.protocol.TType.STRING, (short)2);
-
+  private static final org.apache.thrift.protocol.TField RESOURCE_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("resourceName", org.apache.thrift.protocol.TType.STRING,
+      (short) 1);
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new QuerySourceStandardSchemeFactory());
@@ -53,12 +53,11 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
   }
 
   private String resourceName; // optional
-  private String tableName; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    RESOURCE_NAME((short)1, "resourceName"),
-    TABLE_NAME((short)2, "tableName");
+    RESOURCE_NAME((short) 1, "resourceName"),
+    TABLE_NAME((short) 2, "tableName");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -72,7 +71,7 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // RESOURCE_NAME
           return RESOURCE_NAME;
         case 2: // TABLE_NAME
@@ -88,7 +87,8 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -117,13 +117,13 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
   }
 
   // isset id assignments
-  private static final _Fields optionals[] = {_Fields.RESOURCE_NAME,_Fields.TABLE_NAME};
+  private static final _Fields optionals[] = { _Fields.RESOURCE_NAME, _Fields.TABLE_NAME };
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.RESOURCE_NAME, new org.apache.thrift.meta_data.FieldMetaData("resourceName", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.RESOURCE_NAME, new org.apache.thrift.meta_data.FieldMetaData("resourceName", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.TABLE_NAME, new org.apache.thrift.meta_data.FieldMetaData("tableName", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.TABLE_NAME, new org.apache.thrift.meta_data.FieldMetaData("tableName", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(QuerySource.class, metaDataMap);
@@ -139,9 +139,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     if (other.isSetResourceName()) {
       this.resourceName = other.resourceName;
     }
-    if (other.isSetTableName()) {
-      this.tableName = other.tableName;
-    }
   }
 
   public QuerySource deepCopy() {
@@ -151,7 +148,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
   @Override
   public void clear() {
     this.resourceName = null;
-    this.tableName = null;
   }
 
   public String getResourceName() {
@@ -177,58 +173,22 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     }
   }
 
-  public String getTableName() {
-    return this.tableName;
-  }
-
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
-  }
-
-  public void unsetTableName() {
-    this.tableName = null;
-  }
-
-  /** Returns true if field tableName is set (has been assigned a value) and false otherwise */
-  public boolean isSetTableName() {
-    return this.tableName != null;
-  }
-
-  public void setTableNameIsSet(boolean value) {
-    if (!value) {
-      this.tableName = null;
-    }
-  }
-
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case RESOURCE_NAME:
-      if (value == null) {
-        unsetResourceName();
-      } else {
-        setResourceName((String)value);
-      }
-      break;
-
-    case TABLE_NAME:
-      if (value == null) {
-        unsetTableName();
-      } else {
-        setTableName((String)value);
-      }
-      break;
-
+      case RESOURCE_NAME:
+        if (value == null) {
+          unsetResourceName();
+        } else {
+          setResourceName((String) value);
+        }
+        break;
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case RESOURCE_NAME:
-      return getResourceName();
-
-    case TABLE_NAME:
-      return getTableName();
-
+      case RESOURCE_NAME:
+        return getResourceName();
     }
     throw new IllegalStateException();
   }
@@ -240,10 +200,8 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     }
 
     switch (field) {
-    case RESOURCE_NAME:
-      return isSetResourceName();
-    case TABLE_NAME:
-      return isSetTableName();
+      case RESOURCE_NAME:
+        return isSetResourceName();
     }
     throw new IllegalStateException();
   }
@@ -253,7 +211,7 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     if (that == null)
       return false;
     if (that instanceof QuerySource)
-      return this.equals((QuerySource)that);
+      return this.equals((QuerySource) that);
     return false;
   }
 
@@ -269,16 +227,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
       if (!this.resourceName.equals(that.resourceName))
         return false;
     }
-
-    boolean this_present_tableName = true && this.isSetTableName();
-    boolean that_present_tableName = true && that.isSetTableName();
-    if (this_present_tableName || that_present_tableName) {
-      if (!(this_present_tableName && that_present_tableName))
-        return false;
-      if (!this.tableName.equals(that.tableName))
-        return false;
-    }
-
     return true;
   }
 
@@ -290,12 +238,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     list.add(present_resourceName);
     if (present_resourceName)
       list.add(resourceName);
-
-    boolean present_tableName = true && (isSetTableName());
-    list.add(present_tableName);
-    if (present_tableName)
-      list.add(tableName);
-
     return list.hashCode();
   }
 
@@ -313,16 +255,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
     }
     if (isSetResourceName()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.resourceName, other.resourceName);
-      if (lastComparison != 0) {
-        return lastComparison;
-      }
-    }
-    lastComparison = Boolean.valueOf(isSetTableName()).compareTo(other.isSetTableName());
-    if (lastComparison != 0) {
-      return lastComparison;
-    }
-    if (isSetTableName()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tableName, other.tableName);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -353,16 +285,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
         sb.append("null");
       } else {
         sb.append(this.resourceName);
-      }
-      first = false;
-    }
-    if (isSetTableName()) {
-      if (!first) sb.append(", ");
-      sb.append("tableName:");
-      if (this.tableName == null) {
-        sb.append("null");
-      } else {
-        sb.append(this.tableName);
       }
       first = false;
     }
@@ -405,7 +327,7 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -413,15 +335,7 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.resourceName = iprot.readString();
               struct.setResourceNameIsSet(true);
-            } else { 
-              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-            }
-            break;
-          case 2: // TABLE_NAME
-            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.tableName = iprot.readString();
-              struct.setTableNameIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -442,13 +356,6 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
         if (struct.isSetResourceName()) {
           oprot.writeFieldBegin(RESOURCE_NAME_FIELD_DESC);
           oprot.writeString(struct.resourceName);
-          oprot.writeFieldEnd();
-        }
-      }
-      if (struct.tableName != null) {
-        if (struct.isSetTableName()) {
-          oprot.writeFieldBegin(TABLE_NAME_FIELD_DESC);
-          oprot.writeString(struct.tableName);
           oprot.writeFieldEnd();
         }
       }
@@ -473,15 +380,9 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
       if (struct.isSetResourceName()) {
         optionals.set(0);
       }
-      if (struct.isSetTableName()) {
-        optionals.set(1);
-      }
-      oprot.writeBitSet(optionals, 2);
+      oprot.writeBitSet(optionals, 1);
       if (struct.isSetResourceName()) {
         oprot.writeString(struct.resourceName);
-      }
-      if (struct.isSetTableName()) {
-        oprot.writeString(struct.tableName);
       }
     }
 
@@ -493,12 +394,7 @@ public class QuerySource implements org.apache.thrift.TBase<QuerySource, QuerySo
         struct.resourceName = iprot.readString();
         struct.setResourceNameIsSet(true);
       }
-      if (incoming.get(1)) {
-        struct.tableName = iprot.readString();
-        struct.setTableNameIsSet(true);
-      }
     }
   }
 
 }
-

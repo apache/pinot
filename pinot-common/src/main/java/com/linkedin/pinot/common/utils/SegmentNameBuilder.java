@@ -27,40 +27,36 @@ import com.google.common.collect.Lists;
 
 public class SegmentNameBuilder {
 
-  public static String buildBasic(String resourceName, String tableName, Object minTimeValue, Object maxTimeValue,
+  public static String buildBasic(String resourceName, Object minTimeValue, Object maxTimeValue,
       String prefix) {
-    return StringUtil.join("_", resourceName, tableName, minTimeValue.toString(), maxTimeValue.toString(), prefix);
+    return StringUtil.join("_", resourceName, minTimeValue.toString(), maxTimeValue.toString(), prefix);
   }
 
-  public static String buildBasic(String resourceName, String tableName, String prefix) {
-    return StringUtil.join("_", resourceName, tableName, prefix);
+  public static String buildBasic(String resourceName, String prefix) {
+    return StringUtil.join("_", resourceName, prefix);
   }
 
   public static class Realtime {
-    public static String build(String resourceName, String tableName, String insatanceName, String groupId,
+    public static String build(String resourceName, String insatanceName, String groupId,
         String partitionId, String sequenceNumber) {
       return StringUtils.join(
-          Lists.newArrayList(resourceName, tableName, insatanceName, groupId, partitionId, sequenceNumber), "__");
+          Lists.newArrayList(resourceName, insatanceName, groupId, partitionId, sequenceNumber), "__");
     }
 
     public static String extractResourceName(String segmentId) {
       return segmentId.split("__")[0];
     }
 
-    public static String extractTableName(String segmentId) {
+    public static String extractInstanceName(String segmentId) {
       return segmentId.split("__")[1];
     }
 
-    public static String extractInstanceName(String segmentId) {
+    public static String extractGroupIdName(String segmentId) {
       return segmentId.split("__")[2];
     }
 
-    public static String extractGroupIdName(String segmentId) {
-      return segmentId.split("__")[3];
-    }
-
     public static String extractPartitionName(String segmentId) {
-      return segmentId.split("__")[4];
+      return segmentId.split("__")[3];
     }
 
   }

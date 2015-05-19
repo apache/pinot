@@ -297,7 +297,6 @@ public class RealtimeQueriesSentinelTest {
   private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
     realtimeSegmentZKMetadata.setResourceName("mirror");
-    realtimeSegmentZKMetadata.setTableName("mirror");
     return realtimeSegmentZKMetadata;
   }
 

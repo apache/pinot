@@ -66,7 +66,7 @@ public class TestIntArrays {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.DAYS, "test", "testTable");
+            TimeUnit.DAYS, "test");
     config.setTimeColumnName("daysSinceEpoch");
     driver.init(config);
     driver.build();

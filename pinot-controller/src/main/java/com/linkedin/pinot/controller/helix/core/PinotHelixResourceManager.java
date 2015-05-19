@@ -425,137 +425,6 @@ public class PinotHelixResourceManager {
 
   }
 
-  public synchronized PinotResourceManagerResponse handleAddTableToDataResource(DataResource resource) {
-    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
-    boolean isSuccess = false;
-    switch (resource.getResourceType()) {
-      case OFFLINE:
-        isSuccess = addTableToOfflineDataResource(resource.getResourceName(), resource.getTableName());
-        break;
-      case REALTIME:
-        isSuccess = addTableToRealtimeDataResource(resource.getResourceName(), resource.getTableName());
-        break;
-      case HYBRID:
-        isSuccess =
-            addTableToOfflineDataResource(resource.getResourceName(), resource.getTableName())
-                && addTableToRealtimeDataResource(resource.getResourceName(), resource.getTableName());
-        break;
-
-      default:
-        resp.status = STATUS.failure;
-        resp.errorMessage = String.format("ResourceType is not valid : (%s)!", resource.getResourceType());
-        return resp;
-    }
-
-    if (isSuccess) {
-      resp.status = STATUS.success;
-      resp.errorMessage =
-          String.format("Adding table name (%s) to resource (%s)", resource.getTableName(), resource.getResourceName());
-      return resp;
-    } else {
-      resp.status = STATUS.failure;
-      resp.errorMessage =
-          String.format("Table name (%s) is already existed in resource (%s)", resource.getTableName(),
-              resource.getResourceName());
-      return resp;
-    }
-  }
-
-  private boolean addTableToRealtimeDataResource(String resourceName, String tableName) {
-    RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
-        ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
-    List<String> tableList = realtimeDataResourceZKMetadata.getTableList();
-    if (!tableList.contains(tableName)) {
-      realtimeDataResourceZKMetadata.addToTableList(tableName);
-      ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
-      return true;
-    }
-    return false;
-  }
-
-  private boolean addTableToOfflineDataResource(String resourceName, String tableName) {
-    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-        ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName);
-    List<String> tableList = offlineDataResourceZKMetadata.getTableList();
-    if (!tableList.contains(tableName)) {
-      offlineDataResourceZKMetadata.addToTableList(tableName);
-      ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
-      return true;
-    }
-    return false;
-  }
-
-  public synchronized PinotResourceManagerResponse handleRemoveTableFromDataResource(DataResource resource) {
-    return handleRemoveTableFromDataResource(resource.getResourceName(), resource.getTableName(), resource.getResourceType());
-  }
-
-  public synchronized PinotResourceManagerResponse handleRemoveTableFromDataResource(String resourceName, String tableName, ResourceType resourceType) {
-    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
-    boolean isSuccess = false;
-    switch (resourceType) {
-      case OFFLINE:
-        isSuccess =
-            removeTableToOfflineDataResource(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), tableName);
-        break;
-      case REALTIME:
-        isSuccess =
-            removeTableToRealtimeDataResource(BrokerRequestUtils.buildRealtimeResourceNameForResource(resourceName), tableName);
-        break;
-      case HYBRID:
-        isSuccess = removeTableToOfflineDataResource(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), tableName)
-            && removeTableToRealtimeDataResource(BrokerRequestUtils.buildRealtimeResourceNameForResource(resourceName), tableName);
-        break;
-
-      default:
-        resp.status = STATUS.failure;
-        resp.errorMessage = String.format("ResourceType is not valid : (%s)!", resourceType);
-        return resp;
-    }
-
-    if (isSuccess) {
-      resp.errorMessage = String.format("Removing table name (%s) from resource (%s)", tableName, resourceName);
-      return resp;
-    } else {
-      resp.status = STATUS.failure;
-      resp.errorMessage = String.format("Table name (%s) is not existed in resource (%s)", tableName, resourceName);
-      return resp;
-    }
-  }
-
-  private boolean removeTableToRealtimeDataResource(String resourceName, String tableName) {
-    RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
-        ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
-    List<String> tableList = realtimeDataResourceZKMetadata.getTableList();
-    if (tableList.contains(tableName)) {
-      tableList.remove(tableName);
-      realtimeDataResourceZKMetadata.setTableList(tableList);
-      ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
-      deleteSegmentsInTable(resourceName, tableName);
-      return true;
-    }
-    return false;
-  }
-
-  private boolean removeTableToOfflineDataResource(String resourceName, String tableName) {
-    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-        ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName);
-    List<String> tableList = offlineDataResourceZKMetadata.getTableList();
-    if (tableList.contains(tableName)) {
-      tableList.remove(tableName);
-      offlineDataResourceZKMetadata.setTableList(tableList);
-      ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
-      deleteSegmentsInTable(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), tableName);
-      return true;
-    }
-    return false;
-  }
-
-  private void deleteSegmentsInTable(String resourceName, String tableName) {
-    for (String segmentId : getAllSegmentsForTable(resourceName, tableName)) {
-      deleteSegment(resourceName, segmentId);
-    }
-  }
-
   /**
    * Handle update data resource config will require full configs to be updated. 
    *  
@@ -753,33 +622,24 @@ public class PinotHelixResourceManager {
   /*
    *  fetch list of segments assigned to a give resource from ideal state
    */
-  public Set<String> getAllSegmentsForResource(String resource) {
-    final IdealState state = HelixHelper.getResourceIdealState(_helixZkManager, resource);
-    return state.getPartitionSet();
-  }
-
-  public List<String> getAllSegmentsForTable(String resourceName, String tableName) {
-    List<String> segmentsInTable = new ArrayList<String>();
+  public List<String> getAllSegmentsForResource(String resourceName) {
+    List<String> segmentsInResource = new ArrayList<String>();
     switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
       case REALTIME:
         for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getRealtimeResourceZKMetadataListForResource(getPropertyStore(), resourceName)) {
-          if (segmentZKMetadata.getTableName().equals(tableName)) {
-            segmentsInTable.add(segmentZKMetadata.getSegmentName());
-          }
+          segmentsInResource.add(segmentZKMetadata.getSegmentName());
         }
 
         break;
       case OFFLINE:
         for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(getPropertyStore(), resourceName)) {
-          if (segmentZKMetadata.getTableName().equals(tableName)) {
-            segmentsInTable.add(segmentZKMetadata.getSegmentName());
-          }
+          segmentsInResource.add(segmentZKMetadata.getSegmentName());
         }
         break;
       default:
         break;
     }
-    return segmentsInTable;
+    return segmentsInResource;
   }
 
   /**
@@ -793,11 +653,11 @@ public class PinotHelixResourceManager {
 
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
-      if (!matchResourceAndTableName(segmentMetadata)) {
+      if (!matchResourceName(segmentMetadata)) {
         res.status = STATUS.failure;
         res.errorMessage =
-            "Reject segment: resource name and table name are not registered." + " Resource name: "
-                + segmentMetadata.getResourceName() + ", Table name: " + segmentMetadata.getTableName() + "\n";
+            "Reject segment: resource name is not registered." + " Resource name: "
+                + segmentMetadata.getResourceName() + "\n";
         return res;
       }
       if (ifSegmentExisted(segmentMetadata)) {
@@ -972,47 +832,24 @@ public class PinotHelixResourceManager {
     return true;
   }
 
-  private boolean matchResourceAndTableName(SegmentMetadata segmentMetadata) {
-    if (segmentMetadata == null || segmentMetadata.getResourceName() == null || segmentMetadata.getTableName() == null) {
-      LOGGER.error("SegmentMetadata or resource name or table name is null");
+  private boolean matchResourceName(SegmentMetadata segmentMetadata) {
+    if (segmentMetadata == null || segmentMetadata.getResourceName() == null) {
+      LOGGER.error("SegmentMetadata or resource name is null");
       return false;
     }
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
       if (getAllResourceNames().contains(
           BrokerRequestUtils.buildRealtimeResourceNameForResource(segmentMetadata.getResourceName()))) {
-        if (getAllTableNamesForResource(
-            BrokerRequestUtils.buildRealtimeResourceNameForResource(segmentMetadata.getResourceName())).contains(
-            segmentMetadata.getTableName())) {
-          return true;
-        }
+        return true;
+      }
+    } else {
+      if (getAllResourceNames().contains(
+          BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName()))) {
+        return true;
       }
     }
-    if (!getAllResourceNames().contains(
-        BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName()))) {
-      LOGGER.error("Resource is not registered");
-      return false;
-    }
-    if (!getAllTableNamesForResource(
-        BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName())).contains(
-        segmentMetadata.getTableName())) {
-      LOGGER.error("Table " + segmentMetadata.getTableName() + " is not registered for resource: "
-          + segmentMetadata.getResourceName());
-      return false;
-    }
-    return true;
-  }
-
-  private Set<String> getAllTableNamesForResource(String resourceName) {
-    final Set<String> tableNameSet = new HashSet<String>();
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
-      tableNameSet.addAll(ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName).getTableList());
-    }
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      tableNameSet.addAll(ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName).getTableList());
-    }
-    LOGGER.info("Current holding tables for resource: " + resourceName + " is "
-        + Arrays.toString(tableNameSet.toArray(new String[0])));
-    return tableNameSet;
+    LOGGER.error("Resource {} is not registered", segmentMetadata.getResourceName());
+    return false;
   }
 
   public synchronized PinotResourceManagerResponse addInstance(Instance instance) {

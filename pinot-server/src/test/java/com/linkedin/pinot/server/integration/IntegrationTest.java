@@ -117,7 +117,7 @@ public class IntegrationTest {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim" + i,
-              TimeUnit.DAYS, "midas", "testTable");
+              TimeUnit.DAYS, "midas");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -138,12 +138,11 @@ public class IntegrationTest {
     brokerRequest.setFilterQueryIsSet(false);
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     List<String> searchSegments = new ArrayList<String>();
-    searchSegments.add("midas_testTable_0_9_");
-    instanceRequest.setSearchSegments(searchSegments );
+    searchSegments.add("midas_0_9_");
+    instanceRequest.setSearchSegments(searchSegments);
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getLong(0, 0));
@@ -161,7 +160,6 @@ public class IntegrationTest {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addMidasSearchSegmentsToInstanceRequest(instanceRequest);
@@ -186,7 +184,6 @@ public class IntegrationTest {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addMidasSearchSegmentsToInstanceRequest(instanceRequest);
@@ -208,7 +205,6 @@ public class IntegrationTest {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addMidasSearchSegmentsToInstanceRequest(instanceRequest);
@@ -228,7 +224,6 @@ public class IntegrationTest {
 
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("midas");
-    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     addMidasSearchSegmentsToInstanceRequest(instanceRequest);

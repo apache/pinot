@@ -16,8 +16,6 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
@@ -30,13 +28,14 @@ import org.restlet.resource.Get;
 import org.restlet.resource.Post;
 import org.restlet.resource.Put;
 import org.restlet.resource.ServerResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -48,7 +47,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
  * Sep 24, 2014
  *   sample curl call
  *  curl -i -X POST -H 'Content-Type: application/json' -d
-    '{"resourceName":"resourceName","tableName":"tableName","timeColumnName":"timeColumnName",
+    '{"resourceName":"resourceName","timeColumnName":"timeColumnName",
     "timeType":"timeType","numInstances":2,"numReplicas":3,"retentionTimeUnit":"retentionTimeUnit",
     "retentionTimeValue":"retentionTimeValue","pushFrequency":"pushFrequency"}'
     http://localhost:8998/resource
@@ -85,11 +84,6 @@ public class PinotDataResource extends ServerResource {
         presentation = new StringRepresentation(manager.handleUpdateDataResourceConfig(resource).toJSON().toString());
       } else if (resource.isBrokerResourceUpdate()) {
         presentation = new StringRepresentation(manager.handleUpdateBrokerResource(resource).toJSON().toString());
-      } else if (resource.isDataTableAdd()) {
-        presentation = new StringRepresentation(manager.handleAddTableToDataResource(resource).toJSON().toString());
-      } else if (resource.isDataTableRemove()) {
-        presentation =
-            new StringRepresentation(manager.handleRemoveTableFromDataResource(resource).toJSON().toString());
       } else {
         throw new RuntimeException("Not an updated request");
       }
@@ -107,38 +101,21 @@ public class PinotDataResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      final String tableName = (String) getRequest().getAttributes().get("tableName");
       String resourceRealtimeName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
       String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
-      if (tableName == null) {
-        String respString = "";
-        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), offlineResourceName) != null) {
-          PinotResourceManagerResponse offlineResp = manager.deleteResource(offlineResourceName);
-          respString += offlineResp.toJSON().toString() + "\n";
-        }
-        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), resourceRealtimeName) != null) {
-          PinotResourceManagerResponse realtimeResp = manager.deleteResource(resourceRealtimeName);
-          respString += realtimeResp.toJSON().toString() + "\n";
-        }
-        if (respString.length() < 1) {
-          respString = "No related resource found.\n";
-        }
-        presentation = new StringRepresentation(respString);
-      } else {
-        String respString = "";
-        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), offlineResourceName) != null) {
-          PinotResourceManagerResponse offlineResp = manager.handleRemoveTableFromDataResource(resourceName, tableName, ResourceType.OFFLINE);
-          respString += offlineResp.toJSON().toString() + "\n";
-        }
-        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), resourceRealtimeName) != null) {
-          PinotResourceManagerResponse realtimeResp = manager.handleRemoveTableFromDataResource(resourceName, tableName, ResourceType.REALTIME);
-          respString += realtimeResp.toJSON().toString() + "\n";
-        }
-        if (respString.length() < 1) {
-          respString = "No related resource found.\n";
-        }
-        presentation = new StringRepresentation(respString);
+      String respString = "";
+      if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), offlineResourceName) != null) {
+        PinotResourceManagerResponse offlineResp = manager.deleteResource(offlineResourceName);
+        respString += offlineResp.toJSON().toString() + "\n";
       }
+      if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), resourceRealtimeName) != null) {
+        PinotResourceManagerResponse realtimeResp = manager.deleteResource(resourceRealtimeName);
+        respString += realtimeResp.toJSON().toString() + "\n";
+      }
+      if (respString.length() < 1) {
+        respString = "No related resource found.\n";
+      }
+      presentation = new StringRepresentation(respString);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);

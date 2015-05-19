@@ -59,7 +59,7 @@ public class BitmapPerformanceBenchmark {
       BitmapInvertedIndexReader bitmapInvertedIndex = new BitmapInvertedIndexReader(file, cardinality, true);
       File dictionaryFile = new File(explodedIndexSegmentDir + "/" + column + ".dict");
       ColumnIndexContainer container =
-          ColumnIndexContainer.init(segmentMetadata.getTableName(), column, dictionaryFile.getParentFile(),
+          ColumnIndexContainer.init(column, dictionaryFile.getParentFile(),
               columnMetadata, null, ReadMode.heap);
       ImmutableDictionaryReader dictionary = container.getDictionary();
       if (columnMetadata.getDataType() == DataType.INT) {
