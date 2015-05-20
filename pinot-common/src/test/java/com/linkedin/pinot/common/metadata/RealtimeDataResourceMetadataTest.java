@@ -33,7 +33,7 @@ import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metadata.stream.StreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.StreamType;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 
@@ -72,7 +72,7 @@ public class RealtimeDataResourceMetadataTest {
     fieldMap.putAll(getTestKafkaStreamConfig());
     record.setSimpleFields(fieldMap);
     record.setSimpleField(Helix.DataSource.RESOURCE_NAME, "testResource");
-    record.setEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.REALTIME);
+    record.setEnumField(Helix.DataSource.RESOURCE_TYPE, TableType.REALTIME);
     List<String> sortedColumnList = new ArrayList<String>();
     sortedColumnList.add("sortColumn0");
     sortedColumnList.add("sortColumn1");

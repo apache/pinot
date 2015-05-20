@@ -148,7 +148,7 @@ public class CommonConstants {
       public static final String PARTITION_SUFFIX = "kafka.hlc.partition";
     }
 
-    public static enum ResourceType {
+    public static enum TableType {
       OFFLINE,
       REALTIME,
       HYBRID;

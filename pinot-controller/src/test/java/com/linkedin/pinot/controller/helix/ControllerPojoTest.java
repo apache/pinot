@@ -26,7 +26,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.StreamType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
@@ -39,7 +39,7 @@ public class ControllerPojoTest {
   public void realtimePojoTest() throws JSONException {
     BaseJsonNode metadataJson = getMetadataJson();
 
-    DataResource realtimeDataResource = new DataResource("create", "testResource0", ResourceType.OFFLINE.toString(),
+    DataResource realtimeDataResource = new DataResource("create", "testResource0", TableType.OFFLINE.toString(),
         "daysSinceEpoch", "daysSinceEpoch", 3, 2, "DAYS", "7", "daily", "BalanceNumSegmentAssignmentStrategy", "testBrokerTag",
         1, metadataJson);
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataUtils.getRealtimeDataResourceMetadata(realtimeDataResource);

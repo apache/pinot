@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.SegmentAssignmentStrategy;
 
 
@@ -49,7 +49,7 @@ public class OfflineDataResourceMetadataTest {
   private ZNRecord getTestZNRecord() {
     ZNRecord record = new ZNRecord("testResource_O");
     record.setSimpleField(Helix.DataSource.RESOURCE_NAME, "testResource");
-    record.setEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.OFFLINE);
+    record.setEnumField(Helix.DataSource.RESOURCE_TYPE, TableType.OFFLINE);
     List<String> sortedColumnList = new ArrayList<String>();
     sortedColumnList.add("sortColumn0");
     sortedColumnList.add("sortColumn1");

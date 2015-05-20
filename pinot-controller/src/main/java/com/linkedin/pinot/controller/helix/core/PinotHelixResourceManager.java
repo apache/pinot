@@ -42,6 +42,10 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -50,11 +54,12 @@ import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadat
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TenantRole;
@@ -205,7 +210,7 @@ public class PinotHelixResourceManager {
 
   public synchronized PinotResourceManagerResponse handleCreateNewDataResource(DataResource resource) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
-    ResourceType resourceType = null;
+    TableType resourceType = null;
     try {
       resourceType = resource.getResourceType();
     } catch (Exception e) {
@@ -249,7 +254,7 @@ public class PinotHelixResourceManager {
     final BrokerTagResource brokerTagResource =
         new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
     BrokerDataResource brokerDataResource;
-    ResourceType resourceType = resource.getResourceType();
+    TableType resourceType = resource.getResourceType();
     switch (resourceType) {
       case OFFLINE:
         brokerDataResource =
@@ -301,7 +306,7 @@ public class PinotHelixResourceManager {
   }
 
   private void revertDataResource(DataResource resource) {
-    ResourceType resourceType = resource.getResourceType();
+    TableType resourceType = resource.getResourceType();
     switch (resourceType) {
       case OFFLINE:
         revertDataResourceFor(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
@@ -330,7 +335,7 @@ public class PinotHelixResourceManager {
 
   public synchronized PinotResourceManagerResponse handleUpdateDataResource(DataResource resource) {
     try {
-      ResourceType resourceType = resource.getResourceType();
+      TableType resourceType = resource.getResourceType();
       String resourceName;
       switch (resourceType) {
         case OFFLINE:
@@ -618,7 +623,7 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), resourceTag);
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), resourceTag);
     // Remove groupId/PartitionId mapping for realtime resource type.
-    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceTag) == ResourceType.REALTIME) {
+    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceTag) == TableType.REALTIME) {
       for (String instance : taggedInstanceList) {
         InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instance);
         instanceZKMetadata.removeResource(resourceTag);
@@ -1187,7 +1192,7 @@ public class PinotHelixResourceManager {
     IdealState resourceIdealState =
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     for (String resourceName : resourceIdealState.getPartitionSet()) {
-      if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == ResourceType.OFFLINE) {
+      if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == TableType.OFFLINE) {
         String brokerTag =
             ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider.getOfflineResourceZKMetadata(
                 getPropertyStore(), resourceName).getBrokerTag());
@@ -1636,4 +1641,74 @@ public class PinotHelixResourceManager {
    * Table APIs
    */
 
+  public synchronized PinotResourceManagerResponse handleCreateNewDataResourceV2(DataResource resource) {
+    final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
+    TableType resourceType = null;
+    try {
+      resourceType = resource.getResourceType();
+    } catch (Exception e) {
+      res.errorMessage = "ResourceType has to be REALTIME/OFFLINE/HYBRID : " + e.getMessage();
+      res.status = STATUS.failure;
+      LOGGER.error(e.toString());
+      throw new RuntimeException("ResourceType has to be REALTIME/OFFLINE/HYBRID.", e);
+    }
+    try {
+      switch (resourceType) {
+        case OFFLINE:
+          _pinotHelixAdmin.createNewOfflineDataResource(resource);
+          handleBrokerResource(resource);
+          break;
+        case REALTIME:
+          _pinotHelixAdmin.createNewRealtimeDataResource(resource);
+          handleBrokerResource(resource);
+          break;
+        case HYBRID:
+          _pinotHelixAdmin.createNewOfflineDataResource(resource);
+          _pinotHelixAdmin.createNewRealtimeDataResource(resource);
+          handleBrokerResource(resource);
+          break;
+        default:
+          break;
+      }
+
+    } catch (final Exception e) {
+      res.errorMessage = e.getMessage();
+      res.status = STATUS.failure;
+      LOGGER.error("Caught exception while creating cluster with config " + resource.toString(), e);
+      revertDataResource(resource);
+      throw new RuntimeException("Error creating cluster, have successfull rolled back", e);
+    }
+    res.status = STATUS.success;
+    return res;
+  }
+
+  public void realtimeTableIdealState(Map<String, String> streamMap) {
+    KafkaStreamMetadata metadata = new KafkaStreamMetadata(streamMap);
+  }
+
+  public void addTable(AbstractTableConfig config) {
+    TenantConfig tenants = config.getTenantConfig();
+    if (tenants.getBroker() == null || tenants.getServer() == null) {
+      throw new RuntimeException("missing tenant configs");
+    }
+
+    SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
+    IndexingConfig indexingConfig = config.getIndexingConfig();
+
+    TableType type = TableType.valueOf(config.getTableName().toUpperCase());
+    IdealState state = null;
+    switch (type) {
+      case OFFLINE:
+        state =
+            PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(config.getTableName(),
+                Integer.parseInt(segmentsConfig.getReplication()), _helixAdmin, _helixClusterName);
+        break;
+      case REALTIME:
+        KafkaStreamMetadata metadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
+        break;
+      default:
+        throw new RuntimeException("UnSupported table type");
+    }
+
+  }
 }

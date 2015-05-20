@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
@@ -136,7 +136,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       _dataResourceSet.add(resourceName);
     }
     RoutingTableBuilder routingTableBuilder = null;
-    ResourceType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
+    TableType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
     if (resourceType != null) {
       switch (resourceType) {
         case REALTIME:

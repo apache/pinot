@@ -212,7 +212,7 @@ public class HelixBrokerStarterTest {
     props.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, "colocated");
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, "6");
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, CommonConstants.Helix.ResourceType.OFFLINE.name());
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, CommonConstants.Helix.TableType.OFFLINE.name());
     final DataResource res = DataResource.fromMap(props);
     return res;
   }

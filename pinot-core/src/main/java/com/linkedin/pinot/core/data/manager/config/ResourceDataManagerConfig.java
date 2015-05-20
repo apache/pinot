@@ -25,7 +25,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 /**
@@ -74,7 +74,7 @@ public class ResourceDataManagerConfig {
 
   public static ResourceDataManagerConfig getDefaultHelixResourceDataManagerConfig(
       InstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
-    ResourceType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
+    TableType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
 
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);

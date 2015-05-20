@@ -16,6 +16,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+
 
 public abstract class AbstractTableConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractTableConfig.class);
@@ -31,7 +33,7 @@ public abstract class AbstractTableConfig {
   protected AbstractTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
       TableCustomConfig customConfigs, Map<String, String> rawMap) {
-    this.tableName = tableName;
+    this.tableName = new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableName);
     this.tableType = tableType;
     this.validationConfig = validationConfig;
     this.tenantConfig = tenantConfig;
@@ -42,8 +44,9 @@ public abstract class AbstractTableConfig {
   public static AbstractTableConfig init(String jsonString) throws JSONException, JsonParseException,
       JsonMappingException, JsonProcessingException, IOException {
     JSONObject o = new JSONObject(jsonString);
-    String tableName = o.getString("tableName");
     String tableType = o.getString("tableType").toLowerCase();
+    String tableName =
+        new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(o.getString("tableName"));
     SegmentsValidationAndRetentionConfig validationConfig =
         loadSegmentsConfig(new ObjectMapper().readTree(o.getJSONObject("segmentsConfig").toString()));
     TenantConfig tenantConfig = loadTenantsConfig(new ObjectMapper().readTree(o.getJSONObject("tenants").toString()));
@@ -83,7 +86,7 @@ public abstract class AbstractTableConfig {
 
   public static ZNRecord toZnRecord(AbstractTableConfig config) throws JsonGenerationException, JsonMappingException,
       IOException {
-    ZNRecord rec = new ZNRecord(config.getTableName() + "_" + config.getTableType());
+    ZNRecord rec = new ZNRecord(config.getTableName());
     Map<String, String> map = config.getRawJSONMap();
     rec.setSimpleFields(map);
     return rec;

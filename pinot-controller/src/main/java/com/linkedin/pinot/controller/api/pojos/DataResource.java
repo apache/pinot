@@ -32,7 +32,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 /**
@@ -127,9 +127,9 @@ public class DataResource {
     return resourceName;
   }
 
-  public ResourceType getResourceType() {
+  public TableType getResourceType() {
     try {
-      return ResourceType.valueOf(resourceType);
+      return TableType.valueOf(resourceType);
     } catch (Exception ex) {
       LOGGER.warn("Caught exception", ex);
       return null;

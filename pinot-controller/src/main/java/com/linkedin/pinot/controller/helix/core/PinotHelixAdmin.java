@@ -169,9 +169,9 @@ public class PinotHelixAdmin {
    * @param resource
    */
   public void createNewDataResource(DataResource resource) {
-    if (resource.getResourceType() == Helix.ResourceType.OFFLINE) {
+    if (resource.getResourceType() == Helix.TableType.OFFLINE) {
       createNewOfflineDataResource(resource);
-    } else if (resource.getResourceType() == Helix.ResourceType.REALTIME) {
+    } else if (resource.getResourceType() == Helix.TableType.REALTIME) {
       createNewRealtimeDataResource(resource);
     } else {
       throw new UnsupportedOperationException("Hybrid Resource not supported.");

@@ -33,7 +33,7 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.utils.CommonConstants.Broker;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSourceRequestType;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
@@ -111,7 +111,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -130,7 +130,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.REALTIME.toString());
+    props.put(DataSource.RESOURCE_TYPE, TableType.REALTIME.toString());
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -149,7 +149,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.HYBRID.toString());
+    props.put(DataSource.RESOURCE_TYPE, TableType.HYBRID.toString());
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -168,7 +168,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_DATA_RESOURCE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
     props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
     return DataResource.fromMap(props);
@@ -178,7 +178,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_BROKER_RESOURCE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
     props.put(DataSource.BROKER_TAG_NAME, resourceName);
     props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
     return DataResource.fromMap(props);

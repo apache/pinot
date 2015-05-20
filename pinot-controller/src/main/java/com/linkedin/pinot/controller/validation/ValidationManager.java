@@ -36,7 +36,7 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -122,7 +122,7 @@ public class ValidationManager {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     for (String resourceName : allResourceNames) {
       // For each resource, fetch the metadata for all its segments
-      if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) != ResourceType.OFFLINE) {
+      if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) != TableType.OFFLINE) {
         continue;
       }
       List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(propertyStore, resourceName);

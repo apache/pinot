@@ -30,12 +30,12 @@ import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 public abstract class DataResourceZKMetadata implements ZKMetadata {
   private String _resourceName;
-  private ResourceType _resourceType = null;
+  private TableType _resourceType = null;
   private String _timeColumnName;
   private String _timeType;
   private int _numDataInstances;
@@ -55,7 +55,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
 
   public DataResourceZKMetadata(ZNRecord znRecord) {
     _resourceName = znRecord.getSimpleField(Helix.DataSource.RESOURCE_NAME);
-    _resourceType = znRecord.getEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.class, ResourceType.OFFLINE);
+    _resourceType = znRecord.getEnumField(Helix.DataSource.RESOURCE_TYPE, TableType.class, TableType.OFFLINE);
     _timeColumnName = znRecord.getSimpleField(Helix.DataSource.TIME_COLUMN_NAME);
     _timeType = znRecord.getSimpleField(Helix.DataSource.TIME_TYPE);
     _numDataInstances = znRecord.getIntField(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, -1);
@@ -79,11 +79,11 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     _resourceName = resourceName;
   }
 
-  public ResourceType getResourceType() {
+  public TableType getResourceType() {
     return _resourceType;
   }
 
-  protected void setResourceType(ResourceType resourceType) {
+  protected void setResourceType(TableType resourceType) {
     _resourceType = resourceType;
   }
 

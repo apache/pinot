@@ -291,7 +291,7 @@ public class PerfBenchmarkDriver {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.TableType.OFFLINE.toString());
     props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "daysSinceEpoch");
     props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "DAYS");
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));

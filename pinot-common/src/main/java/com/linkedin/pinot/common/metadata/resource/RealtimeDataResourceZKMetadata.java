@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.metadata.stream.StreamMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.StreamType;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
@@ -39,12 +39,12 @@ public final class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata
   private StreamMetadata _streamMetadata;
 
   public RealtimeDataResourceZKMetadata() {
-    setResourceType(ResourceType.REALTIME);
+    setResourceType(TableType.REALTIME);
   }
 
   public RealtimeDataResourceZKMetadata(ZNRecord znRecord) {
     super(znRecord);
-    setResourceType(ResourceType.REALTIME);
+    setResourceType(TableType.REALTIME);
     _streamType = znRecord.getEnumField(CommonConstants.Helix.DataSource.Realtime.STREAM_TYPE, StreamType.class, StreamType.kafka);
     _dataSchema = Schema.getSchemaFromMap(znRecord.getSimpleFields());
     switch (_streamType) {

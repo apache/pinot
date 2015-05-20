@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
@@ -55,7 +55,7 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     }
     String resourceName = externalView.getResourceName();
     // Do nothing for Realtime Resource.
-    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == ResourceType.REALTIME) {
+    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == TableType.REALTIME) {
       return;
     }
     Set<String> offlineSegmentsServing = externalView.getPartitionSet();

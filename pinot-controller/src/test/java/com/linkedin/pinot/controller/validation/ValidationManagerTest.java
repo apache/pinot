@@ -79,7 +79,7 @@ public class ValidationManagerTest {
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
 
     DataResource dataResource =
-        new DataResource("create", testResourceName, Helix.ResourceType.OFFLINE.toString(), "timestamp",
+        new DataResource("create", testResourceName, Helix.TableType.OFFLINE.toString(), "timestamp",
             "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy", "broker_"
                 + testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);

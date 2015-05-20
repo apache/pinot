@@ -19,7 +19,7 @@ import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
@@ -32,12 +32,12 @@ public final class OfflineDataResourceZKMetadata extends DataResourceZKMetadata 
   private String _segmentAssignmentStrategy = null;
 
   public OfflineDataResourceZKMetadata() {
-    setResourceType(ResourceType.OFFLINE);
+    setResourceType(TableType.OFFLINE);
   }
 
   public OfflineDataResourceZKMetadata(ZNRecord znRecord) {
     super(znRecord);
-    setResourceType(ResourceType.OFFLINE);
+    setResourceType(TableType.OFFLINE);
     setPushFrequency(znRecord.getSimpleField(CommonConstants.Helix.DataSource.PUSH_FREQUENCY));
     setSegmentAssignmentStrategy(znRecord.getSimpleField(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY));
   }
