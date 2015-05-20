@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.data.readers;
 
 import java.io.FileReader;
-import java.io.IOException;
 import java.io.Reader;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -26,8 +25,6 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringEscapeUtils;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -47,8 +44,7 @@ public class CSVRecordReader implements RecordReader {
   private Iterator<CSVRecord> _iterator = null;
   private Map<String, String> _env = null;
 
-  public CSVRecordReader(String dataFile, Schema schema) throws JsonParseException,
-    JsonMappingException, IOException {
+  public CSVRecordReader(String dataFile, Schema schema) {
     _fileName = dataFile;
 
     _schema = schema;
