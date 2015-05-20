@@ -25,6 +25,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -40,8 +42,13 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
+  private static final Logger _logger = LoggerFactory.getLogger(CreateSegmentCommand.class);
+
   @Option(name = "-dataDir", required = true, metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
+
+  @Option(name = "-format", required = false, metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
+  private FileFormat _format = FileFormat.AVRO;
 
   @Option(name = "-resourceName", required = true, metaVar = "<string>", usage = "Name of the resource.")
   private String _resourceName;
@@ -121,7 +128,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     File[] files = dir.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
-        return name.endsWith("avro");
+        return name.toLowerCase().endsWith(_format.toString().toLowerCase());
       }
     });
 
@@ -143,8 +150,11 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     if (_schemaFile != null) {
       File schemaFile = new File(_schemaFile);
       schema = new ObjectMapper().readValue(schemaFile, Schema.class);
-    } else {
+    } else if (_format == FileFormat.AVRO) {
       schema = AvroUtils.extractSchemaFromAvro(files[0]);
+    } else {
+      _logger.error("Error: Input format requires schema");
+      return false;
     }
 
     ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
@@ -159,16 +169,24 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
           try {
 
             SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-            config.setInputFileFormat(FileFormat.AVRO);
+            config.setInputFileFormat(_format);
             config.setSegmentVersion(SegmentVersion.v1);
 
             config.setIndexOutputDir(_outDir);
             config.setResourceName(_resourceName);
 
-            config.setTimeColumnName(schema.getTimeColumnName());
-            config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
             config.setInputFilePath(file.getAbsolutePath());
             config.setSegmentName(_segmentName + "_" + segCnt);
+
+            if (schema.getTimeColumnName() != null) {
+              config.setTimeColumnName(schema.getTimeColumnName());
+            }
+
+            if (schema.getTimeSpec() != null) {
+              config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
+            } else {
+              config.setTimeUnitForSegment(TimeUnit.DAYS);
+            }
 
             final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
             driver.init(config);

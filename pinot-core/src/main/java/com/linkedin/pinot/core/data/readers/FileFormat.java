@@ -18,5 +18,6 @@ package com.linkedin.pinot.core.data.readers;
 public enum FileFormat {
   AVRO,
   GZIPPED_AVRO,
+  CSV,
   JSON;
 }

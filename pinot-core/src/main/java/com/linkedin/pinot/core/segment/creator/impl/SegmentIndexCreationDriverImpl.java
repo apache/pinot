@@ -68,15 +68,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
-    init(
-        config,
-        RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(),
-            FieldExtractorFactory.getPlainFieldExtractor(config)));
+    init(config, RecordReaderFactory.get(config));
   }
 
   public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
     this.config = config;
-
     // Initialize the record reader
     recordReader = reader;
     recordReader.init();

@@ -27,6 +27,8 @@ public class RecordReaderFactory {
     }
     if (segmentCreationSpec.getInputFileFormat() == FileFormat.AVRO || segmentCreationSpec.getInputFileFormat() == FileFormat.GZIPPED_AVRO) {
       return new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(segmentCreationSpec), segmentCreationSpec.getInputFilePath());
+    } else if (segmentCreationSpec.getInputFileFormat() == FileFormat.CSV) {
+      return new CSVRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getSchema());
     }
     throw new UnsupportedOperationException("Not support input format: " + segmentCreationSpec.getInputFileFormat());
   }
