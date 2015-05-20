@@ -49,5 +49,5 @@
   "dimensions" : [ "age", "name" ],
   "metrics" : [ "percent" ],
   "schemaName" : "data1",
-  "schemaVersion" : 11
+  "schemaVersion" : 1
 }

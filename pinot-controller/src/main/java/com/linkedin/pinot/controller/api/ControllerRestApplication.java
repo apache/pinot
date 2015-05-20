@@ -33,10 +33,11 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotControllerHealthC
 import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotSchemas;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotTenantServerResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PqlQueryResource;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotSchemaResletResource;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableRestletResource;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
@@ -64,16 +65,25 @@ public class ControllerRestApplication extends Application {
     final Router router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
 
+    /**
+     * Start Routers 2.0
+     */
+
     router.attach("/tenants", PinotTenantServerResource.class);
     router.attach("/tenants/", PinotTenantServerResource.class);
     router.attach("/tenants/{tenantName}", PinotTenantServerResource.class);
     router.attach("/tenants/{tenantName}/", PinotTenantServerResource.class);
     router.attach("/tenants/{tenantName}/instances", PinotTenantServerResource.class);
 
-    router.attach("/schemas", PinotSchemas.class);
-    router.attach("/schemas/", PinotSchemas.class);
-    router.attach("/schemas/{schemaName}", PinotSchemas.class);
+    router.attach("/schemas", PinotSchemaResletResource.class);
+    router.attach("/schemas/", PinotSchemaResletResource.class);
+    router.attach("/schemas/{schemaName}", PinotSchemaResletResource.class);
 
+    router.attach("/tables", PinotTableRestletResource.class);
+
+    /**
+     *  End Routes 2.0
+     */
     router.attach("/dataresources", PinotDataResource.class);
     router.attach("/dataresources/", PinotDataResource.class);
     router.attach("/dataresources/{resourceName}", PinotDataResource.class);

@@ -1580,10 +1580,17 @@ public class PinotHelixResourceManager {
 
   /**
    * API 2.0
-   * @throws IllegalAccessException
-   * @throws IllegalArgumentException
    */
 
+  /**
+   * Schema APIs
+   */
+  /**
+   *
+   * @param schema
+   * @throws IllegalArgumentException
+   * @throws IllegalAccessException
+   */
   public void addSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = Schema.toZNRecord(schema);
     String path = StringUtil.join("/", "/schemas", schema.getSchemaName(), String.valueOf(schema.getSchemaVersion()));
@@ -1594,6 +1601,14 @@ public class PinotHelixResourceManager {
     _propertyStore.create(path, record, AccessOption.PERSISTENT);
   }
 
+  /**
+   *
+   * @param schemaName
+   * @return
+   * @throws JsonParseException
+   * @throws JsonMappingException
+   * @throws IOException
+   */
   public Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
     String path = StringUtil.join("/", "/schemas", schemaName);
     List<String> schemas = _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
@@ -1608,8 +1623,17 @@ public class PinotHelixResourceManager {
     return Schema.fromZNRecordV2(record);
   }
 
+  /**
+   *
+   * @return
+   */
   public List<String> getSchemaNames() {
     String path = StringUtil.join("/", "/schemas");
     return _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
   }
+
+  /**
+   * Table APIs
+   */
+
 }
