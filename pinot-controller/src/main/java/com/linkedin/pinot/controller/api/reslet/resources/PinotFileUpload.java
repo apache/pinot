@@ -24,8 +24,6 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.restlet.data.MediaType;
 import org.restlet.data.Status;
@@ -36,6 +34,8 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Delete;
 import org.restlet.resource.Post;
 import org.restlet.resource.ServerResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -45,7 +45,6 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
-import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -75,7 +74,7 @@ public class PinotFileUpload extends ServerResource {
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
-    tempDir = new File(baseDataDir, "temp");
+    tempDir = new File(baseDataDir, "fileUploadTemp");
     if (!tempDir.exists()) {
       FileUtils.forceMkdir(tempDir);
     }
@@ -169,8 +168,9 @@ public class PinotFileUpload extends ServerResource {
         // Create a new representation based on disk file.
         // The content is arbitrarily sent as plain text.
         rep = new StringRepresentation(dataFile + " sucessfully uploaded", MediaType.TEXT_PLAIN);
-        tmpSegmentDir = new File(tempUntarredPath, dataFile.getName() + "-" + conf.getControllerHost() + "_" +
-            conf.getControllerPort() + "-" + System.currentTimeMillis());
+        tmpSegmentDir =
+            new File(tempUntarredPath, dataFile.getName() + "-" + conf.getControllerHost() + "_"
+                + conf.getControllerPort() + "-" + System.currentTimeMillis());
         LOGGER.info("Untar segment to temp dir: " + tmpSegmentDir);
         if (tmpSegmentDir.exists()) {
           FileUtils.deleteDirectory(tmpSegmentDir);
@@ -234,11 +234,13 @@ public class PinotFileUpload extends ServerResource {
         throw new RuntimeException("either resource name or segment name is null");
       }
       PinotResourceManagerResponse res = null;
-      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName)) {
+      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
+          BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName)) {
         res = manager.deleteSegment(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName);
         rep = new StringRepresentation(res.toString());
       }
-      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName)) {
+      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
+          BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName)) {
         res = manager.deleteSegment(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName);
         rep = new StringRepresentation(res.toString());
       }
@@ -253,7 +255,7 @@ public class PinotFileUpload extends ServerResource {
     return rep;
   }
 
-  private StringRepresentation exceptionToStringRepresentation(Exception e) {
+  public static StringRepresentation exceptionToStringRepresentation(Exception e) {
     return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
   }
 

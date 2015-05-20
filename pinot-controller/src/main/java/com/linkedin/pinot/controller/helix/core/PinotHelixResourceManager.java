@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +37,12 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.JsonMappingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
@@ -51,6 +56,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
@@ -357,7 +363,7 @@ public class PinotHelixResourceManager {
 
   /**
    * This only handles data resource changes. E.g. Number of data instances and number of data replicas.
-   * 
+   *
    * @param resourceName
    * @param resource
    * @return
@@ -434,8 +440,8 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Handle update data resource config will require full configs to be updated. 
-   *  
+   * Handle update data resource config will require full configs to be updated.
+   *
    * @param resource
    * @return
    */
@@ -443,25 +449,33 @@ public class PinotHelixResourceManager {
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
     switch (resource.getResourceType()) {
       case REALTIME:
-        RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(
-            getPropertyStore(), BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
-        realtimeDataResourceZKMetadata = ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
+        RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
+            ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(),
+                BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
+        realtimeDataResourceZKMetadata =
+            ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
         ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
         break;
       case OFFLINE:
-        OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(
-            getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
-        offlineDataResourceZKMetadata = ZKMetadataUtils.updateOfflineZKMetadataByDataResource(offlineDataResourceZKMetadata, resource);
+        OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
+            ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(),
+                BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
+        offlineDataResourceZKMetadata =
+            ZKMetadataUtils.updateOfflineZKMetadataByDataResource(offlineDataResourceZKMetadata, resource);
         ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
         break;
       case HYBRID:
-        realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(
-            getPropertyStore(), BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
-        realtimeDataResourceZKMetadata = ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
+        realtimeDataResourceZKMetadata =
+            ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(),
+                BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
+        realtimeDataResourceZKMetadata =
+            ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
         ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
-        offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(
-            getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
-        offlineDataResourceZKMetadata = ZKMetadataUtils.updateOfflineZKMetadataByDataResource(offlineDataResourceZKMetadata, resource);
+        offlineDataResourceZKMetadata =
+            ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(),
+                BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
+        offlineDataResourceZKMetadata =
+            ZKMetadataUtils.updateOfflineZKMetadataByDataResource(offlineDataResourceZKMetadata, resource);
         ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
         break;
       default:
@@ -517,8 +531,7 @@ public class PinotHelixResourceManager {
                   + ", not match updated request broker tag : " + resource.getBrokerTagName();
           return resp;
         }
-        brokerTagResource =
-            new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
+        brokerTagResource = new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
         updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
         if (updateBrokerResourceTagResp.isSuccessfull()) {
           realtimeDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
@@ -531,7 +544,8 @@ public class PinotHelixResourceManager {
       case HYBRID:
         realtimeDataResourceZKMetadata =
             ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resource.getResourceName());
-        offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resource.getResourceName());
+        offlineDataResourceZKMetadata =
+            ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resource.getResourceName());
         if (!realtimeDataResourceZKMetadata.getBrokerTag().equals(resource.getBrokerTagName())
             || !offlineDataResourceZKMetadata.getBrokerTag().equals(resource.getBrokerTagName())) {
           final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
@@ -543,14 +557,14 @@ public class PinotHelixResourceManager {
           return resp;
         }
 
-        brokerTagResource =
-            new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
+        brokerTagResource = new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
         updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
         if (updateBrokerResourceTagResp.isSuccessfull()) {
           resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
           offlineDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
           ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
-          PinotResourceManagerResponse resp = createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
+          PinotResourceManagerResponse resp =
+              createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
           if (resp.isSuccessfull()) {
             resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName());
             realtimeDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
@@ -600,7 +614,7 @@ public class PinotHelixResourceManager {
       _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
 
-    // remove from property store 
+    // remove from property store
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), resourceTag);
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), resourceTag);
     // Remove groupId/PartitionId mapping for realtime resource type.
@@ -621,8 +635,7 @@ public class PinotHelixResourceManager {
 
   public synchronized void restartResource(String resourceTag) {
     final Set<String> allInstances =
-        HelixHelper.getAllInstancesForResource(HelixHelper.getResourceIdealState(_helixZkManager,
-            resourceTag));
+        HelixHelper.getAllInstancesForResource(HelixHelper.getResourceIdealState(_helixZkManager, resourceTag));
     HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, false);
     HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, true);
   }
@@ -634,13 +647,15 @@ public class PinotHelixResourceManager {
     List<String> segmentsInResource = new ArrayList<String>();
     switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
       case REALTIME:
-        for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getRealtimeResourceZKMetadataListForResource(getPropertyStore(), resourceName)) {
+        for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider
+            .getRealtimeResourceZKMetadataListForResource(getPropertyStore(), resourceName)) {
           segmentsInResource.add(segmentZKMetadata.getSegmentName());
         }
 
         break;
       case OFFLINE:
-        for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(getPropertyStore(), resourceName)) {
+        for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider
+            .getOfflineResourceZKMetadataListForResource(getPropertyStore(), resourceName)) {
           segmentsInResource.add(segmentZKMetadata.getSegmentName());
         }
         break;
@@ -664,8 +679,8 @@ public class PinotHelixResourceManager {
       if (!matchResourceName(segmentMetadata)) {
         res.status = STATUS.failure;
         res.errorMessage =
-            "Reject segment: resource name is not registered." + " Resource name: "
-                + segmentMetadata.getResourceName() + "\n";
+            "Reject segment: resource name is not registered." + " Resource name: " + segmentMetadata.getResourceName()
+                + "\n";
         return res;
       }
       if (ifSegmentExisted(segmentMetadata)) {
@@ -689,8 +704,9 @@ public class PinotHelixResourceManager {
             ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           }
         } else {
-          String msg = "Not refreshing identical segment " + segmentMetadata.getName() + " with creation time " +
-              segmentMetadata.getIndexCreationTime() + " and crc " + segmentMetadata.getCrc();
+          String msg =
+              "Not refreshing identical segment " + segmentMetadata.getName() + " with creation time "
+                  + segmentMetadata.getIndexCreationTime() + " and crc " + segmentMetadata.getCrc();
           LOGGER.info(msg);
           res.status = STATUS.success;
           res.errorMessage = msg;
@@ -819,8 +835,8 @@ public class PinotHelixResourceManager {
     }
     return _propertyStore.exists(
         ZKMetadataProvider.constructPropertyStorePathForSegment(
-            BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName()), segmentMetadata.getName()),
-        AccessOption.PERSISTENT);
+            BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName()),
+            segmentMetadata.getName()), AccessOption.PERSISTENT);
   }
 
   private boolean ifRefreshAnExistedSegment(SegmentMetadata segmentMetadata) {
@@ -1131,7 +1147,8 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse updateBrokerTenant(Tenant tenant) {
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     String brokerTenantTag = ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tenant.getTenantName());
-    List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantTag);
+    List<String> instancesInClusterWithTag =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantTag);
     if (instancesInClusterWithTag.size() > tenant.getNumberOfInstances()) {
       return scaleDownBroker(tenant, res, brokerTenantTag, instancesInClusterWithTag);
     }
@@ -1142,7 +1159,8 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  private PinotResourceManagerResponse scaleUpBroker(Tenant tenant, PinotResourceManagerResponse res, String brokerTenantTag, List<String> instancesInClusterWithTag) {
+  private PinotResourceManagerResponse scaleUpBroker(Tenant tenant, PinotResourceManagerResponse res,
+      String brokerTenantTag, List<String> instancesInClusterWithTag) {
     List<String> unTaggedInstanceList = _pinotHelixAdmin.getOnlineUnTaggedBrokerInstanceList();
     int numberOfInstancesToAdd = tenant.getNumberOfInstances() - instancesInClusterWithTag.size();
     if (unTaggedInstanceList.size() < numberOfInstancesToAdd) {
@@ -1166,19 +1184,24 @@ public class PinotHelixResourceManager {
   }
 
   private void addInstanceToBrokerIdealState(String brokerTenantTag, String instanceName) {
-    IdealState resourceIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    IdealState resourceIdealState =
+        _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     for (String resourceName : resourceIdealState.getPartitionSet()) {
       if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == ResourceType.OFFLINE) {
-        String brokerTag = ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName).getBrokerTag());
+        String brokerTag =
+            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider.getOfflineResourceZKMetadata(
+                getPropertyStore(), resourceName).getBrokerTag());
         if (brokerTag.equals(brokerTenantTag)) {
           resourceIdealState.setPartitionState(resourceName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
         }
       }
     }
-    _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, resourceIdealState);
+    _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
+        resourceIdealState);
   }
 
-  private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, PinotResourceManagerResponse res, String brokerTenantTag, List<String> instancesInClusterWithTag) {
+  private PinotResourceManagerResponse scaleDownBroker(Tenant tenant, PinotResourceManagerResponse res,
+      String brokerTenantTag, List<String> instancesInClusterWithTag) {
     int numberBrokersToUntag = instancesInClusterWithTag.size() - tenant.getNumberOfInstances();
     for (int i = 0; i < numberBrokersToUntag; ++i) {
       retagInstance(instancesInClusterWithTag.get(i), brokerTenantTag, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
@@ -1202,22 +1225,26 @@ public class PinotHelixResourceManager {
     Set<String> allServingServers = new HashSet<String>();
     allServingServers.addAll(taggedOfflineServers);
     allServingServers.addAll(taggedRealtimeServers);
-    boolean isCurrentTenantColocated = (allServingServers.size() == taggedOfflineServers.size() + taggedRealtimeServers.size());
+    boolean isCurrentTenantColocated =
+        (allServingServers.size() == taggedOfflineServers.size() + taggedRealtimeServers.size());
     if (isCurrentTenantColocated != serverTenant.isColoated()) {
       res.status = STATUS.failure;
       res.errorMessage = "Not support different colocated type request for update request: " + serverTenant;
       LOGGER.error(res.errorMessage);
       return res;
     }
-    if (serverTenant.getNumberOfInstances() < allServingServers.size() || serverTenant.getOfflineInstances() < taggedOfflineServers.size() ||
-        serverTenant.getRealtimeInstances() < taggedRealtimeServers.size()) {
+    if (serverTenant.getNumberOfInstances() < allServingServers.size()
+        || serverTenant.getOfflineInstances() < taggedOfflineServers.size()
+        || serverTenant.getRealtimeInstances() < taggedRealtimeServers.size()) {
       return scaleDownServer(serverTenant, res, taggedRealtimeServers, taggedOfflineServers, allServingServers);
     }
-    return scaleUpServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers, offlineServerTag, taggedOfflineServers, allServingServers);
+    return scaleUpServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers, offlineServerTag,
+        taggedOfflineServers, allServingServers);
   }
 
-  private PinotResourceManagerResponse scaleUpServerTenant(Tenant serverTenant, PinotResourceManagerResponse res, String realtimeServerTag, List<String> taggedRealtimeServers,
-      String offlineServerTag, List<String> taggedOfflineServers, Set<String> allServingServers) {
+  private PinotResourceManagerResponse scaleUpServerTenant(Tenant serverTenant, PinotResourceManagerResponse res,
+      String realtimeServerTag, List<String> taggedRealtimeServers, String offlineServerTag,
+      List<String> taggedOfflineServers, Set<String> allServingServers) {
     int incInstances = serverTenant.getNumberOfInstances() - allServingServers.size();
     List<String> unTaggedInstanceList = _pinotHelixAdmin.getOnlineUnTaggedServerInstanceList();
     if (unTaggedInstanceList.size() < incInstances) {
@@ -1232,15 +1259,18 @@ public class PinotHelixResourceManager {
       return res;
     }
     if (serverTenant.isColoated()) {
-      return updateColocatedServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers, offlineServerTag, taggedOfflineServers, incInstances, unTaggedInstanceList);
+      return updateColocatedServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers, offlineServerTag,
+          taggedOfflineServers, incInstances, unTaggedInstanceList);
     } else {
-      return updateIndependentServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers, offlineServerTag, taggedOfflineServers, incInstances, unTaggedInstanceList);
+      return updateIndependentServerTenant(serverTenant, res, realtimeServerTag, taggedRealtimeServers,
+          offlineServerTag, taggedOfflineServers, incInstances, unTaggedInstanceList);
     }
 
   }
 
-  private PinotResourceManagerResponse updateIndependentServerTenant(Tenant serverTenant, PinotResourceManagerResponse res, String realtimeServerTag,
-      List<String> taggedRealtimeServers, String offlineServerTag, List<String> taggedOfflineServers, int incInstances, List<String> unTaggedInstanceList) {
+  private PinotResourceManagerResponse updateIndependentServerTenant(Tenant serverTenant,
+      PinotResourceManagerResponse res, String realtimeServerTag, List<String> taggedRealtimeServers,
+      String offlineServerTag, List<String> taggedOfflineServers, int incInstances, List<String> unTaggedInstanceList) {
     int incOffline = serverTenant.getOfflineInstances() - taggedOfflineServers.size();
     int incRealtime = serverTenant.getRealtimeInstances() - taggedRealtimeServers.size();
     for (int i = 0; i < incOffline; ++i) {
@@ -1255,8 +1285,9 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  private PinotResourceManagerResponse updateColocatedServerTenant(Tenant serverTenant, PinotResourceManagerResponse res, String realtimeServerTag,
-      List<String> taggedRealtimeServers, String offlineServerTag, List<String> taggedOfflineServers, int incInstances, List<String> unTaggedInstanceList) {
+  private PinotResourceManagerResponse updateColocatedServerTenant(Tenant serverTenant,
+      PinotResourceManagerResponse res, String realtimeServerTag, List<String> taggedRealtimeServers,
+      String offlineServerTag, List<String> taggedOfflineServers, int incInstances, List<String> unTaggedInstanceList) {
     int incOffline = serverTenant.getOfflineInstances() - taggedOfflineServers.size();
     int incRealtime = serverTenant.getRealtimeInstances() - taggedRealtimeServers.size();
     taggedRealtimeServers.removeAll(taggedOfflineServers);
@@ -1273,7 +1304,8 @@ public class PinotHelixResourceManager {
         retagInstance(unTaggedInstanceList.get(i), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
         // TODO: update idealStates & instanceZkMetadata
       } else {
-        _helixAdmin.addInstanceTag(_helixClusterName, taggedOfflineServers.get(i - Math.max(incInstances, incOffline)), realtimeServerTag);
+        _helixAdmin.addInstanceTag(_helixClusterName, taggedOfflineServers.get(i - Math.max(incInstances, incOffline)),
+            realtimeServerTag);
         // TODO: update idealStates & instanceZkMetadata
       }
     }
@@ -1281,8 +1313,8 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  private PinotResourceManagerResponse scaleDownServer(Tenant serverTenant, PinotResourceManagerResponse res, List<String> taggedRealtimeServers,
-      List<String> taggedOfflineServers, Set<String> allServingServers) {
+  private PinotResourceManagerResponse scaleDownServer(Tenant serverTenant, PinotResourceManagerResponse res,
+      List<String> taggedRealtimeServers, List<String> taggedOfflineServers, Set<String> allServingServers) {
     res.status = STATUS.failure;
     res.errorMessage =
         "Not support to size down the current server cluster with tenant info: " + serverTenant
@@ -1311,7 +1343,8 @@ public class PinotHelixResourceManager {
 
   public boolean isBrokerTenantDeletable(String tenantName) {
     String brokerTag = ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tenantName);
-    Set<String> taggedInstances = new HashSet<String>(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag));
+    Set<String> taggedInstances =
+        new HashSet<String>(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag));
     String resourceName = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
     IdealState resourceIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
     for (String partition : resourceIdealState.getPartitionSet()) {
@@ -1325,8 +1358,11 @@ public class PinotHelixResourceManager {
   }
 
   public boolean isServerTenantDeletable(String tenantName) {
-    Set<String> taggedInstances = new HashSet<String>(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName)));
-    taggedInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName)));
+    Set<String> taggedInstances =
+        new HashSet<String>(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
+            ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName)));
+    taggedInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
+        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName)));
     for (String resourceName : getAllResourceNames()) {
       if (resourceName.equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
         continue;
@@ -1350,7 +1386,8 @@ public class PinotHelixResourceManager {
       Builder keyBuilder = _helixDataAccessor.keyBuilder();
       InstanceConfig config = _helixDataAccessor.getProperty(keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)) {
+        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
+            || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)) {
           continue;
         }
         if (ControllerTenantNameBuilder.getTenantRoleFromTenantName(tag) == TenantRole.BROKER) {
@@ -1368,7 +1405,8 @@ public class PinotHelixResourceManager {
       Builder keyBuilder = _helixDataAccessor.keyBuilder();
       InstanceConfig config = _helixDataAccessor.getProperty(keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)) {
+        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
+            || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)) {
           continue;
         }
         if (ControllerTenantNameBuilder.getTenantRoleFromTenantName(tag) == TenantRole.SERVER) {
@@ -1408,14 +1446,16 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  private void assignIndependentServerTenant(Tenant serverTenant, int numberOfInstances, List<String> unTaggedInstanceList) {
+  private void assignIndependentServerTenant(Tenant serverTenant, int numberOfInstances,
+      List<String> unTaggedInstanceList) {
     String offlineServerTag = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(serverTenant.getTenantName());
     for (int i = 0; i < serverTenant.getOfflineInstances(); i++) {
       retagInstance(unTaggedInstanceList.get(i), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE, offlineServerTag);
     }
     String realtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(serverTenant.getTenantName());
     for (int i = 0; i < serverTenant.getRealtimeInstances(); i++) {
-      retagInstance(unTaggedInstanceList.get(i + serverTenant.getOfflineInstances()), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
+      retagInstance(unTaggedInstanceList.get(i + serverTenant.getOfflineInstances()),
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE, realtimeServerTag);
     }
   }
 
@@ -1459,7 +1499,8 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse deleteOfflineServerTenantFor(String tenantName) {
     PinotResourceManagerResponse response = new PinotResourceManagerResponse();
     String offlineTenantTag = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
-    List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineTenantTag);
+    List<String> instancesInClusterWithTag =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineTenantTag);
     for (String instanceName : instancesInClusterWithTag) {
       _helixAdmin.removeInstanceTag(_helixClusterName, instanceName, offlineTenantTag);
       if (getTagsForInstance(instanceName).isEmpty()) {
@@ -1473,7 +1514,8 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse deleteRealtimeServerTenantFor(String tenantName) {
     PinotResourceManagerResponse response = new PinotResourceManagerResponse();
     String realtimeTenantTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
-    List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeTenantTag);
+    List<String> instancesInClusterWithTag =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeTenantTag);
     for (String instanceName : instancesInClusterWithTag) {
       _helixAdmin.removeInstanceTag(_helixClusterName, instanceName, realtimeTenantTag);
       if (getTagsForInstance(instanceName).isEmpty()) {
@@ -1496,14 +1538,17 @@ public class PinotHelixResourceManager {
 
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
     Set<String> instancesSet = new HashSet<String>();
-    instancesSet.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName)));
-    instancesSet.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName)));
+    instancesSet.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
+        ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName)));
+    instancesSet.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
+        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName)));
     return instancesSet;
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
     Set<String> instancesSet = new HashSet<String>();
-    instancesSet.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tenantName)));
+    instancesSet.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
+        ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tenantName)));
     return instancesSet;
   }
 
@@ -1513,13 +1558,15 @@ public class PinotHelixResourceManager {
     for (String resourceName : allResourceNames) {
       switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
         case OFFLINE:
-          String resourceServerTenant = ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName).getServerTenant();
+          String resourceServerTenant =
+              ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName).getServerTenant();
           if (resourceServerTenant.equals(BrokerRequestUtils.getOfflineResourceNameForResource(tenantName))) {
             retResourceSet.add(BrokerRequestUtils.getHybridResourceName(resourceName));
           }
           break;
         case REALTIME:
-          resourceServerTenant = ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName).getServerTenant();
+          resourceServerTenant =
+              ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName).getServerTenant();
           if (resourceServerTenant.equals(BrokerRequestUtils.getRealtimeResourceNameForResource(tenantName))) {
             retResourceSet.add(BrokerRequestUtils.getHybridResourceName(resourceName));
           }
@@ -1529,5 +1576,40 @@ public class PinotHelixResourceManager {
       }
     }
     return retResourceSet;
+  }
+
+  /**
+   * API 2.0
+   * @throws IllegalAccessException
+   * @throws IllegalArgumentException
+   */
+
+  public void addSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
+    ZNRecord record = Schema.toZNRecord(schema);
+    String path = StringUtil.join("/", "/schemas", schema.getSchemaName(), String.valueOf(schema.getSchemaVersion()));
+    if (_propertyStore.exists(path, AccessOption.PERSISTENT)) {
+      throw new IllegalAccessException("schema : " + schema.getSchemaName() + " version : " + schema.getSchemaVersion()
+          + " exist");
+    }
+    _propertyStore.create(path, record, AccessOption.PERSISTENT);
+  }
+
+  public Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
+    String path = StringUtil.join("/", "/schemas", schemaName);
+    List<String> schemas = _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
+    List<Integer> schemasIds = new ArrayList<Integer>();
+    for (String id : schemas) {
+      schemasIds.add(Integer.parseInt(id));
+    }
+    Collections.sort(schemasIds);
+    String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
+    LOGGER.info("found schema {} with version {}", schemaName, latest);
+    ZNRecord record = _propertyStore.get(StringUtil.join("/", path, latest), null, AccessOption.PERSISTENT);
+    return Schema.fromZNRecordV2(record);
+  }
+
+  public List<String> getSchemaNames() {
+    String path = StringUtil.join("/", "/schemas");
+    return _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
   }
 }

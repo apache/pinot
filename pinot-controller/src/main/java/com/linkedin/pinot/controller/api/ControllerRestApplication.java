@@ -33,6 +33,7 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotControllerHealthC
 import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotSchemas;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotTenantServerResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PqlQueryResource;
@@ -68,6 +69,10 @@ public class ControllerRestApplication extends Application {
     router.attach("/tenants/{tenantName}", PinotTenantServerResource.class);
     router.attach("/tenants/{tenantName}/", PinotTenantServerResource.class);
     router.attach("/tenants/{tenantName}/instances", PinotTenantServerResource.class);
+
+    router.attach("/schemas", PinotSchemas.class);
+    router.attach("/schemas/", PinotSchemas.class);
+    router.attach("/schemas/{schemaName}", PinotSchemas.class);
 
     router.attach("/dataresources", PinotDataResource.class);
     router.attach("/dataresources/", PinotDataResource.class);

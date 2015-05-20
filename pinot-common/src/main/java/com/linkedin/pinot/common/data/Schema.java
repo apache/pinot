@@ -15,6 +15,13 @@
  */
 package com.linkedin.pinot.common.data;
 
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,9 +32,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.helix.ZNRecord;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +45,6 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.StringUtil;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 /**
@@ -54,14 +60,65 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
  */
 public class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
-  private final Map<String, FieldSpec> fieldSpecMap = new HashMap<String, FieldSpec>();
+  private Map<String, FieldSpec> fieldSpecMap = new HashMap<String, FieldSpec>();
   private String timeColumnName;
-  private final List<String> dimensions;
-  private final List<String> metrics;
+  private List<String> dimensions;
+  private List<String> metrics;
+  private String schemaName;
+  private Long schemaVersion;
+
+  @JsonIgnore(true)
+  private String jsonSchema;
+
+  public static Schema fromZNRecord(ZNRecord record) {
+    return getSchemaFromMap(record.getSimpleFields());
+  }
+
+  public static Schema fromFile(final File schemaFile) throws JsonParseException, JsonMappingException, IOException {
+    JsonNode node = new ObjectMapper().readTree(schemaFile);
+    System.out.println("node : " + node);
+    Schema schema = new ObjectMapper().readValue(node, Schema.class);
+    schema.setJSONSchema(node.toString());
+    return schema;
+  }
+
+  public static Schema fromZNRecordV2(ZNRecord record) throws JsonParseException, JsonMappingException, IOException {
+    String schemaJSON = record.getSimpleField("schemaJSON");
+    Schema schema = new ObjectMapper().readValue(record.getSimpleField("schemaJSON"), Schema.class);
+    schema.setJSONSchema(schemaJSON);
+    return schema;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static ZNRecord toZNRecord(Schema schema) throws IllegalArgumentException, IllegalAccessException {
+    ZNRecord record = new ZNRecord(String.valueOf(schema.getSchemaVersion()));
+    record.setSimpleField("schemaJSON", schema.getJSONSchema());
+    return record;
+  }
 
   public Schema() {
     this.dimensions = new LinkedList<String>();
     this.metrics = new LinkedList<String>();
+  }
+
+  public void setJSONSchema(String schemaJSON) {
+    jsonSchema = schemaJSON;
+  }
+
+  public String getJSONSchema() {
+    return jsonSchema;
+  }
+
+  protected void setFieldSpecMap(Map<String, FieldSpec> fieldSpecMap) {
+    this.fieldSpecMap = fieldSpecMap;
+  }
+
+  protected void setDimensions(List<String> dimensions) {
+    this.dimensions = dimensions;
+  }
+
+  protected void setMetrics(List<String> metrics) {
+    this.metrics = metrics;
   }
 
   public void addSchema(String columnName, FieldSpec fieldSpec) {
@@ -135,6 +192,22 @@ public class Schema {
     return (TimeFieldSpec) fieldSpecMap.get(timeColumnName);
   }
 
+  public String getSchemaName() {
+    return schemaName;
+  }
+
+  public void setSchemaName(String schemaName) {
+    this.schemaName = schemaName;
+  }
+
+  public long getSchemaVersion() {
+    return schemaVersion;
+  }
+
+  public void setSchemaVersion(long schemaVersion) {
+    this.schemaVersion = schemaVersion;
+  }
+
   // Added getters for Json annotator to work for args4j.
   public Map<String, FieldSpec> getFieldSpecMap() {
     return fieldSpecMap;
@@ -194,8 +267,8 @@ public class Schema {
       FieldType fieldType = fieldSpec.getFieldType();
       schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.FIELD_TYPE),
           fieldType.toString());
-      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.DATA_TYPE),
-          fieldSpec.getDataType().toString());
+      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.DATA_TYPE), fieldSpec
+          .getDataType().toString());
 
       switch (fieldType) {
         case DIMENSION:
@@ -205,8 +278,7 @@ public class Schema {
               fieldSpec.getDelimiter());
           break;
         case TIME:
-          schemaMap.put(StringUtil.join(".",
-              DataSource.SCHEMA, fieldName, DataSource.Schema.TIME_UNIT),
+          schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.TIME_UNIT),
               ((TimeFieldSpec) fieldSpec).getIncomingGranularitySpec().getTimeType().toString());
           break;
         default:
@@ -221,6 +293,16 @@ public class Schema {
 
     public SchemaBuilder() {
       schema = new Schema();
+    }
+
+    public SchemaBuilder setSchemaName(String schemaName) {
+      schema.setSchemaName(schemaName);
+      return this;
+    }
+
+    public SchemaBuilder setSchemaVersion(String version) {
+      schema.setSchemaVersion(Long.parseLong(version));
+      return this;
     }
 
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType type) {
@@ -284,16 +366,22 @@ public class Schema {
         continue;
       }
       String columnName = schemaConfig.get(configKey);
-      FieldType fieldType = FieldType.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.FIELD_TYPE)).toUpperCase());
-      DataType dataType = DataType.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.DATA_TYPE)));
+      FieldType fieldType =
+          FieldType.valueOf(schemaConfig.get(
+              StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.FIELD_TYPE)).toUpperCase());
+      DataType dataType =
+          DataType.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName,
+              DataSource.Schema.DATA_TYPE)));
 
       switch (fieldType) {
         case DIMENSION:
           boolean isSingleValueField =
-              Boolean.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.IS_SINGLE_VALUE)));
+              Boolean.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName,
+                  DataSource.Schema.IS_SINGLE_VALUE)));
           if (!isSingleValueField) {
             String delimeter = null;
-            Object obj = schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.DELIMETER));
+            Object obj =
+                schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.DELIMETER));
             if (obj instanceof String) {
               delimeter = (String) obj;
             } else if (obj instanceof ArrayList) {
@@ -308,7 +396,9 @@ public class Schema {
           schemaBuilder.addMetric(columnName, dataType);
           break;
         case TIME:
-          TimeUnit timeUnit = TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.TIME_UNIT)));
+          TimeUnit timeUnit =
+              TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName,
+                  DataSource.Schema.TIME_UNIT)));
           schemaBuilder.addTime(columnName, timeUnit, dataType);
           break;
         default:
@@ -331,10 +421,8 @@ public class Schema {
 
     Schema other = (Schema) o;
 
-    return isEqual(fieldSpecMap, other.fieldSpecMap) &&
-        isEqual(timeColumnName, other.timeColumnName) &&
-        isEqual(dimensions, other.dimensions) &&
-        isEqual(metrics, other.metrics);
+    return isEqual(fieldSpecMap, other.fieldSpecMap) && isEqual(timeColumnName, other.timeColumnName)
+        && isEqual(dimensions, other.dimensions) && isEqual(metrics, other.metrics);
   }
 
   @Override
@@ -345,9 +433,4 @@ public class Schema {
     result = hashCodeOf(result, metrics);
     return result;
   }
-
-  public static Schema fromZNRecord(ZNRecord record) {
-    return getSchemaFromMap(record.getSimpleFields());
-  }
-
 }
