@@ -37,7 +37,12 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotTenantServerResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PqlQueryResource;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotSchemaResletResource;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableIndexingConfigs;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableInstances;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableMetadataConfigs;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableRestletResource;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableSegmentConfigs;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableTenantConfigs;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
@@ -79,7 +84,18 @@ public class ControllerRestApplication extends Application {
     router.attach("/schemas/", PinotSchemaResletResource.class);
     router.attach("/schemas/{schemaName}", PinotSchemaResletResource.class);
 
+    // POST
     router.attach("/tables", PinotTableRestletResource.class);
+
+    // GET
+    router.attach("/tables/{tableName}", PinotTableRestletResource.class);
+    router.attach("/tables/{tableName}/instances", PinotTableInstances.class);
+
+    // PUT
+    router.attach("/tables/{tableName}/segmentsConfigs", PinotTableSegmentConfigs.class);
+    router.attach("/tables/{tableName}/indexingConfigs", PinotTableIndexingConfigs.class);
+    router.attach("/tables/{tableName}/tenantConfigs", PinotTableTenantConfigs.class);
+    router.attach("/tables/{tableName}/metadataConfigs", PinotTableMetadataConfigs.class);
 
     /**
      *  End Routes 2.0

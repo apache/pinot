@@ -15,14 +15,14 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.linkedin.pinot.common.Utils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
 import org.restlet.data.Protocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;

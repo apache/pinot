@@ -1,5 +1,6 @@
 package com.linkedin.pinot.common.config;
 
+import java.util.Map;
 
 
 public class OfflineTableConfig extends AbstractTableConfig {
@@ -8,8 +9,8 @@ public class OfflineTableConfig extends AbstractTableConfig {
 
   protected OfflineTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, String jsonString, IndexingConfig indexConfig) {
-    super(tableName, tableType, validationConfig, tenantConfig, customConfigs, jsonString);
+      TableCustomConfig customConfigs, Map<String, String> rawMap, IndexingConfig indexConfig) {
+    super(tableName, tableType, validationConfig, tenantConfig, customConfigs, rawMap);
     this.indexConfig = indexConfig;
   }
 
