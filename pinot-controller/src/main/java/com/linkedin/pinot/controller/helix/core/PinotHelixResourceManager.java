@@ -68,6 +68,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
@@ -1631,12 +1632,15 @@ public class PinotHelixResourceManager {
    */
   public void addSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = Schema.toZNRecord(schema);
-    String path = StringUtil.join("/", "/schemas", schema.getSchemaName(), String.valueOf(schema.getSchemaVersion()));
-    if (_propertyStore.exists(path, AccessOption.PERSISTENT)) {
+    String name = StringUtil.join("/", schema.getSchemaName(), String.valueOf(schema.getSchemaVersion()));
+
+    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
+    if (propertyStoreHelper.exist(name)) {
       throw new IllegalAccessException("schema : " + schema.getSchemaName() + " version : " + schema.getSchemaVersion()
           + " exist");
     }
-    _propertyStore.create(path, record, AccessOption.PERSISTENT);
+    propertyStoreHelper.set(name, record);
   }
 
   /**
@@ -1648,7 +1652,9 @@ public class PinotHelixResourceManager {
    * @throws IOException
    */
   public Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
-    String path = StringUtil.join("/", "/schemas", schemaName);
+    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
+    String path = StringUtil.join("/", propertyStoreHelper.getRelativePath(), schemaName);
     List<String> schemas = _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
     List<Integer> schemasIds = new ArrayList<Integer>();
     for (String id : schemas) {
@@ -1657,7 +1663,8 @@ public class PinotHelixResourceManager {
     Collections.sort(schemasIds);
     String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
     LOGGER.info("found schema {} with version {}", schemaName, latest);
-    ZNRecord record = _propertyStore.get(StringUtil.join("/", path, latest), null, AccessOption.PERSISTENT);
+
+    ZNRecord record = propertyStoreHelper.get(schemaName);
     return Schema.fromZNRecordV2(record);
   }
 
@@ -1666,8 +1673,8 @@ public class PinotHelixResourceManager {
    * @return
    */
   public List<String> getSchemaNames() {
-    String path = StringUtil.join("/", "/schemas");
-    return _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
+    return _propertyStore.getChildNames(PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore)
+        .getRelativePath(), AccessOption.PERSISTENT);
   }
 
   /**
