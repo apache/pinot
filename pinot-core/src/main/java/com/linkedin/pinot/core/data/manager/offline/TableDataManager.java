@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -36,14 +36,14 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  * @author xiafu
  *
  */
-public interface ResourceDataManager {
+public interface TableDataManager {
 
   /**
    * Initialize ResourceDataManager based on given config.
    *
    * @param resourceDataManagerConfig
    */
-  public void init(ResourceDataManagerConfig resourceDataManagerConfig);
+  public void init(TableDataManagerConfig resourceDataManagerConfig);
 
   public void start();
 

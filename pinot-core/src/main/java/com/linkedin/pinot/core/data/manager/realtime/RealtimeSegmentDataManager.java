@@ -70,7 +70,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   private volatile boolean keepIndexing = true;
   private TimerTask segmentStatusTask;
-  private final RealtimeResourceDataManager notifier;
+  private final RealtimeTableDataManager notifier;
   private Thread indexingThread;
   private long timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
   private long numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
@@ -78,7 +78,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final RealtimeDataResourceZKMetadata resourceMetadata, InstanceZKMetadata instanceMetadata,
-      RealtimeResourceDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode)
+      RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode)
       throws Exception {
     if (resourceMetadata.getMetadata().containsKey(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING)) {
       try {

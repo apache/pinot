@@ -50,7 +50,7 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.TimerService;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
@@ -59,14 +59,14 @@ import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
-public class RealtimeResourceDataManagerTest {
+public class RealtimeTableDataManagerTest {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeResourceDataManagerTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeTableDataManagerTest.class);
 
   private static RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata;
   private static InstanceZKMetadata instanceZKMetadata;
   private static RealtimeSegmentZKMetadata realtimeSegmentZKMetadata;
-  private static ResourceDataManagerConfig resourceDataManagerConfig;
+  private static TableDataManagerConfig resourceDataManagerConfig;
   private static final String AVRO_DATA = "data/mirror-mv.avro";
   private static String filePath;
   private static Map<String, FieldType> fieldTypeMap;
@@ -89,7 +89,7 @@ public class RealtimeResourceDataManagerTest {
     resourceDataManagerConfig = getResourceDataManagerConfig();
   }
 
-  private static ResourceDataManagerConfig getResourceDataManagerConfig() throws ConfigurationException {
+  private static TableDataManagerConfig getResourceDataManagerConfig() throws ConfigurationException {
     String resourceName = "testResource_R";
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
@@ -97,7 +97,7 @@ public class RealtimeResourceDataManagerTest {
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
     defaultConfig.addProperty(READ_MODE, ReadMode.heap.toString());
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
-    ResourceDataManagerConfig resourceDataManagerConfig = new ResourceDataManagerConfig(defaultConfig);
+    TableDataManagerConfig resourceDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "realtime");
 

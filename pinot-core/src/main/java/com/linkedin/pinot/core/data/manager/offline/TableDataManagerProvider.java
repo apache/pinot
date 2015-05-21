@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.data.manager.offline;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.realtime.RealtimeResourceDataManager;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 
 
 /**
@@ -27,22 +27,22 @@ import com.linkedin.pinot.core.data.manager.realtime.RealtimeResourceDataManager
  * @author xiafu
  *
  */
-public class ResourceDataManagerProvider {
+public class TableDataManagerProvider {
 
-  private static Map<String, Class<? extends ResourceDataManager>> keyToFunction =
-      new ConcurrentHashMap<String, Class<? extends ResourceDataManager>>();
+  private static Map<String, Class<? extends TableDataManager>> keyToFunction =
+      new ConcurrentHashMap<String, Class<? extends TableDataManager>>();
 
   static {
-    keyToFunction.put("offline", OfflineResourceDataManager.class);
-    keyToFunction.put("realtime", RealtimeResourceDataManager.class);
+    keyToFunction.put("offline", OfflineTableDataManager.class);
+    keyToFunction.put("realtime", RealtimeTableDataManager.class);
   }
 
-  public static ResourceDataManager getResourceDataManager(ResourceDataManagerConfig resourceDataManagerConfig) {
+  public static TableDataManager getResourceDataManager(TableDataManagerConfig resourceDataManagerConfig) {
     try {
-      Class<? extends ResourceDataManager> cls =
+      Class<? extends TableDataManager> cls =
           keyToFunction.get(resourceDataManagerConfig.getResourceDataManagerType().toLowerCase());
       if (cls != null) {
-        ResourceDataManager resourceDataManager = (ResourceDataManager) cls.newInstance();
+        TableDataManager resourceDataManager = (TableDataManager) cls.newInstance();
         resourceDataManager.init(resourceDataManagerConfig);
         return resourceDataManager;
       } else {

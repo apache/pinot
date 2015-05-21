@@ -35,10 +35,10 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.ResourceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.ResourceDataManagerProvider;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 
 
@@ -52,7 +52,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
-  private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
+  private Map<String, TableDataManager> _resourceDataManagerMap = new HashMap<String, TableDataManager>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
   private final Object _globalLock = new Object();
@@ -106,7 +106,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void start() {
-    for (ResourceDataManager resourceDataManager : _resourceDataManagerMap.values()) {
+    for (TableDataManager resourceDataManager : _resourceDataManagerMap.values()) {
       resourceDataManager.start();
     }
 
@@ -162,16 +162,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return _isStarted;
   }
 
-  public synchronized void addResourceDataManager(String resourceName, ResourceDataManager resourceDataManager) {
+  public synchronized void addResourceDataManager(String resourceName, TableDataManager resourceDataManager) {
     _resourceDataManagerMap.put(resourceName, resourceDataManager);
   }
 
-  public Collection<ResourceDataManager> getResourceDataManagers() {
+  public Collection<TableDataManager> getResourceDataManagers() {
     return _resourceDataManagerMap.values();
   }
 
   @Override
-  public ResourceDataManager getResourceDataManager(String resourceName) {
+  public TableDataManager getResourceDataManager(String resourceName) {
     return _resourceDataManagerMap.get(resourceName);
   }
 
@@ -179,7 +179,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public synchronized void shutDown() {
 
     if (isStarted()) {
-      for (ResourceDataManager resourceDataManager : getResourceDataManagers()) {
+      for (TableDataManager resourceDataManager : getResourceDataManagers()) {
         resourceDataManager.shutDown();
       }
       _isStarted = false;
@@ -267,24 +267,24 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   public synchronized void addResourceIfNeed(DataResourceZKMetadata dataResourceZKMetadata, String resourceName) throws ConfigurationException {
-    ResourceDataManagerConfig resourceDataManagerConfig = getDefaultHelixResourceDataManagerConfig(resourceName);
+    TableDataManagerConfig resourceDataManagerConfig = getDefaultHelixResourceDataManagerConfig(resourceName);
     if (dataResourceZKMetadata != null) {
       resourceDataManagerConfig.overrideConfigs(dataResourceZKMetadata.getMetadata());
     }
-    ResourceDataManager resourceDataManager = ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+    TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
     resourceDataManager.start();
     addResourceDataManager(resourceName, resourceDataManager);
   }
 
-  private ResourceDataManagerConfig getDefaultHelixResourceDataManagerConfig(String resourceName)
+  private TableDataManagerConfig getDefaultHelixResourceDataManagerConfig(String resourceName)
       throws ConfigurationException {
-    return ResourceDataManagerConfig.getDefaultHelixResourceDataManagerConfig(_instanceDataManagerConfig,
+    return TableDataManagerConfig.getDefaultHelixResourceDataManagerConfig(_instanceDataManagerConfig,
         resourceName);
   }
 
   @Override
   public synchronized void removeSegment(String segmentName) {
-    for (ResourceDataManager resourceDataManager : _resourceDataManagerMap.values()) {
+    for (TableDataManager resourceDataManager : _resourceDataManagerMap.values()) {
       resourceDataManager.removeSegment(segmentName);
     }
   }

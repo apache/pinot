@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
  * @author xiafu
  *
  */
-public class ResourceDataManagerConfig {
+public class TableDataManagerConfig {
 
   private static final String RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
   private static final String RESOURCE_DATA_MANAGER_TYPE = "dataManagerType";
@@ -44,7 +44,7 @@ public class ResourceDataManagerConfig {
 
   private final Configuration _resourceDataManagerConfig;
 
-  public ResourceDataManagerConfig(Configuration resourceDataManagerConfig) throws ConfigurationException {
+  public TableDataManagerConfig(Configuration resourceDataManagerConfig) throws ConfigurationException {
     _resourceDataManagerConfig = resourceDataManagerConfig;
   }
 
@@ -72,7 +72,7 @@ public class ResourceDataManagerConfig {
     return _resourceDataManagerConfig.getInt(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 10);
   }
 
-  public static ResourceDataManagerConfig getDefaultHelixResourceDataManagerConfig(
+  public static TableDataManagerConfig getDefaultHelixResourceDataManagerConfig(
       InstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
     TableType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
 
@@ -86,7 +86,7 @@ public class ResourceDataManagerConfig {
       defaultConfig.addProperty(READ_MODE, ReadMode.heap);
     }
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
-    ResourceDataManagerConfig resourceDataManagerConfig = new ResourceDataManagerConfig(defaultConfig);
+    TableDataManagerConfig resourceDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 
     switch (resourceType) {
       case OFFLINE:

@@ -56,8 +56,8 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
-  private Map<String, ResourceDataManagerConfig> _resourceDataManagerConfigMap =
-      new HashMap<String, ResourceDataManagerConfig>();
+  private Map<String, TableDataManagerConfig> _resourceDataManagerConfigMap =
+      new HashMap<String, TableDataManagerConfig>();
 
   public FileBasedInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
@@ -69,7 +69,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
         resourceConfig.addProperty(kEY_OF_RESOURCE_DATA_DIRECTORY, getInstanceDataDir() + "/" + resourceName
             + "/index/node" + getInstanceId());
       }
-      _resourceDataManagerConfigMap.put(resourceName, new ResourceDataManagerConfig(resourceConfig));
+      _resourceDataManagerConfigMap.put(resourceName, new TableDataManagerConfig(resourceConfig));
     }
   }
 
@@ -106,7 +106,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
     return _instanceDataManagerConfiguration.getList(INSTANCE_RESOURCE_NAME);
   }
 
-  public ResourceDataManagerConfig getResourceDataManagerConfig(String resourceName) {
+  public TableDataManagerConfig getResourceDataManagerConfig(String resourceName) {
     return _resourceDataManagerConfigMap.get(resourceName);
   }
 

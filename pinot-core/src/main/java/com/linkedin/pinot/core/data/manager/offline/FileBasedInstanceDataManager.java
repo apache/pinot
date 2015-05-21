@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 
 
 /**
@@ -48,7 +48,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   private static final FileBasedInstanceDataManager INSTANCE_DATA_MANAGER = new FileBasedInstanceDataManager();
   public static final Logger LOGGER = LoggerFactory.getLogger(FileBasedInstanceDataManager.class);
   private FileBasedInstanceDataManagerConfig _instanceDataManagerConfig;
-  private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
+  private Map<String, TableDataManager> _resourceDataManagerMap = new HashMap<String, TableDataManager>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
 
@@ -64,10 +64,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       InstantiationException, IllegalAccessException, ClassNotFoundException {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
-      ResourceDataManagerConfig resourceDataManagerConfig =
+      TableDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      ResourceDataManager resourceDataManager =
-          ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+      TableDataManager resourceDataManager =
+          TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
     _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
@@ -83,10 +83,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       Utils.rethrowException(e);
     }
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
-      ResourceDataManagerConfig resourceDataManagerConfig =
+      TableDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      ResourceDataManager resourceDataManager =
-          ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+      TableDataManager resourceDataManager =
+          TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
     try {
@@ -108,7 +108,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void start() {
-    for (ResourceDataManager resourceDataManager : _resourceDataManagerMap.values()) {
+    for (TableDataManager resourceDataManager : _resourceDataManagerMap.values()) {
       resourceDataManager.start();
     }
     try {
@@ -163,15 +163,15 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     return _isStarted;
   }
 
-  public synchronized void addResourceDataManager(String resourceName, ResourceDataManager resourceDataManager) {
+  public synchronized void addResourceDataManager(String resourceName, TableDataManager resourceDataManager) {
     _resourceDataManagerMap.put(resourceName, resourceDataManager);
   }
 
-  public Collection<ResourceDataManager> getResourceDataManagers() {
+  public Collection<TableDataManager> getResourceDataManagers() {
     return _resourceDataManagerMap.values();
   }
 
-  public ResourceDataManager getResourceDataManager(String resourceName) {
+  public TableDataManager getResourceDataManager(String resourceName) {
     return _resourceDataManagerMap.get(resourceName);
   }
 
@@ -179,7 +179,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   public synchronized void shutDown() {
 
     if (isStarted()) {
-      for (ResourceDataManager resourceDataManager : getResourceDataManagers()) {
+      for (TableDataManager resourceDataManager : getResourceDataManagers()) {
         resourceDataManager.shutDown();
       }
       _isStarted = false;

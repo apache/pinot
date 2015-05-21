@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.ResourceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
@@ -170,7 +170,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private List<IndexSegment> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
     final String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();
-    final ResourceDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
+    final TableDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
     if (resourceDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
       return new ArrayList<IndexSegment>();
     }

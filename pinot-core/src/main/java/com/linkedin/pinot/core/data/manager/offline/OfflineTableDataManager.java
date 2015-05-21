@@ -39,7 +39,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -54,8 +54,8 @@ import com.yammer.metrics.core.Counter;
  * @author xiafu
  *
  */
-public class OfflineResourceDataManager implements ResourceDataManager {
-  private Logger LOGGER = LoggerFactory.getLogger(OfflineResourceDataManager.class);
+public class OfflineTableDataManager implements TableDataManager {
+  private Logger LOGGER = LoggerFactory.getLogger(OfflineTableDataManager.class);
 
   private volatile boolean _isStarted = false;
   private final Object _globalLock = new Object();
@@ -64,7 +64,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   private ExecutorService _queryExecutorService;
 
-  private ResourceDataManagerConfig _resourceDataManagerConfig;
+  private TableDataManagerConfig _resourceDataManagerConfig;
   private final ExecutorService _segmentAsyncExecutorService = Executors
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private String _resourceDataDir;
@@ -76,30 +76,30 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   private final List<String> _loadingSegments = new ArrayList<String>();
   private Map<String, AtomicInteger> _referenceCounts = new HashMap<String, AtomicInteger>();
 
-  private Counter _currentNumberOfSegments = Metrics.newCounter(OfflineResourceDataManager.class,
+  private Counter _currentNumberOfSegments = Metrics.newCounter(OfflineTableDataManager.class,
       CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
-  private Counter _currentNumberOfDocuments = Metrics.newCounter(OfflineResourceDataManager.class,
+  private Counter _currentNumberOfDocuments = Metrics.newCounter(OfflineTableDataManager.class,
       CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
-  private Counter _numDeletedSegments = Metrics.newCounter(OfflineResourceDataManager.class,
+  private Counter _numDeletedSegments = Metrics.newCounter(OfflineTableDataManager.class,
       CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
-  public OfflineResourceDataManager() {
+  public OfflineTableDataManager() {
   }
 
   @Override
-  public void init(ResourceDataManagerConfig resourceDataManagerConfig) {
+  public void init(TableDataManagerConfig resourceDataManagerConfig) {
     _resourceDataManagerConfig = resourceDataManagerConfig;
     _resourceName = _resourceDataManagerConfig.getResourceName();
 
     LOGGER = LoggerFactory.getLogger(_resourceName + "-OfflineResourceDataManager");
     _currentNumberOfSegments =
-        Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
+        Metrics.newCounter(OfflineTableDataManager.class, _resourceName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
     _currentNumberOfDocuments =
-        Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
+        Metrics.newCounter(OfflineTableDataManager.class, _resourceName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
     _numDeletedSegments =
-        Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
+        Metrics.newCounter(OfflineTableDataManager.class, _resourceName + "-"
             + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
     _resourceDataDir = _resourceDataManagerConfig.getDataDir();
