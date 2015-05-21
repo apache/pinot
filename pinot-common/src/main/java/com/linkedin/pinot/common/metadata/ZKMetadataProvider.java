@@ -223,4 +223,37 @@ public class ZKMetadataProvider {
     return AbstractTableConfig.fromZnRecord(znRecord);
   }
 
+  public static List<OfflineSegmentZKMetadata> getOfflineSegmentZKMetadataListForTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    List<OfflineSegmentZKMetadata> resultList = new ArrayList<OfflineSegmentZKMetadata>();
+    if (propertyStore == null) {
+      return resultList;
+    }
+    String offlineResourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    if (propertyStore.exists(constructPropertyStorePathForResource(offlineResourceName), AccessOption.PERSISTENT)) {
+      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(offlineResourceName), null, AccessOption.PERSISTENT);
+      if (znRecordList != null) {
+        for (ZNRecord record : znRecordList) {
+          resultList.add(new OfflineSegmentZKMetadata(record));
+        }
+      }
+    }
+    return resultList;
+  }
+
+  public static List<RealtimeSegmentZKMetadata> getRealtimeSegmentZKMetadataListForTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    List<RealtimeSegmentZKMetadata> resultList = new ArrayList<RealtimeSegmentZKMetadata>();
+    if (propertyStore == null) {
+      return resultList;
+    }
+    String realtimeResourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
+    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeResourceName), AccessOption.PERSISTENT)) {
+      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(realtimeResourceName), null, AccessOption.PERSISTENT);
+      if (znRecordList != null) {
+        for (ZNRecord record : znRecordList) {
+          resultList.add(new RealtimeSegmentZKMetadata(record));
+        }
+      }
+    }
+    return resultList;
+  }
 }

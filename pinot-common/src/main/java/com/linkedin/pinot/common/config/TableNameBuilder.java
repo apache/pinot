@@ -40,4 +40,13 @@ public class TableNameBuilder {
   public boolean needsPostfix(String tableName) {
     return !tableName.endsWith(type.toString().toUpperCase());
   }
+
+  public static TableType getTableTypeFromTableName(String tableName) {
+    for (TableType tableType : TableType.values()) {
+      if (tableName.endsWith(tableType.toString())) {
+        return tableType;
+      }
+    }
+    return null;
+  }
 }
