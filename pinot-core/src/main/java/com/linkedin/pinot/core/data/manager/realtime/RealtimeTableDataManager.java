@@ -195,10 +195,11 @@ public class RealtimeTableDataManager implements TableDataManager {
             if (!_segmentsMap.containsKey(segmentId)) {
               // this is a new segment, lets create an instance of RealtimeSegmentDataManager
               PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-                  PinotHelixPropertyStoreZnRecordProvider.forSchema(_helixPropertyStore);
-              List<String> schemas =
-                  propertyStore.getChildNames(propertyStoreHelper.getRelativePath() + "/"
-                      + tableConfig.getValidationConfig().getSchemaName(), AccessOption.PERSISTENT);
+                  PinotHelixPropertyStoreZnRecordProvider.forSchema(propertyStore);
+              String path =
+                  StringUtil.join("/", propertyStoreHelper.getRelativePath(), tableConfig.getValidationConfig()
+                      .getSchemaName());
+              List<String> schemas = propertyStore.getChildNames(path, AccessOption.PERSISTENT);
               List<Integer> schemasIds = new ArrayList<Integer>();
               for (String id : schemas) {
                 schemasIds.add(Integer.parseInt(id));
@@ -206,9 +207,10 @@ public class RealtimeTableDataManager implements TableDataManager {
               Collections.sort(schemasIds);
               String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
               LOGGER.info("found schema {} with version {}", tableConfig.getValidationConfig().getSchemaName(), latest);
+
               ZNRecord record =
-                  propertyStoreHelper.get(StringUtil.join("/", tableConfig.getValidationConfig().getSchemaName(),
-                      latest));
+                  propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName() + "/" + latest);
+
               SegmentDataManager manager =
                   new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, tableConfig,
                       instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record));

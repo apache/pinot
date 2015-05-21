@@ -4,8 +4,6 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-
 
 public class PinotHelixPropertyStoreZnRecordProvider {
 
@@ -19,7 +17,7 @@ public class PinotHelixPropertyStoreZnRecordProvider {
 
   private PinotHelixPropertyStoreZnRecordProvider(ZkHelixPropertyStore<ZNRecord> propertyStore, String relativePathName) {
     this.propertyStore = propertyStore;
-    this.pathPrefix = "/" + relativePathName;
+    this.pathPrefix = relativePathName;
   }
 
   public static PinotHelixPropertyStoreZnRecordProvider forSchema(ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -43,7 +41,7 @@ public class PinotHelixPropertyStoreZnRecordProvider {
   }
 
   public boolean exist(String path) {
-    return propertyStore.exists(StringUtil.join("/", pathPrefix, path), AccessOption.PERSISTENT);
+    return propertyStore.exists(pathPrefix + "/" + path, AccessOption.PERSISTENT);
   }
 
   public String getRelativePath() {

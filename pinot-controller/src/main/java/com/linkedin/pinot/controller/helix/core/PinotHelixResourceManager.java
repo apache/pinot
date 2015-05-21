@@ -1664,7 +1664,7 @@ public class PinotHelixResourceManager {
     String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
     LOGGER.info("found schema {} with version {}", schemaName, latest);
 
-    ZNRecord record = propertyStoreHelper.get(schemaName);
+    ZNRecord record = propertyStoreHelper.get(schemaName + "/" + latest);
     return Schema.fromZNRecordV2(record);
   }
 
