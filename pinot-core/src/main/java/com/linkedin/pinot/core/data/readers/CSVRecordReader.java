@@ -27,10 +27,8 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringEscapeUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class CSVRecordReader implements RecordReader {
   private static final String CSV_FORMAT_ENV = "csv_reader_format";
@@ -85,14 +83,11 @@ public class CSVRecordReader implements RecordReader {
       String token = record.get(column);
 
       Object value=null;
-      if ((token == null) || (token.isEmpty())) {
-        value = getDefaultNullValue(fieldSpec);
-
-      } else if (fieldSpec.isSingleValueField()) {
-        value = convertToDataType(token, fieldSpec.getDataType());
+      if (fieldSpec.isSingleValueField()) {
+        value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
 
       } else {
-        value = convertToDataTypeArray(token, fieldSpec.getDataType());
+        value = RecordReaderUtils.convertToDataTypeArray(token, fieldSpec.getDataType());
       }
 
       fieldMap.put(column, value);
@@ -106,60 +101,6 @@ public class CSVRecordReader implements RecordReader {
   @Override
   public void close() throws Exception {
     _parser.close();
-  }
-
-  private static Object convertToDataType(String value, DataType dataType) {
-
-    switch (dataType) {
-      case INT:
-        return (int) Double.parseDouble(value);
-
-      case LONG:
-        return Long.parseLong(value);
-
-      case FLOAT:
-        return Float.parseFloat(value);
-
-      case DOUBLE:
-        return Double.parseDouble(value);
-
-      case STRING:
-      case BOOLEAN:
-        return value;
-
-      default:
-        throw new RuntimeException("Unsupported data type");
-    }
-  }
-
-  private static Object convertToDataTypeArray(String token, DataType dataType) {
-    String [] tokens = token.split(",");
-    final Object[] value = new Object[tokens.length];
-
-    for (int i = 0; i < tokens.length; ++ i) {
-      value[i] = convertToDataType(tokens[i], dataType);
-    }
-
-    return value;
-  }
-
-  private static Object getDefaultNullValue(final FieldSpec spec) {
-    switch (spec.getDataType()) {
-      case INT:
-        return Dictionary.DEFAULT_NULL_INT_VALUE;
-      case FLOAT:
-        return Dictionary.DEFAULT_NULL_FLOAT_VALUE;
-      case DOUBLE:
-        return Dictionary.DEFAULT_NULL_DOUBLE_VALUE;
-      case LONG:
-        return Dictionary.DEFAULT_NULL_LONG_VALUE;
-      case STRING:
-      case BOOLEAN:
-        return Dictionary.DEFAULT_NULL_STRING_VALUE;
-      default:
-        break;
-    }
-    return null;
   }
 
   private CSVFormat getFormatFromEnv() {
