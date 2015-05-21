@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,8 +27,9 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
@@ -60,14 +60,13 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     return INSTANCE_DATA_MANAGER;
   }
 
-  public synchronized void init(FileBasedInstanceDataManagerConfig instanceDataManagerConfig) throws ConfigurationException,
-      InstantiationException, IllegalAccessException, ClassNotFoundException {
+  public synchronized void init(FileBasedInstanceDataManagerConfig instanceDataManagerConfig)
+      throws ConfigurationException, InstantiationException, IllegalAccessException, ClassNotFoundException {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
       TableDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      TableDataManager resourceDataManager =
-          TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+      TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
     _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
@@ -85,8 +84,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
       TableDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      TableDataManager resourceDataManager =
-          TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+      TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
     try {
@@ -94,8 +92,9 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Loaded SegmentMetadataLoader for class name : "
           + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
     } catch (Exception e) {
-      LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
-          + _instanceDataManagerConfig.getSegmentMetadataLoaderClass(), e);
+      LOGGER.error(
+          "Cannot initialize SegmentMetadataLoader for class name : "
+              + _instanceDataManagerConfig.getSegmentMetadataLoaderClass(), e);
       Utils.rethrowException(e);
     }
   }
@@ -159,6 +158,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   }
 
+  @Override
   public boolean isStarted() {
     return _isStarted;
   }
@@ -171,6 +171,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     return _resourceDataManagerMap.values();
   }
 
+  @Override
   public TableDataManager getResourceDataManager(String resourceName) {
     return _resourceDataManagerMap.get(resourceName);
   }
@@ -239,12 +240,13 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   @Override
   public void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception {
-    throw new UnsupportedOperationException("Not support addSegment(SegmentZKMetadata segmentZKMetadata) in FileBasedInstanceDataManager yet!");
+    throw new UnsupportedOperationException(
+        "Not support addSegment(SegmentZKMetadata segmentZKMetadata) in FileBasedInstanceDataManager yet!");
   }
 
   @Override
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
-      SegmentZKMetadata segmentZKMetadata) throws Exception {
+  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
     throw new UnsupportedOperationException("Not support addSegment(...) in FileBasedInstanceDataManager yet!");
   }
 

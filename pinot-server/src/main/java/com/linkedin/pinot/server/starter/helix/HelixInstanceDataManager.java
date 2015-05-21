@@ -27,8 +27,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -37,9 +37,9 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 
 
 /**
@@ -240,8 +240,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
-      SegmentZKMetadata segmentZKMetadata) throws Exception {
+  public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
     if (segmentZKMetadata == null || segmentZKMetadata.getResourceName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
@@ -257,19 +257,21 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       synchronized (_globalLock) {
         if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(dataResourceZKMetadata, resourceName);
+          addResourceIfNeed(tableConfig, resourceName);
         }
       }
     }
-    _resourceDataManagerMap.get(resourceName).addSegment(propertyStore, dataResourceZKMetadata, instanceZKMetadata, segmentZKMetadata);
+    _resourceDataManagerMap.get(resourceName).addSegment(propertyStore, tableConfig, instanceZKMetadata,
+        segmentZKMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
 
   }
 
-  public synchronized void addResourceIfNeed(DataResourceZKMetadata dataResourceZKMetadata, String resourceName) throws ConfigurationException {
+  public synchronized void addResourceIfNeed(AbstractTableConfig tableConfig, String resourceName)
+      throws ConfigurationException {
     TableDataManagerConfig resourceDataManagerConfig = getDefaultHelixResourceDataManagerConfig(resourceName);
-    if (dataResourceZKMetadata != null) {
-      resourceDataManagerConfig.overrideConfigs(dataResourceZKMetadata.getMetadata());
+    if (tableConfig != null) {
+      resourceDataManagerConfig.overrideConfigs(tableConfig);
     }
     TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
     resourceDataManager.start();
@@ -278,8 +280,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   private TableDataManagerConfig getDefaultHelixResourceDataManagerConfig(String resourceName)
       throws ConfigurationException {
-    return TableDataManagerConfig.getDefaultHelixResourceDataManagerConfig(_instanceDataManagerConfig,
-        resourceName);
+    return TableDataManagerConfig.getDefaultHelixResourceDataManagerConfig(_instanceDataManagerConfig, resourceName);
   }
 
   @Override

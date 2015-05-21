@@ -18,18 +18,19 @@ package com.linkedin.pinot.core.data.manager.offline;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
 public interface InstanceDataManager extends DataManager {
   TableDataManager getResourceDataManager(String resourceName);
 
+  @Override
   void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception;
 
-  void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata,
+  void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception;
 
 }

@@ -23,9 +23,9 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
@@ -77,37 +77,24 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private final String sortedColumn;
 
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
-      final RealtimeDataResourceZKMetadata resourceMetadata, InstanceZKMetadata instanceMetadata,
-      RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode)
-      throws Exception {
-    if (resourceMetadata.getMetadata().containsKey(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING)) {
-      try {
-        this.timeInMillisToStopIndexing =
-            Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING));
-      } catch (Exception e) {
-        this.timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
-      }
-    }
+      final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
+      RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
+      final Schema schema) throws Exception {
+    this.timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
     segmentEndTimeThreshold = start + this.timeInMillisToStopIndexing;
-    if (resourceMetadata.getMetadata().containsKey(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING)) {
-      try {
-        this.numIndexedEventsToStopIndexing =
-            Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING));
-      } catch (Exception e) {
-        this.numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
-      }
-    }
-    this.schema = resourceMetadata.getDataSchema();
-    if (resourceMetadata.getSortedColumns().isEmpty()) {
+    this.numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
+    this.schema = schema;
+    if (tableConfig.getIndexingConfig().getSortedColumn().isEmpty()) {
       LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column");
       this.sortedColumn = null;
     } else {
-      String firstSortedColumn = resourceMetadata.getSortedColumns().get(0);
+      String firstSortedColumn = tableConfig.getIndexingConfig().getSortedColumn().get(0);
       if (this.schema.isExisted(firstSortedColumn)) {
         LOGGER.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata.", firstSortedColumn);
         this.sortedColumn = firstSortedColumn;
       } else {
-        LOGGER.warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema.", firstSortedColumn);
+        LOGGER.warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema.",
+            firstSortedColumn);
         this.sortedColumn = null;
       }
     }
@@ -117,7 +104,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // create and init stream provider config
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
     this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
-    this.kafkaStreamProviderConfig.init(resourceMetadata, instanceMetadata);
+    this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
     this.resourceDir = new File(resourceDataDir);
     this.resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!resourceTmpDir.exists()) {
@@ -163,8 +150,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         // lets convert the segment now
         RealtimeSegmentConverter conveter =
             new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(),
-                schema, segmentMetadata.getResourceName(), segmentMetadata
-                    .getSegmentName(), sortedColumn);
+                schema, segmentMetadata.getResourceName(), segmentMetadata.getSegmentName(), sortedColumn);
         try {
           LOGGER.info("Trying to build segment!");
           conveter.build();
@@ -176,7 +162,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
 
-          TimeUnit timeUnit = resourceMetadata.getDataSchema().getTimeSpec().getOutgoingGranularitySpec().getTimeType();
+          TimeUnit timeUnit = schema.getTimeSpec().getOutgoingGranularitySpec().getTimeType();
           swap();
           RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
           metadaToOverrite.setResourceName(segmentMetadata.getResourceName());

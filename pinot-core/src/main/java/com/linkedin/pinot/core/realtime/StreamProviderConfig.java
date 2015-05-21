@@ -17,16 +17,16 @@ package com.linkedin.pinot.core.realtime;
 
 import java.util.Map;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 
 
 public interface StreamProviderConfig {
 
   public void init(Map<String, String> properties, Schema schema);
 
-  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata);
+  public void init(AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema);
 
   String getStreamProviderClass();
 

@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,15 +26,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -42,10 +44,11 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.yammer.metrics.Metrics;
@@ -115,8 +118,8 @@ public class RealtimeTableDataManager implements TableDataManager {
     _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
     _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
     LOGGER
-        .info("Initialized RealtimeResourceDataManager: resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
-            + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
+        .info("Initialized RealtimeResourceDataManager: resource : " + _resourceName + " with :\n\tData Directory: "
+            + _resourceDataDir + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
             + ((_numberOfResourceQueryExecutorThreads > 0) ? _numberOfResourceQueryExecutorThreads : "cached")
             + " threads");
   }
@@ -160,22 +163,25 @@ public class RealtimeTableDataManager implements TableDataManager {
     return _isStarted;
   }
 
+  @Override
   public void addSegment(SegmentZKMetadata segmentMetadata) throws Exception {
     throw new UnsupportedOperationException("Cannot add realtime segment with just SegmentZKMetadata");
   }
 
   @Override
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
-      SegmentZKMetadata segmentZKMetadata) throws Exception {
+  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
     this._helixPropertyStore = propertyStore;
     String segmentId = segmentZKMetadata.getSegmentName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      if (new File(_indexDir, segmentId).exists() && ((RealtimeSegmentZKMetadata) segmentZKMetadata).getStatus() == Status.DONE) {
+      if (new File(_indexDir, segmentId).exists()
+          && ((RealtimeSegmentZKMetadata) segmentZKMetadata).getStatus() == Status.DONE) {
         // segment already exists on file, simply load it and add it to the map
         if (!_segmentsMap.containsKey(segmentId)) {
           synchronized (getGlobalLock()) {
             if (!_segmentsMap.containsKey(segmentId)) {
-              IndexSegment segment = ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode, _indexLoadingConfigMetadata);
+              IndexSegment segment =
+                  ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode, _indexLoadingConfigMetadata);
               _segmentsMap.put(segmentId, new OfflineSegmentDataManager(segment));
               markSegmentAsLoaded(segmentId);
               _referenceCounts.put(segmentId, new AtomicInteger(1));
@@ -187,9 +193,20 @@ public class RealtimeTableDataManager implements TableDataManager {
           synchronized (getGlobalLock()) {
             if (!_segmentsMap.containsKey(segmentId)) {
               // this is a new segment, lets create an instance of RealtimeSegmentDataManager
+              String path = StringUtil.join("/", "/schemas", tableConfig.getValidationConfig().getSchemaName());
+              List<String> schemas = propertyStore.getChildNames(path, AccessOption.PERSISTENT);
+              List<Integer> schemasIds = new ArrayList<Integer>();
+              for (String id : schemas) {
+                schemasIds.add(Integer.parseInt(id));
+              }
+              Collections.sort(schemasIds);
+              String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
+              LOGGER.info("found schema {} with version {}", tableConfig.getValidationConfig().getSchemaName(), latest);
+              ZNRecord record = propertyStore.get(StringUtil.join("/", path, latest), null, AccessOption.PERSISTENT);
+
               SegmentDataManager manager =
-                  new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, (RealtimeDataResourceZKMetadata) dataResourceZKMetadata,
-                      instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode);
+                  new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, tableConfig,
+                      instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record));
               LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);
               _segmentsMap.put(segmentId, manager);
               _loadingSegments.add(segmentId);

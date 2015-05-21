@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
@@ -32,10 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -44,7 +45,6 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
@@ -69,8 +69,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   private static int SEGMENT_LOAD_MAX_RETRY_COUNT;
   private static long SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS;
 
-  public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId, DataManager instanceDataManager,
-      SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties) {
+  public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId,
+      DataManager instanceDataManager, SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties) {
     HELIX_CLUSTER_NAME = helixClusterName;
     INSTANCE_ID = instanceId;
     INSTANCE_DATA_MANAGER = instanceDataManager;
@@ -78,8 +78,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     int maxRetries = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
     try {
-      maxRetries = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT,
-          maxRetries);
+      maxRetries =
+          pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT, maxRetries);
     } catch (Exception e) {
       // Keep the default value
     }
@@ -87,8 +87,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     long minRetryDelayMillis = Long.parseLong(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
     try {
-      minRetryDelayMillis = pinotHelixProperties.getLong(
-          CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS, minRetryDelayMillis);
+      minRetryDelayMillis =
+          pinotHelixProperties.getLong(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS,
+              minRetryDelayMillis);
     } catch (Exception e) {
       // Keep the default value
     }
@@ -101,7 +102,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
-    final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel(HELIX_CLUSTER_NAME, INSTANCE_ID);
+    final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel =
+        new SegmentOnlineOfflineStateModel(HELIX_CLUSTER_NAME, INSTANCE_ID);
     return SegmentOnlineOfflineStateModel;
   }
 
@@ -134,26 +136,30 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         }
       } catch (Exception e) {
         if (LOGGER.isErrorEnabled()) {
-          LOGGER.error("Caught exception in state transition for OFFLINE -> ONLINE for partition" +
-              message.getPartitionName() + " of resource " + message.getResourceName(), e);
+          LOGGER.error(
+              "Caught exception in state transition for OFFLINE -> ONLINE for partition" + message.getPartitionName()
+                  + " of resource " + message.getResourceName(), e);
         }
         Utils.rethrowException(e);
       }
     }
 
-    private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message, NotificationContext context) throws Exception {
+    private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message, NotificationContext context)
+        throws Exception {
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
 
-      ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore =
+          ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
 
       SegmentZKMetadata realtimeSegmentZKMetadata =
           ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, resourceName, segmentId);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
-      RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(propertyStore, resourceName);
-
-      ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, realtimeDataResourceZKMetadata,
-          instanceZKMetadata, realtimeSegmentZKMetadata);
+      AbstractTableConfig tableConfig =
+          AbstractTableConfig.fromZnRecord(propertyStore.get("/CONFIGS/RESOURCE/" + resourceName, null,
+              AccessOption.PERSISTENT));
+      ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, tableConfig, instanceZKMetadata,
+          realtimeSegmentZKMetadata);
     }
 
     private void onBecomeOnlineFromOfflineForOfflineSegment(Message message, NotificationContext context) {
@@ -163,7 +169,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
 
-      ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore =
+          ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, resourceName, segmentId);
@@ -209,22 +216,24 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             try {
               final String uri = offlineSegmentZKMetadata.getDownloadUrl();
               final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-              final SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+              final SegmentMetadata segmentMetadata =
+                  SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
               INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
 
               // Successfully loaded the segment, break out of the retry loop
               break;
             } catch (Exception e) {
               long attemptDurationMillis = System.currentTimeMillis() - attemptStartTime;
-              LOGGER.warn("Caught exception while loading segment " + segmentId + ", attempt " + (retryCount + 1) + " of "
-                  + SEGMENT_LOAD_MAX_RETRY_COUNT, e);
+              LOGGER.warn("Caught exception while loading segment " + segmentId + ", attempt " + (retryCount + 1)
+                  + " of " + SEGMENT_LOAD_MAX_RETRY_COUNT, e);
 
               // Do we need to wait for the next retry attempt?
               if (retryCount < SEGMENT_LOAD_MAX_RETRY_COUNT) {
                 // Exponentially back off, wait for (minDuration + attemptDurationMillis) * 1.0..(2^retryCount)+1.0
                 double maxRetryDurationMultiplier = Math.pow(2.0, (retryCount + 1));
                 double retryDurationMultiplier = Math.random() * maxRetryDurationMultiplier + 1.0;
-                long waitTime = (long) ((SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS + attemptDurationMillis) * retryDurationMultiplier);
+                long waitTime =
+                    (long) ((SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS + attemptDurationMillis) * retryDurationMultiplier);
 
                 LOGGER.warn("Waiting for " + TimeUnit.MILLISECONDS.toSeconds(waitTime) + " seconds to retry");
                 long waitEndTime = System.currentTimeMillis() + waitTime;
@@ -316,27 +325,29 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         throw new UnsupportedOperationException("Not implemented yet");
       } else {
         try {
-          tempSegmentFile = new File(
-              INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + resourceName + "/temp_" + segmentId + "_" + System
-                  .currentTimeMillis());
+          tempSegmentFile =
+              new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + resourceName + "/temp_" + segmentId
+                  + "_" + System.currentTimeMillis());
           if (uri.startsWith("http:")) {
             tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
             final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-            LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: " + httpGetResponseContentLength
-                + ", Length of downloaded file : " + tempFile.length());
+            LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: "
+                + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
             LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
             TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
             FileUtils.deleteQuietly(tempFile);
           } else {
             TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
           }
-          final File segmentDir = new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
+          final File segmentDir =
+              new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
           Thread.sleep(1000);
           if (segmentDir.exists()) {
             LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
             FileUtils.deleteDirectory(segmentDir);
           }
-          LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath() + ". The segment id is - " + segmentId);
+          LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath()
+              + ". The segment id is - " + segmentId);
           FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
           FileUtils.deleteDirectory(tempSegmentFile);
           Thread.sleep(1000);

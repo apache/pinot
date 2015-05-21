@@ -15,13 +15,11 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import java.util.Map;
-import java.util.Map.Entry;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -103,10 +101,9 @@ public class TableDataManagerConfig {
     return resourceDataManagerConfig;
   }
 
-  public void overrideConfigs(Map<String, String> metadata) {
-    for (Entry<String, String> entry : metadata.entrySet()) {
-      _resourceDataManagerConfig.addProperty(entry.getKey(), entry.getValue());
-    }
+  public void overrideConfigs(AbstractTableConfig tableConfig) {
+    _resourceDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode());
+    _resourceDataManagerConfig.setProperty(RESOURCE_DATA_MANAGER_NAME, tableConfig.getTableName());
   }
 
   public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {

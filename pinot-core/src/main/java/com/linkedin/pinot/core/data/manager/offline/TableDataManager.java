@@ -21,8 +21,8 @@ import java.util.concurrent.ExecutorService;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
@@ -70,7 +70,7 @@ public interface TableDataManager {
    * Adding a Segment into the ResourceDataManager by given SegmentZKMetadata.
    *
    * @param indexSegmentToAdd
-   * @throws Exception 
+   * @throws Exception
    */
   public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception;
 
@@ -80,13 +80,13 @@ public interface TableDataManager {
    * @param dataResourceZKMetadata
    * @param instanceZKMetadata
    * @param segmentZKMetadata
-   * @throws Exception 
+   * @throws Exception
    */
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
-      SegmentZKMetadata segmentZKMetadata) throws Exception;
+  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
+      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception;
 
   /**
-   * 
+   *
    * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
    * @param segmentNameToRemove
    */

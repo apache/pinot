@@ -21,9 +21,9 @@ import java.util.Properties;
 
 import kafka.consumer.ConsumerConfig;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
@@ -124,15 +124,14 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
 
   @Override
   public String getStreamProviderClass() {
-    // TODO Auto-generated method stub
     return null;
   }
 
   @Override
-  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata) {
-    this.indexingSchema = resourceMetdata.getDataSchema();
-    this.groupId = instanceMetadata.getGroupId(resourceMetdata.getResourceName());
-    KafkaStreamMetadata kafkaMetadata = (KafkaStreamMetadata) resourceMetdata.getStreamMetadata();
+  public void init(AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
+    this.indexingSchema = schema;
+    this.groupId = instanceMetadata.getGroupId(tableConfig.getTableName());
+    KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();
