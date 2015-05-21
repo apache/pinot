@@ -16,6 +16,8 @@
 package com.linkedin.pinot.common.config;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,12 +29,21 @@ public class IndexingConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexingConfig.class);
 
   private List<String> invertedIndexColumns;
+  private List<String> sortedColumn = new ArrayList<String>();
   private String loadMode;
   private String lazyLoad;
-  private Map<String, String> streamConfigs;
+  private Map<String, String> streamConfigs = new HashMap<String, String>();
 
   public IndexingConfig() {
 
+  }
+
+  public List<String> getSortedColumn() {
+    return sortedColumn;
+  }
+
+  public void setSortedColumn(List<String> sortedColumn) {
+    this.sortedColumn = sortedColumn;
   }
 
   public Map<String, String> getStreamConfigs() {
