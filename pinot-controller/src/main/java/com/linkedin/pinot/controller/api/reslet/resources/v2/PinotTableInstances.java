@@ -45,8 +45,6 @@ public class PinotTableInstances extends ServerResource {
   @Override
   @Get
   public Representation get() {
-    StringRepresentation presentation = null;
-
     final String tableName = (String) getRequest().getAttributes().get("tableName");
     final String type = getQueryValue("type");
     if (tableName == null) {
@@ -112,7 +110,5 @@ public class PinotTableInstances extends ServerResource {
       return PinotFileUpload.exceptionToStringRepresentation(e);
     }
 
-    // get all instances for this tableName
-    return presentation;
   }
 }
