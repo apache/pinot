@@ -59,7 +59,7 @@ public class PinotResourceManagerTest {
   private int _numInstance;
 
   @BeforeTest
-  public void setUp() throws Exception {
+  public void setup() throws Exception {
     ZkTestUtils.startLocalZkServer();
     _zkClient = new ZkClient(ZK_SERVER);
 
@@ -83,7 +83,7 @@ public class PinotResourceManagerTest {
 
     // Create broker tenant
     Tenant brokerTenant =
-        new TenantBuilder(BROKER_TENANT_NAME).setType(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(0)
+        new TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(0)
             .setRealtimeInstances(0).build();
 
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
@@ -92,13 +92,13 @@ public class PinotResourceManagerTest {
 
     // Create server tenant
     Tenant serverTenant =
-        new TenantBuilder(SERVER_TENANT_NAME).setType(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(1)
+        new TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(1)
             .setRealtimeInstances(0).build();
     _pinotHelixResourceManager.createServerTenant(serverTenant);
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
             1).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -158,7 +158,7 @@ public class PinotResourceManagerTest {
   private void addOneSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotHelixResourceManager.addSegmentV2(segmentMetadata, "downloadUrl");
+    _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
   private void deleteOneSegment(String resource, String segment) {

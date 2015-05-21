@@ -25,11 +25,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 
@@ -37,76 +34,6 @@ public class ZKMetadataProvider {
   private static String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static String PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX = "/CONFIGS/RESOURCE";
   private static String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
-
-  @Deprecated
-  public static void setRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, RealtimeDataResourceZKMetadata realtimeDataResource) {
-    ZNRecord znRecord = realtimeDataResource.toZNRecord();
-    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(realtimeDataResource.getResourceName());
-    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeResourceName), znRecord, AccessOption.PERSISTENT);
-  }
-
-  @Deprecated
-  public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeResourceName), null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return null;
-    }
-    return new RealtimeDataResourceZKMetadata(znRecord);
-  }
-
-  @Deprecated
-  public static List<RealtimeSegmentZKMetadata> getRealtimeResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    List<RealtimeSegmentZKMetadata> resultList = new ArrayList<RealtimeSegmentZKMetadata>();
-    if (propertyStore == null) {
-      return resultList;
-    }
-    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
-    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeResourceName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(realtimeResourceName), null, AccessOption.PERSISTENT);
-      if (znRecordList != null) {
-        for (ZNRecord record : znRecordList) {
-          resultList.add(new RealtimeSegmentZKMetadata(record));
-        }
-      }
-    }
-    return resultList;
-  }
-
-  @Deprecated
-  public static void setOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, OfflineDataResourceZKMetadata offlineDataResource) {
-    ZNRecord znRecord = offlineDataResource.toZNRecord();
-    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(offlineDataResource.getResourceName());
-    propertyStore.set(constructPropertyStorePathForResourceConfig(offlineResourceName), znRecord, AccessOption.PERSISTENT);
-  }
-
-  @Deprecated
-  public static OfflineDataResourceZKMetadata getOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(offlineResourceName), null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return null;
-    }
-    return new OfflineDataResourceZKMetadata(znRecord);
-  }
-
-  @Deprecated
-  public static List<OfflineSegmentZKMetadata> getOfflineResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    List<OfflineSegmentZKMetadata> resultList = new ArrayList<OfflineSegmentZKMetadata>();
-    if (propertyStore == null) {
-      return resultList;
-    }
-    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
-    if (propertyStore.exists(constructPropertyStorePathForResource(offlineResourceName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(offlineResourceName), null, AccessOption.PERSISTENT);
-      if (znRecordList != null) {
-        for (ZNRecord record : znRecordList) {
-          resultList.add(new OfflineSegmentZKMetadata(record));
-        }
-      }
-    }
-    return resultList;
-  }
 
   public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeResourceName, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeResourceName), znRecord, AccessOption.PERSISTENT);

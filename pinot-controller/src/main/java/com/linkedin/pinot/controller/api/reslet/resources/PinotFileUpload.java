@@ -191,7 +191,7 @@ public class PinotFileUpload extends ServerResource {
         }
         FileUtils.moveFile(dataFile, segmentFile);
 
-        manager.addSegmentV2(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
+        manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
         return new StringRepresentation("");
       } else {
         // Some problem occurs, sent back a simple line of text.

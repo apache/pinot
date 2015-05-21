@@ -71,10 +71,12 @@ public class PerfBenchmarkDriverConf {
   boolean forceReloadIndex = false;
 
   //resource configuration
-  
+
   boolean configureResources = false;
-  
- 
+
+  String tableName;
+
+  String schemaFileNamePath;
 
   //Query
   boolean runQueries = false;
@@ -306,7 +308,23 @@ public class PerfBenchmarkDriverConf {
   public void setConfigureResources(boolean configureResources) {
     this.configureResources = configureResources;
   }
-  
+
+  public String getTableName() {
+    return tableName;
+  }
+
+  public void setTableName(String tableName) {
+    this.tableName = tableName;
+  }
+
+  public String getSchemaFileNamePath() {
+    return schemaFileNamePath;
+  }
+
+  public void setSchemaFileNamePath(String schemaFileNamePath) {
+    this.schemaFileNamePath = schemaFileNamePath;
+  }
+
   public static void main(String[] args) {
     DumperOptions options = new DumperOptions();
     options.setIndent(4);

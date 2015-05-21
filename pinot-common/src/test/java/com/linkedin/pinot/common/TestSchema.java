@@ -42,6 +42,6 @@ public class TestSchema {
   public void test1() throws IllegalArgumentException, IllegalAccessException, JsonParseException,
       JsonMappingException, IOException {
     ZNRecord record = Schema.toZNRecord(schema);
-    Schema.fromZNRecordV2(record);
+    Schema.fromZNRecord(record);
   }
 }

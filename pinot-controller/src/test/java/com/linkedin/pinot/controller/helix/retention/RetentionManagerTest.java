@@ -92,19 +92,19 @@ public class RetentionManagerTest {
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     _helixZkManager = _pinotHelixResourceManager.getHelixZkManager();
     Tenant brokerTenant =
-        new TenantBuilder("testBroker").setType(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(-1)
+        new TenantBuilder("testBroker").setRole(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(-1)
             .setRealtimeInstances(-1).build();
 
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
 
     Tenant serverTenant =
-        new TenantBuilder("testServer").setType(TenantRole.BROKER).setTotalInstances(4).setOfflineInstances(2)
+        new TenantBuilder("testServer").setRole(TenantRole.BROKER).setTotalInstances(4).setOfflineInstances(2)
             .setRealtimeInstances(2).build();
 
     _pinotHelixResourceManager.createBrokerTenant(serverTenant);
 
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(_testTableName, "testServer", "testBroker", 2)
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, "testServer", "testBroker", 2)
             .toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -123,7 +123,7 @@ public class RetentionManagerTest {
 
   public void cleanupSegments() throws InterruptedException {
     _retentionManager.stop();
-    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResourceV2(_offlineTableName)) {
+    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResource(_offlineTableName)) {
       _pinotHelixResourceManager.deleteSegment(_offlineTableName, segmentId);
     }
     while (_helixZkManager

@@ -90,19 +90,19 @@ public class HelixBrokerStarterTest {
     addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 1);
 
     Tenant brokerTenant =
-        new TenantBuilder("testBroker").setType(TenantRole.BROKER).setTotalInstances(6).setOfflineInstances(-1)
+        new TenantBuilder("testBroker").setRole(TenantRole.BROKER).setTotalInstances(6).setOfflineInstances(-1)
             .setRealtimeInstances(-1).build();
     _pinotResourceManager.createBrokerTenant(brokerTenant);
 
     Tenant serverTenant =
-        new TenantBuilder("testServer").setType(TenantRole.SERVER).setTotalInstances(1).setOfflineInstances(1)
+        new TenantBuilder("testServer").setRole(TenantRole.SERVER).setTotalInstances(1).setOfflineInstances(1)
             .setRealtimeInstances(0).build();
 
     _pinotResourceManager.createServerTenant(serverTenant);
 
     final String tableName = "company";
     JSONObject buildCreateOfflineTableV2JSON =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(tableName, "testServer", "testBroker", 1);
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, "testServer", "testBroker", 1);
     AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
     _pinotResourceManager.addTable(config);
 
@@ -145,7 +145,7 @@ public class HelixBrokerStarterTest {
 
     final String tableName = "cap";
     JSONObject buildCreateOfflineTableV2JSON =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(tableName, "testServer", "testBroker", 1);
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, "testServer", "testBroker", 1);
     AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
     _pinotResourceManager.addTable(config);
 
@@ -234,7 +234,7 @@ public class HelixBrokerStarterTest {
   private void addOneSegment(String tableName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegmentV2(segmentMetadata, "http://localhost:something");
+    _pinotResourceManager.addSegment(segmentMetadata, "http://localhost:something");
   }
 
 }

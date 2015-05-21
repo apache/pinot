@@ -19,18 +19,12 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,13 +42,15 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
@@ -234,7 +230,7 @@ public class PerfBenchmarkDriver {
     controllerStarter.start();
   }
 
-  public void configureResources() {
+  public void configureResources() throws Exception {
     if (!conf.isConfigureResources()) {
       LOGGER.info("Skipping configure resources step");
       return;
@@ -242,12 +238,23 @@ public class PerfBenchmarkDriver {
     //TODO:Get these from configuration
     int numInstances = 1;
     int numReplicas = 1;
-    String resourceName = "mirrorProfileViewOfflineEvents1";
+    String tableName = conf.getTableName();
     String segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
-    // create a DataResource
-    DataResource dataResource =
-        createDataResource(numInstances, numReplicas, resourceName, segmentAssignmentStrategy);
-    controllerStarter.getHelixResourceManager().handleCreateNewDataResource(dataResource);
+    String brokerTenantName = "testBrokerTenant";
+    String serverTenantName = "testServerTenant";
+    // create broker tenant
+    Tenant brokerTenant = new TenantBuilder(brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(numInstances).build();
+    controllerStarter.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    // create server tenant
+    Tenant serverTenant = new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances).setOfflineInstances(numInstances).build();
+    controllerStarter.getHelixResourceManager().createServerTenant(serverTenant);
+    // upload schema 
+
+    // create table
+    String jsonString =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName, numReplicas, segmentAssignmentStrategy).toString();
+    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
+    controllerStarter.getHelixResourceManager().addTable(offlineTableConfig);
   }
 
   public void uploadIndexSegments() throws Exception {
@@ -284,26 +291,6 @@ public class PerfBenchmarkDriver {
       }
       reader.close();
     }
-  }
-
-  public DataResource createDataResource(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.TableType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "daysSinceEpoch");
-    props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "DAYS");
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, "300");
-    props.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, "daily");
-    props.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-    final DataResource res = DataResource.fromMap(props);
-    return res;
   }
 
   public JSONObject postQuery(String query) throws Exception {

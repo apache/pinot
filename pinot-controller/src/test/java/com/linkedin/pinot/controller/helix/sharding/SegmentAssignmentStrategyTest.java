@@ -88,7 +88,7 @@ public class SegmentAssignmentStrategyTest {
             .size(), _numServerInstance);
 
     Tenant brokerTenant =
-        new TenantBuilder(BROKER_TENANT_NAME).setType(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(0)
+        new TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(0)
             .setRealtimeInstances(0).build();
 
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
@@ -110,13 +110,13 @@ public class SegmentAssignmentStrategyTest {
     // Create server tenant
     String serverTenantName = "randomServerTenant";
     Tenant serverTenant =
-        new TenantBuilder(serverTenantName).setType(TenantRole.SERVER).setTotalInstances(20).setOfflineInstances(20)
+        new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(20).setOfflineInstances(20)
             .setRealtimeInstances(0).build();
     _pinotHelixResourceManager.createServerTenant(serverTenant);
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME_RANDOM, serverTenantName,
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_RANDOM, serverTenantName,
             BROKER_TENANT_NAME, numReplicas, "RandomAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -148,13 +148,13 @@ public class SegmentAssignmentStrategyTest {
     // Creating server tenant
     String serverTenantName = "balanceServerTenant";
     Tenant serverTenant =
-        new TenantBuilder(serverTenantName).setType(TenantRole.SERVER).setTotalInstances(6).setOfflineInstances(6)
+        new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(6).setOfflineInstances(6)
             .setRealtimeInstances(0).build();
 
     _pinotHelixResourceManager.createServerTenant(serverTenant);
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME_BALANCED, serverTenantName,
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_BALANCED, serverTenantName,
             BROKER_TENANT_NAME, numReplicas, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -195,7 +195,7 @@ public class SegmentAssignmentStrategyTest {
   private void addOneSegment(String tableName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotHelixResourceManager.addSegmentV2(segmentMetadata, "downloadUrl");
+    _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
 }

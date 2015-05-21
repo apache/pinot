@@ -152,29 +152,10 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addOfflineTable(String resourceName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
     JSONObject request =
-        ControllerRequestBuilder.buildCreateOfflineTableV2JSON(resourceName, serverTenant, brokerTenant,
+        ControllerRequestBuilder.buildCreateOfflineTableJSON(resourceName, serverTenant, brokerTenant,
             timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
             "BalanceNumSegmentAssignmentStrategy");
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
-  }
-
-  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType,
-      int retentionTimeValue, String retentionTimeUnit, int instanceCount, int replicaCount, int brokerCount)
-      throws Exception {
-    JSONObject payload =
-        ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, instanceCount, replicaCount);
-    if (timeColumnName != null && timeColumnType != null) {
-      payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
-    }
-    payload.put(DataSource.NUMBER_OF_BROKER_INSTANCES, Integer.toString(brokerCount));
-    if (retentionTimeUnit != null) {
-      payload.put(DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
-      payload.put(DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
-    }
-    String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload
-            .toString().replaceAll("}$", ", \"metadata\":{}}"));
-    Assert.assertEquals(_success, new JSONObject(res).getString("status"));
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
@@ -220,7 +201,7 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
 
     JSONObject request =
-        ControllerRequestBuilder.buildCreateRealtimeTableV2JSON(resourceName, serverTenant, brokerTenant,
+        ControllerRequestBuilder.buildCreateRealtimeTableJSON(resourceName, serverTenant, brokerTenant,
             timeColumnName, timeColumnType, "rententionTimeUnit", "900", 1, "BalanceNumSegmentAssignmentStrategy",
             metadata, schemaName);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
@@ -229,103 +210,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   }
 
-  protected void createRealtimeResource(String resourceName, String timeColumnName, String timeColumnType,
-      String kafkaZkUrl, String kafkaTopic, File avroFile) throws Exception {
-    // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
-    Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);
-    JSONObject metadata = new JSONObject();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      metadata.put("schema." + fieldName + ".isSingleValue", Boolean.toString(fieldSpec.isSingleValueField()));
-      metadata.put("schema." + fieldName + ".dataType", fieldSpec.getDataType().toString());
-      if (!fieldName.equals(timeColumnName)) {
-        metadata.put("schema." + fieldName + ".fieldType", fieldSpec.getFieldType().toString());
-      } else {
-        metadata.put("schema." + fieldName + ".fieldType", "time");
-        if ("daysSinceEpoch".equals(timeColumnType)) {
-          metadata.put("schema." + fieldName + ".timeUnit", "DAYS");
-        } else {
-          assert false;
-        }
-      }
-      metadata.put("schema." + fieldName + ".columnName", fieldName);
-      metadata.put("schema." + fieldName + ".delimeter", ",");
-    }
-
-    // Add realtime parameters
-    metadata.put("streamType", "kafka");
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
-        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
-
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateRealtimeResourceJSON(resourceName, 1, 1);
-    if (timeColumnName != null && timeColumnType != null) {
-      payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
-    }
-    payload.put("metadata", metadata);
-    String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
-            payload.toString());
-    Assert.assertEquals(_success, new JSONObject(res).getString("status"));
-  }
-
   protected void addHybridTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
     addRealtimeTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schemaName, serverTenant,
         brokerTenant, avroFile);
     addOfflineTable(resourceName, timeColumnName, timeColumnType, 900, "Days", brokerTenant, serverTenant);
-  }
-
-  protected void createHybridResource(String resourceName, String timeColumnName, String timeColumnType,
-      String kafkaZkUrl, String kafkaTopic, File avroFile, int retentionTimeValue, String retentionTimeUnit)
-      throws Exception {
-    // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
-    Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);
-    JSONObject metadata = new JSONObject();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      metadata.put("schema." + fieldName + ".isSingleValue", Boolean.toString(fieldSpec.isSingleValueField()));
-      metadata.put("schema." + fieldName + ".dataType", fieldSpec.getDataType().toString());
-      if (!fieldName.equals(timeColumnName)) {
-        metadata.put("schema." + fieldName + ".fieldType", fieldSpec.getFieldType().toString());
-      } else {
-        metadata.put("schema." + fieldName + ".fieldType", "time");
-        if ("daysSinceEpoch".equals(timeColumnType)) {
-          metadata.put("schema." + fieldName + ".timeUnit", "DAYS");
-        } else {
-          assert false;
-        }
-      }
-      metadata.put("schema." + fieldName + ".columnName", fieldName);
-      metadata.put("schema." + fieldName + ".delimeter", ",");
-    }
-
-    // Add realtime parameters
-    metadata.put("streamType", "kafka");
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
-        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
-
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateHybridResourceJSON(resourceName, 1, 1);
-    if (timeColumnName != null && timeColumnType != null) {
-      payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
-    }
-    if (retentionTimeUnit != null) {
-      payload.put(DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
-      payload.put(DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
-    }
-    payload.put("metadata", metadata);
-    String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
-            payload.toString());
-    Assert.assertEquals(_success, new JSONObject(res).getString("status"));
   }
 }

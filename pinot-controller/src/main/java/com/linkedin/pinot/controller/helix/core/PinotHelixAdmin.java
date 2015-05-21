@@ -19,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
@@ -31,20 +30,11 @@ import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.tools.TestCommand.CommandType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 
 
 /**
@@ -84,100 +74,6 @@ public class PinotHelixAdmin {
         new ZkHelixPropertyStore<ZNRecord>(baseDataAccessor, propertyStorePath, Arrays.asList(propertyStorePath));
     _helixDataAccessor = new ZKHelixDataAccessor(clusterName, baseDataAccessor);
     _helixPropertyKeyBuilder = new PropertyKey.Builder(clusterName);
-  }
-
-  /**
-   * Creates new Offline Data Resource.
-   * @param resource
-   */
-  @Deprecated
-  public void createNewOfflineDataResource(DataResource resource) {
-    final String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
-    OfflineDataResourceZKMetadata offlineDataResource = ZKMetadataUtils.getOfflineDataResourceMetadata(resource);
-    final List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
-    final int numInstanceToUse = offlineDataResource.getNumDataInstances();
-    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
-    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
-    if (unTaggedInstanceList.size() < numInstanceToUse) {
-      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
-    }
-    for (int i = 0; i < numInstanceToUse; ++i) {
-      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + offlineResourceName);
-      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
-          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), offlineResourceName);
-    }
-
-    // now lets build an ideal state
-    LOGGER.info("building empty ideal state for resource : " + offlineResourceName);
-
-    final IdealState idealState =
-        PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(offlineResourceName,
-            offlineDataResource.getNumDataReplicas(), _helixAdmin, _helixClusterName);
-    LOGGER.info("adding resource via the admin");
-    _helixAdmin.addResource(_helixClusterName, offlineResourceName, idealState);
-    LOGGER.info("successfully added the resource : " + offlineResourceName + " to the cluster");
-
-    // lets add resource configs
-    ZKMetadataProvider.setOfflineResourceZKMetadata(_propertyStore, offlineDataResource);
-    _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineResourceName), new ZNRecord(
-        offlineResourceName), AccessOption.PERSISTENT);
-
-  }
-
-  /**
-   *
-   * @param resource
-   */
-  @Deprecated
-  public void createNewRealtimeDataResource(DataResource resource) {
-    final String realtimeResourceName =
-        BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
-    RealtimeDataResourceZKMetadata realtimeDataResource = ZKMetadataUtils.getRealtimeDataResourceMetadata(resource);
-    final List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
-
-    final int numInstanceToUse = realtimeDataResource.getNumDataInstances();
-    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
-    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
-    if (unTaggedInstanceList.size() < numInstanceToUse) {
-      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
-    }
-    for (int i = 0; i < numInstanceToUse; ++i) {
-      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + realtimeResourceName);
-      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
-          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), realtimeResourceName);
-    }
-    // lets add resource configs
-    ZKMetadataProvider.setRealtimeResourceZKMetadata(_propertyStore, realtimeDataResource);
-
-    // now lets build an ideal state
-    LOGGER.info("building empty ideal state for resource : " + realtimeResourceName);
-    final IdealState idealState =
-        PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
-            _helixAdmin, _helixClusterName, _propertyStore);
-    LOGGER.info("adding resource via the admin");
-    _helixAdmin.addResource(_helixClusterName, realtimeResourceName, idealState);
-    LOGGER.info("successfully added the resource : " + realtimeResourceName + " to the cluster");
-
-    // Create Empty PropertyStore path
-    _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(realtimeResourceName), new ZNRecord(
-        realtimeResourceName), AccessOption.PERSISTENT);
-
-  }
-
-  /**
-   *
-   * @param resource
-   */
-  public void createNewDataResource(DataResource resource) {
-    if (resource.getResourceType() == Helix.TableType.OFFLINE) {
-      createNewOfflineDataResource(resource);
-    } else if (resource.getResourceType() == Helix.TableType.REALTIME) {
-      createNewRealtimeDataResource(resource);
-    } else {
-      throw new UnsupportedOperationException("Hybrid Resource not supported.");
-    }
   }
 
   /**

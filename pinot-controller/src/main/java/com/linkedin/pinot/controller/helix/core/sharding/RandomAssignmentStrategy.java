@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 
 
@@ -38,32 +37,6 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RandomAssignmentStrategy.class);
-
-  @Deprecated
-  @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
-      SegmentMetadata segmentMetadata, int numReplicas) {
-    String resourceName = null;
-    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(segmentMetadata.getResourceName());
-    } else {
-      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
-    }
-    final Random random = new Random(System.currentTimeMillis());
-
-    List<String> allInstanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
-    List<String> selectedInstanceList = new ArrayList<String>();
-    for (int i = 0; i < numReplicas; ++i) {
-      final int idx = random.nextInt(allInstanceList.size());
-      selectedInstanceList.add(allInstanceList.get(idx));
-      allInstanceList.remove(idx);
-    }
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getResourceName() + ", selected instances: "
-        + Arrays.toString(selectedInstanceList.toArray()));
-
-    return selectedInstanceList;
-  }
 
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,

@@ -30,7 +30,6 @@ import org.restlet.routing.Template;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotControllerHealthCheck;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
@@ -110,9 +109,6 @@ public class ControllerRestApplication extends Application {
     /**
      *  End Routes 2.0
      */
-    router.attach("/dataresources", PinotDataResource.class);
-    router.attach("/dataresources/", PinotDataResource.class);
-    router.attach("/dataresources/{resourceName}", PinotDataResource.class);
 
     router.attach("/dataresources/{resourceName}/segments", PinotSegment.class);
     router.attach("/dataresources/{resourceName}/segments/{segmentName}", PinotSegment.class);

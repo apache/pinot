@@ -52,7 +52,7 @@ public class AddTenant extends AbstractBaseCommand implements Command {
   @Override
   public boolean execute() throws Exception {
     Tenant t =
-        new Tenant.TenantBuilder(name).setType(role).setTotalInstances(instances).setOfflineInstances(offline)
+        new Tenant.TenantBuilder(name).setRole(role).setTotalInstances(instances).setOfflineInstances(offline)
             .setRealtimeInstances(realtime).build();
 
     String res =

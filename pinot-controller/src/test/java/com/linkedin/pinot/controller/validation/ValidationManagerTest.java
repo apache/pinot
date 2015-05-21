@@ -81,24 +81,24 @@ public class ValidationManagerTest {
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
 
     Tenant brokerTenant =
-        new TenantBuilder("testBroker").setType(TenantRole.BROKER).setTotalInstances(2).setOfflineInstances(-1)
+        new TenantBuilder("testBroker").setRole(TenantRole.BROKER).setTotalInstances(2).setOfflineInstances(-1)
             .setRealtimeInstances(-1).build();
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
 
     Tenant serverTenant =
-        new TenantBuilder("testServer").setType(TenantRole.SERVER).setTotalInstances(2).setOfflineInstances(2)
+        new TenantBuilder("testServer").setRole(TenantRole.SERVER).setTotalInstances(2).setOfflineInstances(2)
             .setRealtimeInstances(0).build();
     _pinotHelixResourceManager.createBrokerTenant(serverTenant);
 
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(testResourceName, "testServer", "testBroker",
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testResourceName, "testServer", "testBroker",
             "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
     DummyMetadata metadata = new DummyMetadata(testResourceName);
 
-    _pinotHelixResourceManager.addSegmentV2(metadata, "http://dummy/");
+    _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
 
     Thread.sleep(1000);
 

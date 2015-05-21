@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.config;
 
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -29,18 +31,20 @@ public class Tenant {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Tenant.class);
 
-  private String role;
-  private String name;
-  private int numberOfInstances;
-  private int offlineInstances;
-  private int realtimeInstances;
+  private String tenantRole;
+  private String tenantName;
+  private int numberOfInstances = 0;
+  private int offlineInstances = 0;
+  private int realtimeInstances = 0;
 
-  public void setRole(String role) {
-    this.role = role;
+  // private boolean colocated = false;
+
+  public void setTenantRole(String tenantRole) {
+    this.tenantRole = tenantRole;
   }
 
-  public void setName(String name) {
-    this.name = name;
+  public void setTenantName(String tenantName) {
+    this.tenantName = tenantName;
   }
 
   public void setNumberOfInstances(int numberOfInstances) {
@@ -56,11 +60,11 @@ public class Tenant {
   }
 
   public TenantRole getTenantRole() {
-    return TenantRole.valueOf(role.toUpperCase());
+    return TenantRole.valueOf(tenantRole.toUpperCase());
   }
 
   public String getTenantName() {
-    return name;
+    return tenantName;
   }
 
   public int getNumberOfInstances() {
@@ -75,6 +79,7 @@ public class Tenant {
     return realtimeInstances;
   }
 
+  @JsonIgnore
   public boolean isColoated() {
     return (realtimeInstances + offlineInstances > numberOfInstances);
   }
@@ -136,11 +141,11 @@ public class Tenant {
 
     public TenantBuilder(String name) {
       tenant = new Tenant();
-      tenant.setName(name);
+      tenant.setTenantName(name);
     }
 
-    public TenantBuilder setType(TenantRole role) {
-      tenant.setRole(role.toString());
+    public TenantBuilder setRole(TenantRole role) {
+      tenant.setTenantRole(role.toString());
       return this;
     }
 
@@ -160,6 +165,7 @@ public class Tenant {
     }
 
     public Tenant build() {
+      tenant.isColoated();
       return tenant;
     }
   }

@@ -77,7 +77,7 @@ public class PinotFileUploadTest extends ControllerTest {
     // Create broker tenant
 
     Tenant brokerTenant =
-        new TenantBuilder(BROKER_TENANT_NAME).setType(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(0)
+        new TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(0)
             .setRealtimeInstances(0).build();
 
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
@@ -86,13 +86,13 @@ public class PinotFileUploadTest extends ControllerTest {
 
     // Create server tenant
     Tenant serverTenant =
-        new TenantBuilder(SERVER_TENANT_NAME).setType(TenantRole.SERVER).setTotalInstances(5).setOfflineInstances(5)
+        new TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER).setTotalInstances(5).setOfflineInstances(5)
             .setRealtimeInstances(0).build();
     _pinotHelixResourceManager.createServerTenant(serverTenant);
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
             2, "RandomAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);

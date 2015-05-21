@@ -212,21 +212,6 @@ public class CommonConstants {
 
   }
 
-  public static class Broker {
-    public static class DataResource {
-      public static final String RESOURCE_NAME = "resourceName";
-      public static final String NUM_BROKER_INSTANCES = "numBrokerInstances";
-      public static final String TAG = "tag";
-      public static final String REALTIME_RESOURCE_SUFFIX = "_R";
-      public static final String OFFLINE_RESOURCE_SUFFIX = "_O";
-    }
-
-    public static class TagResource {
-      public static final String NUM_BROKER_INSTANCES = "numBrokerInstances";
-      public static final String TAG = "tag";
-    }
-  }
-
   public static class Segment {
     public static class Realtime {
       public static enum Status {

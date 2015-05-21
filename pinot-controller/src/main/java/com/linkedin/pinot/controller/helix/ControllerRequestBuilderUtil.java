@@ -18,9 +18,6 @@ package com.linkedin.pinot.controller.helix;
 import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -32,14 +29,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants.Broker;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSourceRequestType;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
-import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
 
 
 /**
@@ -48,45 +38,6 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
  */
 
 public class ControllerRequestBuilderUtil {
-
-  public static JSONObject buildCreateOfflineResourceJSON(String resourceName, int numInstances, int numReplicas)
-      throws JSONException {
-    DataResource dataSource =
-        createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName,
-            "BalanceNumSegmentAssignmentStrategy");
-    return dataSource.toJSON();
-  }
-
-  public static JSONObject buildCreateRealtimeResourceJSON(String resourceName, int numInstances, int numReplicas)
-      throws JSONException {
-    DataResource dataSource =
-        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName,
-            "BalanceNumSegmentAssignmentStrategy");
-
-    return dataSource.toJSON();
-  }
-
-  public static JSONObject buildCreateHybridResourceJSON(String resourceName, int numInstances, int numReplicas)
-      throws JSONException {
-    DataResource dataSource =
-        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName,
-            "BalanceNumSegmentAssignmentStrategy");
-
-    return dataSource.toJSON();
-  }
-
-  public static JSONObject buildUpdateDataResourceJSON(String resourceName, int numInstances, int numReplicas)
-      throws JSONException {
-    DataResource dataSource = createOfflineClusterDataResourceUpdateConfig(numInstances, numReplicas, resourceName);
-
-    return dataSource.toJSON();
-  }
-
-  public static JSONObject buildUpdateBrokerResourceJSON(String resourceName, int numInstances) throws JSONException {
-    DataResource dataSource = createOfflineClusterBrokerResourceUpdateConfig(numInstances, resourceName);
-
-    return dataSource.toJSON();
-  }
 
   public static JSONObject buildInstanceCreateRequestJSON(String host, String port, String tag) throws JSONException {
     final JSONObject ret = new JSONObject();
@@ -107,119 +58,6 @@ public class ControllerRequestBuilderUtil {
     }
 
     return ret;
-  }
-
-  public static DataResource createOfflineClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
-    props.put(DataSource.TIME_COLUMN_NAME, "days");
-    props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(DataSource.RETENTION_TIME_VALUE, "30");
-    props.put(DataSource.PUSH_FREQUENCY, "daily");
-    props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createOfflineClusterCreationConfig(String serverTenant, String brokerTenant,
-      int numReplicas, String resourceName, String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
-    props.put(DataSource.TIME_COLUMN_NAME, "days");
-    props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numReplicas));
-    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(DataSource.RETENTION_TIME_VALUE, "30");
-    props.put(DataSource.PUSH_FREQUENCY, "daily");
-    props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(DataSource.BROKER_TAG_NAME, brokerTenant);
-    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-    props.put(DataSource.SERVER_TENANT, serverTenant);
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createRealtimeClusterCreationConfig(int numInstances, int numReplicas,
-      String resourceName, String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, TableType.REALTIME.toString());
-    props.put(DataSource.TIME_COLUMN_NAME, "days");
-    props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(DataSource.RETENTION_TIME_VALUE, "30");
-    props.put(DataSource.PUSH_FREQUENCY, "daily");
-    props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createHybridClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, TableType.HYBRID.toString());
-    props.put(DataSource.TIME_COLUMN_NAME, "days");
-    props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(DataSource.RETENTION_TIME_VALUE, "30");
-    props.put(DataSource.PUSH_FREQUENCY, "daily");
-    props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createOfflineClusterDataResourceUpdateConfig(int numInstances, int numReplicas,
-      String resourceName) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_DATA_RESOURCE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createOfflineClusterBrokerResourceUpdateConfig(int numInstances, String resourceName) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_BROKER_RESOURCE);
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
-    props.put(DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
-    return DataResource.fromMap(props);
-  }
-
-  public static BrokerDataResource createBrokerDataResourceConfig(String resourceName, int numInstances, String tag) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(Broker.DataResource.RESOURCE_NAME, resourceName);
-    props.put(Broker.DataResource.NUM_BROKER_INSTANCES, numInstances + "");
-    props.put(Broker.DataResource.TAG, tag);
-    return BrokerDataResource.fromMap(props);
-  }
-
-  public static BrokerTagResource createBrokerTagResourceConfig(int numInstances, String tag) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(Broker.TagResource.TAG, tag);
-    props.put(Broker.TagResource.NUM_BROKER_INSTANCES, numInstances + "");
-    return BrokerTagResource.fromMap(props);
   }
 
   public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
@@ -257,26 +95,26 @@ public class ControllerRequestBuilderUtil {
   public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
       throws JSONException {
     Tenant tenant =
-        new TenantBuilder(tenantName).setType(TenantRole.BROKER).setTotalInstances(numberOfInstances)
-            .setOfflineInstances(-1).setRealtimeInstances(-1).build();
+        new TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numberOfInstances)
+            .setOfflineInstances(0).setRealtimeInstances(0).build();
     return tenant.toJSON();
   }
 
   public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
       int offlineInstances, int realtimeInstances) throws JSONException {
     Tenant tenant =
-        new TenantBuilder(tenantName).setType(TenantRole.SERVER).setTotalInstances(numberOfInstances)
+        new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
             .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
     return tenant.toJSON();
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       int numReplicas) throws JSONException {
-    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
         "700", numReplicas, "BalanceNumSegmentAssignmentStrategy");
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy) throws JSONException {
     JSONObject creationRequest = new JSONObject();
@@ -314,9 +152,9 @@ public class ControllerRequestBuilderUtil {
     return creationRequest;
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       int numReplicas, String segmentAssignmentStrategy) throws JSONException {
-    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
         "700", numReplicas, segmentAssignmentStrategy);
   }
 }

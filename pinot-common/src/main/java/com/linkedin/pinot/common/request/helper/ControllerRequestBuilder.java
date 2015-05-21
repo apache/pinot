@@ -19,44 +19,34 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 
 
 public class ControllerRequestBuilder {
 
-  private final static String TENANT_ROLE = "role";
-  private final static String TENANT_NAME = "name";
-  private final static String NUMBER_OF_INSTANCES = "numberOfInstances";
-  private final static String OFFLINE_INSTANCES = "offlineInstances";
-  private final static String REALTIME_INSTANCES = "realtimeInstances";
-
   public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
       throws JSONException {
-    final JSONObject ret = new JSONObject();
-    ret.put(TENANT_ROLE, TenantRole.BROKER.toString());
-    ret.put(TENANT_NAME, tenantName);
-    ret.put(NUMBER_OF_INSTANCES, numberOfInstances);
-    return ret;
+    Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numberOfInstances).build();
+    return tenant.toJSON();
   }
 
   public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
       int offlineInstances, int realtimeInstances) throws JSONException {
-    final JSONObject ret = new JSONObject();
-    ret.put(TENANT_ROLE, TenantRole.SERVER);
-    ret.put(TENANT_NAME, tenantName);
-    ret.put(NUMBER_OF_INSTANCES, numberOfInstances);
-    ret.put(OFFLINE_INSTANCES, offlineInstances);
-    ret.put(REALTIME_INSTANCES, realtimeInstances);
-    return ret;
+    Tenant tenant =
+        new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
+            .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
+    return tenant.toJSON();
   }
 
   public static JSONObject addOfflineTableRequest(String tableName, String serverTenant, String brokerTenant,
       int numReplicas) throws JSONException {
-    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
         "700", numReplicas, "BalanceNumSegmentAssignmentStrategy");
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy) throws JSONException {
     JSONObject creationRequest = new JSONObject();
@@ -94,7 +84,7 @@ public class ControllerRequestBuilder {
     return creationRequest;
   }
 
-  public static JSONObject buildCreateRealtimeTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+  public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName) throws JSONException {
     JSONObject creationRequest = new JSONObject();
@@ -133,9 +123,9 @@ public class ControllerRequestBuilder {
     return creationRequest;
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       int numReplicas, String segmentAssignmentStrategy) throws JSONException {
-    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
         "700", numReplicas, segmentAssignmentStrategy);
   }
 

@@ -43,7 +43,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
  */
 
 public class PinotSegment extends ServerResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegment.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
@@ -72,7 +72,7 @@ public class PinotSegment extends ServerResource {
         final JSONObject ret = new JSONObject();
         ret.put("resource", resourceName);
 
-        for (final String segmentId : manager.getAllSegmentsForResourceV2(resourceName)) {
+        for (final String segmentId : manager.getAllSegmentsForResource(resourceName)) {
           segmentsArray.put(segmentId);
         }
 

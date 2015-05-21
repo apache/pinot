@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 
@@ -203,46 +202,4 @@ public class HelixHelper {
     }
   }
 
-  public static void main(String[] args) {
-    ZkClient zkClient =
-        new ZkClient(StringUtil.join("/", StringUtils.chomp("zk-lva1-pinot.corp.linkedin.com:12913", "/")),
-            ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-    String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, "mpSprintDemoCluster");
-    ZkHelixPropertyStore<ZNRecord> propertyStore =
-        new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), propertyStorePath, null);
-
-    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(propertyStore, "xlntBeta");
-
-    offlineDataResourceZKMetadata.setResourceName("testXlnt");
-    offlineDataResourceZKMetadata.setBrokerTag("testXlnt1");
-    ZKMetadataProvider.setOfflineResourceZKMetadata(propertyStore, offlineDataResourceZKMetadata);
-
-    InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, "Server_lva1-app0120.corp.linkedin.com_8001");
-    instanceZKMetadata.setGroupId("testResource0", "testGroup0");
-    instanceZKMetadata.setPartition("testResource0", "testPart0");
-    ZKMetadataProvider.setInstanceZKMetadata(propertyStore, instanceZKMetadata);
-    System.out.println(instanceZKMetadata);
-
-    InstanceZKMetadata instanceZKMetadata2 = new InstanceZKMetadata();
-    instanceZKMetadata2.setInstanceName("lva1-app0120.corp.linkedin.com");
-    instanceZKMetadata2.setInstanceType("Server");
-    instanceZKMetadata2.setInstancePort(8001);
-
-  }
 }
-
-// DataUpdater<ZNRecord> updater = new DataUpdater<ZNRecord>()
-// {
-// private ZNRecord newIdeal;
-//
-// @Override
-// public ZNRecord update(ZNRecord currentData)
-// {
-// return newIdeal;
-// }
-// };
-// //List<DataUpdater<ZNRecord>> updaters = new ArrayList<DataUpdater<ZNRecord>>(updater);
-// //List<String> paths = new ArrayList<String>(key.getPath());
-// //accessor.updateChildren(paths, updaters, AccessOption.PERSISTENT);
-// //return accessor.updateProperty(key, state);
-

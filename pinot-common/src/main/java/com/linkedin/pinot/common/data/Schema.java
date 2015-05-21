@@ -70,11 +70,6 @@ public class Schema {
   @JsonIgnore(true)
   private String jsonSchema;
 
-  @Deprecated
-  public static Schema fromZNRecord(ZNRecord record) {
-    return getSchemaFromMap(record.getSimpleFields());
-  }
-
   public static Schema fromFile(final File schemaFile) throws JsonParseException, JsonMappingException, IOException {
     JsonNode node = new ObjectMapper().readTree(schemaFile);
     Schema schema = new ObjectMapper().readValue(node, Schema.class);
@@ -82,7 +77,7 @@ public class Schema {
     return schema;
   }
 
-  public static Schema fromZNRecordV2(ZNRecord record) throws JsonParseException, JsonMappingException, IOException {
+  public static Schema fromZNRecord(ZNRecord record) throws JsonParseException, JsonMappingException, IOException {
     String schemaJSON = record.getSimpleField("schemaJSON");
     Schema schema = new ObjectMapper().readValue(record.getSimpleField("schemaJSON"), Schema.class);
     schema.setJSONSchema(schemaJSON);

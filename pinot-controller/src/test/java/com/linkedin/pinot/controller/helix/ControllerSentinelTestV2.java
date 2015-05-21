@@ -82,7 +82,7 @@ public class ControllerSentinelTestV2 extends ControllerTest {
 
     // Create offline table creation request
     String tableName = "testTable";
-    payload = ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, 3);
+    payload = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, 3);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), payload.toString());
     Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(), 1);
     Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getInstanceSet(tableName + "_OFFLINE").size(), 5);
@@ -112,7 +112,7 @@ public class ControllerSentinelTestV2 extends ControllerTest {
 
   private void addOneOfflineSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _pinotResourceManager.addSegmentV2(segmentMetadata, "downloadUrl");
+    _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
   @Override
