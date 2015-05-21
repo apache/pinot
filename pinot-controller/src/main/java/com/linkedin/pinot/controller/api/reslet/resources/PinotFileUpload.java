@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -190,14 +189,9 @@ public class PinotFileUpload extends ServerResource {
           FileUtils.deleteQuietly(segmentFile);
         }
         FileUtils.moveFile(dataFile, segmentFile);
-        PinotResourceManagerResponse res =
-            manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
-        if (!res.isSuccessfull()) {
-          rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
-          setStatus(Status.SERVER_ERROR_INTERNAL);
-          LOGGER.error("Resource manager failed to add segment: " + res.errorMessage);
-          FileUtils.deleteQuietly(new File(resourceDir, dataFile.getName()));
-        }
+
+        manager.addSegmentV2(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
+        return new StringRepresentation("");
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);

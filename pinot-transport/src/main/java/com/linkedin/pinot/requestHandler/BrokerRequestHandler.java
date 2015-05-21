@@ -27,9 +27,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.annotation.ThreadSafe;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -45,7 +45,6 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
@@ -134,8 +133,7 @@ public class BrokerRequestHandler {
    */
   private List<String> getMatchedResources(BrokerRequest request) {
     List<String> matchedResources = new ArrayList<String>();
-    String tableName =
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getResourceName());
+    String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getResourceName());
     if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
       matchedResources.add(tableName);
     }
@@ -192,7 +190,8 @@ public class BrokerRequestHandler {
 
   private void attachTimeBoundary(String hybridResourceName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
     TimeBoundaryInfo timeBoundaryInfo =
-        _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridResourceName));
+        _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER
+            .forTable(hybridResourceName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null || timeBoundaryInfo.getTimeValue() == null) {
       return;
     }

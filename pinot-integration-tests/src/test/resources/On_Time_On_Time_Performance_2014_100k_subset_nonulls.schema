@@ -1,0 +1,655 @@
+{
+  "dimensions": [
+    "Quarter",
+    "FlightNum",
+    "Origin",
+    "LateAircraftDelay",
+    "DivActualElapsedTime",
+    "DivWheelsOns",
+    "DivWheelsOffs",
+    "ArrDel15",
+    "AirTime",
+    "DivTotalGTimes",
+    "DepTimeBlk",
+    "DestCityMarketID",
+    "DivAirportSeqIDs",
+    "DepTime",
+    "Month",
+    "DestStateName",
+    "CRSElapsedTime",
+    "Carrier",
+    "DestAirportID",
+    "Distance",
+    "ArrTimeBlk",
+    "SecurityDelay",
+    "DivArrDelay",
+    "LongestAddGTime",
+    "OriginWac",
+    "WheelsOff",
+    "UniqueCarrier",
+    "DestAirportSeqID",
+    "DivReachedDest",
+    "Diverted",
+    "ActualElapsedTime",
+    "AirlineID",
+    "OriginStateName",
+    "FlightDate",
+    "DepartureDelayGroups",
+    "DivAirportLandings",
+    "OriginCityName",
+    "OriginStateFips",
+    "OriginState",
+    "DistanceGroup",
+    "WeatherDelay",
+    "DestWac",
+    "WheelsOn",
+    "OriginAirportID",
+    "OriginCityMarketID",
+    "NASDelay",
+    "DestState",
+    "ArrTime",
+    "ArrivalDelayGroups",
+    "Flights",
+    "DayofMonth",
+    "RandomAirports",
+    "TotalAddGTime",
+    "CRSDepTime",
+    "DayOfWeek",
+    "Dest",
+    "CancellationCode",
+    "FirstDepTime",
+    "DivTailNums",
+    "DepDelayMinutes",
+    "DepDelay",
+    "TaxiIn",
+    "OriginAirportSeqID",
+    "DestStateFips",
+    "ArrDelay",
+    "Cancelled",
+    "DivAirportIDs",
+    "TaxiOut",
+    "DepDel15",
+    "CarrierDelay",
+    "DivLongestGTimes",
+    "DivAirports",
+    "DivDistance",
+    "Year",
+    "CRSArrTime",
+    "ArrDelayMinutes",
+    "TailNum",
+    "DestCityName"
+  ],
+  "fieldSpecMap": {
+    "ActualElapsedTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "ActualElapsedTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "AirTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "AirTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "AirlineID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "AirlineID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "ArrDel15": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "ArrDel15",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "ArrDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "ArrDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "ArrDelayMinutes": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "ArrDelayMinutes",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "ArrTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "ArrTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "ArrTimeBlk": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "ArrTimeBlk",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "ArrivalDelayGroups": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "ArrivalDelayGroups",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "CRSArrTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "CRSArrTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "CRSDepTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "CRSDepTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "CRSElapsedTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "CRSElapsedTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "CancellationCode": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "CancellationCode",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Cancelled": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Cancelled",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Carrier": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "Carrier",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "CarrierDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "CarrierDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DayOfWeek": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DayOfWeek",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DayofMonth": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DayofMonth",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DaysSinceEpoch": {
+      "dataType": "INT",
+      "fieldType": "TIME",
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "timeType": "DAYS",
+        "columnName": "DaysSinceEpoch"
+      },
+      "incomingTimeColumnName": "DaysSinceEpoch",
+      "name": "DaysSinceEpoch",
+      "outGoingTimeColumnName": "DaysSinceEpoch",
+      "outgoingGranularitySpec": {
+        "dataType": "INT",
+        "timeType": "DAYS",
+        "columnName": "DaysSinceEpoch"
+      },
+      "same": true,
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.TimeFieldSpec"
+    },
+    "DepDel15": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DepDel15",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DepDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DepDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DepDelayMinutes": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DepDelayMinutes",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DepTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DepTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DepTimeBlk": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "DepTimeBlk",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DepartureDelayGroups": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DepartureDelayGroups",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Dest": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "Dest",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestAirportID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DestAirportID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestAirportSeqID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DestAirportSeqID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestCityMarketID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DestCityMarketID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestCityName": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "DestCityName",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestState": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "DestState",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestStateFips": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DestStateFips",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestStateName": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "DestStateName",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DestWac": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DestWac",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Distance": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Distance",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DistanceGroup": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DistanceGroup",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivActualElapsedTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivActualElapsedTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivAirportIDs": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivAirportIDs",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivAirportLandings": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivAirportLandings",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivAirportSeqIDs": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivAirportSeqIDs",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivAirports": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "DivAirports",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivArrDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivArrDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivDistance": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivDistance",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivLongestGTimes": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivLongestGTimes",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivReachedDest": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivReachedDest",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivTailNums": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "DivTailNums",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivTotalGTimes": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivTotalGTimes",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivWheelsOffs": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivWheelsOffs",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "DivWheelsOns": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "DivWheelsOns",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Diverted": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Diverted",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "FirstDepTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "FirstDepTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "FlightDate": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "FlightDate",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "FlightNum": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "FlightNum",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Flights": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Flights",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "LateAircraftDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "LateAircraftDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "LongestAddGTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "LongestAddGTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Month": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Month",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "NASDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "NASDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Origin": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "Origin",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginAirportID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "OriginAirportID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginAirportSeqID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "OriginAirportSeqID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginCityMarketID": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "OriginCityMarketID",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginCityName": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "OriginCityName",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginState": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "OriginState",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginStateFips": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "OriginStateFips",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginStateName": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "OriginStateName",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "OriginWac": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "OriginWac",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Quarter": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Quarter",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "RandomAirports": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "RandomAirports",
+      "singleValueField": false,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "SecurityDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "SecurityDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "TailNum": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "TailNum",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "TaxiIn": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "TaxiIn",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "TaxiOut": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "TaxiOut",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "TotalAddGTime": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "TotalAddGTime",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "UniqueCarrier": {
+      "dataType": "STRING",
+      "fieldType": "DIMENSION",
+      "name": "UniqueCarrier",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "WeatherDelay": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "WeatherDelay",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "WheelsOff": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "WheelsOff",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "WheelsOn": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "WheelsOn",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    },
+    "Year": {
+      "dataType": "INT",
+      "fieldType": "DIMENSION",
+      "name": "Year",
+      "singleValueField": true,
+      "type": "com.linkedin.pinot.common.data.DimensionFieldSpec"
+    }
+  },
+  "metrics": [],
+  "schemaName": "fightDataSchema",
+  "schemaVersion": 1,
+  "timeColumnName": "DaysSinceEpoch"
+}
+

@@ -14,17 +14,17 @@
  ******************************************************************************/
 package com.linkedin.pinot.common.utils;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpVersion;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
@@ -34,10 +34,10 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.Utils;
 
 
 /**
@@ -46,14 +46,16 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class FileUploadUtils {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadUtils.class);
-  public static void sendFile(final String host, final String port, final String fileName,
+
+  public static void sendFile(final String host, final String port, final String path, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
     HttpClient client = new HttpClient();
     try {
 
       client.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
-      PostMethod post = new PostMethod("http://" + host + ":" + port + "/datafiles");
+      PostMethod post = new PostMethod("http://" + host + ":" + port + "/" + path);
       Part[] parts = { new FilePart(fileName, new PartSource() {
         @Override
         public long getLength() {
@@ -84,6 +86,11 @@ public class FileUploadUtils {
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
     }
+  }
+
+  public static void sendFile(final String host, final String port, final String fileName,
+      final InputStream inputStream, final long lengthInBytes) {
+    sendFile(host, port, "datafiles", fileName, inputStream, lengthInBytes);
   }
 
   public static String listFiles(String host, String port) {

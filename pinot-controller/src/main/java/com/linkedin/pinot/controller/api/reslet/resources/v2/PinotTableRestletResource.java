@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Delete;
@@ -51,12 +50,10 @@ public class PinotTableRestletResource extends ServerResource {
     try {
       String jsonRequest = entity.getText();
       config = AbstractTableConfig.init(jsonRequest);
-      System.out.println("original : " + config);
-      ZNRecord rec = AbstractTableConfig.toZnRecord(config);
-      System.out.println("from znRecord : " + AbstractTableConfig.fromZnRecord(rec));
       try {
         manager.addTable(config);
       } catch (Exception e) {
+        e.printStackTrace();
         return new StringRepresentation("Failed: " + e.getMessage());
       }
       return new StringRepresentation("Success");

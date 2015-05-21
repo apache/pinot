@@ -46,7 +46,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.RealtimeTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TenantConfig;
@@ -64,6 +63,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.ServerType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
@@ -182,7 +182,7 @@ public class PinotHelixResourceManager {
         if (object == null) {
           return false;
         }
-        if (object.toString().endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+        if (object.toString().endsWith("_" + ServerType.REALTIME.toString())) {
           return true;
         }
         return false;
@@ -506,6 +506,7 @@ public class PinotHelixResourceManager {
     return resp;
   }
 
+  @Deprecated
   public synchronized PinotResourceManagerResponse handleUpdateBrokerResource(DataResource resource) {
     String resourceName = null;
     String currentResourceBrokerTag = null;
@@ -1719,8 +1720,8 @@ public class PinotHelixResourceManager {
         // now lets build an ideal state
         LOGGER.info("building empty ideal state for resource : " + realtimeTableName);
         final IdealState realtimeIdealState =
-            PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateForV2(realtimeTableName,
-                (RealtimeTableConfig) config, _helixAdmin, _helixClusterName, _propertyStore);
+            PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateForV2(realtimeTableName, config, _helixAdmin,
+                _helixClusterName, _propertyStore);
         LOGGER.info("adding resource via the admin");
         _helixAdmin.addResource(_helixClusterName, realtimeTableName, realtimeIdealState);
         LOGGER.info("successfully added the resource : " + realtimeTableName + " to the cluster");
@@ -1863,7 +1864,8 @@ public class PinotHelixResourceManager {
             ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getResourceName());
         final IdealState idealState =
             PinotResourceIdealStateBuilder.addNewOfflineSegmentToIdealStateForV2(segmentMetadata, _helixAdmin,
-                _helixClusterName, getPropertyStore(), offlineTableConfig.getTenantConfig().getServer());
+                _helixClusterName, getPropertyStore(), ControllerTenantNameBuilder
+                    .getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig().getServer()));
         _helixAdmin.setResourceIdealState(_helixClusterName,
             TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getResourceName()),
             idealState);
@@ -1998,20 +2000,24 @@ public class PinotHelixResourceManager {
   public AbstractTableConfig getTableConfig(String tableName, TableType type) throws JsonParseException,
       JsonMappingException, JsonProcessingException, JSONException, IOException {
     String actualTableName = new TableNameBuilder(type).forTable(tableName);
-    List<String> tableNames = _propertyStore.getChildNames("/tables/" + actualTableName, AccessOption.PERSISTENT);
-    AbstractTableConfig ret = null;
-    if (tableNames.contains(actualTableName)) {
-      ZNRecord rec = _propertyStore.get("/tables/" + actualTableName, null, AccessOption.PERSISTENT);
-      ret = AbstractTableConfig.fromZnRecord(rec);
+    AbstractTableConfig config = null;
+    if (type == TableType.REALTIME) {
+      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+    } else {
+      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
     }
-    return ret;
+    return config;
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType type) throws JsonParseException,
       JsonMappingException, JsonProcessingException, JSONException, IOException {
     String actualTableName = new TableNameBuilder(type).forTable(tableName);
-    ZNRecord rec = _propertyStore.get("/tables/" + actualTableName, null, AccessOption.PERSISTENT);
-    AbstractTableConfig config = AbstractTableConfig.fromZnRecord(rec);
+    AbstractTableConfig config = null;
+    if (type == TableType.REALTIME) {
+      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+    } else {
+      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
+    }
     String serverTenantName =
         ControllerTenantNameBuilder.getTenantName(config.getTenantConfig().getServer(), type.getServerType());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName);
@@ -2021,8 +2027,12 @@ public class PinotHelixResourceManager {
   public List<String> getBrokerInstancesForTable(String tableName, TableType type) throws JsonParseException,
       JsonMappingException, JsonProcessingException, JSONException, IOException {
     String actualTableName = new TableNameBuilder(type).forTable(tableName);
-    ZNRecord rec = _propertyStore.get("/tables/" + actualTableName, null, AccessOption.PERSISTENT);
-    AbstractTableConfig config = AbstractTableConfig.fromZnRecord(rec);
+    AbstractTableConfig config = null;
+    if (type == TableType.REALTIME) {
+      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+    } else {
+      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
+    }
     String brokerTenantName =
         ControllerTenantNameBuilder.getBrokerTenantNameForTenant(config.getTenantConfig().getBroker());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);

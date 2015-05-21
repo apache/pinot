@@ -50,6 +50,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.KafkaTestUtils;
 import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.util.TestUtils;
@@ -78,6 +79,18 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected String getHelixClusterName() {
     return "HybridClusterIntegrationTest";
+  }
+
+  protected void setUpTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
+    Schema schema = Schema.fromFile(schemaFile);
+    String brokerTenant = "hybridBroker";
+    String realtimeTenant = "hybridServer";
+    createBrokerTenant(brokerTenant);
+    createServerTenant(realtimeTenant, 1, 1);
+    addSchema(schemaFile, schema.getSchemaName());
+    addHybridTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+        realtimeTenant, brokerTenant, avroFile);
   }
 
   @BeforeClass
@@ -116,9 +129,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
 
-    // Create a data resource
-    createHybridResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC, avroFiles.get(0), 3000, "DAYS");
+    File schemaFile =
+        new File(OfflineClusterIntegrationTest.class.getClassLoader()
+            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+
+    // Create Pinot resource
+    setUpTable("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+        schemaFile, avroFiles.get(0));
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);

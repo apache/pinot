@@ -28,13 +28,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
@@ -198,9 +198,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     String resourceName = segmentMetadata.getResourceName();
     if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
-      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+      resourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
     } else {
-      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+      resourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName);
     }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
@@ -223,9 +223,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
     String resourceName = segmentZKMetadata.getResourceName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+      resourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
     } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
-      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+      resourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName);
     }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
@@ -249,9 +249,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
     String resourceName = segmentZKMetadata.getResourceName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+      resourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
     } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
-      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+      resourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName);
     }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);

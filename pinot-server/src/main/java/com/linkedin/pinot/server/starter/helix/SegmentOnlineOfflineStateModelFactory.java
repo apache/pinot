@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
@@ -34,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -41,7 +41,6 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
@@ -121,7 +120,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
       LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
-      final TableType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(message.getResourceName());
+      final TableType resourceType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
       try {
         switch (resourceType) {
           case OFFLINE:
@@ -155,9 +154,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       SegmentZKMetadata realtimeSegmentZKMetadata =
           ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, resourceName, segmentId);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
-      AbstractTableConfig tableConfig =
-          AbstractTableConfig.fromZnRecord(propertyStore.get("/CONFIGS/RESOURCE/" + resourceName, null,
-              AccessOption.PERSISTENT));
+      AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(propertyStore, resourceName);
       ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, tableConfig, instanceZKMetadata,
           realtimeSegmentZKMetadata);
     }

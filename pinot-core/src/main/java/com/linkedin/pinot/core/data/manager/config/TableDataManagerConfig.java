@@ -20,9 +20,9 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
@@ -72,7 +72,7 @@ public class TableDataManagerConfig {
 
   public static TableDataManagerConfig getDefaultHelixResourceDataManagerConfig(
       InstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
-    TableType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
+    TableType resourceType = TableNameBuilder.getTableTypeFromTableName(resourceName);
 
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
@@ -102,7 +102,7 @@ public class TableDataManagerConfig {
   }
 
   public void overrideConfigs(AbstractTableConfig tableConfig) {
-    _resourceDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode());
+    _resourceDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode().toLowerCase());
     _resourceDataManagerConfig.setProperty(RESOURCE_DATA_MANAGER_NAME, tableConfig.getTableName());
   }
 

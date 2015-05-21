@@ -70,6 +70,7 @@ public class Schema {
   @JsonIgnore(true)
   private String jsonSchema;
 
+  @Deprecated
   public static Schema fromZNRecord(ZNRecord record) {
     return getSchemaFromMap(record.getSimpleFields());
   }

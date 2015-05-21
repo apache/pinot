@@ -213,7 +213,7 @@ public class RealtimeTableDataManager implements TableDataManager {
 
               SegmentDataManager manager =
                   new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, tableConfig,
-                      instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record));
+                      instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecordV2(record));
               LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);
               _segmentsMap.put(segmentId, manager);
               _loadingSegments.add(segmentId);

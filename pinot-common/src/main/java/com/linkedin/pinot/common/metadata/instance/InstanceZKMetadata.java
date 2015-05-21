@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.common.metadata.instance;
 
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,13 +27,7 @@ import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
-
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 public final class InstanceZKMetadata implements ZKMetadata {
@@ -140,12 +139,9 @@ public final class InstanceZKMetadata implements ZKMetadata {
     }
 
     InstanceZKMetadata metadata = (InstanceZKMetadata) instanceMetadata;
-    return isEqual(_id, metadata._id) &&
-        isEqual(_instanceName, metadata._instanceName) &&
-        isEqual(_instanceType, metadata._instanceType) &&
-        isEqual(_instancePort, metadata._instancePort) &&
-        isEqual(_groupIdMap, metadata._groupIdMap) &&
-        isEqual(_partitionMap, metadata._partitionMap);
+    return isEqual(_id, metadata._id) && isEqual(_instanceName, metadata._instanceName)
+        && isEqual(_instanceType, metadata._instanceType) && isEqual(_instancePort, metadata._instancePort)
+        && isEqual(_groupIdMap, metadata._groupIdMap) && isEqual(_partitionMap, metadata._partitionMap);
   }
 
   @Override

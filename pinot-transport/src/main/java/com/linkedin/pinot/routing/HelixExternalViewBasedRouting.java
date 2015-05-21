@@ -76,8 +76,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   public HelixExternalViewBasedRouting(RoutingTableBuilder defaultOfflineRoutingTableBuilder,
-      RoutingTableBuilder defaultRealtimeRoutingTableBuilder,
-      Map<String, RoutingTableBuilder> routingTableBuilderMap, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      RoutingTableBuilder defaultRealtimeRoutingTableBuilder, Map<String, RoutingTableBuilder> routingTableBuilderMap,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     if (defaultOfflineRoutingTableBuilder != null) {
       _defaultOfflineRoutingTableBuilder = defaultOfflineRoutingTableBuilder;
@@ -99,6 +99,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   @Override
   public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
     String resourceName = request.getResourceName();
+
     if ((_brokerRoutingTable == null) || (!_brokerRoutingTable.containsKey(resourceName))) {
       return null;
     }
@@ -123,7 +124,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     }
     if (_routingTableModifiedTimeStampMap.containsKey(resourceName)) {
       long recentModifiedTimeStamp = _routingTableModifiedTimeStampMap.get(resourceName);
-      LOGGER.info("ExternalView modified timestamp for resource: " + resourceName + " is " + externalView.getRecord().getModifiedTime());
+      LOGGER.info("ExternalView modified timestamp for resource: " + resourceName + " is "
+          + externalView.getRecord().getModifiedTime());
       LOGGER.info("Recent updated timestamp for for resource: " + resourceName + " is " + recentModifiedTimeStamp);
       if (externalView.getRecord().getModifiedTime() <= recentModifiedTimeStamp) {
         LOGGER.info("No change on routing table version, do nothing for resource: " + resourceName);

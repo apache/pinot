@@ -55,6 +55,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
   private final File _segmentDir = new File("/tmp/OfflineClusterIntegrationTest/segmentDir");
   private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
+  private File schemaFile;
 
   private static final int SEGMENT_COUNT = 12;
   private static final int QUERY_COUNT = 1000;
@@ -67,7 +68,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void createResource() throws Exception {
-    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", 1, 1, 1);
+    File schemaFile =
+        new File(OfflineClusterIntegrationTest.class.getClassLoader()
+            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+
+    // Create a table
+    setUpTable(schemaFile, 1, 1);
+  }
+
+  protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
+    String brokerTenant = "offlineBroker";
+    String offlineTenant = "offlineServer";
+    createBrokerTenant(brokerTenant, numBroker);
+    createServerTenant(offlineTenant, numOffline, 0);
+    addSchema(schemaFile, "schemaFile");
+    addOfflineTable("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", brokerTenant, offlineTenant);
   }
 
   @BeforeClass
@@ -83,9 +98,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Start the cluster
     startCluster();
 
-    // Create a data resource
-    createResource();
-
     // Unpack the Avro files
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
@@ -97,6 +109,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
+
+    createResource();
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();

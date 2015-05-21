@@ -35,7 +35,6 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONException;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.RealtimeTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -124,7 +123,7 @@ public class PinotResourceIdealStateBuilder {
    * @param segmentMetadata
    * @param helixAdmin
    * @param helixClusterName
-   * @param serverTenant 
+   * @param serverTenant
    * @param zkClient
    * @return
    */
@@ -150,7 +149,8 @@ public class PinotResourceIdealStateBuilder {
       // Adding new Segments
       final int replicas = offlineDataResourceZKMetadata.getNumDataReplicas();
       final List<String> selectedInstances =
-          segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas, serverTenant);
+          segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas,
+              serverTenant);
       for (final String instance : selectedInstances) {
         currentIdealState.setPartitionState(segmentName, instance, ONLINE);
       }
@@ -508,18 +508,22 @@ public class PinotResourceIdealStateBuilder {
   }
 
   public static IdealState buildInitialRealtimeIdealStateForV2(String realtimeTableName,
-      RealtimeTableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
-    KafkaStreamMetadata kafkaStreamMetadata = (KafkaStreamMetadata) (realtimeTableConfig.getIndexingConfig().getStreamConfigs());
-    String realtimeServerTenant = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
+      AbstractTableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName,
+      ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
+    KafkaStreamMetadata kafkaStreamMetadata =
+        new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+    String realtimeServerTenant =
+        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
     switch (kafkaStreamMetadata.getConsumerType()) {
       case highLevel:
         IdealState idealState =
-            buildInitialKafkaHighLevelConsumerRealtimeIdealStateForV2(realtimeTableName, helixAdmin, helixClusterName, zkHelixPropertyStore);
-        List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeServerTenant);
+            buildInitialKafkaHighLevelConsumerRealtimeIdealStateForV2(realtimeTableName, helixAdmin, helixClusterName,
+                zkHelixPropertyStore);
+        List<String> realtimeInstances =
+            helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeServerTenant);
         setupInstanceConfigForKafkaHighLevelConsumerV2(realtimeTableName, realtimeInstances.size(),
-            Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
-            realtimeTableConfig.getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore,
-            realtimeInstances);
+            Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()), realtimeTableConfig
+                .getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
         return idealState;
       case simple:
       default:
@@ -540,8 +544,8 @@ public class PinotResourceIdealStateBuilder {
     return idealState;
   }
 
-  private static void setupInstanceConfigForKafkaHighLevelConsumerV2(String realtimeTableName,
-      int numDataInstances, int numDataReplicas, Map<String, String> streamProviderConfig,
+  private static void setupInstanceConfigForKafkaHighLevelConsumerV2(String realtimeTableName, int numDataInstances,
+      int numDataReplicas, Map<String, String> streamProviderConfig,
       ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore, List<String> instanceList) {
     int numInstancesPerReplica = numDataInstances / numDataReplicas;
     int partitionId = 0;
@@ -568,8 +572,11 @@ public class PinotResourceIdealStateBuilder {
     }
   }
 
-  private static String getGroupIdFromRealtimeDataResourceV2(String realtimeTableName, Map<String, String> streamProviderConfig) {
-    String keyOfGroupId = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
+  private static String getGroupIdFromRealtimeDataResourceV2(String realtimeTableName,
+      Map<String, String> streamProviderConfig) {
+    String keyOfGroupId =
+        StringUtil
+            .join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
     if (streamProviderConfig.containsKey(keyOfGroupId) && !streamProviderConfig.get(keyOfGroupId).isEmpty()) {
       groupId = streamProviderConfig.get(keyOfGroupId);
@@ -577,15 +584,15 @@ public class PinotResourceIdealStateBuilder {
     return groupId;
   }
 
-  public static IdealState addNewOfflineSegmentToIdealStateForV2(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
-      String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, String serverTenant) throws JsonParseException, JsonMappingException, JsonProcessingException,
-      JSONException, IOException {
+  public static IdealState addNewOfflineSegmentToIdealStateForV2(SegmentMetadata segmentMetadata,
+      HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, String serverTenant)
+      throws JsonParseException, JsonMappingException, JsonProcessingException, JSONException, IOException {
 
-    final String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
+    final String offlineTableName =
+        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
 
     final String segmentName = segmentMetadata.getName();
-    AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
+    AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
 
     if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(offlineTableName)) {
       SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(offlineTableName, SegmentAssignmentStrategyFactory
@@ -599,7 +606,8 @@ public class PinotResourceIdealStateBuilder {
       // Adding new Segments
       final int replicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
       final List<String> selectedInstances =
-          segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas, serverTenant);
+          segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas,
+              serverTenant);
       for (final String instance : selectedInstances) {
         currentIdealState.setPartitionState(segmentName, instance, ONLINE);
       }

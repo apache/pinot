@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,13 +38,16 @@ import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
@@ -91,8 +94,8 @@ public abstract class ClusterTest extends ControllerTest {
       for (int i = 0; i < serverCount; i++) {
         Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR
+            + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
             Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
         overrideOfflineServerConf(configuration);
@@ -125,10 +128,41 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit, int instanceCount,
-      int replicaCount, int brokerCount)
+  protected void addSchema(File schemaFile, String schemaName) throws Exception {
+    FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas", schemaName,
+        new FileInputStream(schemaFile), schemaFile.length());
+  }
+
+  protected void createBrokerTenant(String tenantName, int numBrokers) throws Exception {
+    JSONObject request = ControllerRequestBuilder.buildBrokerTenantCreateRequestJSON(tenantName, numBrokers);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTenantCreate(), request.toString());
+  }
+
+  protected void createBrokerTenant(String tenantName) throws Exception {
+    createBrokerTenant(tenantName, 1);
+  }
+
+  protected void createServerTenant(String tenantName, int numOffline, int numRealtime) throws Exception {
+    JSONObject request =
+        ControllerRequestBuilder.buildServerTenantCreateRequestJSON(tenantName, numOffline + numRealtime, numOffline,
+            numRealtime);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTenantCreate(), request.toString());
+  }
+
+  protected void addOfflineTable(String resourceName, String timeColumnName, String timeColumnType,
+      int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
+    JSONObject request =
+        ControllerRequestBuilder.buildCreateOfflineTableV2JSON(resourceName, serverTenant, brokerTenant,
+            timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
+            "BalanceNumSegmentAssignmentStrategy");
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+  }
+
+  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType,
+      int retentionTimeValue, String retentionTimeUnit, int instanceCount, int replicaCount, int brokerCount)
       throws Exception {
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, instanceCount, replicaCount);
+    JSONObject payload =
+        ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, instanceCount, replicaCount);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
     }
@@ -174,8 +208,29 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void createRealtimeResource(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile)
-      throws Exception {
+  protected void addRealtimeTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+      String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
+    JSONObject metadata = new JSONObject();
+    metadata.put("streamType", "kafka");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
+
+    JSONObject request =
+        ControllerRequestBuilder.buildCreateRealtimeTableV2JSON(resourceName, serverTenant, brokerTenant,
+            timeColumnName, timeColumnType, "rententionTimeUnit", "900", 1, "BalanceNumSegmentAssignmentStrategy",
+            metadata, schemaName);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
+
+  }
+
+  protected void createRealtimeResource(String resourceName, String timeColumnName, String timeColumnType,
+      String kafkaZkUrl, String kafkaTopic, File avroFile) throws Exception {
     // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
     Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);
     JSONObject metadata = new JSONObject();
@@ -206,8 +261,6 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
 
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateRealtimeResourceJSON(resourceName, 1, 1);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
@@ -219,8 +272,15 @@ public abstract class ClusterTest extends ControllerTest {
     Assert.assertEquals(_success, new JSONObject(res).getString("status"));
   }
 
-  protected void createHybridResource(String resourceName, String timeColumnName,
-      String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile, int retentionTimeValue, String retentionTimeUnit)
+  protected void addHybridTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+      String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
+    addRealtimeTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schemaName, serverTenant,
+        brokerTenant, avroFile);
+    addOfflineTable(resourceName, timeColumnName, timeColumnType, 900, "Days", brokerTenant, serverTenant);
+  }
+
+  protected void createHybridResource(String resourceName, String timeColumnName, String timeColumnType,
+      String kafkaZkUrl, String kafkaTopic, File avroFile, int retentionTimeValue, String retentionTimeUnit)
       throws Exception {
     // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
     Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);

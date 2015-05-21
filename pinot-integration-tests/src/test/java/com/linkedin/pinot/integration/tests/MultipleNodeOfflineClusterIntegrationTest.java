@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import java.io.File;
+
+
 /**
  * TODO Document me!
  *
@@ -37,7 +40,9 @@ public class MultipleNodeOfflineClusterIntegrationTest extends OfflineClusterInt
 
   @Override
   protected void createResource() throws Exception {
-    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", SERVER_INSTANCE_COUNT,
-        REPLICA_COUNT, BROKER_INSTANCE_COUNT);
+    File schemaFile =
+        new File(OfflineClusterIntegrationTest.class.getClassLoader()
+            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+    setUpTable(schemaFile, BROKER_COUNT, SERVER_COUNT);
   }
 }

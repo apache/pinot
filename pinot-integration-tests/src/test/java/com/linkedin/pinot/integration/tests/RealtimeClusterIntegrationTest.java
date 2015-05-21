@@ -39,6 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.KafkaTestUtils;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -56,6 +57,18 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int SEGMENT_COUNT = 12;
   public static final int QUERY_COUNT = 1000;
   private KafkaServerStartable kafkaStarter;
+
+  protected void setUpTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
+    Schema schema = Schema.fromFile(schemaFile);
+    String brokerTenant = "realtimeBroker";
+    String realtimeTenant = "realtimeServer";
+    createBrokerTenant(brokerTenant);
+    createServerTenant(realtimeTenant, 0, 1);
+    addSchema(schemaFile, schema.getSchemaName());
+    addRealtimeTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+        realtimeTenant, brokerTenant, avroFile);
+  }
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -84,9 +97,13 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
 
+    File schemaFile =
+        new File(OfflineClusterIntegrationTest.class.getClassLoader()
+            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+
     // Create Pinot resource
-    createRealtimeResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC, avroFiles.get(0));
+    setUpTable("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+        schemaFile, avroFiles.get(0));
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();

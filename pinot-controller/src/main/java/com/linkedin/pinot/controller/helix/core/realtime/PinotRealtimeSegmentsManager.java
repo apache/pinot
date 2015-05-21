@@ -32,9 +32,8 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
@@ -45,7 +44,8 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentsManager.class);
 
-  private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN = "/SEGMENTS/.*_R|/SEGMENTS/.*_R/.*";
+  private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN =
+      "/SEGMENTS/.*_REALTIME|/SEGMENTS/.*_REALTIME/.*";
 
   private final PinotHelixResourceManager pinotClusterManager;
 
@@ -82,15 +82,19 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
 
       if (state.getPartitionSet().size() == 0) {
         // this is a brand new ideal state, which means we will add one new segment to every patition,replica
-        List<String> instancesInResource =
-            pinotClusterManager.getHelixAdmin().getInstancesInClusterWithTag(pinotClusterManager.getHelixClusterName(),
-                resource);
+        List<String> instancesInResource = new ArrayList<String>();
+        try {
+          instancesInResource.addAll(pinotClusterManager.getServerInstancesForTable(resource, TableType.REALTIME));
+        } catch (Exception e) {
+          LOGGER.error("error fetching instances", e);
+        }
+
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
           String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, instanceId, groupId,
-              partitionId, String.valueOf(System.currentTimeMillis())));
+          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, instanceId, groupId, partitionId,
+              String.valueOf(System.currentTimeMillis())));
         }
       } else {
         Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
@@ -109,8 +113,8 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
           String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, instanceId, groupId,
-              partitionId, String.valueOf(System.currentTimeMillis())));
+          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, instanceId, groupId, partitionId,
+              String.valueOf(System.currentTimeMillis())));
         }
       }
     }
