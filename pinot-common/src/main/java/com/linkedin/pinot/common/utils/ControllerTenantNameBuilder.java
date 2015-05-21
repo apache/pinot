@@ -67,14 +67,14 @@ public class ControllerTenantNameBuilder {
   }
 
   public static String getExternalTenantName(String tenantName) {
-    if (tenantName.endsWith(REALTIME_TENANT_SUFFIX)) {
-      return tenantName.substring(0, tenantName.length() - REALTIME_TENANT_SUFFIX.length());
+    if (tenantName.endsWith(ServerType.REALTIME.toString())) {
+      return tenantName.substring(0, tenantName.length() - ServerType.REALTIME.toString().length() + 1);
     }
-    if (tenantName.endsWith(OFFLINE_TENANT_SUFFIX)) {
-      return tenantName.substring(0, tenantName.length() - OFFLINE_TENANT_SUFFIX.length());
+    if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
+      return tenantName.substring(0, tenantName.length() - ServerType.OFFLINE.toString().length() + 1);
     }
-    if (tenantName.endsWith(BROKER_TENANT_SUFFIX)) {
-      return tenantName.substring(0, tenantName.length() - BROKER_TENANT_SUFFIX.length());
+    if (tenantName.endsWith(TenantRole.BROKER.toString())) {
+      return tenantName.substring(0, tenantName.length() - TenantRole.BROKER.toString().length() + 1);
     }
     return tenantName;
   }
