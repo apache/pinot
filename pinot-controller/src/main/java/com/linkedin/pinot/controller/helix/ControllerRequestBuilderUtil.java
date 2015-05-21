@@ -50,9 +50,7 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildCreateOfflineResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
-    DataResource dataSource =
-        createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
-
+    DataResource dataSource = createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
     return dataSource.toJSON();
   }
 
@@ -122,6 +120,26 @@ public class ControllerRequestBuilderUtil {
     props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     props.put(DataSource.BROKER_TAG_NAME, resourceName);
     props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
+    return DataResource.fromMap(props);
+  }
+
+  public static DataResource createOfflineClusterCreationConfig(String serverTenant, String brokerTenant, int numReplicas, String resourceName,
+      String segmentAssignmentStrategy) {
+    final Map<String, String> props = new HashMap<String, String>();
+    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
+    props.put(DataSource.RESOURCE_NAME, resourceName);
+    props.put(DataSource.RESOURCE_TYPE, TableType.OFFLINE.toString());
+    props.put(DataSource.TIME_COLUMN_NAME, "days");
+    props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
+    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numReplicas));
+    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
+    props.put(DataSource.RETENTION_TIME_UNIT, "DAYS");
+    props.put(DataSource.RETENTION_TIME_VALUE, "30");
+    props.put(DataSource.PUSH_FREQUENCY, "daily");
+    props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+    props.put(DataSource.BROKER_TAG_NAME, brokerTenant);
+    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
+    props.put(DataSource.SERVER_TENANT, serverTenant);
     return DataResource.fromMap(props);
   }
 
@@ -239,5 +257,42 @@ public class ControllerRequestBuilderUtil {
   public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances, int offlineInstances, int realtimeInstances) throws JSONException {
     Tenant tenant = new Tenant(TenantRole.SERVER, tenantName, numberOfInstances, offlineInstances, realtimeInstances);
     return tenant.toJSON();
+  }
+
+  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, int numReplicas)
+      throws JSONException {
+    JSONObject creationRequest = new JSONObject();
+    creationRequest.put("tableName", tableName);
+
+    JSONObject segmentsConfig = new JSONObject();
+    segmentsConfig.put("retentionTimeUnit", "DAYS");
+    segmentsConfig.put("retentionTimeValue", "700");
+    segmentsConfig.put("segmentPushFrequency", "daily");
+    segmentsConfig.put("segmentPushType", "APPEND");
+    segmentsConfig.put("replication", numReplicas);
+    segmentsConfig.put("schemaName", "tableSchema");
+    segmentsConfig.put("timeColumnName", "timeColumnName");
+    segmentsConfig.put("timeType", "timeType");
+    segmentsConfig.put("segmentAssignmentStrategy", "BalanceNumSegmentAssignmentStrategy");
+    creationRequest.put("segmentsConfig", segmentsConfig);
+    JSONObject tableIndexConfig = new JSONObject();
+    JSONArray invertedIndexColumns = new JSONArray();
+    invertedIndexColumns.put("column1");
+    invertedIndexColumns.put("column2");
+    tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
+    tableIndexConfig.put("loadMode", "HEAP");
+    tableIndexConfig.put("lazyLoad", "false");
+    creationRequest.put("tableIndexConfig", tableIndexConfig);
+    JSONObject tenants = new JSONObject();
+    tenants.put("broker", brokerTenant);
+    tenants.put("server", serverTenant);
+    creationRequest.put("tenants", tenants);
+    creationRequest.put("tableType", "OFFLINE");
+    JSONObject metadata = new JSONObject();
+    JSONObject customConfigs = new JSONObject();
+    customConfigs.put("d2Name", "xlntBetaPinot");
+    metadata.put("customConfigs", customConfigs);
+    creationRequest.put("metadata", metadata);
+    return creationRequest;
   }
 }

@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 
 
 /**
@@ -48,8 +49,33 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
       resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
     }
     final Random random = new Random(System.currentTimeMillis());
-    List<String> allInstanceList =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
+
+    List<String> allInstanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
+    List<String> selectedInstanceList = new ArrayList<String>();
+    for (int i = 0; i < numReplicas; ++i) {
+      final int idx = random.nextInt(allInstanceList.size());
+      selectedInstanceList.add(allInstanceList.get(idx));
+      allInstanceList.remove(idx);
+    }
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
+        + segmentMetadata.getResourceName() + ", selected instances: "
+        + Arrays.toString(selectedInstanceList.toArray()));
+
+    return selectedInstanceList;
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    String serverTenantName = null;
+    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
+      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
+    } else {
+      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
+    }
+    final Random random = new Random(System.currentTimeMillis());
+
+    List<String> allInstanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<String>();
     for (int i = 0; i < numReplicas; ++i) {
       final int idx = random.nextInt(allInstanceList.size());

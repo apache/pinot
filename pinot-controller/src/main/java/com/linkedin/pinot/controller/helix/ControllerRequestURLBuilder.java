@@ -56,6 +56,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances/");
   }
 
+  public String forInstanceBulkCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", "bulkAdd");
+  }
+
+  // V2 API started
   public String forTenantCreate() {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants/");
   }
@@ -104,8 +109,28 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "?type=server");
   }
 
-  public String forInstanceBulkCreate() {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", "bulkAdd");
+  public String forTableCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables");
+  }
+
+  public String forTableGetConfig(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "configs");
+  }
+
+  public String forTableGetServerInstances(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "instances?type=server");
+  }
+
+  public String forTableGetBrokerInstances(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "instances?type=broker");
+  }
+
+  public String forTableGet(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "instances");
+  }
+
+  public String forTableDelete(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
   }
 
   public static void main(String[] args) {

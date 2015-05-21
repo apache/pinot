@@ -38,9 +38,8 @@ public class ControllerPojoTest {
   @Test
   public void realtimePojoTest() throws JSONException {
     BaseJsonNode metadataJson = getMetadataJson();
-
     DataResource realtimeDataResource = new DataResource("create", "testResource0", TableType.OFFLINE.toString(),
-        "daysSinceEpoch", "daysSinceEpoch", 3, 2, "DAYS", "7", "daily", "BalanceNumSegmentAssignmentStrategy", "testBrokerTag",
+        "daysSinceEpoch", "daysSinceEpoch", 3, 2, "DAYS", "7", "daily", "BalanceNumSegmentAssignmentStrategy", "testBrokerTag", "serverTenant",
         1, metadataJson);
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataUtils.getRealtimeDataResourceMetadata(realtimeDataResource);
 

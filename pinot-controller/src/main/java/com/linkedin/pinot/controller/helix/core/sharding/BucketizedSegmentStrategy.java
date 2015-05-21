@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 
 
@@ -66,4 +67,32 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
     }
   }
 
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    String serverTenantName = null;
+    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
+      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
+    } else {
+      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
+    }
+
+    List<String> allInstances =
+        helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
+    List<String> selectedInstanceList = new ArrayList<String>();
+    if (segmentMetadata.getShardingKey() != null) {
+      for (String instance : allInstances) {
+        if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixAdmin).get("shardingKey")
+            .equalsIgnoreCase(segmentMetadata.getShardingKey())) {
+          selectedInstanceList.add(instance);
+        }
+      }
+      LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
+          + segmentMetadata.getResourceName() + ", selected instances: "
+          + Arrays.toString(selectedInstanceList.toArray()));
+      return selectedInstanceList;
+    } else {
+      throw new RuntimeException("Segment missing sharding key!");
+    }
+  }
 }

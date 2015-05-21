@@ -27,8 +27,10 @@ import org.apache.helix.model.ExternalView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 
@@ -58,6 +60,56 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
       currentNumSegmentsPerInstanceMap.put(instance, 0);
     }
     ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, resourceName);
+    if (externalView != null) {
+      for (String partitionName : externalView.getPartitionSet()) {
+        Map<String, String> instanceToStateMap = externalView.getStateMap(partitionName);
+        for (String instanceName : instanceToStateMap.keySet()) {
+          if (currentNumSegmentsPerInstanceMap.containsKey(instanceName)) {
+            currentNumSegmentsPerInstanceMap.put(instanceName, currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
+          } else {
+            currentNumSegmentsPerInstanceMap.put(instanceName, 1);
+          }
+        }
+      }
+
+    }
+    PriorityQueue<Number2ObjectPair<String>> priorityQueue =
+        new PriorityQueue<Number2ObjectPair<String>>(numReplicas, Pairs.getDescendingnumber2ObjectPairComparator());
+    for (String key : currentNumSegmentsPerInstanceMap.keySet()) {
+      priorityQueue.add(new Number2ObjectPair<String>(currentNumSegmentsPerInstanceMap.get(key), key));
+      if (priorityQueue.size() > numReplicas) {
+        priorityQueue.poll();
+      }
+    }
+
+    while (!priorityQueue.isEmpty()) {
+      selectedInstances.add(priorityQueue.poll().getB());
+    }
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
+        + segmentMetadata.getResourceName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
+    return selectedInstances;
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    String serverTenantName;
+    String tableName;
+    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
+      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
+      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
+    } else {
+      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
+      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
+    }
+
+    List<String> selectedInstances = new ArrayList<String>();
+    Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<String, Integer>();
+    List<String> allTaggedInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
+    for (String instance : allTaggedInstances) {
+      currentNumSegmentsPerInstanceMap.put(instance, 0);
+    }
+    ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
     if (externalView != null) {
       for (String partitionName : externalView.getPartitionSet()) {
         Map<String, String> instanceToStateMap = externalView.getStateMap(partitionName);

@@ -55,6 +55,7 @@ public class DataResource {
   private final String pushFrequency;
   private final String segmentAssignmentStrategy;
   private final String brokerTagName;
+  private final String serverTenant;
   private final int numberOfBrokerInstances;
   private final BaseJsonNode metadata;
 
@@ -80,6 +81,7 @@ public class DataResource {
       @JsonProperty(Helix.DataSource.PUSH_FREQUENCY) String pushFrequency,
       @JsonProperty(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY) String segmentAssignmentStrategy,
       @JsonProperty(Helix.DataSource.BROKER_TAG_NAME) String brokerTagName,
+      @JsonProperty(Helix.DataSource.SERVER_TENANT) String serverTenant,
       @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances,
       @JsonProperty(CommonConstants.Helix.DataSource.METADATA) BaseJsonNode metadata) {
 
@@ -94,6 +96,7 @@ public class DataResource {
     this.retentionTimeValue = retentionTimeValue;
     this.pushFrequency = pushFrequency;
     this.segmentAssignmentStrategy = segmentAssignmentStrategy;
+    this.serverTenant = serverTenant;
     if (brokerTagName != null) {
       if (brokerTagName.startsWith(Helix.PREFIX_OF_BROKER_RESOURCE_TAG)) {
         this.brokerTagName = brokerTagName;
@@ -200,24 +203,11 @@ public class DataResource {
           props.get(Helix.DataSource.RETENTION_TIME_VALUE),
           props.get(Helix.DataSource.PUSH_FREQUENCY),
           props.get(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
-          props.get(Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
+          props.get(Helix.DataSource.BROKER_TAG_NAME),
+          props.get(Helix.DataSource.SERVER_TENANT), Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), null);
     }
-    if (Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE.equalsIgnoreCase(props
-        .get(Helix.DataSource.REQUEST_TYPE))) {
-      return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
-          props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
-          null, null, Integer.parseInt(props
-              .get(Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
-              .get(Helix.DataSource.NUMBER_OF_COPIES)), null, null, null, null, null, -1, null);
-    }
-    if (Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE.equalsIgnoreCase(props
-        .get(Helix.DataSource.REQUEST_TYPE))) {
-      return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
-          props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE), null, null, -1, -1, null, null, null, null,
-          props.get(Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
-              .get(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), null);
-    }
+
     throw new UnsupportedOperationException("Don't support Request type: "
         + props.get(Helix.DataSource.REQUEST_TYPE));
   }
@@ -275,7 +265,8 @@ public class DataResource {
         && incomingDS.getRetentionTimeValue().equals(retentionTimeValue)
         && incomingDS.getSegmentAssignmentStrategy().equals(segmentAssignmentStrategy)
         && incomingDS.getTimeColumnName().equals(timeColumnName)
-        && incomingDS.getTimeType().equals(timeType) && incomingDS.getBrokerTagName().equals(brokerTagName)) {
+        && incomingDS.getTimeType().equals(timeType) && incomingDS.getBrokerTagName().equals(brokerTagName)
+        && incomingDS.getServerTenant().equals(serverTenant)) {
       return true;
     }
     return false;
@@ -294,7 +285,8 @@ public class DataResource {
         segmentAssignmentStrategy,
         timeColumnName,
         timeType,
-        brokerTagName);
+        brokerTagName,
+        serverTenant);
   }
 
   /**
@@ -346,6 +338,7 @@ public class DataResource {
     ret.put(Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
     ret.put(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     ret.put(Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
+    ret.put(Helix.DataSource.SERVER_TENANT, serverTenant);
     ret.put(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
     setMetaToConfigMap(ret);
     return ret;
@@ -366,6 +359,7 @@ public class DataResource {
     bld.append(Helix.DataSource.PUSH_FREQUENCY + " : " + pushFrequency + "\n");
     bld.append(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY + " : " + segmentAssignmentStrategy + "\n");
     bld.append(Helix.DataSource.BROKER_TAG_NAME + " : " + brokerTagName + "\n");
+    bld.append(Helix.DataSource.SERVER_TENANT + " : " + serverTenant + "\n");
     bld.append(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES + " : " + numberOfBrokerInstances + "\n");
     bld.append(Helix.DataSource.METADATA + " : " + metadata + "\n");
     return bld.toString();
@@ -385,22 +379,11 @@ public class DataResource {
     ret.put(Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
     ret.put(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     ret.put(Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
+    ret.put(Helix.DataSource.SERVER_TENANT, serverTenant);
     ret.put(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
     ret.put(Helix.DataSource.METADATA, metadata);
 
     return ret;
-  }
-
-  public static void main(String[] args) throws JSONException {
-    JSONObject metadata = new JSONObject();
-    metadata.put("d2.name", "xlntBetaPinot");
-    DataResource dataResource =
-        new DataResource("requestType", "resourceName", "resourceType", "timeColumnName", "timeType", 1, 2,
-            "retentionTimeUnit", "rentionTimeValue", "pushFrequency", "segmentAssignmentStrategy", "brokerTagName", 3,
-            null);
-    System.out.println(dataResource);
-    System.out.println(dataResource.toJSON());
-
   }
 
   public Map<String, String> toResourceConfigMap() {
@@ -417,6 +400,7 @@ public class DataResource {
       ret.put(Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
       ret.put(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
       ret.put(Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
+      ret.put(Helix.DataSource.SERVER_TENANT, serverTenant);
       ret.put(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
       setMetaToConfigMap(ret);
       return ret;
@@ -466,6 +450,10 @@ public class DataResource {
         ret.put(Helix.DataSource.METADATA + "." + key, metadata.get(key).textValue());
       }
     }
+  }
+
+  public String getServerTenant() {
+    return serverTenant;
   }
 
 }

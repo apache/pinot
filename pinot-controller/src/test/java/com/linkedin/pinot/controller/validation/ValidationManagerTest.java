@@ -81,7 +81,7 @@ public class ValidationManagerTest {
     DataResource dataResource =
         new DataResource("create", testResourceName, Helix.TableType.OFFLINE.toString(), "timestamp",
             "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy", "broker_"
-                + testResourceName, 2, null);
+                + testResourceName, "serverTenant", 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
 
     DummyMetadata metadata = new DummyMetadata(testResourceName);

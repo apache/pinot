@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.reslet.resources;
+package com.linkedin.pinot.controller.api.reslet.resources.v2;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONObject;
@@ -59,15 +59,15 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STA
  *    }' http://lva1-pinot-controller-vip-1.corp.linkedin.com:11984/tenants
  */
 
-public class PinotTenantServerResource extends ServerResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantServerResource.class);
+public class PinotTenantRestletResource extends ServerResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
 
   private static final String TENANT_NAME = "tenantName";
 
   private final PinotHelixResourceManager _pinotHelixResourceMananger;
   private final ObjectMapper _objectMapper;
 
-  public PinotTenantServerResource() {
+  public PinotTenantRestletResource() {
     getVariants().add(new Variant(MediaType.TEXT_PLAIN));
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);

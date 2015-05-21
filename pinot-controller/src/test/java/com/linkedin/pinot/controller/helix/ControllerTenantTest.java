@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 
 
-public class ControllerTenantTest extends ControllerTest { 
+public class ControllerTenantTest extends ControllerTest {
 
   private static final String HELIX_CLUSTER_NAME = "ControllerTenantTest";
   static ZkClient _zkClient = null;
@@ -39,9 +39,7 @@ public class ControllerTenantTest extends ControllerTest {
   public void setup() throws Exception {
     startZk();
     _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
-
     startController();
-
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
         ZkTestUtils.DEFAULT_ZK_STR, 20);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,

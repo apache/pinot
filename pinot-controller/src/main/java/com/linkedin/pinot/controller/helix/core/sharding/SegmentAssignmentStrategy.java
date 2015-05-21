@@ -31,4 +31,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 public interface SegmentAssignmentStrategy {
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas);
+
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
 }

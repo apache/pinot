@@ -55,6 +55,7 @@ public class ZKMetadataUtils {
     offlineDataResourceMetadata.setNumDataReplicas(resource.getNumberOfCopies());
     offlineDataResourceMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
     offlineDataResourceMetadata.setBrokerTag(resource.getBrokerTagName());
+    offlineDataResourceMetadata.setServerTenant(resource.getServerTenant());
     offlineDataResourceMetadata.setPushFrequency(resource.getPushFrequency());
     offlineDataResourceMetadata.setSegmentAssignmentStrategy(resource.getSegmentAssignmentStrategy());
     Map<String, String> metadataMap = new HashMap<String, String>();
@@ -99,6 +100,7 @@ public class ZKMetadataUtils {
     realtimeDataResourceMetadata.setNumDataReplicas(resource.getNumberOfCopies());
     realtimeDataResourceMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
     realtimeDataResourceMetadata.setBrokerTag(resource.getBrokerTagName());
+    realtimeDataResourceMetadata.setServerTenant(resource.getServerTenant());
     realtimeDataResourceMetadata.setStreamType(extractStreamTypeFromDataResource(resource));
 
     Map<String, String> metadataMap = new HashMap<String, String>();

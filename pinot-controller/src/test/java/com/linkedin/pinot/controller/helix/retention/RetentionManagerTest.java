@@ -91,7 +91,7 @@ public class RetentionManagerTest {
     DataResource dataResource =
         new DataResource("create", _testResourceName, Helix.TableType.OFFLINE.toString(),
             "timestamp", "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy",
-            "broker_" + _testResourceName, 2, null);
+            "broker_" + _testResourceName, "serverTenant", 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
   }
 

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.sharding;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +23,7 @@ import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -32,11 +31,17 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.api.pojos.Tenant;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
@@ -50,6 +55,8 @@ public class SegmentAssignmentStrategyTest {
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String RESOURCE_NAME_BALANCED = "testResourceBalanced";
   private final static String RESOURCE_NAME_RANDOM = "testResourceRandom";
+
+  private String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
 
   private PinotHelixResourceManager _pinotResourceManager;
   private ZkClient _zkClient;
@@ -98,8 +105,17 @@ public class SegmentAssignmentStrategyTest {
     final int numRelicas = 2;
     final int numInstancesPerReplica = 10;
     final int totalNumInstances = numRelicas * numInstancesPerReplica;
+
+    String resourceName = "testResource";
+    String brokerTag = "broker_testResource";
+    JSONObject payload = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTag, 5);
+    ControllerTest.sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTenantCreate(), payload.toString());
+    String serverTag = "serverTag_0";
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, serverTag, 6, 3, 3);
+    _pinotResourceManager.createServerTenant(serverTenant );
+
     final DataResource resource =
-        ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalNumInstances, numRelicas,
+        ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(serverTag, brokerTag, numRelicas,
             RESOURCE_NAME_RANDOM, "RandomAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
     Thread.sleep(3000);
