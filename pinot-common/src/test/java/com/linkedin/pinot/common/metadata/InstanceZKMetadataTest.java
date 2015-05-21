@@ -49,8 +49,8 @@ public class InstanceZKMetadataTest {
     Map<String, String> partitionMap = new HashMap<String, String>();
 
     for (int i = 0; i < 10; ++i) {
-      groupIdMap.put("testRes" + i + "_R", "groupId" + i);
-      partitionMap.put("testRes" + i + "_R", "part" + i);
+      groupIdMap.put("testRes" + i + "_REALTIME", "groupId" + i);
+      partitionMap.put("testRes" + i + "_REALTIME", "part" + i);
     }
     record.setMapField("KAFKA_HLC_GROUP_MAP", groupIdMap);
     record.setMapField("KAFKA_HLC_PARTITION_MAP", partitionMap);

@@ -18,8 +18,6 @@ package com.linkedin.pinot.broker.broker;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
 import org.I0Itec.zkclient.ZkClient;
@@ -32,6 +30,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -42,15 +41,14 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
-import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.common.utils.TenantRole;
+import com.linkedin.pinot.controller.api.pojos.Tenant;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
@@ -89,17 +87,21 @@ public class HelixBrokerStarterTest {
     addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 5);
     addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 1);
 
-    _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(6, "broker_colocated"));
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, "testBroker", 6, -1, -1);
+    _pinotResourceManager.createBrokerTenant(brokerTenant);
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, "testServer", 1, 1, 0);
+    _pinotResourceManager.createServerTenant(serverTenant);
 
-    final String dataResource = "company";
-    final DataResource resource = createOfflineClusterConfig(1, 1, dataResource, "BalanceNumSegmentAssignmentStrategy");
-    _pinotResourceManager.handleCreateNewDataResource(resource);
+    final String tableName = "company";
+    JSONObject buildCreateOfflineTableV2JSON = ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(tableName, "testServer", "testBroker", 1);
+    AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
+    _pinotResourceManager.addTable(config);
 
     for (int i = 1; i <= 5; i++) {
-      addOneSegment(dataResource);
+      addOneSegment(tableName);
       Thread.sleep(2000);
       final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(dataResource));
+          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
   }
@@ -113,12 +115,11 @@ public class HelixBrokerStarterTest {
 
   @Test
   public void testResourceAndTagAssignment() throws Exception {
-    final String COMPANY_RESOURCE_NAME = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable("company");
-    final String CAP_RESOURCE_NAME = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable("cap");
-    PinotResourceManagerResponse res;
+    final String COMPANY_RESOURCE_NAME = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable("company");
+    final String CAP_RESOURCE_NAME = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable("cap");
     IdealState idealState;
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 6);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testBroker_BROKER").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet(COMPANY_RESOURCE_NAME).size(), 6);
@@ -127,11 +128,14 @@ public class HelixBrokerStarterTest {
     Assert.assertEquals(externalView.getStateMap(COMPANY_RESOURCE_NAME).size(), 6);
     Thread.sleep(2000);
     HelixExternalViewBasedRouting helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Assert.assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[company_O]");
+    Assert.assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[company_OFFLINE]");
 
-    res = _pinotResourceManager.createBrokerDataResource(createBrokerDataResourceConfig(CAP_RESOURCE_NAME, 6, "broker_colocated"));
-    Assert.assertEquals(res.status == STATUS.success, true);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 6);
+    final String tableName = "cap";
+    JSONObject buildCreateOfflineTableV2JSON = ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(tableName, "testServer", "testBroker", 1);
+    AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
+    _pinotResourceManager.addTable(config);
+
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testBroker_BROKER").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet(CAP_RESOURCE_NAME).size(), 6);
@@ -141,8 +145,9 @@ public class HelixBrokerStarterTest {
     externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(externalView.getStateMap(CAP_RESOURCE_NAME).size(), 6);
     helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Assert
-        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[company_O]");
+    Object[] tableArray = helixExternalViewBasedRouting.getDataResourceSet().toArray();
+    Arrays.sort(tableArray);
+    Assert.assertEquals(Arrays.toString(tableArray), "[cap_OFFLINE, company_OFFLINE]");
 
     Set<String> serverSet = helixExternalViewBasedRouting.getBrokerRoutingTable().get(COMPANY_RESOURCE_NAME).get(0).getServerSet();
     Assert.assertEquals(
@@ -156,7 +161,9 @@ public class HelixBrokerStarterTest {
     externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, COMPANY_RESOURCE_NAME);
     Assert.assertEquals(externalView.getPartitionSet().size(), 6);
     helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Assert.assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[company_O]");
+    tableArray = helixExternalViewBasedRouting.getDataResourceSet().toArray();
+    Arrays.sort(tableArray);
+    Assert.assertEquals(Arrays.toString(tableArray), "[cap_OFFLINE, company_OFFLINE]");
 
     serverSet = helixExternalViewBasedRouting.getBrokerRoutingTable().get(COMPANY_RESOURCE_NAME).get(0).getServerSet();
     Assert.assertEquals(
@@ -174,43 +181,6 @@ public class HelixBrokerStarterTest {
         tearDown();
       }
     }
-  }
-
-  public static BrokerDataResource createBrokerDataResourceConfig(String resourceName, int numInstances, String tag) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Broker.DataResource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, numInstances + "");
-    props.put(CommonConstants.Broker.DataResource.TAG, tag);
-    final BrokerDataResource res = BrokerDataResource.fromMap(props);
-    return res;
-  }
-
-  public static BrokerTagResource createBrokerTagResourceConfig(int numInstances, String tag) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Broker.TagResource.TAG, tag);
-    props.put(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, numInstances + "");
-    final BrokerTagResource res = BrokerTagResource.fromMap(props);
-    return res;
-  }
-
-  public static DataResource createOfflineClusterConfig(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "days");
-    props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, "30");
-    props.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, "daily");
-    props.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, "colocated");
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, "6");
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, CommonConstants.Helix.TableType.OFFLINE.name());
-    final DataResource res = DataResource.fromMap(props);
-    return res;
   }
 
   public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
@@ -247,10 +217,10 @@ public class HelixBrokerStarterTest {
     }
   }
 
-  private void addOneSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
+  private void addOneSegment(String tableName) {
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegment(segmentMetadata, "http://localhost:something");
+    _pinotResourceManager.addSegmentV2(segmentMetadata, "http://localhost:something");
   }
 
 }
