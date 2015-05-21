@@ -15,8 +15,12 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.Reader;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -26,15 +30,16 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
 public class CSVRecordReader implements RecordReader {
-  private static final String CSV_FORMAT_ENV = "csv_reader_format";
-  private static final String CSV_HEADER_ENV = "csv_header";
-  private static final String CSV_DELIMITER_ENV = "csv_delimiter";
+  private static final Logger _logger = LoggerFactory.getLogger(CSVRecordReader.class);
 
   private String _delimiterString = ",";
   private String _fileName;
@@ -42,14 +47,14 @@ public class CSVRecordReader implements RecordReader {
 
   private CSVParser _parser = null;
   private Iterator<CSVRecord> _iterator = null;
-  private Map<String, String> _env = null;
+  RecordReaderConfig _config = null;
 
-  public CSVRecordReader(String dataFile, Schema schema) {
+  public CSVRecordReader(String dataFile, RecordReaderConfig config, Schema schema) {
     _fileName = dataFile;
-
     _schema = schema;
-    _env = System.getenv();
-    _delimiterString = Character.toString(getDelimiterFromEnv());
+
+    _config = config;
+    _delimiterString = _config.getCsvDelimiter();
   }
 
   @Override
@@ -83,12 +88,11 @@ public class CSVRecordReader implements RecordReader {
 
     for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      String token = record.get(column);
+      String token = getValueForColumn(record, column);
 
       Object value=null;
       if (fieldSpec.isSingleValueField()) {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
-
       } else {
         String[] tokens = (token != null) ? StringUtils.split(token, _delimiterString) : null;
         value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec.getDataType());
@@ -107,8 +111,34 @@ public class CSVRecordReader implements RecordReader {
     _parser.close();
   }
 
-  private CSVFormat getFormatFromEnv() {
-    String format = (_env != null) ? _env.get(CSV_FORMAT_ENV) : null;
+  private String getValueForColumn(CSVRecord record, String column) {
+    if (_config.columnIsDate(column)) {
+      return dateToDaysSinceEpochMilli(record.get(column)).toString();
+    } else {
+      return record.get(column);
+    }
+  }
+
+  private Long dateToDaysSinceEpochMilli(String token) {
+    if (token == null) {
+      return 0L;
+    }
+
+    SimpleDateFormat dateFormat = new SimpleDateFormat(_config.getCsvDateFormat());
+
+    // Propagting this exception up causes a whole bunch of other readers to now throw exceptions.
+    // Catch here, and return 0.
+    try {
+      Date date = dateFormat.parse(token);
+      return date.getTime(); // This is in milli-seconds.
+    } catch (ParseException e) {
+      _logger.warn("Illegal date: Expected format: " + _config.getCsvDateFormat());
+      return 0L;
+    }
+  }
+
+  private CSVFormat getFormatFromConfig() {
+    String format = (_config != null) ? _config.getCsvFileFormat() : null;
 
     if (format == null) {
       return CSVFormat.DEFAULT;
@@ -134,17 +164,17 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  private String[] getHeaderFromEnv() {
+  private String[] getHeaderFromConfig() {
     String token;
-    if ((_env == null) || ((token = _env.get(CSV_HEADER_ENV))) == null) {
+    if ((_config == null) || ((token = _config.getCsvHeader())) == null) {
       return null;
     }
     return StringUtils.split(token, _delimiterString);
   }
 
-  private char getDelimiterFromEnv() {
+  private char getDelimiterFromConfig() {
     String delimiter;
-    if ((_env == null) || ((delimiter = _env.get(CSV_DELIMITER_ENV)) == null)) {
+    if ((_config == null) || ((delimiter = _config.getCsvDelimiter()) == null)) {
       return ',';
     } else {
       return StringEscapeUtils.unescapeJava(delimiter).charAt(0);
@@ -152,8 +182,8 @@ public class CSVRecordReader implements RecordReader {
   }
 
   private CSVFormat getFormat() {
-    CSVFormat format = getFormatFromEnv().withDelimiter(getDelimiterFromEnv());
-    String[] header = getHeaderFromEnv();
+    CSVFormat format = getFormatFromConfig().withDelimiter(getDelimiterFromConfig());
+    String[] header = getHeaderFromConfig();
 
     if (header != null) {
       format = format.withHeader(header);

@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
@@ -49,6 +50,9 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
   @Option(name = "-format", required = false, metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
   private FileFormat _format = FileFormat.AVRO;
+
+  @Option(name = "-recordReaderConfigFile", required = false, metaVar = "<string>", usage = "Config file for record readers")
+  private String _recordReaderConfigFile;
 
   @Option(name = "-resourceName", required = true, metaVar = "<string>", usage = "Name of the resource.")
   private String _resourceName;
@@ -157,6 +161,13 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       return false;
     }
 
+    final RecordReaderConfig recordReaderConfig;
+    if (_recordReaderConfigFile != null) {
+      recordReaderConfig = new ObjectMapper().readValue(new File(_recordReaderConfigFile), RecordReaderConfig.class);
+    } else {
+      recordReaderConfig = null;
+    }
+
     ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     int cnt = 0;
@@ -170,6 +181,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
             SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
             config.setInputFileFormat(_format);
+            config.setRecordeReaderConfig(recordReaderConfig);
             config.setSegmentVersion(SegmentVersion.v1);
 
             config.setIndexOutputDir(_outDir);

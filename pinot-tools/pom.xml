@@ -76,6 +76,22 @@
               <name>pinot-admin</name>
             </program>
           </programs>
+          <binFileExtensions>
+            <unix>.sh</unix>
+          </binFileExtensions>
+          <!-- Set the target configuration directory to be used in the bin scripts -->
+          <configurationDirectory>conf</configurationDirectory>
+          <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
+          <copyConfigurationDirectory>false</copyConfigurationDirectory>
+          <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
+          <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
+          <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
+          <!-- Extra JVM arguments that will be included in the bin scripts -->
+          <extraJvmArguments>-Xms10G -Xmx10G</extraJvmArguments>
+          <!-- Generate bin scripts for windows and unix pr default -->
+          <platforms>
+            <platform>unix</platform>
+          </platforms>
         </configuration>
       </plugin>
     </plugins>

@@ -30,7 +30,8 @@ public class RecordReaderFactory {
       return new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(segmentCreationSpec), segmentCreationSpec.getInputFilePath());
 
     } else if (segmentCreationSpec.getInputFileFormat() == FileFormat.CSV) {
-      return new CSVRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getSchema());
+      return new CSVRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getRecordReaderConfig(),
+          segmentCreationSpec.getSchema());
 
     } else if (segmentCreationSpec.getInputFileFormat() == FileFormat.JSON) {
       return new JSONRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getSchema());

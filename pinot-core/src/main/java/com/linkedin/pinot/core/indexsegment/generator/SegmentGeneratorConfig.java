@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 
 
@@ -63,6 +64,8 @@ public class SegmentGeneratorConfig {
 
   private Map<String, Object> properties;
   private Schema schema;
+  private RecordReaderConfig recordReaderConfig;
+
   private boolean createInvertedIndex = false;
 
   /*
@@ -163,6 +166,14 @@ public class SegmentGeneratorConfig {
       }
     }
     return customConfigs;
+  }
+
+  public void setRecordeReaderConfig(RecordReaderConfig readerConfig) {
+    recordReaderConfig = readerConfig;
+  }
+
+  public RecordReaderConfig getRecordReaderConfig() {
+    return recordReaderConfig;
   }
 
   private String getQualifyingDimensions(FieldType type) {
