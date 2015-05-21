@@ -178,7 +178,7 @@ public class ControllerTenantTest extends ControllerTest {
     System.out.println("**************");
     System.out.println(res);
     JSONObject resJsonObject = new JSONObject(res);
-    Assert.assertEquals(resJsonObject.getJSONArray("BROKER").length(), 4);
+    Assert.assertEquals(resJsonObject.getJSONArray("BROKER_TENANTS").length(), 4);
     for (int i = 0; i < 4; i++) {
       String brokerTag = "colocated_" + i;
       res = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantGet(brokerTag));
@@ -220,7 +220,7 @@ public class ControllerTenantTest extends ControllerTest {
     System.out.println("**************");
     System.out.println(res);
     JSONObject resJsonObject = new JSONObject(res);
-    Assert.assertEquals(resJsonObject.getJSONArray("SERVER").length(), 4);
+    Assert.assertEquals(resJsonObject.getJSONArray("SERVER_TENANTS").length(), 8);
     for (int i = 0; i < 4; i++) {
       String serverTag = "serverTag_" + i;
       res = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forServerTenantGet(serverTag));

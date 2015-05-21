@@ -25,7 +25,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
-
+@Deprecated
 public final class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
 
   private String _pushFrequency = null;

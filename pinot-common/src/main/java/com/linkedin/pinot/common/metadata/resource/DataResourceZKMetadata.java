@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
+@Deprecated
 public abstract class DataResourceZKMetadata implements ZKMetadata {
   private String _resourceName;
   private TableType _resourceType = null;

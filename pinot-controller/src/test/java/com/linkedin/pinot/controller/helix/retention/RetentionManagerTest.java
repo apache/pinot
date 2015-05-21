@@ -306,7 +306,7 @@ public class RetentionManagerTest {
     // put into propertyStore
     OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
     ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
-    ZKMetadataProvider.setOfflineSegmentZKMetadataV2(_pinotHelixResourceManager.getPropertyStore(), offlineSegmentZKMetadata);
+    ZKMetadataProvider.setOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), offlineSegmentZKMetadata);
 
     // put into idealStates
     IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName);

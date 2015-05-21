@@ -97,7 +97,7 @@ public class ValidationManagerTest {
     Thread.sleep(1000);
 
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadataV2(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
 
     SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();
@@ -115,7 +115,7 @@ public class ValidationManagerTest {
     Thread.sleep(1000);
 
     offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadataV2(_pinotHelixResourceManager.getPropertyStore(),
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
             metadata.getResourceName(), metadata.getName());
     fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 

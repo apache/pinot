@@ -39,7 +39,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 26, 2014
  */
-
+@Deprecated
 public class DataResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataResource.class);
 

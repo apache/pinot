@@ -15,16 +15,10 @@
  */
 package com.linkedin.pinot.broker.broker;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -47,6 +41,8 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
@@ -103,7 +99,7 @@ public class HelixBrokerStarterTest {
       addOneSegment(dataResource);
       Thread.sleep(2000);
       final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          BrokerRequestUtils.getOfflineResourceNameForResource(dataResource));
+          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(dataResource));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
   }
@@ -117,8 +113,8 @@ public class HelixBrokerStarterTest {
 
   @Test
   public void testResourceAndTagAssignment() throws Exception {
-    final String COMPANY_RESOURCE_NAME = BrokerRequestUtils.getOfflineResourceNameForResource("company");
-    final String CAP_RESOURCE_NAME = BrokerRequestUtils.getOfflineResourceNameForResource("cap");
+    final String COMPANY_RESOURCE_NAME = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable("company");
+    final String CAP_RESOURCE_NAME = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable("cap");
     PinotResourceManagerResponse res;
     IdealState idealState;
 

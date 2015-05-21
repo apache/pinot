@@ -22,6 +22,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -30,10 +31,12 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.common.utils.TenantRole;
+import com.linkedin.pinot.controller.api.pojos.Tenant;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
@@ -43,11 +46,12 @@ import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 public class PinotResourceManagerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotResourceManagerTest.class);
 
-  private PinotHelixResourceManager _pinotResourceManager;
+  private PinotHelixResourceManager _pinotHelixResourceManager;
   private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestPinotResourceManager";
-  private final static String TEST_RESOURCE_NAME = "testResource";
-
+  private final static String BROKER_TENANT_NAME = "testBrokerTenant";
+  private final static String SERVER_TENANT_NAME = "testServerTenant";
+  private final static String TABLE_NAME = "testTable";
   private ZkClient _zkClient;
 
   private HelixManager _helixZkManager;
@@ -60,8 +64,8 @@ public class PinotResourceManagerTest {
     _zkClient = new ZkClient(ZK_SERVER);
 
     final String instanceId = "localhost_helixController";
-    _pinotResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null);
-    _pinotResourceManager.start();
+    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null);
+    _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
     _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
@@ -75,17 +79,27 @@ public class PinotResourceManagerTest {
     Assert.assertEquals(
         _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
             .size(), _numInstance);
-    final DataResource resource =
-        ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(1, 1, TEST_RESOURCE_NAME,
-            "BalanceNumSegmentAssignmentStrategy");
 
-    _pinotResourceManager.handleCreateNewDataResource(resource);
+    // Create broker tenant
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
+    _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BROKER_TENANT_NAME + "_BROKER").size(), 1);
+
+    // Create server tenant
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, 1, 1, 0);
+    _pinotHelixResourceManager.createServerTenant(serverTenant);
+
+    // Adding table
+    String OfflineTableConfigJson =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME, 1).toString();
+    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    _pinotHelixResourceManager.addTable(offlineTableConfig);
 
   }
 
   @AfterTest
   public void tearDown() {
-    _pinotResourceManager.stop();
+    _pinotHelixResourceManager.stop();
     _zkClient.close();
     ZkTestUtils.stopLocalZkServer();
   }
@@ -93,17 +107,17 @@ public class PinotResourceManagerTest {
   @Test
   public void testAddingAndDeletingSegments() throws Exception {
     for (int i = 1; i <= 5; i++) {
-      addOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME));
+      addOneSegment(TABLE_NAME);
       Thread.sleep(2000);
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME));
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
-    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME));
+    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
     int i = 4;
     for (final String segmentId : externalView.getPartitionSet()) {
-      deleteOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME), segmentId);
+      deleteOneSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentId);
       Thread.sleep(2000);
-      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME)).getPartitionSet()
+      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME)).getPartitionSet()
           .size(), i);
       i--;
     }
@@ -118,11 +132,11 @@ public class PinotResourceManagerTest {
         tearDown();
       }
       if ((command != null) && command.equals("add")) {
-        addOneSegment(TEST_RESOURCE_NAME);
+        addOneSegment(TABLE_NAME);
       }
       if ((command != null) && command.startsWith("delete")) {
         final String segment2delete = command.split(" ")[1];
-        deleteOneSegment(TEST_RESOURCE_NAME, segment2delete);
+        deleteOneSegment(TABLE_NAME, segment2delete);
       }
     }
   }
@@ -130,12 +144,12 @@ public class PinotResourceManagerTest {
   private void addOneSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _pinotHelixResourceManager.addSegmentV2(segmentMetadata, "downloadUrl");
   }
 
   private void deleteOneSegment(String resource, String segment) {
     LOGGER.info("Trying to delete Segment : " + segment + " from resource : " + resource);
-    _pinotResourceManager.deleteSegment(resource, segment);
+    _pinotHelixResourceManager.deleteSegment(resource, segment);
   }
 
 }

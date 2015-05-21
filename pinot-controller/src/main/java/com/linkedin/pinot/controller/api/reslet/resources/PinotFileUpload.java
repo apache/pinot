@@ -37,6 +37,7 @@ import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -235,13 +236,13 @@ public class PinotFileUpload extends ServerResource {
       }
       PinotResourceManagerResponse res = null;
       if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
-          BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName)) {
-        res = manager.deleteSegment(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName);
+          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName), segmentName)) {
+        res = manager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName), segmentName);
         rep = new StringRepresentation(res.toString());
       }
       if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
-          BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName)) {
-        res = manager.deleteSegment(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName);
+          TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), segmentName)) {
+        res = manager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), segmentName);
         rep = new StringRepresentation(res.toString());
       }
       if (res == null) {

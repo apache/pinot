@@ -26,10 +26,10 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
@@ -53,20 +53,21 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     if (_propertyStore == null) {
       return;
     }
-    String resourceName = externalView.getResourceName();
+    String tableName = externalView.getResourceName();
     // Do nothing for Realtime Resource.
-    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == TableType.REALTIME) {
+    if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
       return;
     }
     Set<String> offlineSegmentsServing = externalView.getPartitionSet();
-    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, resourceName);
-    TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineDataResourceZKMetadata.getTimeType());
+    AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+
+    TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineTableConfig.getValidationConfig().getTimeType());
     if (!offlineSegmentsServing.isEmpty() && resourceTimeUnit != null) {
       long maxTimeValue = -1;
       for (String segmentId : offlineSegmentsServing) {
         try {
           long endTime = -1;
-          OfflineSegmentZKMetadata offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, resourceName, segmentId);
+          OfflineSegmentZKMetadata offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
           if (offlineSegmentZKMetadata.getEndTime() > 0) {
             if (offlineSegmentZKMetadata.getTimeUnit() != null) {
               endTime = resourceTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
@@ -80,9 +81,9 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
         }
       }
       TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
-      timeBoundaryInfo.setTimeColumn(offlineDataResourceZKMetadata.getTimeColumnName());
+      timeBoundaryInfo.setTimeColumn(offlineTableConfig.getValidationConfig().getTimeColumnName());
       timeBoundaryInfo.setTimeValue(Long.toString(maxTimeValue));
-      _timeBoundaryInfoMap.put(resourceName, timeBoundaryInfo);
+      _timeBoundaryInfoMap.put(tableName, timeBoundaryInfo);
     }
   }
 

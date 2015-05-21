@@ -54,6 +54,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
  *
  */
 
+@Deprecated
 public class PinotDataResource extends ServerResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataResource.class);
 
@@ -72,6 +73,7 @@ public class PinotDataResource extends ServerResource {
     mapper = new ObjectMapper();
   }
 
+  @Deprecated
   @Override
   @Put("json")
   public Representation put(Representation entity) {
@@ -95,6 +97,7 @@ public class PinotDataResource extends ServerResource {
     return presentation;
   }
 
+  @Deprecated
   @Override
   @Delete
   public Representation delete() {
@@ -129,6 +132,7 @@ public class PinotDataResource extends ServerResource {
    *  if resourceName is not present then it sends back a list of
    * @return
    */
+  @Deprecated
   @Override
   @Get
   public Representation get() {
@@ -172,6 +176,7 @@ public class PinotDataResource extends ServerResource {
     return presentation;
   }
 
+  @Deprecated
   @Override
   @Post("json")
   public Representation post(Representation entity) {

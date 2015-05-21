@@ -90,6 +90,7 @@ public class PinotHelixAdmin {
    * Creates new Offline Data Resource.
    * @param resource
    */
+  @Deprecated
   public void createNewOfflineDataResource(DataResource resource) {
     final String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
     OfflineDataResourceZKMetadata offlineDataResource = ZKMetadataUtils.getOfflineDataResourceMetadata(resource);
@@ -128,6 +129,7 @@ public class PinotHelixAdmin {
    *
    * @param resource
    */
+  @Deprecated
   public void createNewRealtimeDataResource(DataResource resource) {
     final String realtimeResourceName =
         BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());

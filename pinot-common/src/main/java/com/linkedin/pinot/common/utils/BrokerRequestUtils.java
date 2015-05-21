@@ -18,16 +18,20 @@ package com.linkedin.pinot.common.utils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
+@Deprecated
 public class BrokerRequestUtils {
 
+  @Deprecated
   public static String buildRealtimeResourceNameForResource(String hybridResource) {
     return hybridResource + CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX;
   }
 
+  @Deprecated
   public static String buildOfflineResourceNameForResource(String hybridResource) {
     return hybridResource + CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX;
   }
 
+  @Deprecated
   public static TableType getResourceTypeFromResourceName(String resourceName) {
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
       return TableType.REALTIME;
@@ -35,6 +39,7 @@ public class BrokerRequestUtils {
     return TableType.OFFLINE;
   }
 
+  @Deprecated
   public static String getRealtimeResourceNameForResource(String resourceName) {
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
       return resourceName;
@@ -43,6 +48,7 @@ public class BrokerRequestUtils {
     }
   }
 
+  @Deprecated
   public static String getOfflineResourceNameForResource(String resourceName) {
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
       return resourceName;
@@ -51,6 +57,7 @@ public class BrokerRequestUtils {
     }
   }
 
+  @Deprecated
   public static String getHybridResourceName(String resourceName) {
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
       return resourceName.substring(0, resourceName.length() - CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX.length());

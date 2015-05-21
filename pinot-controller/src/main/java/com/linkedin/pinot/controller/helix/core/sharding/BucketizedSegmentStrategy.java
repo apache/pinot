@@ -38,6 +38,7 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
+  @Deprecated
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas) {

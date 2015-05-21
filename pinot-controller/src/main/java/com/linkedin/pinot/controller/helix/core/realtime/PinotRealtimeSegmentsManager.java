@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
@@ -123,7 +124,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
         // create realtime segment metadata
         RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
-        realtimeSegmentMetadataToAdd.setResourceName(BrokerRequestUtils.getHybridResourceName(resourceName));
+        realtimeSegmentMetadataToAdd.setResourceName(TableNameBuilder.extractRawTableName(resourceName));
         realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
         realtimeSegmentMetadataToAdd.setSegmentName(segmentId);

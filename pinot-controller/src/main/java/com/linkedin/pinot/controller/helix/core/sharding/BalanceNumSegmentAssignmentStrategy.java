@@ -44,6 +44,7 @@ import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BalanceNumSegmentAssignmentStrategy.class);
 
+  @Deprecated
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas) {

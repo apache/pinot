@@ -32,6 +32,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
+@Deprecated
 public final class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
 
   private StreamType _streamType;

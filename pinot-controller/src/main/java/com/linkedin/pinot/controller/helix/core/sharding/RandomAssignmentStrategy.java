@@ -39,6 +39,7 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RandomAssignmentStrategy.class);
 
+  @Deprecated
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas) {

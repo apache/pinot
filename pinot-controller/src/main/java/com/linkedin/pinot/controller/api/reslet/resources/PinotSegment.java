@@ -16,8 +16,6 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
@@ -27,12 +25,14 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.representation.Variant;
 import org.restlet.resource.Get;
 import org.restlet.resource.ServerResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
@@ -72,7 +72,7 @@ public class PinotSegment extends ServerResource {
         final JSONObject ret = new JSONObject();
         ret.put("resource", resourceName);
 
-        for (final String segmentId : manager.getAllSegmentsForResource(resourceName)) {
+        for (final String segmentId : manager.getAllSegmentsForResourceV2(resourceName)) {
           segmentsArray.put(segmentId);
         }
 
@@ -85,7 +85,7 @@ public class PinotSegment extends ServerResource {
         try {
           OfflineSegmentZKMetadata offlineSegmentZKMetadata =
               ZKMetadataProvider.getOfflineSegmentZKMetadata(manager.getPropertyStore(),
-                  BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName);
+                  TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName), segmentName);
           for (final String key : offlineSegmentZKMetadata.toMap().keySet()) {
             medata.put(key, offlineSegmentZKMetadata.toMap().get(key));
           }
@@ -103,7 +103,7 @@ public class PinotSegment extends ServerResource {
           if (presentation == null) {
             RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
                 ZKMetadataProvider.getRealtimeSegmentZKMetadata(manager.getPropertyStore(),
-                    BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName);
+                    TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), segmentName);
             for (final String key : realtimeSegmentZKMetadata.toMap().keySet()) {
               medata.put(key, realtimeSegmentZKMetadata.toMap().get(key));
             }

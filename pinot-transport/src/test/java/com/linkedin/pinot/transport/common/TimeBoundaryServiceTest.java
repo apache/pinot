@@ -25,16 +25,18 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
@@ -68,9 +70,9 @@ public class TimeBoundaryServiceTest {
   }
 
   @Test
-  public void testExternalViewBasedTimeBoundaryService() {
-    addingResourceToPropertyStore("testResource0");
-    addingResourceToPropertyStore("testResource1");
+  public void testExternalViewBasedTimeBoundaryService() throws Exception {
+    addingTableToPropertyStore("testResource0");
+    addingTableToPropertyStore("testResource1");
     HelixExternalViewBasedTimeBoundaryService tbs = new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
     addingSegmentsToPropertyStore(5, _propertyStore, "testResource0");
     ExternalView externalView = constructExternalView("testResource0");
@@ -95,21 +97,19 @@ public class TimeBoundaryServiceTest {
     Assert.assertEquals(tbi.getTimeValue(), "49");
   }
 
-  private ExternalView constructExternalView(String resourceName) {
-    ExternalView externalView = new ExternalView(resourceName);
-    List<OfflineSegmentZKMetadata> offlineResourceZKMetadataListForResource = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(_propertyStore, resourceName);
+  private ExternalView constructExternalView(String tableName) {
+    ExternalView externalView = new ExternalView(tableName);
+    List<OfflineSegmentZKMetadata> offlineResourceZKMetadataListForResource = ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableName);
     for (OfflineSegmentZKMetadata segmentMetadata : offlineResourceZKMetadataListForResource) {
       externalView.setState(segmentMetadata.getSegmentName(), "localhost", "ONLINE");
     }
     return externalView;
   }
 
-  private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore, String resource) {
-    String resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource);
-
+  private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     for (int i = 0; i < numSegments; ++i) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      offlineSegmentZKMetadata.setSegmentName(resourceName + "_" + System.currentTimeMillis() + "_" + i);
+      offlineSegmentZKMetadata.setSegmentName(tableName + "_" + System.currentTimeMillis() + "_" + i);
       offlineSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
       offlineSegmentZKMetadata.setEndTime(i);
       offlineSegmentZKMetadata.setCrc(-1);
@@ -117,19 +117,48 @@ public class TimeBoundaryServiceTest {
       offlineSegmentZKMetadata.setStartTime(i - 1);
       offlineSegmentZKMetadata.setIndexVersion("0");
       offlineSegmentZKMetadata.setPushTime(i + 5);
-      offlineSegmentZKMetadata.setResourceName(resourceName);
+      offlineSegmentZKMetadata.setResourceName(tableName);
       offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
       ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
     }
   }
 
-  private void addingResourceToPropertyStore(String resource) {
-    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = new OfflineDataResourceZKMetadata();
-    offlineDataResourceZKMetadata.setResourceName(resource);
-    offlineDataResourceZKMetadata.setTimeColumnName("timestamp");
-    offlineDataResourceZKMetadata.setTimeType("daysSinceEpoch");
-    offlineDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.DAYS);
-    offlineDataResourceZKMetadata.setRetentionTimeValue(-1);
-    ZKMetadataProvider.setOfflineResourceZKMetadata(_propertyStore, offlineDataResourceZKMetadata);
+  private void addingTableToPropertyStore(String tableName) throws Exception {
+
+    JSONObject offlineTableConfigJson = new JSONObject();
+    offlineTableConfigJson.put("tableName", tableName);
+
+    JSONObject segmentsConfig = new JSONObject();
+    segmentsConfig.put("retentionTimeUnit", "DAYS");
+    segmentsConfig.put("retentionTimeValue", -1);
+    segmentsConfig.put("segmentPushFrequency", "daily");
+    segmentsConfig.put("segmentPushType", "APPEND");
+    segmentsConfig.put("replication", 1);
+    segmentsConfig.put("schemaName", "tableSchema");
+    segmentsConfig.put("timeColumnName", "timestamp");
+    segmentsConfig.put("timeType", "daysSinceEpoch");
+    segmentsConfig.put("segmentAssignmentStrategy", "");
+    offlineTableConfigJson.put("segmentsConfig", segmentsConfig);
+    JSONObject tableIndexConfig = new JSONObject();
+    JSONArray invertedIndexColumns = new JSONArray();
+    invertedIndexColumns.put("column1");
+    invertedIndexColumns.put("column2");
+    tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
+    tableIndexConfig.put("loadMode", "HEAP");
+    tableIndexConfig.put("lazyLoad", "false");
+    offlineTableConfigJson.put("tableIndexConfig", tableIndexConfig);
+    JSONObject tenants = new JSONObject();
+    tenants.put("broker", "brokerTenant");
+    tenants.put("server", "serverTenant");
+    offlineTableConfigJson.put("tenants", tenants);
+    offlineTableConfigJson.put("tableType", "OFFLINE");
+    JSONObject metadata = new JSONObject();
+    JSONObject customConfigs = new JSONObject();
+    customConfigs.put("d2Name", "xlntBetaPinot");
+    metadata.put("customConfigs", customConfigs);
+    offlineTableConfigJson.put("metadata", metadata);
+    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(offlineTableConfigJson.toString());
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName, AbstractTableConfig.toZnRecord(offlineTableConfig));
   }
 }

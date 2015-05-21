@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.controller.restlet.resources;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTest;
-import org.json.JSONObject;
 import org.restlet.Client;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -32,6 +27,15 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.utils.TenantRole;
+import com.linkedin.pinot.controller.api.pojos.Tenant;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+
 
 /**
  * Tests for the file upload restlet.
@@ -39,6 +43,15 @@ import org.testng.annotations.Test;
  * @author jfim
  */
 public class PinotFileUploadTest extends ControllerTest {
+
+  private final static String BROKER_TENANT_NAME = "testBrokerTenant";
+  private final static String SERVER_TENANT_NAME = "testServerTenant";
+  private final static String TABLE_NAME = "testTable";
+
+  private static final String HELIX_CLUSTER_NAME = "PinotFileUploadTest";
+
+  private PinotHelixResourceManager _pinotHelixResourceManager;
+
   @Test
   public void testUploadBogusData() {
     Client client = new Client(Protocol.HTTP);
@@ -53,25 +66,27 @@ public class PinotFileUploadTest extends ControllerTest {
   public void setUp() throws Exception {
     startZk();
     startController();
-
+    _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkTestUtils.DEFAULT_ZK_STR, 5);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkTestUtils.DEFAULT_ZK_STR, 5);
 
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON("mirror", 2, 2);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
-        payload.toString(), MediaType.APPLICATION_JSON, Status.SUCCESS_OK);
-  }
+    // Create broker tenant
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 5, 0, 0);
+    _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BROKER_TENANT_NAME + "_BROKER").size(), 5);
 
-  private String sendPostRequest(String url, String payload, MediaType mediaType, Status expectedStatus) {
-    Client client = new Client(Protocol.HTTP);
-    Request request = new Request(Method.POST, url);
-    request.setEntity(payload, mediaType);
-    Response response = client.handle(request);
+    // Create server tenant
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, 5, 5, 0);
+    _pinotHelixResourceManager.createServerTenant(serverTenant);
 
-    Assert.assertEquals(response.getStatus(), expectedStatus);
-    return response.getEntityAsText();
+    // Adding table
+    String OfflineTableConfigJson =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME, 2, "RandomAssignmentStrategy").toString();
+    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    _pinotHelixResourceManager.addTable(offlineTableConfig);
+
   }
 
   @AfterClass

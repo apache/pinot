@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
@@ -133,20 +134,20 @@ public class BrokerRequestHandler {
    */
   private List<String> getMatchedResources(BrokerRequest request) {
     List<String> matchedResources = new ArrayList<String>();
-    String resourceName =
-        BrokerRequestUtils.getOfflineResourceNameForResource(request.getQuerySource().getResourceName());
-    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
-      matchedResources.add(resourceName);
+    String tableName =
+        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getResourceName());
+    if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
+      matchedResources.add(tableName);
     }
-    resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(request.getQuerySource().getResourceName());
-    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
-      matchedResources.add(resourceName);
+    tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getResourceName());
+    if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
+      matchedResources.add(tableName);
     }
     // For backward compatible
     if (matchedResources.isEmpty()) {
-      resourceName = request.getQuerySource().getResourceName();
-      if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
-        matchedResources.add(resourceName);
+      tableName = request.getQuerySource().getResourceName();
+      if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
+        matchedResources.add(tableName);
       }
     }
     return matchedResources;
@@ -174,7 +175,7 @@ public class BrokerRequestHandler {
   private BrokerRequest getOfflineBrokerRequest(BrokerRequest request) {
     BrokerRequest offlineRequest = request.deepCopy();
     String hybridResourceName = request.getQuerySource().getResourceName();
-    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(hybridResourceName);
+    String offlineResourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridResourceName);
     offlineRequest.getQuerySource().setResourceName(offlineResourceName);
     attachTimeBoundary(hybridResourceName, offlineRequest, true);
     return offlineRequest;
@@ -183,7 +184,7 @@ public class BrokerRequestHandler {
   private BrokerRequest getRealtimeBrokerRequest(BrokerRequest request) {
     BrokerRequest realtimeRequest = request.deepCopy();
     String hybridResourceName = request.getQuerySource().getResourceName();
-    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(hybridResourceName);
+    String realtimeResourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridResourceName);
     realtimeRequest.getQuerySource().setResourceName(realtimeResourceName);
     attachTimeBoundary(hybridResourceName, realtimeRequest, false);
     return realtimeRequest;
@@ -191,8 +192,7 @@ public class BrokerRequestHandler {
 
   private void attachTimeBoundary(String hybridResourceName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
     TimeBoundaryInfo timeBoundaryInfo =
-        _timeBoundaryService.getTimeBoundaryInfoFor(BrokerRequestUtils
-            .getOfflineResourceNameForResource(hybridResourceName));
+        _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridResourceName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null || timeBoundaryInfo.getTimeValue() == null) {
       return;
     }

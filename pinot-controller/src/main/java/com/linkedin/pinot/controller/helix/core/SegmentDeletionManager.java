@@ -30,8 +30,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 
 
 /**
@@ -81,20 +81,20 @@ public class SegmentDeletionManager {
    * Check if segment got deleted from IdealStates and ExternalView.
    * If segment got removed, then delete this segment from PropertyStore and local disk.
    *
-   * @param resourceName
+   * @param tableName
    * @param segmentId
    */
-  private synchronized void deleteSegmentFromPropertyStoreAndLocal(String resourceName, String segmentId) {
+  private synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, String segmentId) {
     // Check if segment got removed from ExternalView and IdealStates
-    if (_helixAdmin.getResourceExternalView(_helixClusterName, resourceName) == null ||
-        _helixAdmin.getResourceIdealState(_helixClusterName, resourceName) == null) {
-      LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", resourceName);
+    if (_helixAdmin.getResourceExternalView(_helixClusterName, tableName) == null ||
+        _helixAdmin.getResourceIdealState(_helixClusterName, tableName) == null) {
+      LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", tableName);
       return;
     }
     boolean isSegmentReadyToDelete = false;
     try {
-      Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName).getStateMap(segmentId);
-      Map<String, String> segmentToInstancesMapFromIdealStates = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);
+      Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName).getStateMap(segmentId);
+      Map<String, String> segmentToInstancesMapFromIdealStates = _helixAdmin.getResourceIdealState(_helixClusterName, tableName).getInstanceStateMap(segmentId);
       if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.isEmpty())
           && (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
         isSegmentReadyToDelete = true;
@@ -107,11 +107,11 @@ public class SegmentDeletionManager {
     }
     if (isSegmentReadyToDelete) {
       LOGGER.info("Trying to delete segment : {} from Property store.", segmentId);
-      _propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
-      switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
+      _propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId), AccessOption.PERSISTENT);
+      switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
         case OFFLINE:
           if (_localDiskDir != null) {
-            File fileToDelete = new File(new File(_localDiskDir, resourceName), segmentId);
+            File fileToDelete = new File(new File(_localDiskDir, tableName), segmentId);
             if (fileToDelete.exists()) {
               FileUtils.deleteQuietly(fileToDelete);
               LOGGER.info("Delete segment : " + segmentId + " from local directory : " + fileToDelete.getAbsolutePath());

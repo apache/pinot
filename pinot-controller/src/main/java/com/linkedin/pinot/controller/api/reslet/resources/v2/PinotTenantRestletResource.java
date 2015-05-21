@@ -148,16 +148,18 @@ public class PinotTenantRestletResource extends ServerResource {
     try {
       final String tenantName = (String) getRequest().getAttributes().get(TENANT_NAME);
       if (tenantName == null) {
+        // Return all the tags.
         final JSONObject ret = new JSONObject();
         final String type = getReference().getQueryAsForm().getValues("type");
         if (type == null || type.equals("server")) {
-          ret.put("SERVER", _pinotHelixResourceMananger.getAllServerTenantNames());
+          ret.put("SERVER_TENANTS", _pinotHelixResourceMananger.getAllServerTenantNames());
         }
         if (type == null || type.equals("broker")) {
-          ret.put("BROKER", _pinotHelixResourceMananger.getAllBrokerTenantNames());
+          ret.put("BROKER_TENANTS", _pinotHelixResourceMananger.getAllBrokerTenantNames());
         }
         presentation = new StringRepresentation(ret.toString(), MediaType.APPLICATION_JSON);
       } else {
+        // Return instances related to given tenant name.
         final String type = getReference().getQueryAsForm().getValues("type");
 
         JSONObject resourceGetRet = new JSONObject();

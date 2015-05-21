@@ -43,10 +43,20 @@ public class TableNameBuilder {
 
   public static TableType getTableTypeFromTableName(String tableName) {
     for (TableType tableType : TableType.values()) {
-      if (tableName.endsWith(tableType.toString())) {
+      if (tableName.endsWith("_" + tableType.toString())) {
         return tableType;
       }
     }
     return null;
   }
+
+  public static String extractRawTableName(String tableName) {
+    for (TableType tableType : TableType.values()) {
+      if (tableName.endsWith("_" + tableType.toString())) {
+        return tableName.substring(0, tableName.lastIndexOf("_" + tableType.toString()));
+      }
+    }
+    return tableName;
+  }
+
 }
