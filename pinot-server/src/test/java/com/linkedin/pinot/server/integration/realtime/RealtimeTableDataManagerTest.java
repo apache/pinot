@@ -31,7 +31,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -126,7 +125,6 @@ public class RealtimeTableDataManagerTest {
     return resourceDataManagerConfig;
   }
 
-  @Test
   public void testSetup() throws Exception {
     final RealtimeSegmentDataManager manager =
         new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
