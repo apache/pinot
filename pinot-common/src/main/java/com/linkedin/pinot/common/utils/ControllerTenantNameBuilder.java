@@ -16,37 +16,34 @@
 package com.linkedin.pinot.common.utils;
 
 public class ControllerTenantNameBuilder {
-  private static final String REALTIME_TENANT_SUFFIX = "_REALTIME";
-  private static final String OFFLINE_TENANT_SUFFIX = "_OFFLINE";
-  private static final String BROKER_TENANT_SUFFIX = "_BROKER";
 
   private static String buildRealtimeTenantName(String tenantName) {
-    return tenantName + REALTIME_TENANT_SUFFIX;
+    return tenantName + "_" + ServerType.REALTIME.toString();
   }
 
   private static String buildOfflineTenantName(String tenantName) {
-    return tenantName + OFFLINE_TENANT_SUFFIX;
+    return tenantName + "_" + ServerType.OFFLINE.toString();
   }
 
   private static String buildBrokerTenantName(String tenantName) {
-    return tenantName + BROKER_TENANT_SUFFIX;
+    return tenantName + "_" + TenantRole.BROKER.toString();
   }
 
   public static TenantRole getTenantRoleFromTenantName(String tenantName) {
-    if (tenantName.endsWith(REALTIME_TENANT_SUFFIX)) {
+    if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return TenantRole.SERVER;
     }
-    if (tenantName.endsWith(OFFLINE_TENANT_SUFFIX)) {
+    if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
       return TenantRole.SERVER;
     }
-    if (tenantName.endsWith(BROKER_TENANT_SUFFIX)) {
+    if (tenantName.endsWith(TenantRole.BROKER.toString())) {
       return TenantRole.BROKER;
     }
     throw new RuntimeException("Cannot identify tenant type from tenant name : " + tenantName);
   }
 
   public static String getRealtimeTenantNameForTenant(String tenantName) {
-    if (tenantName.endsWith(REALTIME_TENANT_SUFFIX)) {
+    if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return tenantName;
     } else {
       return ControllerTenantNameBuilder.buildRealtimeTenantName(tenantName);
@@ -54,7 +51,7 @@ public class ControllerTenantNameBuilder {
   }
 
   public static String getOfflineTenantNameForTenant(String tenantName) {
-    if (tenantName.endsWith(OFFLINE_TENANT_SUFFIX)) {
+    if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
       return tenantName;
     } else {
       return ControllerTenantNameBuilder.buildOfflineTenantName(tenantName);
@@ -62,7 +59,7 @@ public class ControllerTenantNameBuilder {
   }
 
   public static String getBrokerTenantNameForTenant(String tenantName) {
-    if (tenantName.endsWith(BROKER_TENANT_SUFFIX)) {
+    if (tenantName.endsWith(TenantRole.BROKER.toString())) {
       return tenantName;
     } else {
       return ControllerTenantNameBuilder.buildBrokerTenantName(tenantName);
