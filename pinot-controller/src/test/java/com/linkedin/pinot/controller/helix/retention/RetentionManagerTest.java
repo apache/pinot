@@ -111,11 +111,11 @@ public class RetentionManagerTest {
 
   public void cleanupSegments() throws InterruptedException {
     _retentionManager.stop();
-    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResource(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName))) {
-      _pinotHelixResourceManager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName), segmentId);
+    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResourceV2(_offlineTableName)) {
+      _pinotHelixResourceManager.deleteSegment(_offlineTableName, segmentId);
     }
     while (_helixZkManager.getHelixPropertyStore()
-        .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName)), AccessOption.PERSISTENT)
+        .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName), AccessOption.PERSISTENT)
         .size() > 0) {
       Thread.sleep(1000);
     }

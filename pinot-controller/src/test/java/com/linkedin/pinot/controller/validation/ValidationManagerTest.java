@@ -31,12 +31,13 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.common.utils.TenantRole;
+import com.linkedin.pinot.controller.api.pojos.Tenant;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -78,21 +79,25 @@ public class ValidationManagerTest {
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
 
-    DataResource dataResource =
-        new DataResource("create", testResourceName, Helix.TableType.OFFLINE.toString(), "timestamp",
-            "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy", "broker_"
-                + testResourceName, "serverTenant", 2, null);
-    _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, "testBroker", 2, -1, -1);
+    _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
+    Tenant serverTenant = new Tenant(TenantRole.BROKER, "testServer", 2, 2, 0);
+    _pinotHelixResourceManager.createBrokerTenant(serverTenant);
+
+    String OfflineTableConfigJson =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(testResourceName, "testServer", "testBroker", "timestamp", "millsSinceEpoch", "DAYS", "5", 2,
+            "BalanceNumSegmentAssignmentStrategy").toString();
+    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    _pinotHelixResourceManager.addTable(offlineTableConfig);
 
     DummyMetadata metadata = new DummyMetadata(testResourceName);
 
-    _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
+    _pinotHelixResourceManager.addSegmentV2(metadata, "http://dummy/");
 
     Thread.sleep(1000);
 
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadataV2(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
 
     SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();
@@ -110,7 +115,7 @@ public class ValidationManagerTest {
     Thread.sleep(1000);
 
     offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+        ZKMetadataProvider.getOfflineSegmentZKMetadataV2(_pinotHelixResourceManager.getPropertyStore(),
             metadata.getResourceName(), metadata.getName());
     fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
@@ -235,7 +240,6 @@ public class ValidationManagerTest {
     private String _version;
     private Schema _schema;
     private String _shardingKey;
-    private long _size;
     private String _segmentName;
     private long _indexCreationTime;
     private long _pushTime;
@@ -254,17 +258,9 @@ public class ValidationManagerTest {
       return _indexDir;
     }
 
-    public void setIndexDir(String indexDir) {
-      _indexDir = indexDir;
-    }
-
     @Override
     public String getName() {
       return _segmentName;
-    }
-
-    public void setName(String name) {
-      _segmentName = name;
     }
 
     @Override
@@ -277,17 +273,9 @@ public class ValidationManagerTest {
       return _totalDocs;
     }
 
-    public void setTotalDocs(int totalDocs) {
-      _totalDocs = totalDocs;
-    }
-
     @Override
     public long getIndexCreationTime() {
       return _indexCreationTime;
-    }
-
-    public void setIndexCreationTime(long indexCreationTime) {
-      _indexCreationTime = indexCreationTime;
     }
 
     @Override
@@ -295,17 +283,9 @@ public class ValidationManagerTest {
       return _pushTime;
     }
 
-    public void setPushTime(long pushTime) {
-      _pushTime = pushTime;
-    }
-
     @Override
     public long getRefreshTime() {
       return _refreshTime;
-    }
-
-    public void setRefreshTime(long refreshTime) {
-      _refreshTime = refreshTime;
     }
 
     @Override
@@ -313,17 +293,9 @@ public class ValidationManagerTest {
       return _resourceName;
     }
 
-    public void setResourceName(String resourceName) {
-      _resourceName = resourceName;
-    }
-
     @Override
     public String getIndexType() {
       return _indexType;
-    }
-
-    public void setIndexType(String indexType) {
-      _indexType = indexType;
     }
 
     @Override
@@ -331,17 +303,9 @@ public class ValidationManagerTest {
       return _timeGranularity;
     }
 
-    public void setTimeGranularity(Duration timeGranularity) {
-      _timeGranularity = timeGranularity;
-    }
-
     @Override
     public Interval getTimeInterval() {
       return _interval;
-    }
-
-    public void setTimeInterval(Interval interval) {
-      _interval = interval;
     }
 
     @Override
@@ -358,34 +322,14 @@ public class ValidationManagerTest {
       return _version;
     }
 
-    public void setVersion(String version) {
-      _version = version;
-    }
-
     @Override
     public Schema getSchema() {
       return _schema;
     }
 
-    public void setSchema(Schema schema) {
-      _schema = schema;
-    }
-
     @Override
     public String getShardingKey() {
       return _shardingKey;
-    }
-
-    public void setShardingKey(String shardingKey) {
-      _shardingKey = shardingKey;
-    }
-
-    public long getSize() {
-      return _size;
-    }
-
-    public void setSize(long size) {
-      _size = size;
     }
 
     @Override

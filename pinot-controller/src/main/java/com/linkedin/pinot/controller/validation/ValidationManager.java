@@ -31,11 +31,11 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -108,7 +108,7 @@ public class ValidationManager {
   }
 
   /**
-   * Runs a validation pass over the currently loaded resources.
+   * Runs a validation pass over the currently loaded tables.
    */
   public void runValidation() {
     if (!_pinotHelixResourceManager.isLeader()) {
@@ -117,15 +117,15 @@ public class ValidationManager {
     }
 
     LOGGER.info("Starting validation");
-    // Fetch the list of resources
-    List<String> allResourceNames = _pinotHelixResourceManager.getAllPinotResourceNames();
+    // Fetch the list of tables
+    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotResourceNames();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    for (String resourceName : allResourceNames) {
-      // For each resource, fetch the metadata for all its segments
-      if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) != TableType.OFFLINE) {
+    for (String tableName : allTableNames) {
+      // For each table, fetch the metadata for all its segments
+      if (TableNameBuilder.getTableTypeFromTableName(tableName) != TableType.OFFLINE) {
         continue;
       }
-      List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(propertyStore, resourceName);
+      List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(propertyStore, tableName);
       List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
@@ -148,7 +148,7 @@ public class ValidationManager {
       }
 
       // Update the gauge that contains the number of missing segments
-      _validationMetrics.updateMissingSegmentsGauge(resourceName, missingSegmentCount);
+      _validationMetrics.updateMissingSegmentsGauge(tableName, missingSegmentCount);
 
       // Compute the max segment end time and max segment push time
       long maxSegmentEndTime = Long.MIN_VALUE;
@@ -171,8 +171,8 @@ public class ValidationManager {
       }
 
       // Update the gauges that contain the delay between the current time and last segment end time
-      _validationMetrics.updateOfflineSegmentDelayGauge(resourceName, maxSegmentEndTime);
-      _validationMetrics.updateLastPushTimeGauge(resourceName, maxSegmentPushTime);
+      _validationMetrics.updateOfflineSegmentDelayGauge(tableName, maxSegmentEndTime);
+      _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
     }
     LOGGER.info("Validation completed");
   }

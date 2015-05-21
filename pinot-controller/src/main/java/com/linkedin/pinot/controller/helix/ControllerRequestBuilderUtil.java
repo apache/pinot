@@ -261,19 +261,24 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, int numReplicas)
       throws JSONException {
+    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS", "700", numReplicas, "BalanceNumSegmentAssignmentStrategy");
+  }
+
+  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, String timeColumnName, String timeType,
+      String retentionTimeUnit, String retentionTimeValue, int numReplicas, String segmentAssignmentStrategy) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
     JSONObject segmentsConfig = new JSONObject();
-    segmentsConfig.put("retentionTimeUnit", "DAYS");
-    segmentsConfig.put("retentionTimeValue", "700");
+    segmentsConfig.put("retentionTimeUnit", retentionTimeUnit);
+    segmentsConfig.put("retentionTimeValue", retentionTimeValue);
     segmentsConfig.put("segmentPushFrequency", "daily");
     segmentsConfig.put("segmentPushType", "APPEND");
     segmentsConfig.put("replication", numReplicas);
     segmentsConfig.put("schemaName", "tableSchema");
-    segmentsConfig.put("timeColumnName", "timeColumnName");
-    segmentsConfig.put("timeType", "timeType");
-    segmentsConfig.put("segmentAssignmentStrategy", "BalanceNumSegmentAssignmentStrategy");
+    segmentsConfig.put("timeColumnName", timeColumnName);
+    segmentsConfig.put("timeType", timeType);
+    segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
     JSONArray invertedIndexColumns = new JSONArray();
@@ -294,5 +299,10 @@ public class ControllerRequestBuilderUtil {
     metadata.put("customConfigs", customConfigs);
     creationRequest.put("metadata", metadata);
     return creationRequest;
+  }
+
+  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, int numReplicas, String segmentAssignmentStrategy)
+      throws JSONException {
+    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS", "700", numReplicas, segmentAssignmentStrategy);
   }
 }

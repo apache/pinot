@@ -1908,4 +1908,29 @@ public class PinotHelixResourceManager {
     LOGGER.info("Refresh is done for segment - " + segmentName);
     return true;
   }
+
+  /*
+   *  fetch list of segments assigned to a give resource from ideal state
+   */
+  public List<String> getAllSegmentsForResourceV2(String tableName) {
+    List<String> segmentsInResource = new ArrayList<String>();
+    switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
+      case REALTIME:
+        for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider
+            .getRealtimeSegmentZKMetadataListForTable(getPropertyStore(), tableName)) {
+          segmentsInResource.add(segmentZKMetadata.getSegmentName());
+        }
+
+        break;
+      case OFFLINE:
+        for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider
+            .getOfflineSegmentZKMetadataListForTable(getPropertyStore(), tableName)) {
+          segmentsInResource.add(segmentZKMetadata.getSegmentName());
+        }
+        break;
+      default:
+        break;
+    }
+    return segmentsInResource;
+  }
 }
