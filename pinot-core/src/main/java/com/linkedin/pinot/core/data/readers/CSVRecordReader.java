@@ -25,6 +25,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -35,7 +36,7 @@ public class CSVRecordReader implements RecordReader {
   private static final String CSV_HEADER_ENV = "csv_header";
   private static final String CSV_DELIMITER_ENV = "csv_delimiter";
 
-  static String _delimiterString = ",";
+  private String _delimiterString = ",";
   private String _fileName;
   private Schema _schema = null;
 
@@ -89,7 +90,7 @@ public class CSVRecordReader implements RecordReader {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
 
       } else {
-        String [] tokens = (token != null) ? token.split(_delimiterString) : null;
+        String[] tokens = (token != null) ? StringUtils.split(token, _delimiterString) : null;
         value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec.getDataType());
       }
 
@@ -133,12 +134,12 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  private String [] getHeaderFromEnv() {
+  private String[] getHeaderFromEnv() {
     String token;
     if ((_env == null) || ((token = _env.get(CSV_HEADER_ENV))) == null) {
       return null;
     }
-    return token.split(",");
+    return StringUtils.split(token, _delimiterString);
   }
 
   private char getDelimiterFromEnv() {
@@ -152,7 +153,7 @@ public class CSVRecordReader implements RecordReader {
 
   private CSVFormat getFormat() {
     CSVFormat format = getFormatFromEnv().withDelimiter(getDelimiterFromEnv());
-    String [] header = getHeaderFromEnv();
+    String[] header = getHeaderFromEnv();
 
     if (header != null) {
       format = format.withHeader(header);
