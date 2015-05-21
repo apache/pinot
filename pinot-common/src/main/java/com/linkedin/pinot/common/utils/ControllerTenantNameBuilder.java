@@ -42,6 +42,13 @@ public class ControllerTenantNameBuilder {
     throw new RuntimeException("Cannot identify tenant type from tenant name : " + tenantName);
   }
 
+  public static String getTenantName(String tenantName, ServerType type) {
+    if (type == ServerType.OFFLINE) {
+      return getOfflineTenantNameForTenant(tenantName);
+    }
+    return getRealtimeTenantNameForTenant(tenantName);
+  }
+
   public static String getRealtimeTenantNameForTenant(String tenantName) {
     if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return tenantName;

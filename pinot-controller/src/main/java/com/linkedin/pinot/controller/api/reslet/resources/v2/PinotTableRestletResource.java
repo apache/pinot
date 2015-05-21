@@ -14,8 +14,11 @@ import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -66,15 +69,26 @@ public class PinotTableRestletResource extends ServerResource {
   @Override
   @Get
   public Representation get() {
-    StringRepresentation presentation = null;
-
     final String tableName = (String) getRequest().getAttributes().get("tableName");
     if (tableName == null) {
       return new StringRepresentation("tableName is not present");
     }
+    try {
+      JSONArray ret = new JSONArray();
 
-    // fetch all table configs
-    return presentation;
+      if (manager.hasOfflineTable(tableName)) {
+        ret.add(manager.getTableConfig(tableName, TableType.OFFLINE).toJSON());
+      }
+
+      if (manager.hasRealtimeTable(tableName)) {
+        ret.add(manager.getTableConfig(tableName, TableType.REALTIME).toJSON());
+      }
+
+      return new StringRepresentation(ret.toString());
+    } catch (Exception e) {
+      LOGGER.error("error processing get table config", e);
+      return PinotFileUpload.exceptionToStringRepresentation(e);
+    }
   }
 
   @Override

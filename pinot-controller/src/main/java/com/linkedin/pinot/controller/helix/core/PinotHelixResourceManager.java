@@ -39,7 +39,9 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
 import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,10 +144,12 @@ public class PinotHelixResourceManager {
     String brokerTenantName = null;
     try {
       if (getAllResourceNames().contains(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName))) {
-        brokerTenantName = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker();
+        brokerTenantName =
+            ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker();
       }
       if (getAllResourceNames().contains(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName))) {
-        brokerTenantName = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker();
+        brokerTenantName =
+            ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker();
       }
     } catch (Exception e) {
       throw new RuntimeException("Failed to deserialize the tableConfig from propertyStore");
@@ -735,7 +739,8 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
         LOGGER.info("Added segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
 
-        OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, segmentMetadata.getResourceName());
+        OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
+            ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, segmentMetadata.getResourceName());
         final IdealState idealState =
             PinotResourceIdealStateBuilder.addNewOfflineSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
                 _helixClusterName, getPropertyStore(), offlineDataResourceZKMetadata.getServerTenant());
@@ -1214,15 +1219,15 @@ public class PinotHelixResourceManager {
     for (String tableName : resourceIdealState.getPartitionSet()) {
       if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE) {
         String brokerTag =
-            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider.getOfflineTableConfig(
-                getPropertyStore(), tableName).getTenantConfig().getBroker());
+            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider
+                .getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker());
         if (brokerTag.equals(brokerTenantTag)) {
           resourceIdealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
         }
       } else if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
         String brokerTag =
-            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider.getRealtimeTableConfig(
-                getPropertyStore(), tableName).getTenantConfig().getBroker());
+            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider
+                .getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker());
         if (brokerTag.equals(brokerTenantTag)) {
           resourceIdealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
         }
@@ -1692,24 +1697,29 @@ public class PinotHelixResourceManager {
         LOGGER.info("successfully added the resource : " + offlineTableName + " to the cluster");
 
         // lets add resource configs
-        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName, AbstractTableConfig.toZnRecord(config));
+        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName,
+            AbstractTableConfig.toZnRecord(config));
+
         _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineTableName), new ZNRecord(
             offlineTableName), AccessOption.PERSISTENT);
         break;
       case REALTIME:
         final String realtimeTableName = config.getTableName();
         // lets add resource configs
-        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, realtimeTableName, AbstractTableConfig.toZnRecord(config));
+
+        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, realtimeTableName,
+            AbstractTableConfig.toZnRecord(config));
         // now lets build an ideal state
         LOGGER.info("building empty ideal state for resource : " + realtimeTableName);
-        final IdealState realtimeIdealState = PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateForV2(realtimeTableName, (RealtimeTableConfig) config,
-            _helixAdmin, _helixClusterName, _propertyStore);
+        final IdealState realtimeIdealState =
+            PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateForV2(realtimeTableName,
+                (RealtimeTableConfig) config, _helixAdmin, _helixClusterName, _propertyStore);
         LOGGER.info("adding resource via the admin");
         _helixAdmin.addResource(_helixClusterName, realtimeTableName, realtimeIdealState);
         LOGGER.info("successfully added the resource : " + realtimeTableName + " to the cluster");
         // Create Empty PropertyStore path
-        _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName), new ZNRecord(
-            realtimeTableName), AccessOption.PERSISTENT);
+        _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName),
+            new ZNRecord(realtimeTableName), AccessOption.PERSISTENT);
         break;
       default:
         throw new RuntimeException("UnSupported table type");
@@ -1719,18 +1729,22 @@ public class PinotHelixResourceManager {
 
   private void handleBrokerResourceV2(AbstractTableConfig tableConfig) {
     try {
-      String brokerTenant = ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
+      String brokerTenant =
+          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
       if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant).isEmpty()) {
-        throw new RuntimeException("broker resource tenant : " + tableConfig.getTenantConfig().getBroker() + " is not existed!");
+        throw new RuntimeException("broker resource tenant : " + tableConfig.getTenantConfig().getBroker()
+            + " is not existed!");
       }
       LOGGER.info("Trying to update BrokerDataResource IdealState!");
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      final IdealState idealState =
+          _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       String tableName = tableConfig.getTableName();
       for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant)) {
         idealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
       }
       if (idealState != null) {
-        _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
+        _helixAdmin
+            .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
       }
     } catch (final Exception e) {
       LOGGER.warn("Caught exception while creating broker data resource", e);
@@ -1775,7 +1789,7 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), realtimeTableName);
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), realtimeTableName);
     ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), realtimeTableName);
-    // Remove groupId/PartitionId mapping for realtime resource type. 
+    // Remove groupId/PartitionId mapping for realtime resource type.
     for (String instance : getAllInstancesForTable(realtimeTableName)) {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instance);
       instanceZKMetadata.removeResource(realtimeTableName);
@@ -1799,8 +1813,8 @@ public class PinotHelixResourceManager {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       if (!matchResourceNameV2(segmentMetadata)) {
-        throw new RuntimeException(
-            "Reject segment: resource name is not registered." + " Resource name: " + segmentMetadata.getResourceName() + "\n");
+        throw new RuntimeException("Reject segment: resource name is not registered." + " Resource name: "
+            + segmentMetadata.getResourceName() + "\n");
       }
       if (ifSegmentExisted(segmentMetadata)) {
         if (ifRefreshAnExistedSegment(segmentMetadata)) {
@@ -1838,7 +1852,8 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
         LOGGER.info("Added segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
 
-        AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getResourceName());
+        AbstractTableConfig offlineTableConfig =
+            ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getResourceName());
         final IdealState idealState =
             PinotResourceIdealStateBuilder.addNewOfflineSegmentToIdealStateForV2(segmentMetadata, _helixAdmin,
                 _helixClusterName, getPropertyStore(), offlineTableConfig.getTenantConfig().getServer());
@@ -1858,11 +1873,13 @@ public class PinotHelixResourceManager {
       return false;
     }
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      if (getAllResourceNames().contains(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName()))) {
+      if (getAllResourceNames().contains(
+          TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName()))) {
         return true;
       }
     } else {
-      if (getAllResourceNames().contains(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName()))) {
+      if (getAllResourceNames().contains(
+          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName()))) {
         return true;
       }
     }
@@ -1905,8 +1922,7 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE",
-        _externalViewOnlineToOfflineTimeout)) {
+    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout)) {
       LOGGER.error("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: " + segmentName);
       return false;
     }
@@ -1942,15 +1958,15 @@ public class PinotHelixResourceManager {
     List<String> segmentsInResource = new ArrayList<String>();
     switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
       case REALTIME:
-        for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider
-            .getRealtimeSegmentZKMetadataListForTable(getPropertyStore(), tableName)) {
+        for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(
+            getPropertyStore(), tableName)) {
           segmentsInResource.add(segmentZKMetadata.getSegmentName());
         }
 
         break;
       case OFFLINE:
-        for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider
-            .getOfflineSegmentZKMetadataListForTable(getPropertyStore(), tableName)) {
+        for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(
+            getPropertyStore(), tableName)) {
           segmentsInResource.add(segmentZKMetadata.getSegmentName());
         }
         break;
@@ -1959,4 +1975,51 @@ public class PinotHelixResourceManager {
     }
     return segmentsInResource;
   }
+
+  public boolean hasRealtimeTable(String tableName) {
+    String actualTableName = new TableNameBuilder(TableType.REALTIME).forTable(tableName);
+    List<String> tables = _propertyStore.getChildNames("/tables", AccessOption.PERSISTENT);
+    return tables.contains(actualTableName);
+  }
+
+  public boolean hasOfflineTable(String tableName) {
+    String actualTableName = new TableNameBuilder(TableType.OFFLINE).forTable(tableName);
+    List<String> tables = _propertyStore.getChildNames("/tables", AccessOption.PERSISTENT);
+    return tables.contains(actualTableName);
+  }
+
+  public AbstractTableConfig getTableConfig(String tableName, TableType type) throws JsonParseException,
+      JsonMappingException, JsonProcessingException, JSONException, IOException {
+    String actualTableName = new TableNameBuilder(type).forTable(tableName);
+    List<String> tableNames = _propertyStore.getChildNames("/tables/" + actualTableName, AccessOption.PERSISTENT);
+    AbstractTableConfig ret = null;
+    if (tableNames.contains(actualTableName)) {
+      ZNRecord rec = _propertyStore.get("/tables/" + actualTableName, null, AccessOption.PERSISTENT);
+      ret = AbstractTableConfig.fromZnRecord(rec);
+    }
+    return ret;
+  }
+
+  public List<String> getServerInstancesForTable(String tableName, TableType type) throws JsonParseException,
+      JsonMappingException, JsonProcessingException, JSONException, IOException {
+    String actualTableName = new TableNameBuilder(type).forTable(tableName);
+    ZNRecord rec = _propertyStore.get("/tables/" + actualTableName, null, AccessOption.PERSISTENT);
+    AbstractTableConfig config = AbstractTableConfig.fromZnRecord(rec);
+    String serverTenantName =
+        ControllerTenantNameBuilder.getTenantName(config.getTenantConfig().getServer(), type.getServerType());
+    List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName);
+    return serverInstances;
+  }
+
+  public List<String> getBrokerInstancesForTable(String tableName, TableType type) throws JsonParseException,
+      JsonMappingException, JsonProcessingException, JSONException, IOException {
+    String actualTableName = new TableNameBuilder(type).forTable(tableName);
+    ZNRecord rec = _propertyStore.get("/tables/" + actualTableName, null, AccessOption.PERSISTENT);
+    AbstractTableConfig config = AbstractTableConfig.fromZnRecord(rec);
+    String brokerTenantName =
+        ControllerTenantNameBuilder.getBrokerTenantNameForTenant(config.getTenantConfig().getBroker());
+    List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
+    return serverInstances;
+  }
+
 }

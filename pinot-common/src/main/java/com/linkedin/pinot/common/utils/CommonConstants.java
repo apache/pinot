@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import com.google.common.collect.Sets;
-
 import java.util.Collections;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
+
+import com.google.common.collect.Sets;
 
 
 public class CommonConstants {
@@ -58,8 +58,8 @@ public class CommonConstants {
     /**
      * Resources names that are not Pinot resources (such as broker resource)
      */
-    public static final Set<String> NON_PINOT_RESOURCE_RESOURCE_NAMES =
-        Collections.unmodifiableSet(Sets.newHashSet(BROKER_RESOURCE_INSTANCE));
+    public static final Set<String> NON_PINOT_RESOURCE_RESOURCE_NAMES = Collections.unmodifiableSet(Sets
+        .newHashSet(BROKER_RESOURCE_INSTANCE));
 
     public static class DataSource {
       public static final String RESOURCE_NAME = "resourceName";
@@ -152,6 +152,13 @@ public class CommonConstants {
       OFFLINE,
       REALTIME,
       HYBRID;
+
+      public ServerType getServerType() {
+        if (this == OFFLINE) {
+          return ServerType.OFFLINE;
+        }
+        return ServerType.REALTIME;
+      }
     }
 
     public static final String KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
@@ -169,23 +176,29 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
-    public static final String CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "pinot.server.instance.segment.metadata.loader.class";
+    public static final String CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS =
+        "pinot.server.instance.segment.metadata.loader.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT = "pinot.server.segment.loadMaxRetryCount";
-    public static final String CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "pinot.server.segment.minRetryDelayMillis";
+    public static final String CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS =
+        "pinot.server.segment.minRetryDelayMillis";
 
     public static final String DEFAULT_READ_MODE = "heap";
     public static final String DEFAULT_INSTANCE_DATA_DIR = "/tmp/PinotServer/test/index";
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = "/tmp/PinotServer/test/segmentTar";
-    public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS = "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
-    public static final String DEFAULT_DATA_MANAGER_CLASS = "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
-    public static final String DEFAULT_QUERY_EXECUTOR_CLASS = "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl";
+    public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS =
+        "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
+    public static final String DEFAULT_DATA_MANAGER_CLASS =
+        "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
+    public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
+        "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl";
     public static final String DEFAULT_QUERY_EXECUTOR_TIMEOUT = "150000";
-    public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS = "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
+    public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
+        "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT = "5";
     public static final String DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "60000";
   }

@@ -37,11 +37,11 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 public abstract class AbstractTableConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractTableConfig.class);
 
-  private final String tableName;
-  private final String tableType;
-  private final SegmentsValidationAndRetentionConfig validationConfig;
-  private final TenantConfig tenantConfig;
-  private final TableCustomConfig customConfigs;
+  protected final String tableName;
+  protected final String tableType;
+  protected final SegmentsValidationAndRetentionConfig validationConfig;
+  protected final TenantConfig tenantConfig;
+  protected final TableCustomConfig customConfigs;
 
   private final Map<String, String> rawMap;
 
@@ -163,4 +163,6 @@ public abstract class AbstractTableConfig {
     result.append("customConfigs : " + customConfigs.toString() + "\n");
     return result.toString();
   }
+
+  public abstract JSONObject toJSON() throws JSONException, JsonGenerationException, JsonMappingException, IOException;
 }
