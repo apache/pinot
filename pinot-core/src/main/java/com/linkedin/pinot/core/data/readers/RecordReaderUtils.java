@@ -46,17 +46,15 @@ public class RecordReaderUtils {
     }
   }
 
-  public static Object convertToDataTypeArray(String token, DataType dataType) {
+  public static Object convertToDataTypeArray(String [] tokens, DataType dataType) {
     Object [] value;
 
-    if ((token == null) || (token.isEmpty())) {
+    if ((tokens == null) || (tokens.length == 0)) {
       value = new Object[1];
       value[0] = getDefaultNullValue(dataType);
 
     } else {
-      String [] tokens = token.split(",");
       value = new Object[tokens.length];
-
       for (int i = 0; i < tokens.length; ++ i) {
         value[i] = convertToDataType(tokens[i], dataType);
       }

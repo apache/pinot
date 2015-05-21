@@ -35,6 +35,7 @@ public class CSVRecordReader implements RecordReader {
   private static final String CSV_HEADER_ENV = "csv_header";
   private static final String CSV_DELIMITER_ENV = "csv_delimiter";
 
+  static String _delimiterString = ",";
   private String _fileName;
   private Schema _schema = null;
 
@@ -47,6 +48,7 @@ public class CSVRecordReader implements RecordReader {
 
     _schema = schema;
     _env = System.getenv();
+    _delimiterString = Character.toString(getDelimiterFromEnv());
   }
 
   @Override
@@ -87,7 +89,8 @@ public class CSVRecordReader implements RecordReader {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
 
       } else {
-        value = RecordReaderUtils.convertToDataTypeArray(token, fieldSpec.getDataType());
+        String [] tokens = (token != null) ? token.split(_delimiterString) : null;
+        value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec.getDataType());
       }
 
       fieldMap.put(column, value);

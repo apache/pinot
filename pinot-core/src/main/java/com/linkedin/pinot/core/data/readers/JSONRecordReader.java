@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.data.readers;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
@@ -38,7 +40,7 @@ public class JSONRecordReader implements RecordReader {
   JsonParser _parser;
   Iterator<Map> _iterator;
 
-  public JSONRecordReader(String dataFile, Schema schema) throws JsonParseException, IOException {
+  public JSONRecordReader(String dataFile, Schema schema) {
     _dataFile = dataFile;
     _schema = schema;
   }
@@ -69,18 +71,19 @@ public class JSONRecordReader implements RecordReader {
 
   @Override
   public GenericRow next() {
-    Map<String, String> record = _iterator.next();
+    Map<String, Object> record = _iterator.next();
     Map<String, Object> fieldMap = new HashMap<String, Object>();
 
     for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      String token = record.get(column);
+      Object data = record.get(column);
 
       Object value=null;
       if (fieldSpec.isSingleValueField()) {
+        String token = (data != null) ? data.toString() : null;
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
       } else {
-        value = RecordReaderUtils.convertToDataTypeArray(token, fieldSpec.getDataType());
+        value = convertToDataTypeArray(data, fieldSpec.getDataType());
       }
 
       fieldMap.put(column, value);
@@ -94,5 +97,25 @@ public class JSONRecordReader implements RecordReader {
   @Override
   public void close() throws Exception {
     _parser.close();
+  }
+
+  private Object [] convertToDataTypeArray(Object data, DataType dataType) {
+    Object [] value;
+
+    if ((data == null)) {
+      value = new Object[1];
+      value[0] = RecordReaderUtils.getDefaultNullValue(dataType);
+
+    } else {
+      ArrayList objs = (ArrayList) data;
+      value = new Object[objs.size()];
+
+      for (int i = 0; i < objs.size(); ++i) {
+        String token = (objs.get(i) != null) ? objs.get(i).toString() : null;
+        value[i] = RecordReaderUtils.convertToDataType(token, dataType);
+      }
+    }
+
+    return value;
   }
 }
