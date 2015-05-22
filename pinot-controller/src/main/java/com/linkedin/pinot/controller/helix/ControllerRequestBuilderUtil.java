@@ -30,6 +30,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Broker;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSourceRequestType;
@@ -38,7 +40,6 @@ import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.api.pojos.Tenant;
 
 
 /**
@@ -50,14 +51,17 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildCreateOfflineResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
-    DataResource dataSource = createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
+    DataResource dataSource =
+        createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName,
+            "BalanceNumSegmentAssignmentStrategy");
     return dataSource.toJSON();
   }
 
   public static JSONObject buildCreateRealtimeResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
+        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName,
+            "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
   }
@@ -65,7 +69,8 @@ public class ControllerRequestBuilderUtil {
   public static JSONObject buildCreateHybridResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName, "BalanceNumSegmentAssignmentStrategy");
+        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName,
+            "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
   }
@@ -123,8 +128,8 @@ public class ControllerRequestBuilderUtil {
     return DataResource.fromMap(props);
   }
 
-  public static DataResource createOfflineClusterCreationConfig(String serverTenant, String brokerTenant, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
+  public static DataResource createOfflineClusterCreationConfig(String serverTenant, String brokerTenant,
+      int numReplicas, String resourceName, String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
@@ -143,8 +148,8 @@ public class ControllerRequestBuilderUtil {
     return DataResource.fromMap(props);
   }
 
-  public static DataResource createRealtimeClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
+  public static DataResource createRealtimeClusterCreationConfig(int numInstances, int numReplicas,
+      String resourceName, String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
@@ -249,23 +254,31 @@ public class ControllerRequestBuilderUtil {
     }
   }
 
-  public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances) throws JSONException {
-    Tenant tenant = new Tenant(TenantRole.BROKER, tenantName, numberOfInstances, -1, -1);
-    return tenant.toJSON();
-  }
-
-  public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances, int offlineInstances, int realtimeInstances) throws JSONException {
-    Tenant tenant = new Tenant(TenantRole.SERVER, tenantName, numberOfInstances, offlineInstances, realtimeInstances);
-    return tenant.toJSON();
-  }
-
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, int numReplicas)
+  public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
       throws JSONException {
-    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS", "700", numReplicas, "BalanceNumSegmentAssignmentStrategy");
+    Tenant tenant =
+        new TenantBuilder(tenantName).setType(TenantRole.BROKER).setTotalInstances(numberOfInstances)
+            .setOfflineInstances(-1).setRealtimeInstances(-1).build();
+    return tenant.toJSON();
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, String timeColumnName, String timeType,
-      String retentionTimeUnit, String retentionTimeValue, int numReplicas, String segmentAssignmentStrategy) throws JSONException {
+  public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
+      int offlineInstances, int realtimeInstances) throws JSONException {
+    Tenant tenant =
+        new TenantBuilder(tenantName).setType(TenantRole.SERVER).setTotalInstances(numberOfInstances)
+            .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
+    return tenant.toJSON();
+  }
+
+  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+      int numReplicas) throws JSONException {
+    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+        "700", numReplicas, "BalanceNumSegmentAssignmentStrategy");
+  }
+
+  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+      String segmentAssignmentStrategy) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -301,8 +314,9 @@ public class ControllerRequestBuilderUtil {
     return creationRequest;
   }
 
-  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant, int numReplicas, String segmentAssignmentStrategy)
-      throws JSONException {
-    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS", "700", numReplicas, segmentAssignmentStrategy);
+  public static JSONObject buildCreateOfflineTableV2JSON(String tableName, String serverTenant, String brokerTenant,
+      int numReplicas, String segmentAssignmentStrategy) throws JSONException {
+    return buildCreateOfflineTableV2JSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+        "700", numReplicas, segmentAssignmentStrategy);
   }
 }

@@ -32,12 +32,13 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.pojos.Tenant;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -79,14 +80,19 @@ public class ValidationManagerTest {
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
 
-    Tenant brokerTenant = new Tenant(TenantRole.BROKER, "testBroker", 2, -1, -1);
+    Tenant brokerTenant =
+        new TenantBuilder("testBroker").setType(TenantRole.BROKER).setTotalInstances(2).setOfflineInstances(-1)
+            .setRealtimeInstances(-1).build();
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
-    Tenant serverTenant = new Tenant(TenantRole.BROKER, "testServer", 2, 2, 0);
+
+    Tenant serverTenant =
+        new TenantBuilder("testServer").setType(TenantRole.SERVER).setTotalInstances(2).setOfflineInstances(2)
+            .setRealtimeInstances(0).build();
     _pinotHelixResourceManager.createBrokerTenant(serverTenant);
 
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(testResourceName, "testServer", "testBroker", "timestamp", "millsSinceEpoch", "DAYS", "5", 2,
-            "BalanceNumSegmentAssignmentStrategy").toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(testResourceName, "testServer", "testBroker",
+            "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
@@ -97,7 +103,8 @@ public class ValidationManagerTest {
     Thread.sleep(1000);
 
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+            metadata.getResourceName(), metadata.getName());
 
     SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();

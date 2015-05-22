@@ -32,8 +32,8 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
+import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.pojos.Tenant;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
@@ -71,12 +71,13 @@ public class PinotTenantRestletResource extends ServerResource {
     getVariants().add(new Variant(MediaType.TEXT_PLAIN));
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
-    _pinotHelixResourceMananger = (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-        .get(PinotHelixResourceManager.class.toString());
+    _pinotHelixResourceMananger =
+        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
+            .get(PinotHelixResourceManager.class.toString());
     _objectMapper = new ObjectMapper();
   }
 
-  /* 
+  /*
    * For tenant creation
    */
   @Override
@@ -85,7 +86,7 @@ public class PinotTenantRestletResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       PinotResourceManagerResponse response = null;
-      final Tenant tenant = _objectMapper.readValue(ByteStreams.toByteArray(entity.getStream()), Tenant.class);
+      final Tenant tenant = _objectMapper.readValue(entity.getText(), Tenant.class);
       switch (tenant.getTenantRole()) {
         case BROKER:
           response = _pinotHelixResourceMananger.createBrokerTenant(tenant);
@@ -168,10 +169,12 @@ public class PinotTenantRestletResource extends ServerResource {
           resourceGetRet.put("BrokerInstances", _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
         } else {
           if (type.equals("server")) {
-            resourceGetRet.put("ServerInstances", _pinotHelixResourceMananger.getAllInstancesForServerTenant(tenantName));
+            resourceGetRet.put("ServerInstances",
+                _pinotHelixResourceMananger.getAllInstancesForServerTenant(tenantName));
           }
           if (type.equals("broker")) {
-            resourceGetRet.put("BrokerInstances", _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
+            resourceGetRet.put("BrokerInstances",
+                _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
           }
         }
         resourceGetRet.put(TENANT_NAME, tenantName);
@@ -194,8 +197,9 @@ public class PinotTenantRestletResource extends ServerResource {
       final String tenantName = (String) getRequest().getAttributes().get(TENANT_NAME);
       final String type = getReference().getQueryAsForm().getValues("type");
       if (type == null) {
-        presentation = new StringRepresentation("Not specify the type for the tenant name. Please try to append:"
-            + "/?type=SERVER or /?type=BROKER ");
+        presentation =
+            new StringRepresentation("Not specify the type for the tenant name. Please try to append:"
+                + "/?type=SERVER or /?type=BROKER ");
       } else {
         TenantRole tenantRole = TenantRole.valueOf(type.toUpperCase());
         PinotResourceManagerResponse res = null;

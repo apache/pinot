@@ -22,7 +22,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -33,10 +32,11 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.pojos.Tenant;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
@@ -73,7 +73,8 @@ public class PinotResourceManagerTest {
 
     /////////////////////////
     _numInstance = 1;
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 1);
     Thread.sleep(3000);
     Assert.assertEquals(
@@ -81,17 +82,24 @@ public class PinotResourceManagerTest {
             .size(), _numInstance);
 
     // Create broker tenant
-    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
+    Tenant brokerTenant =
+        new TenantBuilder(BROKER_TENANT_NAME).setType(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(0)
+            .setRealtimeInstances(0).build();
+
     _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BROKER_TENANT_NAME + "_BROKER").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BROKER_TENANT_NAME + "_BROKER")
+        .size(), 1);
 
     // Create server tenant
-    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, 1, 1, 0);
+    Tenant serverTenant =
+        new TenantBuilder(SERVER_TENANT_NAME).setType(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(1)
+            .setRealtimeInstances(0).build();
     _pinotHelixResourceManager.createServerTenant(serverTenant);
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME, 1).toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableV2JSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
+            1).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
@@ -109,16 +117,22 @@ public class PinotResourceManagerTest {
     for (int i = 1; i <= 5; i++) {
       addOneSegment(TABLE_NAME);
       Thread.sleep(2000);
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
+      final ExternalView externalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
-    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
+    final ExternalView externalView =
+        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
     int i = 4;
     for (final String segmentId : externalView.getPartitionSet()) {
       deleteOneSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentId);
       Thread.sleep(2000);
-      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME)).getPartitionSet()
-          .size(), i);
+      Assert.assertEquals(
+          _helixAdmin
+              .getResourceExternalView(HELIX_CLUSTER_NAME,
+                  TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME)).getPartitionSet().size(), i);
       i--;
     }
   }
