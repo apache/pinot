@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.reslet.resources;
+package com.linkedin.pinot.controller.api.reslet.resources.v2;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,9 +55,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * sample curl call : curl -F campaignInsights_adsAnalysis-bmCamp_11=@campaignInsights_adsAnalysis-bmCamp_11      http://localhost:8998/segments
  *
  */
-@Deprecated
-public class PinotFileUpload extends ServerResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFileUpload.class);
+public class PinotSegmentUploadRestletResource extends ServerResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
@@ -65,7 +64,7 @@ public class PinotFileUpload extends ServerResource {
   private final File tempUntarredPath;
   private final String vip;
 
-  public PinotFileUpload() throws IOException {
+  public PinotSegmentUploadRestletResource() throws IOException {
 
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
@@ -91,7 +90,7 @@ public class PinotFileUpload extends ServerResource {
   public Representation get() {
     Representation presentation = null;
     try {
-      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      final String resourceName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
 
       if ((resourceName == null) && (segmentName == null)) {
@@ -223,7 +222,7 @@ public class PinotFileUpload extends ServerResource {
   public Representation delete() {
     Representation rep = null;
     try {
-      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      final String resourceName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
       LOGGER.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
       if (resourceName == null || segmentName == null) {

@@ -41,7 +41,7 @@ public class PinotTableTenantConfigs extends ServerResource {
   @Put("json")
   public Representation put(Representation entity) {
     try {
-      throw new RuntimeException("current tenant config updates are not supported");
+      throw new UnsupportedOperationException("current tenant config updates are not supported");
     } catch (Exception e) {
       LOGGER.error("errpr updating medata configs for table {}", entity, e);
       return PinotFileUpload.exceptionToStringRepresentation(e);

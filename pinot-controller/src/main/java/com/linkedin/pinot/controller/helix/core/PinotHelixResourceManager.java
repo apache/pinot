@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -2053,6 +2054,27 @@ public class PinotHelixResourceManager {
     return segmentsInResource;
   }
 
+  public Map<String, List<String>> getInstanceToSegmentsInATableMap(String tableName) {
+    Map<String, List<String>> instancesToSegmentsMap = new HashMap<String, List<String>>();
+    IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+    Set<String> segments = is.getPartitionSet();
+
+    for (String segment : segments) {
+      Set<String> instances = is.getInstanceSet(segment);
+      for (String instance : instances) {
+        if (instancesToSegmentsMap.containsKey(instance)) {
+          instancesToSegmentsMap.get(instance).add(segment);
+        } else {
+          List<String> a = new ArrayList<String>();
+          a.add(segment);
+          instancesToSegmentsMap.put(instance, a);
+        }
+      }
+    }
+
+    return instancesToSegmentsMap;
+  }
+
   public boolean hasRealtimeTable(String tableName) {
     String actualTableName = new TableNameBuilder(TableType.REALTIME).forTable(tableName);
     List<String> tables = _propertyStore.getChildNames("/tables", AccessOption.PERSISTENT);
@@ -2106,5 +2128,4 @@ public class PinotHelixResourceManager {
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
     return serverInstances;
   }
-
 }
