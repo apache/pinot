@@ -24,9 +24,9 @@ import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 
 
-public class AddTenant extends AbstractBaseCommand implements Command {
+public class CreateTenant extends AbstractBaseCommand implements Command {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AddTenant.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CreateTenant.class);
 
   @Option(name = "-url", required = true, metaVar = "<http>", usage = "Http address of Controller (with port).")
   private String url = null;
