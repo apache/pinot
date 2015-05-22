@@ -16,6 +16,7 @@ public class StarTreeBootstrapPhaseTwoConfig {
   private List<MetricType> metricTypes;
   private String timeColumnName;
   private String timeUnit;
+  private int bucketSize;
   private String aggregationGranularity;
   private int numTimeBuckets;
 
@@ -26,7 +27,7 @@ public class StarTreeBootstrapPhaseTwoConfig {
   public StarTreeBootstrapPhaseTwoConfig(String collectionName,
       List<String> dimensionNames, List<String> metricNames,
       List<MetricType> metricTypes, String timeColumnName, String timeUnit,
-      String aggregationGranularity, int numTimeBuckets) {
+      String aggregationGranularity, int bucketSize, int numTimeBuckets) {
     super();
     this.collectionName = collectionName;
     this.dimensionNames = dimensionNames;
@@ -34,6 +35,7 @@ public class StarTreeBootstrapPhaseTwoConfig {
     this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
     this.timeUnit = timeUnit;
+    this.bucketSize = bucketSize;
     this.aggregationGranularity = aggregationGranularity;
     this.numTimeBuckets = numTimeBuckets;
   }
@@ -64,6 +66,10 @@ public class StarTreeBootstrapPhaseTwoConfig {
 
   public String getTimeUnit() {
     return timeUnit;
+  }
+
+  public int getBucketSize() {
+    return bucketSize;
   }
 
   public String getAggregationGranularity() {
@@ -105,6 +111,7 @@ public class StarTreeBootstrapPhaseTwoConfig {
                                                config.getTime().getColumnName(),
                                                config.getTime().getInput().getUnit().toString(),
                                                config.getTime().getBucket().getUnit().toString(),
+                                               config.getTime().getBucket().getSize(),
                                                numTimeBuckets);
   }
 }

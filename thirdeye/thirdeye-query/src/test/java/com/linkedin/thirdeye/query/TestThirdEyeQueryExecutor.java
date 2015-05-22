@@ -54,7 +54,8 @@ public class TestThirdEyeQueryExecutor {
     when(starTreeManager.getCollections()).thenReturn(ImmutableSet.of(config.getCollection()));
     when(starTreeManager.getConfig(config.getCollection())).thenReturn(config);
     when(starTreeManager.getStarTrees(config.getCollection())).thenReturn(ImmutableMap.of(new File("dummy"), starTree));
-    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn(new IndexMetadata(0L, Long.MAX_VALUE));
+    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn(
+        new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE, "schedule"));
 
     executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     queryExecutor = new ThirdEyeQueryExecutor(executorService, starTreeManager);

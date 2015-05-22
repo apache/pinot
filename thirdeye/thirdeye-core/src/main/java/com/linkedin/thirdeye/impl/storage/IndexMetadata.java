@@ -9,12 +9,12 @@ public class IndexMetadata {
   private Long minDataTime;
   private Long maxDataTime;
   /**
-   * Wall clock time of the data, Note wall clock time is non overlapping across two indexes of the same granularity (hourly, daily, weekly, monthly)  
+   * Wall clock time of the data, Note wall clock time is non overlapping across two indexes of the same granularity (hourly, daily, weekly, monthly)
    */
   private Long startTime;
 
   private Long endTime;
-  
+
   private String timeGranularity;
 
   public IndexMetadata(Long minDataTime, Long maxDataTime) {
@@ -24,6 +24,17 @@ public class IndexMetadata {
 
   public IndexMetadata() {
 
+  }
+
+
+
+  public IndexMetadata(Long minDataTime, Long maxDataTime, Long startTime, Long endTime, String timeGranularity) {
+    super();
+    this.minDataTime = minDataTime;
+    this.maxDataTime = maxDataTime;
+    this.startTime = startTime;
+    this.endTime = endTime;
+    this.timeGranularity = timeGranularity;
   }
 
   public Long getStartTime() {

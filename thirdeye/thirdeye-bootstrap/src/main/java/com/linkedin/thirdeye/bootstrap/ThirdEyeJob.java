@@ -506,12 +506,12 @@ public class ThirdEyeJob {
 
 
 
-  private IndexMetadata mergeIndexMetadata(List<IndexMetadata> indexMetdataList)
+  private IndexMetadata mergeIndexMetadata(List<IndexMetadata> indexMetdataList,
+      Long startTime, Long endTime, String schedule)
   {
     Long min = Long.MAX_VALUE;
     Long max = 0L;
 
-    IndexMetadata mergedIndexMetadata = new IndexMetadata();
 
     for (IndexMetadata indexMetadata : indexMetdataList)
     {
@@ -524,9 +524,7 @@ public class ThirdEyeJob {
         max = indexMetadata.getMaxDataTime();
       }
     }
-
-    mergedIndexMetadata.setMaxDataTime(max);
-    mergedIndexMetadata.setMinDataTime(min);
+    IndexMetadata mergedIndexMetadata = new IndexMetadata(min, max, startTime, endTime, schedule);
 
     return mergedIndexMetadata;
   }
@@ -679,7 +677,8 @@ public class ThirdEyeJob {
         }
 
         Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
-        IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList);
+        IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList,
+            minTime.getMillis(), maxTime.getMillis(), schedule);
         writeMergedIndexMetadata(fileSystem, metadataPath, mergedIndexMetadata);
 
         listFiles = fileSystem.listFiles(dataPath, false);

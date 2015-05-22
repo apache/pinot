@@ -58,6 +58,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH;
@@ -95,6 +96,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       LOGGER.info("AggregatePhaseJob.AggregationMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
+
       Path configPath =
           new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString()));
       try {
@@ -195,6 +197,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private Path pathToTree;
     private Long minDataTime = Long.MAX_VALUE;
     private Long maxDataTime = 0L;
+    private Long startTime = 0L;
+    private Long endTime = Long.MAX_VALUE;
+    private String schedule = "";
     private IndexMetadata indexMetadata;
 
     @Override
@@ -258,6 +263,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     public void reduce(BytesWritable keyWritable,
         Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable, Context context)
         throws IOException, InterruptedException {
+
       String nodeId = new String(keyWritable.copyBytes());
 
       LOGGER.info("START: processing {}", nodeId);
@@ -322,9 +328,15 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
           records, dictionary);
 
       // Create metadata object
-      indexMetadata = new IndexMetadata(minDataTime, maxDataTime);
+      long minDataTimeMillis = TimeUnit.MILLISECONDS.convert
+          (minDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getTimeUnit()));
 
-      LOGGER.info("END: processing {}", nodeId);
+      long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert
+          (maxDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getTimeUnit()));
+
+      indexMetadata = new IndexMetadata(minDataTimeMillis, maxDataTimeMillis, startTime, endTime, schedule);
+
+       LOGGER.info("END: processing {}", nodeId);
     }
 
     @Override

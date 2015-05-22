@@ -298,7 +298,8 @@ public class DataUpdateManager {
       // Create index metadata
       File metadataFile = new File(segmentBufferDir, StarTreeConstants.METADATA_FILE_NAME);
       LOGGER.info("Creating index metadata {}", metadataFile);
-      IndexMetadata metadata = new IndexMetadata(minDataTime.get(), maxDataTime.get());
+      IndexMetadata metadata = new IndexMetadata(minDataTime.get(), maxDataTime.get(),
+          minTime.getMillis(), maxTime.getMillis(), schedule);
       OutputStream metadataStream = new FileOutputStream(metadataFile);
       metadata.toProperties().store(metadataStream, "This segment was created via DataUpdateManager#persistTree");
       metadataStream.close();
