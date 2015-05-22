@@ -46,7 +46,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.OfflineTableConfig;
+import com.linkedin.pinot.common.config.RealtimeTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
@@ -1733,6 +1737,70 @@ public class PinotHelixResourceManager {
         throw new RuntimeException("UnSupported table type");
     }
     handleBrokerResourceV2(config);
+  }
+
+  private void setTableConfig(AbstractTableConfig config, String tableNameWithSuffix, TableType type)
+      throws JsonGenerationException, JsonMappingException, IOException {
+    if (type == TableType.REALTIME) {
+      ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithSuffix,
+          AbstractTableConfig.toZnRecord(config));
+    } else {
+      ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithSuffix,
+          AbstractTableConfig.toZnRecord(config));
+    }
+  }
+
+  public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs) throws Exception {
+    String actualTableName = new TableNameBuilder(type).forTable(tableName);
+    AbstractTableConfig config;
+    if (type == TableType.REALTIME) {
+      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+    } else {
+      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
+    }
+    if (config == null) {
+      throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
+    }
+    config.setCustomConfigs(newConfigs);
+    setTableConfig(config, actualTableName, type);
+  }
+
+  public void updateSegmentsValidationAndRetentionConfigFor(String tableName, TableType type,
+      SegmentsValidationAndRetentionConfig newConfigs) throws Exception {
+    String actualTableName = new TableNameBuilder(type).forTable(tableName);
+    AbstractTableConfig config;
+    if (type == TableType.REALTIME) {
+      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+    } else {
+      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
+    }
+    if (config == null) {
+      throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
+    }
+    config.setValidationConfig(newConfigs);
+
+    setTableConfig(config, actualTableName, type);
+  }
+
+  public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs) throws Exception {
+    String actualTableName = new TableNameBuilder(type).forTable(tableName);
+    AbstractTableConfig config;
+    if (type == TableType.REALTIME) {
+      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+      if (config != null) {
+        ((RealtimeTableConfig) config).setIndexConfig(newConfigs);
+      }
+    } else {
+      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
+      if (config != null) {
+        ((OfflineTableConfig) config).setIndexConfig(newConfigs);
+      }
+    }
+    if (config == null) {
+      throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
+    }
+
+    setTableConfig(config, actualTableName, type);
   }
 
   private void handleBrokerResourceV2(AbstractTableConfig tableConfig) {

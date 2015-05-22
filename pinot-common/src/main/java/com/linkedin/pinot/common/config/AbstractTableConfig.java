@@ -37,23 +37,19 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 public abstract class AbstractTableConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractTableConfig.class);
 
-  protected final String tableName;
-  protected final String tableType;
-  protected final SegmentsValidationAndRetentionConfig validationConfig;
-  protected final TenantConfig tenantConfig;
-  protected final TableCustomConfig customConfigs;
-
-  private final Map<String, String> rawMap;
+  protected String tableName;
+  protected String tableType;
+  protected SegmentsValidationAndRetentionConfig validationConfig;
+  protected TenantConfig tenantConfig;
+  protected TableCustomConfig customConfigs;
 
   protected AbstractTableConfig(String tableName, String tableType,
-      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, Map<String, String> rawMap) {
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig, TableCustomConfig customConfigs) {
     this.tableName = new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableName);
     this.tableType = tableType;
     this.validationConfig = validationConfig;
     this.tenantConfig = tenantConfig;
     this.customConfigs = customConfigs;
-    this.rawMap = rawMap;
   }
 
   public static AbstractTableConfig init(String jsonString) throws JSONException, JsonParseException,
@@ -70,18 +66,10 @@ public abstract class AbstractTableConfig {
     IndexingConfig config =
         loadIndexingConfig(new ObjectMapper().readTree(o.getJSONObject("tableIndexConfig").toString()));
 
-    Map<String, String> rawMap = new HashMap<String, String>();
-    rawMap.put("tableName", tableName);
-    rawMap.put("tableType", tableType);
-    rawMap.put("segmentsConfig", new ObjectMapper().writeValueAsString(validationConfig));
-    rawMap.put("tenants", new ObjectMapper().writeValueAsString(tenantConfig));
-    rawMap.put("metadata", new ObjectMapper().writeValueAsString(customConfig));
-    rawMap.put("tableIndexConfig", new ObjectMapper().writeValueAsString(config));
-
     if (tableType.equals("offline")) {
-      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, rawMap, config);
+      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
     } else if (tableType.equals("realtime")) {
-      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, rawMap, config);
+      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
     }
     throw new UnsupportedOperationException("unknown tableType : " + tableType);
   }
@@ -102,8 +90,14 @@ public abstract class AbstractTableConfig {
   public static ZNRecord toZnRecord(AbstractTableConfig config) throws JsonGenerationException, JsonMappingException,
       IOException {
     ZNRecord rec = new ZNRecord(config.getTableName());
-    Map<String, String> map = config.getRawJSONMap();
-    rec.setSimpleFields(map);
+    Map<String, String> rawMap = new HashMap<String, String>();
+    rawMap.put("tableName", config.getTableName());
+    rawMap.put("tableType", config.getTableType());
+    rawMap.put("segmentsConfig", new ObjectMapper().writeValueAsString(config.getValidationConfig()));
+    rawMap.put("tenants", new ObjectMapper().writeValueAsString(config.getValidationConfig()));
+    rawMap.put("metadata", new ObjectMapper().writeValueAsString(config.getCustomConfigs()));
+    rawMap.put("tableIndexConfig", new ObjectMapper().writeValueAsString(config));
+    rec.setSimpleFields(rawMap);
     return rec;
   }
 
@@ -127,8 +121,24 @@ public abstract class AbstractTableConfig {
     return new ObjectMapper().readValue(node, IndexingConfig.class);
   }
 
-  public Map<String, String> getRawJSONMap() throws JsonGenerationException, JsonMappingException, IOException {
-    return rawMap;
+  public void setTableName(String tableName) {
+    this.tableName = tableName;
+  }
+
+  public void setTableType(String tableType) {
+    this.tableType = tableType;
+  }
+
+  public void setValidationConfig(SegmentsValidationAndRetentionConfig validationConfig) {
+    this.validationConfig = validationConfig;
+  }
+
+  public void setTenantConfig(TenantConfig tenantConfig) {
+    this.tenantConfig = tenantConfig;
+  }
+
+  public void setCustomConfigs(TableCustomConfig customConfigs) {
+    this.customConfigs = customConfigs;
   }
 
   public String getTableName() {

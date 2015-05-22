@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.config;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -27,18 +26,22 @@ import org.json.JSONObject;
 
 public class OfflineTableConfig extends AbstractTableConfig {
 
-  private final IndexingConfig indexConfig;
+  private IndexingConfig indexConfig;
 
   protected OfflineTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, Map<String, String> rawMap, IndexingConfig indexConfig) {
-    super(tableName, tableType, validationConfig, tenantConfig, customConfigs, rawMap);
+      TableCustomConfig customConfigs, IndexingConfig indexConfig) {
+    super(tableName, tableType, validationConfig, tenantConfig, customConfigs);
     this.indexConfig = indexConfig;
   }
 
   @Override
   public IndexingConfig getIndexingConfig() {
     return indexConfig;
+  }
+
+  public void setIndexConfig(IndexingConfig indexConfig) {
+    this.indexConfig = indexConfig;
   }
 
   @Override
