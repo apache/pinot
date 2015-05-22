@@ -4,6 +4,7 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
+
 import org.joda.time.DateTime;
 
 import java.util.*;
@@ -17,7 +18,13 @@ public class ThirdEyeQueryExecutor {
 
   private final ExecutorService executorService;
   private final StarTreeManager starTreeManager;
-
+  private static Map<String, Integer> timeGranularitySortOrder = new HashMap<String, Integer>();
+  static {
+    timeGranularitySortOrder.put("monthly", 0);
+    timeGranularitySortOrder.put("weekly", 1);
+    timeGranularitySortOrder.put("daily", 2);
+    timeGranularitySortOrder.put("hourly", 3);
+  }
   public ThirdEyeQueryExecutor(ExecutorService executorService, StarTreeManager starTreeManager) {
     this.executorService = executorService;
     this.starTreeManager = starTreeManager;
@@ -59,27 +66,18 @@ public class ThirdEyeQueryExecutor {
     }
 
     // Time
-    long startTime = dateTimeToCollectionTime(config, new DateTime(query.getStart().getMillis() - startOffset));
-    long endTime = dateTimeToCollectionTime(config, query.getEnd());
+    long queryStartTime = dateTimeToCollectionTime(config, new DateTime(query.getStart().getMillis() - startOffset));
+    long queryEndTime = dateTimeToCollectionTime(config, query.getEnd());
 
     // Align to aggregation boundary
     if (collectionWindowMillis > 0) {
       long collectionWindow = dateTimeToCollectionTime(config, new DateTime(collectionWindowMillis));
-      startTime = (startTime / collectionWindow) * collectionWindow;
-      endTime = (endTime / collectionWindow + 1) * collectionWindow; // include everything in that window
+      queryStartTime = (queryStartTime / collectionWindow) * collectionWindow;
+      queryEndTime = (queryEndTime / collectionWindow + 1) * collectionWindow; // include everything in that window
     }
-
-    final TimeRange timeRange = new TimeRange(startTime, endTime);
-
-    // Determine which trees we need to query
-    Set<UUID> treeIds = new HashSet<>();
-    for (StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
-      IndexMetadata indexMetadata = starTreeManager.getIndexMetadata(starTree.getRoot().getId());
-      TimeRange treeTimeRange = new TimeRange(indexMetadata.getMinDataTime(), indexMetadata.getMaxDataTime());
-      if (!timeRange.isDisjoint(treeTimeRange)) {
-        treeIds.add(starTree.getRoot().getId());
-      }
-    }
+    
+    final TimeRange queryTimeRange = new TimeRange(queryStartTime, queryEndTime);
+    List<UUID> treeIdsToQuery = selectTreesToQuery(config, queryTimeRange);
 
     // For all group by dimensions add those as fixed
     if (!query.getGroupByColumns().isEmpty()) {
@@ -90,7 +88,7 @@ public class ThirdEyeQueryExecutor {
 
         final Set<Future<Set<String>>> dimensionSetFutures = new HashSet<>();
         for (final StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
-          if (!treeIds.contains(starTree.getRoot().getId())) {
+          if (!treeIdsToQuery.contains(starTree.getRoot().getId())) {
             continue;
           }
 
@@ -132,7 +130,7 @@ public class ThirdEyeQueryExecutor {
     // Metrics
     Map<StarTree, Map<DimensionKey, Future<MetricTimeSeries>>> timeSeriesFutures = new HashMap<>();
     for (final StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
-      if (!treeIds.contains(starTree.getRoot().getId())) {
+      if (!treeIdsToQuery.contains(starTree.getRoot().getId())) {
         continue;
       }
 
@@ -141,7 +139,7 @@ public class ThirdEyeQueryExecutor {
         timeSeriesFutures.get(starTree).put(dimensionKey, executorService.submit(new Callable<MetricTimeSeries>() {
           @Override
           public MetricTimeSeries call() throws Exception {
-            return starTree.getTimeSeries(new StarTreeQueryImpl(config, dimensionKey, timeRange));
+            return starTree.getTimeSeries(new StarTreeQueryImpl(config, dimensionKey, queryTimeRange));
           }
         }));
       }
@@ -179,6 +177,65 @@ public class ThirdEyeQueryExecutor {
     }
 
     return result;
+  }
+
+  private List<UUID> selectTreesToQuery(StarTreeConfig config, final TimeRange queryTimeRange) {
+    long queryStartTime = queryTimeRange.getStart();
+    long queryEndTime = queryTimeRange.getEnd();
+
+    List<UUID> treeIds = new ArrayList<>();
+    // Determine which trees we need to query
+    for (StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
+      IndexMetadata indexMetadata = starTreeManager.getIndexMetadata(starTree.getRoot().getId());
+      TimeRange treeTimeRange =
+          new TimeRange(indexMetadata.getMinDataTime(), indexMetadata.getMaxDataTime());
+      if (!queryTimeRange.isDisjoint(treeTimeRange)) {
+        treeIds.add(starTree.getRoot().getId());
+      }
+    }
+
+    Comparator<? super UUID> comparator = new Comparator<UUID>() {
+      @Override
+      public int compare(UUID treeId1, UUID treeId2) {
+        IndexMetadata indexMetadata1 = starTreeManager.getIndexMetadata(treeId1);
+        IndexMetadata indexMetadata2 = starTreeManager.getIndexMetadata(treeId1);
+        Long startTime1 = indexMetadata1.getStartTime();
+        Long startTime2 = indexMetadata2.getStartTime();
+        int ret = startTime1.compareTo(startTime2);
+        if (ret == 0) {
+          Integer timeGranularity1 =
+              timeGranularitySortOrder.get(indexMetadata1.getTimeGranularity());
+          Integer timeGranularity2 =
+              timeGranularitySortOrder.get(indexMetadata2.getTimeGranularity());
+          ret = timeGranularity1.compareTo(timeGranularity2);
+        }
+        return ret;
+      }
+    };
+    // We will have segments at multiple granularities hourly, daily, weekly, monthly.
+    // Find the minimum number of trees to query
+    // We use a greedy algorithm that sorts the tree with startTime, Granularity (monthly appears
+    // first followed by weekly daily and hourly)
+    Collections.sort(treeIds, comparator);
+    TimeRange remainingTimeRange = new TimeRange(queryStartTime, queryEndTime);
+    List<UUID> treeIdsToQuery = new ArrayList<>();
+
+    for (UUID treeId : treeIds) {
+      IndexMetadata indexMetadata = starTreeManager.getIndexMetadata(treeId);
+      long startTime = indexMetadata.getStartTime();
+      long endTime = indexMetadata.getStartTime();
+      TimeRange treeTimeRange = new TimeRange(startTime, endTime);
+      if (treeTimeRange.isWithIn(remainingTimeRange)) {
+        treeIdsToQuery.add(treeId);
+        // update the remaining Time Range
+        remainingTimeRange = new TimeRange(endTime, queryEndTime);
+        // if we have reached the queryEndTime, break out of the loop
+        if (endTime == queryEndTime) {
+          break;
+        }
+      }
+    }
+    return treeIdsToQuery;
   }
 
   private static long dateTimeToCollectionTime(StarTreeConfig config, DateTime dateTime) {

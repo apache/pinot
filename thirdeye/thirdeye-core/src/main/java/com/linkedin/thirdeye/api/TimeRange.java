@@ -80,4 +80,8 @@ public class TimeRange implements Comparable<TimeRange>, Serializable
   {
     return start + ":" + end;
   }
+
+  public boolean isWithIn(TimeRange timeRange) {
+    return this.start >=timeRange.start && this.end <= timeRange.end;
+  }
 }

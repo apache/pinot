@@ -72,7 +72,7 @@ public class StorageUtils
         + "_" + (maxTime == null ? "LATEST" : StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime))
         + "_" + treeId;
   }
-
+  
   public static String getDataDirPrefix()
   {
     return StarTreeConstants.DATA_DIR_PREFIX;
