@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -44,7 +43,7 @@ public class PinotTableTenantConfigs extends ServerResource {
       throw new UnsupportedOperationException("current tenant config updates are not supported");
     } catch (Exception e) {
       LOGGER.error("errpr updating medata configs for table {}", entity, e);
-      return PinotFileUpload.exceptionToStringRepresentation(e);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 }

@@ -77,7 +77,6 @@ public class Schema {
 
   public static Schema fromFile(final File schemaFile) throws JsonParseException, JsonMappingException, IOException {
     JsonNode node = new ObjectMapper().readTree(schemaFile);
-    System.out.println("node : " + node);
     Schema schema = new ObjectMapper().readValue(node, Schema.class);
     schema.setJSONSchema(node.toString());
     return schema;

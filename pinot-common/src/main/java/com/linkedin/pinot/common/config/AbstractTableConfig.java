@@ -94,9 +94,9 @@ public abstract class AbstractTableConfig {
     rawMap.put("tableName", config.getTableName());
     rawMap.put("tableType", config.getTableType());
     rawMap.put("segmentsConfig", new ObjectMapper().writeValueAsString(config.getValidationConfig()));
-    rawMap.put("tenants", new ObjectMapper().writeValueAsString(config.getValidationConfig()));
+    rawMap.put("tenants", new ObjectMapper().writeValueAsString(config.getTenantConfig()));
     rawMap.put("metadata", new ObjectMapper().writeValueAsString(config.getCustomConfigs()));
-    rawMap.put("tableIndexConfig", new ObjectMapper().writeValueAsString(config));
+    rawMap.put("tableIndexConfig", new ObjectMapper().writeValueAsString(config.getIndexingConfig()));
     rec.setSimpleFields(rawMap);
     return rec;
   }

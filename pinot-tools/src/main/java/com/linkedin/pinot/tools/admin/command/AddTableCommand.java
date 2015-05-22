@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import org.json.JSONObject;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
 
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 
 
@@ -27,19 +27,14 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
  *
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
-public class CreateResourceCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-resourceName", required = true, metaVar = "<string>", usage = "Name of the resource to create.")
-  private String _resourceName;
+public class AddTableCommand extends AbstractBaseCommand implements Command {
+
+  @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
+  private String filePath;
 
   @Option(name = "-controllerAddress", required = true, metaVar = "<http>",
       usage = "Http address of Controller (with port).")
-  private String _controllerAddress = null;
-
-  @Option(name = "-numInstances", required = false, metaVar = "<int>", usage = "Number of instances.")
-  int _numInstances = 1;
-
-  @Option(name = "-numReplicas", required = false, metaVar = "<int>", usage = "Number of replicas.")
-  private int _numReplicas = 1;
+  private String controllerAddress = null;
 
   @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   private boolean _help = false;
@@ -56,8 +51,15 @@ public class CreateResourceCommand extends AbstractBaseCommand implements Comman
 
   @Override
   public String toString() {
-    return ("CreateResource " + _resourceName + " -controllerAddress " + _controllerAddress + " -numInstances "
-        + _numInstances + " -numReplicase " + _numReplicas);
+    String res = null;
+
+    try {
+      res = new ObjectMapper().writeValueAsString(this);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    return res;
   }
 
   @Override
@@ -65,27 +67,24 @@ public class CreateResourceCommand extends AbstractBaseCommand implements Comman
 
   }
 
-  public CreateResourceCommand setResourceName(String resourceName) {
-    _resourceName = resourceName;
+  public AddTableCommand setFilePath(String filePath) {
+    this.filePath = filePath;
     return this;
   }
 
-  public CreateResourceCommand setControllerAddress(String controllerAddress) {
-    _controllerAddress = controllerAddress;
+  public AddTableCommand setControllerAddress(String controllerAddress) {
+    this.controllerAddress = controllerAddress;
     return this;
   }
 
   @Override
   public boolean execute() throws Exception {
-    JSONObject payload =
-        ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(_resourceName, _numInstances, _numReplicas);
-
+    JsonNode node = new ObjectMapper().readTree(filePath);
     String res =
-        AbstractBaseCommand.sendPostRequest(
-            ControllerRequestURLBuilder.baseUrl(_controllerAddress).forResourceCreate(),
-            payload.toString().replaceAll("}$", ", \"metadata\":{}}"));
+        AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
+            node.toString());
 
-    String status = new JSONObject(res).getString("status");
-    return status.equals("success");
+    System.out.println(res);
+    return true;
   }
 }

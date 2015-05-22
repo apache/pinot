@@ -25,7 +25,7 @@ import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
 
 import com.linkedin.pinot.tools.admin.command.Command;
-import com.linkedin.pinot.tools.admin.command.CreateResourceCommand;
+import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.GenerateDataCommand;
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
@@ -48,7 +48,7 @@ public class PinotAdministrator {
   @SubCommands({
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
-      @SubCommand(name = "CreateResource", impl = CreateResourceCommand.class),
+      @SubCommand(name = "CreateResource", impl = AddTableCommand.class),
       @SubCommand(name = "StartServer", impl = StartServerCommand.class),
       @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
       @SubCommand(name = "StartController", impl = StartControllerCommand.class),
