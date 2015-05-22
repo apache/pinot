@@ -1,25 +1,40 @@
 package com.linkedin.thirdeye.query;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.linkedin.thirdeye.api.*;
-import com.linkedin.thirdeye.impl.StarTreeImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
-import com.linkedin.thirdeye.impl.StarTreeUtils;
-import com.linkedin.thirdeye.impl.storage.IndexMetadata;
+import java.io.File;
+import java.io.PrintWriter;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import java.io.File;
-import java.io.PrintWriter;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 public class TestThirdEyeQueryExecutor {
   private StarTreeConfig config;
@@ -54,8 +69,7 @@ public class TestThirdEyeQueryExecutor {
     when(starTreeManager.getCollections()).thenReturn(ImmutableSet.of(config.getCollection()));
     when(starTreeManager.getConfig(config.getCollection())).thenReturn(config);
     when(starTreeManager.getStarTrees(config.getCollection())).thenReturn(ImmutableMap.of(new File("dummy"), starTree));
-    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn(
-        new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE, "schedule"));
+    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn(new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE, "HOURLY"));
 
     executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     queryExecutor = new ThirdEyeQueryExecutor(executorService, starTreeManager);
@@ -125,6 +139,125 @@ public class TestThirdEyeQueryExecutor {
     checkData(result.getData().get(otherKey), 0);
   }
 
+  @Test
+  public void testSelectTreeForQueryTimeRange() throws Exception {
+    String[][] indexMetadataArray = new String[][] {
+        new String[] {
+            "2014-10", "2014-11", "MONTHLY"
+        }, //
+        new String[] {
+            "2014-11", "2014-12", "MONTHLY"
+        }, //
+        new String[] {
+            "2014-12", "2015-01", "MONTHLY"
+        }, //
+        new String[] {
+            "2014-12-24", "2014-12-25", "DAILY"
+        }, //
+        new String[] {
+            "2014-12-25", "2014-12-26", "DAILY"
+        }, //
+        new String[] {
+            "2014-12-26", "2014-12-27", "DAILY"
+        }, //
+        new String[] {
+            "2014-12-27", "2014-12-28", "DAILY"
+        }, //
+        new String[] {
+            "2014-12-28", "2014-12-29", "DAILY"
+        }, //
+        new String[] {
+            "2014-12-29", "2014-12-30", "DAILY"
+        }, //
+        new String[] {
+            "2014-12-30", "2014-12-31", "DAILY"
+        }, //
+        new String[] {
+            "2015-01-01", "2015-01-02", "DAILY"
+        }, //
+        new String[] {
+            "2015-01-02", "2015-01-03", "DAILY"
+        }, //
+        new String[] {
+            "2015-01-03", "2015-01-04", "DAILY"
+        }, //
+        new String[] {
+            "2015-01-04", "2015-01-05", "DAILY"
+        }, //
+        new String[] {
+            "2015-01-05", "2015-01-06", "DAILY"
+        }, //
+        new String[] {
+            "2015-01-06", "2015-01-07", "DAILY"
+        }
+    //
+        // new String[]{"2015-01-07 00:00:00", "2015-01-07", "HOURLY"}, //
+
+        };
+    Map<UUID, IndexMetadata> treeMetadataMap = new HashMap<UUID, IndexMetadata>();
+    Map<UUID, Integer> treeIdToArrayIndexMapping = new HashMap<UUID, Integer>();
+
+    for (int i = 0; i < indexMetadataArray.length; i++) {
+      Long minDataTime = toMilliSecond(indexMetadataArray[i][0], indexMetadataArray[i][2]);
+      Long maxDataTime = toMilliSecond(indexMetadataArray[i][1], indexMetadataArray[i][2]);
+      Long startTime = toMilliSecond(indexMetadataArray[i][0], indexMetadataArray[i][2]);
+      Long endTime = toMilliSecond(indexMetadataArray[i][1], indexMetadataArray[i][2]);
+      String timeGranularity = indexMetadataArray[i][2];
+      IndexMetadata value =
+          new IndexMetadata(minDataTime, maxDataTime, startTime, endTime, timeGranularity);
+      UUID uuid = UUID.nameUUIDFromBytes(("" + i).getBytes());
+      System.out.println("Adding metadata for treeId:" + uuid
+          + Arrays.toString(indexMetadataArray[i]) + " metadata:" + value);
+      treeMetadataMap.put(uuid, value);
+      treeIdToArrayIndexMapping.put(uuid, i);
+    }
+    String queryStart = "2014-12-02";
+    String queryEnd = "2015-01-04";
+    TimeRange queryTimeRange =
+        new TimeRange(toMilliSecond(queryStart, "DAILY"), toMilliSecond(queryEnd, "DAILY"));
+    System.out.println(queryTimeRange);
+    List<UUID> treesToQuery = queryExecutor.selectTreesToQuery(treeMetadataMap, queryTimeRange);
+    System.out.println(treesToQuery);
+    System.out.println("The following tree's will be queried for query range " + (queryStart)
+        + " - " + queryEnd);
+    Assert.assertEquals(treesToQuery.size(), 4);
+    for (UUID treeId : treesToQuery) {
+      String[] metadataInfo = indexMetadataArray[treeIdToArrayIndexMapping.get(treeId)];
+      System.out.println(treeId + ":" + Arrays.toString(metadataInfo));
+    }
+    Assert.assertEquals(indexMetadataArray[treeIdToArrayIndexMapping.get(treesToQuery.get(0))],
+        new String[] {
+            "2014-12", "2015-01", "MONTHLY"
+        });
+    Assert.assertEquals(indexMetadataArray[treeIdToArrayIndexMapping.get(treesToQuery.get(1))],
+        new String[] {
+            "2015-01-01", "2015-01-02", "DAILY"
+        });
+    Assert.assertEquals(indexMetadataArray[treeIdToArrayIndexMapping.get(treesToQuery.get(2))],
+        new String[] {
+            "2015-01-02", "2015-01-03", "DAILY"
+        });
+    Assert.assertEquals(indexMetadataArray[treeIdToArrayIndexMapping.get(treesToQuery.get(3))],
+        new String[] {
+            "2015-01-03", "2015-01-04", "DAILY"
+        });
+
+  }
+  
+  private long toMilliSecond(String dateString, String granularity) throws Exception {
+    long ret;
+    if (granularity.equalsIgnoreCase("MONTHLY")) {
+      ret = new SimpleDateFormat("yyyy-MM").parse(dateString).getTime();
+    } else if (granularity.equalsIgnoreCase("DAILY")) {
+      ret = new SimpleDateFormat("yyyy-MM-dd").parse(dateString).getTime();
+    } else if (granularity.equalsIgnoreCase("HOURLY")) {
+      ret = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(dateString).getTime();
+    } else {
+      throw new Exception("Unsupported granularity: " + granularity);
+    }
+    System.out.println("Converted "+ dateString + " of granularity:"+ granularity + " to " + ret + " ms to timestamp:"+ new Timestamp(ret));
+    return ret;
+  }
   private void checkData(MetricTimeSeries timeSeries, long expectedValue) {
     for (Long time : timeSeries.getTimeWindowSet()) {
       for (int i = 0; i < timeSeries.getSchema().getNumMetrics(); i++) {

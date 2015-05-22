@@ -17,24 +17,16 @@ public class IndexMetadata {
 
   private String timeGranularity;
 
-  public IndexMetadata(Long minDataTime, Long maxDataTime) {
-    this.minDataTime = minDataTime;
-    this.maxDataTime = maxDataTime;
-  }
-
-  public IndexMetadata() {
-
-  }
-
-
-
   public IndexMetadata(Long minDataTime, Long maxDataTime, Long startTime, Long endTime, String timeGranularity) {
-    super();
     this.minDataTime = minDataTime;
     this.maxDataTime = maxDataTime;
     this.startTime = startTime;
     this.endTime = endTime;
     this.timeGranularity = timeGranularity;
+  }
+
+  public IndexMetadata() {
+
   }
 
   public Long getStartTime() {
@@ -109,6 +101,13 @@ public class IndexMetadata {
     indexMetadata.setTimeGranularity(timeGranularity);
     return indexMetadata;
 
+  }
+  
+  @Override
+  public String toString() {
+    return String.format(
+        "minDataTime:%s, maxDataTime:%s, startTime:%s, endTime:%s, timeGranularity:%s, ",
+        minDataTime, maxDataTime, startTime, endTime, timeGranularity);
   }
 
 }

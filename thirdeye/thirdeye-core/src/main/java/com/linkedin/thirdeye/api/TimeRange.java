@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.api;
 
 import java.io.Serializable;
+import java.sql.Timestamp;
 
 public class TimeRange implements Comparable<TimeRange>, Serializable
 {
@@ -78,10 +79,7 @@ public class TimeRange implements Comparable<TimeRange>, Serializable
   @Override
   public String toString()
   {
-    return start + ":" + end;
-  }
-
-  public boolean isWithIn(TimeRange timeRange) {
-    return this.start >=timeRange.start && this.end <= timeRange.end;
+    return "[" + start + " TO " + end + "]" + "[" + new Timestamp(start) + " TO "
+        + new Timestamp(end) + "]";
   }
 }
