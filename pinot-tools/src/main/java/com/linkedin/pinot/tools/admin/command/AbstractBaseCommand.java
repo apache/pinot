@@ -15,11 +15,20 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
+import java.net.URL;
+import java.net.URLConnection;
 
+import org.json.JSONException;
 import org.kohsuke.args4j.Option;
+
 
 /**
  * Super class for all the commands.
@@ -37,7 +46,8 @@ public class AbstractBaseCommand {
     });
   }
 
-  public void cleanup() { };
+  public void cleanup() {
+  };
 
   public String getName() {
     return "BaseCommand";
@@ -50,15 +60,14 @@ public class AbstractBaseCommand {
       if (f.isAnnotationPresent(Option.class)) {
         Option option = f.getAnnotation(Option.class);
 
-        System.out.println(String.format("\t%-15s %-15s: %s (reqiured=%s)", option.name(),
-            option.metaVar(), option.usage(), option.required()));
+        System.out.println(String.format("\t%-15s %-15s: %s (reqiured=%s)", option.name(), option.metaVar(),
+            option.usage(), option.required()));
       }
     }
   }
 
   public static int getPID() {
-    String processName =
-      java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+    String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
     return Integer.parseInt(processName.split("@")[0]);
   }
 
@@ -66,5 +75,27 @@ public class AbstractBaseCommand {
     FileWriter pidFile = new FileWriter(fileName);
     pidFile.write(getPID());
     pidFile.close();
+  }
+
+  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
+      IOException, JSONException {
+    final URL url = new URL(urlString);
+    final URLConnection conn = url.openConnection();
+
+    conn.setDoOutput(true);
+    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+
+    writer.write(payload, 0, payload.length());
+    writer.flush();
+
+    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+    final StringBuilder sb = new StringBuilder();
+    String line = null;
+
+    while ((line = reader.readLine()) != null) {
+      sb.append(line);
+    }
+
+    return sb.toString();
   }
 }
