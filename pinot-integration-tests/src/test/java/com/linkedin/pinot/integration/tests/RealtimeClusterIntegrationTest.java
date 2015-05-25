@@ -58,7 +58,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public static final int QUERY_COUNT = 1000;
   private KafkaServerStartable kafkaStarter;
 
-  protected void setUpTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     String brokerTenant = "realtimeBroker";
@@ -66,7 +66,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     createBrokerTenant(brokerTenant);
     createServerTenant(realtimeTenant, 0, 1);
     addSchema(schemaFile, schema.getSchemaName());
-    addRealtimeTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+    addRealtimeTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
         realtimeTenant, brokerTenant, avroFile);
   }
 
@@ -101,8 +101,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
         new File(OfflineClusterIntegrationTest.class.getClassLoader()
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
 
-    // Create Pinot resource
-    setUpTable("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+    // Create Pinot table
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
         schemaFile, avroFiles.get(0));
 
     // Load data into H2
@@ -120,7 +120,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'myresource'", "mytable");
+        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
       }
     });
 
@@ -144,7 +144,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
       Thread.sleep(5000L);
 
       // Run the query
-      JSONObject response = postQuery("select count(*) from 'myresource'");
+      JSONObject response = postQuery("select count(*) from 'mytable'");
       JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
       JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
       String pinotValue = firstAggregationResult.getString("value");
@@ -181,14 +181,14 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'myresource' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
 
   }
 

@@ -52,7 +52,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
-  private Map<String, TableDataManager> _resourceDataManagerMap = new HashMap<String, TableDataManager>();
+  private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<String, TableDataManager>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
   private final Object _globalLock = new Object();
@@ -105,8 +105,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void start() {
-    for (TableDataManager resourceDataManager : _resourceDataManagerMap.values()) {
-      resourceDataManager.start();
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      tableDataManager.start();
     }
 
     _isStarted = true;
@@ -116,10 +116,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private String getServerInfo() {
     StringBuilder sb = new StringBuilder();
     sb.append("\n[InstanceDataManager Info] : ");
-    for (String resourceName : _resourceDataManagerMap.keySet()) {
-      sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
+    for (String tableName : _tableDataManagerMap.keySet()) {
+      sb.append("\n\t{\n\t\tTable : [" + tableName + "];\n\t\tSegments : [");
       boolean isFirstSegment = true;
-      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+      for (SegmentDataManager segmentDataManager : _tableDataManagerMap.get(tableName).getAllSegments()) {
         if (isFirstSegment) {
           sb.append(segmentDataManager.getSegment().getSegmentName());
           isFirstSegment = false;
@@ -132,54 +132,30 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return sb.toString();
   }
 
-  /* private void bootstrapSegmentsFromLocal() throws Exception {
-     if (_instanceDataManagerConfig.getInstanceDataDir() != null) {
-       File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-       if (instanceDataDir.exists() && instanceDataDir.isDirectory()) {
-         for (File resourceDir : instanceDataDir.listFiles()) {
-           if (resourceDir.isDirectory()) {
-             LOGGER.info("Trying to bootstrap segment for resource: " + resourceDir.getName());
-             for (File segment : resourceDir.listFiles()) {
-               if (segment.isDirectory()) {
-                 LOGGER.info("Trying to bootstrap segment from directory : " + segment.getAbsolutePath());
-                 addSegment(_segmentMetadataLoader.load(segment));
-               }
-             }
-           }
-         }
-       } else {
-         LOGGER.info("Bootstrap segment directory : " + _instanceDataManagerConfig.getInstanceDataDir()
-             + " doesn't exist.");
-       }
-     } else {
-       LOGGER.info("Config of bootstrap segment directory hasn't been set.");
-     }
-   }*/
-
   @Override
   public boolean isStarted() {
     return _isStarted;
   }
 
-  public synchronized void addResourceDataManager(String resourceName, TableDataManager resourceDataManager) {
-    _resourceDataManagerMap.put(resourceName, resourceDataManager);
+  public synchronized void addTableDataManager(String tableName, TableDataManager tableDataManager) {
+    _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
-  public Collection<TableDataManager> getResourceDataManagers() {
-    return _resourceDataManagerMap.values();
+  public Collection<TableDataManager> getTableDataManagers() {
+    return _tableDataManagerMap.values();
   }
 
   @Override
-  public TableDataManager getResourceDataManager(String resourceName) {
-    return _resourceDataManagerMap.get(resourceName);
+  public TableDataManager getTableDataManager(String tableName) {
+    return _tableDataManagerMap.get(tableName);
   }
 
   @Override
   public synchronized void shutDown() {
 
     if (isStarted()) {
-      for (TableDataManager resourceDataManager : getResourceDataManagers()) {
-        resourceDataManager.shutDown();
+      for (TableDataManager tableDataManager : getTableDataManagers()) {
+        tableDataManager.shutDown();
       }
       _isStarted = false;
       LOGGER.info("InstanceDataManager is shutDown!");
@@ -190,102 +166,102 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
-    if (segmentMetadata == null || segmentMetadata.getResourceName() == null) {
+    if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
     LOGGER.info("Trying to add segment with name: " + segmentMetadata.getName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
-    String resourceName = segmentMetadata.getResourceName();
+    String tableName = segmentMetadata.getTableName();
     if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
-      resourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
+      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     } else {
-      resourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName);
+      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     }
-    if (!_resourceDataManagerMap.containsKey(resourceName)) {
-      LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
+    if (!_tableDataManagerMap.containsKey(tableName)) {
+      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
       synchronized (_globalLock) {
-        if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(null, resourceName);
+        if (!_tableDataManagerMap.containsKey(tableName)) {
+          addTableIfNeed(null, tableName);
         }
       }
     }
-    _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
+    _tableDataManagerMap.get(tableName).addSegment(segmentMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentMetadata.getName() + " in HelixInstanceDataManager");
   }
 
   @Override
   public synchronized void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception {
-    if (segmentZKMetadata == null || segmentZKMetadata.getResourceName() == null) {
+    if (segmentZKMetadata == null || segmentZKMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
     LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
-    String resourceName = segmentZKMetadata.getResourceName();
+    String tableName = segmentZKMetadata.getTableName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      resourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
+      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
-      resourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName);
+      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     }
-    if (!_resourceDataManagerMap.containsKey(resourceName)) {
-      LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
+    if (!_tableDataManagerMap.containsKey(tableName)) {
+      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
       synchronized (_globalLock) {
-        if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(null, resourceName);
+        if (!_tableDataManagerMap.containsKey(tableName)) {
+          addTableIfNeed(null, tableName);
         }
       }
     }
-    _resourceDataManagerMap.get(resourceName).addSegment(segmentZKMetadata);
+    _tableDataManagerMap.get(tableName).addSegment(segmentZKMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
   }
 
   @Override
   public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
-    if (segmentZKMetadata == null || segmentZKMetadata.getResourceName() == null) {
+    if (segmentZKMetadata == null || segmentZKMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
     LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
-    String resourceName = segmentZKMetadata.getResourceName();
+    String tableName = segmentZKMetadata.getTableName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      resourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
+      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
-      resourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName);
+      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     }
-    if (!_resourceDataManagerMap.containsKey(resourceName)) {
-      LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
+    if (!_tableDataManagerMap.containsKey(tableName)) {
+      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
       synchronized (_globalLock) {
-        if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(tableConfig, resourceName);
+        if (!_tableDataManagerMap.containsKey(tableName)) {
+          addTableIfNeed(tableConfig, tableName);
         }
       }
     }
-    _resourceDataManagerMap.get(resourceName).addSegment(propertyStore, tableConfig, instanceZKMetadata,
+    _tableDataManagerMap.get(tableName).addSegment(propertyStore, tableConfig, instanceZKMetadata,
         segmentZKMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
 
   }
 
-  public synchronized void addResourceIfNeed(AbstractTableConfig tableConfig, String resourceName)
+  public synchronized void addTableIfNeed(AbstractTableConfig tableConfig, String tableName)
       throws ConfigurationException {
-    TableDataManagerConfig resourceDataManagerConfig = getDefaultHelixResourceDataManagerConfig(resourceName);
+    TableDataManagerConfig tableDataManagerConfig = getDefaultHelixTableDataManagerConfig(tableName);
     if (tableConfig != null) {
-      resourceDataManagerConfig.overrideConfigs(tableConfig);
+      tableDataManagerConfig.overrideConfigs(tableConfig);
     }
-    TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
-    resourceDataManager.start();
-    addResourceDataManager(resourceName, resourceDataManager);
+    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
+    tableDataManager.start();
+    addTableDataManager(tableName, tableDataManager);
   }
 
-  private TableDataManagerConfig getDefaultHelixResourceDataManagerConfig(String resourceName)
+  private TableDataManagerConfig getDefaultHelixTableDataManagerConfig(String tableName)
       throws ConfigurationException {
-    return TableDataManagerConfig.getDefaultHelixResourceDataManagerConfig(_instanceDataManagerConfig, resourceName);
+    return TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableName);
   }
 
   @Override
   public synchronized void removeSegment(String segmentName) {
-    for (TableDataManager resourceDataManager : _resourceDataManagerMap.values()) {
-      resourceDataManager.removeSegment(segmentName);
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      tableDataManager.removeSegment(segmentName);
     }
   }
 
@@ -310,10 +286,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public SegmentMetadata getSegmentMetadata(String resource, String segmentName) {
-    if (_resourceDataManagerMap.containsKey(resource)) {
-      if (_resourceDataManagerMap.get(resource).getSegment(segmentName) != null) {
-        return _resourceDataManagerMap.get(resource).getSegment(segmentName).getSegment().getSegmentMetadata();
+  public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
+    if (_tableDataManagerMap.containsKey(table)) {
+      if (_tableDataManagerMap.get(table).getSegment(segmentName) != null) {
+        return _tableDataManagerMap.get(table).getSegment(segmentName).getSegment().getSegmentMetadata();
       }
     }
     return null;

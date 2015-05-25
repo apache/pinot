@@ -37,7 +37,7 @@ public class KafkaSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public String getResourceName() {
+  public String getTableName() {
     return null;
   }
 

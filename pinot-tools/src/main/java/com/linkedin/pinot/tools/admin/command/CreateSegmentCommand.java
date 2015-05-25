@@ -54,8 +54,8 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Option(name = "-recordReaderConfigFile", required = false, metaVar = "<string>", usage = "Config file for record readers")
   private String _recordReaderConfigFile;
 
-  @Option(name = "-resourceName", required = true, metaVar = "<string>", usage = "Name of the resource.")
-  private String _resourceName;
+  @Option(name = "-tableName", required = true, metaVar = "<string>", usage = "Name of the table.")
+  private String _tableName;
 
   @Option(name = "-segmentName", required = true, metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
@@ -86,8 +86,8 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     return this;
   }
 
-  public CreateSegmentCommand setResourceName(String resourceName) {
-    _resourceName = resourceName;
+  public CreateSegmentCommand setTableName(String tableName) {
+    _tableName = tableName;
     return this;
   }
 
@@ -109,7 +109,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Override
   public String toString() {
     return ("CreateSegmentCommand -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
-        " -resourceName " + _resourceName + " -segmentName " +
+        " -tableName " + _tableName + " -segmentName " +
         _segmentName + " -outDir " + _outDir);
   }
 
@@ -185,7 +185,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
             config.setSegmentVersion(SegmentVersion.v1);
 
             config.setIndexOutputDir(_outDir);
-            config.setResourceName(_resourceName);
+            config.setTableName(_tableName);
 
             config.setInputFilePath(file.getAbsolutePath());
             config.setSegmentName(_segmentName + "_" + segCnt);

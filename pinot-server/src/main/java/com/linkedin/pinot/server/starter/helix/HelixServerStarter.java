@@ -15,24 +15,14 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.List;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZKHelixDataAccessor;
-import org.apache.helix.manager.zk.ZKUtil;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
@@ -44,6 +34,7 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -127,9 +118,10 @@ public class HelixServerStarter {
     final Configuration configuration = new PropertiesConfiguration();
     final int port = 8003;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
+    long currentTimeMillis = System.currentTimeMillis();
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
     final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
+        new HelixServerStarter("pinotControllerV2", "localhost:2121", configuration);
   }
 }

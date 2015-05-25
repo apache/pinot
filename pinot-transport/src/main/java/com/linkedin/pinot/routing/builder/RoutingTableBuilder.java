@@ -37,9 +37,9 @@ public interface RoutingTableBuilder {
   void init(Configuration configuration);
 
   /**
-   * @param resourceName
+   * @param tableName
    * @param externalView
    * @return List of routing table used to
    */
-  List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String resourceName, ExternalView externalView);
+  List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView);
 }

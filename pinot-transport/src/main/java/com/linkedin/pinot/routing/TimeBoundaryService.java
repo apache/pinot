@@ -18,18 +18,18 @@ package com.linkedin.pinot.routing;
 public interface TimeBoundaryService {
 
   /**
-   * For a given federated resource name, return its time boundary info.
+   * For a given federated table name, return its time boundary info.
    *
-   * @param resource
+   * @param table
    * @return
    */
-  TimeBoundaryInfo getTimeBoundaryInfoFor(String resource);
+  TimeBoundaryInfo getTimeBoundaryInfoFor(String table);
 
   /**
-   * Remove a resource from TimeBoundaryService
-   * @param resourceName
+   * Remove a table from TimeBoundaryService
+   * @param tableName
    */
-  void remove(String resourceName);
+  void remove(String tableName);
 
   public class TimeBoundaryInfo {
     private String _timeColumn;

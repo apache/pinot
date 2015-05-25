@@ -186,7 +186,7 @@ public class HelixBrokerStarter {
     configuration.addProperty("pinot.broker.time.out", 500 * 1000L);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
+        new HelixBrokerStarter("pinotControllerV2", "localhost:2121", configuration);
     Thread.sleep(1000);
   }
 }

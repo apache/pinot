@@ -62,25 +62,9 @@ public class CommonConstants {
         .newHashSet(BROKER_RESOURCE_INSTANCE));
 
     public static class DataSource {
-      public static final String RESOURCE_NAME = "resourceName";
-      public static final String RESOURCE_TYPE = "resourceType";
-      public static final String TIME_COLUMN_NAME = "timeColumnName";
-      public static final String TIME_TYPE = "timeType";
-      public static final String NUMBER_OF_DATA_INSTANCES = "numberOfDataInstances";
-      public static final String NUMBER_OF_COPIES = "numberOfCopies";
-      public static final String RETENTION_TIME_UNIT = "retentionTimeUnit";
-      public static final String RETENTION_TIME_VALUE = "retentionTimeValue";
-      public static final String PUSH_FREQUENCY = "pushFrequency";
-      public static final String SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
-      public static final String BROKER_TAG_NAME = "brokerTagName";
-      public static final String SERVER_TENANT = "serverTenant";
-      public static final String NUMBER_OF_BROKER_INSTANCES = "numberOfBrokerInstances";
-      public static final String REQUEST_TYPE = "requestType";
-      public static final String METADATA = "metadata";
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
       public static final String STREAM_PREFIX = "stream";
-      public static final String SORTED_COLUMN_LIST = "sortedColumnList";
 
       public static enum SegmentAssignmentStrategy {
         RandomAssignmentStrategy,
@@ -134,14 +118,6 @@ public class CommonConstants {
 
     }
 
-    public static class DataSourceRequestType {
-      public static final String CREATE = "create";
-      public static final String UPDATE_DATA_RESOURCE = "updateDataResource";
-      public static final String EXPAND_DATA_RESOURCE = "expandDataResource";
-      public static final String UPDATE_DATA_RESOURCE_CONFIG = "updateDataResourceConfig";
-      public static final String UPDATE_BROKER_RESOURCE = "updateBrokerResource";
-    }
-
     public static class Instance {
       public static final String INSTANCE_NAME = "instance.name";
       public static final String GROUP_ID_SUFFIX = "kafka.hlc.groupId";
@@ -161,8 +137,6 @@ public class CommonConstants {
       }
     }
 
-    public static final String KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
-    public static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
     public static final int DEFAULT_SERVER_NETTY_PORT = 8098;
     public static final String KEY_OF_BROKER_QUERY_PORT = "pinot.broker.client.queryPort";
@@ -228,7 +202,7 @@ public class CommonConstants {
     }
 
     public static final String SEGMENT_NAME = "segment.name";
-    public static final String RESOURCE_NAME = "segment.resource.name";
+    public static final String TABLE_NAME = "segment.table.name";
     public static final String SEGMENT_TYPE = "segment.type";
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String START_TIME = "segment.start.time";

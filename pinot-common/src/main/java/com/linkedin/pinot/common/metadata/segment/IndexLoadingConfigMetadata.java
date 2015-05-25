@@ -32,8 +32,8 @@ public class IndexLoadingConfigMetadata {
   private final static String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
 
-  public IndexLoadingConfigMetadata(Configuration resourceDataManagerConfig) {
-    List<String> valueOfLoadingInvertedIndexConfig = resourceDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
+  public IndexLoadingConfigMetadata(Configuration tableDataManagerConfig) {
+    List<String> valueOfLoadingInvertedIndexConfig = tableDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
     if ((valueOfLoadingInvertedIndexConfig != null) && (!valueOfLoadingInvertedIndexConfig.isEmpty())) {
       initLoadingInvertedIndexColumnSet(valueOfLoadingInvertedIndexConfig.toArray(new String[0]));
     }

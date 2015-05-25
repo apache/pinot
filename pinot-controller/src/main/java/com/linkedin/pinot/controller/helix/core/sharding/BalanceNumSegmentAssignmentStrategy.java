@@ -49,10 +49,10 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
     String serverTenantName;
     String tableName;
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
+      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
     } else {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
+      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
     }
 
@@ -89,7 +89,7 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
       selectedInstances.add(priorityQueue.poll().getB());
     }
     LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getResourceName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
+        + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
     return selectedInstances;
   }
 }

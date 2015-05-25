@@ -74,7 +74,7 @@ public class InstanceServerStarter {
   private static void sendQueryToQueryExecutor(BrokerRequest brokerRequest, QueryExecutor queryExecutor) {
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {

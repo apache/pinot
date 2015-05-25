@@ -20,8 +20,6 @@ import java.io.File;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -34,18 +32,18 @@ public class RealtimeSegmentConverter {
   private RealtimeSegmentImpl realtimeSegmentImpl;
   private String outputPath;
   private Schema dataSchema;
-  private String resourceName;
+  private String tableName;
   private String segmentName;
   private String sortedColumn;
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String resourceName, String segmentName, String sortedColumn) {
+      String tableName, String segmentName, String sortedColumn) {
     realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists");
     }
-    this.resourceName = resourceName;
+    this.tableName = tableName;
     this.segmentName = segmentName;
     TimeFieldSpec original = schema.getTimeSpec();
     TimeGranularitySpec incoming = original.getIncomingGranularitySpec();
@@ -82,7 +80,7 @@ public class RealtimeSegmentConverter {
 
     genConfig.setTimeUnitForSegment(dataSchema.getTimeSpec().getOutgoingGranularitySpec().getTimeType());
     genConfig.setSegmentVersion(SegmentVersion.v1);
-    genConfig.setResourceName(resourceName);
+    genConfig.setTableName(tableName);
     genConfig.setIndexOutputDir(outputPath);
     genConfig.setSegmentName(segmentName);
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

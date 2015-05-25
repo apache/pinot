@@ -18,8 +18,6 @@ package com.linkedin.pinot.controller.helix.core.util;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -27,11 +25,10 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 
 
 public class ZKMetadataUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataUtils.class);
 
   public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata, SegmentMetadata segmentMetadata) {
     offlineSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
-    offlineSegmentZKMetadata.setResourceName(segmentMetadata.getResourceName());
+    offlineSegmentZKMetadata.setTableName(segmentMetadata.getTableName());
     offlineSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
     offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
 

@@ -99,8 +99,8 @@ public class QueriesSentinelTest {
     File segmentFile = new File(INDEX_DIR, "segment").listFiles()[0];
     segmentName = segmentFile.getName();
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
-    instanceDataManager.getResourceDataManager("mirror");
-    instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
+    instanceDataManager.getTableDataManager("mirror");
+    instanceDataManager.getTableDataManager("mirror").addSegment(indexSegment);
 
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
     QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
@@ -208,7 +208,7 @@ public class QueriesSentinelTest {
     }
   }
 
-  private void setUpTestQueries(String resource) throws FileNotFoundException, IOException {
+  private void setUpTestQueries(String table) throws FileNotFoundException, IOException {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
@@ -233,12 +233,12 @@ public class QueriesSentinelTest {
     mets.add("count");
 
     final String time = "minutesSinceEpoch";
-    AVRO_QUERY_GENERATOR = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource);
+    AVRO_QUERY_GENERATOR = new AvroQueryGenerator(new File(filePath), dims, mets, time, table);
     AVRO_QUERY_GENERATOR.init();
     AVRO_QUERY_GENERATOR.generateSimpleAggregationOnSingleColumnFilters();
   }
 
-  private void setupSegmentFor(String resource) throws Exception {
+  private void setupSegmentFor(String table) throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
     if (INDEX_DIR.exists()) {
@@ -248,7 +248,7 @@ public class QueriesSentinelTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
-            "segment"), "daysSinceEpoch", TimeUnit.DAYS, resource);
+            "segment"), "daysSinceEpoch", TimeUnit.DAYS, table);
 
     final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 

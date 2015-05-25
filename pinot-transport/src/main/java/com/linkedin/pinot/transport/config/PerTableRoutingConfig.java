@@ -40,19 +40,19 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  * @author bvaradar
  *
  */
-public class ResourceRoutingConfig {
+public class PerTableRoutingConfig {
   // Keys to load config
   private static final String NUM_NODES_PER_REPLICA = "numNodesPerReplica";
   private static final String SERVERS_FOR_NODE = "serversForNode";
   private static final String DEFAULT_SERVERS_FOR_NODE = "default";
 
-  private final Configuration _resourceCfg;
+  private final Configuration _tableCfg;
   private int _numNodes;
   private List<ServerInstance> _defaultServers;
   private final Map<Integer, List<ServerInstance>> _nodeToInstancesMap;
 
-  public ResourceRoutingConfig(Configuration cfg) {
-    _resourceCfg = cfg;
+  public PerTableRoutingConfig(Configuration cfg) {
+    _tableCfg = cfg;
     _nodeToInstancesMap = new HashMap<Integer, List<ServerInstance>>();
     _defaultServers = new ArrayList<ServerInstance>();
     loadConfig();
@@ -61,15 +61,15 @@ public class ResourceRoutingConfig {
   @SuppressWarnings("unchecked")
   private void loadConfig() {
 
-    if (null == _resourceCfg) {
+    if (null == _tableCfg) {
       return;
     }
 
     _nodeToInstancesMap.clear();
 
-    _numNodes = _resourceCfg.getInt(NUM_NODES_PER_REPLICA);
+    _numNodes = _tableCfg.getInt(NUM_NODES_PER_REPLICA);
     for (int i = 0; i < _numNodes; i++) {
-      List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, i + ""));
+      List<String> servers = _tableCfg.getList(getKey(SERVERS_FOR_NODE, i + ""));
 
       if ((null != servers) && (!servers.isEmpty())) {
         List<ServerInstance> servers2 = getServerInstances(servers);
@@ -77,7 +77,7 @@ public class ResourceRoutingConfig {
       }
     }
 
-    List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, DEFAULT_SERVERS_FOR_NODE));
+    List<String> servers = _tableCfg.getList(getKey(SERVERS_FOR_NODE, DEFAULT_SERVERS_FOR_NODE));
     if ((null != servers) && (!servers.isEmpty())) {
       _defaultServers = getServerInstances(servers);
     }
@@ -167,7 +167,7 @@ public class ResourceRoutingConfig {
 
   @Override
   public String toString() {
-    return "ResourceRoutingConfig [_resourceCfg=" + _resourceCfg + ", _numNodes=" + _numNodes + ", _defaultServers="
+    return "PerTableRoutingConfig [_tableCfg=" + _tableCfg + ", _numNodes=" + _numNodes + ", _defaultServers="
         + _defaultServers + ", _nodeToInstancesMap=" + _nodeToInstancesMap + "]";
   }
 }

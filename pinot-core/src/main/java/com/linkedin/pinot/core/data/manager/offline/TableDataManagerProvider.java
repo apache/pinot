@@ -37,20 +37,20 @@ public class TableDataManagerProvider {
     keyToFunction.put("realtime", RealtimeTableDataManager.class);
   }
 
-  public static TableDataManager getResourceDataManager(TableDataManagerConfig resourceDataManagerConfig) {
+  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig) {
     try {
       Class<? extends TableDataManager> cls =
-          keyToFunction.get(resourceDataManagerConfig.getResourceDataManagerType().toLowerCase());
+          keyToFunction.get(tableDataManagerConfig.getTableDataManagerType().toLowerCase());
       if (cls != null) {
-        TableDataManager resourceDataManager = (TableDataManager) cls.newInstance();
-        resourceDataManager.init(resourceDataManagerConfig);
-        return resourceDataManager;
+        TableDataManager tableDataManager = (TableDataManager) cls.newInstance();
+        tableDataManager.init(tableDataManagerConfig);
+        return tableDataManager;
       } else {
-        throw new UnsupportedOperationException("No ResourceDataManager type found.");
+        throw new UnsupportedOperationException("No tableDataManager type found.");
       }
     } catch (Exception ex) {
-      throw new RuntimeException("Not support ResourceDataManager type with - "
-          + resourceDataManagerConfig.getResourceDataManagerType());
+      throw new RuntimeException("Not support tableDataManager type with - "
+          + tableDataManagerConfig.getTableDataManagerType());
     }
   }
 

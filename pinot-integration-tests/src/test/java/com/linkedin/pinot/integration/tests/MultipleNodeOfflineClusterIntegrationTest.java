@@ -39,7 +39,7 @@ public class MultipleNodeOfflineClusterIntegrationTest extends OfflineClusterInt
   }
 
   @Override
-  protected void createResource() throws Exception {
+  protected void createTable() throws Exception {
     File schemaFile =
         new File(OfflineClusterIntegrationTest.class.getClassLoader()
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());

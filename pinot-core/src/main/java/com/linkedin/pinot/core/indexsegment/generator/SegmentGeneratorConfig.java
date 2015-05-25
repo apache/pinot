@@ -118,12 +118,12 @@ public class SegmentGeneratorConfig {
     return properties.get(key).toString();
   }
 
-  public void setResourceName(String resourceName) {
-    properties.put(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
+  public void setTableName(String resourceName) {
+    properties.put(MetadataKeys.Segment.TABLE_NAME, resourceName);
   }
 
-  public String getResourceName() {
-    return properties.get(MetadataKeys.Segment.RESOURCE_NAME).toString();
+  public String getTableName() {
+    return properties.get(MetadataKeys.Segment.TABLE_NAME).toString();
   }
 
   public String getDimensions() {

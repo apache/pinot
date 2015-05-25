@@ -35,7 +35,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private static final String NULL = "null";
 
   private String _segmentName = null;
-  private String _resourceName = null;
+  private String _tableName = null;
   private SegmentType _segmentType = null;
   private long _startTime = -1;
   private long _endTime = -1;
@@ -50,7 +50,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   public SegmentZKMetadata(ZNRecord znRecord) {
     _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
-    _resourceName = znRecord.getSimpleField(CommonConstants.Segment.RESOURCE_NAME);
+    _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
@@ -72,12 +72,12 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentName = segmentName;
   }
 
-  public String getResourceName() {
-    return _resourceName;
+  public String getTableName() {
+    return _tableName;
   }
 
-  public void setResourceName(String resourceName) {
-    _resourceName = resourceName;
+  public void setTableName(String tableName) {
+    _tableName = tableName;
   }
 
   public long getStartTime() {
@@ -156,7 +156,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
     SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
     return isEqual(_segmentName, metadata._segmentName) &&
-        isEqual(_resourceName, metadata._resourceName) &&
+        isEqual(_tableName, metadata._tableName) &&
         isEqual(_indexVersion, metadata._indexVersion) &&
         isEqual(_timeUnit, metadata._timeUnit) &&
         isEqual(_startTime, metadata._startTime) &&
@@ -170,7 +170,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   @Override
   public int hashCode() {
     int result = hashCodeOf(_segmentName);
-    result = hashCodeOf(result, _resourceName);
+    result = hashCodeOf(result, _tableName);
     result = hashCodeOf(result, _segmentType);
     result = hashCodeOf(result, _startTime);
     result = hashCodeOf(result, _endTime);
@@ -186,7 +186,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
-    znRecord.setSimpleField(CommonConstants.Segment.RESOURCE_NAME, _resourceName);
+    znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
     znRecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, _segmentType);
     if (_timeUnit == null) {
       znRecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, NULL);
@@ -206,7 +206,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   public Map<String, String> toMap() {
     Map<String, String> configMap = new HashMap<String, String>();
     configMap.put(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
-    configMap.put(CommonConstants.Segment.RESOURCE_NAME, _resourceName);
+    configMap.put(CommonConstants.Segment.TABLE_NAME, _tableName);
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, _segmentType.toString());
     if (_timeUnit == null) {
       configMap.put(CommonConstants.Segment.TIME_UNIT, null);

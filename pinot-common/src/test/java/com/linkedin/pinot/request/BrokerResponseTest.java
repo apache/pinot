@@ -43,7 +43,7 @@ public class BrokerResponseTest {
     System.out.println(newBrokerResponse);
     System.out.println(newBrokerResponse.getExceptions().get(0));
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No resource hit!");
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No table hit!");
   }
 
   @Test
@@ -58,7 +58,7 @@ public class BrokerResponseTest {
     System.out.println(newBrokerResponse);
     System.out.println(newBrokerResponse.getExceptions().get(0));
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No resource hit!");
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No table hit!");
     System.out.println(newBrokerResponse.getExceptions().get(1));
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);

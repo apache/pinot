@@ -31,7 +31,7 @@ struct QueryType {
  * Query source
  **/
 struct QuerySource {
-  1: optional string resourceName;
+  1: optional string tableName;
 }
 
 /**

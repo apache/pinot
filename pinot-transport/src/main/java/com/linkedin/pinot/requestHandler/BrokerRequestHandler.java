@@ -111,58 +111,58 @@ public class BrokerRequestHandler {
   //TODO: Define a broker response class and return
   public Object processBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
       throws InterruptedException {
-    if (request == null || request.getQuerySource() == null || request.getQuerySource().getResourceName() == null) {
-      LOGGER.info("Query contains null resource.");
+    if (request == null || request.getQuerySource() == null || request.getQuerySource().getTableName() == null) {
+      LOGGER.info("Query contains null table.");
       return BrokerResponse.getNullBrokerResponse();
     }
-    List<String> matchedResources = getMatchedResources(request);
-    if (matchedResources.size() > 1) {
+    List<String> matchedTables = getMatchedTables(request);
+    if (matchedTables.size() > 1) {
       return processFederatedBrokerRequest(request, overriddenSelection);
     }
-    if (matchedResources.size() == 1) {
-      return processSingleResourceBrokerRequest(request, matchedResources.get(0), overriddenSelection);
+    if (matchedTables.size() == 1) {
+      return processSingleTableBrokerRequest(request, matchedTables.get(0), overriddenSelection);
     }
     return BrokerResponse.getNullBrokerResponse();
   }
 
   /**
-   * Given a request, will look up routing table to see how many resources are matched there.
+   * Given a request, will look up routing table to see how many tables are matched there.
    *
    * @param request
    * @return
    */
-  private List<String> getMatchedResources(BrokerRequest request) {
-    List<String> matchedResources = new ArrayList<String>();
-    String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getResourceName());
+  private List<String> getMatchedTables(BrokerRequest request) {
+    List<String> matchedTables = new ArrayList<String>();
+    String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getTableName());
     if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
-      matchedResources.add(tableName);
+      matchedTables.add(tableName);
     }
-    tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getResourceName());
+    tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(request.getQuerySource().getTableName());
     if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
-      matchedResources.add(tableName);
+      matchedTables.add(tableName);
     }
     // For backward compatible
-    if (matchedResources.isEmpty()) {
-      tableName = request.getQuerySource().getResourceName();
+    if (matchedTables.isEmpty()) {
+      tableName = request.getQuerySource().getTableName();
       if (_routingTable.findServers(new RoutingTableLookupRequest(tableName)) != null) {
-        matchedResources.add(tableName);
+        matchedTables.add(tableName);
       }
     }
-    return matchedResources;
+    return matchedTables;
   }
 
-  private Object processSingleResourceBrokerRequest(final BrokerRequest request, String matchedResourceName,
+  private Object processSingleTableBrokerRequest(final BrokerRequest request, String matchedTableName,
       BucketingSelection overriddenSelection) throws InterruptedException {
-    request.getQuerySource().setResourceName(matchedResourceName);
+    request.getQuerySource().setTableName(matchedTableName);
     return getDataTableFromBrokerRequest(request, null);
   }
 
   private Object processFederatedBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection) {
-    List<BrokerRequest> perResourceRequests = new ArrayList<BrokerRequest>();
-    perResourceRequests.add(getRealtimeBrokerRequest(request));
-    perResourceRequests.add(getOfflineBrokerRequest(request));
+    List<BrokerRequest> perTableRequests = new ArrayList<BrokerRequest>();
+    perTableRequests.add(getRealtimeBrokerRequest(request));
+    perTableRequests.add(getOfflineBrokerRequest(request));
     try {
-      return getDataTableFromBrokerRequestList(request, perResourceRequests, null);
+      return getDataTableFromBrokerRequestList(request, perTableRequests, null);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing federated broker request", e);
       Utils.rethrowException(e);
@@ -172,26 +172,26 @@ public class BrokerRequestHandler {
 
   private BrokerRequest getOfflineBrokerRequest(BrokerRequest request) {
     BrokerRequest offlineRequest = request.deepCopy();
-    String hybridResourceName = request.getQuerySource().getResourceName();
-    String offlineResourceName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridResourceName);
-    offlineRequest.getQuerySource().setResourceName(offlineResourceName);
-    attachTimeBoundary(hybridResourceName, offlineRequest, true);
+    String hybridTableName = request.getQuerySource().getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName);
+    offlineRequest.getQuerySource().setTableName(offlineTableName);
+    attachTimeBoundary(hybridTableName, offlineRequest, true);
     return offlineRequest;
   }
 
   private BrokerRequest getRealtimeBrokerRequest(BrokerRequest request) {
     BrokerRequest realtimeRequest = request.deepCopy();
-    String hybridResourceName = request.getQuerySource().getResourceName();
-    String realtimeResourceName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridResourceName);
-    realtimeRequest.getQuerySource().setResourceName(realtimeResourceName);
-    attachTimeBoundary(hybridResourceName, realtimeRequest, false);
+    String hybridTableName = request.getQuerySource().getTableName();
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridTableName);
+    realtimeRequest.getQuerySource().setTableName(realtimeTableName);
+    attachTimeBoundary(hybridTableName, realtimeRequest, false);
     return realtimeRequest;
   }
 
-  private void attachTimeBoundary(String hybridResourceName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
+  private void attachTimeBoundary(String hybridTableName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
     TimeBoundaryInfo timeBoundaryInfo =
         _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER
-            .forTable(hybridResourceName));
+            .forTable(hybridTableName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null || timeBoundaryInfo.getTimeValue() == null) {
       return;
     }
@@ -234,7 +234,7 @@ public class BrokerRequestHandler {
       throws InterruptedException {
     // Step1
     final long routingStartTime = System.nanoTime();
-    RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
+    RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName());
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null || segmentServices.isEmpty()) {
       LOGGER.debug("Not found ServerInstances to Segments Mapping:");
@@ -328,13 +328,13 @@ public class BrokerRequestHandler {
         new HashMap<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>>();
     for (BrokerRequest request : requests) {
       final long routingStartTime = System.nanoTime();
-      RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
+      RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName());
       Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
       if (segmentServices == null || segmentServices.isEmpty()) {
-        LOGGER.info("Not found ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
+        LOGGER.info("Not found ServerInstances to Segments Mapping for Table - " + rtRequest.getTableName());
         continue;
       }
-      LOGGER.debug("Find ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
+      LOGGER.debug("Find ServerInstances to Segments Mapping for table - " + rtRequest.getTableName());
       for (ServerInstance serverInstance : segmentServices.keySet()) {
         LOGGER.debug(serverInstance + " : " + segmentServices.get(serverInstance));
       }

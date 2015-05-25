@@ -19,7 +19,7 @@ import java.util.Map;
 
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.config.ResourceRoutingConfig;
+import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +40,10 @@ public class CfgBasedRouting implements RoutingTable {
   @Override
   public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
 
-    ResourceRoutingConfig cfg = _cfg.getResourceRoutingCfg().get(request.getResourceName());
+    PerTableRoutingConfig cfg = _cfg.getPerTableRoutingCfg().get(request.getTableName());
 
     if (null == cfg) {
-      LOGGER.warn("Unable to find routing setting for resource :" + request.getResourceName());
+      LOGGER.warn("Unable to find routing setting for table :" + request.getTableName());
       return null;
     }
 

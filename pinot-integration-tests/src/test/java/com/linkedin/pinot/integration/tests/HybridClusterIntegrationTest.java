@@ -81,7 +81,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     return "HybridClusterIntegrationTest";
   }
 
-  protected void setUpTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     String brokerTenant = "hybridBroker";
@@ -89,7 +89,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     createBrokerTenant(brokerTenant);
     createServerTenant(realtimeTenant, 1, 1);
     addSchema(schemaFile, schema.getSchemaName());
-    addHybridTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
         realtimeTenant, brokerTenant, avroFile);
   }
 
@@ -133,8 +133,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
         new File(OfflineClusterIntegrationTest.class.getClassLoader()
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
 
-    // Create Pinot resource
-    setUpTable("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+    // Create Pinot table
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
         schemaFile, avroFiles.get(0));
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
@@ -160,13 +160,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "myresource");
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable");
 
     // Initialize query generator
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'myresource'", "mytable");
+        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
       }
     });
 
@@ -183,7 +183,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
-          if (externalView.getId().contains("myresource")) {
+          if (externalView.getId().contains("mytable")) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
             if (partitionSet.size() == OFFLINE_SEGMENT_COUNT) {
@@ -197,7 +197,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
               }
 
               if (onlinePartitionCount == OFFLINE_SEGMENT_COUNT) {
-                System.out.println("Got " + OFFLINE_SEGMENT_COUNT + " online resources, unlatching the main thread");
+                System.out.println("Got " + OFFLINE_SEGMENT_COUNT + " online tables, unlatching the main thread");
                 latch.countDown();
               }
             }
@@ -211,7 +211,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     for (String segmentName : _tarDir.list()) {
       System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
-      FileUploadUtils.sendFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
     }
 
     // Wait for all offline segments to be online
@@ -228,7 +228,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       Thread.sleep(5000L);
 
       // Run the query
-      JSONObject response = postQuery("select count(*) from 'myresource'");
+      JSONObject response = postQuery("select count(*) from 'mytable'");
       JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
       JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
       String pinotValue = firstAggregationResult.getString("value");
@@ -273,14 +273,14 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'myresource' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
   }
 
   @Override

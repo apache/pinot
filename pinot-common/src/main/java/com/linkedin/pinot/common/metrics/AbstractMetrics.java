@@ -82,7 +82,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @return The complete metric name
    */
   private String buildMetricName(BrokerRequest request, String metricName) {
-    return _metricPrefix + request.getQuerySource().getResourceName() + "." + metricName;
+    return _metricPrefix + request.getQuerySource().getTableName() + "." + metricName;
   }
 
   /**

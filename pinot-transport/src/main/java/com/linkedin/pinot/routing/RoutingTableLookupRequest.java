@@ -23,14 +23,14 @@ package com.linkedin.pinot.routing;
  */
 public class RoutingTableLookupRequest {
 
-  private final String resourceName;
+  private final String tableName;
 
-  public String getResourceName() {
-    return resourceName;
+  public String getTableName() {
+    return tableName;
   }
 
-  public RoutingTableLookupRequest(String resourceName) {
+  public RoutingTableLookupRequest(String tableName) {
     super();
-    this.resourceName = resourceName;
+    this.tableName = tableName;
   }
 }

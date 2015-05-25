@@ -45,31 +45,31 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
   public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
-  // Key of resource names that will be holding from initialization.
-  public static String INSTANCE_RESOURCE_NAME = "resourceName";
-  // Key of resource data directory
-  public static String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
-  // Key of resource data directory
-  public static String kEY_OF_RESOURCE_NAME = "name";
+  // Key of table names that will be holding from initialization.
+  public static String INSTANCE_TABLE_NAME = "tableName";
+  // Key of table data directory
+  public static String kEY_OF_TABLE_DATA_DIRECTORY = "directory";
+  // Key of table data directory
+  public static String kEY_OF_TABLE_NAME = "name";
   // Key of instance level segment read mode.
   public static String READ_MODE = "readMode";
 
-  private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
+  private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_TABLE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
-  private Map<String, TableDataManagerConfig> _resourceDataManagerConfigMap =
+  private Map<String, TableDataManagerConfig> _tableDataManagerConfigMap =
       new HashMap<String, TableDataManagerConfig>();
 
   public FileBasedInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
     checkRequiredKeys();
-    for (String resourceName : getResourceNames()) {
-      Configuration resourceConfig = _instanceDataManagerConfiguration.subset(resourceName);
-      resourceConfig.addProperty(kEY_OF_RESOURCE_NAME, resourceName);
-      if (!resourceConfig.containsKey(kEY_OF_RESOURCE_DATA_DIRECTORY)) {
-        resourceConfig.addProperty(kEY_OF_RESOURCE_DATA_DIRECTORY, getInstanceDataDir() + "/" + resourceName
+    for (String tableName : getTableNames()) {
+      Configuration tableConfig = _instanceDataManagerConfiguration.subset(tableName);
+      tableConfig.addProperty(kEY_OF_TABLE_NAME, tableName);
+      if (!tableConfig.containsKey(kEY_OF_TABLE_DATA_DIRECTORY)) {
+        tableConfig.addProperty(kEY_OF_TABLE_DATA_DIRECTORY, getInstanceDataDir() + "/" + tableName
             + "/index/node" + getInstanceId());
       }
-      _resourceDataManagerConfigMap.put(resourceName, new TableDataManagerConfig(resourceConfig));
+      _tableDataManagerConfigMap.put(tableName, new TableDataManagerConfig(tableConfig));
     }
   }
 
@@ -102,12 +102,12 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   }
 
   @SuppressWarnings("unchecked")
-  public List<String> getResourceNames() {
-    return _instanceDataManagerConfiguration.getList(INSTANCE_RESOURCE_NAME);
+  public List<String> getTableNames() {
+    return _instanceDataManagerConfiguration.getList(INSTANCE_TABLE_NAME);
   }
 
-  public TableDataManagerConfig getResourceDataManagerConfig(String resourceName) {
-    return _resourceDataManagerConfigMap.get(resourceName);
+  public TableDataManagerConfig getTableDataManagerConfig(String tableName) {
+    return _tableDataManagerConfigMap.get(tableName);
   }
 
   public String getSegmentMetadataLoaderClass() {

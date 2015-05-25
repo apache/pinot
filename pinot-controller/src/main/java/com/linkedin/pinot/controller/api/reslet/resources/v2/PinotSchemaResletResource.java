@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -68,7 +67,7 @@ public class PinotSchemaResletResource extends ServerResource {
         return new StringRepresentation(ret.toString());
       }
     } catch (Exception e) {
-      return PinotFileUpload.exceptionToStringRepresentation(e);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -114,7 +113,7 @@ public class PinotSchemaResletResource extends ServerResource {
           rep = new StringRepresentation(dataFile + " sucessfully added", MediaType.TEXT_PLAIN);
         } catch (Exception e) {
           LOGGER.error("error adding schema ", e);
-          rep = PinotFileUpload.exceptionToStringRepresentation(e);
+          rep = PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
           LOGGER.error("Caught exception in file upload", e);
           setStatus(Status.SERVER_ERROR_INTERNAL);
         }
@@ -125,7 +124,7 @@ public class PinotSchemaResletResource extends ServerResource {
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
-      rep = PinotFileUpload.exceptionToStringRepresentation(e);
+      rep = PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception in file upload", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }

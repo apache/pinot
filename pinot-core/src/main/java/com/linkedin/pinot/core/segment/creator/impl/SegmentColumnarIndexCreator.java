@@ -29,7 +29,7 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DIMENSIONS;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.METRICS;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.RESOURCE_NAME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TABLE_NAME;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_NAME;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME;
@@ -184,7 +184,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     properties.setProperty(SEGMENT_NAME, segmentName);
-    properties.setProperty(RESOURCE_NAME, config.getResourceName());
+    properties.setProperty(TABLE_NAME, config.getTableName());
     properties.setProperty(DIMENSIONS, config.getDimensions());
     properties.setProperty(METRICS, config.getMetrics());
     properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());

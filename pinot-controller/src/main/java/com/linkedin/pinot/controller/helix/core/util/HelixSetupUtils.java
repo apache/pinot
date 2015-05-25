@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 
 
 /**
@@ -107,7 +107,7 @@ public class HelixSetupUtils {
     HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
         helixClusterName, admin);
     IdealState idealState =
-        PinotResourceIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
+        PinotTableIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
     admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
     LOGGER.info("New Cluster setup completed... ********************************************** ");
   }

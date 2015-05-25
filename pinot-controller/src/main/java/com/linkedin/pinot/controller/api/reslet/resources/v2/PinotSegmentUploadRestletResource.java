@@ -90,33 +90,33 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
   public Representation get() {
     Representation presentation = null;
     try {
-      final String resourceName = (String) getRequest().getAttributes().get("tableName");
+      final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
 
-      if ((resourceName == null) && (segmentName == null)) {
+      if ((tableName == null) && (segmentName == null)) {
         final JSONArray ret = new JSONArray();
         for (final File file : baseDataDir.listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/datafiles/"
+              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
                   + file.getName();
           ret.put(url);
         }
         presentation = new StringRepresentation(ret.toString());
         return presentation;
 
-      } else if ((resourceName != null) && (segmentName == null)) {
+      } else if ((tableName != null) && (segmentName == null)) {
         final JSONArray ret = new JSONArray();
-        for (final File file : new File(baseDataDir, resourceName).listFiles()) {
+        for (final File file : new File(baseDataDir, tableName).listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/datafiles/"
-                  + resourceName + "/" + file.getName();
+              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
+                  + tableName + "/" + file.getName();
           ret.put(url);
         }
         presentation = new StringRepresentation(ret.toString());
         return presentation;
       }
 
-      final File dataFile = new File(baseDataDir, StringUtil.join("/", resourceName, segmentName));
+      final File dataFile = new File(baseDataDir, StringUtil.join("/", tableName, segmentName));
       if (dataFile.exists()) {
         presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
         return presentation;
@@ -183,14 +183,14 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata = new SegmentMetadataImpl(tmpSegmentDir.listFiles()[0]);
-        final File resourceDir = new File(baseDataDir, metadata.getResourceName());
-        File segmentFile = new File(resourceDir, dataFile.getName());
+        final File tableDir = new File(baseDataDir, metadata.getTableName());
+        File segmentFile = new File(tableDir, dataFile.getName());
         if (segmentFile.exists()) {
           FileUtils.deleteQuietly(segmentFile);
         }
         FileUtils.moveFile(dataFile, segmentFile);
 
-        manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
+        manager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
         return new StringRepresentation("");
       } else {
         // Some problem occurs, sent back a simple line of text.
@@ -222,25 +222,25 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
   public Representation delete() {
     Representation rep = null;
     try {
-      final String resourceName = (String) getRequest().getAttributes().get("tableName");
+      final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-      LOGGER.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
-      if (resourceName == null || segmentName == null) {
-        throw new RuntimeException("either resource name or segment name is null");
+      LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
+      if (tableName == null || segmentName == null) {
+        throw new RuntimeException("either table name or segment name is null");
       }
       PinotResourceManagerResponse res = null;
       if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
-          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName), segmentName)) {
-        res = manager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(resourceName), segmentName);
+          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
+        res = manager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
         rep = new StringRepresentation(res.toString());
       }
       if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
-          TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), segmentName)) {
-        res = manager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), segmentName);
+          TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
+        res = manager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
         rep = new StringRepresentation(res.toString());
       }
       if (res == null) {
-        rep = new StringRepresentation("Cannot find the segment: " + segmentName + " in resource: " + resourceName);
+        rep = new StringRepresentation("Cannot find the segment: " + segmentName + " in table: " + tableName);
       }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
@@ -254,8 +254,8 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
   }
 
-  public String constructDownloadUrl(String resouceName, String segmentName) {
-    final String ret = StringUtil.join("/", vip, "datafiles", resouceName, segmentName);
+  public String constructDownloadUrl(String tableName, String segmentName) {
+    final String ret = StringUtil.join("/", vip, "segments", tableName, segmentName);
     return ret;
   }
 }

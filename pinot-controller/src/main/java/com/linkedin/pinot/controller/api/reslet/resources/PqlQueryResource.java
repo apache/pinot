@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.reslet.resources;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -32,14 +31,15 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.antlr.runtime.RecognitionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.ServerResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -80,30 +80,25 @@ public class PqlQueryResource extends ServerResource {
       return new StringRepresentation("your request does not contain the collection information");
     }
 
-    String resource;
-
+    final String resource;
     try {
-      final String collection = compiledJSON.getString("collection");
-      resource = collection.substring(0, collection.indexOf("."));
+      resource = compiledJSON.getString("collection");
     } catch (final JSONException e) {
       LOGGER.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
     }
 
-    String instanceId = null;
+    final String instanceId;
     try {
-      List<String> instanceIds = manager.getBrokerInstancesFor(resource);
-      if (instanceIds != null || instanceIds.size() > 0) {
+      final List<String> instanceIds = manager.getBrokerInstancesFor(resource);
+      if (instanceIds.isEmpty()) {
+        return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
+      } else {
         Collections.shuffle(instanceIds);
         instanceId = instanceIds.get(0);
       }
-     
     } catch (final Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
-      return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
-    }
-
-    if (instanceId == null) {
       return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
     }
 

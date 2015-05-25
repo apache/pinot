@@ -63,9 +63,9 @@ public class RealtimeTableDataManager implements TableDataManager {
   private boolean _isStarted = false;
   private File _indexDir;
   private ReadMode _readMode;
-  private TableDataManagerConfig _resourceDataManagerConfig;
-  private String _resourceDataDir;
-  private int _numberOfResourceQueryExecutorThreads;
+  private TableDataManagerConfig _tableDataManagerConfig;
+  private String _tableDataDir;
+  private int _numberOfTableQueryExecutorThreads;
   private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
   private ExecutorService _queryExecutorService;
 
@@ -79,7 +79,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   private Map<String, AtomicInteger> _referenceCounts = new HashMap<String, AtomicInteger>();
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
 
-  private String _resourceName;
+  private String _tableName;
 
   private Counter _currentNumberOfSegments = Metrics.newCounter(RealtimeTableDataManager.class,
       CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
@@ -89,50 +89,50 @@ public class RealtimeTableDataManager implements TableDataManager {
       CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
   @Override
-  public void init(TableDataManagerConfig resourceDataManagerConfig) {
-    _resourceDataManagerConfig = resourceDataManagerConfig;
-    _resourceName = _resourceDataManagerConfig.getResourceName();
-    LOGGER = LoggerFactory.getLogger(_resourceName + "-RealtimeResourceDataManager");
+  public void init(TableDataManagerConfig tableDataManagerConfig) {
+    _tableDataManagerConfig = tableDataManagerConfig;
+    _tableName = _tableDataManagerConfig.getTableName();
+    LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
     _currentNumberOfSegments =
-        Metrics.newCounter(RealtimeTableDataManager.class, _resourceName + "-"
+        Metrics.newCounter(RealtimeTableDataManager.class, _tableName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
     _currentNumberOfDocuments =
-        Metrics.newCounter(RealtimeTableDataManager.class, _resourceName + "-"
+        Metrics.newCounter(RealtimeTableDataManager.class, _tableName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
     _numDeletedSegments =
-        Metrics.newCounter(RealtimeTableDataManager.class, _resourceName + "-"
+        Metrics.newCounter(RealtimeTableDataManager.class, _tableName + "-"
             + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
-    _resourceDataDir = _resourceDataManagerConfig.getDataDir();
-    if (!new File(_resourceDataDir).exists()) {
-      new File(_resourceDataDir).mkdirs();
+    _tableDataDir = _tableDataManagerConfig.getDataDir();
+    if (!new File(_tableDataDir).exists()) {
+      new File(_tableDataDir).mkdirs();
     }
-    _numberOfResourceQueryExecutorThreads = _resourceDataManagerConfig.getNumberOfResourceQueryExecutorThreads();
-    if (_numberOfResourceQueryExecutorThreads > 0) {
+    _numberOfTableQueryExecutorThreads = _tableDataManagerConfig.getNumberOfTableQueryExecutorThreads();
+    if (_numberOfTableQueryExecutorThreads > 0) {
       _queryExecutorService =
-          Executors.newFixedThreadPool(_numberOfResourceQueryExecutorThreads, new NamedThreadFactory(
-              "parallel-query-executor-" + _resourceName));
+          Executors.newFixedThreadPool(_numberOfTableQueryExecutorThreads, new NamedThreadFactory(
+              "parallel-query-executor-" + _tableName));
     } else {
       _queryExecutorService =
-          Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
+          Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _tableName));
     }
-    _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
-    _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
+    _readMode = ReadMode.valueOf(_tableDataManagerConfig.getReadMode());
+    _indexLoadingConfigMetadata = _tableDataManagerConfig.getIndexLoadingConfigMetadata();
     LOGGER
-        .info("Initialized RealtimeResourceDataManager: resource : " + _resourceName + " with :\n\tData Directory: "
-            + _resourceDataDir + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
-            + ((_numberOfResourceQueryExecutorThreads > 0) ? _numberOfResourceQueryExecutorThreads : "cached")
+        .info("Initialized RealtimeTableDataManager: table : " + _tableName + " with :\n\tData Directory: "
+            + _tableDataDir + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
+            + ((_numberOfTableQueryExecutorThreads > 0) ? _numberOfTableQueryExecutorThreads : "cached")
             + " threads");
   }
 
   @Override
   public void start() {
     if (_isStarted) {
-      LOGGER.warn("RealtimeResourceDataManager is already started.");
+      LOGGER.warn("RealtimeTableDataManager is already started.");
       return;
     }
-    _indexDir = new File(_resourceDataManagerConfig.getDataDir());
-    _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
+    _indexDir = new File(_tableDataManagerConfig.getDataDir());
+    _readMode = ReadMode.valueOf(_tableDataManagerConfig.getReadMode());
     if (!_indexDir.exists()) {
       if (!_indexDir.mkdir()) {
         LOGGER.error("could not create data dir");
@@ -143,14 +143,14 @@ public class RealtimeTableDataManager implements TableDataManager {
 
   @Override
   public void shutDown() {
-    LOGGER.info("Trying to shutdown resource : " + _resourceName);
+    LOGGER.info("Trying to shutdown table : " + _tableName);
     if (_isStarted) {
       _queryExecutorService.shutdown();
       _segmentAsyncExecutorService.shutdown();
-      _resourceDataManagerConfig = null;
+      _tableDataManagerConfig = null;
       _isStarted = false;
     } else {
-      LOGGER.warn("Already shutDown resource : " + _resourceName);
+      LOGGER.warn("Already shutDown table : " + _tableName);
     }
   }
 
@@ -232,12 +232,12 @@ public class RealtimeTableDataManager implements TableDataManager {
 
   @Override
   public void addSegment(IndexSegment indexSegmentToAdd) {
-    throw new UnsupportedOperationException("Not supported addSegment(IndexSegment) in RealtimeResourceDataManager");
+    throw new UnsupportedOperationException("Not supported addSegment(IndexSegment) in RealtimeTableDataManager");
   }
 
   @Override
   public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception {
-    throw new UnsupportedOperationException("Not supported addSegment(SegmentMetadata) in RealtimeResourceDataManager");
+    throw new UnsupportedOperationException("Not supported addSegment(SegmentMetadata) in RealtimeTableDataManager");
   }
 
   @Override
@@ -287,7 +287,7 @@ public class RealtimeTableDataManager implements TableDataManager {
       _segmentAsyncExecutorService.execute(new Runnable() {
         @Override
         public void run() {
-          FileUtils.deleteQuietly(new File(_resourceDataDir, segmentId));
+          FileUtils.deleteQuietly(new File(_tableDataDir, segmentId));
           LOGGER.info("The index directory for the segment " + segmentId + " has been deleted");
         }
       });

@@ -60,7 +60,7 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public String getResourceName() {
+  public String getTableName() {
     return _resourceName;
   }
 

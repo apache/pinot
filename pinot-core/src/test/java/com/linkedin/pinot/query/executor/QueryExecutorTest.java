@@ -82,8 +82,8 @@ public class QueryExecutorTest {
     instanceDataManager.start();
 
     for (int i = 0; i < 2; ++i) {
-      instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").addSegment(_indexSegmentList.get(i));
+      instanceDataManager.getTableDataManager("midas");
+      instanceDataManager.getTableDataManager("midas").addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
@@ -130,7 +130,7 @@ public class QueryExecutorTest {
     BrokerRequest brokerRequest = getCountQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -155,7 +155,7 @@ public class QueryExecutorTest {
     BrokerRequest brokerRequest = getSumQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -181,7 +181,7 @@ public class QueryExecutorTest {
     BrokerRequest brokerRequest = getMaxQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
@@ -207,7 +207,7 @@ public class QueryExecutorTest {
     BrokerRequest brokerRequest = getMinQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());

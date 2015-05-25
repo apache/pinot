@@ -23,9 +23,7 @@ import java.io.InputStream;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.HttpVersion;
-import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.multipart.FilePart;
@@ -40,14 +38,10 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
 
 
-/**
- * To upload via command line use
- * curl -F segmentId2=@./part-r-0001.tar.gz localhost:8089/files/
- *
- */
 public class FileUploadUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadUtils.class);
+  private static final String SEGMENTS_PATH = "segments";
 
   public static void sendFile(final String host, final String port, final String path, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
@@ -88,59 +82,9 @@ public class FileUploadUtils {
     }
   }
 
-  public static void sendFile(final String host, final String port, final String fileName,
+  public static void sendSegmentFile(final String host, final String port, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
-    sendFile(host, port, "datafiles", fileName, inputStream, lengthInBytes);
-  }
-
-  public static String listFiles(String host, String port) {
-    try {
-      HttpClient httpClient = new HttpClient();
-      GetMethod httpget = new GetMethod("http://" + host + ":" + port + "/files/");
-      httpClient.executeMethod(httpget);
-      return IOUtils.toString(httpget.getResponseBodyAsStream());
-    } catch (Exception ex) {
-      LOGGER.error("Caught exception", ex);
-      Utils.rethrowException(ex);
-      throw new AssertionError("Should not reach this");
-    }
-  }
-
-  public static String getStringResponse(String url) {
-    try {
-      HttpClient httpClient = new HttpClient();
-      GetMethod httpget = new GetMethod(url);
-      httpClient.executeMethod(httpget);
-      InputStream responseBodyAsStream = httpget.getResponseBodyAsStream();
-      String ret = IOUtils.toString(responseBodyAsStream);
-      IOUtils.closeQuietly(responseBodyAsStream);
-      return ret;
-    } catch (Exception ex) {
-      LOGGER.error("Caught exception", ex);
-      Utils.rethrowException(ex);
-      throw new AssertionError("Should not reach this");
-    }
-  }
-
-  public static long getFile(String host, String port, String remoteFileName, File file) {
-    try {
-      HttpClient httpClient = new HttpClient();
-      GetMethod httpget = new GetMethod("http://" + host + ":" + port + "/files/" + remoteFileName);
-      httpClient.executeMethod(httpget);
-      long ret = httpget.getResponseContentLength();
-      if ((file.getParentFile() != null) && !file.getParentFile().exists()) {
-        file.getParentFile().mkdirs();
-      }
-      BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(file));
-      IOUtils.copyLarge(httpget.getResponseBodyAsStream(), output);
-      IOUtils.closeQuietly(output);
-
-      return ret;
-    } catch (Exception ex) {
-      LOGGER.error("Caught exception", ex);
-      Utils.rethrowException(ex);
-      throw new AssertionError("Should not reach this");
-    }
+    sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes);
   }
 
   public static long getFile(String url, File file) {
@@ -159,26 +103,5 @@ public class FileUploadUtils {
       Utils.rethrowException(ex);
       throw new AssertionError("Should not reach this");
     }
-  }
-
-  public static int deleteFile(final String host, final String port, final String fileName) throws HttpException,
-      IOException {
-    String url = "http://" + host + ":" + port + "/files/" + fileName;
-    HttpClient httpClient = new HttpClient();
-    httpClient.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
-    HttpMethod method = new DeleteMethod(url);
-    return httpClient.executeMethod(method);
-  }
-
-  public static int deleteFile(final String url) throws HttpException, IOException {
-    HttpClient httpClient = new HttpClient();
-    httpClient.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
-    HttpMethod method = new DeleteMethod(url);
-    int responseCode = httpClient.executeMethod(method);
-    if (responseCode >= 400) {
-      String errorString = "Response Code: " + responseCode + "\n";
-      throw new HttpException(errorString);
-    }
-    return responseCode;
   }
 }

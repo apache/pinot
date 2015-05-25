@@ -120,9 +120,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
       LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
-      final TableType resourceType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
+      final TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
       try {
-        switch (resourceType) {
+        switch (tableType) {
           case OFFLINE:
             onBecomeOnlineFromOfflineForOfflineSegment(message, context);
             break;
@@ -131,13 +131,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             break;
 
           default:
-            throw new RuntimeException("Not supported resource Type for onBecomeOnlineFromOffline message: " + message);
+            throw new RuntimeException("Not supported table Type for onBecomeOnlineFromOffline message: " + message);
         }
       } catch (Exception e) {
         if (LOGGER.isErrorEnabled()) {
           LOGGER.error(
               "Caught exception in state transition for OFFLINE -> ONLINE for partition" + message.getPartitionName()
-                  + " of resource " + message.getResourceName(), e);
+                  + " of table " + message.getResourceName(), e);
         }
         Utils.rethrowException(e);
       }
@@ -146,15 +146,15 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message, NotificationContext context)
         throws Exception {
       final String segmentId = message.getPartitionName();
-      final String resourceName = message.getResourceName();
+      final String tableName = message.getResourceName();
 
       ZkHelixPropertyStore<ZNRecord> propertyStore =
           ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
 
       SegmentZKMetadata realtimeSegmentZKMetadata =
-          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, resourceName, segmentId);
+          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentId);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
-      AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(propertyStore, resourceName);
+      AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
       ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, tableConfig, instanceZKMetadata,
           realtimeSegmentZKMetadata);
     }
@@ -164,22 +164,22 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       // OfflineSegmentZKMetadata to InstanceDataManager.
 
       final String segmentId = message.getPartitionName();
-      final String resourceName = message.getResourceName();
+      final String tableName = message.getResourceName();
 
       ZkHelixPropertyStore<ZNRecord> propertyStore =
           ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, resourceName, segmentId);
+          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentId);
 
-      LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
+      LOGGER.info("Trying to load segment : " + segmentId + " for table : " + tableName);
       try {
         SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(offlineSegmentZKMetadata);
         SegmentMetadata segmentMetadataFromServer =
-            INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
+            INSTANCE_DATA_MANAGER.getSegmentMetadata(tableName, segmentMetadataForCheck.getName());
         if (segmentMetadataFromServer == null) {
           final String localSegmentDir =
-              new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).toString();
+              new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), tableName), segmentId).toString();
           if (new File(localSegmentDir).exists()) {
             try {
               segmentMetadataFromServer = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
@@ -212,7 +212,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             long attemptStartTime = System.currentTimeMillis();
             try {
               final String uri = offlineSegmentZKMetadata.getDownloadUrl();
-              final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
+              final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
               final SegmentMetadata segmentMetadata =
                   SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
               INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
@@ -291,9 +291,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
       LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
       final String segmentId = message.getPartitionName();
-      final String resourceName = message.getResourceName();
+      final String tableName = message.getResourceName();
       try {
-        final File segmentDir = new File(getSegmentLocalDirectory(resourceName, segmentId));
+        final File segmentDir = new File(getSegmentLocalDirectory(tableName, segmentId));
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
         }
@@ -315,7 +315,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       }
     }
 
-    private String downloadSegmentToLocal(String uri, String resourceName, String segmentId) throws Exception {
+    private String downloadSegmentToLocal(String uri, String tableName, String segmentId) throws Exception {
       File tempSegmentFile = null;
       File tempFile = null;
       if (uri.startsWith("hdfs:")) {
@@ -323,7 +323,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       } else {
         try {
           tempSegmentFile =
-              new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + resourceName + "/temp_" + segmentId
+              new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + tableName + "/temp_" + segmentId
                   + "_" + System.currentTimeMillis());
           if (uri.startsWith("http:")) {
             tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
@@ -337,7 +337,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
           }
           final File segmentDir =
-              new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
+              new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), tableName), segmentId);
           Thread.sleep(1000);
           if (segmentDir.exists()) {
             LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
@@ -362,8 +362,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       }
     }
 
-    private String getSegmentLocalDirectory(String resourceName, String segmentId) {
-      final String segmentDir = INSTANCE_DATA_MANAGER.getSegmentDataDirectory() + "/" + resourceName + "/" + segmentId;
+    private String getSegmentLocalDirectory(String tableName, String segmentId) {
+      final String segmentDir = INSTANCE_DATA_MANAGER.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
       return segmentDir;
     }
 

@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 
 
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
@@ -68,7 +68,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
 
     Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
 
-    for (String resource : pinotClusterManager.getAllRealtimeResources()) {
+    for (String resource : pinotClusterManager.getAllRealtimeTables()) {
       idealStateMap.put(resource,
           pinotClusterManager.getHelixAdmin()
               .getResourceIdealState(pinotClusterManager.getHelixClusterName(), resource));
@@ -103,7 +103,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         for (String partition : state.getPartitionSet()) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
               ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
-                  SegmentNameBuilder.Realtime.extractResourceName(partition), partition);
+                  SegmentNameBuilder.Realtime.extractTableName(partition), partition);
           if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
             String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(partition);
             instancesToAssignRealtimeSegment.remove(instanceName);
@@ -123,12 +123,12 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
 
     // new lets add the new segments
     for (String segmentId : listOfSegmentsToAdd) {
-      String resourceName = SegmentNameBuilder.Realtime.extractResourceName(segmentId);
+      String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
       String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(segmentId);
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
         // create realtime segment metadata
         RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
-        realtimeSegmentMetadataToAdd.setResourceName(TableNameBuilder.extractRawTableName(resourceName));
+        realtimeSegmentMetadataToAdd.setTableName(TableNameBuilder.extractRawTableName(resourceName));
         realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
         realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
@@ -137,10 +137,10 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
             realtimeSegmentMetadataToAdd);
         //update ideal state next
         IdealState s =
-            PinotResourceIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId,
+            PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId,
                 idealStateMap.get(resourceName), instanceName);
         pinotClusterManager.getHelixAdmin().setResourceIdealState(pinotClusterManager.getHelixClusterName(),
-            resourceName, PinotResourceIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, s, instanceName));
+            resourceName, PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, s, instanceName));
       }
     }
   }

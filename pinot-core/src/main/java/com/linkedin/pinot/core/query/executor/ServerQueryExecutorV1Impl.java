@@ -123,7 +123,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           return _planMaker.makeInterSegmentPlan(
               queryableSegmentDataManagerList,
               brokerRequest,
-              _instanceDataManager.getResourceDataManager(brokerRequest.getQuerySource().getResourceName())
+              _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName())
                   .getExecutorService(),
               getResourceTimeOut(instanceRequest.getQuery()));
         }
@@ -161,27 +161,27 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
       return instanceResponse;
     } finally {
-      if (_instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName()) != null) {
-        _instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
+      if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
+        _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
             .returnSegmentReaders(instanceRequest.getSearchSegments());
       }
     }
   }
 
   private List<IndexSegment> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
-    final String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();
-    final TableDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
-    if (resourceDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
+    final String resourceName = instanceRequest.getQuery().getQuerySource().getTableName();
+    final TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(resourceName);
+    if (tableDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
       return new ArrayList<IndexSegment>();
     }
 
     final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
     final List<SegmentDataManager> matchedSegmentDataManagerFromServer =
-        resourceDataManager.getSegments(instanceRequest.getSearchSegments());
+        tableDataManager.getSegments(instanceRequest.getSearchSegments());
 
     LOGGER.info("InstanceRequest request " + instanceRequest.getSearchSegments().size() + " segments : "
         + Arrays.toString(instanceRequest.getSearchSegments().toArray(new String[0])));
-    LOGGER.info("ResourceDataManager found " + matchedSegmentDataManagerFromServer.size() + " segments before pruning : "
+    LOGGER.info("TableDataManager found " + matchedSegmentDataManagerFromServer.size() + " segments before pruning : "
         + Arrays.toString(matchedSegmentDataManagerFromServer.toArray(new SegmentDataManager[0])));
     for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
       final IndexSegment indexSegment = segmentDataManager.getSegment();
@@ -220,7 +220,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private long getResourceTimeOut(BrokerRequest brokerRequest) {
     try {
-      String resourceName = brokerRequest.getQuerySource().getResourceName();
+      String resourceName = brokerRequest.getQuerySource().getTableName();
       if (_resourceTimeOutMsMap.containsKey(resourceName)) {
         return _resourceTimeOutMsMap.get(brokerRequest);
       }

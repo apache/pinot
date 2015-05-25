@@ -39,7 +39,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /**
- * HelixExternalViewBasedRouting will maintain the routing table for assigned data resource.
+ * HelixExternalViewBasedRouting will maintain the routing table for assigned data table.
  *
  * @author xiafu
  *
@@ -47,7 +47,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
-  private final Set<String> _dataResourceSet = new HashSet<String>();
+  private final Set<String> _dataTableSet = new HashSet<String>();
   private final RoutingTableBuilder _defaultOfflineRoutingTableBuilder;
   private final RoutingTableBuilder _defaultRealtimeRoutingTableBuilder;
   private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
@@ -98,12 +98,12 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   @Override
   public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
-    String resourceName = request.getResourceName();
+    String tableName = request.getTableName();
 
-    if ((_brokerRoutingTable == null) || (!_brokerRoutingTable.containsKey(resourceName))) {
+    if ((_brokerRoutingTable == null) || (!_brokerRoutingTable.containsKey(tableName))) {
       return null;
     }
-    List<ServerToSegmentSetMap> serverToSegmentSetMaps = _brokerRoutingTable.get(resourceName);
+    List<ServerToSegmentSetMap> serverToSegmentSetMaps = _brokerRoutingTable.get(tableName);
     return serverToSegmentSetMaps.get(_random.nextInt(serverToSegmentSetMaps.size())).getRouting();
   }
 
@@ -118,29 +118,29 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Shutdown HelixExternalViewBasedRouting!");
   }
 
-  public synchronized void markDataResourceOnline(String resourceName, ExternalView externalView) {
+  public synchronized void markDataResourceOnline(String tableName, ExternalView externalView) {
     if (externalView == null) {
       return;
     }
-    if (_routingTableModifiedTimeStampMap.containsKey(resourceName)) {
-      long recentModifiedTimeStamp = _routingTableModifiedTimeStampMap.get(resourceName);
-      LOGGER.info("ExternalView modified timestamp for resource: " + resourceName + " is "
+    if (_routingTableModifiedTimeStampMap.containsKey(tableName)) {
+      long recentModifiedTimeStamp = _routingTableModifiedTimeStampMap.get(tableName);
+      LOGGER.info("ExternalView modified timestamp for table: " + tableName + " is "
           + externalView.getRecord().getModifiedTime());
-      LOGGER.info("Recent updated timestamp for for resource: " + resourceName + " is " + recentModifiedTimeStamp);
+      LOGGER.info("Recent updated timestamp for for table: " + tableName + " is " + recentModifiedTimeStamp);
       if (externalView.getRecord().getModifiedTime() <= recentModifiedTimeStamp) {
-        LOGGER.info("No change on routing table version, do nothing for resource: " + resourceName);
+        LOGGER.info("No change on routing table version, do nothing for table: " + tableName);
         return;
       }
     }
-    _routingTableModifiedTimeStampMap.put(resourceName, externalView.getRecord().getModifiedTime());
-    if (!_dataResourceSet.contains(resourceName)) {
-      LOGGER.info("Adding a new data resource to broker : " + resourceName);
-      _dataResourceSet.add(resourceName);
+    _routingTableModifiedTimeStampMap.put(tableName, externalView.getRecord().getModifiedTime());
+    if (!_dataTableSet.contains(tableName)) {
+      LOGGER.info("Adding a new data table to broker : " + tableName);
+      _dataTableSet.add(tableName);
     }
     RoutingTableBuilder routingTableBuilder = null;
-    TableType resourceType = TableNameBuilder.getTableTypeFromTableName(resourceName);
-    if (resourceType != null) {
-      switch (resourceType) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType != null) {
+      switch (tableType) {
         case REALTIME:
           routingTableBuilder = _defaultRealtimeRoutingTableBuilder;
           break;
@@ -154,20 +154,20 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     } else {
       routingTableBuilder = _defaultOfflineRoutingTableBuilder;
     }
-    if (_routingTableBuilderMap.containsKey(resourceName) && (_routingTableBuilderMap.get(resourceName) != null)) {
-      routingTableBuilder = _routingTableBuilderMap.get(resourceName);
+    if (_routingTableBuilderMap.containsKey(tableName) && (_routingTableBuilderMap.get(tableName) != null)) {
+      routingTableBuilder = _routingTableBuilderMap.get(tableName);
     }
-    LOGGER.info("Trying to compute routing table for resource : " + resourceName + ",by : " + routingTableBuilder);
+    LOGGER.info("Trying to compute routing table for table : " + tableName + ",by : " + routingTableBuilder);
     try {
       List<ServerToSegmentSetMap> serverToSegmentSetMap =
-          routingTableBuilder.computeRoutingTableFromExternalView(resourceName, externalView);
+          routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView);
 
-      _brokerRoutingTable.put(resourceName, serverToSegmentSetMap);
+      _brokerRoutingTable.put(tableName, serverToSegmentSetMap);
     } catch (Exception e) {
       LOGGER.error("Failed to compute/update the routing table" + e.getCause());
     }
     try {
-      LOGGER.info("Trying to compute time boundary service for resource : " + resourceName);
+      LOGGER.info("Trying to compute time boundary service for table : " + tableName);
       _timeBoundaryService.updateTimeBoundaryService(externalView);
     } catch (Exception e) {
       LOGGER.error("Failed to update the TimeBoundaryService : " + e.getCause());
@@ -175,22 +175,22 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   }
 
-  public synchronized void markDataResourceOffline(String resourceName) {
-    LOGGER.info("Trying to remove data resource from broker : " + resourceName);
-    if (_dataResourceSet.contains(resourceName)) {
-      _dataResourceSet.remove(resourceName);
-      _brokerRoutingTable.remove(resourceName);
-      _routingTableModifiedTimeStampMap.remove(resourceName);
-      _timeBoundaryService.remove(resourceName);
+  public synchronized void markDataResourceOffline(String tableName) {
+    LOGGER.info("Trying to remove data table from broker : " + tableName);
+    if (_dataTableSet.contains(tableName)) {
+      _dataTableSet.remove(tableName);
+      _brokerRoutingTable.remove(tableName);
+      _routingTableModifiedTimeStampMap.remove(tableName);
+      _timeBoundaryService.remove(tableName);
     }
   }
 
-  public boolean contains(String resourceName) {
-    return _dataResourceSet.contains(resourceName);
+  public boolean contains(String tableName) {
+    return _dataTableSet.contains(tableName);
   }
 
-  public Set<String> getDataResourceSet() {
-    return _dataResourceSet;
+  public Set<String> getDataTableSet() {
+    return _dataTableSet;
   }
 
   public Map<String, List<ServerToSegmentSetMap>> getBrokerRoutingTable() {

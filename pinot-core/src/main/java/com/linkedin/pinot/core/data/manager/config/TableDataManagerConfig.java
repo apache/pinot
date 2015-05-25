@@ -27,87 +27,86 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 /**
- * The config used for ResourceDataManager.
+ * The config used for TableDataManager.
  *
  * @author xiafu
  *
  */
 public class TableDataManagerConfig {
 
-  private static final String RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
-  private static final String RESOURCE_DATA_MANAGER_TYPE = "dataManagerType";
+  private static final String TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
+  private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
   private static final String READ_MODE = "readMode";
-  private static final String RESOURCE_DATA_MANAGER_DATA_DIRECTORY = "directory";
-  private static final String RESOURCE_DATA_MANAGER_NAME = "name";
+  private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
+  private static final String TABLE_DATA_MANAGER_NAME = "name";
 
-  private final Configuration _resourceDataManagerConfig;
+  private final Configuration _tableDataManagerConfig;
 
-  public TableDataManagerConfig(Configuration resourceDataManagerConfig) throws ConfigurationException {
-    _resourceDataManagerConfig = resourceDataManagerConfig;
+  public TableDataManagerConfig(Configuration tableDataManagerConfig) throws ConfigurationException {
+    _tableDataManagerConfig = tableDataManagerConfig;
   }
 
   public String getReadMode() {
-    return _resourceDataManagerConfig.getString(READ_MODE);
+    return _tableDataManagerConfig.getString(READ_MODE);
   }
 
   public Configuration getConfig() {
-    return _resourceDataManagerConfig;
+    return _tableDataManagerConfig;
   }
 
-  public String getResourceDataManagerType() {
-    return _resourceDataManagerConfig.getString(RESOURCE_DATA_MANAGER_TYPE);
+  public String getTableDataManagerType() {
+    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_TYPE);
   }
 
   public String getDataDir() {
-    return _resourceDataManagerConfig.getString(RESOURCE_DATA_MANAGER_DATA_DIRECTORY);
+    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_DATA_DIRECTORY);
   }
 
-  public String getResourceName() {
-    return _resourceDataManagerConfig.getString(RESOURCE_DATA_MANAGER_NAME);
+  public String getTableName() {
+    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
-  public int getNumberOfResourceQueryExecutorThreads() {
-    return _resourceDataManagerConfig.getInt(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 10);
+  public int getNumberOfTableQueryExecutorThreads() {
+    return _tableDataManagerConfig.getInt(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 10);
   }
 
-  public static TableDataManagerConfig getDefaultHelixResourceDataManagerConfig(
-      InstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
-    TableType resourceType = TableNameBuilder.getTableTypeFromTableName(resourceName);
+  public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
+      InstanceDataManagerConfig _instanceDataManagerConfig, String tableName) throws ConfigurationException {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     Configuration defaultConfig = new PropertiesConfiguration();
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
-    String dataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + resourceName;
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableName);
+    String dataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableName;
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
     if (_instanceDataManagerConfig.getReadMode() != null) {
       defaultConfig.addProperty(READ_MODE, _instanceDataManagerConfig.getReadMode().toString());
     } else {
       defaultConfig.addProperty(READ_MODE, ReadMode.heap);
     }
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
-    TableDataManagerConfig resourceDataManagerConfig = new TableDataManagerConfig(defaultConfig);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
+    TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 
-    switch (resourceType) {
+    switch (tableType) {
       case OFFLINE:
-        defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "offline");
+        defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "offline");
         break;
       case REALTIME:
-        defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "realtime");
+        defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "realtime");
         break;
 
       default:
-        throw new UnsupportedOperationException("Not supported resource type for - " + resourceName);
+        throw new UnsupportedOperationException("Not supported table type for - " + tableName);
     }
-
-    return resourceDataManagerConfig;
+    return tableDataManagerConfig;
   }
 
   public void overrideConfigs(AbstractTableConfig tableConfig) {
-    _resourceDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode().toLowerCase());
-    _resourceDataManagerConfig.setProperty(RESOURCE_DATA_MANAGER_NAME, tableConfig.getTableName());
+    _tableDataManagerConfig.setProperty(READ_MODE, tableConfig.getIndexingConfig().getLoadMode().toLowerCase());
+    _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
   }
 
   public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {
-    IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(_resourceDataManagerConfig);
+    IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(_tableDataManagerConfig);
     return indexLoadingConfigMetadata;
   }
 }

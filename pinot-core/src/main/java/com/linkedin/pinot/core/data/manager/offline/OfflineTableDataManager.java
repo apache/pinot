@@ -48,7 +48,7 @@ import com.yammer.metrics.core.Counter;
 
 
 /**
- * An implemenation of offline ResourceDataManager.
+ * An implemenation of offline TableDataManager.
  * Provide add and remove segment functionality.
  *
  * @author xiafu
@@ -59,16 +59,16 @@ public class OfflineTableDataManager implements TableDataManager {
 
   private volatile boolean _isStarted = false;
   private final Object _globalLock = new Object();
-  private String _resourceName;
+  private String _tableName;
   private ReadMode _readMode;
 
   private ExecutorService _queryExecutorService;
 
-  private TableDataManagerConfig _resourceDataManagerConfig;
+  private TableDataManagerConfig _tableDataManagerConfig;
   private final ExecutorService _segmentAsyncExecutorService = Executors
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
-  private String _resourceDataDir;
-  private int _numberOfResourceQueryExecutorThreads;
+  private String _tableDataDir;
+  private int _numberOfTableQueryExecutorThreads;
   private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
 
   private final Map<String, OfflineSegmentDataManager> _segmentsMap = new HashMap<String, OfflineSegmentDataManager>();
@@ -87,68 +87,68 @@ public class OfflineTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void init(TableDataManagerConfig resourceDataManagerConfig) {
-    _resourceDataManagerConfig = resourceDataManagerConfig;
-    _resourceName = _resourceDataManagerConfig.getResourceName();
+  public void init(TableDataManagerConfig tableDataManagerConfig) {
+    _tableDataManagerConfig = tableDataManagerConfig;
+    _tableName = _tableDataManagerConfig.getTableName();
 
-    LOGGER = LoggerFactory.getLogger(_resourceName + "-OfflineResourceDataManager");
+    LOGGER = LoggerFactory.getLogger(_tableName + "-OfflineTableDataManager");
     _currentNumberOfSegments =
-        Metrics.newCounter(OfflineTableDataManager.class, _resourceName + "-"
+        Metrics.newCounter(OfflineTableDataManager.class, _tableName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
     _currentNumberOfDocuments =
-        Metrics.newCounter(OfflineTableDataManager.class, _resourceName + "-"
+        Metrics.newCounter(OfflineTableDataManager.class, _tableName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
     _numDeletedSegments =
-        Metrics.newCounter(OfflineTableDataManager.class, _resourceName + "-"
+        Metrics.newCounter(OfflineTableDataManager.class, _tableName + "-"
             + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
-    _resourceDataDir = _resourceDataManagerConfig.getDataDir();
-    if (!new File(_resourceDataDir).exists()) {
-      new File(_resourceDataDir).mkdirs();
+    _tableDataDir = _tableDataManagerConfig.getDataDir();
+    if (!new File(_tableDataDir).exists()) {
+      new File(_tableDataDir).mkdirs();
     }
-    _numberOfResourceQueryExecutorThreads = _resourceDataManagerConfig.getNumberOfResourceQueryExecutorThreads();
-    //_numberOfResourceQueryExecutorThreads = 1;
-    if (_numberOfResourceQueryExecutorThreads > 0) {
+    _numberOfTableQueryExecutorThreads = _tableDataManagerConfig.getNumberOfTableQueryExecutorThreads();
+    //_numberOfTableQueryExecutorThreads = 1;
+    if (_numberOfTableQueryExecutorThreads > 0) {
       _queryExecutorService =
-          Executors.newFixedThreadPool(_numberOfResourceQueryExecutorThreads, new NamedThreadFactory(
-              "parallel-query-executor-" + _resourceName));
+          Executors.newFixedThreadPool(_numberOfTableQueryExecutorThreads, new NamedThreadFactory(
+              "parallel-query-executor-" + _tableName));
     } else {
       _queryExecutorService =
-          Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
+          Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _tableName));
     }
-    _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
-    _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
+    _readMode = ReadMode.valueOf(_tableDataManagerConfig.getReadMode());
+    _indexLoadingConfigMetadata = _tableDataManagerConfig.getIndexLoadingConfigMetadata();
     LOGGER
-        .info("Initialized resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
+        .info("Initialized table : " + _tableName + " with :\n\tData Directory: " + _tableDataDir
             + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
-            + ((_numberOfResourceQueryExecutorThreads > 0) ? _numberOfResourceQueryExecutorThreads : "cached")
+            + ((_numberOfTableQueryExecutorThreads > 0) ? _numberOfTableQueryExecutorThreads : "cached")
             + " threads");
   }
 
   @Override
   public void start() {
-    LOGGER.info("Trying to start resource : " + _resourceName);
-    if (_resourceDataManagerConfig != null) {
+    LOGGER.info("Trying to start table : " + _tableName);
+    if (_tableDataManagerConfig != null) {
       if (_isStarted) {
-        LOGGER.warn("Already start the OfflineResourceDataManager for resource : " + _resourceName);
+        LOGGER.warn("Already start the OfflineTableDataManager for table : " + _tableName);
       } else {
         _isStarted = true;
       }
     } else {
-      LOGGER.error("The OfflineResourceDataManager hasn't been initialized.");
+      LOGGER.error("The OfflineTableDataManager hasn't been initialized.");
     }
   }
 
   @Override
   public void shutDown() {
-    LOGGER.info("Trying to shutdown resource : " + _resourceName);
+    LOGGER.info("Trying to shutdown table : " + _tableName);
     if (_isStarted) {
       _queryExecutorService.shutdown();
       _segmentAsyncExecutorService.shutdown();
-      _resourceDataManagerConfig = null;
+      _tableDataManagerConfig = null;
       _isStarted = false;
     } else {
-      LOGGER.warn("Already shutDown resource : " + _resourceName);
+      LOGGER.warn("Already shutDown table : " + _tableName);
     }
   }
 
@@ -156,13 +156,13 @@ public class OfflineTableDataManager implements TableDataManager {
   public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     IndexSegment indexSegment =
         ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
-    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
+    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to table : " + _tableName);
     addSegment(indexSegment);
   }
 
   @Override
   public void addSegment(final IndexSegment indexSegmentToAdd) {
-    LOGGER.info("Trying to add a new segment to resource : " + _resourceName);
+    LOGGER.info("Trying to add a new segment to table : " + _tableName);
 
     synchronized (getGlobalLock()) {
       if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
@@ -188,7 +188,7 @@ public class OfflineTableDataManager implements TableDataManager {
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl((OfflineSegmentZKMetadata) indexSegmentToAdd);
     IndexSegment indexSegment =
         ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
-    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
+    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to table : " + _tableName);
     addSegment(indexSegment);
   }
 
@@ -196,18 +196,6 @@ public class OfflineTableDataManager implements TableDataManager {
   public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
     addSegment(segmentZKMetadata);
-  }
-
-  private void refreshSegment(final IndexSegment segmentToRefresh) {
-    synchronized (getGlobalLock()) {
-      OfflineSegmentDataManager segment = _segmentsMap.get(segmentToRefresh.getSegmentName());
-      _segmentsMap.put(segmentToRefresh.getSegmentName(), new OfflineSegmentDataManager(segmentToRefresh));
-      if (segment != null) {
-        _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
-        _currentNumberOfDocuments.inc(segmentToRefresh.getTotalDocs());
-        segment.getSegment().destroy();
-      }
-    }
   }
 
   @Override
@@ -246,7 +234,7 @@ public class OfflineTableDataManager implements TableDataManager {
       _segmentAsyncExecutorService.execute(new Runnable() {
         @Override
         public void run() {
-          FileUtils.deleteQuietly(new File(_resourceDataDir, segmentId));
+          FileUtils.deleteQuietly(new File(_tableDataDir, segmentId));
           LOGGER.info("The index directory for the segment " + segmentId + " has been deleted");
         }
       });

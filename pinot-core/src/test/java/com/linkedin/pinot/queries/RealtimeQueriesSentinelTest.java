@@ -94,8 +94,8 @@ public class RealtimeQueriesSentinelTest {
     final FileBasedInstanceDataManager instanceDataManager = FileBasedInstanceDataManager.getInstanceDataManager();
     instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
-    instanceDataManager.getResourceDataManager("mirror");
-    instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
+    instanceDataManager.getTableDataManager("mirror");
+    instanceDataManager.getTableDataManager("mirror").addSegment(indexSegment);
 
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
     QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
@@ -240,7 +240,7 @@ public class RealtimeQueriesSentinelTest {
     }
   }
 
-  private void setUpTestQueries(String resource) throws FileNotFoundException, IOException {
+  private void setUpTestQueries(String table) throws FileNotFoundException, IOException {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
@@ -265,7 +265,7 @@ public class RealtimeQueriesSentinelTest {
     mets.add("count");
 
     final String time = "minutesSinceEpoch";
-    AVRO_QUERY_GENERATOR = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource, true);
+    AVRO_QUERY_GENERATOR = new AvroQueryGenerator(new File(filePath), dims, mets, time, table, true);
     AVRO_QUERY_GENERATOR.init();
     AVRO_QUERY_GENERATOR.generateSimpleAggregationOnSingleColumnFilters();
   }
@@ -296,7 +296,7 @@ public class RealtimeQueriesSentinelTest {
 
   private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentZKMetadata.setResourceName("mirror");
+    realtimeSegmentZKMetadata.setTableName("mirror");
     return realtimeSegmentZKMetadata;
   }
 

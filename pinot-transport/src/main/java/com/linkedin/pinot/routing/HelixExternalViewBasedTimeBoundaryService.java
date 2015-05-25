@@ -54,15 +54,15 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       return;
     }
     String tableName = externalView.getResourceName();
-    // Do nothing for Realtime Resource.
+    // Do nothing for realtime table.
     if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
       return;
     }
     Set<String> offlineSegmentsServing = externalView.getPartitionSet();
     AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
 
-    TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineTableConfig.getValidationConfig().getTimeType());
-    if (!offlineSegmentsServing.isEmpty() && resourceTimeUnit != null) {
+    TimeUnit tableTimeUnit = getTimeUnitFromString(offlineTableConfig.getValidationConfig().getTimeType());
+    if (!offlineSegmentsServing.isEmpty() && tableTimeUnit != null) {
       long maxTimeValue = -1;
       for (String segmentId : offlineSegmentsServing) {
         try {
@@ -70,7 +70,7 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
           OfflineSegmentZKMetadata offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
           if (offlineSegmentZKMetadata.getEndTime() > 0) {
             if (offlineSegmentZKMetadata.getTimeUnit() != null) {
-              endTime = resourceTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
+              endTime = tableTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
             } else {
               endTime = offlineSegmentZKMetadata.getEndTime();
             }
@@ -114,14 +114,14 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
   }
 
   @Override
-  public void remove(String resourceName) {
-    _timeBoundaryInfoMap.remove(resourceName);
+  public void remove(String tableName) {
+    _timeBoundaryInfoMap.remove(tableName);
 
   }
 
   @Override
-  public TimeBoundaryInfo getTimeBoundaryInfoFor(String resource) {
-    return _timeBoundaryInfoMap.get(resource);
+  public TimeBoundaryInfo getTimeBoundaryInfoFor(String table) {
+    return _timeBoundaryInfoMap.get(table);
   }
 
 }

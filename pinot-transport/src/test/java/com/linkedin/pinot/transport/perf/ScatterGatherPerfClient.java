@@ -58,7 +58,7 @@ import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.config.ResourceRoutingConfig;
+import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
@@ -78,7 +78,7 @@ public class ScatterGatherPerfClient implements Runnable {
   private static final String BROKER_CONFIG_OPT_NAME = "broker_conf";
   private static final String NUM_REQUESTS_OPT_NAME = "num_requests";
   private static final String REQUEST_SIZE_OPT_NAME = "request_size";
-  private static final String RESOURCE_NAME_OPT_NAME = "resource_name";
+  private static final String TABLE_NAME_OPT_NAME = "resource_name";
 
   // RequestId Generator
   private static AtomicLong _requestIdGen = new AtomicLong(0);
@@ -292,7 +292,7 @@ public class ScatterGatherPerfClient implements Runnable {
    */
   public SimpleScatterGatherRequest getRequest() throws IOException, JSONException {
 
-    ResourceRoutingConfig cfg = _routingConfig.getResourceRoutingCfg().get(_resourceName);
+    PerTableRoutingConfig cfg = _routingConfig.getPerTableRoutingCfg().get(_resourceName);
     if (null == cfg) {
       System.out.println("Unable to find routing config for resource (" + _resourceName + ")");
       return null;
@@ -437,7 +437,7 @@ public class ScatterGatherPerfClient implements Runnable {
     private final long _requestId;
     private final Map<ServerInstance, SegmentIdSet> _pgToServersMap;
 
-    public SimpleScatterGatherRequest(byte[] q, ResourceRoutingConfig routingConfig, long requestId) {
+    public SimpleScatterGatherRequest(byte[] q, PerTableRoutingConfig routingConfig, long requestId) {
       _brokerRequest = q;
       _pgToServersMap = routingConfig.buildRequestRoutingMap();
       _requestId = requestId;
@@ -514,7 +514,7 @@ public class ScatterGatherPerfClient implements Runnable {
   private static Options buildCommandLineOptions() {
     Options options = new Options();
     options.addOption(BROKER_CONFIG_OPT_NAME, true, "Broker Config file");
-    options.addOption(RESOURCE_NAME_OPT_NAME, true, "Resource Name");
+    options.addOption(TABLE_NAME_OPT_NAME, true, "Resource Name");
     options.addOption(REQUEST_SIZE_OPT_NAME, true, "Request Size");
     options.addOption(NUM_REQUESTS_OPT_NAME, true, "Num Requests");
     return options;
@@ -528,7 +528,7 @@ public class ScatterGatherPerfClient implements Runnable {
     CommandLine cmd = cliParser.parse(cliOptions, args, true);
 
     if ((!cmd.hasOption(BROKER_CONFIG_OPT_NAME)) || (!cmd.hasOption(REQUEST_SIZE_OPT_NAME))
-        || (!cmd.hasOption(RESOURCE_NAME_OPT_NAME)) || (!cmd.hasOption(RESOURCE_NAME_OPT_NAME))) {
+        || (!cmd.hasOption(TABLE_NAME_OPT_NAME)) || (!cmd.hasOption(TABLE_NAME_OPT_NAME))) {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
       throw new RuntimeException("Missing required arguments !!");
@@ -537,7 +537,7 @@ public class ScatterGatherPerfClient implements Runnable {
     String brokerConfigPath = cmd.getOptionValue(BROKER_CONFIG_OPT_NAME);
     int requestSize = Integer.parseInt(cmd.getOptionValue(REQUEST_SIZE_OPT_NAME));
     int numRequests = Integer.parseInt(cmd.getOptionValue(NUM_REQUESTS_OPT_NAME));
-    String resourceName = cmd.getOptionValue(RESOURCE_NAME_OPT_NAME);
+    String resourceName = cmd.getOptionValue(TABLE_NAME_OPT_NAME);
 
     // build  brokerConf
     PropertiesConfiguration brokerConf = new PropertiesConfiguration();

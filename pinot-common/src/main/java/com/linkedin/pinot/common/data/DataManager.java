@@ -43,7 +43,7 @@ public interface DataManager {
 
   SegmentMetadataLoader getSegmentMetadataLoader();
 
-  SegmentMetadata getSegmentMetadata(String resource, String segmentName);
+  SegmentMetadata getSegmentMetadata(String tableName, String segmentName);
 
   boolean isStarted();
 }

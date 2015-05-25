@@ -30,7 +30,7 @@ import org.apache.commons.cli.Options;
 import com.linkedin.pinot.common.metrics.AggregatedHistogram;
 import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.config.ResourceRoutingConfig;
+import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
 import com.yammer.metrics.core.Histogram;
 
@@ -120,8 +120,8 @@ public class ScatterGatherPerfTester {
       int port = _startPortNum;
       // Setup Routing config for clients
       RoutingTableConfig config = new RoutingTableConfig();
-      Map<String, ResourceRoutingConfig> cfg = config.getResourceRoutingCfg();
-      ResourceRoutingConfig c = new ResourceRoutingConfig(null);
+      Map<String, PerTableRoutingConfig> cfg = config.getPerTableRoutingCfg();
+      PerTableRoutingConfig c = new PerTableRoutingConfig(null);
       Map<Integer, List<ServerInstance>> instanceMap = c.getNodeToInstancesMap();
       port = _startPortNum;
 

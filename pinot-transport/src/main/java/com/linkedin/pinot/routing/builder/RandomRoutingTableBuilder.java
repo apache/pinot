@@ -53,7 +53,7 @@ public class RandomRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public synchronized List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String resourceName,
+  public synchronized List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName,
       ExternalView externalView) {
 
     List<Map<String, Set<String>>> routingTables = new ArrayList<Map<String, Set<String>>>();

@@ -118,7 +118,7 @@ public class ValidationManager {
 
     LOGGER.info("Starting validation");
     // Fetch the list of tables
-    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotResourceNames();
+    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     for (String tableName : allTableNames) {
       // For each table, fetch the metadata for all its segments

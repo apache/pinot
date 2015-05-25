@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 
 import org.apache.helix.HelixAdmin;
@@ -52,7 +51,7 @@ import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrate
  * @author xiafu
  *
  */
-public class PinotResourceIdealStateBuilder {
+public class PinotTableIdealStateBuilder {
   public static final String ONLINE = "ONLINE";
   public static final String OFFLINE = "OFFLINE";
   public static final String DROPPED = "DROPPED";
@@ -62,32 +61,32 @@ public class PinotResourceIdealStateBuilder {
 
   /**
    *
-   * Building an empty idealState for a given resource.
-   * Used when creating a new resource.
+   * Building an empty idealState for a given table.
+   * Used when creating a new table.
    *
-   * @param resource
+   * @param table
    * @param helixAdmin
    * @param helixClusterName
    * @return
    */
-  public static IdealState buildEmptyIdealStateFor(String resourceName, int numCopies, HelixAdmin helixAdmin,
+  public static IdealState buildEmptyIdealStateFor(String tableName, int numCopies, HelixAdmin helixAdmin,
       String helixClusterName) {
-    final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resourceName);
+    final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableName);
     final int replicas = numCopies;
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
         .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
-    idealState.setInstanceGroupTag(resourceName);
+    idealState.setInstanceGroupTag(tableName);
     return idealState;
   }
 
   /**
    *
-   * Building an empty idealState for a given resource.
-   * Used when creating a new resource.
+   * Building an empty idealState for a given table.
+   * Used when creating a new table.
    *
-   * @param resource
+   * @param table
    * @param helixAdmin
    * @param helixClusterName
    * @return
@@ -113,23 +112,23 @@ public class PinotResourceIdealStateBuilder {
   /**
    * Remove a segment is also required to recompute the ideal state.
    *
-   * @param resourceName
+   * @param tableName
    * @param segmentId
    * @param helixAdmin
    * @param helixClusterName
    * @return
    */
-  public synchronized static IdealState dropSegmentFromIdealStateFor(String resourceName, String segmentId,
+  public synchronized static IdealState dropSegmentFromIdealStateFor(String tableName, String segmentId,
       HelixAdmin helixAdmin, String helixClusterName) {
 
-    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
+    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
     final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentId);
     if (!currentInstanceSet.isEmpty() && currentIdealState.getPartitionSet().contains(segmentId)) {
       for (String instanceName : currentIdealState.getInstanceSet(segmentId)) {
         currentIdealState.setPartitionState(segmentId, instanceName, "DROPPED");
       }
     } else {
-      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in resource - " + resourceName);
+      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in table - " + tableName);
     }
     return currentIdealState;
   }
@@ -137,21 +136,21 @@ public class PinotResourceIdealStateBuilder {
   /**
    * Remove a segment is also required to recompute the ideal state.
    *
-   * @param resourceName
+   * @param tableName
    * @param segmentId
    * @param helixAdmin
    * @param helixClusterName
    * @return
    */
-  public synchronized static IdealState removeSegmentFromIdealStateFor(String resourceName, String segmentId,
+  public synchronized static IdealState removeSegmentFromIdealStateFor(String tableName, String segmentId,
       HelixAdmin helixAdmin, String helixClusterName) {
 
-    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
+    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
     if (currentIdealState != null && currentIdealState.getPartitionSet() != null
         && currentIdealState.getPartitionSet().contains(segmentId)) {
       currentIdealState.getPartitionSet().remove(segmentId);
     } else {
-      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in resource - " + resourceName);
+      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in table - " + tableName);
     }
     return currentIdealState;
   }
@@ -172,90 +171,6 @@ public class PinotResourceIdealStateBuilder {
       currentIdealState.getPartitionSet().remove(brokerResourceName);
     } else {
       throw new RuntimeException("Cannot found broker resource - " + brokerResourceName + " in broker resource ");
-    }
-    return currentIdealState;
-  }
-
-  public static IdealState updateExpandedDataResourceIdealStateFor(String resourceName, int numCopies,
-      HelixAdmin helixAdmin, String helixClusterName) {
-    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
-    // Increase number of replicas
-    if (Integer.parseInt(idealState.getReplicas()) < numCopies) {
-      Random randomSeed = new Random(System.currentTimeMillis());
-      int currentReplicas = Integer.parseInt(idealState.getReplicas());
-      idealState.setReplicas(numCopies + "");
-      Set<String> segmentSet = idealState.getPartitionSet();
-      List<String> instanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
-      for (String segmentName : segmentSet) {
-        // TODO(xiafu) : current just random assign one more replica.
-        // In future, has to implement read segmentMeta from PropertyStore then use segmentAssignmentStrategy to assign.
-        Set<String> selectedInstanceSet = idealState.getInstanceSet(segmentName);
-        int numInstancesToAssign = numCopies - currentReplicas;
-        int numInstancesAvailable = instanceList.size() - selectedInstanceSet.size();
-        for (String instance : instanceList) {
-          if (selectedInstanceSet.contains(instance)) {
-            continue;
-          }
-          if (randomSeed.nextInt(numInstancesAvailable) < numInstancesToAssign) {
-            idealState.setPartitionState(segmentName, instance,
-                PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-            numInstancesToAssign--;
-          }
-          if (numInstancesToAssign == 0) {
-            break;
-          }
-          numInstancesAvailable--;
-        }
-      }
-
-      return idealState;
-    }
-    // Decrease number of replicas
-    if (Integer.parseInt(idealState.getReplicas()) > numCopies) {
-      int replicas = numCopies;
-      int currentReplicas = Integer.parseInt(idealState.getReplicas());
-      idealState.setReplicas(replicas + "");
-      Set<String> segmentSet = idealState.getPartitionSet();
-
-      for (String segmentName : segmentSet) {
-        Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-        int cnt = 1;
-        for (final String instance : instanceSet) {
-          idealState.setPartitionState(segmentName, instance,
-              PinotHelixSegmentOnlineOfflineStateModelGenerator.DROPPED_STATE);
-          if (cnt++ > (currentReplicas - replicas)) {
-            break;
-          }
-        }
-      }
-
-      return idealState;
-    }
-    return idealState;
-  }
-
-  /**
-   * For adding a new segment, we have to recompute the ideal states.
-   *
-   * @param segmentMetadata
-   * @param helixAdmin
-   * @param helixClusterName
-   * @return
-   */
-  public static IdealState updateExistedSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
-      String helixClusterName) {
-
-    final String resourceName = segmentMetadata.getResourceName();
-    final String segmentName = segmentMetadata.getName();
-
-    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
-    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
-    for (final String instance : currentInstanceSet) {
-      currentIdealState.setPartitionState(segmentName, instance, OFFLINE);
-    }
-    helixAdmin.setResourceIdealState(helixClusterName, resourceName, currentIdealState);
-    for (final String instance : currentInstanceSet) {
-      currentIdealState.setPartitionState(segmentName, instance, ONLINE);
     }
     return currentIdealState;
   }
@@ -304,7 +219,7 @@ public class PinotResourceIdealStateBuilder {
     int partitionId = 0;
     int replicaId = 0;
 
-    String groupId = getGroupIdFromRealtimeDataResource(realtimeTableName, streamProviderConfig);
+    String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamProviderConfig);
     for (String instance : instanceList) {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
       if (instanceZKMetadata == null) {
@@ -325,7 +240,7 @@ public class PinotResourceIdealStateBuilder {
     }
   }
 
-  private static String getGroupIdFromRealtimeDataResource(String realtimeTableName,
+  private static String getGroupIdFromRealtimeDataTable(String realtimeTableName,
       Map<String, String> streamProviderConfig) {
     String keyOfGroupId =
         StringUtil
@@ -342,7 +257,7 @@ public class PinotResourceIdealStateBuilder {
       throws JsonParseException, JsonMappingException, JsonProcessingException, JSONException, IOException {
 
     final String offlineTableName =
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getResourceName());
+        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getTableName());
 
     final String segmentName = segmentMetadata.getName();
     AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);

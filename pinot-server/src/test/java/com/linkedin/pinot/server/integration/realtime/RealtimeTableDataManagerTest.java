@@ -64,16 +64,16 @@ public class RealtimeTableDataManagerTest {
 
   private static InstanceZKMetadata instanceZKMetadata;
   private static RealtimeSegmentZKMetadata realtimeSegmentZKMetadata;
-  private static TableDataManagerConfig resourceDataManagerConfig;
+  private static TableDataManagerConfig tableDataManagerConfig;
   private static final String AVRO_DATA = "data/mirror-mv.avro";
   private static String filePath;
   private static Map<String, FieldType> fieldTypeMap;
 
-  private static final String RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
-  private static final String RESOURCE_DATA_MANAGER_TYPE = "dataManagerType";
+  private static final String TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
+  private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
   private static final String READ_MODE = "readMode";
-  private static final String RESOURCE_DATA_MANAGER_DATA_DIRECTORY = "directory";
-  private static final String RESOURCE_DATA_MANAGER_NAME = "name";
+  private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
+  private static final String TABLE_DATA_MANAGER_NAME = "name";
 
   private static final long SEGMENT_CONSUMING_TIME = 1000 * 60 * 3;
 
@@ -83,7 +83,7 @@ public class RealtimeTableDataManagerTest {
   public static void setup() throws Exception {
     instanceZKMetadata = getInstanceZKMetadata();
     realtimeSegmentZKMetadata = getRealtimeSegmentZKMetadata();
-    resourceDataManagerConfig = getResourceDataManagerConfig();
+    tableDataManagerConfig = getTableDataManagerConfig();
 
     JSONObject request = new JSONObject();
     request.put("tableName", "mirror");
@@ -110,25 +110,25 @@ public class RealtimeTableDataManagerTest {
     tableConfig = AbstractTableConfig.init(request.toString());
   }
 
-  private static TableDataManagerConfig getResourceDataManagerConfig() throws ConfigurationException {
-    String resourceName = "testResource_R";
+  private static TableDataManagerConfig getTableDataManagerConfig() throws ConfigurationException {
+    String tableName = "testTable_R";
     Configuration defaultConfig = new PropertiesConfiguration();
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
-    String dataDir = "/tmp/" + resourceName;
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableName);
+    String dataDir = "/tmp/" + tableName;
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
     defaultConfig.addProperty(READ_MODE, ReadMode.heap.toString());
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
-    TableDataManagerConfig resourceDataManagerConfig = new TableDataManagerConfig(defaultConfig);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
+    TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "realtime");
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "realtime");
 
-    return resourceDataManagerConfig;
+    return tableDataManagerConfig;
   }
 
   public void testSetup() throws Exception {
     final RealtimeSegmentDataManager manager =
         new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
-            resourceDataManagerConfig.getDataDir(), ReadMode.valueOf(resourceDataManagerConfig.getReadMode()),
+            tableDataManagerConfig.getDataDir(), ReadMode.valueOf(tableDataManagerConfig.getReadMode()),
             getTestSchema());
 
     final long start = System.currentTimeMillis();
@@ -264,8 +264,8 @@ public class RealtimeTableDataManagerTest {
     Map<String, String> groupIdMap = new HashMap<String, String>();
     Map<String, String> partitionMap = new HashMap<String, String>();
 
-    groupIdMap.put("mirror", "groupId_testResource_" + String.valueOf(System.currentTimeMillis()));
-    partitionMap.put("testResource_R", "0");
+    groupIdMap.put("mirror", "groupId_testTable_" + String.valueOf(System.currentTimeMillis()));
+    partitionMap.put("testTable_R", "0");
     record.setMapField("KAFKA_HLC_GROUP_MAP", groupIdMap);
     record.setMapField("KAFKA_HLC_PARTITION_MAP", partitionMap);
     return new InstanceZKMetadata(record);
@@ -273,8 +273,8 @@ public class RealtimeTableDataManagerTest {
 
   private static RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
     RealtimeSegmentZKMetadata realtimeSegmentMetadata = new RealtimeSegmentZKMetadata();
-    realtimeSegmentMetadata.setSegmentName("testResource_R_1000_groupId0_part0");
-    realtimeSegmentMetadata.setResourceName("testResource");
+    realtimeSegmentMetadata.setSegmentName("testTable_R_1000_groupId0_part0");
+    realtimeSegmentMetadata.setTableName("testTable");
     realtimeSegmentMetadata.setSegmentType(SegmentType.REALTIME);
     realtimeSegmentMetadata.setIndexVersion("v1");
     realtimeSegmentMetadata.setStartTime(1000);
@@ -286,47 +286,6 @@ public class RealtimeTableDataManagerTest {
     realtimeSegmentMetadata.setCreationTime(1000);
     return realtimeSegmentMetadata;
   }
-
-  /*private static RealtimeDataResourceZKMetadata getRealtimeDataResourceZKMetadata() throws FileNotFoundException,
-      IOException {
-    RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = new RealtimeDataResourceZKMetadata();
-    realtimeDataResourceZKMetadata.setResourceName("testResource");
-    realtimeDataResourceZKMetadata.setTimeColumnName("daysSinceEpoch");
-    realtimeDataResourceZKMetadata.setTimeType("daysSinceEpoch");
-    realtimeDataResourceZKMetadata.setNumDataInstances(6);
-    realtimeDataResourceZKMetadata.setNumDataReplicas(3);
-    realtimeDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.DAYS);
-    realtimeDataResourceZKMetadata.setRetentionTimeValue(7);
-    realtimeDataResourceZKMetadata.setBrokerTag("testBroker");
-    realtimeDataResourceZKMetadata.setNumBrokerInstance(2);
-    realtimeDataResourceZKMetadata.setMetadata(new HashMap<String, String>());
-    realtimeDataResourceZKMetadata.setDataSchema(getTestSchema());
-    realtimeDataResourceZKMetadata.setStreamType(StreamType.kafka);
-    realtimeDataResourceZKMetadata.setStreamMetadata(new KafkaStreamMetadata(getTestKafkaStreamConfig()));
-    return realtimeDataResourceZKMetadata;
-  }
-
-  private static Map<String, String> getTestKafkaStreamConfig() {
-    Map<String, String> streamMap = new HashMap<String, String>();
-
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE),
-        Helix.DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.TOPIC_NAME),
-        "MirrorDecoratedProfileViewEvent");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
-        "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-        Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID), "testGroupId");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-        Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
-        "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
-    streamMap.put(
-        StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-            Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
-        "http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas");
-
-    return streamMap;
-  }*/
 
   private static Schema getTestSchema() throws FileNotFoundException, IOException {
     filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();

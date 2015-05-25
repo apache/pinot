@@ -139,7 +139,7 @@ public class RetentionManager {
   }
 
   private void updateDeletionStrategiesForEntireCluster() {
-    List<String> tableNames = _pinotHelixResourceManager.getAllPinotResourceNames();
+    List<String> tableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     for (String tableName : tableNames) {
       _tableDeletionStrategy.putAll(retrieveDeletionStrategiesForTable(tableName));
     }
@@ -208,7 +208,7 @@ public class RetentionManager {
   }
 
   private void updateSegmentMetadataForEntireCluster() {
-    List<String> tableNames = _pinotHelixResourceManager.getAllPinotResourceNames();
+    List<String> tableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     for (String tableName : tableNames) {
       _segmentMetadataMap.put(tableName, retrieveSegmentMetadataForTable(tableName));
     }

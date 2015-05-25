@@ -37,7 +37,7 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTa
   }
 
   @Override
-  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String resourceName, ExternalView externalView) {
+  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView) {
     Set<String> segments = externalView.getPartitionSet();
     List<ServerToSegmentSetMap> routingTable = new ArrayList<ServerToSegmentSetMap>();
     Map<String, Map<String, Set<String>>> groupIdToRouting = new HashMap<String, Map<String, Set<String>>>();

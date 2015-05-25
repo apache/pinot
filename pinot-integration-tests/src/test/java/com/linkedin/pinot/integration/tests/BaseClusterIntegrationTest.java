@@ -491,7 +491,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory, final File segmentTarDir, final String resourceName) {
+      final File baseDirectory, final File segmentTarDir, final String tableName) {
     int segmentCount = avroFiles.size();
     System.out.println("Building " + segmentCount + " segments in parallel");
     for (int i = 1; i <= segmentCount; ++i) {
@@ -507,7 +507,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             File outputDir = new File(baseDirectory, "segment-" + segmentNumber);
             final SegmentGeneratorConfig genConfig =
                 SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
-                    TimeUnit.DAYS, resourceName);
+                    TimeUnit.DAYS, tableName);
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
 
@@ -557,7 +557,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     for (String query : getHardCodedQuerySet()) {
       try {
         System.out.println(query);
-        runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+        runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
       } catch (Exception e) {
         // TODO: handle exception
       }
@@ -596,47 +596,47 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected String[] getHardCodedQuerySet() {
     String[] queries =
         new String[] {
-            "SELECT AirTime, avg(TotalAddGTime) FROM 'myresource'  WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000",
-            "SELECT count(*) FROM 'myresource'  WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2') ",
-            "SELECT count(*) FROM 'myresource'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') ",
-            "SELECT ArrDelay, avg(DestCityMarketID) FROM 'myresource'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000",
-            "SELECT OriginAirportSeqID, min(CRSArrTime) FROM 'myresource'  WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000",
-            "SELECT NASDelay, DestAirportSeqID, min(DayOfWeek) FROM 'myresource'  WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000",
-            "SELECT DestState, avg(DistanceGroup) FROM 'myresource'  GROUP BY DestState LIMIT 10000",
-            "SELECT ActualElapsedTime, DestCityMarketID, sum(OriginAirportSeqID) FROM 'myresource'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000",
-            "SELECT sum(CarrierDelay) FROM 'myresource'  WHERE      CRSDepTime < '1047' OR DestWac = '84'   LIMIT 16",
-            "SELECT Year, sum(CarrierDelay) FROM 'myresource'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000",
-            "select count(*) from 'myresource'", "select sum(DepDelay) from 'myresource'",
-            "select count(DepDelay) from 'myresource'",
-            "select min(DepDelay) from 'myresource'",
-            "select max(DepDelay) from 'myresource'",
-            "select avg(DepDelay) from 'myresource'",
-            "select Carrier, count(*) from 'myresource' group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where ArrDelay > 15 group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where Cancelled = 1 group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where DepDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where DepDelay < 15 group by Carrier ",
-            "select Carrier, count(*) from 'myresource' where ArrDelay <= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where DepDelay < 15 and ArrDelay <= 15 group by Carrier ",
-            "select Carrier, count(*) from 'myresource' where DepDelay between 5 and 15 group by Carrier  ",
-            "select Carrier, count(*) from 'myresource' where DepDelay in (2, 8, 42) group by Carrier ",
-            "select Carrier, count(*) from 'myresource' where DepDelay not in (4, 16) group by Carrier ",
-            "select Carrier, count(*) from 'myresource' where Cancelled <> 1 group by Carrier ",
-            "select Carrier, min(ArrDelay) from 'myresource' group by Carrier ",
-            "select Carrier, max(ArrDelay) from 'myresource' group by Carrier ",
-            "select Carrier, sum(ArrDelay) from 'myresource' group by Carrier ",
-            "select TailNum, avg(ArrDelay) from 'myresource' group by TailNum ",
-            "select FlightNum, avg(ArrDelay) from 'myresource' group by FlightNum ",
-            "select distinctCount(Carrier) from 'myresource' where TailNum = 'D942DN' ",
-            "SELECT count(*) FROM 'myresource'  WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'  "
+            "SELECT AirTime, avg(TotalAddGTime) FROM 'mytable'  WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000",
+            "SELECT count(*) FROM 'mytable'  WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2') ",
+            "SELECT count(*) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') ",
+            "SELECT ArrDelay, avg(DestCityMarketID) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000",
+            "SELECT OriginAirportSeqID, min(CRSArrTime) FROM 'mytable'  WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000",
+            "SELECT NASDelay, DestAirportSeqID, min(DayOfWeek) FROM 'mytable'  WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000",
+            "SELECT DestState, avg(DistanceGroup) FROM 'mytable'  GROUP BY DestState LIMIT 10000",
+            "SELECT ActualElapsedTime, DestCityMarketID, sum(OriginAirportSeqID) FROM 'mytable'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000",
+            "SELECT sum(CarrierDelay) FROM 'mytable'  WHERE      CRSDepTime < '1047' OR DestWac = '84'   LIMIT 16",
+            "SELECT Year, sum(CarrierDelay) FROM 'mytable'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000",
+            "select count(*) from 'mytable'", "select sum(DepDelay) from 'mytable'",
+            "select count(DepDelay) from 'mytable'",
+            "select min(DepDelay) from 'mytable'",
+            "select max(DepDelay) from 'mytable'",
+            "select avg(DepDelay) from 'mytable'",
+            "select Carrier, count(*) from 'mytable' group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where ArrDelay > 15 group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where Cancelled = 1 group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where DepDelay < 15 group by Carrier ",
+            "select Carrier, count(*) from 'mytable' where ArrDelay <= 15 group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier ",
+            "select Carrier, count(*) from 'mytable' where DepDelay between 5 and 15 group by Carrier  ",
+            "select Carrier, count(*) from 'mytable' where DepDelay in (2, 8, 42) group by Carrier ",
+            "select Carrier, count(*) from 'mytable' where DepDelay not in (4, 16) group by Carrier ",
+            "select Carrier, count(*) from 'mytable' where Cancelled <> 1 group by Carrier ",
+            "select Carrier, min(ArrDelay) from 'mytable' group by Carrier ",
+            "select Carrier, max(ArrDelay) from 'mytable' group by Carrier ",
+            "select Carrier, sum(ArrDelay) from 'mytable' group by Carrier ",
+            "select TailNum, avg(ArrDelay) from 'mytable' group by TailNum ",
+            "select FlightNum, avg(ArrDelay) from 'mytable' group by FlightNum ",
+            "select distinctCount(Carrier) from 'mytable' where TailNum = 'D942DN' ",
+            "SELECT count(*) FROM 'mytable'  WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'  "
         };
     return queries;
   }
 
   protected long getCurrentServingNumDocs() {
     try {
-      String countQuery = "SELECT count(*) FROM 'myresource' LIMIT 0";
+      String countQuery = "SELECT count(*) FROM 'mytable' LIMIT 0";
       JSONObject ret = postQuery(countQuery);
       ret.put("pql", countQuery);
       System.out.println(ret.toString(1));

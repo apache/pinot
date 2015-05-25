@@ -132,7 +132,7 @@ public class ControllerStarter {
     conf.setControllerPort("9000");
     conf.setDataDir("/tmp/PinotController");
     conf.setZkStr("localhost:2121");
-    conf.setHelixClusterName("sprintDemoClusterOne");
+    conf.setHelixClusterName("pinotControllerV2");
     conf.setControllerVipHost("localhost");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);

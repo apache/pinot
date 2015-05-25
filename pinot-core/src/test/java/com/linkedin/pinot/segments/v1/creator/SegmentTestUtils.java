@@ -52,7 +52,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 public class SegmentTestUtils {
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      String timeColumn, TimeUnit timeUnit, String clusterName) throws FileNotFoundException,
+      String timeColumn, TimeUnit timeUnit, String tableName) throws FileNotFoundException,
       IOException {
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
@@ -61,7 +61,7 @@ public class SegmentTestUtils {
     segmentGenSpec.setTimeUnitForSegment(timeUnit);
     segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
-    segmentGenSpec.setResourceName(clusterName);
+    segmentGenSpec.setTableName(tableName);
     segmentGenSpec.setIndexOutputDir(outputDir.getAbsolutePath());
     return segmentGenSpec;
   }

@@ -117,7 +117,7 @@ public class TimeBoundaryServiceTest {
       offlineSegmentZKMetadata.setStartTime(i - 1);
       offlineSegmentZKMetadata.setIndexVersion("0");
       offlineSegmentZKMetadata.setPushTime(i + 5);
-      offlineSegmentZKMetadata.setResourceName(tableName);
+      offlineSegmentZKMetadata.setTableName(tableName);
       offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
       ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
     }

@@ -42,7 +42,7 @@ public class SegmentPrunerTest {
   private BrokerRequest getBrokerRequest(String resourceName) {
     final BrokerRequest brokerRequest = new BrokerRequest();
     final QuerySource querySource = new QuerySource();
-    querySource.setResourceName(resourceName);
+    querySource.setTableName(resourceName);
     brokerRequest.setQuerySource(querySource);
     return brokerRequest;
   }
@@ -103,7 +103,7 @@ public class SegmentPrunerTest {
           }
 
           @Override
-          public String getResourceName() {
+          public String getTableName() {
             return resourceName;
           }
 

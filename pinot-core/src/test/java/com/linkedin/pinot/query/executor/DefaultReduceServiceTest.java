@@ -87,8 +87,8 @@ public class DefaultReduceServiceTest {
     instanceDataManager1.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager1.start();
     for (int i = 0; i < 2; ++i) {
-      instanceDataManager1.getResourceDataManager("midas");
-      instanceDataManager1.getResourceDataManager("midas").addSegment(_indexSegmentList.get(i));
+      instanceDataManager1.getTableDataManager("midas");
+      instanceDataManager1.getTableDataManager("midas").addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1, new ServerMetrics(new MetricsRegistry()));
@@ -133,7 +133,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getCountQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -167,7 +167,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getSumQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -200,7 +200,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getMaxQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -232,7 +232,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getMinQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -264,7 +264,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getAvgQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -297,7 +297,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getDistinctCountQuery("dim0");
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -330,7 +330,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getDistinctCountQuery("dim1");
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -363,7 +363,7 @@ public class DefaultReduceServiceTest {
     BrokerRequest brokerRequest = getMultiAggregationQuery();
 
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("midas");
+    querySource.setTableName("midas");
 
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
@@ -425,8 +425,7 @@ public class DefaultReduceServiceTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
   }
 
@@ -436,8 +435,7 @@ public class DefaultReduceServiceTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
   }
 
@@ -447,8 +445,7 @@ public class DefaultReduceServiceTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
   }
 
@@ -458,8 +455,7 @@ public class DefaultReduceServiceTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
   }
 
@@ -469,8 +465,7 @@ public class DefaultReduceServiceTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
   }
 
@@ -480,8 +475,7 @@ public class DefaultReduceServiceTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
   }
 
@@ -496,14 +490,8 @@ public class DefaultReduceServiceTest {
     aggregationsInfo.add(getDistinctCountAggregationInfo("dim0"));
     aggregationsInfo.add(getDistinctCountAggregationInfo("dim1"));
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
+    query.setFilterQuery(null);
     return query;
-  }
-
-  private FilterQuery getFilterQuery() {
-    FilterQuery filterQuery = new FilterQuery();
-    return null;
   }
 
   private AggregationInfo getCountAggregationInfo() {

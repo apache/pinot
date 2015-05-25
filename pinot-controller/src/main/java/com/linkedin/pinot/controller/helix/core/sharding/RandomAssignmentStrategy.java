@@ -57,7 +57,7 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
       allInstanceList.remove(idx);
     }
     LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getResourceName() + ", selected instances: "
+        + segmentMetadata.getTableName() + ", selected instances: "
         + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;

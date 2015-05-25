@@ -40,7 +40,7 @@ public class SegmentTestUtils {
       segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
     }
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
-    segmentGenSpec.setResourceName(clusterName);
+    segmentGenSpec.setTableName(clusterName);
     segmentGenSpec.setIndexOutputDir(outputDir.getAbsolutePath());
     return segmentGenSpec;
   }

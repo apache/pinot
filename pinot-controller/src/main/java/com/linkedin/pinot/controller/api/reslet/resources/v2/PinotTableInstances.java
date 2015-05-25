@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -107,7 +106,7 @@ public class PinotTableInstances extends ServerResource {
       return new StringRepresentation(ret.toString());
     } catch (Exception e) {
       LOGGER.error("error processing fetch table request, ", e);
-      return PinotFileUpload.exceptionToStringRepresentation(e);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
 
   }

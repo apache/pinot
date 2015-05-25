@@ -27,23 +27,23 @@ import com.google.common.collect.Lists;
 
 public class SegmentNameBuilder {
 
-  public static String buildBasic(String resourceName, Object minTimeValue, Object maxTimeValue,
+  public static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue,
       String prefix) {
-    return StringUtil.join("_", resourceName, minTimeValue.toString(), maxTimeValue.toString(), prefix);
+    return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), prefix);
   }
 
-  public static String buildBasic(String resourceName, String prefix) {
-    return StringUtil.join("_", resourceName, prefix);
+  public static String buildBasic(String tableName, String prefix) {
+    return StringUtil.join("_", tableName, prefix);
   }
 
   public static class Realtime {
-    public static String build(String resourceName, String insatanceName, String groupId,
+    public static String build(String tableName, String instanceName, String groupId,
         String partitionId, String sequenceNumber) {
       return StringUtils.join(
-          Lists.newArrayList(resourceName, insatanceName, groupId, partitionId, sequenceNumber), "__");
+          Lists.newArrayList(tableName, instanceName, groupId, partitionId, sequenceNumber), "__");
     }
 
-    public static String extractResourceName(String segmentId) {
+    public static String extractTableName(String segmentId) {
       return segmentId.split("__")[0];
     }
 

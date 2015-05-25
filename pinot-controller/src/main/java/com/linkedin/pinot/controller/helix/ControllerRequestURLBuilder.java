@@ -49,7 +49,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forDataFileUpload() {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments");
   }
 
   public String forInstanceCreate() {

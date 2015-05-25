@@ -117,7 +117,7 @@ public class RequestConverter {
     final QuerySource source = new QuerySource();
     if (requestJSON.has(COLLECTION)) {
       final String collection = requestJSON.getString(COLLECTION);
-      source.setResourceName(collection);
+      source.setTableName(collection);
     }
 
     req.setQuerySource(source);

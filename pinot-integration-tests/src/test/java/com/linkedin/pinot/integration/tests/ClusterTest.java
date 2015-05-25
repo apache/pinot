@@ -149,10 +149,10 @@ public abstract class ClusterTest extends ControllerTest {
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTenantCreate(), request.toString());
   }
 
-  protected void addOfflineTable(String resourceName, String timeColumnName, String timeColumnType,
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
     JSONObject request =
-        ControllerRequestBuilder.buildCreateOfflineTableJSON(resourceName, serverTenant, brokerTenant,
+        ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant,
             timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
             "BalanceNumSegmentAssignmentStrategy");
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
@@ -189,7 +189,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void addRealtimeTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+  protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
     JSONObject metadata = new JSONObject();
     metadata.put("streamType", "kafka");
@@ -201,7 +201,7 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
 
     JSONObject request =
-        ControllerRequestBuilder.buildCreateRealtimeTableJSON(resourceName, serverTenant, brokerTenant,
+        ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
             timeColumnName, timeColumnType, "rententionTimeUnit", "900", 1, "BalanceNumSegmentAssignmentStrategy",
             metadata, schemaName);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
@@ -210,10 +210,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   }
 
-  protected void addHybridTable(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+  protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
-    addRealtimeTable(resourceName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schemaName, serverTenant,
+    addRealtimeTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schemaName, serverTenant,
         brokerTenant, avroFile);
-    addOfflineTable(resourceName, timeColumnName, timeColumnType, 900, "Days", brokerTenant, serverTenant);
+    addOfflineTable(tableName, timeColumnName, timeColumnType, 900, "Days", brokerTenant, serverTenant);
   }
 }

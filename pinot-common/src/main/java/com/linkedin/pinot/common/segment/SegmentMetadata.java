@@ -34,7 +34,7 @@ public interface SegmentMetadata {
   /**
    * @return
    */
-  public String getResourceName();
+  public String getTableName();
 
   /**
    * @return

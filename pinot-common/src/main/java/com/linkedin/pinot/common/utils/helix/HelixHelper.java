@@ -162,7 +162,7 @@ public class HelixHelper {
     admin.removeConfig(scope, keys);
   }
 
-  public static IdealState getResourceIdealState(HelixManager manager, String resourceName) {
+  public static IdealState getTableIdealState(HelixManager manager, String resourceName) {
     final HelixDataAccessor accessor = manager.getHelixDataAccessor();
     final Builder builder = accessor.keyBuilder();
     return accessor.getProperty(builder.idealStates(resourceName));

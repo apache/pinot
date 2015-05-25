@@ -93,8 +93,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         Long.toString(offlineSegmentZKMetadata.getStartTime()));
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
         Long.toString(offlineSegmentZKMetadata.getEndTime()));
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME,
-        offlineSegmentZKMetadata.getResourceName());
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
+        offlineSegmentZKMetadata.getTableName());
 
     final TimeUnit timeUnit = offlineSegmentZKMetadata.getTimeUnit();
     if (timeUnit != null) {
@@ -126,8 +126,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         Long.toString(segmentMetadata.getStartTime()));
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
         Long.toString(segmentMetadata.getEndTime()));
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME,
-        segmentMetadata.getResourceName());
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
+        segmentMetadata.getTableName());
 
     final TimeUnit timeUnit = segmentMetadata.getTimeUnit();
     if (timeUnit != null) {
@@ -317,8 +317,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getResourceName() {
-    return (String) _segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);
+  public String getTableName() {
+    return (String) _segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME);
   }
 
   @Override
@@ -374,7 +374,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public Map<String, String> toMap() {
     final Map<String, String> ret = new HashMap<String, String>();
-    ret.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, getResourceName());
+    ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
     ret.put(V1Constants.VERSION, getVersion());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());

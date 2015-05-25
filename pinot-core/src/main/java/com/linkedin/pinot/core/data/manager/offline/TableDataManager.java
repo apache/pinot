@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
 /**
- * ResourceDataManager interface.
+ * TableDataManager interface.
  * Provided interfaces to do operations on segment level.
  *
  * @author xiafu
@@ -39,11 +39,11 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public interface TableDataManager {
 
   /**
-   * Initialize ResourceDataManager based on given config.
+   * Initialize TableDataManager based on given config.
    *
-   * @param resourceDataManagerConfig
+   * @param tableDataManagerConfig
    */
-  public void init(TableDataManagerConfig resourceDataManagerConfig);
+  public void init(TableDataManagerConfig tableDataManagerConfig);
 
   public void start();
 
@@ -52,14 +52,14 @@ public interface TableDataManager {
   public boolean isStarted();
 
   /**
-   * Adding an IndexSegment into the ResourceDataManager.
+   * Adding an IndexSegment into the TableDataManager.
    *
    * @param indexSegmentToAdd
    */
   public void addSegment(IndexSegment indexSegmentToAdd);
 
   /**
-   * Adding a Segment into the ResourceDataManager by given SegmentMetadata.
+   * Adding a Segment into the TableDataManager by given SegmentMetadata.
    *
    * @param segmentMetaToAdd
    * @throws Exception
@@ -67,7 +67,7 @@ public interface TableDataManager {
   public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
 
   /**
-   * Adding a Segment into the ResourceDataManager by given SegmentZKMetadata.
+   * Adding a Segment into the TableDataManager by given SegmentZKMetadata.
    *
    * @param indexSegmentToAdd
    * @throws Exception
@@ -75,9 +75,9 @@ public interface TableDataManager {
   public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception;
 
   /**
-   * Adding a Segment into the ResourceDataManager by given DataResourceZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
+   * Adding a Segment into the TableDataManager by given DataTableZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
    * @param propertyStore
-   * @param dataResourceZKMetadata
+   * @param dataTableZKMetadata
    * @param instanceZKMetadata
    * @param segmentZKMetadata
    * @throws Exception
@@ -94,19 +94,19 @@ public interface TableDataManager {
 
   /**
    *
-   * @return all the segments in this ResourceDataManager.
+   * @return all the segments in this TableDataManager.
    */
   public List<SegmentDataManager> getAllSegments();
 
   /**
    *
-   * @return segments by giving a list of segment names in this ResourceDataManager.
+   * @return segments by giving a list of segment names in this TableDataManager.
    */
   public List<SegmentDataManager> getSegments(List<String> segmentList);
 
   /**
    *
-   * @return a segment by giving the name of this segment in this ResourceDataManager.
+   * @return a segment by giving the name of this segment in this TableDataManager.
    */
   public SegmentDataManager getSegment(String segmentName);
 

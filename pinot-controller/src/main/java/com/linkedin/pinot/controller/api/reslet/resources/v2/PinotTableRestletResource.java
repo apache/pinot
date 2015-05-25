@@ -17,7 +17,6 @@ import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -84,7 +83,7 @@ public class PinotTableRestletResource extends ServerResource {
       return new StringRepresentation(ret.toString());
     } catch (Exception e) {
       LOGGER.error("error processing get table config", e);
-      return PinotFileUpload.exceptionToStringRepresentation(e);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 

@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -57,7 +56,7 @@ public class PinotTableMetadataConfigs extends ServerResource {
       return new StringRepresentation("done");
     } catch (final Exception e) {
       LOGGER.error("errpr updating medata configs for table {}", config.getTableName(), e);
-      return PinotFileUpload.exceptionToStringRepresentation(e);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 }

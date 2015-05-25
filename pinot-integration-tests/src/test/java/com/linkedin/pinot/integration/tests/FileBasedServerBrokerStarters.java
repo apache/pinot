@@ -52,7 +52,7 @@ public class FileBasedServerBrokerStarters {
    * */
 
   // common properties
-  public static final String[] RESOURCE_NAMES = { "resource1", "resource2" };
+  public static final String[] TABLE_NAMES = { "table1", "table2" };
 
   // server properties
   public static final String SERVER_PORT = "8000";
@@ -80,15 +80,15 @@ public class FileBasedServerBrokerStarters {
     //config based routing
     brokerConfiguration.addProperty("pinot.broker.transport.routingMode", "CONFIG");
 
-    //two resources
-    brokerConfiguration.addProperty("pinot.broker.transport.routing.resourceName", StringUtils.join(RESOURCE_NAMES, ","));
+    //two tables
+    brokerConfiguration.addProperty("pinot.broker.transport.routing.tableName", StringUtils.join(TABLE_NAMES, ","));
 
-    // resource a conf
+    // table conf
 
-    for (final String resource : RESOURCE_NAMES) {
-      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", resource, "numNodesPerReplica"), "1");
-      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", resource, "serversForNode.0"), "localhost:" + SERVER_PORT);
-      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", resource, "serversForNode.default"), "localhost:"
+    for (final String table : TABLE_NAMES) {
+      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "numNodesPerReplica"), "1");
+      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "serversForNode.0"), "localhost:" + SERVER_PORT);
+      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "serversForNode.default"), "localhost:"
           + SERVER_PORT);
     }
     // client properties
@@ -104,11 +104,11 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty(getKey("pinot.server.instance", "id"), "0");
     serverConfiguration.addProperty(getKey("pinot.server.instance", "bootstrap.segment.dir"), SERVER_BOOTSTRAP_DIR);
     serverConfiguration.addProperty(getKey("pinot.server.instance", "dataDir"), SERVER_INDEX_DIR);
-    serverConfiguration.addProperty(getKey("pinot.server.instance", "resourceName"), StringUtils.join(RESOURCE_NAMES, ',').trim());
-    for (final String resource : RESOURCE_NAMES) {
-      serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "numQueryExecutorThreads"), "50");
-      serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "dataManagerType"), "offline");
-      serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "readMode"), SERVER_INDEX_READ_MODE);
+    serverConfiguration.addProperty(getKey("pinot.server.instance", "tableName"), StringUtils.join(TABLE_NAMES, ',').trim());
+    for (final String table : TABLE_NAMES) {
+      serverConfiguration.addProperty(getKey("pinot.server.instance", table.trim(), "numQueryExecutorThreads"), "50");
+      serverConfiguration.addProperty(getKey("pinot.server.instance", table.trim(), "dataManagerType"), "offline");
+      serverConfiguration.addProperty(getKey("pinot.server.instance", table.trim(), "readMode"), SERVER_INDEX_READ_MODE);
     }
     serverConfiguration.addProperty("pinot.server.instance.data.manager.class", FileBasedInstanceDataManager.class.getName());
     serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class", ColumnarSegmentMetadataLoader.class.getName());

@@ -31,51 +31,15 @@ import com.linkedin.pinot.common.utils.StringUtil;
  * Oct 14, 2014
  */
 public class TestingServerPropertiesBuilder {
-  private static final String TMP = "/tmp";
   private static final String PINOT_SERVER_PREFIX = "pinot.server";
   private static final String INSTANCE_PREFIC = "instance";
   private static final String EXECUTOR_PREFIX = "query.executor";
 
-  private final String[] resourceNames;
+  private final String[] tableNames;
 
-  public TestingServerPropertiesBuilder(String... resourceNames) {
-    this.resourceNames = resourceNames;
+  public TestingServerPropertiesBuilder(String... tableNames) {
+    this.tableNames = tableNames;
   }
-
-  /**
-   *
-   *
-   *
-   *
-   *
-  pinot.server.instance.resourceName=midas,wvmp
-
-  pinot.server.instance.midas.dataManagerType=offline
-  pinot.server.instance.midas.readMode=heap
-  pinot.server.instance.midas.numQueryExecutorThreads=50
-  pinot.server.instance.wvmp.dataManagerType=offline
-  pinot.server.instance.wvmp.readMode=heap
-
-  pinot.server.instance.id=0
-  pinot.server.instance.bootstrap.segment.dir=/tmp/pinot/core/segments
-  pinot.server.instance.dataDir=/tmp/pinot/core/test1
-  pinot.server.instance.data.manager.class=com.linkedin.pinot.core.data.manager.InstanceDataManager
-  pinot.server.instance.segment.metadata.loader.class=com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader
-
-  # query executor parameters
-  pinot.server.query.executor.pruner.class=TimeSegmentPruner,DataSchemaSegmentPruner
-  pinot.server.query.executor.pruner.TimeSegmentPruner.id=0
-  pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id=1
-  pinot.server.query.executor.class=com.linkedin.pinot.core.query.executor.ServerQueryExecutor
-  pinot.server.query.executor.timeout=150000
-
-  # request handler factory parameters
-  pinot.server.requestHandlerFactory.class=com.linkedin.pinot.server.request.SimpleRequestHandlerFactory
-
-  # netty port
-  pinot.server.netty.port=8882
-
-   */
 
   public PropertiesConfiguration build() throws IOException {
     final File file = new File("/tmp/" + TestingServerPropertiesBuilder.class.toString());
@@ -102,12 +66,12 @@ public class TestingServerPropertiesBuilder {
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, "segment.metadata.loader.class"),
         "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader");
 
-    config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, "resourceName"), StringUtils.join(resourceNames, ","));
+    config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, "tableName"), StringUtils.join(tableNames, ","));
 
-    for (final String resource : resourceNames) {
-      config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, resource, "dataManagerType"), "offline");
-      config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, resource, "readMode"), "heap");
-      config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, resource, "numQueryExecutorThreads"), "50");
+    for (final String table : tableNames) {
+      config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, table, "dataManagerType"), "offline");
+      config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, table, "readMode"), "heap");
+      config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, INSTANCE_PREFIC, table, "numQueryExecutorThreads"), "50");
     }
 
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "class"),

@@ -73,7 +73,7 @@ public class ValidationManagerTest {
   @Test
   public void testPushTimePersistence() throws Exception {
 
-    String testResourceName = "testResource";
+    String testTableName = "testTable";
 
     Thread.sleep(1000);
 
@@ -91,12 +91,12 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager.createBrokerTenant(serverTenant);
 
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testResourceName, "testServer", "testBroker",
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, "testServer", "testBroker",
             "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
-    DummyMetadata metadata = new DummyMetadata(testResourceName);
+    DummyMetadata metadata = new DummyMetadata(testTableName);
 
     _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
 
@@ -104,7 +104,7 @@ public class ValidationManagerTest {
 
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            metadata.getResourceName(), metadata.getName());
+            metadata.getTableName(), metadata.getName());
 
     SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();
@@ -123,7 +123,7 @@ public class ValidationManagerTest {
 
     offlineSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-            metadata.getResourceName(), metadata.getName());
+            metadata.getTableName(), metadata.getName());
     fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
     // Check that the segment still has the same push time
@@ -296,7 +296,7 @@ public class ValidationManagerTest {
     }
 
     @Override
-    public String getResourceName() {
+    public String getTableName() {
       return _resourceName;
     }
 

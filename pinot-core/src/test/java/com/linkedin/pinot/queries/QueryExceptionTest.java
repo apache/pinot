@@ -84,8 +84,8 @@ public class QueryExceptionTest {
     File segmentFile = new File(INDEX_DIR, "segment").listFiles()[0];
     segmentName = segmentFile.getName();
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
-    instanceDataManager.getResourceDataManager("mirror");
-    instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
+    instanceDataManager.getTableDataManager("mirror");
+    instanceDataManager.getTableDataManager("mirror").addSegment(indexSegment);
 
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
     QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
@@ -97,7 +97,7 @@ public class QueryExceptionTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void setupSegmentFor(String resource) throws Exception {
+  private void setupSegmentFor(String table) throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
     if (INDEX_DIR.exists()) {
@@ -107,7 +107,7 @@ public class QueryExceptionTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
-            "segment"), "daysSinceEpoch", TimeUnit.DAYS, resource);
+            "segment"), "daysSinceEpoch", TimeUnit.DAYS, table);
 
     final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 

@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
  * @author xiafu
  *
  */
-public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig{
+public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
 
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
@@ -39,10 +39,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
   public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
-  // Key of resource data directory
-  public static final String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
-  // Key of resource data directory
-  public static final String kEY_OF_RESOURCE_NAME = "name";
+  // Key of table data directory
+  public static final String kEY_OF_TABLE_DATA_DIRECTORY = "directory";
+  // Key of table data directory
+  public static final String kEY_OF_TABLE_NAME = "name";
   // Key of instance level segment read mode.
   public static final String READ_MODE = "readMode";
 

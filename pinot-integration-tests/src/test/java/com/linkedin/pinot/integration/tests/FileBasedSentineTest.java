@@ -108,11 +108,11 @@ public class FileBasedSentineTest extends ControllerTest {
 
     int counter = 0;
     for (final File avro : avroDataDir.listFiles()) {
-      for (final String resource : FileBasedServerBrokerStarters.RESOURCE_NAMES) {
+      for (final String table : FileBasedServerBrokerStarters.TABLE_NAMES) {
         final SegmentGeneratorConfig genConfig =
             SegmentTestUtils
                 .getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
-                    TimeUnit.DAYS, resource);
+                    TimeUnit.DAYS, table);
 
         final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
         driver.init(genConfig);
@@ -129,7 +129,7 @@ public class FileBasedSentineTest extends ControllerTest {
 
     // pick some values from here if you need to use it for running filter queries
 
-    final JSONObject selectionRequestResponse = postQuery("select * from 'resource1' limit 100",
+    final JSONObject selectionRequestResponse = postQuery("select * from 'table1' limit 100",
         "http://localhost:" + FileBasedServerBrokerStarters.BROKER_CLIENT_PORT);
 
     System.out.println(selectionRequestResponse.toString(1));

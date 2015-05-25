@@ -67,7 +67,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
   }
 
-  protected void createResource() throws Exception {
+  protected void createTable() throws Exception {
     File schemaFile =
         new File(OfflineClusterIntegrationTest.class.getClassLoader()
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
@@ -82,7 +82,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     createBrokerTenant(brokerTenant, numBroker);
     createServerTenant(offlineTenant, numOffline, 0);
     addSchema(schemaFile, "schemaFile");
-    addOfflineTable("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", brokerTenant, offlineTenant);
+    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", brokerTenant, offlineTenant);
   }
 
   @BeforeClass
@@ -110,7 +110,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
 
-    createResource();
+    createTable();
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -124,13 +124,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "myresource");
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable");
 
     // Initialize query generator
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'myresource'", "mytable");
+        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
       }
     });
 
@@ -147,7 +147,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
-          if (externalView.getId().contains("myresource")) {
+          if (externalView.getId().contains("mytable")) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
             if (partitionSet.size() == SEGMENT_COUNT) {
@@ -161,7 +161,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
               }
 
               if (onlinePartitionCount == SEGMENT_COUNT) {
-                System.out.println("Got " + SEGMENT_COUNT + " online resources, unlatching the main thread");
+                System.out.println("Got " + SEGMENT_COUNT + " online tables, unlatching the main thread");
                 latch.countDown();
               }
             }
@@ -175,7 +175,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     for (String segmentName : _tarDir.list()) {
       System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
-      FileUploadUtils.sendFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
     }
 
     // Wait for all segments to be online
@@ -214,14 +214,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'myresource' where DaysSinceEpoch >= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
-    query = "select count(*) from 'myresource' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'myresource'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
 
   }
 

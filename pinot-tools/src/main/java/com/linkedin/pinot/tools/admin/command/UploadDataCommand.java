@@ -93,7 +93,7 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
 
       String outFile = TarGzCompressionUtils.createTarGzOfDirectory(srcDir);
       File tgzFile = new File(outFile);
-      FileUploadUtils.sendFile(_controllerHost, _controllerPort, tgzFile.getName(),
+      FileUploadUtils.sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(),
           new FileInputStream(tgzFile), tgzFile.length());
 
       FileUtils.deleteQuietly(tgzFile);

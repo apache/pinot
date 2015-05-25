@@ -73,7 +73,7 @@ public class RetentionManagerTest {
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private String _testTableName = "testResource";
+  private String _testTableName = "testTable";
   private String _offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName);
 
   private RetentionManager _retentionManager;
@@ -383,7 +383,7 @@ public class RetentionManagerTest {
     }
 
     final long creationTime = System.currentTimeMillis();
-    final String segmentName = "testResource_testTable_" + creationTime;
+    final String segmentName = _testTableName + creationTime;
 
     SegmentMetadata segmentMetadata = new SegmentMetadata() {
       TimeUnit segmentTimeUnit = TimeUnit.valueOf(timeUnit);
@@ -394,7 +394,7 @@ public class RetentionManagerTest {
       @Override
       public Map<String, String> toMap() {
         final Map<String, String> ret = new HashMap<String, String>();
-        ret.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, getResourceName());
+        ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
         ret.put(V1Constants.VERSION, getVersion());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
@@ -438,8 +438,8 @@ public class RetentionManagerTest {
       }
 
       @Override
-      public String getResourceName() {
-        return "testResource";
+      public String getTableName() {
+        return _testTableName;
       }
 
       @Override

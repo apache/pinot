@@ -48,7 +48,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   private static final FileBasedInstanceDataManager INSTANCE_DATA_MANAGER = new FileBasedInstanceDataManager();
   public static final Logger LOGGER = LoggerFactory.getLogger(FileBasedInstanceDataManager.class);
   private FileBasedInstanceDataManagerConfig _instanceDataManagerConfig;
-  private Map<String, TableDataManager> _resourceDataManagerMap = new HashMap<String, TableDataManager>();
+  private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<String, TableDataManager>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
 
@@ -63,11 +63,11 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   public synchronized void init(FileBasedInstanceDataManagerConfig instanceDataManagerConfig)
       throws ConfigurationException, InstantiationException, IllegalAccessException, ClassNotFoundException {
     _instanceDataManagerConfig = instanceDataManagerConfig;
-    for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
-      TableDataManagerConfig resourceDataManagerConfig =
-          _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
-      _resourceDataManagerMap.put(resourceName, resourceDataManager);
+    for (String tableName : _instanceDataManagerConfig.getTableNames()) {
+      TableDataManagerConfig tableDataManagerConfig =
+          _instanceDataManagerConfig.getTableDataManagerConfig(tableName);
+      TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
+      _tableDataManagerMap.put(tableName, tableDataManager);
     }
     _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
   }
@@ -81,11 +81,11 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       LOGGER.error("Error during InstanceDataManager initialization", e);
       Utils.rethrowException(e);
     }
-    for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
-      TableDataManagerConfig resourceDataManagerConfig =
-          _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      TableDataManager resourceDataManager = TableDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
-      _resourceDataManagerMap.put(resourceName, resourceDataManager);
+    for (String tableName : _instanceDataManagerConfig.getTableNames()) {
+      TableDataManagerConfig tableDataManagerConfig =
+          _instanceDataManagerConfig.getTableDataManagerConfig(tableName);
+      TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig);
+      _tableDataManagerMap.put(tableName, tableDataManager);
     }
     try {
       _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
@@ -107,8 +107,8 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void start() {
-    for (TableDataManager resourceDataManager : _resourceDataManagerMap.values()) {
-      resourceDataManager.start();
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      tableDataManager.start();
     }
     try {
       bootstrapSegmentsFromSegmentDir();
@@ -124,10 +124,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   private String getServerInfo() {
     StringBuilder sb = new StringBuilder();
     sb.append("\n[InstanceDataManager Info] : ");
-    for (String resourceName : _resourceDataManagerMap.keySet()) {
-      sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
+    for (String tableName : _tableDataManagerMap.keySet()) {
+      sb.append("\n\t{\n\t\tTable : [" + tableName + "];\n\t\tSegments : [");
       boolean isFirstSegment = true;
-      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+      for (SegmentDataManager segmentDataManager : _tableDataManagerMap.get(tableName).getAllSegments()) {
         if (isFirstSegment) {
           sb.append(segmentDataManager.getSegment().getSegmentName());
           isFirstSegment = false;
@@ -163,25 +163,25 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     return _isStarted;
   }
 
-  public synchronized void addResourceDataManager(String resourceName, TableDataManager resourceDataManager) {
-    _resourceDataManagerMap.put(resourceName, resourceDataManager);
+  public synchronized void addTableDataManager(String tableName, TableDataManager tableDataManager) {
+    _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
-  public Collection<TableDataManager> getResourceDataManagers() {
-    return _resourceDataManagerMap.values();
+  public Collection<TableDataManager> getTableDataManagers() {
+    return _tableDataManagerMap.values();
   }
 
   @Override
-  public TableDataManager getResourceDataManager(String resourceName) {
-    return _resourceDataManagerMap.get(resourceName);
+  public TableDataManager getTableDataManager(String tableName) {
+    return _tableDataManagerMap.get(tableName);
   }
 
   @Override
   public synchronized void shutDown() {
 
     if (isStarted()) {
-      for (TableDataManager resourceDataManager : getResourceDataManagers()) {
-        resourceDataManager.shutDown();
+      for (TableDataManager tableDataManager : getTableDataManagers()) {
+        tableDataManager.shutDown();
       }
       _isStarted = false;
       LOGGER.info("InstanceDataManager is shutDown!");
@@ -192,13 +192,13 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
-    String resourceName = segmentMetadata.getResourceName();
+    String tableName = segmentMetadata.getTableName();
     LOGGER.info("Trying to add segment : " + segmentMetadata.getName());
-    if (_resourceDataManagerMap.containsKey(resourceName)) {
-      _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
-      LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to resource : " + resourceName);
+    if (_tableDataManagerMap.containsKey(tableName)) {
+      _tableDataManagerMap.get(tableName).addSegment(segmentMetadata);
+      LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to table : " + tableName);
     } else {
-      LOGGER.error("InstanceDataManager doesn't contain the assigned resource for segment : "
+      LOGGER.error("InstanceDataManager doesn't contain the assigned table for segment : "
           + segmentMetadata.getName());
     }
   }
@@ -229,10 +229,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public SegmentMetadata getSegmentMetadata(String resource, String segmentName) {
-    if (_resourceDataManagerMap.containsKey(resource)) {
-      if (_resourceDataManagerMap.get(resource).getSegment(segmentName) != null) {
-        return _resourceDataManagerMap.get(resource).getSegment(segmentName).getSegment().getSegmentMetadata();
+  public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
+    if (_tableDataManagerMap.containsKey(table)) {
+      if (_tableDataManagerMap.get(table).getSegment(segmentName) != null) {
+        return _tableDataManagerMap.get(table).getSegment(segmentName).getSegment().getSegmentMetadata();
       }
     }
     return null;

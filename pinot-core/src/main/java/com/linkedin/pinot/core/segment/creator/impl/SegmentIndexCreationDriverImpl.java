@@ -30,7 +30,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -141,11 +140,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
         final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
         segmentName =
-            SegmentNameBuilder.buildBasic(config.getResourceName(), minTimeValue, maxTimeValue,
+            SegmentNameBuilder.buildBasic(config.getTableName(), minTimeValue, maxTimeValue,
                 config.getSegmentNamePostfix());
       } else {
         segmentName =
-            SegmentNameBuilder.buildBasic(config.getResourceName(), config.getSegmentNamePostfix());
+            SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
       }
     }
 

@@ -23,7 +23,6 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,8 +42,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
@@ -84,7 +81,6 @@ public class Schema {
     return schema;
   }
 
-  @SuppressWarnings("unchecked")
   public static ZNRecord toZNRecord(Schema schema) throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = new ZNRecord(String.valueOf(schema.getSchemaVersion()));
     record.setSimpleField("schemaJSON", schema.getJSONSchema());
@@ -252,37 +248,6 @@ public class Schema {
     return result.toString();
   }
 
-  public Map<String, String> toMap() {
-    Map<String, String> schemaMap = new HashMap<String, String>();
-    for (String fieldName : fieldSpecMap.keySet()) {
-      FieldSpec fieldSpec = fieldSpecMap.get(fieldName);
-
-      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.COLUMN_NAME),
-          fieldSpec.getName());
-      FieldType fieldType = fieldSpec.getFieldType();
-      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.FIELD_TYPE),
-          fieldType.toString());
-      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.DATA_TYPE), fieldSpec
-          .getDataType().toString());
-
-      switch (fieldType) {
-        case DIMENSION:
-          schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.IS_SINGLE_VALUE),
-              fieldSpec.isSingleValueField() + "");
-          schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.DELIMETER),
-              fieldSpec.getDelimiter());
-          break;
-        case TIME:
-          schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.TIME_UNIT),
-              ((TimeFieldSpec) fieldSpec).getIncomingGranularitySpec().getTimeType().toString());
-          break;
-        default:
-          break;
-      }
-    }
-    return schemaMap;
-  }
-
   public static class SchemaBuilder {
     private Schema schema;
 
@@ -350,58 +315,6 @@ public class Schema {
     public Schema build() {
       return schema;
     }
-  }
-
-  public static Schema getSchemaFromMap(Map<String, String> schemaConfig) {
-    SchemaBuilder schemaBuilder = new SchemaBuilder();
-
-    for (String configKey : schemaConfig.keySet()) {
-
-      if (!configKey.startsWith(DataSource.SCHEMA) || !configKey.endsWith(DataSource.Schema.COLUMN_NAME)) {
-        continue;
-      }
-      String columnName = schemaConfig.get(configKey);
-      FieldType fieldType =
-          FieldType.valueOf(schemaConfig.get(
-              StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.FIELD_TYPE)).toUpperCase());
-      DataType dataType =
-          DataType.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName,
-              DataSource.Schema.DATA_TYPE)));
-
-      switch (fieldType) {
-        case DIMENSION:
-          boolean isSingleValueField =
-              Boolean.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName,
-                  DataSource.Schema.IS_SINGLE_VALUE)));
-          if (!isSingleValueField) {
-            String delimeter = null;
-            Object obj =
-                schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.DELIMETER));
-            if (obj instanceof String) {
-              delimeter = (String) obj;
-            } else if (obj instanceof ArrayList) {
-              delimeter = ",";
-            }
-            schemaBuilder.addMultiValueDimension(columnName, dataType, delimeter);
-          } else {
-            schemaBuilder.addSingleValueDimension(columnName, dataType);
-          }
-          break;
-        case METRIC:
-          schemaBuilder.addMetric(columnName, dataType);
-          break;
-        case TIME:
-          TimeUnit timeUnit =
-              TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName,
-                  DataSource.Schema.TIME_UNIT)));
-          schemaBuilder.addTime(columnName, timeUnit, dataType);
-          break;
-        default:
-          throw new RuntimeException("Unable to recongize field type for column: " + columnName + ", fieldType = "
-              + schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.FIELD_TYPE)));
-      }
-    }
-    return schemaBuilder.build();
   }
 
   @Override

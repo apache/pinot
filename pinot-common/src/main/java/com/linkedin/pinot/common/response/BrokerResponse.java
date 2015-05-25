@@ -42,19 +42,19 @@ public class BrokerResponse {
   private Map<String, String> _traceInfo;
   private JSONObject _selectionResults;
   public static BrokerResponse EMPTY_RESULT;
-  public static BrokerResponse NO_RESOURCE_RESULT;
+  public static BrokerResponse NO_TABLE_RESULT;
 
   static {
     EMPTY_RESULT = new BrokerResponse();
     EMPTY_RESULT.setTimeUsedMs(0);
 
-    NO_RESOURCE_RESULT = new BrokerResponse();
-    NO_RESOURCE_RESULT.setTimeUsedMs(0);
+    NO_TABLE_RESULT = new BrokerResponse();
+    NO_TABLE_RESULT.setTimeUsedMs(0);
     List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
     ProcessingException exception = QueryException.BROKER_RESOURCE_MISSING_ERROR.deepCopy();
-    exception.setMessage("No resource hit!");
+    exception.setMessage("No table hit!");
     processingExceptions.add(exception);
-    NO_RESOURCE_RESULT.setExceptions(processingExceptions);
+    NO_TABLE_RESULT.setExceptions(processingExceptions);
   }
 
   public BrokerResponse() {
@@ -319,7 +319,7 @@ public class BrokerResponse {
   }
 
   public static BrokerResponse getNullBrokerResponse() {
-    return NO_RESOURCE_RESULT;
+    return NO_TABLE_RESULT;
   }
 
   public static BrokerResponse getEmptyBrokerResponse() {
