@@ -17,6 +17,7 @@
     <module>pinot-hadoop</module>
     <module>pinot-tools</module>
     <module>pinot-transport</module>
+    <module>pinot-trace</module>
   </modules>
   <properties>
     <build.profile.id>dev</build.profile.id>
@@ -24,6 +25,7 @@
     <jacoco.ut.execution.data.file>${project.build.directory}/coverage-reports/jacoco-ut.exec</jacoco.ut.execution.data.file>
     <jdk.version>1.7</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <guava.version>17.0</guava.version>
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
@@ -107,7 +109,12 @@
         <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
-      
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-trace</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.restlet.jse</groupId>
         <artifactId>org.restlet</artifactId>
