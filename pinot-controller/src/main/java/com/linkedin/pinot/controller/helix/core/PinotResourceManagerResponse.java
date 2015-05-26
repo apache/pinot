@@ -27,6 +27,9 @@ import org.json.JSONObject;
 
 public class PinotResourceManagerResponse {
 
+  public final static PinotResourceManagerResponse SUCCESS_RESPONSE = new PinotResourceManagerResponse(true);
+  public final static PinotResourceManagerResponse FAILURE_RESPONSE = new PinotResourceManagerResponse(false);
+
   public enum STATUS {
     success,
     failure;
@@ -35,6 +38,17 @@ public class PinotResourceManagerResponse {
   public String errorMessage = "DEFAULT_VAL";
   public STATUS status = STATUS.failure;
   public Map<String, String> metadata;
+
+  public PinotResourceManagerResponse() {
+  }
+
+  public PinotResourceManagerResponse(boolean isSucceed) {
+    if (isSucceed) {
+      status = STATUS.success;
+    } else {
+      status = STATUS.failure;
+    }
+  }
 
   public boolean isSuccessfull() {
     return status == STATUS.success ? true : false;

@@ -84,6 +84,7 @@ public class ControllerRestApplication extends Application {
 
     // POST
     router.attach("/tables", PinotTableRestletResource.class);
+    router.attach("/tables/", PinotTableRestletResource.class);
 
     // GET
     router.attach("/tables/{tableName}", PinotTableRestletResource.class);
@@ -100,6 +101,7 @@ public class ControllerRestApplication extends Application {
 
     // Uploading Downloading segments
     router.attach("/segments", PinotSegmentUploadRestletResource.class);
+    router.attach("/segments/", PinotSegmentUploadRestletResource.class);
     router.attach("/segments/{tableName}", PinotSegmentUploadRestletResource.class);
     router.attach("/segments/{tableName}/{segmentName}", PinotSegmentUploadRestletResource.class);
 
@@ -109,6 +111,8 @@ public class ControllerRestApplication extends Application {
 
     router.attach("/instances", PinotInstance.class);
     router.attach("/instances/", PinotInstance.class);
+    router.attach("/instances/{instanceName}", PinotInstance.class);
+    router.attach("/instances/{instanceName}/", PinotInstance.class);
 
     router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
 

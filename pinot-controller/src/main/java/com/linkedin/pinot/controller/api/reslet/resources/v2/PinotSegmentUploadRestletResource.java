@@ -193,6 +193,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
         FileUtils.moveFile(dataFile, segmentFile);
 
         manager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+        setStatus(Status.SUCCESS_OK);
         return new StringRepresentation("");
       } else {
         // Some problem occurs, sent back a simple line of text.

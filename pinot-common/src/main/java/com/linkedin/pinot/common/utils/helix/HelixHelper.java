@@ -15,43 +15,36 @@
  */
 package com.linkedin.pinot.common.utils.helix;
 
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.google.common.base.Function;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 
 
 public class HelixHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
+
+  private static final String ONLINE = "ONLINE";
+  private static final String OFFLINE = "OFFLINE";
+  private static final String DROPPED = "DROPPED";
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
@@ -191,7 +184,7 @@ public class HelixHelper {
     if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
       Map<String, String> instanceStateMap = brokerIdealState.getInstanceStateMap(resourceTag);
       for (String instance : instanceStateMap.keySet()) {
-        brokerIdealState.setPartitionState(resourceTag, instance, "DROPPED");
+        brokerIdealState.setPartitionState(resourceTag, instance, DROPPED);
       }
       helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
     }
@@ -202,4 +195,31 @@ public class HelixHelper {
     }
   }
 
+  public static Set<String> getOnlineInstanceFromExternalView(ExternalView resourceExternalView) {
+    Set<String> instanceSet = new HashSet<String>();
+    if (resourceExternalView != null) {
+      for (String partition : resourceExternalView.getPartitionSet()) {
+        Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
+        for (String instance : stateMap.keySet()) {
+          if (stateMap.get(instance).equalsIgnoreCase(ONLINE)) {
+            instanceSet.add(instance);
+          }
+        }
+      }
+    }
+    return instanceSet;
+  }
+
+  public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
+    Set<String> instanceSet = new HashSet<String>();
+    for (String partition : resourceExternalView.getPartitionSet()) {
+      Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
+      for (String instance : stateMap.keySet()) {
+        if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
+          instanceSet.add(instance);
+        }
+      }
+    }
+    return instanceSet;
+  }
 }

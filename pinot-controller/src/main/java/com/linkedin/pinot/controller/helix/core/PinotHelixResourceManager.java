@@ -33,9 +33,11 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonParseException;
@@ -63,6 +65,7 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ServerType;
@@ -1256,5 +1259,56 @@ public class PinotHelixResourceManager {
         ControllerTenantNameBuilder.getBrokerTenantNameForTenant(config.getTenantConfig().getBroker());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
     return serverInstances;
+  }
+
+  public PinotResourceManagerResponse enableInstance(String instanceName) {
+    return toogleInstance(instanceName, true, 10);
+  }
+
+  public PinotResourceManagerResponse disableInstance(String instanceName) {
+    return toogleInstance(instanceName, false, 10);
+  }
+
+  // toggle = true for enable, false for disable.
+  public PinotResourceManagerResponse toogleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
+    _helixAdmin.enableInstance(_helixClusterName, instanceName, toggle);
+    long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
+    boolean toggleSucceed = false;
+    String beforeToggleStates = (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
+
+    while (System.currentTimeMillis() < deadline) {
+      toggleSucceed = true;
+      PropertyKey liveInstanceKey = _helixDataAccessor.keyBuilder().liveInstance(instanceName);
+      LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
+      if (liveInstance == null) {
+        if (toggle) {
+          return PinotResourceManagerResponse.FAILURE_RESPONSE;
+        } else {
+          return PinotResourceManagerResponse.SUCCESS_RESPONSE;
+        }
+      }
+      PropertyKey instanceCurrentStatesKey = _helixDataAccessor.keyBuilder().currentStates(instanceName, liveInstance.getSessionId());
+      List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
+      if (instanceCurrentStates == null) {
+        return PinotResourceManagerResponse.SUCCESS_RESPONSE;
+      } else {
+        for (CurrentState currentState : instanceCurrentStates) {
+          for (String state : currentState.getPartitionStateMap().values()) {
+            if (beforeToggleStates.equals(state)) {
+              toggleSucceed = false;
+            }
+          }
+        }
+      }
+      if (toggleSucceed) {
+        return PinotResourceManagerResponse.SUCCESS_RESPONSE;
+      } else {
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+        }
+      }
+    }
+    return PinotResourceManagerResponse.FAILURE_RESPONSE;
   }
 }
