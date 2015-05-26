@@ -29,7 +29,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 /**
  * The config used for TableDataManager.
  *
- * @author xiafu
  *
  */
 public class TableDataManagerConfig {

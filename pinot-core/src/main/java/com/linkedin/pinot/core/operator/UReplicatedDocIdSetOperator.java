@@ -34,7 +34,6 @@ import com.linkedin.pinot.core.common.Operator;
  * So ALWAYS call BDocIdSetOperator.nextBlock() BEFORE calling this class.
  *
  *
- * @author xiafu
  *
  */
 public class UReplicatedDocIdSetOperator implements Operator {

@@ -27,7 +27,6 @@ import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 13, 2014
  */
 

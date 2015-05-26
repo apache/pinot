@@ -37,7 +37,6 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  * For each aggregation function, there will be a corresponding AggregationFunctionGroupByOperator just focus on it.
  * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
- * @author xiafu
  *
  */
 public class MAggregationGroupByOperator implements Operator {

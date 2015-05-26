@@ -35,7 +35,6 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 
 
 /**
- * @author xiafu
  *
  */
 public class SegmentDeletionManager {

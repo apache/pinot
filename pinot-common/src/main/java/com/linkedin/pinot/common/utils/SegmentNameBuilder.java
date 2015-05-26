@@ -21,7 +21,6 @@ import com.google.common.collect.Lists;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 11, 2014
  */
 

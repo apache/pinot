@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Dec 4, 2014
  */
 

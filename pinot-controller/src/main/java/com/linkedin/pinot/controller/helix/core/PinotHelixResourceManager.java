@@ -81,7 +81,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com
  * Sep 30, 2014
  */
 public class PinotHelixResourceManager {
@@ -280,7 +279,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * TODO(xiafu) : Due to the issue of helix, if remove the segment from idealState directly, the node won't get transaction,
+   * TODO : Due to the issue of helix, if remove the segment from idealState directly, the node won't get transaction,
    * so we first disable the segment, then remove it from idealState, then enable the segment. This will trigger transactions.
    * After the helix patch, we can refine the logic here by directly drop the segment from idealState.
    *

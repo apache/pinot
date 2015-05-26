@@ -24,7 +24,6 @@ import org.apache.commons.io.FileUtils;
 /**
  * Utilities to start controllers during unit tests.
  *
- * @author jfim
  */
 public class ControllerTestUtils {
   public static final String DEFAULT_CONTROLLER_INSTANCE_NAME = "localhost_11984";

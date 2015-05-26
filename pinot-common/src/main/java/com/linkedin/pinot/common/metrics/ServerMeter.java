@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.Utils;
 /**
 * Enumeration containing all the meters exposed by the Pinot server.
 *
-* @author jfim
 */
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),

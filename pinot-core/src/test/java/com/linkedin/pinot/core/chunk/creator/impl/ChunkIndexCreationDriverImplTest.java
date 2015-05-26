@@ -49,7 +49,6 @@ import com.linkedin.pinot.util.TestUtils;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 7, 2014
  */
 

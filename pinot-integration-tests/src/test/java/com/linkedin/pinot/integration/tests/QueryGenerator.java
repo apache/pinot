@@ -43,7 +43,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility class to generate random SQL queries based on an Avro file.
  *
- * @author jfim
  */
 public class QueryGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryGenerator.class);

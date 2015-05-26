@@ -34,7 +34,6 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  * TCP Server
  *
- * @author Balaji Varadarajan
  *
  */
 public class NettyTCPServer extends NettyServer {

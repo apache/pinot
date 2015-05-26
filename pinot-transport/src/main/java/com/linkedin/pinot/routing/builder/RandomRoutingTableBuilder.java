@@ -32,7 +32,6 @@ import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  *
- * @author xiafu
  *
  */
 public class RandomRoutingTableBuilder implements RoutingTableBuilder {

@@ -37,7 +37,6 @@ import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 /**
  * Assigns a segment to the instance that has least number of segments.
  *
- * @author xiafu
  *
  */
 public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStrategy {

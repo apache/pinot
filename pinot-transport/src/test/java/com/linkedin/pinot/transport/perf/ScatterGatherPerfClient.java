@@ -491,7 +491,6 @@ public class ScatterGatherPerfClient implements Runnable {
 
   /**
    * Selects the first replica in the list
-   * @author bvaradar
    *
    */
   public static class FirstReplicaSelection extends ReplicaSelection {

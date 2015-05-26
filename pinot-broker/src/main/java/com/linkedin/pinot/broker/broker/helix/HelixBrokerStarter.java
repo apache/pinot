@@ -49,7 +49,6 @@ import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
 /**
  * Helix Broker Startable
  *
- * @author xiafu
  *
  */
 public class HelixBrokerStarter {

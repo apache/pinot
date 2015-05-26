@@ -25,7 +25,6 @@ import org.testng.Assert;
 /**
  * Utility class for JSON comparisons in unit tests.
  *
- * @author jfim
  */
 public class JsonAssert {
   /**

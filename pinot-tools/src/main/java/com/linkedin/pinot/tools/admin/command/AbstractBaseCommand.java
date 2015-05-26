@@ -34,7 +34,6 @@ import org.kohsuke.args4j.Option;
  * Super class for all the commands.
  * Implements the common printUsage method.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class AbstractBaseCommand {
   public AbstractBaseCommand() {

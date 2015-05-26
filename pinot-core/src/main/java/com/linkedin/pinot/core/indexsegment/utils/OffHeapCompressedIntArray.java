@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 
 /**
  * Sept 15, 2012
- * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 public class OffHeapCompressedIntArray implements IntArray {

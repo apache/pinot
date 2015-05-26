@@ -231,7 +231,7 @@ public class ScatterGatherPerfTester {
     options.addOption(NUM_REQUESTS, true, "Number of requests to be sent per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
     options.addOption(SERVER_START_PORT, true, "Start port for server. If execution_mode == RUN_SERVER or RUN_BOTH, then, N (controlled by num_servers) servers will be started with port numbers monotonically incremented from this value. If execution_mode == RUN_CLIENT, then N servers are assumed to be running remotely and this client connects to them");
     options.addOption(SYNC_REQUEST_DISPATCH, false, "Do we want to send requests synchronously (one by one requests and response per client). Set it to false to mimic production workflows");
-    options.addOption(SERVER_HOSTS, true, "Comma seperated list of remote hosts (e.g: dpatel-ld1,xiafu-ld1) where the servers are assumed to be running with same ports (assigned from start_port_num)");
+    options.addOption(SERVER_HOSTS, true, "Comma seperated list of remote hosts where the servers are assumed to be running with same ports (assigned from start_port_num)");
     options.addOption(CONN_POOL_SIZE_PER_PEER, true, "Number of max active connections to be allowed");
     options.addOption(NUM_RESPONSE_READERS, true, "Number of reponse reader threads per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
     options.addOption(RESPONSE_LATENCY, true, "Induced Latency in server per request. Used only when execution mode is RUN_SERVER or RUN_BOTH");
@@ -313,8 +313,6 @@ public class ScatterGatherPerfTester {
       servers = Arrays.asList(cmd.getOptionValue(SERVER_HOSTS).split(","));
     }
 
-    //servers.add("dpatel-ld");
-    //servers.add("xiafu-ld1");
     ScatterGatherPerfTester tester = new ScatterGatherPerfTester(numClients, // num Client Threads
                                                                  numServers, // Num Servers
                                                                  requestSize, // Request Size

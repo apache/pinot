@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.response.ServerInstance;
  * Replica selection Policy implementation. The options mentioned in {@link ReplicaSelectionPolicy}
  * are supported.
  *
- * @author balaji varadarajan
  *
  */
 public abstract class ReplicaSelection {

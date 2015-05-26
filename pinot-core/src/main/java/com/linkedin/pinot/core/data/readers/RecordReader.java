@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.data.GenericRow;
  * Generic interface to implement any new file format in which
  * input data can be read and converted into segments.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 

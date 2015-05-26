@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 /**
  * Jul 15, 2014
- * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 public interface IntArray {

@@ -31,7 +31,6 @@ import org.testng.annotations.Test;
 /**
  * Tests for SearchableByteBufferUtil
  *
- * @author jfim
  */
 public class SearchableByteBufferUtilTest {
   private static final int DISTINCT_VALUES = 10000;

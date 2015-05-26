@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
  * This strategy is default and will check the segment Interval from segmentMetadata and
  * purge segment passed the retention duration.
  *
- * @author xiafu
  *
  */
 public class TimeRetentionStrategy implements RetentionStrategy {

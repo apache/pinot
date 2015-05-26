@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  * TableDataManager interface.
  * Provided interfaces to do operations on segment level.
  *
- * @author xiafu
  *
  */
 public interface TableDataManager {

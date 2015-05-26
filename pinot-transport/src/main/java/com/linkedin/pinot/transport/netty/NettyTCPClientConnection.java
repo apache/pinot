@@ -59,7 +59,6 @@ import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
  * |                    ...............                       |
  * |                    ...............                       |
  * ------------------------------------------------------------
- * @author Balaji Varadarajan
  */
 public class NettyTCPClientConnection extends NettyClientConnection  {
   /**
@@ -378,7 +377,6 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
   /**
    * Timer task responsible for closing the connection on timeout
-   * @author Balaji Varadarajan
    *
    */
   public class ReadTimeoutHandler implements TimerTask {

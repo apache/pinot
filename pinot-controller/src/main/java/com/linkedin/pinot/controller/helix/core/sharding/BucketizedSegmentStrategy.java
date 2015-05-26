@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 /**
  * Assigns a segment to the instance that has same sharding key.
  *
- * @author xiafu
  *
  */
 public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {

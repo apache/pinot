@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Taken from http://www.thoughtspark.org/node/53
- * @author Jeremy Whitlock
  *
  */
 public class TarGzCompressionUtils {

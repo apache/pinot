@@ -23,7 +23,6 @@ import org.testng.annotations.Test;
 /**
  * Tests for the Utils class.
  *
- * @author jfim
  */
 public class UtilsTest {
   @Test

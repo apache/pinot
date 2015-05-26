@@ -29,7 +29,6 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 /**
  * Data structure to hold a whole mapping from ServerInstances to all the queryable segments.
  *
- * @author xiafu
  *
  */
 public class ServerToSegmentSetMap {

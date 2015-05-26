@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 /**
  * Allows one to listen to segment metadata changes
  *
- * @author kgopalak
  *
  */
 public interface SegmentMetadataListener {

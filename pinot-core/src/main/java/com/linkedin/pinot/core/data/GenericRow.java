@@ -30,7 +30,6 @@ import com.linkedin.pinot.common.data.RowEvent;
 /**
  * A plain implementation of RowEvent based on HashMap.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public class GenericRow implements RowEvent {

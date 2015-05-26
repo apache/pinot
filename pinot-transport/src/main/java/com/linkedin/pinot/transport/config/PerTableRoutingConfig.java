@@ -37,7 +37,6 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  * pinot.broker.routing.midas.serversForPartitions.0=localhost:9099
  * pinot.broker.routing.midas.serversForPartitions.1=localhost:9099
  *
- * @author bvaradar
  *
  */
 public class PerTableRoutingConfig {

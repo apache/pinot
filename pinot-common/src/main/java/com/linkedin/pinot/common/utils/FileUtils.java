@@ -19,7 +19,6 @@ import java.util.Random;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 12, 2014
  */
 

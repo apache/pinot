@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 /**
  * InstanceResponseBlock is just a holder to get InstanceResponse from InstanceResponseBlock.
  *
- * @author xiafu
  *
  */
 public class InstanceResponseBlock implements Block {

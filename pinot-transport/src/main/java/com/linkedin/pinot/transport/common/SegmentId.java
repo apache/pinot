@@ -17,7 +17,6 @@ package com.linkedin.pinot.transport.common;
 
 /**
  * Represent one segment in the system identified by a "string" type identifier
- * @author bvaradar
  *
  */
 public class SegmentId {

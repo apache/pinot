@@ -42,7 +42,6 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  * caller is responsible to ensure that the array is big enough to fit all the
  * values. The return value tells the number of values.<br/>
  *
- * @author kgopalak
  *
  */
 public class FixedByteWidthRowColDataFileReader implements Closeable {

@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 
 /**
  * Result Block shared across all operators in the Filter Tree
- * @author kgopalak
  *
  */
 public class FilterResultBlock implements Block {

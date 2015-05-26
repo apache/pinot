@@ -65,7 +65,6 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Oct 14, 2014
  */
 

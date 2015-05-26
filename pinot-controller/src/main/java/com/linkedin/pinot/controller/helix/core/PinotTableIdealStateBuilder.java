@@ -48,7 +48,6 @@ import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrate
 /**
  * Pinot data server layer IdealState builder.
  *
- * @author xiafu
  *
  */
 public class PinotTableIdealStateBuilder {

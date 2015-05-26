@@ -25,7 +25,6 @@ import com.yammer.metrics.stats.Snapshot;
  * Latency Metric Snapshot constructed from Histogram ( or AggregatedHistogram)
  * Provides a snapshot of commonly used latency numbers.
  *
- * @author bvaradar
  *
  * @param <T> Histogram
  */

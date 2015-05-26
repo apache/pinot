@@ -27,7 +27,6 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 /**
  * Class to implement StartServer command.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")

@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Validation metrics utility class, which contains the glue code to publish metrics.
  *
- * @author jfim
  */
 public class ValidationMetrics {
   private final MetricsRegistry _metricsRegistry;

@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.Utils;
 /**
 * Enumeration containing all the metrics exposed by the Pinot broker.
 *
-* @author jfim
 */
 public enum BrokerMeter implements AbstractMetrics.Meter {
   UNCAUGHT_GET_EXCEPTIONS("exceptions", true),

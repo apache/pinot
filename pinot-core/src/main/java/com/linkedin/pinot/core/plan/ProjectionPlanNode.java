@@ -32,7 +32,6 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  * ProjectionPlanNode takes care of a map from column name to its corresponding
  * data source.
  *
- * @author xiafu
  *
  */
 public class ProjectionPlanNode implements PlanNode {

@@ -66,7 +66,6 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 /**
  * SelectionOperator provides the apis for selection query.
  *
- * @author xiafu
  *
  */
 public class SelectionOperatorUtils {

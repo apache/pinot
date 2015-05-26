@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  *
  * Nov 7, 2014
  *

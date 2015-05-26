@@ -49,7 +49,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 24, 2014
  *
  * sample curl call : curl -F campaignInsights_adsAnalysis-bmCamp_11=@campaignInsights_adsAnalysis-bmCamp_11      http://localhost:8998/segments

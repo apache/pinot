@@ -33,7 +33,6 @@ import com.linkedin.pinot.common.utils.MmapUtils;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 10, 2014
  */
 

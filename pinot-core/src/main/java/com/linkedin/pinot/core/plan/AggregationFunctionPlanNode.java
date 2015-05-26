@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
  * AggregationFunctionPlanNode takes care of how to apply one aggregation
  * function for given data sources.
  *
- * @author xiafu
  *
  */
 public class AggregationFunctionPlanNode implements PlanNode {

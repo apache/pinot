@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 /**
  *
- * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 19, 2014
  */
 public class SortedIntArray implements IntArray {

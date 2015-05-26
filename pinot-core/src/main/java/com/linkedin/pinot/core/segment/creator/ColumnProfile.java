@@ -20,7 +20,6 @@ import java.util.Set;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 6, 2014
  */
 

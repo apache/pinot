@@ -40,7 +40,6 @@ import com.linkedin.pinot.tools.admin.command.UploadDataCommand;
 /**
  * Class to implement Pinot Administrator, that provides the following commands:
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class PinotAdministrator {
   // @formatter:off

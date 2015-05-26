@@ -34,7 +34,6 @@ import com.linkedin.pinot.transport.common.NoneType;
  * A Netty standalone connection. This will be managed as a resource in a pool to reuse
  * connection. This is not thread-safe so multiple requests cannot be sent simultaneously.
  * This class provides an async API to send requests and wait for response.
- * @author Balaji Varadarajan
  */
 public abstract class NettyClientConnection {
   protected static Logger LOGGER = LoggerFactory.getLogger(NettyTCPClientConnection.class);

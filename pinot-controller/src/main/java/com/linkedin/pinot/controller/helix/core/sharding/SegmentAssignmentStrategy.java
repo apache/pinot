@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 /**
  * Given a segmentMetadata, each strategy has to implement its own method to compute the assigned instances.
  *
- * @author xiafu
  *
  */
 public interface SegmentAssignmentStrategy {

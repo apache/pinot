@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 /**
  * Sept 15, 2012
- * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 public class HeapCompressedIntArray implements IntArray {

@@ -25,7 +25,6 @@ import com.linkedin.pinot.core.operator.UResultOperator;
 /**
  * The root node of an instance query plan.
  *
- * @author xiafu
  *
  */
 public class InstanceResponsePlanNode implements PlanNode {

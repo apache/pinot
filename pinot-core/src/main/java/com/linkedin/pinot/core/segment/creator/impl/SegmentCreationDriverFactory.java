@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 /**
  * Jun 28, 2014
  *
- * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 public class SegmentCreationDriverFactory {

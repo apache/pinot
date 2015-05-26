@@ -27,7 +27,6 @@ import com.linkedin.pinot.core.common.Operator;
  * Internally, cached a given size of docIds, so this Operator could be replicated
  * for many ColumnarReaderDataSource.
  *
- * @author xiafu
  *
  */
 public class BReusableFilteredDocIdSetOperator implements Operator {

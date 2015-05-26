@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.common.Predicate;
 
 /**
  * Base Operator for all filter operators. ResultBlock is initialized in the planning phase
- * @author kgopalak
  *
  */
 public abstract class BaseFilterOperator implements Operator {

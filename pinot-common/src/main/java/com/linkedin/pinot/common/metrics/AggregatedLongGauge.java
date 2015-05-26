@@ -26,7 +26,6 @@ import com.yammer.metrics.core.Gauge;
  * An aggregated gauge that provides an average among the underlying gauges. You can have
  * multi-level aggregations of gauges (long types)
  *
- * @author bvaradar
  *
  * @param <T>
  */

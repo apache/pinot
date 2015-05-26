@@ -27,7 +27,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 /**
  * TODO Document me!
  *
- * @author jfim
  */
 public class ZkUtils {
   public static ZkHelixPropertyStore<ZNRecord> getZkPropertyStore(HelixManager helixManager, String clusterName) {

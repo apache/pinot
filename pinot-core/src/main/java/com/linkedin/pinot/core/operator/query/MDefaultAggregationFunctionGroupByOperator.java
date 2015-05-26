@@ -38,7 +38,6 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  * The most generic GroupBy Operator which will take all the required
  * dataSources and do aggregation and groupBy.
  *
- * @author xiafu
  *
  */
 public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunctionGroupByOperator {

@@ -16,7 +16,6 @@
 package com.linkedin.pinot.tools.data.generator;
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 13, 2014
  */
 

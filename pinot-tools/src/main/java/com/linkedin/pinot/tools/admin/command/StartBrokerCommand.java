@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 /**
  * Class to implement StartBroker command.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")

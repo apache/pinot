@@ -51,7 +51,6 @@ import com.yammer.metrics.core.Counter;
  * An implemenation of offline TableDataManager.
  * Provide add and remove segment functionality.
  *
- * @author xiafu
  *
  */
 public class OfflineTableDataManager implements TableDataManager {

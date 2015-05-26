@@ -33,7 +33,6 @@ import com.linkedin.pinot.common.utils.TenantRole;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 29, 2014
  */
 

@@ -59,7 +59,6 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 4, 2014
  */
 public class BrokerServerBuilder {

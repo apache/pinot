@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.segment.creator;
 import com.linkedin.pinot.core.data.GenericRow;
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 6, 2014
  */
 

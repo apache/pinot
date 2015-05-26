@@ -27,7 +27,6 @@ import org.kohsuke.args4j.Option;
  * Class for command to stop a process.
  * Relies on pid written by process, and works on local-host only.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  *
  */
 public class StopProcessCommand extends AbstractBaseCommand implements Command {

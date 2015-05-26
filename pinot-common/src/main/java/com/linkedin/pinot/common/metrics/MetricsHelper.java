@@ -303,7 +303,6 @@ public class MetricsHelper {
   /**
    *
    * TimerContext to measure elapsed time
-   * @author bvaradar
    *
    */
   public static class TimerContext {

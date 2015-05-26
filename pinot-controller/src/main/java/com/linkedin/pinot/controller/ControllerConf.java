@@ -22,7 +22,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 26, 2014
  */
 

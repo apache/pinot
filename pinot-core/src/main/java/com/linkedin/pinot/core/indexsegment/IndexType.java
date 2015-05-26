@@ -21,7 +21,6 @@ package com.linkedin.pinot.core.indexsegment;
  * In the future can support more index types, like row based or tree based
  * structure.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public enum IndexType {

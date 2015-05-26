@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 /**
  * Class for command to upload data into Pinot.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  *
  */
 public class UploadDataCommand extends AbstractBaseCommand implements Command {

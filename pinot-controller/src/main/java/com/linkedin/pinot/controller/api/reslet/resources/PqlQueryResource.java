@@ -47,7 +47,6 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Dec 8, 2014
  */
 

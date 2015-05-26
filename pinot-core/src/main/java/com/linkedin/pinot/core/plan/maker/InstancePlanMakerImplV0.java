@@ -37,7 +37,6 @@ import com.linkedin.pinot.core.plan.SelectionPlanNode;
  * Make the huge plan, root is always ResultPlanNode, the child of it is a huge
  * plan node which will take the segment and query, then do everything.
  *
- * @author xiafu
  *
  */
 public class InstancePlanMakerImplV0 implements PlanMaker {

@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 12, 2014
  */
 

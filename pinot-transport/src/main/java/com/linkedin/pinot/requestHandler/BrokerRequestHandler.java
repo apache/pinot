@@ -64,7 +64,6 @@ import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 /**
  * Request Handler to serve a Broker Request. THis is thread-safe and clients
  * can concurrently submit requests to the main method.
- * @author bvaradar
  *
  */
 @ThreadSafe

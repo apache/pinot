@@ -36,7 +36,6 @@ import com.linkedin.pinot.core.realtime.RealtimeIndexingConfig;
  * the replicas listen to this update and consumes from Kafka until that offset,
  * flushes the segment to disk and reload the segment from disk (note on disk
  * format is different from in memory format) and frees up the memory <br/>
- * @author kgopalak
  */
 public class RealtimeResourceStateTransitionHandler {
   /**

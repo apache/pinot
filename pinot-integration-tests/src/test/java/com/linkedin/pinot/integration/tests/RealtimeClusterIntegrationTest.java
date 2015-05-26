@@ -47,7 +47,6 @@ import com.linkedin.pinot.util.TestUtils;
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  *
- * @author jfim
  */
 public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);

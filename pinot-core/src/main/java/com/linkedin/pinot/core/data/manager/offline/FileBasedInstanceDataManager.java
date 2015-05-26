@@ -40,7 +40,6 @@ import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 /**
  * InstanceDataManager is the top level DataManger, Singleton.
  *
- * @author xiafu
  *
  */
 public class FileBasedInstanceDataManager implements InstanceDataManager {

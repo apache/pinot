@@ -25,7 +25,6 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 /**
  * Class to implement CreateResource command.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class AddTableCommand extends AbstractBaseCommand implements Command {
 

@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.query.planner.QueryPlan;
 /**
  * Given a query and query plan, different strategy may apply based on the query type.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public interface PlanExecutor {

@@ -37,7 +37,6 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 /**
  * AggregationPlanNode takes care of how to apply an aggregation query to an IndexSegment.
  *
- * @author xiafu
  *
  */
 public class AggregationPlanNode implements PlanNode {

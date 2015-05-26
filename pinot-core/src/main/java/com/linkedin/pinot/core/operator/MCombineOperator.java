@@ -56,7 +56,6 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
  *      Number of Operators is based on the pruned segments:
  *          one segment to one Operator.
  *
- * @author xiafu
  *
  */
 public class MCombineOperator implements Operator {

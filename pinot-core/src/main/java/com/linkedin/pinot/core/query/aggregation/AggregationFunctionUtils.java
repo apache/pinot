@@ -26,7 +26,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 
 
 /**
- * @author xiafu
  *
  */
 public class AggregationFunctionUtils {

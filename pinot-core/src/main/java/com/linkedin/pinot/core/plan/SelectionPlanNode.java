@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 /**
  * SelectionPlanNode takes care creating MSelectionOperator.
- * @author xiafu
  *
  */
 public class SelectionPlanNode implements PlanNode {

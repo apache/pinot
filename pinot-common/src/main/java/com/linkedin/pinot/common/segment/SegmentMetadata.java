@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.data.Schema;
  * SegmentMetadata holds segment level management information and data
  * statistics.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public interface SegmentMetadata {

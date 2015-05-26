@@ -22,7 +22,6 @@ import org.apache.commons.configuration.ConfigurationException;
 /**
  * The config used for Server.
  *
- * @author xiafu
  *
  */
 public class ServerConf {

@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.common.DataSource;
  * should be one of the supported {@link com.linkedin.pinot.core.indexsegment.IndexType
  * IndexType}.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public interface IndexSegment {

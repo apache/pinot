@@ -39,7 +39,6 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
  * This MSelectionOnlyOperator will take care of applying a selection query to one IndexSegment.
  * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
- * @author xiafu
  *
  */
 public class MSelectionOnlyOperator implements Operator {

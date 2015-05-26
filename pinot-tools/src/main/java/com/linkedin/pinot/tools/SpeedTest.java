@@ -25,7 +25,6 @@ import java.nio.channels.FileChannel.MapMode;
 /**
  * Compares perf between Heap, Direct and Memory Mapped
  *
- * @author kgopalak
  *
  */
 public class SpeedTest {

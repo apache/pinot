@@ -41,7 +41,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 /**
  * Tests for the file upload restlet.
  *
- * @author jfim
  */
 public class PinotFileUploadTest extends ControllerTest {
 

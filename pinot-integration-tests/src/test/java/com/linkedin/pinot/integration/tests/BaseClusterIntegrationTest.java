@@ -77,7 +77,6 @@ import com.linkedin.pinot.util.TestUtils;
 /**
  * TODO Document me!
  *
- * @author jfim
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);

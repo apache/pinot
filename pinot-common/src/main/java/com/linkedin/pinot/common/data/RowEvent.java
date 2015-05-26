@@ -21,7 +21,6 @@ import java.util.Map;
 /**
  * The interface for a row based record usually comes with dimensions, metrics and timestamps.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public interface RowEvent {

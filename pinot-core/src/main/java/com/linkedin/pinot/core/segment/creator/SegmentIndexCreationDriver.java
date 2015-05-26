@@ -21,7 +21,6 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 /**
  * Driver that creates and writes index segments to disk from data that is stored on disk.
  *
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 6, 2014
  */
 

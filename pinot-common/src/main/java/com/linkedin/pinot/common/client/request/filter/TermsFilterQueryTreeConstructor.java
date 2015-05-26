@@ -29,7 +29,6 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 29, 2014
  */
 

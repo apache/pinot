@@ -28,7 +28,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 /**
  *
- * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 17, 2014
  *
  */

@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 
 /**
  * Provide static function to get PartitionDataManager implementation.
- * @author xiafu
  *
  */
 public class TableDataManagerProvider {

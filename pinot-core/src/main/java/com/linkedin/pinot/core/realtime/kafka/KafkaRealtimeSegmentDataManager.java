@@ -36,7 +36,6 @@ import com.linkedin.pinot.core.realtime.SegmentMetadataListener;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
 /**
- * @author kgopalak
  */
 public class KafkaRealtimeSegmentDataManager implements RealtimeSegmentDataManager {
 

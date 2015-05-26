@@ -42,7 +42,6 @@ import com.yammer.metrics.core.MetricsRegistry;
  * Will auto join current cluster as a participant.
  *
  *
- * @author xiafu
  *
  */
 public class HelixServerStarter {

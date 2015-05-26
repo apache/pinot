@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 7, 2014
  */
 

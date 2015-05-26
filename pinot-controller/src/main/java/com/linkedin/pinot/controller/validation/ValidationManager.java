@@ -46,8 +46,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  *
- * @author Dhaval Patel<dpatel@linkedin.com>
- * @author jfim
  * Dec 10, 2014
 */
 

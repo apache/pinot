@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 /**
  * Random assign segment to instances.
  *
- * @author xiafu
  *
  */
 public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {

@@ -39,7 +39,6 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 /**
  * Initialize a ServerBuilder with serverConf file.
  *
- * @author xiafu
  *
  */
 public class ServerBuilder {

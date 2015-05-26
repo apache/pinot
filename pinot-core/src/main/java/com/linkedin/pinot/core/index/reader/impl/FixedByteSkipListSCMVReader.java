@@ -41,7 +41,6 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  * - Have the same number of documents.
  * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up. 
  * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section 
- * @author kgopalak
  *
  */
 public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader {

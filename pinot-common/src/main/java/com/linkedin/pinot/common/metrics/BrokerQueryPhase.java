@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.Utils;
 /**
 * Enumeration containing all the query phases executed by the Pinot broker.
 *
-* @author jfim
 */
 public enum BrokerQueryPhase implements AbstractMetrics.QueryPhase {
   REQUEST_COMPILATION,

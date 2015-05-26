@@ -40,7 +40,6 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 /**
  * HelixSetupUtils handles how to create or get a helixCluster in controller.
  *
- * @author xiafu
  *
  */
 public class HelixSetupUtils {

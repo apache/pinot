@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
  * you would have to regenerate (or redefine) request/response classes anyways and implement the SerDe for it.
  *
  * Please note the implementation is not thread-safe as underlying thrift serialization is not threadsafe.
- * @author bvaradar
  *
  */
 @NotThreadSafe

@@ -30,7 +30,6 @@ import com.linkedin.pinot.core.common.Operator;
 /**
  * MProjectionOperator will call nextBlock then return a ProjectionBlock.
  *
- * @author xiafu
  *
  */
 public class MProjectionOperator implements Operator {

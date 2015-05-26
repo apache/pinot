@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.data.GenericRow;
  * Take a GenericRow transform it to an indexable GenericRow.
  * Customized logic will apply in transform(...)
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public interface FieldExtractor {

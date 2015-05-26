@@ -55,7 +55,6 @@ import com.yammer.metrics.core.MetricName;
 /**
  *
  * Scatter-Gather implementation
- * @author Balaji Varadarajan
  *
  */
 public class ScatterGatherImpl implements ScatterGather {
@@ -337,7 +336,6 @@ public class ScatterGatherImpl implements ScatterGather {
 
   /**
    * Runnable responsible for sending a request to the server once the connection is available
-   * @author bvaradar
    *
    */
   public static class SingleRequestHandler implements Runnable {
@@ -444,7 +442,6 @@ public class ScatterGatherImpl implements ScatterGather {
 
   /**
    * This is used to checkin the connections once the responses/errors are obtained
-   * @author bvaradar
    *
    */
   /*

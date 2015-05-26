@@ -29,7 +29,6 @@ import com.yammer.metrics.core.MetricsRegistry;
 /**
  * Common code for metrics implementations.
  *
- * @author jfim
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter> {
 

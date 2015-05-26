@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 13, 2014
  */
 

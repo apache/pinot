@@ -24,7 +24,6 @@ import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 /**
  * Utilities to start a broker during unit tests.
  *
- * @author jfim
  */
 public class BrokerTestUtils {
   public static Configuration getDefaultBrokerConfiguration() {

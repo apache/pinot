@@ -43,7 +43,6 @@ import com.linkedin.pinot.controller.ControllerStarter;
 /**
  * Base class for controller tests.
  *
- * @author jfim
  */
 public abstract class ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);

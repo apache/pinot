@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 /**
  *
- * @author Dhaval Patel<dpatel@linkedin.com
  * July 19, 2014
  */
 public class ColumnarSegmentLoader {

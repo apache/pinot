@@ -37,7 +37,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 29, 2014
  */
 

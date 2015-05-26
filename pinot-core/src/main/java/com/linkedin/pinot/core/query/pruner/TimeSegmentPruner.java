@@ -27,7 +27,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  * Pruner will prune segment if there is no overlapping of segment time interval and query
  * time interval.
  *
- * @author xiafu
  *
  */
 public class TimeSegmentPruner implements SegmentPruner {

@@ -45,7 +45,6 @@ import com.linkedin.pinot.core.util.CrcUtils;
 
 /**
  * Implementation of an index segment creator.
- * @author Dhaval Patel<dpatel@linkedin.com> Nov 6, 2014
  */
 
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {

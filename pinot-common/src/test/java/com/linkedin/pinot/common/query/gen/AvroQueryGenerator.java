@@ -43,7 +43,6 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Oct 17, 2014
  */
 
@@ -419,7 +418,7 @@ public class AvroQueryGenerator {
   }
 
   public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException {
-    AvroQueryGenerator gen = setUpTestQueries("mirror");
+    AvroQueryGenerator gen = setUpTestQueries("mirror", args[0]);
 
     final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(100);
     final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(100);
@@ -433,9 +432,7 @@ public class AvroQueryGenerator {
     }
   }
 
-  private static AvroQueryGenerator setUpTestQueries(String resource) throws FileNotFoundException, IOException {
-    final String filePath =
-        "/home/xiafu/workspace-building/open-source/github/new_pinot_build/pinot-core/target/test-classes/data/mirror-sv.avro";
+  private static AvroQueryGenerator setUpTestQueries(String resource, String filePath) throws FileNotFoundException, IOException {
     final List<String> dims = new ArrayList<String>();
     dims.add("viewerId");
     dims.add("viewerType");

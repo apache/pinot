@@ -25,7 +25,6 @@ import org.apache.commons.lang.RandomStringUtils;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 12, 2014
  */
 

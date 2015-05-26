@@ -52,7 +52,6 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
  * 3. the real world business logic: dimensions, metrics and timeStamps.
  * Different indexing and query strategies are used for different data schema types.
  *
- * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public class Schema {

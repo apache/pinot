@@ -486,7 +486,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
           // that eventually fail?
           _lastCreateError = null;
         } else if ((_waiters.size() > 0) || (_poolSize < _minSize)) {
-          // Balaji: We need to update the below metrics only at the place where we do the actual add. Otherwise
+          // We need to update the below metrics only at the place where we do the actual add. Otherwise
           // destroy() would make shutdown to hang()
           //_poolSize++; <== Moved to add()
           //_sampleMaxPoolSize = Math.max(_poolSize, _sampleMaxPoolSize); <== Moved to add()
@@ -525,7 +525,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
           create = objectDestroyed();
           if (!_waiters.isEmpty()) {
             waitersDenied = cancelWaiters();
-            //Balaji: Verify if we really need to create again
+            //Verify if we really need to create again
             create = shouldCreate();
           } else {
             waitersDenied = Collections.emptyList();
@@ -619,7 +619,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       future.cancel(false);
     }
 
-    // Balaji: We should be calling destroy() on resources while shutting down.
+    // We should be calling destroy() on resources while shutting down.
     LOGGER.info("{}: {}", _poolName, "Discarding resources before shutdown");
     TimedObject<T> obj = _idle.pollFirst();
     while (obj != null) {

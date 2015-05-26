@@ -30,7 +30,6 @@ import static org.testng.Assert.assertTrue;
 /**
  * Tests for the MetricsHelper class.
  *
- * @author jfim
  */
 public class MetricsHelperTest {
   public static boolean listenerOneOkay;

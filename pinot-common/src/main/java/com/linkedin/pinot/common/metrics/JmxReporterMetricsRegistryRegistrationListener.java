@@ -22,7 +22,6 @@ import com.yammer.metrics.reporting.JmxReporter;
 /**
  * Adapter that causes metrics from a metric registry to be published to JMX.
  *
- * @author jfim
  */
 public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
   @Override

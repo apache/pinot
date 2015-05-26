@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 /**
  * Test for equals and hashCode for the various ZK metadata classes
  *
- * @author jfim
  */
 public class MetadataEqualsHashCodeTest {
   @Test

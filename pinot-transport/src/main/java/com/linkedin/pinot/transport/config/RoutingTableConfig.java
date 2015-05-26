@@ -31,7 +31,6 @@ import org.apache.commons.configuration.ConfigurationException;
  *
  * pinot.broker.routing.midas.servers.default=localhost:9099
  *
- * @author bvaradar
  *
  */
 public class RoutingTableConfig {

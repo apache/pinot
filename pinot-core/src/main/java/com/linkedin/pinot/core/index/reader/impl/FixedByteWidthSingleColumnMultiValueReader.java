@@ -63,7 +63,6 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  * (offset and length) at offset 0, in this case we get 6,3. Now we read, 6
  * integer
  *
- * @author kgopalak
  *
  */
 public class FixedByteWidthSingleColumnMultiValueReader implements

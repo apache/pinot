@@ -38,7 +38,6 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
  *
  * This class is used for benchmarking the Scatter-Gather Layer
  *
- * @author bvaradar
  *
  */
 public class ScatterGatherPerfServer {

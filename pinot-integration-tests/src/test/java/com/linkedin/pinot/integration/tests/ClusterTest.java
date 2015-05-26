@@ -59,7 +59,6 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 /**
  * Base class for integration tests that involve a complete Pinot cluster.
  *
- * @author jfim
  */
 public abstract class ClusterTest extends ControllerTest {
   private static final String _success = "success";

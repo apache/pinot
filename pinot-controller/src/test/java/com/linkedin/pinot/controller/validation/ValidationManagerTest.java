@@ -47,7 +47,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 /**
  * Tests for the ValidationManager.
  *
- * @author jfim
  */
 public class ValidationManagerTest {
 

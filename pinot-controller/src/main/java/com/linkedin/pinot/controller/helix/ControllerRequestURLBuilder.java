@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 30, 2014
  */
 

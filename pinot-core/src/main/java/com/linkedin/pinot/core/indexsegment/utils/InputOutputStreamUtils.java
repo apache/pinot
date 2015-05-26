@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.data.readers.FileSystemMode;
 
 /**
  *
- * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 19, 2014
  */
 @Deprecated

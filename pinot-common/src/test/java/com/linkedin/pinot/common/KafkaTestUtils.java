@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 /**
  * Utilities to start Kafka during unit tests.
  *
- * @author jfim
  */
 public class KafkaTestUtils {
   public static final int DEFAULT_KAFKA_PORT = 19092;

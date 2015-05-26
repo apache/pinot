@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.data.Schema;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 14, 2014
  */
 

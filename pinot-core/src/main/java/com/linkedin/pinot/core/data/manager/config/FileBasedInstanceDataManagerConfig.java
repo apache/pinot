@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 /**
  * The config used for InstanceDataManager.
  *
- * @author xiafu
  *
  */
 public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerConfig {

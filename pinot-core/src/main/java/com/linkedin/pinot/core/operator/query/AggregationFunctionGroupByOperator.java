@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFuncti
 /**
  * AggregationFunctionGroupByOperator will take all the needed info for the implementations.
  *
- * @author xiafu
  *
  */
 public abstract class AggregationFunctionGroupByOperator implements Operator {

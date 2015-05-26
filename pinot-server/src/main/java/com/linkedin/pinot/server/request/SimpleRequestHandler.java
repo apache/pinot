@@ -48,7 +48,6 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 /**
  * A simple implementation of RequestHandler.
  *
- * @author xiafu
  *
  */
 public class SimpleRequestHandler implements RequestHandler {

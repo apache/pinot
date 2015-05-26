@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.query.config.SegmentPrunerConfig;
 /**
  * An implementation of SegmentPrunerService.
  *
- * @author xiafu
  *
  */
 public class SegmentPrunerServiceImpl implements SegmentPrunerService {

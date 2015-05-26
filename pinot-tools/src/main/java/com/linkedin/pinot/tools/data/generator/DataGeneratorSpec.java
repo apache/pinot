@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 12, 2014
  */
 

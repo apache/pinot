@@ -18,7 +18,6 @@ package com.linkedin.pinot.controller.helix.core.sharding;
 /**
  * Get SegmentAssignmentStrategyFactory methods.
  *
- * @author xiafu
  *
  */
 public class SegmentAssignmentStrategyFactory {

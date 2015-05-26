@@ -51,7 +51,6 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  *
  * and do aggregation and groupBy.
  *
- * @author xiafu
  *
  */
 public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extends AggregationFunctionGroupByOperator {

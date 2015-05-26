@@ -22,7 +22,6 @@ import org.testng.annotations.Test;
 /**
  * Test for IndexType.
  *
- * @author jfim
  */
 public class IndexTypeTest {
   @Test

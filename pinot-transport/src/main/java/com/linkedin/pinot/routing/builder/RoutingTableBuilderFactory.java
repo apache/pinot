@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Create a RoutingTableBuilder instance from a given key.
  *
- * @author xiafu
  *
  */
 public class RoutingTableBuilderFactory {

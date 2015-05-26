@@ -21,7 +21,6 @@ import java.io.Closeable;
 
 /**
  *
- * @author kgopalak
  *
  */
 public interface DataFileWriter extends Closeable {

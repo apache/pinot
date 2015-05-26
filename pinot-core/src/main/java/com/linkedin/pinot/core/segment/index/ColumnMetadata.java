@@ -30,7 +30,6 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 12, 2014
  */
 

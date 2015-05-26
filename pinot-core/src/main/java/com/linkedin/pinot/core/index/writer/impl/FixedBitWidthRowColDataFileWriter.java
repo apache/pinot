@@ -34,7 +34,6 @@ import org.apache.commons.io.IOUtils;
  * Represents a datatable where each col contains values that can be represented
  * using a fix set of bits.
  *
- * @author kgopalak
  *
  */
 public class FixedBitWidthRowColDataFileWriter implements Closeable {

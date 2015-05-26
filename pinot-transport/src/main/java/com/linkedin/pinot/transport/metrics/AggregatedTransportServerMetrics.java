@@ -28,7 +28,6 @@ import com.yammer.metrics.core.Summarizable;
 /**
  *
  * Aggregated Transport Server Metrics. Provides multi-level aggregation.
- * @author bvaradar
  *
  */
 public class AggregatedTransportServerMetrics implements TransportServerMetrics {

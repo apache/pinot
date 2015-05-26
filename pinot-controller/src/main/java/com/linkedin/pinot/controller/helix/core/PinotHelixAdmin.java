@@ -39,7 +39,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 
 /**
  * HelixAdmin wrapper to perform all helix related CRUD operations
- * @author kgopalak
  *
  */
 public class PinotHelixAdmin {

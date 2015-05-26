@@ -18,7 +18,6 @@ package com.linkedin.pinot.tools.admin.command;
 /**
  * Interface class for pinot-admin commands.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  *
  */
 public interface Command {

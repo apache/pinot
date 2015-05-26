@@ -72,7 +72,6 @@ import org.slf4j.LoggerFactory;
  * first.Overall having dictionary allow us to convert data table into a fixed
  * width matrix and thus allowing look up and easy traversal.
  *
- * @author kgopalak
  *
  */
 public class DataTableBuilder {

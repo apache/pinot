@@ -28,7 +28,6 @@ import com.linkedin.pinot.core.common.Operator;
  * AggregationFunctionGroupByOperator as a copy of MProjectionOperator.
  * nextBlock() here returns currentBlock in MProjectionOperator.
  *
- * @author xiafu
  *
  */
 public class UReplicatedProjectionOperator implements Operator {

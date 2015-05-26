@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Various utilities for unit tests.
  *
- * @author jfim
  */
 public class TestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);

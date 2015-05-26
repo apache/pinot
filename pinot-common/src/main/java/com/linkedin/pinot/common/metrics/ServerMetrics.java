@@ -21,7 +21,6 @@ import com.yammer.metrics.core.MetricsRegistry;
 /**
  * Utility class to centralize all metrics reporting for the Pinot server.
  *
- * @author jfim
  */
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter> {
   @Override

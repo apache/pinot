@@ -60,7 +60,6 @@ import com.linkedin.pinot.util.TestUtils;
  * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
  * two month overlap).
  *
- * @author jfim
  */
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);

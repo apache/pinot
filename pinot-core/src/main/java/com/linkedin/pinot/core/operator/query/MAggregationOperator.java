@@ -36,7 +36,6 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  * to a given IndexSegment.
  * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
- * @author xiafu
  *
  */
 public class MAggregationOperator implements Operator {

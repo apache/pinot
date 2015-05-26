@@ -42,7 +42,6 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 /**
  * A holder of InstanceResponse components. Easy to do merge.
  *
- * @author xiafu
  *
  */
 public class IntermediateResultsBlock implements Block {

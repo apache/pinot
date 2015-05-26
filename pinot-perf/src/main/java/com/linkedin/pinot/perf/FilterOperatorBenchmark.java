@@ -36,7 +36,6 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
 /**
  * Allows us to benchmark filter operator in isolation
  * USAGE FilterOperatorBenchmark <IndexRootDir> <Query>
- * @author kgopalak
  *
  */
 public class FilterOperatorBenchmark {

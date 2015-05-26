@@ -22,7 +22,6 @@ import org.apache.commons.configuration.ConfigurationException;
 /**
  * Config for QueryPlanner.
  *
- * @author xiafu
  *
  */
 public class QueryPlannerConfig {

@@ -26,7 +26,6 @@ import com.linkedin.pinot.core.operator.UResultOperator;
 /**
  * GlobalPlan for a query applied to all the pruned segments.
  *
- * @author xiafu
  *
  */
 public class GlobalPlanImplV0 extends Plan {

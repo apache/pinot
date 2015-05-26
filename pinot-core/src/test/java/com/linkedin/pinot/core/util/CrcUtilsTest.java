@@ -34,7 +34,6 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Dec 4, 2014
  */
 

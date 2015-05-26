@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 
 /**
  * Wrapper to encapsulate the metadata informatio for a real time segment based on Kafka
- * @author kgopalak
  *
  */
 public class KafkaSegmentMetadata implements SegmentMetadata {

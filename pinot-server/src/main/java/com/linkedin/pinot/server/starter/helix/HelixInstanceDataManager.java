@@ -45,7 +45,6 @@ import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 /**
  * InstanceDataManager is the top level DataManger, Singleton.
  *
- * @author xiafu
  *
  */
 public class HelixInstanceDataManager implements InstanceDataManager {

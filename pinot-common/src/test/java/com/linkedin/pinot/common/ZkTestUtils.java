@@ -29,7 +29,6 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
 /**
  * Utilities to start a Zookeeper cluster during unit tests.
  *
- * @author jfim
  */
 public class ZkTestUtils {
   public static final int DEFAULT_ZK_TEST_PORT = 2191;

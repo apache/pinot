@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.response.ServerInstance;
  * This class provides an option to use a precalculated Selection to be used
  * for request. This is useful for testing where we wanted the request to go to
  * specific servers.
- * @author bvaradar
  *
  */
 public class BucketingSelection {

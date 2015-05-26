@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.Aggregati
  * AggregationFunctionGroupByPlanNode takes care of how to apply one aggregation
  * function and the groupby query to an IndexSegment.
  *
- * @author xiafu
  *
  */
 public class AggregationFunctionGroupByPlanNode implements PlanNode {

@@ -31,7 +31,6 @@ import com.yammer.metrics.core.Histogram;
  *
  * Original Author information:
  *
- * @author Steven Ihde
  * @version $Revision: $
  *
  * @param <T> Resource type to be managed

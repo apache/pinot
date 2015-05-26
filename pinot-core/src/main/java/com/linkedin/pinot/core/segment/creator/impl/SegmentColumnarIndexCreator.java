@@ -63,7 +63,6 @@ import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreat
 /**
  * Segment creator which writes data in a columnar form.
  *
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 9, 2014
  */
 

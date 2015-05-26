@@ -30,7 +30,6 @@ import com.linkedin.pinot.core.operator.MCombineOperator;
 /**
  * CombinePlanNode takes care how to create MCombineOperator.
  *
- * @author xiafu
  *
  */
 public class CombinePlanNode implements PlanNode {

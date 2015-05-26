@@ -44,7 +44,6 @@ import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
 /**
  * Class to implement GenerateData command.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class GenerateDataCommand extends AbstractBaseCommand implements Command {
   @Option(name="-numRecords", required=true, metaVar="<int>", usage="Number of records to generate.")

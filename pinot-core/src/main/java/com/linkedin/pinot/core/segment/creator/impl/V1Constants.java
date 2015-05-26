@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 
 /**
  * Jun 30, 2014
- * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 public class V1Constants {
@@ -109,7 +108,7 @@ public class V1Constants {
 
     public static class Column {
       public static final String CARDINALITY = "cardinality";
-      public static final String TOTAL_DOCS = "todalDocs";
+      public static final String TOTAL_DOCS = "totalDocs";
       public static final String DATA_TYPE = "dataType";
       public static final String BITS_PER_ELEMENT = "bitsPerElement";
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";

@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 7, 2014
  */
 

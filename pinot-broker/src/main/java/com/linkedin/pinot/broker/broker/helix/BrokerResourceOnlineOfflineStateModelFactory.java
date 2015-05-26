@@ -35,7 +35,6 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
  * Broker Resource layer state model to take over how to operate on:
  * Adding an external view to routing table.
  *
- * @author xiafu
  *
  */
 public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {

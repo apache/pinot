@@ -28,7 +28,6 @@ import com.yammer.metrics.core.Stoppable;
  * A metrics registry which extends {@link MetricsRegistry} and provides additional
  * APIs to register aggregated metrics to registry
  *
- * @author bvaradar
  *
  */
 public class AggregatedMetricsRegistry extends MetricsRegistry {

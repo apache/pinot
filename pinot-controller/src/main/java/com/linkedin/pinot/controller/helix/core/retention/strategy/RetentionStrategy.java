@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
 /**
- * @author xiafu
  *
  */
 public interface RetentionStrategy {

@@ -27,7 +27,6 @@ import com.linkedin.pinot.controller.ControllerStarter;
 /**
  * Class to implement StartController command.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class StartControllerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")

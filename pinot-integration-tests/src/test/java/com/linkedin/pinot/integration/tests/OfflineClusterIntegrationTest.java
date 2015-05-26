@@ -49,7 +49,6 @@ import com.linkedin.pinot.util.TestUtils;
 /**
  * Integration test that converts avro data for 12 segments and runs queries against it.
  *
- * @author jfim
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");

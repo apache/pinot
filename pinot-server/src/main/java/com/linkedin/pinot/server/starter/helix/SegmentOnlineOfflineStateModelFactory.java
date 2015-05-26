@@ -56,7 +56,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * 2. Refresh an existed now servring segment.
  * 3. Delete an existed segment.
  *
- * @author xiafu
  *
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {

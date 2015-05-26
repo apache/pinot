@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 13, 2014
  */
 

@@ -31,7 +31,6 @@ import com.google.common.io.Files;
 /**
  * Class for command to start ZooKeeper.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  *
  */
 public class StartZookeeperCommand extends AbstractBaseCommand implements Command {

@@ -18,7 +18,6 @@ package com.linkedin.pinot.common.utils;
 import org.apache.commons.lang.StringUtils;
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 30, 2014
  */
 

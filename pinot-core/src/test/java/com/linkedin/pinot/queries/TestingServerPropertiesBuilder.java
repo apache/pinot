@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Oct 14, 2014
  */
 public class TestingServerPropertiesBuilder {

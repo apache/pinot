@@ -23,7 +23,6 @@ import org.apache.commons.configuration.Configuration;
 /**
  * Utilities to start servers during unit tests.
  *
- * @author jfim
  */
 public class ServerTestUtils {
   static class PublicHelixServerStarter extends HelixServerStarter {

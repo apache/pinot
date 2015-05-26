@@ -23,7 +23,6 @@ import java.util.Map;
 /**
  * Various utilities to be used in implementing equals and hashCode.
  *
- * @author jfim
  */
 public class EqualityUtils {
   private EqualityUtils() {

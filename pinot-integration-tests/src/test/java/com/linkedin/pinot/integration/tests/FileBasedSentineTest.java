@@ -47,7 +47,6 @@ import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 14, 2014
  */
 

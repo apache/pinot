@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Utilities to deal with memory mapped buffers, which may not be portable.
  *
- * @author jfim
  */
 public class MmapUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapUtils.class);

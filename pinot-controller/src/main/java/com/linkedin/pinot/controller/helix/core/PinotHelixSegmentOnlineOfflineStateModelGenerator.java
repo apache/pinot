@@ -31,7 +31,6 @@ import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
  * Online to Offline, Online to Dropped
  * Offline to Online, Offline to Dropped
  *
- * @author xiafu
  *
  */
 public class PinotHelixSegmentOnlineOfflineStateModelGenerator {

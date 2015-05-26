@@ -44,7 +44,6 @@ import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetention
  * It will first scan the table configs to get segment retention strategy then
  * do data retention..
  *
- * @author xiafu
  *
  */
 public class RetentionManager {

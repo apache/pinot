@@ -19,7 +19,6 @@ import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileRea
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 11, 2014
  */
 

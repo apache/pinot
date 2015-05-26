@@ -19,7 +19,6 @@ import java.io.IOException;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 21, 2014
  *
  * Implementation of this class is used to create inverted Indexes

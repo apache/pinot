@@ -40,7 +40,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 /**
  * Class to implement CreateSegment command.
  *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
   private static final Logger _logger = LoggerFactory.getLogger(CreateSegmentCommand.class);

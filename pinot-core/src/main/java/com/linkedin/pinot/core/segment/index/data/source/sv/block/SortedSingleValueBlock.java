@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 15, 2014
  */
 

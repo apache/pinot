@@ -50,7 +50,6 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  *
  * GetAggregationGroupByResult will return the results.
  *
- * @author xiafu
  *
  */
 public class MAggregationFunctionGroupByWithDictionaryOperator extends AggregationFunctionGroupByOperator {

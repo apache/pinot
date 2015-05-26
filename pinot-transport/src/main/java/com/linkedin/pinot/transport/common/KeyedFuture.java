@@ -37,7 +37,6 @@ import com.google.common.util.concurrent.ListenableFuture;
  * of futures ( multi-level aggregations). This is needed for scatter-gather type
  * request dispatch with speculative (duplicate) request dispatching.
  *
- * @author bvaradar
  *
  * @param <K> Key type to identify a result/error
  * @param <V> Response Type

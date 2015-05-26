@@ -53,7 +53,6 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWri
  *     .....
  *     [set of values of row n]
  * </code>
- * @author kgopalak
  *
  */
 

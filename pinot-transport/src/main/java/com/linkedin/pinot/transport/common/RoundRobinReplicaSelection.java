@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.response.ServerInstance;
 
 /**
  * Maintains next pointer per segment basis. Expected to be thread-safe
- * @author bvaradar
  *
  */
 @ThreadSafe

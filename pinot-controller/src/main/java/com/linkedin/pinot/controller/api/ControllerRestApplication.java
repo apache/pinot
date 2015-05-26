@@ -47,7 +47,6 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 24, 2014
  */
 

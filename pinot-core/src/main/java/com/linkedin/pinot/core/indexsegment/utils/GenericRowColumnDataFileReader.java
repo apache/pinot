@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Jun 30, 2014
- * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 public class GenericRowColumnDataFileReader {
