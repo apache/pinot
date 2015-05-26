@@ -106,11 +106,14 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
 
       } else if ((tableName != null) && (segmentName == null)) {
         final JSONArray ret = new JSONArray();
-        for (final File file : new File(baseDataDir, tableName).listFiles()) {
-          final String url =
-              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
-                  + tableName + "/" + file.getName();
-          ret.put(url);
+        File tableDir = new File(baseDataDir, tableName);
+        if (tableDir.exists()) {
+          for (final File file : tableDir.listFiles()) {
+            final String url =
+                "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
+                    + tableName + "/" + file.getName();
+            ret.put(url);
+          }
         }
         presentation = new StringRepresentation(ret.toString());
         return presentation;
@@ -121,7 +124,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
         presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
         return presentation;
       }
-      presentation = new StringRepresentation("this is a string");
+      presentation = new StringRepresentation("Table or segment is not found!");
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing get request", e);

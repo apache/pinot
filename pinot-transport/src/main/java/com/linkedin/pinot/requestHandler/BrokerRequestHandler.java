@@ -238,7 +238,7 @@ public class BrokerRequestHandler {
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null || segmentServices.isEmpty()) {
       LOGGER.debug("Not found ServerInstances to Segments Mapping:");
-      return null;
+      return BrokerResponse.getEmptyBrokerResponse();
     }
     LOGGER.debug("Find ServerInstances to Segments Mapping:");
     for (ServerInstance serverInstance : segmentServices.keySet()) {
