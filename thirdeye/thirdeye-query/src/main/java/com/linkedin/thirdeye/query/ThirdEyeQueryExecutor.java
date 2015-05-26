@@ -248,12 +248,13 @@ public class ThirdEyeQueryExecutor {
           && remainingTimeRange.getStart() <= treeTimeRange.getEnd()) {
         LOGGER.info("Selecting treeId:{} with TimeRange:{}", treeId, treeTimeRange);
         treeIdsToQuery.add(treeId);
-        // update the remaining Time Range
-        remainingTimeRange = new TimeRange(endTime, queryEndTime);
         // if we have reached the queryEndTime, break out of the loop
         if (endTime >= queryEndTime) {
           break;
         }
+        // update the remaining Time Range
+        remainingTimeRange = new TimeRange(endTime, queryEndTime);
+       
       }
     }
     return treeIdsToQuery;
