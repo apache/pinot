@@ -13,8 +13,7 @@ $(document).ready(function() {
           var dateTime = moment.utc(currentUTC)
           var path = parsePath(window.location.pathname)
           var baselineDiff = path.currentMillis - path.baselineMillis
-          var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
-          var currentMillis = moment.utc(currentUTC) + aggregateMillis
+          var currentMillis = moment.utc(currentUTC)
 
           path.currentMillis = currentMillis
           path.baselineMillis = currentMillis - baselineDiff
