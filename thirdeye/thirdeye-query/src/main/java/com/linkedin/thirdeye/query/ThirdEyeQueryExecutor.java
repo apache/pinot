@@ -212,7 +212,7 @@ public class ThirdEyeQueryExecutor {
     for (UUID treeId : treeMetadataMap.keySet()) {
       IndexMetadata indexMetadata = treeMetadataMap.get(treeId);
       TimeRange treeTimeRange =
-          new TimeRange(indexMetadata.getMinDataTime(), indexMetadata.getMaxDataTime());
+          new TimeRange(indexMetadata.getMinDataTimeMillis(), indexMetadata.getMaxDataTimeMillis());
       if (!queryTimeRange.isDisjoint(treeTimeRange)) {
         treeIds.add(treeId);
       }
@@ -222,8 +222,8 @@ public class ThirdEyeQueryExecutor {
       public int compare(UUID treeId1, UUID treeId2) {
         IndexMetadata indexMetadata1 = treeMetadataMap.get(treeId1);
         IndexMetadata indexMetadata2 = treeMetadataMap.get(treeId2);
-        Long startTime1 = indexMetadata1.getStartTime();
-        Long startTime2 = indexMetadata2.getStartTime();
+        Long startTime1 = indexMetadata1.getStartTimeMillis();
+        Long startTime2 = indexMetadata2.getStartTimeMillis();
         int ret = startTime1.compareTo(startTime2);
         if (ret == 0) {
           Integer timeGranularity1 =
@@ -245,13 +245,13 @@ public class ThirdEyeQueryExecutor {
     if(treeIds.size()>0){
       IndexMetadata indexMetadata = treeMetadataMap.get(treeIds.get(0));
       if(indexMetadata.getStartTime() > queryStartTime ){
-        remainingTimeRange = new TimeRange(Math.min(indexMetadata.getStartTime(), queryEndTime), queryEndTime);
+        remainingTimeRange = new TimeRange(Math.min(indexMetadata.getStartTimeMillis(), queryEndTime), queryEndTime);
       }
     }
     for (UUID treeId : treeIds) {
       IndexMetadata indexMetadata = treeMetadataMap.get(treeId);
-      long startTime = indexMetadata.getStartTime();
-      long endTime = indexMetadata.getEndTime();
+      long startTime = indexMetadata.getStartTimeMillis();
+      long endTime = indexMetadata.getEndTimeMillis();
       TimeRange treeTimeRange = new TimeRange(startTime, endTime);
       if (remainingTimeRange.getStart() >= treeTimeRange.getStart()
           && remainingTimeRange.getStart() < treeTimeRange.getEnd()) {

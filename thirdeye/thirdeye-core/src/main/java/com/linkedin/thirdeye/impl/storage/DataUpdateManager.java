@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl.storage;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
@@ -28,6 +29,7 @@ import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -298,12 +300,25 @@ public class DataUpdateManager {
       // Create index metadata
       File metadataFile = new File(segmentBufferDir, StarTreeConstants.METADATA_FILE_NAME);
       LOGGER.info("Creating index metadata {}", metadataFile);
+      TimeUnit aggregationGranularity = starTree.getConfig().getTime().getBucket().getUnit();
+      int bucketSize = starTree.getConfig().getTime().getBucket().getSize();
+      Long minDataTimeMillis = TimeUnit.MILLISECONDS.convert(minDataTime.get() * bucketSize, aggregationGranularity);
+      Long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert(maxDataTime.get() * bucketSize, aggregationGranularity);
+      Long startTime = aggregationGranularity.convert(minTime.getMillis(), TimeUnit.MILLISECONDS) / bucketSize;
+      Long endTime = aggregationGranularity.convert(maxTime.getMillis(), TimeUnit.MILLISECONDS) / bucketSize;
+
       IndexMetadata metadata =
-          new IndexMetadata(minDataTime.get(), maxDataTime.get(), minTime.getMillis(),
-              maxTime.getMillis(), schedule);
+          new IndexMetadata(minDataTime.get(), maxDataTime.get(), minDataTimeMillis, maxDataTimeMillis,
+              startTime, endTime, minTime.getMillis(), maxTime.getMillis(),
+              schedule, aggregationGranularity.toString(), bucketSize);
       OutputStream metadataStream = new FileOutputStream(metadataFile);
       metadata.toProperties().store(metadataStream, "This segment was created via DataUpdateManager#persistTree");
       metadataStream.close();
+
+      File configFile = new File(segmentBufferDir, StarTreeConstants.CONFIG_FILE_NAME);
+      LOGGER.info("Creating config.yml {}", configFile);
+      ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.writeValue(configFile, starTree.getConfig());
 
       // Move the segment buffers into actual data directory
       String treeId = starTree.getRoot().getId().toString();

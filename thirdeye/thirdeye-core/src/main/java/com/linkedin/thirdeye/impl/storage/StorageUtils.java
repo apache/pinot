@@ -72,7 +72,7 @@ public class StorageUtils
         + "_" + (maxTime == null ? "LATEST" : StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime))
         + "_" + treeId;
   }
-  
+
   public static String getDataDirPrefix()
   {
     return StarTreeConstants.DATA_DIR_PREFIX;
@@ -165,6 +165,14 @@ public class StorageUtils
     if (!dstMetadataFile.exists())
     {
       FileUtils.moveFile(srcMetadataFile, dstMetadataFile);
+    }
+
+    // Config
+    File srcConfigFile = new File(srcDataDir, StarTreeConstants.CONFIG_FILE_NAME);
+    File dstConfigFile = new File(dstDataDir, StarTreeConstants.CONFIG_FILE_NAME);
+    if (!dstConfigFile.exists())
+    {
+      FileUtils.moveFile(srcConfigFile, dstConfigFile);
     }
 
     // Dimensions

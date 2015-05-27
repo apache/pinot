@@ -69,7 +69,10 @@ public class TestThirdEyeQueryExecutor {
     when(starTreeManager.getCollections()).thenReturn(ImmutableSet.of(config.getCollection()));
     when(starTreeManager.getConfig(config.getCollection())).thenReturn(config);
     when(starTreeManager.getStarTrees(config.getCollection())).thenReturn(ImmutableMap.of(new File("dummy"), starTree));
-    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn(new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE, "HOURLY"));
+    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn
+    (new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
+        0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
+        "HOURLY", TimeUnit.HOURS.toString(), 1));
 
     executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     queryExecutor = new ThirdEyeQueryExecutor(executorService, starTreeManager);
@@ -198,13 +201,24 @@ public class TestThirdEyeQueryExecutor {
     Map<UUID, Integer> treeIdToArrayIndexMapping = new HashMap<UUID, Integer>();
 
     for (int i = 0; i < indexMetadataArray.length; i++) {
-      Long minDataTime = toMilliSecond(indexMetadataArray[i][0], indexMetadataArray[i][2]);
-      Long maxDataTime = toMilliSecond(indexMetadataArray[i][1], indexMetadataArray[i][2]);
-      Long startTime = toMilliSecond(indexMetadataArray[i][0], indexMetadataArray[i][2]);
-      Long endTime = toMilliSecond(indexMetadataArray[i][1], indexMetadataArray[i][2]);
+      Long minDataTimeMillis = toMilliSecond(indexMetadataArray[i][0], indexMetadataArray[i][2]);
+      Long maxDataTimeMillis = toMilliSecond(indexMetadataArray[i][1], indexMetadataArray[i][2]);
+      Long startTimeMillis = toMilliSecond(indexMetadataArray[i][0], indexMetadataArray[i][2]);
+      Long endTimeMillis = toMilliSecond(indexMetadataArray[i][1], indexMetadataArray[i][2]);
       String timeGranularity = indexMetadataArray[i][2];
+
+      TimeUnit aggregationGranularity = TimeUnit.HOURS;
+      int bucketSize = 1;
+
+      Long minDataTime = aggregationGranularity.convert(minDataTimeMillis, TimeUnit.MILLISECONDS) / bucketSize;
+      Long maxDataTime = aggregationGranularity.convert(maxDataTimeMillis, TimeUnit.MILLISECONDS) / bucketSize;
+      Long startTime = aggregationGranularity.convert(startTimeMillis, TimeUnit.MILLISECONDS) / bucketSize;
+      Long endTime = aggregationGranularity.convert(endTimeMillis, TimeUnit.MILLISECONDS) / bucketSize;
+
       IndexMetadata value =
-          new IndexMetadata(minDataTime, maxDataTime, startTime, endTime, timeGranularity);
+          new IndexMetadata(minDataTime, maxDataTime, minDataTimeMillis, maxDataTimeMillis,
+              startTime, endTime, startTimeMillis, endTimeMillis,
+              timeGranularity, aggregationGranularity.toString(), bucketSize);
       UUID uuid = UUID.nameUUIDFromBytes(("" + i).getBytes());
       System.out.println("Adding metadata for treeId:" + uuid
           + Arrays.toString(indexMetadataArray[i]) + " metadata:" + value);
@@ -243,7 +257,7 @@ public class TestThirdEyeQueryExecutor {
         });
 
   }
-  
+
   private long toMilliSecond(String dateString, String granularity) throws Exception {
     long ret;
     if (granularity.equalsIgnoreCase("MONTHLY")) {

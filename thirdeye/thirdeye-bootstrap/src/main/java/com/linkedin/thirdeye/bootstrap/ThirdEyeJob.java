@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -507,29 +508,49 @@ public class ThirdEyeJob {
 
 
   private IndexMetadata mergeIndexMetadata(List<IndexMetadata> indexMetdataList,
-      Long startTime, Long endTime, String schedule)
+      Long startTimeMillis, Long endTimeMillis, String schedule)
   {
     Long min = Long.MAX_VALUE;
+    Long minMillis = Long.MAX_VALUE;
     Long max = 0L;
+    Long maxMillis = 0L;
+    Long startTime = Long.MAX_VALUE;
+    Long endTime = 0L;
+    String aggregationGranularity = "";
+    int bucketSize = 0;
 
 
     for (IndexMetadata indexMetadata : indexMetdataList)
     {
+      if (aggregationGranularity.equals(""))
+      {
+        aggregationGranularity = indexMetadata.getAggregationGranularity();
+        bucketSize = indexMetadata.getBucketSize();
+      }
       if (indexMetadata.getMinDataTime() != null && indexMetadata.getMinDataTime() < min)
       {
         min = indexMetadata.getMinDataTime();
+        minMillis = indexMetadata.getMaxDataTimeMillis();
       }
       if (indexMetadata.getMaxDataTime() != null && indexMetadata.getMaxDataTime() > max)
       {
         max = indexMetadata.getMaxDataTime();
+        maxMillis = indexMetadata.getMaxDataTimeMillis();
       }
     }
-    IndexMetadata mergedIndexMetadata = new IndexMetadata(min, max, startTime, endTime, schedule);
+
+    startTime = TimeUnit.valueOf(aggregationGranularity).convert(startTimeMillis, TimeUnit.MILLISECONDS) / bucketSize;
+    endTime = TimeUnit.valueOf(aggregationGranularity).convert(endTimeMillis, TimeUnit.MILLISECONDS) / bucketSize;
+
+    IndexMetadata mergedIndexMetadata = new IndexMetadata
+        (min, max, minMillis, maxMillis,
+            startTime, endTime, startTimeMillis, endTimeMillis,
+            schedule, aggregationGranularity, bucketSize);
 
     return mergedIndexMetadata;
   }
 
-  private void writeMergedIndexMetadata(FileSystem fileSystem, Path metadataPath, IndexMetadata mergedIndexMetadata) throws IOException {
+  private void writeMergedIndexMetadataServerPush(FileSystem fileSystem, Path metadataPath, IndexMetadata mergedIndexMetadata) throws IOException {
     OutputStream os = null;
     try {
       os = fileSystem.create(metadataPath);
@@ -665,7 +686,7 @@ public class ThirdEyeJob {
         while (listFiles.hasNext())
         {
           Path path = listFiles.next().getPath();
-          IndexMetadata localIndexMetadata = builder.getMetadataObject(path);
+          IndexMetadata localIndexMetadata = builder.getMetadataObjectBootstrap(path);
           if (localIndexMetadata != null) {
             indexMetadataList.add(localIndexMetadata);
           }
@@ -679,7 +700,7 @@ public class ThirdEyeJob {
         Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
         IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList,
             minTime.getMillis(), maxTime.getMillis(), schedule);
-        writeMergedIndexMetadata(fileSystem, metadataPath, mergedIndexMetadata);
+        writeMergedIndexMetadataServerPush(fileSystem, metadataPath, mergedIndexMetadata);
 
         listFiles = fileSystem.listFiles(dataPath, false);
 
@@ -697,6 +718,8 @@ public class ThirdEyeJob {
             builder.addTarGzFile(path);
           }
         }
+
+        builder.addFileEntry(configPath);
 
         builder.finish();
         if (fileSystem.exists(outputTarGzFilePath)) {

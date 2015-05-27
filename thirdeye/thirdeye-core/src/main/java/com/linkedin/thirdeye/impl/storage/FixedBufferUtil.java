@@ -289,12 +289,12 @@ public class FixedBufferUtil
     oos.close();
   }
 
-  public static void writeMetadata(IndexMetadata indexMetadata, File outputDir) throws IOException
+  public static void writeMetadataBootstrap(IndexMetadata indexMetadata, File outputDir) throws IOException
   {
     File indexMetadataFile =
         new File(outputDir, StarTreeConstants.METADATA_FILE_NAME);
     OutputStream os = new FileOutputStream(indexMetadataFile);
-    Properties indexMetadataProperties = indexMetadata.toProperties();
+    Properties indexMetadataProperties = indexMetadata.toPropertiesBootstrap();
 
     indexMetadataProperties.store(os, "Index Metadata Properties");
 

@@ -334,7 +334,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert
           (maxDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getTimeUnit()));
 
-      indexMetadata = new IndexMetadata(minDataTimeMillis, maxDataTimeMillis, startTime, endTime, schedule);
+      indexMetadata = new IndexMetadata
+          (minDataTime, maxDataTime, minDataTimeMillis, maxDataTimeMillis,
+              config.getTimeUnit(), config.getBucketSize());
 
        LOGGER.info("END: processing {}", nodeId);
     }
@@ -372,7 +374,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.TREE_FILE_NAME));
 
       // add metadata
-      FixedBufferUtil.writeMetadata(indexMetadata, new File(localOutputDataDir));
+      FixedBufferUtil.writeMetadataBootstrap(indexMetadata, new File(localOutputDataDir));
       builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.METADATA_FILE_NAME));
 
       Collection<File> dimFiles = FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);

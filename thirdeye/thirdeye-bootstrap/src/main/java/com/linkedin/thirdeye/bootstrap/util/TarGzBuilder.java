@@ -135,7 +135,7 @@ public class TarGzBuilder {
   }
 
 
-  public IndexMetadata getMetadataObject(Path path) throws Exception {
+  public IndexMetadata getMetadataObjectBootstrap(Path path) throws Exception {
     TarArchiveInputStream debInputStream = null;
     InputStream is = null;
     IndexMetadata localIndexMetadata = null;
@@ -154,7 +154,7 @@ public class TarGzBuilder {
 
           Properties localProperties = new Properties();
           localProperties.load(inputStream);
-          localIndexMetadata = IndexMetadata.fromProperties(localProperties);
+          localIndexMetadata = IndexMetadata.fromPropertiesBootstrap(localProperties);
 
           break;
         }
