@@ -15,9 +15,15 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONException;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 
@@ -27,13 +33,14 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
  *
  */
 public class AddTableCommand extends AbstractBaseCommand implements Command {
+  private static final Logger _logger = LoggerFactory.getLogger(AddTenantCommand.class);
 
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
-  private String filePath;
+  private String _filePath;
 
   @Option(name = "-controllerAddress", required = true, metaVar = "<http>",
       usage = "Http address of Controller (with port).")
-  private String controllerAddress = null;
+  private String _controllerAddress = null;
 
   @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   private boolean _help = false;
@@ -67,23 +74,27 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   }
 
   public AddTableCommand setFilePath(String filePath) {
-    this.filePath = filePath;
+    this._filePath = filePath;
     return this;
   }
 
   public AddTableCommand setControllerAddress(String controllerAddress) {
-    this.controllerAddress = controllerAddress;
+    this._controllerAddress = controllerAddress;
     return this;
+  }
+
+  public boolean execute(JsonNode node) throws UnsupportedEncodingException, IOException, JSONException {
+    String res =
+        AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(),
+            node.toString());
+
+    _logger.info(res);
+    return true;
   }
 
   @Override
   public boolean execute() throws Exception {
-    JsonNode node = new ObjectMapper().readTree(filePath);
-    String res =
-        AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(),
-            node.toString());
-
-    System.out.println(res);
-    return true;
+    JsonNode node = new ObjectMapper().readTree(_filePath);
+    return execute(node);
   }
 }
