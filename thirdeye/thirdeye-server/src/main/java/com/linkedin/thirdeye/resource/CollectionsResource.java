@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import com.linkedin.thirdeye.impl.storage.StarTreeMetadataProperties;
 import com.linkedin.thirdeye.impl.storage.StorageUtils;
 import com.sun.jersey.api.ConflictException;
@@ -18,6 +19,7 @@ import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
 
 import io.dropwizard.lifecycle.Managed;
+
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -290,44 +292,21 @@ public class CollectionsResource implements Managed
     List<SegmentDescriptor> descriptors = new ArrayList<>();
     if (dataDirs != null) {
       for (File dataDir : dataDirs) {
-        // Wall time
-        String[] tokens = dataDir.getName().split("_");
-        DateTime startWallTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[2]);
-        DateTime endWallTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]);
-
         // Segment metadata
         File metadataFile = new File(dataDir, StarTreeConstants.METADATA_FILE_NAME);
-        Properties metadata = new Properties();
+        Properties properties = new Properties();
         InputStream inputStream = new FileInputStream(metadataFile);
         try {
-          metadata.load(inputStream);
+          properties.load(inputStream);
         } finally {
           inputStream.close();
         }
 
-        // Min data time
-        DateTime minDataTime = null;
-        String minDataTimeProp = metadata.getProperty(StarTreeMetadataProperties.MIN_DATA_TIME);
-        if (minDataTimeProp != null) {
-          long collectionTime = Long.valueOf(minDataTimeProp);
-          long size = config.getTime().getBucket().getSize();
-          TimeUnit unit = config.getTime().getBucket().getUnit();
-          long minTimeMillis = TimeUnit.MILLISECONDS.convert(collectionTime * size, unit);
-          minDataTime = new DateTime(minTimeMillis, DateTimeZone.UTC);
-        }
-
-        // Max data time
-        DateTime maxDataTime = null;
-        String maxDataTimeProp = metadata.getProperty(StarTreeMetadataProperties.MAX_DATA_TIME);
-        if (maxDataTimeProp != null) {
-          long collectionTime = Long.valueOf(maxDataTimeProp);
-          long size = config.getTime().getBucket().getSize();
-          TimeUnit unit = config.getTime().getBucket().getUnit();
-          long maxTimeMillis = TimeUnit.MILLISECONDS.convert(collectionTime * size, unit);
-          maxDataTime = new DateTime(maxTimeMillis, DateTimeZone.UTC);
-        }
-
-        descriptors.add(new SegmentDescriptor(dataDir, startWallTime, endWallTime, minDataTime, maxDataTime));
+        IndexMetadata indexMetadata = IndexMetadata.fromProperties(properties);
+        DateTime startWallTime= new DateTime(indexMetadata.getStartTime());
+        DateTime endWallTime= new DateTime(indexMetadata.getEndTime());
+        descriptors.add(new SegmentDescriptor(dataDir, startWallTime, endWallTime, new DateTime(
+            indexMetadata.getMinDataTime()), new DateTime(indexMetadata.getMaxDataTime())));
       }
     }
 
