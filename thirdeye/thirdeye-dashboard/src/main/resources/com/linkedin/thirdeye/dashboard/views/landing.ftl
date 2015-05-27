@@ -12,11 +12,15 @@
 
             <!-- Collections drop-down -->
             <form class="uk-form">
-                <select id="landing-collection">
-                    <#list collections as collection>
-                        <option value="${collection}">${collection}</option>
-                    </#list>
-                </select>
+                <div class="uk-button uk-form-select" data-uk-form-select>
+                    <span></span>
+                    <i class="uk-icon-caret-down"></i>
+                    <select id="landing-collection">
+                        <#list collections as collection>
+                            <option value="${collection}">${collection}</option>
+                        </#list>
+                    </select>
+                </div>
                 <button id="landing-submit" class="uk-button uk-button-primary">Go</button>
             </form>
         </div>

@@ -44,4 +44,9 @@ public class SegmentDescriptor {
   public DateTime getEndDataTime() {
     return endDataTime;
   }
+
+  @Override
+  public String toString() {
+    return file.getName();
+  }
 }

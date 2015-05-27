@@ -137,6 +137,10 @@
     clear: both;
 }
 
+.metric-table-time:hover {
+    cursor: pointer;
+}
+
 /* Dimension */
 
 #dimension-heat-map-area,
