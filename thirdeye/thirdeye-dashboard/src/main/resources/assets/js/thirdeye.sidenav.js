@@ -85,14 +85,12 @@ $(document).ready(function() {
 
     // Generate Timezone drop down
     var timezones = moment.tz.names()
-        var currentTimeZone = ""
-    if(window.location.search) {
-        var searchArr = window.location.search.substring(1).split('&')
-        $.each(searchArr, function(idx, item) {
-            if(item.match(new RegExp('timezone'))) {
-                currentTimeZone = item.split('=')[1].split('-').join('/')
-            }    
-        })
+    var currentTimeZone = ""
+    if(window.location.hash) {
+        var params = parseHashParameters(window.location.hash)
+        if( params.timezone  ) {
+            currentTimeZone = params.timezone.split('-').join('/')
+        }    
     } else {
         currentTimeZone = getLocalTimeZone().split(' ')[1]
     }
@@ -278,10 +276,11 @@ $(document).ready(function() {
         path.baselineMillis = baselineMillisUTC
         path.currentMillis = currentMillisUTC
         var dashboardPath = getDashboardPath(path)
+        var params = {}
         if(timezone !== getLocalTimeZone().split(' ')[1]) {
-            dashboardPath += '?timezone=' + timezone.split('/').join('-')
+            params.timezone = timezone.split('/').join('-')
         }
         errorAlert.hide()
-        window.location = dashboardPath
+        window.location = dashboardPath + encodeHashParameters(params)
     })
 })
