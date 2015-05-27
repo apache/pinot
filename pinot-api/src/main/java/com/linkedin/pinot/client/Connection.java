@@ -22,6 +22,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -30,11 +32,13 @@ import java.util.concurrent.TimeoutException;
  * @author jfim
  */
 public class Connection {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   private final List<String> _brokerList;
   private final PinotClientTransport _transport;
   private final Random _random = new Random();
 
   Connection(List<String> brokerList, PinotClientTransport transport) {
+    LOGGER.info("Creating connection to broker list {}", brokerList);
     _brokerList = brokerList;
     _transport = transport;
   }

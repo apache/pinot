@@ -15,8 +15,17 @@
  */
 package com.linkedin.pinot.client;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
+import org.I0Itec.zkclient.IZkConnection;
+import org.I0Itec.zkclient.ZkClient;
+import org.I0Itec.zkclient.ZkConnection;
+import org.apache.helix.manager.zk.ByteArraySerializer;
+import org.apache.helix.util.ZKClientPool;
+import org.json.JSONObject;
 
 
 /**
@@ -36,8 +45,38 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
-    // TODO jfim: Implement!
-    throw new AssertionError("Unimplemented!");
+    try {
+      ZkClient client = new ZkClient(zkUrl);
+      client.setZkSerializer(new ByteArraySerializer());
+      byte[] brokerResourceNodeData = client.readData("/EXTERNALVIEW/brokerResource", true);
+      System.out.println("brokerResourceNodeData = " + new String(brokerResourceNodeData));
+      JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
+      System.out.println("jsonObject = " + jsonObject);
+      JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
+
+      List<String> brokerUrls = new ArrayList<String>();
+
+      Iterator<String> resourceNames = brokerResourceNode.keys();
+      while (resourceNames.hasNext()) {
+        String resourceName = resourceNames.next();
+        JSONObject resource = brokerResourceNode.getJSONObject(resourceName);
+
+        Iterator<String> brokerNames = resource.keys();
+        while (brokerNames.hasNext()) {
+          String brokerName = brokerNames.next();
+          if (brokerName.startsWith("Broker_") && "ONLINE".equals(resource.getString(brokerName))) {
+            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
+            brokerUrls.add(brokerName.replace("Broker_", "").replace("_", ":"));
+          }
+        }
+      }
+
+      client.close();
+
+      return new Connection(brokerUrls, _transportFactory.buildTransport());
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
   }
 
   /**
@@ -47,8 +86,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
-    // TODO jfim: Implement!
-    throw new AssertionError("Unimplemented!");
+    return new Connection(Arrays.asList(properties.getProperty("brokerList")), _transportFactory.buildTransport());
   }
 
   /**

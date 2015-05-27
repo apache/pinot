@@ -23,6 +23,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,6 +33,7 @@ import org.json.JSONObject;
  * @author jfim
  */
 class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
   AsyncHttpClient _httpClient = new AsyncHttpClient();
 
   @Override
@@ -49,6 +52,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       json.put("pql", query);
 
       final String url = "http://" + brokerAddress + "/query";
+
       final Future<Response> response = _httpClient.preparePost(url).setBody(json.toString()).execute();
 
       return new Future<BrokerResponse>() {
@@ -78,7 +82,11 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
         public BrokerResponse get(long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
           try {
+            LOGGER.info("Sending query to {}", url);
+
             Response httpResponse = response.get(timeout, unit);
+
+            LOGGER.info("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 
             if (httpResponse.getStatusCode() != 200) {
               throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() +

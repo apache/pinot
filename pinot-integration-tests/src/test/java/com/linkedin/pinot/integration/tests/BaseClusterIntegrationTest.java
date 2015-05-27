@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.client.ConnectionFactory;
+import com.linkedin.pinot.common.ZkTestUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -91,8 +93,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected QueryGenerator _queryGenerator;
   protected static long TOTAL_DOCS = 115545;
 
-  protected abstract int getGeneratedQueryCount();
   protected File queriesFile;
+
+  protected com.linkedin.pinot.client.Connection _pinotConnection = null;
 
   private class NullableStringComparator implements Comparator<String> {
     @Override
@@ -634,16 +637,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return queries;
   }
 
-  protected long getCurrentServingNumDocs() {
-    try {
-      String countQuery = "SELECT count(*) FROM 'mytable' LIMIT 0";
-      JSONObject ret = postQuery(countQuery);
-      ret.put("pql", countQuery);
-      System.out.println(ret.toString(1));
-      return ret.getLong("numDocsScanned");
-    } catch (Exception e) {
-      return 0;
+  protected void ensurePinotConnectionIsCreated() {
+    if (_pinotConnection == null) {
+      synchronized (BaseClusterIntegrationTest.class) {
+        if (_pinotConnection == null) {
+          _pinotConnection = ConnectionFactory.fromZookeeper(ZkTestUtils.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+        }
+      }
     }
   }
 
+  protected long getCurrentServingNumDocs() {
+    ensurePinotConnectionIsCreated();
+    com.linkedin.pinot.client.ResultSet resultSet = _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0").getResultSet(0);
+    return resultSet.getInt(0);
+  }
+
+  protected int getGeneratedQueryCount() {
+    return -1;
+  }
 }
