@@ -5,8 +5,35 @@
         <button id="dimension-heat-map-button-contribution" class="uk-button dimension-heat-map-button" impl="contribution" type="button">Contribution</button>
         <button id="dimension-heat-map-button-volume" class="uk-button uk-active dimension-heat-map-button" impl="volume" type="button">Volume</button>
     </div>
+    <a 
+        href="#heat-map-info-modal" 
+        data-uk-modal
+    >
+        <i 
+            class="uk-icon-info-circle"
+        ></i>
+    </a>
 </div>
 
+<div id="heat-map-info-modal" class="uk-modal">
+    <div class="uk-modal-dialog">
+        <div class="uk-modal-header">
+            Heat Map Info
+            <a class="uk-modal-close uk-close uk-align-right"></a>
+        </div>
+        <h3>Contribution Heat Maps</h3>
+        <p>
+            Contributions Heat maps are based on the Current Ratio / Previous
+            Ratio. <br /> If the item in the heat map has a border it is more
+            likely to be an outlier. <br /> 
+        </p>
+        <h3>Volume Heat Maps</h3>
+        <p>
+            Items are ordered based on current value and colored based on
+            previous value,<br /> allowing you to see how an item is affected.
+        </p>
+    </div>
+</div>
 
 <div id="dimension-heat-map-area">
     <#if (dimensionView.view.heatMaps?size == 0)>

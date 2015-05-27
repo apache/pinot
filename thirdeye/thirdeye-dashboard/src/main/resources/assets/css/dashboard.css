@@ -49,6 +49,10 @@
     margin-left: 5%;
 }
 
+#sidenav-timezone {
+  text-indent: 20px;
+}
+
 #sidenav-error {
     display: none;
 }

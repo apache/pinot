@@ -82,9 +82,27 @@ $(document).ready(function() {
         }
     })
 
-    // Load current time zone
-    $("#sidenav-timezone").html(" (" + getLocalTimeZone() + ")")
 
+    // Generate Timezone drop down
+    var timezones = moment.tz.names()
+        var currentTimeZone = ""
+    if(window.location.search) {
+        var searchArr = window.location.search.substring(1).split('&')
+        $.each(searchArr, function(idx, item) {
+            if(item.match(new RegExp('timezone'))) {
+                currentTimeZone = item.split('=')[1].split('-').join('/')
+            }    
+        })
+    } else {
+        currentTimeZone = getLocalTimeZone().split(' ')[1]
+    }
+    $.each(timezones, function(idx, tz){
+        $("#sidenav-timezone").append('<option value="' + tz + '">' + tz + '</option>')
+        if(tz === currentTimeZone) {
+            $("#sidenav-timezone option:last-child").prop('selected', 1)
+        }
+    })
+    
     // Load existing metrics selection / function
     if (path.metricFunction) {
       var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
@@ -220,12 +238,15 @@ $(document).ready(function() {
             return
         }
 
+        // Timezone
+        var timezone = $("#sidenav-timezone").val()
+
         // Baseline
         var baselineSize = parseInt($("#sidenav-baseline-size").val())
         var baselineUnit = parseInt($("#sidenav-baseline-unit").val())
 
         // DateTimes
-        var current = moment(date + " " + time)
+        var current = moment.tz(date + " " + time, timezone)
         var baseline = moment(current.valueOf() - (baselineSize * baselineUnit))
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
@@ -248,6 +269,7 @@ $(document).ready(function() {
         // Aggregate
         metricFunction = "AGGREGATE_" + aggregateSize + "_" + aggregateUnit + "(" + metricFunction + ")"
 
+
         // Path
         var path = parsePath(window.location.pathname)
         path.metricFunction = metricFunction
@@ -256,7 +278,10 @@ $(document).ready(function() {
         path.baselineMillis = baselineMillisUTC
         path.currentMillis = currentMillisUTC
         var dashboardPath = getDashboardPath(path)
+        if(timezone !== getLocalTimeZone().split(' ')[1]) {
+            dashboardPath += '?timezone=' + timezone.split('/').join('-')
+        }
         errorAlert.hide()
-        window.location.pathname = dashboardPath
+        window.location = dashboardPath
     })
 })

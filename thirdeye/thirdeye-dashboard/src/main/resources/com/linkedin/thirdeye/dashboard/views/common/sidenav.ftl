@@ -40,10 +40,23 @@
                 </div>
 
                 <div class="uk-form-row">
-                    <label class="uk-form-label">Date / Time<br/><span id="sidenav-timezone"></span></label>
+                    <label class="uk-form-label">
+                        Date / Time
+                    </label>
+                    <div class="uk-form-icon">
+                        <i class="uk-icon-clock-o"></i>
+                        <select 
+                            id="sidenav-timezone" 
+                        >
+                            <option value="">--Select Value--</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="uk-form-row">
                     <div class="uk-form-icon">
                         <i class="uk-icon-calendar"></i>
-                        <input id="sidenav-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
+                        <input id="sidenav-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}" />
                     </div>
                 </div>
 
