@@ -31,9 +31,11 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 public class ZKMetadataProvider {
+  private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
   private static String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
+  private static String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
 
   public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord, AccessOption.PERSISTENT);
@@ -66,6 +68,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForResourceConfig(String resourceName) {
     return StringUtil.join("/", PROPERTYSTORE_TABLE_CONFIGS_PREFIX, resourceName);
+  }
+
+  public static String constructPropertyStorePathForControllerConfig(String controllerConfigKey) {
+    return StringUtil.join("/", PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX, controllerConfigKey);
   }
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource, String segmentName) {
@@ -168,4 +174,25 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
+  public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean isSingleTenantCluster) {
+    if (!propertyStore.exists(constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY), AccessOption.PERSISTENT)) {
+      ZNRecord znRecord = new ZNRecord(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
+      znRecord.setBooleanField(CLUSTER_TENANT_ISOLATION_ENABLED_KEY, isSingleTenantCluster);
+      propertyStore.set(constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY), znRecord, AccessOption.PERSISTENT);
+    }
+  }
+
+  public static Boolean getClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    String controllerConfigPath = constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
+    if (propertyStore.exists(controllerConfigPath, AccessOption.PERSISTENT)) {
+      ZNRecord znRecord = propertyStore.get(controllerConfigPath, null, AccessOption.PERSISTENT);
+      if (znRecord.getSimpleFields().keySet().contains(CLUSTER_TENANT_ISOLATION_ENABLED_KEY)) {
+        return znRecord.getBooleanField(CLUSTER_TENANT_ISOLATION_ENABLED_KEY, true);
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
 }

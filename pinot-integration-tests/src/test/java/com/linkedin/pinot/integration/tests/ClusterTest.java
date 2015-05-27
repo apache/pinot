@@ -132,22 +132,6 @@ public abstract class ClusterTest extends ControllerTest {
         new FileInputStream(schemaFile), schemaFile.length());
   }
 
-  protected void createBrokerTenant(String tenantName, int numBrokers) throws Exception {
-    JSONObject request = ControllerRequestBuilder.buildBrokerTenantCreateRequestJSON(tenantName, numBrokers);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTenantCreate(), request.toString());
-  }
-
-  protected void createBrokerTenant(String tenantName) throws Exception {
-    createBrokerTenant(tenantName, 1);
-  }
-
-  protected void createServerTenant(String tenantName, int numOffline, int numRealtime) throws Exception {
-    JSONObject request =
-        ControllerRequestBuilder.buildServerTenantCreateRequestJSON(tenantName, numOffline + numRealtime, numOffline,
-            numRealtime);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTenantCreate(), request.toString());
-  }
-
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
     JSONObject request =

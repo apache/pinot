@@ -32,13 +32,10 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -65,7 +62,7 @@ public class ValidationManagerTest {
     _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null);
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true);
     _pinotHelixResourceManager.start();
   }
 
@@ -76,21 +73,11 @@ public class ValidationManagerTest {
 
     Thread.sleep(1000);
 
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
-
-    Tenant brokerTenant =
-        new TenantBuilder("testBroker").setRole(TenantRole.BROKER).setTotalInstances(2).setOfflineInstances(-1)
-            .setRealtimeInstances(-1).build();
-    _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
-
-    Tenant serverTenant =
-        new TenantBuilder("testServer").setRole(TenantRole.SERVER).setTotalInstances(2).setOfflineInstances(2)
-            .setRealtimeInstances(0).build();
-    _pinotHelixResourceManager.createBrokerTenant(serverTenant);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
 
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, "testServer", "testBroker",
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, null, null,
             "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);

@@ -27,6 +27,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants;
 
 
@@ -40,6 +41,7 @@ public class ControllerTenantTest extends ControllerTest {
     startZk();
     _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
     startController();
+    ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, false);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
         ZkTestUtils.DEFAULT_ZK_STR, 20);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
@@ -51,8 +53,8 @@ public class ControllerTenantTest extends ControllerTest {
   public void tearDown() {
     stopController();
     try {
-      if (_zkClient.exists("/ControllerSentinelTest")) {
-        _zkClient.deleteRecursive("/ControllerSentinelTest");
+      if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
+        _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
       }
     } catch (Exception e) {
     }

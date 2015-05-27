@@ -27,8 +27,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 
 
@@ -59,8 +61,11 @@ public class ControllerRequestBuilderUtil {
     return ret;
   }
 
-  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
-      int numInstances) throws Exception {
+  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances) throws Exception {
+    addFakeBrokerInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false);
+  }
+
+  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances, boolean isSingleTenant) throws Exception {
     for (int i = 0; i < numInstances; ++i) {
       final String brokerId = "Broker_localhost_" + i;
       final HelixManager helixZkManager =
@@ -70,13 +75,20 @@ public class ControllerRequestBuilderUtil {
       stateMachineEngine.registerStateModelFactory(EmptyBrokerOnlineOfflineStateModelFactory.getStateModelDef(),
           stateModelFactory);
       helixZkManager.connect();
-      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
+      if (isSingleTenant) {
+        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+      } else {
+        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
+      }
       Thread.sleep(1000);
     }
   }
 
-  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
-      int numInstances) throws Exception {
+  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances) throws Exception {
+    addFakeDataInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false);
+  }
+
+  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances, boolean isSingleTenant) throws Exception {
     for (int i = 0; i < numInstances; ++i) {
       final String instanceId = "Server_localhost_" + i;
 
@@ -87,7 +99,14 @@ public class ControllerRequestBuilderUtil {
       stateMachineEngine.registerStateModelFactory(EmptySegmentOnlineOfflineStateModelFactory.getStateModelDef(),
           stateModelFactory);
       helixZkManager.connect();
-      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
+      if (isSingleTenant) {
+        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
+            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
+            TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+      } else {
+        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
+      }
     }
   }
 
@@ -139,8 +158,12 @@ public class ControllerRequestBuilderUtil {
     tableIndexConfig.put("lazyLoad", "false");
     creationRequest.put("tableIndexConfig", tableIndexConfig);
     JSONObject tenants = new JSONObject();
-    tenants.put("broker", brokerTenant);
-    tenants.put("server", serverTenant);
+    if (brokerTenant != null) {
+      tenants.put("broker", brokerTenant);
+    }
+    if (serverTenant != null) {
+      tenants.put("server", serverTenant);
+    }
     creationRequest.put("tenants", tenants);
     creationRequest.put("tableType", "OFFLINE");
     JSONObject metadata = new JSONObject();

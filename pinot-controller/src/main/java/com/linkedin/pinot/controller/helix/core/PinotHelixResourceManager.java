@@ -87,6 +87,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * Sep 30, 2014
  */
 public class PinotHelixResourceManager {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
 
   private String _zkBaseUrl;
@@ -99,6 +100,7 @@ public class PinotHelixResourceManager {
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
   private long _externalViewOnlineToOfflineTimeout;
+  private boolean _isSingleTenantCluster = true;
 
   PinotHelixAdmin _pinotHelixAdmin;
   private HelixDataAccessor _helixDataAccessor;
@@ -109,20 +111,24 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
-      String localDiskDir) {
+      String localDiskDir, long externalViewOnlineToOfflineTimeout, boolean isSingleTenantCluster) {
     _zkBaseUrl = zkURL;
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _localDiskDir = localDiskDir;
-    _externalViewOnlineToOfflineTimeout = 10000L;
+    _externalViewOnlineToOfflineTimeout = externalViewOnlineToOfflineTimeout;
+    _isSingleTenantCluster = isSingleTenantCluster;
+  }
+
+  public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId, String localDiskDir) {
+    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, 10000L, false);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
-    _zkBaseUrl = controllerConf.getZkStr();
-    _helixClusterName = controllerConf.getHelixClusterName();
-    _instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
-    _localDiskDir = controllerConf.getDataDir();
-    _externalViewOnlineToOfflineTimeout = controllerConf.getExternalViewOnlineToOfflineTimeout();
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
+        controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
+        controllerConf.getExternalViewOnlineToOfflineTimeout(),
+        controllerConf.tenantIsolationEnabled());
   }
 
   public synchronized void start() throws Exception {
@@ -134,6 +140,7 @@ public class PinotHelixResourceManager {
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
     _externalViewOnlineToOfflineTimeout = 10000L;
     _pinotHelixAdmin = new PinotHelixAdmin(_helixZkURL, _helixClusterName);
+    ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
 
   public synchronized void stop() {
@@ -831,14 +838,30 @@ public class PinotHelixResourceManager {
    */
 
   public void addTable(AbstractTableConfig config) throws JsonGenerationException, JsonMappingException, IOException {
-    TenantConfig tenants = config.getTenantConfig();
-    if (tenants.getBroker() == null || tenants.getServer() == null) {
-      throw new RuntimeException("missing tenant configs");
+    TenantConfig tenantConfig = null;
+    TableType type = TableType.valueOf(config.getTableType().toUpperCase());
+    if (isSingleTenantCluster()) {
+      tenantConfig = new TenantConfig();
+      tenantConfig.setBroker(ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+      switch (type) {
+        case OFFLINE:
+          tenantConfig.setServer(ControllerTenantNameBuilder.getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+          break;
+        case REALTIME:
+          tenantConfig.setServer(ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+          break;
+        default:
+          throw new RuntimeException("UnSupported table type");
+      }
+      config.setTenantConfig(tenantConfig);
+    } else {
+      tenantConfig = config.getTenantConfig();
+      if (tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
+        throw new RuntimeException("missing tenant configs");
+      }
     }
 
     SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
-
-    TableType type = TableType.valueOf(config.getTableType().toUpperCase());
     switch (type) {
       case OFFLINE:
         final String offlineTableName = config.getTableName();
@@ -1310,5 +1333,9 @@ public class PinotHelixResourceManager {
       }
     }
     return PinotResourceManagerResponse.FAILURE_RESPONSE;
+  }
+
+  public boolean isSingleTenantCluster() {
+    return _isSingleTenantCluster;
   }
 }

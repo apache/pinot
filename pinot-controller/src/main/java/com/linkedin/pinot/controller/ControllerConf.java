@@ -32,6 +32,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String DATA_DIR = "controller.data.dir";
   private static final String ZK_STR = "controller.zk.str";
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
+  private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
@@ -146,5 +147,16 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setExternalViewOnlineToOfflineTimeout(long timeout) {
     setProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT, timeout);
+  }
+
+  public boolean tenantIsolationEnabled() {
+    if (containsKey(CLUSTER_TENANT_ISOLATION_ENABLE)) {
+      return Boolean.parseBoolean(getProperty(CLUSTER_TENANT_ISOLATION_ENABLE).toString());
+    }
+    return true;
+  }
+
+  public void setTenantIsolationEnabled(boolean isSingleTenant) {
+    setProperty(CLUSTER_TENANT_ISOLATION_ENABLE, isSingleTenant);
   }
 }

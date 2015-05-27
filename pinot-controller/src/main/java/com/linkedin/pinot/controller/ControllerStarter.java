@@ -135,7 +135,7 @@ public class ControllerStarter {
     conf.setControllerVipHost("localhost");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
-
+    conf.setTenantIsolationEnabled(false);
     final ControllerStarter starter = new ControllerStarter(conf);
 
     System.out.println(conf.getQueryConsole());

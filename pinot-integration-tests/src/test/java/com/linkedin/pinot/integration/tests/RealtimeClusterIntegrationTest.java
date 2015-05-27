@@ -60,13 +60,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
-    String brokerTenant = "realtimeBroker";
-    String realtimeTenant = "realtimeServer";
-    createBrokerTenant(brokerTenant);
-    createServerTenant(realtimeTenant, 0, 1);
     addSchema(schemaFile, schema.getSchemaName());
     addRealtimeTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        realtimeTenant, brokerTenant, avroFile);
+        null, null, avroFile);
   }
 
   @BeforeClass

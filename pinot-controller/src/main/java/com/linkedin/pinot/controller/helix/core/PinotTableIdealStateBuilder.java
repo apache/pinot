@@ -186,8 +186,10 @@ public class PinotTableIdealStateBuilder {
         IdealState idealState =
             buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeTableName, helixAdmin, helixClusterName,
                 zkHelixPropertyStore);
-        List<String> realtimeInstances =
-            helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeServerTenant);
+        List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeServerTenant);
+        if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
+          throw new RuntimeException("Number of instance in current tenant should be an integer multiples of the number of replications");
+        }
         setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
             Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()), realtimeTableConfig
                 .getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
@@ -219,7 +221,8 @@ public class PinotTableIdealStateBuilder {
     int replicaId = 0;
 
     String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamProviderConfig);
-    for (String instance : instanceList) {
+    for (int i = 0; i < numInstancesPerReplica * numDataReplicas; ++i) {
+      String instance = instanceList.get(i);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
       if (instanceZKMetadata == null) {
         instanceZKMetadata = new InstanceZKMetadata();

@@ -32,11 +32,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
@@ -49,8 +45,6 @@ public class PinotResourceManagerTest {
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestPinotResourceManager";
-  private final static String BROKER_TENANT_NAME = "testBrokerTenant";
-  private final static String SERVER_TENANT_NAME = "testServerTenant";
   private final static String TABLE_NAME = "testTable";
   private ZkClient _zkClient;
 
@@ -64,7 +58,7 @@ public class PinotResourceManagerTest {
     _zkClient = new ZkClient(ZK_SERVER);
 
     final String instanceId = "localhost_helixController";
-    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null);
+    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
     _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
@@ -73,33 +67,16 @@ public class PinotResourceManagerTest {
 
     /////////////////////////
     _numInstance = 1;
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 1);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 1, true);
     Thread.sleep(3000);
-    Assert.assertEquals(
-        _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
-            .size(), _numInstance);
 
-    // Create broker tenant
-    Tenant brokerTenant =
-        new TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(0)
-            .setRealtimeInstances(0).build();
-
-    _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BROKER_TENANT_NAME + "_BROKER")
-        .size(), 1);
-
-    // Create server tenant
-    Tenant serverTenant =
-        new TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).setOfflineInstances(1)
-            .setRealtimeInstances(0).build();
-    _pinotHelixResourceManager.createServerTenant(serverTenant);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(), 1);
 
     // Adding table
-    String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
-            1).toString();
+    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, null, null, 1).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 

@@ -54,7 +54,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
   private final File _segmentDir = new File("/tmp/OfflineClusterIntegrationTest/segmentDir");
   private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
-  private File schemaFile;
 
   private static final int SEGMENT_COUNT = 12;
   private static final int QUERY_COUNT = 1000;
@@ -76,12 +75,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
-    String brokerTenant = "offlineBroker";
-    String offlineTenant = "offlineServer";
-    createBrokerTenant(brokerTenant, numBroker);
-    createServerTenant(offlineTenant, numOffline, 0);
     addSchema(schemaFile, "schemaFile");
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", brokerTenant, offlineTenant);
+    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null);
   }
 
   @BeforeClass

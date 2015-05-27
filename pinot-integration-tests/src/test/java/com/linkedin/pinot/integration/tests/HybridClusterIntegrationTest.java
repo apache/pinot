@@ -83,13 +83,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
-    String brokerTenant = "hybridBroker";
-    String realtimeTenant = "hybridServer";
-    createBrokerTenant(brokerTenant);
-    createServerTenant(realtimeTenant, 1, 1);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        realtimeTenant, brokerTenant, avroFile);
+        null, null, avroFile);
   }
 
   @BeforeClass

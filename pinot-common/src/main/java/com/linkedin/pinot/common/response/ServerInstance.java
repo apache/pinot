@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * If the name passed is "127.0.0.1", then it is resolved to the
  * local hostname.
  */
-public class ServerInstance {
+public class ServerInstance implements Comparable<ServerInstance> {
   protected static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   public static final String NAME_PORT_DELIMITER = ":";
@@ -132,6 +132,11 @@ public class ServerInstance {
   @Override
   public String toString() {
     return "ServerInstance [_hostname=" + _hostname + ", _port=" + _port + ", _ipAddress=" + _ipAddress + "]";
+  }
+
+  @Override
+  public int compareTo(ServerInstance o) {
+    return this.toString().compareTo(o.toString());
   }
 
 }

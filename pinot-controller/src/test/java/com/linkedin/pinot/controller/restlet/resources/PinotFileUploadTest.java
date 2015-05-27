@@ -29,9 +29,6 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -44,8 +41,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
  */
 public class PinotFileUploadTest extends ControllerTest {
 
-  private final static String BROKER_TENANT_NAME = "testBrokerTenant";
-  private final static String SERVER_TENANT_NAME = "testServerTenant";
   private final static String TABLE_NAME = "testTable";
 
   private static final String HELIX_CLUSTER_NAME = "PinotFileUploadTest";
@@ -69,30 +64,16 @@ public class PinotFileUploadTest extends ControllerTest {
     startController();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkTestUtils.DEFAULT_ZK_STR, 5);
+        ZkTestUtils.DEFAULT_ZK_STR, 5, true);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkTestUtils.DEFAULT_ZK_STR, 5);
+        ZkTestUtils.DEFAULT_ZK_STR, 5, true);
 
-    // Create broker tenant
-
-    Tenant brokerTenant =
-        new TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(5).setOfflineInstances(0)
-            .setRealtimeInstances(0).build();
-
-    _pinotHelixResourceManager.createBrokerTenant(brokerTenant);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BROKER_TENANT_NAME + "_BROKER")
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER")
         .size(), 5);
-
-    // Create server tenant
-    Tenant serverTenant =
-        new TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER).setTotalInstances(5).setOfflineInstances(5)
-            .setRealtimeInstances(0).build();
-    _pinotHelixResourceManager.createServerTenant(serverTenant);
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, SERVER_TENANT_NAME, BROKER_TENANT_NAME,
-            2, "RandomAssignmentStrategy").toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, null, null, 2, "RandomAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 

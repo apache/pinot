@@ -18,12 +18,14 @@ package com.linkedin.pinot.requestHandler;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.annotation.ThreadSafe;
@@ -353,6 +355,7 @@ public class BrokerRequestHandler {
     long deserializationTime = 0;
     //Step 5 - Deserialize Responses and build instance response map
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final AtomicInteger responseSeq = new AtomicInteger(-1);
     {
       for (BrokerRequest request : responseFuturesList.keySet()) {
         CompositeFuture<ServerInstance, ByteBuf> response = responseFuturesList.get(request);
@@ -372,7 +375,6 @@ public class BrokerRequestHandler {
         Map<ServerInstance, Throwable> errors = response.getError();
 
         if (null != responses) {
-          int responseSeq = 0;
           for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
             try {
               ByteBuf b = e.getValue();
@@ -384,7 +386,7 @@ public class BrokerRequestHandler {
               DataTable r2 = new DataTable(b2);
               // Hybrid requests may get response from same instance, so we need to distinguish them.
               ServerInstance decoratedServerInstance =
-                  new ServerInstance(e.getKey().getHostname(), e.getKey().getPort(), (responseSeq++));
+                  new ServerInstance(e.getKey().getHostname(), e.getKey().getPort(), responseSeq.incrementAndGet());
               if (errors != null && errors.containsKey(e.getKey())) {
                 Throwable throwable = errors.get(e.getKey());
                 if (throwable != null) {

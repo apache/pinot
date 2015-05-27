@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils;
 
 public class ControllerTenantNameBuilder {
+  public final static String DEFAULT_TENANT_NAME = "DefaultTenant";
 
   private static String buildRealtimeTenantName(String tenantName) {
     return tenantName + "_" + ServerType.REALTIME.toString();
@@ -50,6 +51,9 @@ public class ControllerTenantNameBuilder {
   }
 
   public static String getRealtimeTenantNameForTenant(String tenantName) {
+    if (tenantName == null) {
+      return ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(DEFAULT_TENANT_NAME);
+    }
     if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return tenantName;
     } else {
@@ -58,6 +62,9 @@ public class ControllerTenantNameBuilder {
   }
 
   public static String getOfflineTenantNameForTenant(String tenantName) {
+    if (tenantName == null) {
+      return ControllerTenantNameBuilder.getOfflineTenantNameForTenant(DEFAULT_TENANT_NAME);
+    }
     if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
       return tenantName;
     } else {
@@ -66,6 +73,9 @@ public class ControllerTenantNameBuilder {
   }
 
   public static String getBrokerTenantNameForTenant(String tenantName) {
+    if (tenantName == null) {
+      return ControllerTenantNameBuilder.getBrokerTenantNameForTenant(DEFAULT_TENANT_NAME);
+    }
     if (tenantName.endsWith(TenantRole.BROKER.toString())) {
       return tenantName;
     } else {
@@ -85,4 +95,5 @@ public class ControllerTenantNameBuilder {
     }
     return tenantName;
   }
+
 }
