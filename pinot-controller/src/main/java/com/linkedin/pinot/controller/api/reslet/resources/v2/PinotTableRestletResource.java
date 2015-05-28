@@ -3,7 +3,9 @@ package com.linkedin.pinot.controller.api.reslet.resources.v2;
 import java.io.File;
 import java.io.IOException;
 
+import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Delete;
@@ -67,7 +69,19 @@ public class PinotTableRestletResource extends ServerResource {
   public Representation get() {
     final String tableName = (String) getRequest().getAttributes().get("tableName");
     if (tableName == null) {
-      return new StringRepresentation("tableName is not present");
+      try {
+        JSONObject object = new JSONObject();
+        JSONArray tableArray = new JSONArray();
+        List<String> tableNames = manager.getAllPinotTableNames();
+        for (String pinotTableName : tableNames) {
+          tableArray.add(pinotTableName);
+        }
+        object.put("tables", tableArray);
+        return new StringRepresentation(object.toString());
+      } catch (Exception e) {
+        LOGGER.error("Error processing table list", e);
+        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      }
     }
     try {
       JSONArray ret = new JSONArray();
