@@ -303,10 +303,10 @@ public class CollectionsResource implements Managed
         }
 
         IndexMetadata indexMetadata = IndexMetadata.fromProperties(properties);
-        DateTime startWallTime= new DateTime(indexMetadata.getStartTime());
-        DateTime endWallTime= new DateTime(indexMetadata.getEndTime());
+        DateTime startWallTime= new DateTime(indexMetadata.getStartTimeMillis());
+        DateTime endWallTime= new DateTime(indexMetadata.getEndTimeMillis());
         descriptors.add(new SegmentDescriptor(dataDir, startWallTime, endWallTime, new DateTime(
-            indexMetadata.getMinDataTime()), new DateTime(indexMetadata.getMaxDataTime())));
+            indexMetadata.getMinDataTimeMillis()), new DateTime(indexMetadata.getMaxDataTimeMillis())));
       }
     }
 
