@@ -35,19 +35,19 @@ import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileRea
 
 /**
  * Reads a column where each row can have multiple values. Lets say we want to
- * represent (1,2,4) <br/>
- * (3,4) <br/>
- * (5,6)<br/>
+ * represent (1,2,4) <br>
+ * (3,4) <br>
+ * (5,6)<br>
  * Overall there are (3+2+2) = 7 values that we need to store. We will store
  * them sequentially but by storing sequentially we dont know the boundary
  * between each row. We store additional header section that tells the offset
  * and length for each row.
  *
- * The file can be represented as two sections <br/>
+ * The file can be represented as two sections <br>
  *
  * <pre>
  * {@code
- * Header <br/>
+ * Header <br>
  * (rowOffset, number of values)
  * 0 3
  * 3 2
@@ -85,8 +85,8 @@ public class FixedBitCompressedMVForwardIndexReader implements
   /**
    * @param file
    * @param numDocs
-   * @param columnSizeInBytes
-   * @param isHeap
+   * @param columnSizeInBits
+   * @param isMMap
    */
   public FixedBitCompressedMVForwardIndexReader(File file, int numDocs,
       int columnSizeInBits, boolean isMMap) throws Exception {
@@ -98,8 +98,8 @@ public class FixedBitCompressedMVForwardIndexReader implements
   /**
    * @param file
    * @param numDocs
-   * @param columnSizeInBytes
-   * @param isHeap
+   * @param columnSizeInBits
+   * @param isMMap
    */
   public FixedBitCompressedMVForwardIndexReader(File file, int numDocs,
       int columnSizeInBits, boolean[] signed, boolean isMMap)

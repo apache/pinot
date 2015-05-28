@@ -71,7 +71,7 @@ public class GenericRowColumnDataFileReader {
 
   /**
    *
-   * @param fileName
+   * @param dataFile
    * @param rows
    * @param cols
    * @param columnSizes in bytes

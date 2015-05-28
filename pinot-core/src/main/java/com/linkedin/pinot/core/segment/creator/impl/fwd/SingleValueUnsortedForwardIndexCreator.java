@@ -57,7 +57,7 @@ public class SingleValueUnsortedForwardIndexCreator implements Closeable, Forwar
 
   /**
    * {@inheritDoc}
-   * @see com.linkedin.pinot.core.segment.creator.ForwardIndexCreator#index(java.lang.Object)
+   * @see com.linkedin.pinot.core.segment.creator.ForwardIndexCreator#index(int, Object)
    */
   @Override
   public void index(int docId, Object e) {

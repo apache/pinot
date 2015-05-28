@@ -67,7 +67,6 @@ public class SingleNodeServerStarter {
   /**
    * Construct from config file path
    * @param configFilePath Path to the config file
-   * @return
    * @throws Exception
    */
   public static void buildServerConfig(File configFilePath) throws Exception {

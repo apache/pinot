@@ -172,7 +172,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * The framework will go ahead and cancel any outstanding futures.
    *
    * @param name Name of the future which got completed
-   * @param response Response
+   * @param responses Response
    * @param error Error
    * @return true if processing done
    */

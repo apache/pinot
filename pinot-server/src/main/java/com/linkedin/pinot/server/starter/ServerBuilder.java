@@ -101,9 +101,8 @@ public class ServerBuilder {
 
   /**
    * Initialize with Configuration file
-   * @param Configuration object
+   * @param config object
    * @param metricsRegistry
-   * @throws Exception
    */
   public ServerBuilder(Configuration config, MetricsRegistry metricsRegistry) {
     this.metricsRegistry = metricsRegistry;
@@ -113,7 +112,7 @@ public class ServerBuilder {
 
   /**
    * Initialize with ServerConf object
-   * @param ServerConf object
+   * @param serverConf object
    * @param metricsRegistry
    */
   public ServerBuilder(ServerConf serverConf, MetricsRegistry metricsRegistry) {

@@ -39,7 +39,7 @@ public interface MutableIndexSegment extends IndexSegment {
   /**
    * gives the aggregate count of the events,
    * in case an implementation is aggregating events
-   * raw count will be > aggregate count
+   * raw count will be &gt; aggregate count
    * otherwise
    * raw count will be = aggregate count
    * @return

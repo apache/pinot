@@ -42,8 +42,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
   /**
    *
    * @param rows
-   * @param column
-   * @param columnSize
+   * @param columnSizesInBytes
    */
   public FixedByteSingleColumnSingleValueReaderWriter(int rows, int[] columnSizesInBytes) throws IOException {
     this.cols = 1;

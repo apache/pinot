@@ -29,9 +29,9 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWri
 
 
 /**
- * Supports both reads and writes using the same data structure.<br/>
- * Writes must be strictly sequential, while reads can be random <br/>
- * It is very similar to the SingleColumnMultiValue format representation <br/>
+ * Supports both reads and writes using the same data structure.<br>
+ * Writes must be strictly sequential, while reads can be random <br>
+ * It is very similar to the SingleColumnMultiValue format representation <br>
  * except that the variable size data buffer size is not known up front in case FixedByteSingleColumnMultiValueReaderWriter
  * This class allocates extra memory in chunks as needed.
  * Data format

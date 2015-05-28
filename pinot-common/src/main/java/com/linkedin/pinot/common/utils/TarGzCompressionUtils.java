@@ -52,9 +52,9 @@ public class TarGzCompressionUtils {
    * Creates a tar.gz file at the specified path with the contents of the
    * specified directory.
    *
-   * @param dirPath
+   * @param directoryPath
    *          The path to the directory to create an archive of
-   * @param archivePath
+   * @param tarGzPath
    *          The path to the archive to create
    * @return tarGzPath
    * @throws IOException

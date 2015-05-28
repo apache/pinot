@@ -133,7 +133,6 @@ public class PerTableRoutingConfig {
    * Builds a map needed for routing the partitions in the partition-group passed.
    * There could be different set of servers for each partition in the passed partition-group.
    *
-   * @param pg segmentSet for which the routing map needs to be built.
    * @return
    */
   public Map<ServerInstance, SegmentIdSet> buildRequestRoutingMap() {

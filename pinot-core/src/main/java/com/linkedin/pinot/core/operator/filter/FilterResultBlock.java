@@ -48,8 +48,8 @@ public class FilterResultBlock implements Block {
 
   /**
    * sets the docId from min to max in the result block
-   * @param min
-   * @param max
+   * @param minDocId
+   * @param maxDocId
    */
   private void setRange(int minDocId, int maxDocId) {
 
@@ -82,7 +82,7 @@ public class FilterResultBlock implements Block {
 
   /**
    * Check if the docId is included in the result set
-   * @param index
+   * @param docId
    * @return
    */
   private boolean isSet(int docId) {

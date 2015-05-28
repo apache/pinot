@@ -66,7 +66,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    * Return a previously checked out object to the pool.  It is an error to return an object to
    * the pool that is not currently checked out from the pool.
    *
-   * @param obj the object to be returned
+   * @param object the object to be returned
    */
   public void checkinObject(K key, T object);
 
@@ -81,13 +81,13 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
 
   /**
    * Initiate an orderly shutdown of the pool.  The pool will immediately stop accepting
-   * new {@link #get(com.linkedin.common.callback.Callback)} requests.  Shutdown is complete when
+   * new get(com.linkedin.common.callback.Callback) requests.  Shutdown is complete when
    * <ul>
    *   <li>No pending requests are waiting for objects</li>
-   *   <li>All objects have been returned to the pool, via either {@link #put(Object)} or {@link #dispose(Object)}</li>
+   *   <li>All objects have been returned to the pool, via either put(Object) or dispose(Object)</li>
    * </ul>
    *
-   * @param composite Future which you can call get() to wait for shutdown.
+   * @return composite Future which you can call get() to wait for shutdown.
    */
   public KeyedFuture<K, NoneType> shutdown();
 }

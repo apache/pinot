@@ -46,7 +46,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   }
 
   /**
-   * After setting the startDocId, next calls will always return from >=startDocId
+   * After setting the startDocId, next calls will always return from &gt;=startDocId
    * @param startDocId
    */
   public void setStartDocId(int startDocId) {
@@ -91,7 +91,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
     }
 
     /**
-     * After setting the startDocId, next calls will always return from >=startDocId
+     * After setting the startDocId, next calls will always return from &gt;=startDocId
      * @param startDocId
      */
     public void setStartDocId(int startDocId) {

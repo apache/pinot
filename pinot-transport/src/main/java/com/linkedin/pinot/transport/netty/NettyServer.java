@@ -60,7 +60,7 @@ public abstract class NettyServer implements Runnable {
     /**
      * Callback for Servers to process the request and return the response.
      * The ownership of the request bytebuf resides with the caler (NettyServer).
-     * This callback is not expected to call {@Bytebuf.release()} on request
+     * This callback is not expected to call {@link ByteBuf#release()} on request
      * The ownership of the request byteBuf lies with the caller.
      *
      * The implementation MUST not throw any runtime exceptions. In case of errors,

@@ -63,7 +63,7 @@ public class PinotTableIdealStateBuilder {
    * Building an empty idealState for a given table.
    * Used when creating a new table.
    *
-   * @param table
+   * @param tableName
    * @param helixAdmin
    * @param helixClusterName
    * @return
@@ -85,7 +85,6 @@ public class PinotTableIdealStateBuilder {
    * Building an empty idealState for a given table.
    * Used when creating a new table.
    *
-   * @param table
    * @param helixAdmin
    * @param helixClusterName
    * @return

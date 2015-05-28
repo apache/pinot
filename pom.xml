@@ -561,6 +561,7 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
+			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
               <skip>false</skip>
             </configuration>
           </execution>
@@ -642,6 +643,7 @@
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
+			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
@@ -651,6 +653,7 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
+			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>

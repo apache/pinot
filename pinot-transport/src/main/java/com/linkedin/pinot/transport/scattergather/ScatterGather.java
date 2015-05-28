@@ -30,7 +30,7 @@ public interface ScatterGather {
    * Async Scatter-Gather request.
    *
    * If one of the request is to the server which is running this code, then the
-   * {@link LocalRequestHandler} instance passed as part of scatter request
+   * LocalRequestHandler instance passed as part of scatter request
    * will be called in a separate thread.
    *
    *  Here are the steps:

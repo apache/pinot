@@ -68,7 +68,6 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
 
   /**
    * Add Collection of metrics to be aggregated
-   * @param counters collection of metrics to be aggregated
    * @return this instance
    */
   public AggregatedHistogram<T> addAll(Collection<T> histograms) {
@@ -78,7 +77,6 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
 
   /**
    * Add a metric to be aggregated
-   * @param counter
    * @return this instance
    */
   public AggregatedHistogram<T> add(T histogram) {
@@ -88,7 +86,6 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
 
   /**
    * Remove a metric which was already added
-   * @param counter metric to be removed
    * @return true if the metric was present in the list
    */
   public boolean remove(T histogram) {

@@ -103,7 +103,7 @@ public abstract class NettyClientConnection {
    * API to send a request asynchronously.
    * @param serializedRequest serialized payload to send the request
    * @param requestId Request Id
-   * @param timeoutMS Timeout in milli-seconds. If timeout < 0, then no timeout
+   * @param timeoutMs Timeout in milli-seconds. If timeout &lt; 0, then no timeout
    * @return Future to return the response returned from the server.
    */
   public abstract ResponseFuture sendRequest(ByteBuf serializedRequest, long requestId, long timeoutMs);

@@ -48,7 +48,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
 
   /**
    * Constructs an inverted index with the specified size.
-   * @param size the number of bitmaps in the inverted index, which should be the same as the number of values in
+   * @param cardinality the number of bitmaps in the inverted index, which should be the same as the number of values in
    * the dictionary.
    * @throws IOException
    */

@@ -17,6 +17,7 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -51,7 +52,7 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
   public String getName();
 
   /**
-   * Blocking call. Similar to {@link Future.get()} But returns any one of the keyed
+   * Blocking call. Similar to {@link Future#get()} But returns any one of the keyed
    * response. Useful when we know the only one response is expected.
    * @return
    */
@@ -65,7 +66,6 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
    * @param timeout the maximum time to wait
    * @param unit the time unit of the timeout argument
    * @return the computed result
-   * @throws CancellationException if the computation was cancelled
    * @throws ExecutionException if the computation threw an
    * exception
    * @throws InterruptedException if the current thread was interrupted

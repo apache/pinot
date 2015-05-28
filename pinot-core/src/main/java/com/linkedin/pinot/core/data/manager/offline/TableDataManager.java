@@ -76,7 +76,7 @@ public interface TableDataManager {
   /**
    * Adding a Segment into the TableDataManager by given DataTableZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
    * @param propertyStore
-   * @param dataTableZKMetadata
+   * @param tableConfig
    * @param instanceZKMetadata
    * @param segmentZKMetadata
    * @throws Exception
@@ -87,7 +87,7 @@ public interface TableDataManager {
   /**
    *
    * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
-   * @param segmentNameToRemove
+   * @param segmentToRemove
    */
   public void removeSegment(String segmentToRemove);
 

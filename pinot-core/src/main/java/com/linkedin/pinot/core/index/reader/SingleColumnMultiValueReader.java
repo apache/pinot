@@ -29,7 +29,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param shortsArray
    * @return return the number of shorts read
    */
@@ -38,7 +37,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param intArray
    * @return
    */
@@ -47,7 +45,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param longArray
    * @return
    */
@@ -56,7 +53,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param floatArray
    * @return
    */
@@ -65,7 +61,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param doubleArray
    * @return
    */
@@ -74,7 +69,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param stringArray
    * @return
    */
@@ -83,7 +77,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   /**
    *
    * @param row
-   * @param col
    * @param bytesArray
    * @return
    */

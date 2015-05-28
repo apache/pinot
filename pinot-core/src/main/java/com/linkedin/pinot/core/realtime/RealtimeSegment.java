@@ -45,8 +45,7 @@ public interface RealtimeSegment extends MutableIndexSegment {
 
   /**
    *
-   * @param columnName
-   * @param docIdCounter
+   * @param docId
    * @return
    */
   public GenericRow getRawValueRowAt(int docId);

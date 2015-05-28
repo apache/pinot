@@ -72,7 +72,6 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
 
   /**
    * Add Collection of metrics to be aggregated
-   * @param counters collection of metrics to be aggregated
    * @return this instance
    */
   public AggregatedMeter<T> addAll(Collection<T> meters) {
@@ -82,7 +81,6 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
 
   /**
    * Add a metric to be aggregated
-   * @param counter
    * @return this instance
    */
   public AggregatedMeter<T> add(T meter) {
@@ -92,7 +90,6 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
 
   /**
    * Remove a metric which was already added
-   * @param counter metric to be removed
    * @return true if the metric was present in the list
    */
   public boolean remove(T meter) {

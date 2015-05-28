@@ -54,7 +54,6 @@ public class AggregatedLongGauge<T extends Number, V extends Gauge<T>> extends G
 
   /**
    * Add Collection of metrics to be aggregated
-   * @param counters collection of metrics to be aggregated
    * @return this instance
    */
   public AggregatedLongGauge<T, V> addAll(Collection<Gauge<T>> gauges) {
@@ -64,7 +63,6 @@ public class AggregatedLongGauge<T extends Number, V extends Gauge<T>> extends G
 
   /**
    * Add a metric to be aggregated
-   * @param counter
    * @return this instance
    */
   public AggregatedLongGauge<T, V> add(Gauge<T> gauge) {
@@ -74,7 +72,6 @@ public class AggregatedLongGauge<T extends Number, V extends Gauge<T>> extends G
 
   /**
    * Remove a metric which was already added
-   * @param counter metric to be removed
    * @return true if the metric was present in the list
    */
   public boolean remove(Gauge<T> gauge) {

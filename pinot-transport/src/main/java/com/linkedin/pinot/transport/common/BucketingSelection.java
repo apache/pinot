@@ -46,7 +46,7 @@ public class BucketingSelection {
    * Use the preselected server for a partition only if it is present in the passed list of candidates.
    *
    * @param p Partition for which selection has to happen.
-   * @param orderedServers Collection of candidates from which a server has to be picked
+   * @param servers Collection of candidates from which a server has to be picked
    * @return the preselected server only if it is present in the passed list of candidates. Otherwise, it is null.
    */
   public ServerInstance selectServer(SegmentId p, Collection<ServerInstance> servers) {

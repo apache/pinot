@@ -81,7 +81,7 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
   /**
    * Take a list of intermediate results and merge them.
    *
-   * @param aggregationResultList
+   * @param combinedResultList
    * @return final merged results
    */
   ReduceResult reduce(List<AggregateResult> combinedResultList);

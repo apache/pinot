@@ -160,7 +160,7 @@ public class ScatterGatherImpl implements ScatterGather {
    * Merge segment-sets which have the same set of servers. If 2 segmentIds have overlapping
    * set of servers, they are not merged. If there is predefined-selection for a segmentId,
    * a separate entry is added for those in the inverted map.
-   * @param request Scatter gather request
+   * @param requestContext Scatter gather request
    */
   protected void buildInvertedMap(ScatterGatherRequestContext requestContext) {
     ScatterGatherRequest request = requestContext.getRequest();

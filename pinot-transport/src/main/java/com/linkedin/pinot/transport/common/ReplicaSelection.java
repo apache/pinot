@@ -78,9 +78,9 @@ public abstract class ReplicaSelection {
    * This method is expected to be thread-safe as several request can call this method
    * concurrently.
    *
-   * @param segmentId The segmentId for which server selection needs to happen
+   * @param p The segmentId for which server selection needs to happen
    * @param orderedServers Ordered list of servers from which a server has to be selected
-   * @param hashKey bucketKey whose {@link Object.hashcode()} provides hash-based selection
+   * @param hashKey bucketKey whose {@link Object#hashCode()} provides hash-based selection
    * @return
    */
   public abstract ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers, Object hashKey);

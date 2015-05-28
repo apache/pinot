@@ -64,7 +64,7 @@ public class RangePredicateEvaluator {
 
   /**
    * @param dictionary
-   * @param rangePredicate
+   * @param predicate
    * @return array of size 2, with range start,end.
    */
   public int[] evalStartEndIndex(Dictionary dictionary, RangePredicate predicate) {

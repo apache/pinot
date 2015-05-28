@@ -29,11 +29,11 @@ public class HeapCompressedIntArray implements IntArray {
    */
   private final long[] blocks;
   /**
-   * A right-aligned mask of width BitsPerValue used by {@link #get(int)}.
+   * A right-aligned mask of width BitsPerValue used by {@link #getInt(int)}.
    */
   private final long maskRight;
   /**
-   * Optimization: Saves one lookup in {@link #get(int)}.
+   * Optimization: Saves one lookup in {@link #getInt(int)}.
    */
   private final int bpvMinusBlockSize;
   private final int bitsPerValue;
@@ -56,8 +56,8 @@ public class HeapCompressedIntArray implements IntArray {
   }
 
   /**
-   * Creates an array backed by the given blocks. </p>
-   * <p>
+   * <p>Creates an array backed by the given blocks. </p>
+   *
    * Note: The blocks are used directly, so changes to the given block will
    * affect the Packed64-structure.
    *

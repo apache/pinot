@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public interface SegmentPrunerService {
   /**
    * @param segment
-   * @param request
+   * @param query
    * @return
    */
   public boolean prune(final IndexSegment segment, final BrokerRequest query);

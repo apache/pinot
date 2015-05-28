@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  *
  * Datatable that holds data in a matrix form. The purpose of this class is to
  * provide a way to construct a datatable and ability to serialize and
- * deserialize.<br/>
+ * deserialize.<br>
  * Why can't we use existing serialization/deserialization mechanism. Most
  * existing techniques protocol buffer, thrift, avro are optimized for
  * transporting a single record but Pinot transfers quite a lot of data from
@@ -47,21 +47,21 @@ import org.slf4j.LoggerFactory;
  * Integer etc. This is waste of cpu resource and increase the payload size. We
  * optimize the data format for Pinot usecase. We can also support lazy
  * construction of obejcts. Infact we retain the bytes as it is and will be able
- * to lookup the a field directly within a byte buffer.<br/>
+ * to lookup the a field directly within a byte buffer.<br>
  *
  * USAGE:
  *
  * Datatable is initialized with the schema of the table. Schema describes the
- * columnnames, their order and data type for each column.<br/>
+ * columnnames, their order and data type for each column.<br>
  * Each row must follow the same convention. We don't support MultiValue columns
  * for now. Format,
  * |VERSION,DATA_START_OFFSET,DICTIONARY_START_OFFSET,INDEX_START_OFFSET
- * ,METADATA_START_OFFSET | |<DATA> |
+ * ,METADATA_START_OFFSET | |&lt;DATA&gt; |
  *
- * |<DICTIONARY>|
+ * |&lt;DICTIONARY&gt;|
  *
  *
- * |<METADATA>| Data contains the actual values written by the application We
+ * |&lt;METADATA&gt;| Data contains the actual values written by the application We
  * first write the entire data in its raw byte format. For example if you data
  * type is Int, it will write 4 bytes. For most data types that are fixed width,
  * we just write the raw data. For special cases like String, we create a
@@ -100,7 +100,7 @@ public class DataTableBuilder {
   int rowSizeInBytes;
 
   /**
-   * format length of header. VERSION, <br/>
+   * format length of header. VERSION, <br>
    * START_OFFSET LENGTH for each sub section
    *
    */
@@ -439,7 +439,7 @@ public class DataTableBuilder {
   /**
    *
    * @param columnIndex
-   * @param value
+   * @param values
    * @throws Exception
    */
   public void setColumn(int columnIndex, String[] values) throws Exception {

@@ -35,8 +35,8 @@ public interface BlockDocIdIterator {
   /**
    * Moves to first entry beyond current docId whose docId is equal or greater
    * than targetDocId
-   * @param docId
-   * @return docId that is beyond current docId or EOF if no documents exists that is >= targetDocId
+   * @param targetDocId
+   * @return docId that is beyond current docId or EOF if no documents exists that is &gt;= targetDocId
    */
   int advance(int targetDocId);
 

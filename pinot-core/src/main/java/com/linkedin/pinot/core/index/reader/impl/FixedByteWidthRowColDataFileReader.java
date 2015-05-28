@@ -35,12 +35,12 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  * Generic utility class to read data from file. The data file consists of rows
  * and columns. The number of columns are fixed. Each column can have either
  * single value or multiple values. There are two basic types of methods to read
- * the data <br/>
- * 1. <TYPE> getType(int row, int col) this is used for single value column <br/>
+ * the data <br>
+ * 1. &lt;TYPE&gt; getType(int row, int col) this is used for single value column <br>
  * 2. int getTYPEArray(int row, int col, TYPE[] array). The caller has to create
  * and initialize the array. The implementation will fill up the array. The
  * caller is responsible to ensure that the array is big enough to fit all the
- * values. The return value tells the number of values.<br/>
+ * values. The return value tells the number of values.<br>
  *
  *
  */
@@ -88,7 +88,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
 
   /**
    *
-   * @param fileName
+   * @param dataFile
    * @param rows
    * @param cols
    * @param columnSizes
