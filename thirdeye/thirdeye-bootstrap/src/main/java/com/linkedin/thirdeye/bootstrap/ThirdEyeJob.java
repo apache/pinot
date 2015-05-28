@@ -118,6 +118,8 @@ public class ThirdEyeJob {
   private static final String USAGE = "usage: phase_name job.properties";
   private static final String AVRO_SCHEMA = "schema.avsc";
   private static final String TREE_FILE_FORMAT = ".bin";
+  private static final String DEFAULT_CLEANUP_DAYS_AGO = "7";
+  private static final String DEFAULT_CLEANUP_SKIP = "false";
 
   private enum FlowSpec {
     DIMENSION_INDEX,
@@ -443,7 +445,6 @@ public class ThirdEyeJob {
 
       @Override
       Class<?> getKlazz() {
-        // TODO Auto-generated method stub
         return null;
       }
 
@@ -461,13 +462,15 @@ public class ThirdEyeJob {
         Properties config = new Properties();
 
         String thirdeyeCleanupDaysAgo =
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName());
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
+                DEFAULT_CLEANUP_DAYS_AGO );
         config.setProperty(
             ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
             thirdeyeCleanupDaysAgo);
 
         String thirdeyeCleanupSkip =
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName());
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
+                DEFAULT_CLEANUP_SKIP);
         config.setProperty(
             ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
             thirdeyeCleanupSkip);
@@ -788,7 +791,7 @@ public class ThirdEyeJob {
     else if (PhaseSpec.CLEANUP.equals(phaseSpec))
     {
 
-      boolean cleanupSkip = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_SKIP.getName()));
+      boolean cleanupSkip = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_SKIP.getName(), DEFAULT_CLEANUP_SKIP));
       LOGGER.info("cleanup skip {}", cleanupSkip);
       if (cleanupSkip)
       {
@@ -796,13 +799,13 @@ public class ThirdEyeJob {
       }
       else
       {
-        int cleanupDaysAgo = Integer.valueOf(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName()));
-        long cleanupDaysAgoSeconds = cleanupDaysAgo * 24 * 60 * 60;
+        int cleanupDaysAgo = Integer.valueOf(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(), DEFAULT_CLEANUP_DAYS_AGO));
+        DateTime cleanupDaysAgoDate = (new DateTime()).minusDays(cleanupDaysAgo);
 
         Path dimensionIndexdir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.DIMENSION_INDEX);
         Path metricIndexDir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.METRIC_INDEX);
 
-        LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoSeconds, dimensionIndexdir, metricIndexDir);
+        LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoDate.getMillis(), dimensionIndexdir, metricIndexDir);
 
         FileSystem fileSystem = FileSystem.get(new Configuration());
 
@@ -812,17 +815,16 @@ public class ThirdEyeJob {
           @Override
           public boolean accept(Path path) {
 
-            return path.getName().startsWith("data_");
+            return path.getName().startsWith(StarTreeConstants.DATA_DIR_PREFIX);
           }
         });
 
         for (FileStatus file : fileStatus)
         {
           //get last modified date
-          long diffSeconds = (new Date().getTime() - file.getModificationTime())/1000;
+          DateTime lastModifiedDate = new DateTime(file.getModificationTime());
 
-          // if older than cleanupdaysAgo then delete
-          if (diffSeconds > cleanupDaysAgoSeconds)
+          if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis()))
           {
             LOGGER.info("Deleting {}", file.getPath());
             fileSystem.delete(file.getPath(), true);
@@ -836,20 +838,19 @@ public class ThirdEyeJob {
           @Override
           public boolean accept(Path path) {
 
-            return path.getName().startsWith("data_");
+            return path.getName().startsWith(StarTreeConstants.DATA_DIR_PREFIX);
           }
         });
 
         for (FileStatus file : fileStatus)
         {
-          //get last modified date
-          long diffSeconds = (new Date().getTime() - file.getModificationTime())/1000;
+        //get last modified date
+          DateTime lastModifiedDate = new DateTime(file.getModificationTime());
 
-          // if older than cleanupdaysAgo then delete everything except data.tar.gz
-          if (diffSeconds > cleanupDaysAgoSeconds)
+          if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis()))
           {
-            Path startreeBootstrapPath1 = new Path(file.getPath(), "startree_bootstrap_phase1");
-            Path startreeBootstrapPath2 = new Path(file.getPath(), "startree_bootstrap_phase2");
+            Path startreeBootstrapPath1 = new Path(file.getPath(), PhaseSpec.STARTREE_BOOTSTRAP_PHASE1.getName().toLowerCase());
+            Path startreeBootstrapPath2 = new Path(file.getPath(), PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName().toLowerCase());
 
             LOGGER.info("Deleting {} {}", startreeBootstrapPath1, startreeBootstrapPath2);
             fileSystem.delete(startreeBootstrapPath1, true);
