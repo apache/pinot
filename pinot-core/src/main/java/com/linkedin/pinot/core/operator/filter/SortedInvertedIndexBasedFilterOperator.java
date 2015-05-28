@@ -70,7 +70,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       int[] minMax = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
       pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
     }
-    LOGGER.info("Creating a Sorted Block with pairs: {}", pairs);
+    LOGGER.debug("Creating a Sorted Block with pairs: {}", pairs);
     sortedBlock = new SortedBlock(pairs);
     return sortedBlock;
   }

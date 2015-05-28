@@ -125,7 +125,7 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
 
       @Override
       public int next() {
-        long start = System.nanoTime();
+        long start = System.currentTimeMillis();
 
         if (currentDocId == Constants.EOF) {
           return currentDocId;
@@ -154,8 +154,13 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
         } else {
           currentDocId = Constants.EOF;
         }
-        long end = System.nanoTime();
+        long end = System.currentTimeMillis();
         timeMeasure.addAndGet(end - start);
+        //Remove this after tracing is added
+//      if (currentDocId == Constants.EOF) {
+//        LOGGER.debug("OR took:" + timeMeasure.get());
+//      }
+
         return currentDocId;
       }
 

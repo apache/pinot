@@ -23,16 +23,13 @@ import org.yaml.snakeyaml.Yaml;
 
 /**
  * Simple code to run queries against a server
- * USAGE: QueryRunner confFile queryDirectory (optional)
+ * USAGE: QueryRunner confFile query numberOfTimesToRun
  */
 public class QueryRunner {
   public static void main(String[] args) throws Exception {
     String confFile = args[0];
 
     PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(confFile));
-    if (args.length > 1) {
-      conf.setQueriesDirectory(args[1]);
-    }
     //since its only to run queries, we should ensure no services get started
     conf.setStartBroker(false);
     conf.setStartController(false);
@@ -40,7 +37,16 @@ public class QueryRunner {
     conf.setStartZookeeper(false);
     conf.setUploadIndexes(false);
     conf.setRunQueries(true);
+    conf.setConfigureResources(false);
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    driver.postQueries();
+
+    String query = args[1];
+
+    int numTimes = Integer.parseInt(args[2]);
+
+    for (int i = 0; i < numTimes; i++) {
+      JSONObject response = driver.postQuery(query);
+      System.out.println("Response:" + response);
+    }
   }
 }

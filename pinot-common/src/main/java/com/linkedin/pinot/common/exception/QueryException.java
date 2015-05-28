@@ -31,6 +31,7 @@ public class QueryException {
   public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(300);
   public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(350);
   public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(400);
+  public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR = new ProcessingException(1100);
   public static final ProcessingException BROKER_RESOURCE_MISSING_ERROR = new ProcessingException(410);
   public static final ProcessingException BROKER_INSTANCE_MISSING_ERROR = new ProcessingException(420);
   public static final ProcessingException INTERNAL_ERROR = new ProcessingException(450);
@@ -47,6 +48,7 @@ public class QueryException {
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");
     BROKER_TIMEOUT_ERROR.setMessage("BrokerTimeout");
+    COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeOut");
     BROKER_RESOURCE_MISSING_ERROR.setMessage("BrokerResourceMissingError");
     BROKER_INSTANCE_MISSING_ERROR.setMessage("BrokerInstanceMissingError");
     INTERNAL_ERROR.setMessage("InternalError");

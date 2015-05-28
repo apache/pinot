@@ -29,7 +29,7 @@ public class PerfBenchmarkDriverConf {
    * zookeeper configuration
    */
   String zkHost = "localhost";
-  int zkPort = 2181;
+  int zkPort = 2191;
   boolean startZookeeper = true;
 
   //server configuration

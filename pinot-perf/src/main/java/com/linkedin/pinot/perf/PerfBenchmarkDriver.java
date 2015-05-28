@@ -20,6 +20,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.URL;
@@ -36,6 +37,11 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.tools.ClusterStateVerifier;
 import org.apache.helix.tools.ClusterStateVerifier.Verifier;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +51,7 @@ import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
@@ -110,7 +117,7 @@ public class PerfBenchmarkDriver {
       serverInstanceName = conf.getServerInstanceName();
     }
     serverInstanceDataDir = "/tmp/server/" + serverInstanceName + "/index_data_dir";
-    if (conf.getServerInstanceName() != null) {
+    if (conf.getServerInstanceDataDir() != null) {
       serverInstanceDataDir = conf.getServerInstanceDataDir();
     }
     serverInstanceSegmentTarDir = "/tmp/pinot/server/" + serverInstanceName + "/segment_tar_dir";
@@ -205,6 +212,7 @@ public class PerfBenchmarkDriver {
     Configuration serverConfiguration = new PropertiesConfiguration();
     serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR.toString(),
         serverInstanceDataDir);
+
     serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR.toString(),
         serverInstanceSegmentTarDir);
     serverConfiguration.setProperty("instanceId", serverInstanceName);
@@ -235,26 +243,39 @@ public class PerfBenchmarkDriver {
       LOGGER.info("Skipping configure resources step");
       return;
     }
+    String tableName = conf.getTableName();
+    configureTable(tableName);
+  }
+
+  public void configureTable(String tableName) throws Exception {
     //TODO:Get these from configuration
     int numInstances = 1;
     int numReplicas = 1;
-    String tableName = conf.getTableName();
     String segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
     String brokerTenantName = "testBrokerTenant";
     String serverTenantName = "testServerTenant";
     // create broker tenant
-    Tenant brokerTenant = new TenantBuilder(brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(numInstances).build();
+    Tenant brokerTenant =
+        new TenantBuilder(brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(numInstances).build();
     controllerStarter.getHelixResourceManager().createBrokerTenant(brokerTenant);
     // create server tenant
-    Tenant serverTenant = new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances).setOfflineInstances(numInstances).build();
+    Tenant serverTenant =
+        new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
+            .setOfflineInstances(numInstances).build();
     controllerStarter.getHelixResourceManager().createServerTenant(serverTenant);
     // upload schema 
 
     // create table
     String jsonString =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName, numReplicas, segmentAssignmentStrategy).toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName,
+            numReplicas, segmentAssignmentStrategy).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
     controllerStarter.getHelixResourceManager().addTable(offlineTableConfig);
+  }
+
+  public void addSegment(SegmentMetadata metadata) {
+    controllerStarter.getHelixResourceManager().addSegment(metadata,
+        "http://" + controllerHost + ":" + controllerPort + "/" + metadata.getName());
   }
 
   public void uploadIndexSegments() throws Exception {
@@ -267,8 +288,8 @@ public class PerfBenchmarkDriver {
     File[] listFiles = file.listFiles();
     for (File indexFile : listFiles) {
       LOGGER.info("Uploading index segment " + indexFile.getAbsolutePath());
-      FileUploadUtils.sendSegmentFile(controllerHost, "" + controllerPort, indexFile.getName(),
-          new FileInputStream(indexFile), indexFile.length());
+      FileUploadUtils.sendSegmentFile(controllerHost, "" + controllerPort, indexFile.getName(), new FileInputStream(
+          indexFile), indexFile.length());
     }
   }
 

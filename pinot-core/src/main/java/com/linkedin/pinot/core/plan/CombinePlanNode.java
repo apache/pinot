@@ -17,14 +17,22 @@ package com.linkedin.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MCombineOperator;
+import com.sun.corba.se.impl.interceptors.PINoOpHandlerImpl;
 
 
 /**
@@ -38,11 +46,13 @@ public class CombinePlanNode implements PlanNode {
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
+  private static ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
 
   public CombinePlanNode(BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
     _brokerRequest = brokerRequest;
     _executorService = executorService;
     _timeOutMs = timeOutMs;
+
   }
 
   public void addPlanNode(PlanNode planNode) {
@@ -56,14 +66,36 @@ public class CombinePlanNode implements PlanNode {
   @Override
   public Operator run() {
     long start = System.currentTimeMillis();
-    List<Operator> retOperators = new ArrayList<Operator>();
-    for (PlanNode planNode : _planNodeList) {
-      retOperators.add(planNode.run());
+    final List<Operator> retOperators = new ArrayList<Operator>(_planNodeList.size());
+    if (_planNodeList.size() < 10) {
+      for (PlanNode planNode : _planNodeList) {
+        retOperators.add(planNode.run());
+      }
+    } else {
+      final CountDownLatch latch = new CountDownLatch(_planNodeList.size());
+      final ConcurrentLinkedQueue<Operator> queue = new ConcurrentLinkedQueue<Operator>();
+      for (final PlanNode planNode : _planNodeList) {
+        cachedThreadPool.execute(new Runnable() {
+          @Override
+          public void run() {
+            Operator operator = planNode.run();
+            queue.add(operator);
+            latch.countDown();
+          }
+        });
+      }
+      try {
+        latch.await(60, TimeUnit.SECONDS);
+        retOperators.addAll(queue);
+      } catch (InterruptedException e) {
+        LOGGER.error("Interupted exception. Planning each segment took more than 60 seconds: ", e  );
+        throw new RuntimeException(QueryException.COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR);
+      }
     }
     MCombineOperator mCombineOperator =
         new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
     long end = System.currentTimeMillis();
-    LOGGER.debug("CombinePlanNode.run took: " + (end - start));
+    LOGGER.info("CombinePlanNode.run took: " + (end - start));
     return mCombineOperator;
   }
 
