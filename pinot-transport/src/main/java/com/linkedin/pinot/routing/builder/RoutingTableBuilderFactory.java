@@ -36,6 +36,8 @@ public class RoutingTableBuilderFactory {
   static {
     keyToFunction.put("random", RandomRoutingTableBuilder.class);
     keyToFunction.put("randomroutingtablebsuilder", RandomRoutingTableBuilder.class);
+    keyToFunction.put("balanced", BalancedRandomRoutingTableBuilder.class);
+    keyToFunction.put("balancedrandomroutingtablebsuilder", BalancedRandomRoutingTableBuilder.class);
     keyToFunction.put("kafkahighlevelconsumerbased", KafkaHighLevelConsumerBasedRoutingTableBuilder.class);
     keyToFunction.put("kafkahighlevelconsumerbasedroutingtablebuilder", KafkaHighLevelConsumerBasedRoutingTableBuilder.class);
   }

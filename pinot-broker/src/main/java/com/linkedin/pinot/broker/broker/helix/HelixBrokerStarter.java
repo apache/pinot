@@ -55,6 +55,7 @@ import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
  */
 public class HelixBrokerStarter {
 
+  private static final String TABLES_KEY = "tables";
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final Configuration _pinotHelixProperties;
@@ -86,14 +87,14 @@ public class HelixBrokerStarter {
         getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY));
     RoutingTableBuilder defaultRealtimeRoutingTableBuilder =
         getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY));
-    Map<String, RoutingTableBuilder> resourceToRoutingTableBuilderMap =
-        getResourceToRoutingTableBuilderMap(_pinotHelixProperties.subset(ROUTING_TABLE_BUILDER_KEY));
+    Map<String, RoutingTableBuilder> tableToRoutingTableBuilderMap =
+        getTableToRoutingTableBuilderMap(_pinotHelixProperties.subset(ROUTING_TABLE_BUILDER_KEY));
     ZkClient zkClient =
         new ZkClient(StringUtil.join("/", StringUtils.chomp(zkServer, "/"), helixClusterName, "PROPERTYSTORE"),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
     _helixExternalViewBasedRouting =
-        new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder, resourceToRoutingTableBuilderMap, _propertyStore);
+        new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder, tableToRoutingTableBuilderMap, _propertyStore);
 
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
@@ -124,22 +125,23 @@ public class HelixBrokerStarter {
     }
   }
 
-  private Map<String, RoutingTableBuilder> getResourceToRoutingTableBuilderMap(Configuration routingTableBuilderConfig) {
-    String[] resources = routingTableBuilderConfig.getStringArray("resources");
-    if ((resources != null) && (resources.length > 0)) {
-      Map<String, RoutingTableBuilder> routingTableBuilderMap = new HashMap<String, RoutingTableBuilder>();
-      for (String resource : resources) {
-        RoutingTableBuilder routingTableBuilder = getRoutingTableBuilder(routingTableBuilderConfig.subset(resource));
-        if (routingTableBuilder == null) {
-          LOGGER.error("RoutingTableBuilder is null for resource : " + resource);
-        } else {
-          routingTableBuilderMap.put(resource, routingTableBuilder);
+  private Map<String, RoutingTableBuilder> getTableToRoutingTableBuilderMap(Configuration routingTableBuilderConfig) {
+    if (routingTableBuilderConfig.containsKey(TABLES_KEY)) {
+      String[] tables = routingTableBuilderConfig.getStringArray(TABLES_KEY);
+      if ((tables != null) && (tables.length > 0)) {
+        Map<String, RoutingTableBuilder> routingTableBuilderMap = new HashMap<String, RoutingTableBuilder>();
+        for (String table : tables) {
+          RoutingTableBuilder routingTableBuilder = getRoutingTableBuilder(routingTableBuilderConfig.subset(table));
+          if (routingTableBuilder == null) {
+            LOGGER.error("RoutingTableBuilder is null for table : " + table);
+          } else {
+            routingTableBuilderMap.put(table, routingTableBuilder);
+          }
         }
+        return routingTableBuilderMap;
       }
-      return routingTableBuilderMap;
-    } else {
-      return null;
     }
+    return null;
   }
 
   private RoutingTableBuilder getRoutingTableBuilder(Configuration routingTableBuilderConfig) {
