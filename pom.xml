@@ -392,11 +392,6 @@
         <artifactId>kafka_2.10</artifactId>
         <version>${kafka.version}</version>
       </dependency>
-      <dependency>
-        <groupId>classmexer</groupId>
-        <artifactId>classmexer</artifactId>
-        <version>0.03</version>
-      </dependency>
 
     </dependencies>
   </dependencyManagement>
