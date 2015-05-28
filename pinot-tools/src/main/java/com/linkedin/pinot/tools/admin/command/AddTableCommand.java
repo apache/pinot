@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -52,20 +53,12 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String getName() {
-    return "CreateResource";
+    return "AddTable";
   }
 
   @Override
   public String toString() {
-    String res = null;
-
-    try {
-      res = new ObjectMapper().writeValueAsString(this);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-
-    return res;
+    return ("AddTable -filePath " + _filePath  + " -controllerAddress " + _controllerAddress);
   }
 
   @Override
@@ -94,7 +87,7 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
-    JsonNode node = new ObjectMapper().readTree(_filePath);
+    JsonNode node = new ObjectMapper().readTree(new FileInputStream (_filePath));
     return execute(node);
   }
 }

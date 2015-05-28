@@ -33,16 +33,16 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-name", required = true, metaVar = "<string>", usage = "Name of the tenant to be created")
   private String _name;
 
-  @Option(name = "-role", required = false, metaVar = "<BROKER/SERVER>", usage = "Tenant role (broker/server).")
+  @Option(name = "-role", required = true, metaVar = "<BROKER/SERVER>", usage = "Tenant role (broker/server).")
   private TenantRole _role;
 
-  @Option(name = "-instances", required = true, metaVar = "<string>", usage = "Number of instances.")
+  @Option(name = "-instanceCount", required = true, metaVar = "<int>", usage = "Number of instances.")
   private int _instanceCount;
 
-  @Option(name = "-offline", required = false, metaVar = "<string>", usage = "Number of offline instances.")
+  @Option(name = "-offlineInstanceCount", required = true, metaVar = "<int>", usage = "Number of offline instances.")
   private int _offlineInstanceCount;
 
-  @Option(name = "-realtime", required = false, metaVar = "<string>", usage = "Number of realtime instances.")
+  @Option(name = "-realTimeInstanceCount", required = true, metaVar = "<int>", usage = "Number of realtime instances.")
   private int _realtimeInstanceCount;
 
   @Option(name = "-help", required = false, help = true, usage = "Print this message.")
@@ -93,7 +93,19 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
   }
 
   @Override
+  public String getName() {
+    return "AddTenant";
+  }
+
+  @Override
   public boolean getHelp() {
     return help;
+  }
+
+  @Override
+  public String toString() {
+    return ("AddTenant -controllerAddress " + _controllerAddress + " -name " + _name +
+        " -role " + _role + " -instanceCount " + _instanceCount + " -offlineInstanceCount " +
+        _offlineInstanceCount + " -realTimeInstanceCount " + _realtimeInstanceCount);
   }
 }
