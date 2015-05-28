@@ -23,7 +23,6 @@ import org.json.JSONObject;
 /**
  * A Pinot query result set for group by results, of which there is one of per aggregation function in the query.
  *
- * @author jfim
  */
 class GroupByResultSet extends AbstractResultSet {
   private final JSONObject _jsonObject;

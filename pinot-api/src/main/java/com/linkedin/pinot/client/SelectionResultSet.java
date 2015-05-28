@@ -23,7 +23,6 @@ import org.json.JSONObject;
 /**
  * TODO Document me!
  *
- * @author jfim
  */
 public class SelectionResultSet extends AbstractResultSet {
   private JSONArray _resultsArray;

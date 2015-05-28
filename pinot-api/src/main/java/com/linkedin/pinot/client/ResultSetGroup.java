@@ -24,7 +24,6 @@ import org.json.JSONObject;
 /**
  * A Pinot result set group, containing the results given back by Pinot for a given query.
  *
- * @author jfim
  */
 public class ResultSetGroup {
   private final List<ResultSet> _resultSets;

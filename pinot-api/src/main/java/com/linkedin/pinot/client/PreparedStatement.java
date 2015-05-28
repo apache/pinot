@@ -21,7 +21,6 @@ import java.util.concurrent.Future;
 /**
  * A prepared statement, which is used to escape query parameters sent to Pinot.
  *
- * @author jfim
  */
 public class PreparedStatement {
   private final Connection _connection;

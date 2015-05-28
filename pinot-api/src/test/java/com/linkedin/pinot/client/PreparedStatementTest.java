@@ -26,7 +26,6 @@ import org.testng.annotations.Test;
 /**
  * Tests for prepared statement escaping
  *
- * @author jfim
  */
 public class PreparedStatementTest {
   @Test

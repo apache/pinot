@@ -24,7 +24,6 @@ import org.testng.annotations.Test;
 /**
  * Tests for the connection factory
  *
- * @author jfim
  */
 public class ConnectionFactoryTest {
   @Test

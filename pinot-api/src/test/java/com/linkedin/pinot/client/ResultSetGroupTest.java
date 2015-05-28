@@ -28,7 +28,6 @@ import org.testng.annotations.Test;
 /**
  * Tests deserialization of a ResultSet given hardcoded Pinot results.
  *
- * @author jfim
  */
 public class ResultSetGroupTest {
   @Test

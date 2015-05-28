@@ -91,6 +91,5 @@
  *
  * resultSet.close();}</pre>
  *
- * @author jfim
  */
 package com.linkedin.pinot.client;

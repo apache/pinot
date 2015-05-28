@@ -31,7 +31,6 @@ import org.json.JSONObject;
 /**
  * Creates connections to Pinot, given various initialization methods.
  *
- * @author jfim
  */
 public class ConnectionFactory {
   static PinotClientTransportFactory _transportFactory = new JsonAsyncHttpPinotClientTransportFactory();

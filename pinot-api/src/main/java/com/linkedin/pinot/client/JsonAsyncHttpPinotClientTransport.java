@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 /**
  * JSON encoded Pinot client transport over AsyncHttpClient.
  *
- * @author jfim
  */
 class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);

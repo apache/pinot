@@ -18,7 +18,6 @@ package com.linkedin.pinot.client;
 /**
  * Shared implementation between the different ResultSets.
  *
- * @author jfim
  */
 abstract class AbstractResultSet implements ResultSet {
   @Override

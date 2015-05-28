@@ -18,7 +18,6 @@ package com.linkedin.pinot.client;
 /**
  * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
  *
- * @author jfim
  */
 class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
   @Override
