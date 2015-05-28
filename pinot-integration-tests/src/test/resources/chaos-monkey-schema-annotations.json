@@ -1,0 +1,24 @@
+[
+  {
+    "column" : "name",
+    "range" : false,
+    "cardinality" : 100
+  },
+  {
+    "column" : "days",
+    "range" : true,
+    "rangeStart" : 100,
+    "rangeEnd"   : 200
+  },
+  {
+    "column" : "percent",
+    "range" : true,
+    "rangeStart" : 0.1,
+    "rangeEnd"   : 99.99
+  },
+  {
+    "column" : "age",
+    "range" : false,
+    "cardinality" : 100
+  }
+]

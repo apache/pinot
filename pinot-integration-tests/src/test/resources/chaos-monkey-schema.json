@@ -1,0 +1,50 @@
+{
+  "fieldSpecMap" : {
+    "name" : {
+      "type" : "com.linkedin.pinot.common.data.DimensionFieldSpec",
+      "dataType" : "STRING",
+      "delimiter" : null,
+      "fieldType" : "DIMENSION",
+      "singleValueField" : true,
+      "name" : "name"
+    },
+    "days" : {
+      "type" : "com.linkedin.pinot.common.data.TimeFieldSpec",
+      "outgoingGranularitySpec" : {
+        "timeType" : "DAYS",
+        "dataType" : "LONG"
+      },
+      "same" : true,
+      "incomingTimeColumnName" : "days",
+      "outGoingTimeColumnName" : "days",
+      "incomingGranularitySpec" : {
+        "timeType" : "DAYS",
+        "dataType" : "LONG"
+      },
+      "dataType" : "LONG",
+      "delimiter" : null,
+      "fieldType" : "TIME",
+      "singleValueField" : true,
+      "name" : "days"
+    },
+    "percent" : {
+      "type" : "com.linkedin.pinot.common.data.MetricFieldSpec",
+      "dataType" : "FLOAT",
+      "delimiter" : null,
+      "fieldType" : "METRIC",
+      "singleValueField" : true,
+      "name" : "percent"
+    },
+    "age" : {
+      "type" : "com.linkedin.pinot.common.data.DimensionFieldSpec",
+      "dataType" : "INT",
+      "delimiter" : null,
+      "fieldType" : "DIMENSION",
+      "singleValueField" : true,
+      "name" : "age"
+    }
+  },
+  "timeColumnName" : "days",
+  "dimensions" : [ "age", "name" ],
+  "metrics" : [ "percent" ]
+}
