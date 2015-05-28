@@ -32,8 +32,8 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
@@ -57,23 +57,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final Random _random = new Random(System.currentTimeMillis());
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
 
-  @Deprecated
-  public HelixExternalViewBasedRouting(RoutingTableBuilder defaultOfflineRoutingTableBuilder,
-      Map<String, RoutingTableBuilder> routingTableBuilderMap, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
-    if (defaultOfflineRoutingTableBuilder != null) {
-      _defaultOfflineRoutingTableBuilder = defaultOfflineRoutingTableBuilder;
-    } else {
-      _defaultOfflineRoutingTableBuilder = new RandomRoutingTableBuilder();
-    }
-    _defaultRealtimeRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
-    if (routingTableBuilderMap != null) {
-      _routingTableBuilderMap = routingTableBuilderMap;
-    } else {
-      _routingTableBuilderMap = new HashMap<String, RoutingTableBuilder>();
-    }
-  }
-
   public HelixExternalViewBasedRouting(RoutingTableBuilder defaultOfflineRoutingTableBuilder,
       RoutingTableBuilder defaultRealtimeRoutingTableBuilder, Map<String, RoutingTableBuilder> routingTableBuilderMap,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -81,12 +64,12 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (defaultOfflineRoutingTableBuilder != null) {
       _defaultOfflineRoutingTableBuilder = defaultOfflineRoutingTableBuilder;
     } else {
-      _defaultOfflineRoutingTableBuilder = new RandomRoutingTableBuilder();
+      _defaultOfflineRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
     }
     if (defaultRealtimeRoutingTableBuilder != null) {
       _defaultRealtimeRoutingTableBuilder = defaultRealtimeRoutingTableBuilder;
     } else {
-      _defaultRealtimeRoutingTableBuilder = new RandomRoutingTableBuilder();
+      _defaultRealtimeRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
     }
     if (routingTableBuilderMap != null) {
       _routingTableBuilderMap = routingTableBuilderMap;
