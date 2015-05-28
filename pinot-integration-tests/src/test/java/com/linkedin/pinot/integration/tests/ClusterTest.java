@@ -31,12 +31,10 @@ import org.apache.commons.configuration.Configuration;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
@@ -44,7 +42,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
@@ -76,6 +73,7 @@ public abstract class ClusterTest extends ControllerTest {
         Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
         configuration.setProperty("pinot.broker.time.out", 100 * 1000L);
         configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(18099 + i));
+        configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
         overrideBrokerConf(configuration);
         _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkTestUtils.DEFAULT_ZK_STR, configuration));
       }
