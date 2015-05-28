@@ -11,7 +11,9 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_TIME_MIN("thirdeye.time.min"),
   THIRDEYE_TIME_MAX("thirdeye.time.max"),
   THIRDEYE_DIMENSION_INDEX_REF("thirdeye.dimension.index.ref"),
-  INPUT_PATHS("input.paths");
+  INPUT_PATHS("input.paths"),
+  THIRDEYE_CLEANUP_DAYSAGO("thirdeye.cleanup.daysago"),
+  THIRDEYE_CLEANUP_SKIP("thirdeye.cleanup.skip");
 
   private final String propertyName;
 

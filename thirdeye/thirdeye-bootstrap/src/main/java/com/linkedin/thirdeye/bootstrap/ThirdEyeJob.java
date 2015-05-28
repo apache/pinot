@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -21,9 +22,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.mapred.Merger;
 import org.apache.hadoop.mapreduce.Job;
@@ -435,6 +438,44 @@ public class ThirdEyeJob {
           throws Exception {
         return null; // unused
       }
+    },
+    CLEANUP {
+
+      @Override
+      Class<?> getKlazz() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      String getDescription() {
+
+        return "Cleans up folders older than thirdeye.cleanup.daysago ago if "
+            + "thirdeye.cleanup.skip is false";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection, FlowSpec flowSpec,
+          DateTime minTime, DateTime maxTime, String inputPaths) throws Exception {
+
+        Properties config = new Properties();
+
+        String thirdeyeCleanupDaysAgo =
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName());
+        config.setProperty(
+            ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
+            thirdeyeCleanupDaysAgo);
+
+        String thirdeyeCleanupSkip =
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName());
+        config.setProperty(
+            ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
+            thirdeyeCleanupSkip);
+
+
+        return config;
+      }
+
     };
 
     abstract Class<?> getKlazz();
@@ -604,6 +645,7 @@ public class ThirdEyeJob {
     case STARTREE_BOOTSTRAP_PHASE1:
     case STARTREE_BOOTSTRAP_PHASE2:
     case SERVER_PUSH:
+    case CLEANUP:
       flowSpec = FlowSpec.METRIC_INDEX;
       break;
     default:
@@ -741,6 +783,81 @@ public class ThirdEyeJob {
         LOGGER.info("Load {} #=> response code: {}", outputTarGzFile, responseCode);
       } else {
         throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
+      }
+    }
+    else if (PhaseSpec.CLEANUP.equals(phaseSpec))
+    {
+
+      boolean cleanupSkip = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_SKIP.getName()));
+      LOGGER.info("cleanup skip {}", cleanupSkip);
+      if (cleanupSkip)
+      {
+        LOGGER.info("Skipping cleanup");
+      }
+      else
+      {
+        int cleanupDaysAgo = Integer.valueOf(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName()));
+        long cleanupDaysAgoSeconds = cleanupDaysAgo * 24 * 60 * 60;
+
+        Path dimensionIndexdir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.DIMENSION_INDEX);
+        Path metricIndexDir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.METRIC_INDEX);
+
+        LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoSeconds, dimensionIndexdir, metricIndexDir);
+
+        FileSystem fileSystem = FileSystem.get(new Configuration());
+
+        // list folders in dimensionDir starting with data_
+        FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexdir, new PathFilter() {
+
+          @Override
+          public boolean accept(Path path) {
+
+            return path.getName().startsWith("data_");
+          }
+        });
+
+        for (FileStatus file : fileStatus)
+        {
+          //get last modified date
+          long diffSeconds = (new Date().getTime() - file.getModificationTime())/1000;
+
+          // if older than cleanupdaysAgo then delete
+          if (diffSeconds > cleanupDaysAgoSeconds)
+          {
+            LOGGER.info("Deleting {}", file.getPath());
+            fileSystem.delete(file.getPath(), true);
+          }
+        }
+
+
+        // list folders in metricDir starting with data_
+        fileStatus = fileSystem.listStatus(metricIndexDir, new PathFilter() {
+
+          @Override
+          public boolean accept(Path path) {
+
+            return path.getName().startsWith("data_");
+          }
+        });
+
+        for (FileStatus file : fileStatus)
+        {
+          //get last modified date
+          long diffSeconds = (new Date().getTime() - file.getModificationTime())/1000;
+
+          // if older than cleanupdaysAgo then delete everything except data.tar.gz
+          if (diffSeconds > cleanupDaysAgoSeconds)
+          {
+            Path startreeBootstrapPath1 = new Path(file.getPath(), "startree_bootstrap_phase1");
+            Path startreeBootstrapPath2 = new Path(file.getPath(), "startree_bootstrap_phase2");
+
+            LOGGER.info("Deleting {} {}", startreeBootstrapPath1, startreeBootstrapPath2);
+            fileSystem.delete(startreeBootstrapPath1, true);
+            fileSystem.delete(startreeBootstrapPath2, true);
+
+          }
+
+        }
       }
     } else // Hadoop job
     {
