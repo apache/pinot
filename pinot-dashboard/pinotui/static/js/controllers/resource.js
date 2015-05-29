@@ -6,6 +6,7 @@ pinotApp.controller('resourceController', function($scope, $routeParams) {
     'tables': [],
     'nodes': []
   }
+  $scope.undecorate = undecorate;
   var noshow = ['tableName'];
   $.get(URLUTILS.forCluster($routeParams.fabricName, $routeParams.clusterName), function(data) {
     validateAjaxCall(data, function() {
@@ -17,8 +18,9 @@ pinotApp.controller('resourceController', function($scope, $routeParams) {
 
         _.each(data.tables, function(table) {
           $scope.cluster.tables.push({
-            'name': table,
-            'url': URLUTILS.forSegmentsPage($routeParams.fabricName, $routeParams.clusterName, table)
+            'name': table.name,
+            'type': table.type,
+            'url': URLUTILS.forTableInfo($routeParams.fabricName, $routeParams.clusterName, table.name)
           });
         });
 

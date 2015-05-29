@@ -1,0 +1,17 @@
+<div class="row">
+  <div class="large-6 columns">
+    <h4>{{cluster.fabric}} :: {{cluster.name}} :: Create Schema</h4>
+    <form>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Paste Schema Definition
+            <textarea required ng-model="schema"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <input class="button" type="submit" ng-click="create(table)" value="Validate &amp; Create Schema" />
+    </form>
+  </div>
+</div>

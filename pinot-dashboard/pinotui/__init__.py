@@ -97,8 +97,8 @@ def cluster_info(fabric, cluster):
   return jsonify(dict(success=True, info={}, tables=resource.get_tables(zkhandle), nodes=resource.get_nodes(zkhandle)))
 
 
-@pinotui.route('/segments/<string:fabric>/<string:cluster>/<string:table>')
-def get_segments(fabric, cluster, table):
+@pinotui.route('/cluster/<string:fabric>/<string:cluster>/table/<string:table>')
+def get_table_info(fabric, cluster, table):
   resource = PinotResource(config, logger, fabric, cluster)
 
   try:
@@ -107,7 +107,7 @@ def get_segments(fabric, cluster, table):
     return jsonify(dict(success=False, error_message='Failed getting ZK: {0}'.format(e)))
 
   zkhandle = zk.get_handle()
-  return jsonify(dict(success=True, segments=resource.get_table_segments(table, zkhandle)))
+  return jsonify(dict(success=True, data=resource.get_table_info(table, zkhandle), segments=resource.get_table_segments(table, zkhandle)))
 
 
 @pinotui.route('/fabrics')
