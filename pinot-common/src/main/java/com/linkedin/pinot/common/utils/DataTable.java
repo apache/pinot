@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.utils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -27,6 +28,7 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -79,9 +81,8 @@ public class DataTable {
    * @param variableSizeDataBytes
    * @throws Exception
    */
-  public DataTable(int numRows, Map<String, Map<Integer, String>> dictionary,
-      Map<String, String> metadata, DataSchema schema,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) throws Exception {
+  public DataTable(int numRows, Map<String, Map<Integer, String>> dictionary, Map<String, String> metadata,
+      DataSchema schema, byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) throws Exception {
     this.numRows = numRows;
     this.dictionary = dictionary;
     this.metadata = metadata;
@@ -191,19 +192,19 @@ public class DataTable {
     final byte[] dictionaryBytes = new byte[dictionaryLength];
     input.position(dictionaryStart);
     input.get(dictionaryBytes);
-    dictionary = (Map<String, Map<Integer, String>>) deserialize(dictionaryBytes);
+    dictionary = (Map<String, Map<Integer, String>>) deserializeDictionary(dictionaryBytes);
 
     // READ METADATA
     final byte[] metadataBytes = new byte[metadataLength];
     input.position(metadataStart);
     input.get(metadataBytes);
-    metadata = (Map<String, String>) deserialize(metadataBytes);
+    metadata = (Map<String, String>) deserializeMetadata(metadataBytes);
 
     // READ SCHEMA
     final byte[] schemaBytes = new byte[schemaLength];
     input.position(schemaStart);
     input.get(schemaBytes);
-    schema = deserialize(schemaBytes);
+    schema = DataSchema.fromBytes(schemaBytes);
     columnOffsets = computeColumnOffsets(schema);
 
     // READ FIXED SIZE DATA BYTES 
@@ -217,6 +218,7 @@ public class DataTable {
     input.position(variableDataStart);
     input.get(variableSizeDataBytes);
     variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+
   }
 
   public DataTable() {
@@ -233,9 +235,12 @@ public class DataTable {
    * @throws Exception
    */
   public byte[] toBytes() throws Exception {
-    final byte[] dictionaryBytes = serializeObject(dictionary);
-    final byte[] metadataBytes = serializeObject(metadata);
-    final byte[] schemaBytes = serializeObject(schema);
+    final byte[] dictionaryBytes = serializeDictionary();
+    final byte[] metadataBytes = serializeMetadata();
+    byte[] schemaBytes = new byte[0];
+    if (schema != null) {
+      schemaBytes = schema.toBytes();
+    }
     final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     final DataOutputStream out = new DataOutputStream(baos);
     // TODO: convert this format into a proper class
@@ -289,7 +294,99 @@ public class DataTable {
     if (variableSizeDataBytes != null) {
       out.write(variableSizeDataBytes);
     }
-    return baos.toByteArray();
+    byte[] byteArray = baos.toByteArray();
+    long end = System.currentTimeMillis();
+    return byteArray;
+  }
+
+  private byte[] serializeMetadata() throws Exception {
+    if (metadata != null) {
+      final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      final DataOutputStream out = new DataOutputStream(baos);
+      out.writeInt(metadata.size());
+      for (Entry<String, String> entry : metadata.entrySet()) {
+        byte[] keyBytes = entry.getKey().getBytes();
+        out.writeInt(keyBytes.length);
+        out.write(keyBytes);
+        byte[] valueBytes = entry.getValue().getBytes();
+        out.writeInt(valueBytes.length);
+        out.write(valueBytes);
+      }
+      return baos.toByteArray();
+    }
+    return new byte[0];
+  }
+
+  private Map<String, String> deserializeMetadata(byte[] buffer) {
+    Map<String, String> map = new HashMap<String, String>();
+    try {
+      final ByteArrayInputStream bais = new ByteArrayInputStream(buffer);
+      final DataInputStream in = new DataInputStream(bais);
+      int size = in.readInt();
+      for (int i = 0; i < size; i++) {
+        Integer keyLength = in.readInt();
+        byte[] keyBytes = new byte[keyLength];
+        in.read(keyBytes);
+        int valueLength = in.readInt();
+        byte[] valueBytes = new byte[valueLength];
+        in.read(valueBytes);
+        map.put(new String(keyBytes), new String(valueBytes));
+      }
+    } catch (Exception e) {
+      LOGGER.error("Exception while deserializing dictionary", e);
+    }
+    return map;
+  }
+
+  private byte[] serializeDictionary() throws Exception {
+    if (dictionary != null) {
+      final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      final DataOutputStream out = new DataOutputStream(baos);
+      out.writeInt(dictionary.size());
+      for (String key : dictionary.keySet()) {
+        byte[] bytes = key.getBytes();
+        out.writeInt(bytes.length);
+        out.write(bytes);
+        Map<Integer, String> map = dictionary.get(key);
+        out.writeInt(map.size());
+        for (Entry<Integer, String> entry : map.entrySet()) {
+          out.writeInt(entry.getKey());
+          byte[] valueBytes = entry.getValue().getBytes();
+          out.writeInt(valueBytes.length);
+          out.write(valueBytes);
+        }
+      }
+      return baos.toByteArray();
+    }
+    return new byte[0];
+  }
+
+  private Map<String, Map<Integer, String>> deserializeDictionary(byte[] buffer) {
+    Map<String, Map<Integer, String>> map = new HashMap<String, Map<Integer, String>>();
+    try {
+      final ByteArrayInputStream bais = new ByteArrayInputStream(buffer);
+      final DataInputStream in = new DataInputStream(bais);
+      int size = in.readInt();
+      byte[] temp;
+      for (int i = 0; i < size; i++) {
+        int readLength = in.readInt();
+        temp = new byte[readLength];
+        in.read(temp);
+        Map<Integer, String> childMap = new HashMap<Integer, String>();
+        map.put(new String(temp), childMap);
+        int childMapSize = in.readInt();
+        for (int j = 0; j < childMapSize; j++) {
+          Integer key = in.readInt();
+          int valueLength = in.readInt();
+          temp = new byte[valueLength];
+          in.read(temp);
+          childMap.put(key, new String(temp));
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.error("Exception while deserializing dictionary", e);
+    }
+    return map;
   }
 
   /**
@@ -298,6 +395,8 @@ public class DataTable {
    * @return
    */
   private byte[] serializeObject(Object value) {
+    long start = System.nanoTime();
+
     byte[] bytes;
     final ByteArrayOutputStream bos = new ByteArrayOutputStream();
     ObjectOutput out = null;
@@ -311,23 +410,27 @@ public class DataTable {
         Utils.rethrowException(e);
       }
       bytes = bos.toByteArray();
+
     } finally {
       IOUtils.closeQuietly((Closeable) out);
       IOUtils.closeQuietly(bos);
     }
+    long end = System.nanoTime();
+    LOGGER.info("java ser time:{}", (end - start));
     return bytes;
   }
 
   @SuppressWarnings("unchecked")
   private <T extends Serializable> T deserialize(byte[] value) {
+    long start = System.nanoTime();
     final ByteArrayInputStream bais = new ByteArrayInputStream(value);
     ObjectInputStream out = null;
-
+    Object readObject;
     try {
       try {
         out = new ObjectInputStream(bais);
-        final Object readObject = out.readObject();
-        return (T) readObject;
+        readObject = out.readObject();
+
       } catch (final Exception e) {
         LOGGER.error("Caught exception while deserializing DataTable", e);
         return null;
@@ -336,6 +439,10 @@ public class DataTable {
       IOUtils.closeQuietly(out);
       IOUtils.closeQuietly(bais);
     }
+    long end = System.nanoTime();
+    LOGGER.info("java deser time:{}", (end - start));
+    return (T) readObject;
+
   }
 
   /**
@@ -654,8 +761,7 @@ public class DataTable {
             b.append(fixedSizeData.getInt());
             break;
           case OBJECT:
-            b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
-                fixedSizeData.getInt()));
+            b.append(String.format("(%s:%s)", fixedSizeData.getInt(), fixedSizeData.getInt()));
             break;
           case BYTE_ARRAY:
           case CHAR_ARRAY:
@@ -665,8 +771,7 @@ public class DataTable {
           case FLOAT_ARRAY:
           case DOUBLE_ARRAY:
           case STRING_ARRAY:
-            b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
-                fixedSizeData.getInt()));
+            b.append(String.format("(%s:%s)", fixedSizeData.getInt(), fixedSizeData.getInt()));
             break;
           default:
             throw new RuntimeException("Unsupported datatype:" + type);

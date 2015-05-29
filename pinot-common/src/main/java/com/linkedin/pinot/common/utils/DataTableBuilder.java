@@ -16,18 +16,23 @@
 package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
+
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -560,6 +565,67 @@ public class DataTableBuilder {
 
     public DataType getColumnType(int idx) {
       return columnTypes[idx];
+    }
+
+    public byte[] toBytes() throws Exception {
+      if (columnNames == null || columnNames.length == 0) {
+        return new byte[0];
+      }
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      DataOutputStream dos = new DataOutputStream(out);
+      int length = columnNames.length;
+      //write the number of fields
+      dos.writeInt(length);
+      //write the columnNames
+      for (int i = 0; i < length; i++) {
+        byte[] bytes = columnNames[i].getBytes();
+        dos.writeInt(bytes.length);
+        dos.write(bytes);
+      }
+      //write the DataTypes, 
+      for (int i = 0; i < length; i++) {
+        //we don't want to use ordinal of the enum (even though its reduces the data size) 
+        //since adding a new data type will break things if server and broker use different versions of DataType class.
+        byte[] bytes = columnTypes[i].name().getBytes();
+        dos.writeInt(bytes.length);
+        dos.write(bytes);
+      }
+      return out.toByteArray();
+    }
+
+    public static DataSchema fromBytes(byte[] buffer) {
+      if (buffer == null || buffer.length == 0) {
+        return null;
+      }
+      ByteArrayInputStream bais = new ByteArrayInputStream(buffer);
+      DataInputStream dis = new DataInputStream(bais);
+      try {
+
+        int length;
+        length = dis.readInt();
+        String[] columnNames = new String[length];
+        DataType[] columnTypes = new DataType[length];
+
+        for (int i = 0; i < length; i++) {
+          int size = dis.readInt();
+          byte[] bytes = new byte[size];
+          dis.read(bytes);
+          columnNames[i] = new String(bytes);
+        }
+        for (int i = 0; i < length; i++) {
+          int size = dis.readInt();
+          byte[] bytes = new byte[size];
+          dis.read(bytes);
+          columnTypes[i] = DataType.valueOf(new String(bytes));
+        }
+        DataSchema schema = new DataSchema(columnNames, columnTypes);
+        return schema;
+
+      } catch (IOException e) {
+        LOGGER.error("Exception deserializing DataSchema", e);
+        return new DataSchema(new String[] {}, new DataType[] {});
+      }
+
     }
 
     @Override

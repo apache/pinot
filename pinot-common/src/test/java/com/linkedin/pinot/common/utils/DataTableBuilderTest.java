@@ -15,13 +15,19 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 import junit.framework.Assert;
 
+import org.apache.commons.io.IOUtils;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -41,7 +47,8 @@ public class DataTableBuilderTest {
     dataTable.addException(processingException);
     byte[] bytes = dataTable.toBytes();
     DataTable desDataTable = new DataTable(bytes);
-    String exceptionMsg = desDataTable.getMetadata().get("Exception" + QueryException.EXECUTION_TIMEOUT_ERROR.getErrorCode());
+    String exceptionMsg =
+        desDataTable.getMetadata().get("Exception" + QueryException.EXECUTION_TIMEOUT_ERROR.getErrorCode());
     org.testng.Assert.assertEquals(exceptionMsg, exception.toString());
   }
 
@@ -140,13 +147,11 @@ public class DataTableBuilderTest {
     builder.seal();
     final DataTable dataTable = builder.build();
     //System.out.println(dataTable);
-    validate(dataTable, NUM_ROWS, schema, boolArr, cArr, bArr, sArr, iArr,
-        fArr, lArr, dArr, strArr, oArr);
+    validate(dataTable, NUM_ROWS, schema, boolArr, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr, oArr);
     final byte[] bytes = dataTable.toBytes();
 
     final DataTable newDataTable = new DataTable(bytes);
-    validate(newDataTable, NUM_ROWS, schema, boolArr, cArr, bArr, sArr, iArr,
-        fArr, lArr, dArr, strArr, oArr);
+    validate(newDataTable, NUM_ROWS, schema, boolArr, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr, oArr);
 
   }
 
@@ -225,8 +230,7 @@ public class DataTableBuilderTest {
 
   @Test
   public void testComplexDataTypes() throws Exception {
-    DataType[] columnTypes = new DataType[] { DataType.INT_ARRAY,
-        DataType.INT_ARRAY };
+    DataType[] columnTypes = new DataType[] { DataType.INT_ARRAY, DataType.INT_ARRAY };
     String[] columnNames = new String[] { "col-0", "col-1" };
     DataSchema schema = new DataSchema(columnNames, columnTypes);
     DataTableBuilder builder = new DataTableBuilder(schema);
@@ -271,8 +275,7 @@ public class DataTableBuilderTest {
 
   }
 
-  private void validate(DataType type, DataTable dataTable, Object[] arr,
-      int rowId, int colId) {
+  private void validate(DataType type, DataTable dataTable, Object[] arr, int rowId, int colId) {
     switch (type) {
       case BOOLEAN:
         Assert.assertEquals(arr[rowId], dataTable.getBoolean(rowId, colId));
@@ -333,16 +336,109 @@ public class DataTableBuilderTest {
     }
   }
 
-  private void validate(DataTable dataTable, int numRows, DataSchema schema,
-      boolean[] boolArr, char[] cArr, byte[] bArr, short[] sArr, int[] iArr,
-      float[] fArr, long[] lArr, double[] dArr, String[] strArr, Object[] oArr) {
+  @Test
+  public void testSerDeserSpeed() throws Exception {
+
+    String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
+    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
+
+    DataSchema schema = new DataSchema(columnNames, columnTypes);
+    DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.startRow();
+    builder.setColumn(0, "sum_count");
+    Map<String, Double> map = new HashMap<String, Double>();
+    System.out.println(map.keySet().getClass());
+    map.put("2358\tmember\t0", 4.0);
+    map.put("2359\tmember\t0", 1.0);
+    map.put("2358\tgroup\t6", 1.0);
+    map.put("2358\tskill\t4", 23.0);
+    map.put("2367\tmember\t0", 1.0);
+    map.put("2358\tupdates\t9", 3.0);
+    map.put("2358\tgroup\t8", 2.0);
+    map.put("2359\tgroup\t3", 2.0);
+    map.put("2361\tgroup\t3", 1.0);
+    map.put("2358\tmember\t2", 9.0);
+    builder.setColumn(1, map);
+    builder.finishRow();
+    builder.addMetaData("timeUsedMs", "18");
+    builder.addMetaData("requestId", "3");
+    builder.addMetaData("totalDocs", "1001049811");
+    builder.addMetaData("numDocsScanned", "25");
+    builder.seal();
+    DataTable dataTable = builder.build();
+    DataTable newDataTable = new DataTable(dataTable.toBytes());
+    Assert.assertEquals(dataTable.numRows, newDataTable.numRows);
+    Assert.assertEquals(dataTable.numCols, newDataTable.numCols);
+
+    for (int i = 0; i < newDataTable.numRows; i++) {
+      for (int j = 0; j < newDataTable.numCols; j++) {
+        switch (columnTypes[j]) {
+          case STRING:
+            Assert.assertEquals(dataTable.getString(i, j), newDataTable.getString(i, j));
+            break;
+          case OBJECT:
+            Assert.assertEquals(dataTable.getObject(i, j), newDataTable.getObject(i, j));
+            break;
+          case BOOLEAN:
+            break;
+          case BYTE:
+            break;
+          case BYTE_ARRAY:
+            break;
+          case CHAR:
+            break;
+          case CHAR_ARRAY:
+            break;
+          case DOUBLE:
+            break;
+          case DOUBLE_ARRAY:
+            break;
+          case FLOAT:
+            break;
+          case FLOAT_ARRAY:
+            break;
+          case INT:
+            break;
+          case INT_ARRAY:
+            break;
+          case LONG:
+            break;
+          case LONG_ARRAY:
+            break;
+          case SHORT:
+            break;
+          case SHORT_ARRAY:
+            break;
+          case STRING_ARRAY:
+            break;
+          default:
+            break;
+        }
+      }
+    }
+    int size = 0;
+    for (int i = 0; i < 10; i++) {
+      long start = System.nanoTime();
+      byte[] buffer = dataTable.toBytes();
+      long end = System.nanoTime();
+      System.out.println("ser time:\t\t" + (end - start));
+      size = buffer.length;
+      start = System.nanoTime();
+      new DataTable(buffer);
+      end = System.nanoTime();
+      System.out.println("deser time:\t\t" + (end - start));
+    }
+    System.out.println("SIZE:" + size);
+  }
+
+  private void validate(DataTable dataTable, int numRows, DataSchema schema, boolean[] boolArr, char[] cArr,
+      byte[] bArr, short[] sArr, int[] iArr, float[] fArr, long[] lArr, double[] dArr, String[] strArr, Object[] oArr) {
     for (int rowId = 0; rowId < numRows; rowId++) {
       for (int colId = 0; colId < schema.columnNames.length; colId++) {
         final DataType type = schema.columnTypes[colId];
         switch (type) {
           case BOOLEAN:
-            Assert.assertEquals(boolArr[rowId],
-                dataTable.getBoolean(rowId, colId));
+            Assert.assertEquals(boolArr[rowId], dataTable.getBoolean(rowId, colId));
             break;
           case CHAR:
             Assert.assertEquals(cArr[rowId], dataTable.getChar(rowId, colId));
