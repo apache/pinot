@@ -14,12 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import json
 import os
-import kazoo
 import requests
-import string
 from collections import defaultdict
 from exceptions import PinotException
 from requests.exceptions import RequestException
@@ -61,6 +58,12 @@ class PinotResource(object):
 
     return segments
 
+  def get_table_info(self, table, zk):
+    root = self.config.get_zk_root(self.fabric)
+    path = os.path.join(root, 'PROPERTYSTORE', 'CONFIGS', 'TABLE', table)
+    data = json.loads(zk.get(path)[0])
+    return data
+
   def get_nodes(self, zk):
     nodes_status = defaultdict(dict)
     pinot_fabric = PinotFabric(self.config, self.logger, self.fabric)
@@ -90,6 +93,25 @@ class PinotResource(object):
       if tenants['server'] != self.resource:
         continue
 
-      tables.append(table)
+      tables.append({
+        'name': table,
+        'type': data['simpleFields']['tableType']
+      })
 
     return tables
+
+  def delete_segment(self, segment_name):
+    url = '{0}/datafiles/{1}/{2}'.format(self.config.get_controller_url(self.fabric), self.resource, segment_name)
+    try:
+      result = requests.delete(url)
+    except RequestException as e:
+      raise PinotException(e)
+    return result.status_code == 200
+
+  def delete(self):
+    url = '{0}/datafiles/{1}'.format(self.config.get_controller_url(self.fabric), self.resource)
+    try:
+      result = requests.delete(url)
+    except RequestException as e:
+      raise PinotException(e)
+    return result.status_code == 200

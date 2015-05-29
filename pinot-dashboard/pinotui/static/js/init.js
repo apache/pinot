@@ -1,10 +1,10 @@
 var URLUTILS = {
-  forSegments: function(fabric, cluster, table) {
-    return '/segments/'+fabric+'/'+cluster+'/'+table;
+  forBackendTableInfo: function(fabric, cluster, table) {
+    return '/cluster/'+fabric+'/'+cluster+'/table/'+table;
   },
 
-  forSegmentsPage: function(fabric, cluster, table) {
-    return '#'+this.forSegments(fabric, cluster, table);
+  forTableInfo: function(fabric, cluster, table) {
+    return '#'+this.forBackendTableInfo(fabric, cluster, table);
   },
 
   forCluster: function(fabric, cluster) {
@@ -27,6 +27,10 @@ var URLUTILS = {
     return '/authinfo';
   },
 };
+
+function undecorate(name) {
+  return name.split('_OFFLINE')[0].split('_ONLINE')[0].split('_BROKER')[0];
+}
 
 function validateAjaxCall(data, callback) {
   if (data.success) {
@@ -75,9 +79,21 @@ pinotApp.config(function($routeProvider) {
       templateUrl: '/pinot_static/js/templates/cluster_profile.html',
       controller: 'resourceController'
     })
-    .when('/segments/:fabricName/:clusterName/:tableName', {
-      templateUrl: '/pinot_static/js/templates/table_segments.html',
-      controller: 'segmentViewController'
+    .when('/cluster/:fabricName/:clusterName/table/:tableName', {
+      templateUrl: '/pinot_static/js/templates/table_info.html',
+      controller: 'tableInfoController'
+    })
+    .when('/fabric/:fabricName/createTenant', {
+      templateUrl: '/pinot_static/js/templates/create_tenant.html',
+      controller: 'createTenantController'
+    })
+    .when('/fabric/:fabricName/:clusterName/createTable', {
+      templateUrl: '/pinot_static/js/templates/create_table.html',
+      controller: 'createTableController'
+    })
+    .when('/fabric/:fabricName/:clusterName/createSchema', {
+      templateUrl: '/pinot_static/js/templates/create_schema.html',
+      controller: 'createSchemaController'
     })
     .when('/console', {
       templateUrl: '/pinot_static/js/templates/query_console.html',

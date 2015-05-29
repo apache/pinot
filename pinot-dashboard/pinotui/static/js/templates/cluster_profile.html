@@ -23,12 +23,20 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Type</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
-        <tr ng-repeat="table in cluster.tables"><td>{{table.name}} <a style="float: right;" href="{{table.url}}">Segments</a></td></tr>
+        <tr ng-repeat="table in cluster.tables">
+          <td>{{undecorate(table.name)}}</td>
+          <td>{{table.type}}</td>
+          <td><a style="float: right;" href="{{table.url}}">Info</a></td>
+        </tr>
       </tbody>
     </table>
+    <a class="button tiny" href="#/fabric/{{cluster.fabric}}/{{cluster.name}}/createTable">Create Table</a>
+    <a class="button tiny" href="#/fabric/{{cluster.fabric}}/{{cluster.name}}/createSchema">Create Schema</a>
     <h4>Nodes</h4>
     <table style="width: 100%">
       <thead>
@@ -48,4 +56,3 @@
     </table>
   </div>
 </div>
-
