@@ -105,17 +105,17 @@ public class IndexSegmentImpl implements IndexSegment {
       try {
         indexContainerMap.get(column).getDictionary().close();
       } catch (Exception e) {
-        LOGGER.error("Error when close dictionary index for column : " + column + ", StackTrace: " + e);
+        LOGGER.error("Error when close dictionary index for column : " + column, e);
       }
       try {
         indexContainerMap.get(column).getForwardIndex().close();
       } catch (Exception e) {
-        LOGGER.error("Error when close forward index for column : " + column + ", StackTrace: " + e);
+        LOGGER.error("Error when close forward index for column : " + column, e);
       }
       try {
         indexContainerMap.get(column).getInvertedIndex().close();
       } catch (Exception e) {
-        LOGGER.error("Error when close inverted index for column : " + column + ", StackTrace: " + e);
+        LOGGER.error("Error when close inverted index for column : " + column, e);
       }
     }
     indexContainerMap.clear();
