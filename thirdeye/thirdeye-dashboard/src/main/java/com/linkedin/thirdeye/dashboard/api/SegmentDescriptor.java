@@ -47,6 +47,9 @@ public class SegmentDescriptor {
 
   @Override
   public String toString() {
+    if (file == null) {
+      return "null";
+    }
     return file.getName();
   }
 }

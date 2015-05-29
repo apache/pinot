@@ -34,12 +34,14 @@ public class StarTreeManagerImpl implements StarTreeManager {
   private final ConcurrentMap<String, StarTreeConfig> configs;
   private final ConcurrentMap<String, ConcurrentMap<File, StarTree>> trees;
   private final ConcurrentMap<UUID, IndexMetadata> allIndexMetadata;
+  private final ConcurrentMap<String, StarTree> mutableTrees;
   private final Set<String> openCollections;
 
   public StarTreeManagerImpl() {
     this.configs = new ConcurrentHashMap<String, StarTreeConfig>();
     this.trees = new ConcurrentHashMap<String, ConcurrentMap<File, StarTree>>();
     this.allIndexMetadata = new ConcurrentHashMap<>();
+    this.mutableTrees = new ConcurrentHashMap<>();
     this.openCollections = new HashSet<String>();
   }
 
@@ -51,6 +53,11 @@ public class StarTreeManagerImpl implements StarTreeManager {
   @Override
   public StarTreeConfig getConfig(String collection) {
     return configs.get(collection);
+  }
+
+  @Override
+  public StarTree getMutableStarTree(String collection) {
+    return mutableTrees.get(collection);
   }
 
   @Override
@@ -109,6 +116,26 @@ public class StarTreeManagerImpl implements StarTreeManager {
           IndexMetadata indexMetadata = IndexMetadata.fromProperties(indexMetadataProps);
           allIndexMetadata.put(root.getId(), indexMetadata);
         }
+
+        // Create mutable in-memory tree
+        StarTreeConfig inMemoryConfig = new StarTreeConfig(config.getCollection(),
+            StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
+            new Properties(),
+            config.getAnomalyDetectionFunctionClass(),
+            config.getAnomalyDetectionFunctionConfig(),
+            config.getAnomalyHandlerClass(),
+            config.getAnomalyHandlerConfig(),
+            config.getAnomalyDetectionMode(),
+            config.getDimensions(),
+            config.getMetrics(),
+            config.getTime(),
+            config.getJoinSpec(),
+            config.getRollup(),
+            config.getSplit(),
+            false);
+        final StarTree mutableTree = new StarTreeImpl(inMemoryConfig);
+        mutableTree.open();
+        mutableTrees.put(collection, mutableTree);
 
         openCollections.add(collection);
         LOGGER.info("Opened {} trees for collection {}", dataDirs.length, collection);

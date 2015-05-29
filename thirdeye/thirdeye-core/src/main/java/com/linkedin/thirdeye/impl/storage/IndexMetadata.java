@@ -20,9 +20,11 @@ public class IndexMetadata {
   private Long endTime;
   private Long endTimeMillis;
 
+  // The schedule at which the segment was generated (e.g. MONTHLY, DAILY)
   private String timeGranularity;
-
+  // The unit at which data is aggregated in the segment
   private String aggregationGranularity;
+  // The number of aggregationGranularity units (e.g. 10 MINUTES)
   private int bucketSize;
 
   public IndexMetadata(Long minDataTime, Long maxDataTime, Long minDataTimeMillis, Long maxDataTimeMillis,
@@ -200,28 +202,30 @@ public class IndexMetadata {
 
   }
 
+  private static String getAndCheck(Properties properties, String name) {
+    String value = properties.getProperty(name);
+    if (value == null) {
+      throw new IllegalStateException("Cannot find required metadata property: " + name);
+    }
+    return value;
+  }
 
   public static IndexMetadata fromProperties(Properties properties)
   {
     IndexMetadata indexMetadata = new IndexMetadata();
 
-    String minDataTime = properties.getProperty(StarTreeMetadataProperties.MIN_DATA_TIME);
-    String maxDataTime = properties.getProperty(StarTreeMetadataProperties.MAX_DATA_TIME);
-    String minDataTimeMillis = properties.getProperty(StarTreeMetadataProperties.MIN_DATA_TIME_MILLIS);
-    String maxDataTimeMillis = properties.getProperty(StarTreeMetadataProperties.MAX_DATA_TIME_MILLIS);
-    String startTime = properties.getProperty(StarTreeMetadataProperties.START_TIME);
-    String endTime = properties.getProperty(StarTreeMetadataProperties.END_TIME);
-    String startTimeMillis = properties.getProperty(StarTreeMetadataProperties.START_TIME_MILLIS);
-    String endTimeMillis = properties.getProperty(StarTreeMetadataProperties.END_TIME_MILLIS);
-    String timeGranularity = properties.getProperty(StarTreeMetadataProperties.TIME_GRANULARITY);
-    String aggregationGranularity = properties.getProperty(StarTreeMetadataProperties.AGGREGATION_GRANULARITY);
-    String bucketSize = properties.getProperty(StarTreeMetadataProperties.BUCKET_SIZE);
+    String minDataTime = getAndCheck(properties, StarTreeMetadataProperties.MIN_DATA_TIME);
+    String maxDataTime = getAndCheck(properties, StarTreeMetadataProperties.MAX_DATA_TIME);
+    String minDataTimeMillis = getAndCheck(properties, StarTreeMetadataProperties.MIN_DATA_TIME_MILLIS);
+    String maxDataTimeMillis = getAndCheck(properties, StarTreeMetadataProperties.MAX_DATA_TIME_MILLIS);
+    String startTime = getAndCheck(properties, StarTreeMetadataProperties.START_TIME);
+    String endTime = getAndCheck(properties, StarTreeMetadataProperties.END_TIME);
+    String startTimeMillis = getAndCheck(properties, StarTreeMetadataProperties.START_TIME_MILLIS);
+    String endTimeMillis = getAndCheck(properties, StarTreeMetadataProperties.END_TIME_MILLIS);
+    String timeGranularity = getAndCheck(properties, StarTreeMetadataProperties.TIME_GRANULARITY);
+    String aggregationGranularity = getAndCheck(properties, StarTreeMetadataProperties.AGGREGATION_GRANULARITY);
+    String bucketSize = getAndCheck(properties, StarTreeMetadataProperties.BUCKET_SIZE);
 
-    if (minDataTime == null || maxDataTime == null || minDataTimeMillis == null || maxDataTimeMillis == null
-        || startTime == null || endTime == null ||  startTimeMillis == null || endTimeMillis == null
-        || timeGranularity == null|| aggregationGranularity == null || bucketSize == null)    {
-      throw new IllegalStateException("Cannot find required metadata properties");
-    }
     indexMetadata.setMinDataTime(Long.valueOf(minDataTime));
     indexMetadata.setMaxDataTime(Long.valueOf(maxDataTime));
     indexMetadata.setMinDataTimeMillis(Long.valueOf(minDataTimeMillis));

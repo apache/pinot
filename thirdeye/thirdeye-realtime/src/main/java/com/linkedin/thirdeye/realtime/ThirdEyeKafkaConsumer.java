@@ -2,8 +2,6 @@ package com.linkedin.thirdeye.realtime;
 
 import com.codahale.metrics.MetricRegistry;
 import com.linkedin.thirdeye.api.*;
-import com.linkedin.thirdeye.impl.StarTreeImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryHashMapImpl;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import kafka.consumer.Consumer;
 import kafka.consumer.ConsumerConfig;
@@ -27,8 +25,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ThirdEyeKafkaConsumer {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaConsumer.class);
+  private static final String SCHEDULE = "KAFKA";
 
-  private final StarTreeConfig starTreeConfig;
+  private final StarTree starTree;
   private final ThirdEyeKafkaConfig kafkaConfig;
   private final ExecutorService consumerExecutors;
   private final ScheduledExecutorService taskScheduler;
@@ -42,8 +41,8 @@ public class ThirdEyeKafkaConsumer {
   /**
    * Consumes data from Kafka for one collection.
    *
-   * @param starTreeConfig
-   *  The collection index configuration
+   * @param starTree
+   *  The mutable index
    * @param kafkaConfig
    *  The kafka configuration (e.g. zk address, topic, etc.)
    * @param consumerExecutors
@@ -55,27 +54,30 @@ public class ThirdEyeKafkaConsumer {
    * @param metricRegistry
    *  The server's metric registry for reporting
    */
-  public ThirdEyeKafkaConsumer(StarTreeConfig starTreeConfig,
+  public ThirdEyeKafkaConsumer(StarTree starTree,
                                ThirdEyeKafkaConfig kafkaConfig,
                                ExecutorService consumerExecutors,
                                ScheduledExecutorService taskScheduler,
                                DataUpdateManager dataUpdateManager,
                                MetricRegistry metricRegistry) {
-    if (starTreeConfig == null) {
-      throw new NullPointerException("Provided star tree config is null");
+    if (starTree == null) {
+      throw new NullPointerException("Provided star tree is null");
     }
     if (kafkaConfig == null) {
       throw new NullPointerException("Provided kafka config is null");
     }
 
-    this.starTreeConfig = starTreeConfig;
+    String collection = starTree.getConfig().getCollection();
+    String topic = kafkaConfig.getTopicName();
+
+    this.starTree = starTree;
     this.kafkaConfig = kafkaConfig;
     this.consumerExecutors = consumerExecutors;
     this.taskScheduler = taskScheduler;
     this.dataUpdateManager = dataUpdateManager;
     this.isStarted = new AtomicBoolean();
     this.lock = new ReentrantReadWriteLock();
-    this.stats = new ThirdEyeKafkaStats(starTreeConfig.getCollection(), kafkaConfig.getTopicName(), metricRegistry);
+    this.stats = new ThirdEyeKafkaStats(collection, topic, metricRegistry);
     this.persistTask = new AtomicReference<>();
   }
 
@@ -85,31 +87,11 @@ public class ThirdEyeKafkaConsumer {
 
   public void start() throws Exception {
     if (!isStarted.getAndSet(true)) {
-      // Create an in-memory tree
-      LOG.info("Creating in-memory star tree");
-      StarTreeConfig inMemoryConfig = new StarTreeConfig(starTreeConfig.getCollection(),
-          StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
-          new Properties(),
-          starTreeConfig.getAnomalyDetectionFunctionClass(),
-          starTreeConfig.getAnomalyDetectionFunctionConfig(),
-          starTreeConfig.getAnomalyHandlerClass(),
-          starTreeConfig.getAnomalyHandlerConfig(),
-          starTreeConfig.getAnomalyDetectionMode(),
-          starTreeConfig.getDimensions(),
-          starTreeConfig.getMetrics(),
-          starTreeConfig.getTime(),
-          starTreeConfig.getJoinSpec(),
-          starTreeConfig.getRollup(),
-          starTreeConfig.getSplit(),
-          false);
-      final StarTree starTree = new StarTreeImpl(inMemoryConfig);
-      starTree.open();
-
       // Construct decoder
       LOG.info("Constructing decoder {}", kafkaConfig.getDecoderClass());
       Class<?> decoderClass = Class.forName(kafkaConfig.getDecoderClass());
       ThirdEyeKafkaDecoder decoder = (ThirdEyeKafkaDecoder) decoderClass.getConstructor().newInstance();
-      decoder.init(starTreeConfig, kafkaConfig);
+      decoder.init(starTree.getConfig(), kafkaConfig);
 
       // Configure Kafka consumer
       Properties props = new Properties();
@@ -150,9 +132,10 @@ public class ThirdEyeKafkaConsumer {
   /** Stops consumer and shuts down the provided executors. */
   public void stop() throws Exception {
     if (isStarted.getAndSet(false)) {
-      LOG.info("Shutting down Kafka consumer persist scheduler for {}", starTreeConfig.getCollection());
+      String collection = starTree.getConfig().getCollection();
+      LOG.info("Shutting down Kafka consumer persist scheduler for {}", collection);
       taskScheduler.shutdown();
-      LOG.info("Shutting down Kafka consumer executors for {}", starTreeConfig.getCollection());
+      LOG.info("Shutting down Kafka consumer executors for {}", collection);
       consumerExecutors.shutdown();
 
       // Persist any remaining
@@ -161,7 +144,7 @@ public class ThirdEyeKafkaConsumer {
         persistTask.get().run();
       }
 
-      LOG.info("Shut down kafka consumer for {}", starTreeConfig.getCollection());
+      LOG.info("Shut down kafka consumer for {}", collection);
     }
   }
 
@@ -218,7 +201,8 @@ public class ThirdEyeKafkaConsumer {
             }
           }
         } catch (Exception e) {
-          LOG.error("Error consuming message from kafka for {}", starTreeConfig.getCollection(), e);
+          String collection = starTree.getConfig().getCollection();
+          LOG.error("Error consuming message from kafka for {}", collection, e);
         }
       }
     }
@@ -235,12 +219,10 @@ public class ThirdEyeKafkaConsumer {
 
     @Override
     public void run() {
-      String collection = starTreeConfig.getCollection();
+      String collection = starTree.getConfig().getCollection();
       long currentTime = System.currentTimeMillis();
       DateTime minTime = new DateTime(stats.getLastPersistTimeMillis().get(), DateTimeZone.UTC);
       DateTime maxTime = new DateTime(currentTime, DateTimeZone.UTC);
-      TimeGranularity scheduleGranularity = kafkaConfig.getPersistInterval();
-      String schedule = String.format("KAFKA-%d-%s", scheduleGranularity.getSize(), scheduleGranularity.getUnit());
 
       LOG.info("Beginning persist data from {} to {} for {}", minTime, maxTime, collection);
       lock.writeLock().lock();
@@ -248,7 +230,7 @@ public class ThirdEyeKafkaConsumer {
         // Write to disk
         LOG.info("Locked {} to persist data...", lock);
         StarTree rolledUpTree = dataUpdateManager.rollUp(starTree);
-        dataUpdateManager.persistTree(collection, schedule, minTime, maxTime, rolledUpTree);
+        dataUpdateManager.persistTree(collection, SCHEDULE, minTime, maxTime, rolledUpTree);
         LOG.info("Clearing existing star tree metrics...");
         starTree.clear();
         LOG.info("Updating last persist time to {}", currentTime);
@@ -268,13 +250,13 @@ public class ThirdEyeKafkaConsumer {
 
   private long getMinCollectionTimeMillis(MetricTimeSeries timeSeries) {
     long minTime = Collections.min(timeSeries.getTimeWindowSet());
-    TimeGranularity bucket = starTreeConfig.getTime().getBucket();
+    TimeGranularity bucket = starTree.getConfig().getTime().getBucket();
     return TimeUnit.MILLISECONDS.convert(minTime * bucket.getSize(), bucket.getUnit());
   }
 
   private long getMaxCollectionTimeMillis(MetricTimeSeries timeSeries) {
     long maxTime = Collections.max(timeSeries.getTimeWindowSet());
-    TimeGranularity bucket = starTreeConfig.getTime().getBucket();
+    TimeGranularity bucket = starTree.getConfig().getTime().getBucket();
     return TimeUnit.MILLISECONDS.convert(maxTime * bucket.getSize(), bucket.getUnit());
   }
 }

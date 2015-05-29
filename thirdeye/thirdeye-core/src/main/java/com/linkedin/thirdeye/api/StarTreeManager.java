@@ -20,6 +20,11 @@ public interface StarTreeManager
   Map<File, StarTree> getStarTrees(String collection);
 
   /**
+   * Returns an in-memory star tree suitable for live updates.
+   */
+  StarTree getMutableStarTree(String collection);
+
+  /**
    * Returns the index metadata for a data segment.
    */
   IndexMetadata getIndexMetadata(UUID treeId);

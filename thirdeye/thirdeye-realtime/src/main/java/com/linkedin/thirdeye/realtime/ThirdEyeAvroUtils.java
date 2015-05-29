@@ -130,9 +130,6 @@ public class ThirdEyeAvroUtils {
           case TERNARY:
             dimensionValue = parseTernaryValue(dimensionValue, dimensionSpec.getConfig());
             break;
-          case IP_GEO:
-            dimensionValue = ThirdEyeIPUtils.getCountry(dimensionValue);
-            break;
         }
       }
       dimensionValues[i] = dimensionValue;

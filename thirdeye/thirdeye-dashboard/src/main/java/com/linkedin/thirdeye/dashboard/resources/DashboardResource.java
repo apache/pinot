@@ -78,12 +78,16 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
-      if (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0) {
+      if (segment.getEndDataTime() != null && (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0)) {
         latestDataTime = segment.getEndDataTime();
       }
+    }
+
+    if (earliestDataTime == null || latestDataTime == null) {
+      throw new NotFoundException("No data loaded in server for " + collection);
     }
 
     return new DashboardStartView(schema, earliestDataTime, latestDataTime);
@@ -154,12 +158,16 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
-      if (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0) {
+      if (segment.getEndDataTime() != null && (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0)) {
         latestDataTime = segment.getEndDataTime();
       }
+    }
+
+    if (earliestDataTime == null || latestDataTime == null) {
+      throw new NotFoundException("No data loaded in server for " + collection);
     }
 
     try {

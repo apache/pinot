@@ -5,7 +5,10 @@ import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.joda.JodaModule;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryHashMapImpl;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import com.linkedin.thirdeye.realtime.ThirdEyeKafkaConfig;
 import com.linkedin.thirdeye.realtime.ThirdEyeKafkaConsumer;
@@ -16,6 +19,7 @@ import org.apache.commons.cli.Options;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,7 +40,7 @@ public class StandAloneKafkaConsumer {
     }
 
     // Args
-    StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(cli.getArgs()[0]));
+    StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(cli.getArgs()[0]));
     ObjectMapper objectMapper = new ObjectMapper(new YAMLFactory());
     objectMapper.registerModule(new JodaModule());
     final ThirdEyeKafkaConfig kafkaConfig = objectMapper.readValue(new File(cli.getArgs()[1]), ThirdEyeKafkaConfig.class);
@@ -52,6 +56,25 @@ public class StandAloneKafkaConsumer {
     DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir);
     MetricRegistry metricRegistry = new MetricRegistry();
 
+    // Tree
+    StarTreeConfig inMemoryConfig = new StarTreeConfig(config.getCollection(),
+        StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
+        new Properties(),
+        config.getAnomalyDetectionFunctionClass(),
+        config.getAnomalyDetectionFunctionConfig(),
+        config.getAnomalyHandlerClass(),
+        config.getAnomalyHandlerConfig(),
+        config.getAnomalyDetectionMode(),
+        config.getDimensions(),
+        config.getMetrics(),
+        config.getTime(),
+        config.getJoinSpec(),
+        config.getRollup(),
+        config.getSplit(),
+        false);
+    final StarTree mutableTree = new StarTreeImpl(inMemoryConfig);
+    mutableTree.open();
+
     // Report stats to console
     ConsoleReporter reporter = ConsoleReporter.forRegistry(metricRegistry)
         .convertRatesTo(TimeUnit.SECONDS)
@@ -60,7 +83,7 @@ public class StandAloneKafkaConsumer {
 
     // Consumer
     final ThirdEyeKafkaConsumer kafkaConsumer = new ThirdEyeKafkaConsumer(
-        starTreeConfig,
+        mutableTree,
         kafkaConfig,
         consumerExecutors,
         taskScheduler,

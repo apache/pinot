@@ -4,12 +4,14 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.SegmentDescriptor;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.api.StarTreeStats;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
-import com.linkedin.thirdeye.impl.storage.StarTreeMetadataProperties;
 import com.linkedin.thirdeye.impl.storage.StorageUtils;
 import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
@@ -310,7 +312,26 @@ public class CollectionsResource implements Managed
       }
     }
 
+    // A "virtual" segment descriptor for the in-memory tree
+    StarTree mutableTree = manager.getMutableStarTree(collection);
+    if (mutableTree != null) {
+      StarTreeStats stats = mutableTree.getStats();
+      DateTime minTime = collectionTimeToDateTime(mutableTree.getConfig(), stats.getMinTime());
+      DateTime maxTime = collectionTimeToDateTime(mutableTree.getConfig(), stats.getMaxTime());
+      SegmentDescriptor descriptor = new SegmentDescriptor(null, null, null, minTime, maxTime);
+      descriptors.add(descriptor);
+    }
+
     return descriptors;
+  }
+
+  private static DateTime collectionTimeToDateTime(StarTreeConfig config, long collectionTime) {
+    if (collectionTime == -1) {
+      return null;
+    }
+    TimeGranularity bucket = config.getTime().getBucket();
+    long millis = TimeUnit.MILLISECONDS.convert(collectionTime * bucket.getSize(), bucket.getUnit());
+    return new DateTime(millis);
   }
 }
 

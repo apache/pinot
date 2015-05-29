@@ -4,7 +4,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.joda.JodaModule;
-import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
@@ -83,9 +82,8 @@ public class KafkaConsumerManager implements Managed {
     File collectionDir = new File(rootDir, collection);
     File kafkaFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
     ThirdEyeKafkaConfig kafkaConfig = OBJECT_MAPPER.readValue(kafkaFile, ThirdEyeKafkaConfig.class);
-    StarTreeConfig starTreeConfig = starTreeManager.getConfig(collection);
     ThirdEyeKafkaConsumer consumer = new ThirdEyeKafkaConsumer(
-        starTreeConfig,
+        starTreeManager.getMutableStarTree(collection),
         kafkaConfig,
         Executors.newSingleThreadExecutor(),
         Executors.newSingleThreadScheduledExecutor(),

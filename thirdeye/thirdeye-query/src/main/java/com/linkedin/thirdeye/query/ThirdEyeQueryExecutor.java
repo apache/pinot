@@ -79,13 +79,19 @@ public class ThirdEyeQueryExecutor {
     final TimeRange inputQueryTimeRange = new TimeRange(queryStartInMillis.getMillis(), query.getEnd().getMillis());
 
     // select the trees that need to be queried based on the
-    Map<UUID, IndexMetadata> treeMetadataMap = new HashMap<UUID, IndexMetadata>();
+    Map<UUID, IndexMetadata> immutableMetadataMap = new HashMap<>();
+    Map<UUID, IndexMetadata> realTimeMetadataMap = new HashMap<>();
     for (StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
       UUID treeId = starTree.getRoot().getId();
-      treeMetadataMap.put(treeId, starTreeManager.getIndexMetadata(treeId));
+      IndexMetadata indexMetadata = starTreeManager.getIndexMetadata(treeId);
+      if ("KAFKA".equals(indexMetadata.getTimeGranularity())) {
+        realTimeMetadataMap.put(treeId, indexMetadata);
+      } else {
+        immutableMetadataMap.put(treeId, indexMetadata);
+      }
     }
     LOGGER.info("Selecting trees to query for queryTimeRange:{}", inputQueryTimeRange);
-    List<UUID> treeIdsToQuery = selectTreesToQuery(treeMetadataMap, inputQueryTimeRange);
+    List<UUID> treeIdsToQuery = selectTreesToQuery(immutableMetadataMap, inputQueryTimeRange);
 
     // Align to aggregation boundary
     if (collectionWindowMillis > 0) {
@@ -95,6 +101,54 @@ public class ThirdEyeQueryExecutor {
     }
     final TimeRange queryTimeRange = new TimeRange(queryStartTime, queryEndTime);
 
+    // Time ranges that should be queried for each tree
+    final Map<UUID, TimeRange> timeRangesToQuery = new HashMap<>();
+    for (UUID treeId : treeIdsToQuery) {
+      // Whole query time for each of the immutable trees
+      timeRangesToQuery.put(treeId, queryTimeRange);
+    }
+
+    // Determine max data time from the most recent tree that's being queried from immutable segments
+    Long maxImmutableTimeMillis = null;
+    for (UUID treeId : treeIdsToQuery) {
+      IndexMetadata indexMetadata = immutableMetadataMap.get(treeId);
+      if (maxImmutableTimeMillis == null || maxImmutableTimeMillis < indexMetadata.getMaxDataTimeMillis()) {
+        maxImmutableTimeMillis = indexMetadata.getMaxDataTimeMillis();
+      }
+    }
+
+    // Get the starting collection time we should use for real-time segments
+    Long realTimeStartTime = null;
+    Long realTimeStartTimeMillis = null;
+    if (maxImmutableTimeMillis == null) {
+      realTimeStartTime = queryTimeRange.getStart();
+      realTimeStartTimeMillis = queryStartInMillis.getMillis();
+    } else if (maxImmutableTimeMillis < query.getEnd().getMillis()) {
+      realTimeStartTime = dateTimeToCollectionTime(config, new DateTime(maxImmutableTimeMillis));
+      realTimeStartTimeMillis = maxImmutableTimeMillis;
+      long collectionWindow = dateTimeToCollectionTime(config, new DateTime(collectionWindowMillis));
+      if (collectionWindow > 0) {
+        realTimeStartTime = (realTimeStartTime / collectionWindow) * collectionWindow;
+      }
+    }
+
+    // Get the real time trees we need to query
+    List<UUID> realTimeTreeIdsToQuery = new ArrayList<>();
+    if (realTimeStartTime != null) {
+      TimeRange mutableTimeRange = new TimeRange(realTimeStartTime, queryTimeRange.getEnd());
+      TimeRange mutableTimeRangeMillis = new TimeRange(realTimeStartTimeMillis, query.getEnd().getMillis());
+      realTimeTreeIdsToQuery.addAll(selectTreesToQuery(realTimeMetadataMap, mutableTimeRangeMillis));
+
+      // Also add in-memory tree (though it may not match)
+      StarTree mutableTree = starTreeManager.getMutableStarTree(config.getCollection());
+      realTimeTreeIdsToQuery.add(mutableTree.getRoot().getId());
+
+      // Only query the back-end of the time range for these trees
+      for (UUID treeId : realTimeTreeIdsToQuery) {
+        timeRangesToQuery.put(treeId, mutableTimeRange);
+      }
+    }
+
     // For all group by dimensions add those as fixed
     if (!query.getGroupByColumns().isEmpty()) {
       for (final String groupByColumn : query.getGroupByColumns()) {
@@ -103,8 +157,14 @@ public class ThirdEyeQueryExecutor {
         }
 
         final Set<Future<Set<String>>> dimensionSetFutures = new HashSet<>();
-        for (final StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
-          if (!treeIdsToQuery.contains(starTree.getRoot().getId())) {
+        final List<StarTree> starTrees = new ArrayList<>(starTreeManager.getStarTrees(config.getCollection()).values());
+        StarTree mutableTree = starTreeManager.getMutableStarTree(config.getCollection());
+        if (mutableTree != null) {
+          starTrees.add(mutableTree);
+        }
+        for (final StarTree starTree : starTrees) {
+          UUID treeId = starTree.getRoot().getId();
+          if (!treeIdsToQuery.contains(treeId) && !realTimeTreeIdsToQuery.contains(treeId)) {
             continue;
           }
 
@@ -145,8 +205,14 @@ public class ThirdEyeQueryExecutor {
 
     // Metrics
     Map<StarTree, Map<DimensionKey, Future<MetricTimeSeries>>> timeSeriesFutures = new HashMap<>();
-    for (final StarTree starTree : starTreeManager.getStarTrees(config.getCollection()).values()) {
-      if (!treeIdsToQuery.contains(starTree.getRoot().getId())) {
+    final List<StarTree> starTrees = new ArrayList<>(starTreeManager.getStarTrees(config.getCollection()).values());
+    StarTree mutableTree = starTreeManager.getMutableStarTree(config.getCollection());
+    if (mutableTree != null) {
+      starTrees.add(mutableTree);
+    }
+    for (final StarTree starTree : starTrees) {
+      final UUID treeId = starTree.getRoot().getId();
+      if (!treeIdsToQuery.contains(treeId) && !realTimeTreeIdsToQuery.contains(treeId)) {
         continue;
       }
 
@@ -155,7 +221,8 @@ public class ThirdEyeQueryExecutor {
         timeSeriesFutures.get(starTree).put(dimensionKey, executorService.submit(new Callable<MetricTimeSeries>() {
           @Override
           public MetricTimeSeries call() throws Exception {
-            return starTree.getTimeSeries(new StarTreeQueryImpl(config, dimensionKey, queryTimeRange));
+            TimeRange timeRange = timeRangesToQuery.get(treeId);
+            return starTree.getTimeSeries(new StarTreeQueryImpl(config, dimensionKey, timeRange));
           }
         }));
       }
@@ -197,16 +264,15 @@ public class ThirdEyeQueryExecutor {
   }
 
   /**
-   * Selects the appropriate number of trees needed to query
-   * @param treeMetadataMap
-   * @param queryTimeRange
-   * @return
+   * Selects the trees whose data times are non-disjoint with the query time range.
+   *
+   * <p>
+   *   This uses a greedy selection algorithm, in which we prefer trees with a
+   *   more coarse granularity (e.g. MONTHLY over HOURLY)
+   * </p>
    */
   public List<UUID> selectTreesToQuery(final Map<UUID, IndexMetadata> treeMetadataMap,
-      final TimeRange queryTimeRange) {
-    long queryStartTime = queryTimeRange.getStart();
-    long queryEndTime = queryTimeRange.getEnd();
-
+                                       final TimeRange queryTimeRange) {
     List<UUID> treeIds = new ArrayList<>();
     // Determine which trees we need to query
     for (UUID treeId : treeMetadataMap.keySet()) {
@@ -235,37 +301,27 @@ public class ThirdEyeQueryExecutor {
         return ret;
       }
     };
+
     // We will have segments at multiple granularities hourly, daily, weekly, monthly.
     // Find the minimum number of trees to query
     // We use a greedy algorithm that sorts the tree with startTime, Granularity (monthly appears
     // first followed by weekly daily and hourly)
     Collections.sort(treeIds, comparator);
-    TimeRange remainingTimeRange = new TimeRange(queryStartTime, queryEndTime);
+
     List<UUID> treeIdsToQuery = new ArrayList<>();
-    if(treeIds.size()>0){
-      IndexMetadata indexMetadata = treeMetadataMap.get(treeIds.get(0));
-      if(indexMetadata.getStartTime() > queryStartTime ){
-        remainingTimeRange = new TimeRange(Math.min(indexMetadata.getStartTimeMillis(), queryEndTime), queryEndTime);
-      }
-    }
+
+    // Select the disjointed trees after filtering
+    TimeRange lastSelectedRange = null;
     for (UUID treeId : treeIds) {
       IndexMetadata indexMetadata = treeMetadataMap.get(treeId);
-      long startTime = indexMetadata.getStartTimeMillis();
-      long endTime = indexMetadata.getEndTimeMillis();
-      TimeRange treeTimeRange = new TimeRange(startTime, endTime);
-      if (remainingTimeRange.getStart() >= treeTimeRange.getStart()
-          && remainingTimeRange.getStart() < treeTimeRange.getEnd()) {
-        LOGGER.info("Selecting treeId:{} with TimeRange:{}", treeId, treeTimeRange);
+      TimeRange treeRange = new TimeRange(indexMetadata.getStartTimeMillis(), indexMetadata.getEndTimeMillis());
+      if (lastSelectedRange == null || lastSelectedRange.getEnd() <= treeRange.getStart()) { // range end is exclusive for tree
+        lastSelectedRange = treeRange;
         treeIdsToQuery.add(treeId);
-        // if we have reached the queryEndTime, break out of the loop
-        if (endTime >= queryEndTime) {
-          break;
-        }
-        // update the remaining Time Range
-        remainingTimeRange = new TimeRange(endTime, queryEndTime);
-
+        LOGGER.info("Selecting treeId:{} with TimeRange:{}", treeId, treeRange);
       }
     }
+
     return treeIdsToQuery;
   }
 
