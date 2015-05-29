@@ -596,7 +596,7 @@
             <exclude>**/*.log</exclude>
             <exclude>**/target/**/*.*</exclude>
             <exclude>**/resources/**/*.*</exclude>
-            <!-- Stuff that's generated through Avro -->
+            <!-- Stuff that's generated through Thrift -->
             <exclude>**/com/linkedin/pinot/common/request/*.*</exclude>
             <exclude>**/com/linkedin/pinot/common/response/*.*</exclude>
             <exclude>pinot-dashboard/**/*.*</exclude>
@@ -606,6 +606,11 @@
             <exclude>**/FileUploadUtils.java</exclude>
             <exclude>**/TarGzCompressionUtils.java</exclude>
           </excludes>
+          <mapping>
+            <thrift>JAVADOC_STYLE</thrift>
+            <g>DOUBLESLASH_STYLE</g>
+            <g4>JAVADOC_STYLE</g4>
+          </mapping>
         </configuration>
         <executions>
           <execution>
