@@ -18,12 +18,17 @@ package com.linkedin.pinot.index.writer;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.Arrays;
 import java.util.Random;
 
+import org.apache.commons.lang.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+
 
 @Test
 public class FixedByteWidthRowColDataFileWriterTest {
@@ -78,6 +83,44 @@ public class FixedByteWidthRowColDataFileWriterTest {
       }
     }
     dis.close();
+    file.delete();
+  }
+
+  @Test
+  public void testSpecialCharsForStringReaderWriter() throws Exception {
+    final byte[] bytes1 = new byte[] { -17, -65, -67, -17, -65, -67, 32, 69, 120, 101, 99, 117, 116, 105, 118, 101 };
+    final byte[] bytes2 = new byte[] { -17, -65, -68, 32, 99, 97, 108, 103, 97, 114, 121, 32, 106, 117, 110, 107, 32, 114, 101, 109, 111, 118, 97, 108 };
+    File file = new File("test_single_col_writer.dat");
+    file.delete();
+    int rows = 100;
+    int cols = 1;
+    String testString1 = new String(bytes1);
+    String testString2 = new String(bytes2);
+    System.out.println(Arrays.toString(bytes2));
+    int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
+    int[] columnSizes = new int[] { stringColumnMaxLength };
+    FixedByteWidthRowColDataFileWriter writer = new FixedByteWidthRowColDataFileWriter(file, rows, cols, columnSizes);
+    String[] data = new String[rows];
+    for (int i = 0; i < rows; i++) {
+      String toPut = (i % 2 == 0) ? testString1 : testString2;
+      final int padding = stringColumnMaxLength - toPut.getBytes().length;
+
+      final StringBuilder bld = new StringBuilder();
+      bld.append(toPut);
+      for (int j = 0; j < padding; j++) {
+        bld.append(V1Constants.Str.STRING_PAD_CHAR);
+      }
+      data[i] = bld.toString();
+      writer.setString(i, 0, data[i]);
+    }
+    writer.close();
+    FixedByteWidthRowColDataFileReader dataFileReader = FixedByteWidthRowColDataFileReader.forMmap(file, rows, 1, new int[] { stringColumnMaxLength });
+    for (int i = 0; i < rows; i++) {
+      String stringInFile = dataFileReader.getString(i, 0);
+      Assert.assertEquals(stringInFile, data[i]);
+      Assert.assertEquals(StringUtils.remove(stringInFile, String.valueOf(V1Constants.Str.STRING_PAD_CHAR)),
+          StringUtils.remove(data[i], String.valueOf(V1Constants.Str.STRING_PAD_CHAR)));
+    }
     file.delete();
   }
 }
