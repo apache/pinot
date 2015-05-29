@@ -13,7 +13,8 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_DIMENSION_INDEX_REF("thirdeye.dimension.index.ref"),
   INPUT_PATHS("input.paths"),
   THIRDEYE_CLEANUP_DAYSAGO("thirdeye.cleanup.daysago"),
-  THIRDEYE_CLEANUP_SKIP("thirdeye.cleanup.skip");
+  THIRDEYE_CLEANUP_SKIP("thirdeye.cleanup.skip"),
+  THIRDEYE_SKIP_MISSING("thirdeye.skip.missing");
 
   private final String propertyName;
 
