@@ -188,8 +188,12 @@ public abstract class FieldSpec {
         return STRING;
       }
 
-      if (type == Type.DOUBLE || type == Type.FLOAT) {
+      if (type == Type.FLOAT) {
         return FLOAT;
+      }
+
+      if (type == Type.DOUBLE) {
+        return DOUBLE;
       }
 
       throw new UnsupportedOperationException(type.toString());
