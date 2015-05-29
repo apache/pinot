@@ -24,7 +24,7 @@ import org.json.JSONObject;
  * TODO Document me!
  *
  */
-public class SelectionResultSet extends AbstractResultSet {
+class SelectionResultSet extends AbstractResultSet {
   private JSONArray _resultsArray;
   private JSONArray _columnsArray;
 

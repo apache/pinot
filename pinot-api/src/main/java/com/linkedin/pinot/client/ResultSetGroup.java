@@ -52,17 +52,17 @@ public class ResultSetGroup {
    * Returns the number of result sets in this result set group, or 0 if there are no result sets; there is one result
    * set per aggregation function in the original query and one result set in the case of a selection query.
    *
-   * @return The number of result groups in this result set
+   * @return The number of result sets in this result set
    */
   public int getResultSetCount() {
     return _resultSets.size();
   }
 
   /**
-   * Obtains the result group at the given index, starting from zero.
+   * Obtains the result set at the given index, starting from zero.
    *
-   * @param index The index for which to obtain the result group
-   * @return The result group at the given index
+   * @param index The index for which to obtain the result set
+   * @return The result set at the given index
    */
   public ResultSet getResultSet(int index) {
     return _resultSets.get(index);
