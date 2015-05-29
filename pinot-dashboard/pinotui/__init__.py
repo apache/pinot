@@ -66,11 +66,21 @@ def send_pql(fabric):
 @pinotui.route('/clusters/<string:fabric>')
 def list_resources(fabric):
   try:
-    resources = PinotFabric(config, logger, fabric).get_resources()
+    pinot_fabric = PinotFabric(config, logger, fabric)
+  except PinotException as e:
+    return jsonify(dict(success=False, error_message='Failed getting fabric {0}'.format(e)))
+
+  try:
+    resources = pinot_fabric.get_resources()
   except PinotException as e:
     return jsonify(dict(success=False, error_message='Failed getting fabric: {0}'.format(e)))
 
-  return jsonify(dict(success=True, clusters=resources))
+  try:
+    zk = PinotZk(config, logger, fabric)
+  except PinotException as e:
+    return jsonify(dict(success=False, error_message='Failed getting ZK: {0}'.format(e)))
+
+  return jsonify(dict(success=True, clusters=resources, nodes=pinot_fabric.get_nodes(zk.get_handle())))
 
 
 @pinotui.route('/cluster/<string:fabric>/<string:cluster>')
@@ -82,13 +92,22 @@ def cluster_info(fabric, cluster):
   except PinotException as e:
     return jsonify(dict(success=False, error_message='Failed getting ZK: {0}'.format(e)))
 
-  return jsonify(dict(success=True, info=resource.get_info(), nodes=resource.get_nodes(zk)))
+  zkhandle = zk.get_handle()
+
+  return jsonify(dict(success=True, info={}, tables=resource.get_tables(zkhandle), nodes=resource.get_nodes(zkhandle)))
 
 
 @pinotui.route('/segments/<string:fabric>/<string:cluster>/<string:table>')
 def get_segments(fabric, cluster, table):
   resource = PinotResource(config, logger, fabric, cluster)
-  return jsonify(dict(success=True, segments=resource.get_table_segments(table)))
+
+  try:
+    zk = PinotZk(config, logger, fabric)
+  except PinotException as e:
+    return jsonify(dict(success=False, error_message='Failed getting ZK: {0}'.format(e)))
+
+  zkhandle = zk.get_handle()
+  return jsonify(dict(success=True, segments=resource.get_table_segments(table, zkhandle)))
 
 
 @pinotui.route('/fabrics')

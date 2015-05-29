@@ -15,21 +15,20 @@ pinotApp.controller('resourceController', function($scope, $routeParams) {
             $scope.cluster.settings[k] = v;
         });
 
-        if (_.has(data.info, 'tableName')) {
-          _.each(data.info.tableName, function(table) {
-            $scope.cluster.tables.push({
-              'name': table,
-              'url': URLUTILS.forSegmentsPage($routeParams.fabricName, $routeParams.clusterName, table)
-            });       
+        _.each(data.tables, function(table) {
+          $scope.cluster.tables.push({
+            'name': table,
+            'url': URLUTILS.forSegmentsPage($routeParams.fabricName, $routeParams.clusterName, table)
           });
-        }
+        });
 
         _.each(data.nodes, function(n, name) {
           $scope.cluster.nodes.push({
             'name': name,
+            'type': n.type,
             'state': n.online ? 'Up' : 'Down',
             'label': n.online ? 'success' : 'alert',
-          });     
+          });
         })
       });
     });

@@ -15,6 +15,8 @@
 # limitations under the License.
 
 import requests
+import os
+import json
 from exceptions import PinotException
 from requests.exceptions import RequestException
 
@@ -28,7 +30,7 @@ class PinotFabric(object):
 
   def get_resources(self):
     host = self.config.get_controller_url(self.fabric)
-    url = '{0}/dataresources/'.format(host)
+    url = '{0}/tenants?type=server'.format(host)
     try:
       r = requests.get(url)
     except RequestException:
@@ -43,7 +45,26 @@ class PinotFabric(object):
       self.logger.exception(error)
       raise PinotException(error)
 
-    return filter(lambda x: x != 'brokerResource', data['resources'])
+    return map(lambda x: x.split('_O')[0], data['SERVER_TENANTS'])
+
+  def get_nodes(self, zk):
+
+    root = self.config.get_zk_root(self.fabric)
+    state_path = os.path.join(root, 'CONFIGS', 'PARTICIPANT')
+
+    nodes = []
+
+    for node in zk.get_children(state_path):
+      data = zk.get(os.path.join(state_path, node))
+      extracted = json.loads(data[0])
+      nodes.append({
+        'nodename': node,
+        'host': extracted['simpleFields']['HELIX_HOST'].split('_', 1)[-1],
+        'type': node.split('_')[0],
+        'tags': extracted['listFields']['TAG_LIST']
+      })
+
+    return nodes
 
   def run_pql(self, pql):
     host = self.config.get_controller_url(self.fabric)

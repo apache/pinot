@@ -8,7 +8,7 @@ pinotApp.controller('segmentViewController', function($scope, $routeParams) {
   $.get(URLUTILS.forSegments($routeParams.fabricName, $routeParams.clusterName, $routeParams.tableName), function(data) {
     validateAjaxCall(data, function() {
       $scope.$apply(function() {
-        $scope.cluster.segments = data.segments;
+        $scope.cluster.segments = _.pluck(data.segments, 'name');
       });
     });
   });

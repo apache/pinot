@@ -34,12 +34,14 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Type</th>
           <th>State</th>
         </tr>
       </thead>
       <tbody>
         <tr ng-repeat="node in cluster.nodes">
           <td>{{node.name}}</td>
+          <td>{{node.type}}</td>
           <td><span class="label radius {{node.label}}">{{node.state}}</span></td>
         </tr>
       </tbody>
