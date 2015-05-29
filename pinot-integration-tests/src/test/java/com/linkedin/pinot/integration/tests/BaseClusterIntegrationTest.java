@@ -537,6 +537,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
+  @Test
   public void testMultipleQueries() throws Exception {
     queriesFile =
         new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader().getResource(
@@ -576,7 +577,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Test
   public void testGeneratedQueries() throws Exception {
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
+    int generatedQueryCount = getGeneratedQueryCount();
+
+    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
+    if (generatedQueryCountProperty != null) {
+      generatedQueryCount = Integer.parseInt(generatedQueryCountProperty);
+    }
+
+    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
     _queryGenerator.setSkipMultivaluePredicates(true);
     for (int i = 0; i < queries.length; i++) {
       queries[i] = _queryGenerator.generateQuery();
@@ -590,7 +598,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Test
   public void testGeneratedQueriesWithMultivalues() throws Exception {
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
+    int generatedQueryCount = getGeneratedQueryCount();
+
+    String generatedQueryCountProperty = System.getProperty("integration.test.generatedQueryCount");
+    if (generatedQueryCountProperty != null) {
+      generatedQueryCount = Integer.parseInt(generatedQueryCountProperty);
+    }
+
+    QueryGenerator.Query[] queries = new QueryGenerator.Query[generatedQueryCount];
     _queryGenerator.setSkipMultivaluePredicates(false);
     for (int i = 0; i < queries.length; i++) {
       queries[i] = _queryGenerator.generateQuery();
