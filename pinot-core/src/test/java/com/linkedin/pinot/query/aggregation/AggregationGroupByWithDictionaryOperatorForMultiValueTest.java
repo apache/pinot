@@ -75,7 +75,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
 
-  private final String AVRO_DATA = "data/mirror-mv.avro";
+  private final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
       + "TestAggregationGroupByWithDictionaryOperatorForMultiValue");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator

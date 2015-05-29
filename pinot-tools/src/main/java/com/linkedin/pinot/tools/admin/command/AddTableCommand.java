@@ -34,7 +34,7 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
  *
  */
 public class AddTableCommand extends AbstractBaseCommand implements Command {
-  private static final Logger _logger = LoggerFactory.getLogger(AddTenantCommand.class);
+  private static final Logger _logger = LoggerFactory.getLogger(AddTableCommand.class);
 
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
   private String _filePath;

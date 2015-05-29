@@ -54,7 +54,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 public class ChunkIndexCreationDriverImplTest {
 
-  private static final String AVRO_DATA = "data/mirror-mv.avro";
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(ChunkIndexCreationDriverImplTest.class.toString());
 
   @BeforeClass

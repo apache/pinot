@@ -43,9 +43,9 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 
 public class AvroDataPublisherTest {
 
-  private final String AVRO_DATA = "data/sample_data.avro";
-  private final String JSON_DATA = "data/sample_data.json";
-  private final String AVRO_MULTI_DATA = "data/sample_data_multi_value.avro";
+  private final String AVRO_DATA = "data/test_sample_data.avro";
+  private final String JSON_DATA = "data/test_sample_data.json";
+  private final String AVRO_MULTI_DATA = "data/test_sample_data_multi_value.avro";
 
   @Test
   public void TestReadAvro() throws Exception {

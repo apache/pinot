@@ -41,7 +41,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class BitmapInvertedIndexTest {
-  private final String AVRO_DATA = "data/sample_data.avro";
+  private final String AVRO_DATA = "data/test_sample_data.avro";
   private static File INDEX_DIR = new File(BitmapInvertedIndexTest.class.toString());
 
   @Test

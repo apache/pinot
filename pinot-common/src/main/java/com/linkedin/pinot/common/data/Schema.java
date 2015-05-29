@@ -190,6 +190,7 @@ public class Schema {
     this.schemaName = schemaName;
   }
 
+  @JsonIgnore
   public long getSchemaVersion() {
     return schemaVersion;
   }

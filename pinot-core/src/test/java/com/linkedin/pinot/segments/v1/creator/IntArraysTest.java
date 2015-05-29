@@ -44,7 +44,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 
 public class IntArraysTest {
-  private static final String AVRO_DATA = "data/mirror-mv.avro";
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
       + IntArraysTest.class.getName());
 

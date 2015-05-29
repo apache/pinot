@@ -39,7 +39,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class CrcUtilsTest {
 
-  private static final String AVRO_DATA = "data/mirror-mv.avro";
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File("/tmp/testingCrc");
 
   @Test

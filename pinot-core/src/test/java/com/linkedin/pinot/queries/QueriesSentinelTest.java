@@ -73,7 +73,7 @@ public class QueriesSentinelTest {
   private static ReduceService REDUCE_SERVICE = new DefaultReduceService();
 
   private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());
-  private final String AVRO_DATA = "data/mirror-mv.avro";
+  private final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "QueriesSentinelTest");
   private static AvroQueryGenerator AVRO_QUERY_GENERATOR;
   private static QueryExecutor QUERY_EXECUTOR;

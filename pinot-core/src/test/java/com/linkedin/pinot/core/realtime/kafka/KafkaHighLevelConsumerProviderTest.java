@@ -36,7 +36,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
 public class KafkaHighLevelConsumerProviderTest {
-  private static final String AVRO_DATA = "data/mirror-mv.avro";
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static Schema schema;
   private static String filePath;
   private static Map<String, FieldType> fieldTypeMap;

@@ -65,7 +65,7 @@ public class RealtimeTableDataManagerTest {
   private static InstanceZKMetadata instanceZKMetadata;
   private static RealtimeSegmentZKMetadata realtimeSegmentZKMetadata;
   private static TableDataManagerConfig tableDataManagerConfig;
-  private static final String AVRO_DATA = "data/mirror-mv.avro";
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static String filePath;
   private static Map<String, FieldType> fieldTypeMap;
 

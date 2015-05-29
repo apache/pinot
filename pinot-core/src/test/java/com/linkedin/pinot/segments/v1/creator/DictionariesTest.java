@@ -58,7 +58,7 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 
 
 public class DictionariesTest {
-  private static final String AVRO_DATA = "data/sample_data.avro";
+  private static final String AVRO_DATA = "data/test_sample_data.avro";
   private static File INDEX_DIR = new File(DictionariesTest.class.toString());
   static Map<String, Set<Object>> uniqueEntries;
 

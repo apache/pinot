@@ -39,7 +39,7 @@ import com.linkedin.pinot.server.util.SegmentTestUtils;
 
 public class HelixStarterTest {
 
-  private final String AVRO_DATA = "data/sample_data.avro";
+  private final String AVRO_DATA = "data/test_sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "HelixStarterTest");
   public static IndexSegment _indexSegment;
   private final ColumnarSegmentMetadataLoader _columnarSegmentMetadataLoader = new ColumnarSegmentMetadataLoader();

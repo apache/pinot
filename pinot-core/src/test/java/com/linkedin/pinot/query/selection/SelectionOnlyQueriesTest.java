@@ -71,7 +71,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 public class SelectionOnlyQueriesTest {
 
-  private final String AVRO_DATA = "data/sample_data.avro";
+  private final String AVRO_DATA = "data/test_sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueries");
   private static File INDEXES_DIR =
       new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesList");
