@@ -37,6 +37,7 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants;
@@ -133,6 +134,7 @@ public class ThirdEyeJob {
   private static final String DEFAULT_CLEANUP_DAYS_AGO = "7";
   private static final String DEFAULT_CLEANUP_SKIP = "false";
   private static final String DEFAULT_SKIP_MISSING = "true";
+  private static final String INPUT_PATHS_JOINER = ",";
 
   private enum FlowSpec {
     DIMENSION_INDEX,
@@ -636,25 +638,22 @@ public class ThirdEyeJob {
 
     FileSystem fileSystem = FileSystem.get(new Configuration());
 
-    String[] inputs = inputPaths.split(",");
-    StringBuilder filteredInputs = new StringBuilder();
-    String filteredInputPaths;
+    String[] inputs = inputPaths.split(INPUT_PATHS_JOINER);
+    List<String> filteredInputs = new ArrayList<String>();
 
     for (String input : inputs) {
       if (fileSystem.exists(new Path(input))) {
-        filteredInputs.append(input+",");
+        filteredInputs.add(input);
       } else {
         LOGGER.info("Skipping missing input path {}", input);
       }
     }
 
-    if (filteredInputs.length() > 0) {
-        filteredInputPaths = filteredInputs.substring(0, filteredInputs.length() - 1);
-    } else {
+    if (filteredInputs.isEmpty()) {
       throw new IllegalArgumentException("Must provide valid existing "+ThirdEyeJobConstants.INPUT_PATHS.getName());
     }
 
-    return filteredInputPaths;
+    return Joiner.on(INPUT_PATHS_JOINER).join(filteredInputs);
   }
 
 
