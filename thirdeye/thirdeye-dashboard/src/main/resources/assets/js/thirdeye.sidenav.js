@@ -90,7 +90,9 @@ $(document).ready(function() {
         var params = parseHashParameters(window.location.hash)
         if( params.timezone  ) {
             currentTimeZone = params.timezone.split('-').join('/')
-        }    
+        } else {
+            currentTimeZone = getLocalTimeZone().split(' ')[1]
+        } 
     } else {
         currentTimeZone = getLocalTimeZone().split(' ')[1]
     }
