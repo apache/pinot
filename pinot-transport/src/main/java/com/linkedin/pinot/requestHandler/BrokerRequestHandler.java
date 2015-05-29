@@ -18,7 +18,6 @@ package com.linkedin.pinot.requestHandler;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -238,12 +237,8 @@ public class BrokerRequestHandler {
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName());
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null || segmentServices.isEmpty()) {
-      LOGGER.debug("Not found ServerInstances to Segments Mapping:");
+      LOGGER.warn("Not found ServerInstances to Segments Mapping:");
       return BrokerResponse.getEmptyBrokerResponse();
-    }
-    LOGGER.debug("Find ServerInstances to Segments Mapping:");
-    for (ServerInstance serverInstance : segmentServices.keySet()) {
-      LOGGER.debug(serverInstance + " : " + segmentServices.get(serverInstance));
     }
 
     final long queryRoutingTime = System.nanoTime() - routingStartTime;

@@ -23,11 +23,18 @@ import com.linkedin.pinot.common.Utils;
 *
 */
 public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
-  TOTAL_QUERY_TIME, SEGMENT_PRUNING, BUILD_QUERY_PLAN, QUERY_PLAN_EXECUTION;
+  TOTAL_QUERY_TIME,
+  SEGMENT_PRUNING,
+  BUILD_QUERY_PLAN,
+  QUERY_PLAN_EXECUTION,
+  RESPONSE_SERIALIZATION,
+  QUERY_PROCESSING;
 
   private final String queryPhaseName;
 
-  ServerQueryPhase() { queryPhaseName = Utils.toCamelCase(name().toLowerCase()); }
+  ServerQueryPhase() {
+    queryPhaseName = Utils.toCamelCase(name().toLowerCase());
+  }
 
   public String getQueryPhaseName() {
     return queryPhaseName;

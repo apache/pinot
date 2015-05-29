@@ -15,29 +15,23 @@
  */
 package com.linkedin.pinot.server.request;
 
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import io.netty.buffer.ByteBuf;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
-
 import java.util.concurrent.Callable;
+
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
@@ -65,24 +59,25 @@ public class SimpleRequestHandler implements RequestHandler {
 
   @Override
   public byte[] processRequest(ByteBuf request) {
+    long queryStartTime = System.nanoTime();
     _serverMetrics.addMeteredValue(null, ServerMeter.QUERIES, 1);
 
     LOGGER.debug("processing request : " + request);
 
     DataTable instanceResponse = null;
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
 
     byte[] byteArray = new byte[request.readableBytes()];
     request.readBytes(byteArray);
     SerDe serDe = new SerDe(new TCompactProtocol.Factory());
+    BrokerRequest brokerRequest = null;
     try {
       final InstanceRequest queryRequest = new InstanceRequest();
       serDe.deserialize(queryRequest, byteArray);
+      long deserRequestTime = System.nanoTime();
+      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, deserRequestTime - queryStartTime);
       LOGGER.info("instance request : " + queryRequest);
-
-      final BrokerRequest brokerRequest = queryRequest.getQuery();
-
-      instanceResponse = _serverMetrics.timePhase(queryRequest.getQuery(), ServerQueryPhase.TOTAL_QUERY_TIME, new Callable<DataTable>() {
+      brokerRequest = queryRequest.getQuery();
+      instanceResponse = _serverMetrics.timePhase(queryRequest.getQuery(), ServerQueryPhase.QUERY_PROCESSING, new Callable<DataTable>() {
         @Override
         public DataTable call() throws Exception {
           return _queryExecutor.processQuery(queryRequest);
@@ -105,17 +100,25 @@ public class SimpleRequestHandler implements RequestHandler {
       exceptions.add(exception);
       instanceResponse = dataTableBuilder.buildExceptions();
     }
+
+    byte[] responseByte;
+    long serializationStartTime = System.nanoTime();
     try {
       if (instanceResponse == null) {
-        return new byte[0];
+        LOGGER.warn("Instance response is null.");
+        responseByte = new byte[0];
       } else {
-        return instanceResponse.toBytes();
+        responseByte = instanceResponse.toBytes();
       }
     } catch (Exception e) {
       _serverMetrics.addMeteredValue(null, ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       LOGGER.error("Got exception while serializing response.", e);
-      return null;
+      responseByte = null;
     }
+    long serializationEndTime = System.nanoTime();
+    _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.RESPONSE_SERIALIZATION, serializationEndTime - serializationStartTime);
+    _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, serializationEndTime - queryStartTime);
+    return responseByte;
   }
 
 }

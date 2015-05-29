@@ -23,16 +23,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MCombineOperator;
-import com.sun.corba.se.impl.interceptors.PINoOpHandlerImpl;
 
 
 /**
@@ -88,7 +85,7 @@ public class CombinePlanNode implements PlanNode {
         latch.await(60, TimeUnit.SECONDS);
         retOperators.addAll(queue);
       } catch (InterruptedException e) {
-        LOGGER.error("Interupted exception. Planning each segment took more than 60 seconds: ", e  );
+        LOGGER.error("Interupted exception. Planning each segment took more than 60 seconds: ", e);
         throw new RuntimeException(QueryException.COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR);
       }
     }
