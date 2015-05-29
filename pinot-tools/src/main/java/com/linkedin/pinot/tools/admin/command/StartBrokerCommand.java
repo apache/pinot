@@ -89,6 +89,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _queryPort);
     configuration.setProperty("instanceId", brokerInstanceName);
+    configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
         new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
