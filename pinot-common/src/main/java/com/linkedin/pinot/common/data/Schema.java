@@ -192,7 +192,11 @@ public class Schema {
 
   @JsonIgnore
   public long getSchemaVersion() {
+    if (schemaVersion == null) {
+      return -1;
+    }
     return schemaVersion;
+
   }
 
   public void setSchemaVersion(long schemaVersion) {

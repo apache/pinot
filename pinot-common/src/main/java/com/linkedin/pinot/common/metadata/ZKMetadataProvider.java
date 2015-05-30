@@ -189,10 +189,10 @@ public class ZKMetadataProvider {
       if (znRecord.getSimpleFields().keySet().contains(CLUSTER_TENANT_ISOLATION_ENABLED_KEY)) {
         return znRecord.getBooleanField(CLUSTER_TENANT_ISOLATION_ENABLED_KEY, true);
       } else {
-        return null;
+        return true;
       }
     } else {
-      return null;
+      return true;
     }
   }
 }
