@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.creator.impl;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import org.apache.commons.io.FileUtils;
@@ -107,8 +108,9 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         for (final Object e : sortedList) {
-          if (stringColumnMaxLength < ((String) e).getBytes().length) {
-            stringColumnMaxLength = ((String) e).getBytes().length;
+          int length = ((String) e).getBytes(Charset.forName("UTF-8")).length;
+          if (stringColumnMaxLength < length) {
+            stringColumnMaxLength = length;
           }
         }
 
@@ -119,7 +121,7 @@ public class SegmentDictionaryCreator implements Closeable {
         final String[] revised = new String[sortedList.length];
         for (int i = 0; i < sortedList.length; i++) {
           final String toWrite = sortedList[i].toString();
-          final int padding = stringColumnMaxLength - toWrite.getBytes().length;
+          final int padding = stringColumnMaxLength - toWrite.getBytes(Charset.forName("UTF-8")).length;
 
           final StringBuilder bld = new StringBuilder();
           bld.append(toWrite);
@@ -127,6 +129,7 @@ public class SegmentDictionaryCreator implements Closeable {
             bld.append(V1Constants.Str.STRING_PAD_CHAR);
           }
           revised[i] = bld.toString();
+          assert (revised[i].getBytes(Charset.forName("UTF-8")).length == stringColumnMaxLength);
         }
         Arrays.sort(revised);
 
@@ -174,7 +177,7 @@ public class SegmentDictionaryCreator implements Closeable {
       case BOOLEAN:
         final StringBuilder bld = new StringBuilder();
         bld.append(e.toString());
-        for (int i = 0; i < (stringColumnMaxLength - ((String) e).getBytes().length); i++) {
+        for (int i = 0; i < (stringColumnMaxLength - ((String) e).getBytes(Charset.forName("UTF-8")).length); i++) {
           bld.append(V1Constants.Str.STRING_PAD_CHAR);
         }
         return new Integer(searchableByteBuffer.binarySearch(0, bld.toString()));
@@ -217,7 +220,7 @@ public class SegmentDictionaryCreator implements Closeable {
         for (int i = 0; i < multiValues.length; i++) {
           final StringBuilder bld = new StringBuilder();
           bld.append(multiValues[i].toString());
-          for (int j = 0; j < (stringColumnMaxLength - ((String) multiValues[i]).getBytes().length); j++) {
+          for (int j = 0; j < (stringColumnMaxLength - ((String) multiValues[i]).getBytes(Charset.forName("UTF-8")).length); j++) {
             bld.append(V1Constants.Str.STRING_PAD_CHAR);
           }
           ret[i] = searchableByteBuffer.binarySearch(0, bld.toString());

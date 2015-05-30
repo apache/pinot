@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.index.reader.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -23,6 +24,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -235,7 +237,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
    * @return
    */
   public String getString(int row, int col) {
-    return new String(getBytes(row, col));
+    return new String(getBytes(row, col),Charset.forName("UTF-8"));
   }
 
   /**
