@@ -211,22 +211,19 @@ public class QueriesSentinelTest {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
-    dims.add("viewerId");
-    dims.add("viewerType");
-    dims.add("vieweeId");
-    dims.add("viewerCompany");
-    dims.add("viewerCountry");
-    dims.add("viewerRegionCode");
-    dims.add("viewerIndustry");
-    dims.add("viewerOccupation");
-    dims.add("viewerSchool");
-    dims.add("viewerSeniority");
-    dims.add("viewerPrivacySetting");
-    dims.add("viewerObfuscationType");
-    dims.add("vieweePrivacySetting");
+    dims.add("column1");
+    dims.add("column2");
+    dims.add("column3");
+    dims.add("column4");
+    dims.add("column5");
+    dims.add("column6");
+    dims.add("column7");
+    dims.add("column8");
+    dims.add("column9");
+    dims.add("column10");
     dims.add("weeksSinceEpochSunday");
     dims.add("daysSinceEpoch");
-    dims.add("hoursSinceEpoch");
+    dims.add("count");
 
     final List<String> mets = new ArrayList<String>();
     mets.add("count");
@@ -259,7 +256,7 @@ public class QueriesSentinelTest {
 
   @Test
   public void testSingleQuery() throws RecognitionException, Exception {
-    String query = "select count(*) from mirror where viewerId='24516187'";
+    String query = "select count(*) from mirror where viewerId='186154188'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
@@ -291,13 +288,13 @@ public class QueriesSentinelTest {
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(1));
 
     Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getInt("value"), 100000);
-    Assert.assertEquals(brokerResponse.getAggregationResults().get(1).getDouble("value"), 100000.00000);
+    Assert.assertEquals(brokerResponse.getAggregationResults().get(1).getDouble("value"), 8.90662862E13);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 100000);
   }
 
   @Test
   public void testRangeQuery() throws RecognitionException, Exception {
-    String query = "select count(*) from mirror where viewerId in ('24516187', '159470367', '4823449', '4421992', '85417', '13599286', '228392479')";
+    String query = "select count(*) from mirror where column1 in ('999983251', '510705831', '1000720716', '1001058817', '1001099410')";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));

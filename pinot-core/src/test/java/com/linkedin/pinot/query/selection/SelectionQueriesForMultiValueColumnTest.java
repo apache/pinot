@@ -158,7 +158,6 @@ public class SelectionQueriesForMultiValueColumnTest {
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     final Selection selection = getSelectionQuery();
-
     final MSelectionOrderByOperator selectionOperator =
         new MSelectionOrderByOperator(_indexSegment, selection, projectionOperator);
 
@@ -169,7 +168,7 @@ public class SelectionQueriesForMultiValueColumnTest {
     while (!pq.isEmpty()) {
       final Serializable[] row = pq.poll();
       System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
-      Assert.assertEquals(row[0], 356899);
+      Assert.assertEquals(row[0], 2147339302);
     }
   }
 
@@ -204,17 +203,17 @@ public class SelectionQueriesForMultiValueColumnTest {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "vieweeId");
-    Assert.assertEquals(columnJsonArray.getString(1), "count");
-    Assert.assertEquals(columnJsonArray.getString(2), "viewerCompanies");
-    Assert.assertEquals(columnJsonArray.getString(3), "viewerId");
-    Assert.assertEquals(columnJsonArray.getString(4), "viewerObfuscationType");
-    Assert.assertEquals(columnJsonArray.getString(5), "viewerOccupations");
+    Assert.assertEquals(columnJsonArray.getString(0), "column2");
+    Assert.assertEquals(columnJsonArray.getString(1), "column1");
+    Assert.assertEquals(columnJsonArray.getString(2), "column5");
+    Assert.assertEquals(columnJsonArray.getString(3), "column6");
+    Assert.assertEquals(columnJsonArray.getString(4), "column7");
+    Assert.assertEquals(columnJsonArray.getString(5), "count");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "356899");
+      Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
     }
   }
 
@@ -222,6 +221,7 @@ public class SelectionQueriesForMultiValueColumnTest {
   public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
     setupSegment();
     final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
+    System.out.println(brokerRequest);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
@@ -251,33 +251,34 @@ public class SelectionQueriesForMultiValueColumnTest {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "vieweeId");
-    Assert.assertEquals(columnJsonArray.getString(1), "count");
-    Assert.assertEquals(columnJsonArray.getString(2), "viewerCompanies");
-    Assert.assertEquals(columnJsonArray.getString(3), "viewerId");
-    Assert.assertEquals(columnJsonArray.getString(4), "viewerObfuscationType");
-    Assert.assertEquals(columnJsonArray.getString(5), "viewerOccupations");
+    Assert.assertEquals(columnJsonArray.getString(0), "column2");
+    Assert.assertEquals(columnJsonArray.getString(1), "column1");
+    Assert.assertEquals(columnJsonArray.getString(2), "column5");
+    Assert.assertEquals(columnJsonArray.getString(3), "column6");
+    Assert.assertEquals(columnJsonArray.getString(4), "column7");
+    Assert.assertEquals(columnJsonArray.getString(5), "count");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "356899");
+      Assert.assertEquals(rowJsonArray.getString(0), "1787748327");
     }
+
+    System.out.println(jsonResult);
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"356899\",\"1\",[\"2147483647\"],\"189805519\",\"SCHOOL\",[\"2147483647\"]],"
-                + "[\"356899\",\"1\",[\"1482\"],\"636019\",\"OCCUPATION_COMPANY\",[\"478\"]],"
-                + "[\"356899\",\"1\",[\"94413\"],\"110523574\",\"OCCUPATION_COMPANY\",[\"532\"]],"
-                + "[\"356899\",\"1\",[\"10061\"],\"4094221\",\"COMPANY\",[\"239\",\"565\"]],"
-                + "[\"356899\",\"1\",[\"94413\"],\"110523574\",\"OCCUPATION_COMPANY\",[\"532\"]],"
-                + "[\"356899\",\"1\",[\"2147483647\"],\"189805519\",\"SCHOOL\",[\"2147483647\"]],"
-                + "[\"356899\",\"1\",[\"1482\"],\"636019\",\"OCCUPATION_COMPANY\",[\"478\"]],"
-                + "[\"356899\",\"1\",[\"2147483647\"],\"189805519\",\"SCHOOL\",[\"2147483647\"]],"
-                + "[\"356899\",\"1\",[\"2147483647\"],\"189805519\",\"SCHOOL\",[\"2147483647\"]],"
-                + "[\"356899\",\"1\",[\"2147483647\"],\"4315729\",\"OCCUPATION_COMPANY\",[\"2147483647\"]]],"
-                + "\"columns\":[\"vieweeId\",\"count\",\"viewerCompanies\",\"viewerId\",\"viewerObfuscationType\",\"viewerOccupations\"]}");
-
+            "{\"columns\":[\"column2\",\"column1\",\"column5\",\"column6\",\"column7\",\"count\"],"
+              + "\"results\":[[\"1787748327\",\"401448718\",\"OKyOqU\",[\"2147483647\"],[\"2147483647\"],\"890662862\"],"
+              + "[\"1787748327\",\"1493628747\",\"AKXcXcIqsqOJFsdwxZ\",[\"1482\"],[\"478\"],\"890662862\"],"
+              + "[\"1787748327\",\"1295439109\",\"AKXcXcIqsqOJFsdwxZ\",[\"94413\"],[\"532\"],\"890662862\"],"
+              + "[\"1787748327\",\"269506187\",\"EOFxevm\",[\"10061\"],[\"239\",\"565\"],\"890662862\"],"
+              + "[\"1787748327\",\"1295439109\",\"AKXcXcIqsqOJFsdwxZ\",[\"94413\"],[\"532\"],\"890662862\"],"
+              + "[\"1787748327\",\"401448718\",\"OKyOqU\",[\"2147483647\"],[\"2147483647\"],\"890662862\"],"
+              + "[\"1787748327\",\"1493628747\",\"AKXcXcIqsqOJFsdwxZ\",[\"1482\"],[\"478\"],\"890662862\"],"
+              + "[\"1787748327\",\"401448718\",\"OKyOqU\",[\"2147483647\"],[\"2147483647\"],\"890662862\"],"
+              + "[\"1787748327\",\"401448718\",\"OKyOqU\",[\"2147483647\"],[\"2147483647\"],\"890662862\"],"
+              + "[\"1787748327\",\"1966355282\",\"AKXcXcIqsqOJFsdwxZ\",[\"2147483647\"],[\"2147483647\"],\"890662862\"]]}");
   }
 
   @Test
@@ -304,28 +305,29 @@ public class SelectionQueriesForMultiValueColumnTest {
 
     JSONObject jsonResult = brokerResponse.getSelectionResults();
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "vieweeId");
-    Assert.assertEquals(columnJsonArray.getString(1), "count");
-    Assert.assertEquals(columnJsonArray.getString(2), "viewerCompanies");
-    Assert.assertEquals(columnJsonArray.getString(3), "viewerId");
-    Assert.assertEquals(columnJsonArray.getString(4), "viewerObfuscationType");
-    Assert.assertEquals(columnJsonArray.getString(5), "viewerOccupations");
+    System.out.println(columnJsonArray);
+    Assert.assertEquals(columnJsonArray.getString(0), "column2");
+    Assert.assertEquals(columnJsonArray.getString(1), "column1");
+    Assert.assertEquals(columnJsonArray.getString(2), "column5");
+    Assert.assertEquals(columnJsonArray.getString(3), "column6");
+    Assert.assertEquals(columnJsonArray.getString(4), "column7");
+    Assert.assertEquals(columnJsonArray.getString(5), "count");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "356899");
+      Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
     }
 
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
     final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("vieweeId", _indexSegment.getDataSource("vieweeId"));
-    dataSourceMap.put("viewerId", _indexSegment.getDataSource("viewerId"));
-    dataSourceMap.put("viewerCompanies", _indexSegment.getDataSource("viewerCompanies"));
-    dataSourceMap.put("viewerOccupations", _indexSegment.getDataSource("viewerOccupations"));
-    dataSourceMap.put("viewerObfuscationType", _indexSegment.getDataSource("viewerObfuscationType"));
+    dataSourceMap.put("column2", _indexSegment.getDataSource("column2"));
+    dataSourceMap.put("column1", _indexSegment.getDataSource("column1"));
+    dataSourceMap.put("column5", _indexSegment.getDataSource("column5"));
+    dataSourceMap.put("column6", _indexSegment.getDataSource("column6"));
+    dataSourceMap.put("column7", _indexSegment.getDataSource("column7"));
     dataSourceMap.put("count", _indexSegment.getDataSource("count"));
     return dataSourceMap;
   }
@@ -339,18 +341,18 @@ public class SelectionQueriesForMultiValueColumnTest {
   private Selection getSelectionQuery() {
     final Selection selection = new Selection();
     final List<String> selectionColumns = new ArrayList<String>();
-    selectionColumns.add("vieweeId");
-    selectionColumns.add("viewerId");
-    selectionColumns.add("viewerCompanies");
-    selectionColumns.add("viewerOccupations");
-    selectionColumns.add("viewerObfuscationType");
+    selectionColumns.add("column2");
+    selectionColumns.add("column1");
+    selectionColumns.add("column5");
+    selectionColumns.add("column6");
+    selectionColumns.add("column7");
     selectionColumns.add("count");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
     selection.setSize(10);
     final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
     final SelectionSort selectionSort = new SelectionSort();
-    selectionSort.setColumn("vieweeId");
+    selectionSort.setColumn("column2");
     selectionSort.setIsAsc(false);
     selectionSortSequence.add(selectionSort);
     selection.setSelectionSortSequence(selectionSortSequence);
@@ -366,8 +368,8 @@ public class SelectionQueriesForMultiValueColumnTest {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    final String filterColumn = "vieweeId";
-    final String filterVal = "356899";
+    final String filterColumn = "column2";
+    final String filterVal = "1787748327";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");

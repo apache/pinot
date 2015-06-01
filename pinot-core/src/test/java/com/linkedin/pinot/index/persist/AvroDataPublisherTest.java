@@ -54,8 +54,8 @@ public class AvroDataPublisherTest {
     final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
     Schema schema =
-        new Schema.SchemaBuilder().addSingleValueDimension("dim_campaignType", DataType.STRING)
-            .addSingleValueDimension("sort_campaignId", DataType.STRING).build();
+        new Schema.SchemaBuilder().addSingleValueDimension("column3", DataType.STRING)
+            .addSingleValueDimension("column2", DataType.STRING).build();
 
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setInputFileFormat(FileFormat.AVRO);
@@ -82,7 +82,7 @@ public class AvroDataPublisherTest {
       }
       cnt++;
     }
-    Assert.assertEquals(cnt, 10000);
+    Assert.assertEquals(cnt, 10001);
   }
 
   @Test
@@ -91,12 +91,12 @@ public class AvroDataPublisherTest {
     final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
     final List<String> projectedColumns = new ArrayList<String>();
-    projectedColumns.add("dim_campaignType");
-    projectedColumns.add("sort_campaignId");
+    projectedColumns.add("column3");
+    projectedColumns.add("column2");
 
     Schema schema =
-        new Schema.SchemaBuilder().addSingleValueDimension("dim_campaignType", DataType.STRING)
-            .addSingleValueDimension("sort_campaignId", DataType.STRING).build();
+        new Schema.SchemaBuilder().addSingleValueDimension("column3", DataType.STRING)
+            .addSingleValueDimension("column2", DataType.STRING).build();
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
 
     config.setInputFileFormat(FileFormat.AVRO);
@@ -125,7 +125,7 @@ public class AvroDataPublisherTest {
       }
       cnt++;
     }
-    Assert.assertEquals(10000, cnt);
+    Assert.assertEquals(10001, cnt);
   }
 
   @Test

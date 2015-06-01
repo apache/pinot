@@ -157,6 +157,7 @@ public class SelectionOnlyQueriesTest {
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
     final ArrayList<Serializable[]> rowEvents = (ArrayList<Serializable[]>) block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
+    System.out.println("Test: SelectionIteration");
     System.out.println(dataSchema);
     for (int i = 0; i < rowEvents.size(); ++i) {
       final Serializable[] row = rowEvents.get(i);
@@ -174,6 +175,7 @@ public class SelectionOnlyQueriesTest {
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("Test: InnerSegmentPlanMakerForSelectionNoFilter");
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
@@ -194,13 +196,14 @@ public class SelectionOnlyQueriesTest {
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
+
     final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
+
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"m\",\"112\",\"5\"],[\"m\",\"102\",\"1\"],[\"m\",\"100\",\"5\"],[\"m\",\"99\",\"1\"],[\"m\",\"96\",\"2\"],[\"m\",\"92\",\"2\"],[\"m\",\"88\",\"3\"],[\"m\",\"84\",\"5\"],[\"m\",\"80\",\"3\"],[\"m\",\"80\",\"1\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
-
+            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"], \"results\":[[\"i\",\"jgn\",\"4955241829510629137\"],[\"i\",\"lVH\",\"6240989492723764727\"],[\"i\",\"kWZ\",\"4955241829510629137\"],[\"i\",\"pm\",\"6240989492723764727\"],[\"i\",\"GF\",\"8637957270245933828\"],[\"i\",\"kB\",\"8637957270245933828\"],[\"i\",\"BQ\",\"8310347835142446717\"],[\"i\",\"YO\",\"4955241829510629137\"],[\"i\",\"RI\",\"8310347835142446717\"],[\"i\",\"RI\",\"6240989492723764727\"]]}");
   }
 
   @Test
@@ -211,6 +214,7 @@ public class SelectionOnlyQueriesTest {
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("Test: InnerSegmentPlanMakerForSelectionWithFilter");
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
@@ -240,7 +244,7 @@ public class SelectionOnlyQueriesTest {
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"93\",\"1\"],[\"u\",\"27\",\"1\"],[\"u\",\"71\",\"1\"],[\"u\",\"48\",\"2\"],[\"u\",\"80\",\"2\"],[\"u\",\"67\",\"1\"],[\"u\",\"90\",\"1\"],[\"u\",\"12\",\"2\"],[\"u\",\"68\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"U\",\"GF\",\"8310347835142446717\"],[\"U\",\"WI\",\"6240989492723764727\"],[\"U\",\"xk\",\"6240989492723764727\"],[\"U\",\"Ld\",\"6240989492723764727\"],[\"U\",\"Zi\",\"8637957270245933828\"],[\"U\",\"RI\",\"8637957270245933828\"],[\"U\",\"ai\",\"6240989492723764727\"],[\"U\",\"Ot\",\"6240989492723764727\"],[\"U\",\"ZW\",\"8637957270245933828\"],[\"U\",\"iL\",\"8310347835142446717\"]]}");
   }
 
   @Test
@@ -255,6 +259,7 @@ public class SelectionOnlyQueriesTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
+    System.out.println("Test: InterSegmentSelectionPlanMakerAndRun");
     System.out.println("instanceResponse : " + instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
@@ -263,16 +268,17 @@ public class SelectionOnlyQueriesTest {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    System.out.println("Result: " + brokerResponse.getSelectionResults());
     JsonAssert
         .assertEqualsIgnoreOrder(
             brokerResponse.getSelectionResults().toString(),
-            "{\"results\":[[\"m\",\"112\",\"5\"],[\"m\",\"102\",\"1\"],[\"m\",\"100\",\"5\"],[\"m\",\"99\",\"1\"],[\"m\",\"96\",\"2\"],[\"m\",\"92\",\"2\"],[\"m\",\"88\",\"3\"],[\"m\",\"84\",\"5\"],[\"m\",\"80\",\"3\"],[\"m\",\"80\",\"1\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"i\",\"jgn\",\"4955241829510629137\"],[\"i\",\"lVH\",\"6240989492723764727\"],[\"i\",\"kWZ\",\"4955241829510629137\"],[\"i\",\"pm\",\"6240989492723764727\"],[\"i\",\"GF\",\"8637957270245933828\"],[\"i\",\"kB\",\"8637957270245933828\"],[\"i\",\"BQ\",\"8310347835142446717\"],[\"i\",\"YO\",\"4955241829510629137\"],[\"i\",\"RI\",\"8310347835142446717\"],[\"i\",\"RI\",\"6240989492723764727\"]]}");
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
     final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
-    dataSourceMap.put("dim_memberIndustry", _indexSegment.getDataSource("dim_memberIndustry"));
+    dataSourceMap.put("column11", _indexSegment.getDataSource("column11"));
+    dataSourceMap.put("column12", _indexSegment.getDataSource("column12"));
     dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     return dataSourceMap;
   }
@@ -292,8 +298,8 @@ public class SelectionOnlyQueriesTest {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    final String filterColumn = "dim_memberGender";
-    final String filterVal = "u";
+    final String filterColumn = "column11";
+    final String filterVal = "U";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");
@@ -318,8 +324,8 @@ public class SelectionOnlyQueriesTest {
   private Selection getSelectionQuery() {
     final Selection selection = new Selection();
     final List<String> selectionColumns = new ArrayList<String>();
-    selectionColumns.add("dim_memberGender");
-    selectionColumns.add("dim_memberIndustry");
+    selectionColumns.add("column11");
+    selectionColumns.add("column12");
     selectionColumns.add("met_impressionCount");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
@@ -328,5 +334,6 @@ public class SelectionOnlyQueriesTest {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] { "m : 112 : 5", "m : 102 : 1", "m : 100 : 5", "m : 99 : 1", "m : 96 : 2", "m : 92 : 2", "m : 88 : 3", "m : 84 : 5", "m : 80 : 3", "m : 80 : 1" };
+      //new String[] { "m : 112 : 5", "m : 102 : 1", "m : 100 : 5", "m : 99 : 1", "m : 96 : 2", "m : 92 : 2", "m : 88 : 3", "m : 84 : 5", "m : 80 : 3", "m : 80 : 1" };
+      new String [] {"i : jgn : 4955241829510629137", "i : lVH : 6240989492723764727", "i : kWZ : 4955241829510629137", "i : pm : 6240989492723764727", "i : GF : 8637957270245933828", "i : kB : 8637957270245933828", "i : BQ : 8310347835142446717", "i : YO : 4955241829510629137", "i : RI : 8310347835142446717", "i : RI : 6240989492723764727"};
 }
