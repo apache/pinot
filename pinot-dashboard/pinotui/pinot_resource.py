@@ -14,15 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import json
 import os
-import kazoo
 import requests
-import string
 from collections import defaultdict
 from exceptions import PinotException
 from requests.exceptions import RequestException
+from pinot_fabric import PinotFabric
 
 
 class PinotResource(object):
@@ -34,93 +32,136 @@ class PinotResource(object):
     self.resource = resource
 
   def get_info(self):
-    host = self.config.get_controller_url(self.fabric)
-    r = requests.get('{0}/dataresources/{1}'.format(host, self.resource))
+    return {}
 
-    # hacky stopgap
-    c = r.json()['config'].values().pop()
-    results = re.findall('\{(\w+=[^\}]+)\}', c)
-    data = {}
-    for result in results:
-      result = result.split('{')[-1]
-      m = re.search('([^=]+)=\[([^]]+)\]', result)
-      if m:
-        k, v = m.groups()
-        data.update({k: map(string.strip, v.split(','))})
-      else:
-        m = re.findall('(\w+)=([^,]+)', result)
-        if m:
-          data.update(dict(m))
+  def get_table_segments(self, table, zk):
+    segments = []
 
-    return data
+    root = self.config.get_zk_root(self.fabric)
+    path = os.path.join(root, 'PROPERTYSTORE', 'SEGMENTS', table)
 
-  def get_table_segments(self, table):
-    host = self.config.get_controller_url(self.fabric)
+    external_path = os.path.join(root, 'EXTERNALVIEW', table)
+    external_data = json.loads(zk.get(external_path)[0])
 
-    try:
-      r = requests.get('{0}/dataresources/{1}/{2}/segments'.format(host, self.resource, table))
-    except RequestException:
-      error = 'Failed requesting /dataresources/ endpoint'
-      self.logger.exception(error)
-      raise PinotException(error)
+    for segment in zk.get_children(path):
+      segment_path = os.path.join(path, segment)
+      segment_data = json.loads(zk.get(segment_path)[0])
 
-    try:
-      segments = r.json()['segments']
-    except (ValueError, KeyError):
-      error = 'Failed parsing json data'
-      self.logger.exception(error)
-      raise PinotException(error)
+      try:
+        segments.append({
+          'name': segment_data['id'],
+          'info': segment_data['simpleFields'],
+          'availability': external_data['mapFields'][segment]
+        })
+      except KeyError:
+        self.logger.exception('failed getting segment data from zk')
 
     return segments
 
-  def get_nodes(self, pinot_zoo):
-    if not re.match('^[a-zA-Z0-9_]+$', self.resource):
-      error = 'potentially unsafe resource name: {0}'.format(self.resource)
-      self.logger.error(error)
-      raise PinotException(error)
-
-    zk = pinot_zoo.get_handle()
-
-    if not zk:
-      return False
-
+  def get_table_info(self, table, zk):
     root = self.config.get_zk_root(self.fabric)
-    state_path = os.path.join(root, 'IDEALSTATES', self.resource)
+    path = os.path.join(root, 'PROPERTYSTORE', 'CONFIGS', 'TABLE', table)
+    data = json.loads(zk.get(path)[0])
+    return data
 
-    try:
-      ideal_state = zk.get(state_path)[0]
-    except kazoo.exceptions.NoNodeError:
-      pinot_zoo.close()
-      error = 'Failed getting statefile'
-      self.logger.exception(error)
-      raise PinotException(error)
-
-    try:
-      host_maps = json.loads(ideal_state)['mapFields']
-    except (ValueError, KeyError):
-      error = 'Failed parsing JSON IDEALSTATES data'
-      self.logger.exception(error)
-      raise PinotException(error)
-
-    nodes_list = set()
-
-    for servers in host_maps.itervalues():
-      for hostname in servers.iterkeys():
-        nodes_list.add(hostname)
-
+  def get_nodes(self, zk):
     nodes_status = defaultdict(dict)
-
-    for node in nodes_list:
-      instance_path = os.path.join(root, 'LIVEINSTANCES', node)
-      parts = node.split('_')
-      node = parts[1]
-      nodes_status[node]['helix_port'] = parts[2]
-      nodes_status[node]['type'] = parts[0]
-      if zk.exists(instance_path):
-        nodes_status[node]['online'] = True
-      else:
-        nodes_status[node]['online'] = False
-
-    pinot_zoo.close()
+    pinot_fabric = PinotFabric(self.config, self.logger, self.fabric)
+    for node in pinot_fabric.get_nodes(zk):
+      match = False
+      for tag in node['tags']:
+        if tag.startswith(self.resource):
+          match = True
+          break
+      if not match:
+        continue
+      instance_path = os.path.join(self.config.get_zk_root(self.fabric), 'LIVEINSTANCES', node['nodename'])
+      host = node['host']
+      nodes_status[host]['type'] = node['type']
+      nodes_status[host]['helix_port'] = 0
+      nodes_status[host]['online'] = zk.exists(instance_path)
 
     return nodes_status
+
+  def get_tables(self, zk):
+    tables = []
+    root = os.path.join(self.config.get_zk_root(self.fabric), 'PROPERTYSTORE', 'CONFIGS', 'TABLE')
+    for table in zk.get_children(root):
+      path = os.path.join(root, table)
+      data = json.loads(zk.get(path)[0])
+      tenants = json.loads(data['simpleFields']['tenants'])
+      if tenants['server'] != self.resource:
+        continue
+
+      tables.append({
+        'name': table,
+        'type': data['simpleFields']['tableType']
+      })
+
+    return tables
+
+  def create_table(self, settings):
+
+    try:
+      data = {
+        'tableName': settings['name'],
+        'tableConfig': {
+          'retention.TimeUnit': settings['retention_unit'],
+          'retention.TimeValue': settings['retention_value'],
+          'segment.pushFrequency': settings['push_frequency'],
+          'segment.pushType': settings['push_type'],
+          'replication': settings['replication'],
+          'schemaName': settings['schema']
+        },
+        'tableIndexConfig': {
+          'invertedIndexColumns': settings['inverted_index_columns'],
+          'loadMode': settings['loadmode'],
+          'lazyLoad': settings['lazyload']
+        },
+        'tenants': {
+          'broker': settings['broker_tenant'],
+          'server': settings['server_tenant'],
+        },
+        'tableType': settings['type'],
+        'metadata': {
+          'd2.name': settings['d2']
+        }
+      }
+    except KeyError as e:
+      raise PinotException('Missing key: {0}'.format(e))
+
+    url = '{0}/tables'.format(self.config.get_controller_url(self.fabric))
+
+    try:
+      result = requests.post(url, json=data)
+    except RequestException as e:
+      raise PinotException(e)
+
+    if result.status_code != 200:
+      raise PinotException(result.text)
+
+    return True
+
+  def delete_segment(self, segment_name):
+    url = '{0}/datafiles/{1}/{2}'.format(self.config.get_controller_url(self.fabric), self.resource, segment_name)
+    try:
+      result = requests.delete(url)
+    except RequestException as e:
+      raise PinotException(e)
+
+    if result.status_code != 200:
+      raise PinotException(result.text)
+
+    return True
+
+  def delete(self):
+    url = '{0}/datafiles/{1}'.format(self.config.get_controller_url(self.fabric), self.resource)
+    try:
+      result = requests.delete(url)
+    except RequestException as e:
+      raise PinotException(e)
+
+    if result.status_code != 200:
+      raise PinotException(result.text)
+
+    return True

@@ -1,0 +1,52 @@
+<div class="row">
+  <div class="large-12 columns">
+    <a style="float: right;" href="#/resource/{{cluster.fabric}}/{{cluster.name}}">Back</a>
+    <h4>{{cluster.fabric}} :: {{cluster.name}} :: Table {{undecorate(cluster.table)}}</h4>
+    <h6>Configs</h6>
+    <table>
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr ng-repeat="(key, val) in cluster.configs.simpleFields">
+          <td>{{key}}</td>
+          <td>{{val}}</td>
+        </tr>
+      </tbody>
+    </table>
+    <h6>Segments</h6>
+    <table>
+      <thead>
+        <tr>
+          <th>Segment Name</th>
+          <th>Index version</th>
+          <th>CRC</th>
+          <th>Creation Time</th>
+          <th>Push Time</th>
+          <th>Refresh Time</th>
+          <th>Document Count</th>
+          <th>Type</th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr ng-repeat="segment in cluster.segments" style="font-size: 80%">
+          <td>{{segment['segment.name']}}</td>
+          <td>{{segment['segment.index.version']}}</td>
+          <td>{{segment['segment.crc']}}</td>
+          <td>{{prettyDate(segment['segment.creation.time'])}}</td>
+          <td>{{prettyDate(segment['segment.offline.push.time'])}}</td>
+          <td>{{prettyDate(segment['segment.offline.refresh.time'])}}</td>
+          <td>{{segment['segment.total.docs']}}</td>
+          <td>{{segment['segment.type']}}</td>
+          <td><a style="float: left;" href="{{segment['segment.offline.download.url']}}">Download</a></td>
+          <td><a style="float: left;" href="#" onclick="return confirm('Are you sure?');">Delete</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

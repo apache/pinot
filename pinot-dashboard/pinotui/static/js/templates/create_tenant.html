@@ -1,0 +1,44 @@
+<div class="row">
+  <div class="large-6 columns">
+    <h4>{{fabric}} :: Create Tenant</h4>
+    <form>
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Name
+            <input required ng-model="tenant.name" type="text" />
+          </label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Type
+            <select required ng-model="tenant.type">
+              <option value="server">Server</option>
+              <option value="broker">Broker</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="large-12 columns">
+          <label># Instances
+            <input required ng-model="tenant.num_instances" type="number" min="0" />
+          </label>
+        </div>
+      </div>
+      <div class="row" ng-if="tenant.type=='server'">
+        <div class="large-4 columns">
+          <label># Offline Instances
+            <input required ng-model="tenant.num_offline" type="number" min="0" />
+          </label>
+        </div>
+        <div class="large-4 columns">
+          <label># Realtime Instances
+            <input required ng-model="tenant.num_realtime" type="number" min="0" />
+          </label>
+        </div>
+      </div>
+      <input class="button" type="submit" ng-click="create(tenant)" value="Create Tenant" />
+    </form>
+  </div>
+</div>

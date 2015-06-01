@@ -38,9 +38,6 @@ pinot-core/test-output/
 pinot-dashboard/.env
 pinot-dashboard/activate
 pinot-dashboard/config.yml
-pinot-dashboard/**/*.swp
-pinot-dashboard/**/*.pyc
-pinot-dashboard/**/*.swo
 pinot-dashboard/logs/*
 pinot-dashboard/dist
 pinot-dashboard/pinotui.egg-info

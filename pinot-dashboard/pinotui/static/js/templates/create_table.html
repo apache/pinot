@@ -1,0 +1,131 @@
+<div class="row">
+  <div class="large-6 columns">
+    <h4>{{cluster.fabric}} :: {{cluster.name}} :: Create Table</h4>
+    <form>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Table Name
+            <input required ng-model="table.name" type="text" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Schema Name
+            <input required ng-model="table.schema" type="text" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>d2 Name
+            <input ng-model="table.d2" type="text" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Inverted index columns
+            <input ng-model="table.inverted_index_columns" type="text" placeholder="comma-separated" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Replication factor
+            <input ng-model="table.replication" type="number" value="3" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-6 columns">
+          <label>Segment Push Frequency
+            <select required ng-model="table.push_frequency">
+              <option selected>days</option>
+              <option>hours</option>
+              <option>minutes</option>
+              <option>seconds</option>
+            </select>
+          </label>
+        </div>
+        <div class="large-6 columns">
+          <label>Segment Push Type
+            <select required ng-model="table.push_type">
+              <option selected>append</option>
+              <option>refresh</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-6 columns">
+          <label>Retention time unit
+            <input required ng-model="table.retention_unit" type="text" value="DAYS" />
+          </label>
+        </div>
+        <div class="large-6 columns">
+          <label>Retention time value
+            <input required ng-model="table.retention_value" type="number" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-6 columns">
+          <label>Server Tenant
+            <input required ng-model="table.server_tenant" type="text" value="{{cluster.name}}" />
+          </label>
+        </div>
+        <div class="large-6 columns">
+          <label>Broker Tenant
+            <input required ng-model="table.broker_tenant" type="text" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Segment Load Moad
+            <select required ng-model="table.loadmode">
+              <option value="heap">heap</option>
+              <option value="mmap">mmap</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Segment Lazy Load
+            <select required ng-model="table.lazyload">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="large-12 columns">
+          <label>Type
+            <select required ng-model="table.type">
+              <option value="offline">offline</option>
+              <option value="realtime">realtime</option>
+              <option value="hybrid">hybrid</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <input class="button" type="submit" ng-click="create(table)" value="Create Table" />
+    </form>
+  </div>
+</div>
+
