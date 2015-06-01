@@ -874,7 +874,7 @@ public class ThirdEyeJob {
           if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis()))
           {
             LOGGER.info("Deleting {}", file.getPath());
-            //fileSystem.delete(file.getPath(), true);
+            fileSystem.delete(file.getPath(), true);
           }
         }
 
@@ -899,13 +899,13 @@ public class ThirdEyeJob {
             Path startreeBootstrapPath1 = new Path(file.getPath(), PhaseSpec.STARTREE_BOOTSTRAP_PHASE1.getName().toLowerCase());
             if (fileSystem.exists(startreeBootstrapPath1)) {
               LOGGER.info("Deleting {}", startreeBootstrapPath1);
-              //fileSystem.delete(startreeBootstrapPath1, true);
+              fileSystem.delete(startreeBootstrapPath1, true);
             }
 
             Path startreeBootstrapPath2 = new Path(file.getPath(), PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName().toLowerCase());
             if (fileSystem.exists(startreeBootstrapPath2)) {
               LOGGER.info("Deleting {}", startreeBootstrapPath2);
-              //fileSystem.delete(startreeBootstrapPath2, true);
+              fileSystem.delete(startreeBootstrapPath2, true);
             }
 
           }
