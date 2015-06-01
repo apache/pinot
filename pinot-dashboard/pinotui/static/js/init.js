@@ -26,6 +26,15 @@ var URLUTILS = {
   forAuthInfo: function() {
     return '/authinfo';
   },
+
+  forCreateTenant: function(fabric) {
+    return '/create/tenant/'+fabric;
+  },
+
+  forCreateTable: function(fabric, resource) {
+    return '/create/table/'+fabric+'/'+resource;
+  },
+
 };
 
 function undecorate(name) {

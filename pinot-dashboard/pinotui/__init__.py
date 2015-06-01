@@ -117,6 +117,45 @@ def list_fabrics():
   except PinotException as e:
     return jsonify(dict(success=False, error_message='Failed getting fabrics: {0}'.format(e)))
 
+@pinotui.route('/create/tenant/<string:fabric>', methods=['POST'])
+def create_tenant(fabric):
+  try:
+    pinot_fabric = PinotFabric(config, logger, fabric)
+  except PinotException as e:
+    return jsonify(dict(success=False, error_message='Failed getting fabric {0}'.format(e)))
+  data = request.get_json(force=True)
+  try:
+    tenant_type = data['type']
+    tenant_name = data['name']
+    tenant_num_instances = data['num_instances']
+  except KeyError:
+    return jsonify(dict(success=False, error_message='Required fields missing'))
+
+  if tenant_type not in ['broker', 'server']:
+    return jsonify(dict(success=False, error_message='Tenant must be either server or broker'))
+
+  if tenant_type == 'server':
+    tenant_num_offline = data['num_offline']
+    tenant_num_realtime = data['num_realtime']
+    try:
+      result = pinot_fabric.create_server_tenant(tenant_name, tenant_num_instances, tenant_num_offline, tenant_num_realtime)
+    except PinotException as e:
+      return jsonify(dict(success=False, error_message='Creating server tenant: {0}'.format(e)))
+  elif tenant_type == 'broker':
+    try:
+      result = pinot_fabric.create_broker_tenant(tenant_name, tenant_num_instances)
+    except PinotException as e:
+      return jsonify(dict(success=False, error_message='Creating broker tenant: {0}'.format(e)))
+
+  return jsonify(dict(success=result, error_message=''))
+
+
+@pinotui.route('/create/table/<string:fabric>/<string:resource>', methods=['POST'])
+def create_table(fabric):
+  resource = PinotResource(config, logger, fabric, cluster)
+
+  data = request.get_json(force=True)
+
 
 # Store our blueprint's static content in a different path to not conflict with
 # tools team's static

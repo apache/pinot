@@ -92,7 +92,7 @@ class PinotFabric(object):
     url = '{0}/tenants'.format(self.config.get_controller_url(self.fabric))
     try:
       result = requests.post(url, json={
-        'tenantType': 'broker',
+        'tenantRole': 'broker',
         'numberOfInstances': instances,
         'tenantName': name,
       })
@@ -100,7 +100,8 @@ class PinotFabric(object):
       error = 'Failed hitting {0}'.format(url)
       self.logger.exception(error)
       raise PinotException(error)
-    return result
+    print result
+    return result.status_code == 200
 
   def create_server_tenant(self, name, instances, offline_instances=0, realtime_instances=0):
     url = '{0}/tenants'.format(self.config.get_controller_url(self.fabric))
@@ -116,4 +117,5 @@ class PinotFabric(object):
       error = 'Failed hitting {0}'.format(url)
       self.logger.exception(error)
       raise PinotException(error)
-    return result
+    print result
+    return result.status_code == 200
