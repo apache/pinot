@@ -79,6 +79,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private File file;
   private int totalDocs;
   private int docIdCounter;
+  private Map<String, Map<Object, Object>> dictionaryCache = new HashMap<String, Map<Object, Object>>();
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec,
@@ -118,7 +119,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // For each column, build its dictionary and initialize a forwards and an inverted index
     for (final String column : dictionaryCreatorMap.keySet()) {
       dictionaryCreatorMap.get(column).build();
-
+      dictionaryCache.put(column, new HashMap<Object, Object>());
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
         if (indexCreationInfo.isSorted()) {
@@ -152,7 +153,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void indexRow(GenericRow row) {
     for (final String column : dictionaryCreatorMap.keySet()) {
-      Object dictionaryIndex = dictionaryCreatorMap.get(column).indexOf(row.getValue(column));
+
+      Object columnValueToIndex = row.getValue(column);
+      Object dictionaryIndex;
+      if (dictionaryCache.get(column).containsKey(columnValueToIndex)) {
+        dictionaryIndex = dictionaryCache.get(column).get(columnValueToIndex);
+      } else {
+        dictionaryIndex = dictionaryCreatorMap.get(column).indexOf(columnValueToIndex);
+        dictionaryCache.get(column).put(columnValueToIndex, dictionaryIndex);
+      }
       forwardIndexCreatorMap.get(column).index(docIdCounter, dictionaryIndex);
       if (config.createInvertedIndexEnabled()) {
         invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);

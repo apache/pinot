@@ -97,6 +97,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void build() throws Exception {
     // Count the number of documents and gather per-column statistics
+    LOGGER.info("Start building StatsCollector!");
     totalDocs = 0;
     while (recordReader.hasNext()) {
       totalDocs++;
@@ -108,15 +109,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       totalRecordReadTime += (stop - start);
       totalStatsCollectorTime += (stop1 - stop);
     }
-
     buildIndexCreationInfo();
+    LOGGER.info("Finished building StatsCollector!");
 
     // Initialize the index creation using the per-column statistics information
     indexCreator.init(config, indexCreationInfoMap, dataSchema, totalDocs, tempIndexDir);
 
     // Build the index
     recordReader.rewind();
-
+    LOGGER.info("Start building IndexCreator!");
     while (recordReader.hasNext()) {
       long start = System.currentTimeMillis();
       GenericRow row = recordReader.next();
@@ -126,8 +127,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       totalRecordReadTime += (stop - start);
       totalIndexTime += (stop1 - stop);
     }
-
     recordReader.close();
+    LOGGER.info("Finished records indexing in IndexCreator!");
 
     // Build the segment name, if necessary
     final String timeColumn = config.getTimeColumnName();
@@ -150,6 +151,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Write the index files to disk
     indexCreator.setSegmentName(segmentName);
     indexCreator.seal();
+    LOGGER.info("Finished segment seal!");
 
     // Delete the directory named after the segment name, if it exists
     final File outputDir = new File(config.getIndexOutputDir());
