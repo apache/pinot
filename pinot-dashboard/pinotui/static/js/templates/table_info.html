@@ -38,9 +38,9 @@
           <td>{{segment['segment.name']}}</td>
           <td>{{segment['segment.index.version']}}</td>
           <td>{{segment['segment.crc']}}</td>
-          <td>{{segment['segment.creation.time']}}</td>
-          <td>{{segment['segment.offline.push.time']}}</td>
-          <td>{{segment['segment.offline.refresh.time'] < 0 ? '' : segment['segment.offline.refresh.time']}}</td>
+          <td>{{prettyDate(segment['segment.creation.time'])}}</td>
+          <td>{{prettyDate(segment['segment.offline.push.time'])}}</td>
+          <td>{{prettyDate(segment['segment.offline.refresh.time'])}}</td>
           <td>{{segment['segment.total.docs']}}</td>
           <td>{{segment['segment.type']}}</td>
           <td><a style="float: left;" href="{{segment['segment.offline.download.url']}}">Download</a></td>

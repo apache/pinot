@@ -7,6 +7,11 @@ pinotApp.controller('tableInfoController', function($scope, $routeParams) {
     'configs': [],
   }
   $scope.undecorate = undecorate;
+  $scope.prettyDate = function(time) {
+    if (time < 0)
+      return '';
+    return (new Date(Number(time))).format(Date.ISO8601_DATETIME);
+  }
   $.get(URLUTILS.forBackendTableInfo($routeParams.fabricName, $routeParams.clusterName, $routeParams.tableName), function(data) {
     validateAjaxCall(data, function() {
       console.log(data)
