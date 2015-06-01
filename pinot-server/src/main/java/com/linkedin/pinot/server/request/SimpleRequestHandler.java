@@ -62,7 +62,7 @@ public class SimpleRequestHandler implements RequestHandler {
     long queryStartTime = System.nanoTime();
     _serverMetrics.addMeteredValue(null, ServerMeter.QUERIES, 1);
 
-    LOGGER.debug("processing request : " + request);
+    LOGGER.debug("processing request : {}", request);
 
     DataTable instanceResponse = null;
 
@@ -75,7 +75,7 @@ public class SimpleRequestHandler implements RequestHandler {
       serDe.deserialize(queryRequest, byteArray);
       long deserRequestTime = System.nanoTime();
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, deserRequestTime - queryStartTime);
-      LOGGER.info("instance request : " + queryRequest);
+      LOGGER.info("instance request : {}", queryRequest);
       brokerRequest = queryRequest.getQuery();
       instanceResponse = _serverMetrics.timePhase(queryRequest.getQuery(), ServerQueryPhase.QUERY_PROCESSING, new Callable<DataTable>() {
         @Override
@@ -85,7 +85,7 @@ public class SimpleRequestHandler implements RequestHandler {
       });
       LOGGER.debug("******************************");
       if (instanceResponse != null) {
-        LOGGER.debug("instanceResponse : " + instanceResponse.toString());
+        LOGGER.debug("instanceResponse : {}", instanceResponse.toString());
       } else {
         LOGGER.debug("instanceResponse : null");
       }

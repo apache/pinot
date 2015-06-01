@@ -38,8 +38,12 @@ import com.yammer.metrics.core.MetricsRegistry;
  */
 public class NettyTCPServer extends NettyServer {
 
+  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs) {
+    super(port, handlerFactory, registry, defaultLargeQueryLatencyMs);
+  }
+
   public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry) {
-    super(port, handlerFactory, registry);
+    this(port, handlerFactory, registry, 100);
   }
 
   @Override
@@ -51,7 +55,7 @@ public class NettyTCPServer extends NettyServer {
   }
 
   protected ChannelInitializer<SocketChannel> createChannelInitializer() {
-    return new ServerChannelInitializer(_handlerFactory, _metricsRegistry, _metrics);
+    return new ServerChannelInitializer(_handlerFactory, _metricsRegistry, _metrics, _defaultLargeQueryLatencyMs);
   }
 
   /**
@@ -68,12 +72,19 @@ public class NettyTCPServer extends NettyServer {
      */
     private final MetricsRegistry _registry;
     private final AggregatedTransportServerMetrics _globalMetrics;
+    private final long _defaultLargeQueryLatencyMs;
 
     public ServerChannelInitializer(RequestHandlerFactory handlerFactory, MetricsRegistry registry,
-        AggregatedTransportServerMetrics globalMetrics) {
+        AggregatedTransportServerMetrics globalMetrics, long defaultLargeQueryLatencyMs) {
       _handlerFactory = handlerFactory;
       _registry = registry;
       _globalMetrics = globalMetrics;
+      _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
+    }
+
+    public ServerChannelInitializer(RequestHandlerFactory handlerFactory, MetricsRegistry registry,
+        AggregatedTransportServerMetrics globalMetrics) {
+      this(handlerFactory, registry, globalMetrics, 100);
     }
 
     @Override
@@ -91,7 +102,7 @@ public class NettyTCPServer extends NettyServer {
       }
 
       ch.pipeline().addLast("request_handler",
-          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric));
+          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric, _defaultLargeQueryLatencyMs));
     }
   }
 }

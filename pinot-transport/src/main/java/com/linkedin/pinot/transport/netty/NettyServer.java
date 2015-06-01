@@ -108,11 +108,14 @@ public abstract class NettyServer implements Runnable {
   //Aggregated Server Metrics
   protected final AggregatedTransportServerMetrics _metrics;
 
-  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry) {
+  protected final long _defaultLargeQueryLatencyMs;
+
+  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs) {
     _port = port;
     _handlerFactory = handlerFactory;
     _metricsRegistry = registry;
     _metrics = new AggregatedTransportServerMetrics(_metricsRegistry, AGGREGATED_SERVER_METRICS_NAME + port + "_");
+    _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
   }
 
   @Override
@@ -154,20 +157,21 @@ public abstract class NettyServer implements Runnable {
     }
   }
 
- /**
-  * Request and Response have the following format
-  *
-  * 0                                                         31
-  * ------------------------------------------------------------
-  * |                  Length ( 32 bits)                       |
-  * |                 Payload (Request/Response)               |
-  * |                    ...............                       |
-  * |                    ...............                       |
-  * |                    ...............                       |
-  * |                    ...............                       |
-  * ------------------------------------------------------------
-  */
+  /**
+   * Request and Response have the following format
+   *
+   * 0                                                         31
+   * ------------------------------------------------------------
+   * |                  Length ( 32 bits)                       |
+   * |                 Payload (Request/Response)               |
+   * |                    ...............                       |
+   * |                    ...............                       |
+   * |                    ...............                       |
+   * |                    ...............                       |
+   * ------------------------------------------------------------
+   */
   public static class NettyChannelInboundHandler extends ChannelInboundHandlerAdapter implements ChannelFutureListener {
+    private final long _defaultLargeQueryLatencyMs;
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
 
@@ -176,10 +180,16 @@ public abstract class NettyServer implements Runnable {
     private long _lastResponseSizeInBytes;
     private TimerContext _lastSendResponseLatency;
     private TimerContext _lastProcessingLatency;
+    private long _requestStartTime;
 
-    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric) {
+    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
       _handler = handler;
       _metric = metric;
+      _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
+    }
+
+    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric) {
+      this(handler, metric, 100);
     }
 
     public enum State {
@@ -197,6 +207,7 @@ public abstract class NettyServer implements Runnable {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
+      _requestStartTime = System.currentTimeMillis();
       LOGGER.debug("Request received by server !!");
       _state = State.REQUEST_RECEIVED;
       ByteBuf request = (ByteBuf) msg;
@@ -230,6 +241,11 @@ public abstract class NettyServer implements Runnable {
       _lastSendResponseLatency.stop();
       _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false,
           _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
+      long totalQueryTime = System.currentTimeMillis() - _requestStartTime;
+      if (totalQueryTime > _defaultLargeQueryLatencyMs) {
+        LOGGER.info("Trace Info: request handler processing time : {}, send response latency: {}, total time to handle request: {}", _lastProcessingLatency.getLatencyMs(),
+            _lastSendResponseLatency.getLatencyMs(), totalQueryTime);
+      }
       _state = State.RESPONSE_SENT;
     }
 
