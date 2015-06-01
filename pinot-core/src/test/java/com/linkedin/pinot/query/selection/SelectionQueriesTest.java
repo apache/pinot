@@ -164,7 +164,7 @@ public class SelectionQueriesTest {
     while (!pq.isEmpty()) {
       final Serializable[] row = pq.poll();
       System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
-      Assert.assertEquals(row[0], "u");
+      Assert.assertEquals(row[0], "i");
     }
   }
 
@@ -198,14 +198,14 @@ public class SelectionQueriesTest {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "dim_memberGender");
-    Assert.assertEquals(columnJsonArray.getString(1), "dim_memberIndustry");
+    Assert.assertEquals(columnJsonArray.getString(0), "column11");
+    Assert.assertEquals(columnJsonArray.getString(1), "column12");
     Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "u");
+      Assert.assertEquals(rowJsonArray.getString(0), "i");
     }
   }
 
@@ -241,14 +241,14 @@ public class SelectionQueriesTest {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "dim_memberGender");
-    Assert.assertEquals(columnJsonArray.getString(1), "dim_memberIndustry");
+    Assert.assertEquals(columnJsonArray.getString(0), "column11");
+    Assert.assertEquals(columnJsonArray.getString(1), "column12");
     Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "u");
+      Assert.assertEquals(rowJsonArray.getString(0), "U");
     }
   }
 
@@ -275,21 +275,21 @@ public class SelectionQueriesTest {
 
     JSONObject jsonResult = brokerResponse.getSelectionResults();
     JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "dim_memberGender");
-    Assert.assertEquals(columnJsonArray.getString(1), "dim_memberIndustry");
+    Assert.assertEquals(columnJsonArray.getString(0), "column11");
+    Assert.assertEquals(columnJsonArray.getString(1), "column12");
     Assert.assertEquals(columnJsonArray.getString(2), "met_impressionCount");
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "u");
+      Assert.assertEquals(rowJsonArray.getString(0), "i");
     }
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
     final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
-    dataSourceMap.put("dim_memberIndustry", _indexSegment.getDataSource("dim_memberIndustry"));
+    dataSourceMap.put("column11", _indexSegment.getDataSource("column11"));
+    dataSourceMap.put("column12", _indexSegment.getDataSource("column12"));
     dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     return dataSourceMap;
   }
@@ -309,8 +309,8 @@ public class SelectionQueriesTest {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    final String filterColumn = "dim_memberGender";
-    final String filterVal = "u";
+    final String filterColumn = "column11";
+    final String filterVal = "U";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");
@@ -335,15 +335,15 @@ public class SelectionQueriesTest {
   private Selection getSelectionQuery() {
     final Selection selection = new Selection();
     final List<String> selectionColumns = new ArrayList<String>();
-    selectionColumns.add("dim_memberGender");
-    selectionColumns.add("dim_memberIndustry");
+    selectionColumns.add("column11");
+    selectionColumns.add("column12");
     selectionColumns.add("met_impressionCount");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
     selection.setSize(10);
     final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
     final SelectionSort selectionSort = new SelectionSort();
-    selectionSort.setColumn("dim_memberGender");
+    selectionSort.setColumn("column11");
     selectionSort.setIsAsc(false);
     selectionSortSequence.add(selectionSort);
     selection.setSelectionSortSequence(selectionSortSequence);
