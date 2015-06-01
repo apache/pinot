@@ -55,14 +55,17 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       final Future<Response> response = _httpClient.preparePost(url).setBody(json.toString()).execute();
 
       return new Future<BrokerResponse>() {
+        @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
           return response.cancel(mayInterruptIfRunning);
         }
 
+        @Override
         public boolean isCancelled() {
           return response.isCancelled();
         }
 
+        @Override
         public boolean isDone() {
           return response.isDone();
         }

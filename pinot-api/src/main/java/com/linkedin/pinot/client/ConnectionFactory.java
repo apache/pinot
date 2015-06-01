@@ -20,11 +20,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
-import org.I0Itec.zkclient.IZkConnection;
 import org.I0Itec.zkclient.ZkClient;
-import org.I0Itec.zkclient.ZkConnection;
 import org.apache.helix.manager.zk.ByteArraySerializer;
-import org.apache.helix.util.ZKClientPool;
 import org.json.JSONObject;
 
 
@@ -35,7 +32,8 @@ import org.json.JSONObject;
 public class ConnectionFactory {
   static PinotClientTransportFactory _transportFactory = new JsonAsyncHttpPinotClientTransportFactory();
 
-  private ConnectionFactory(){}
+  private ConnectionFactory() {
+  }
 
   /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
@@ -48,9 +46,7 @@ public class ConnectionFactory {
       ZkClient client = new ZkClient(zkUrl);
       client.setZkSerializer(new ByteArraySerializer());
       byte[] brokerResourceNodeData = client.readData("/EXTERNALVIEW/brokerResource", true);
-      System.out.println("brokerResourceNodeData = " + new String(brokerResourceNodeData));
       JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
-      System.out.println("jsonObject = " + jsonObject);
       JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
 
       List<String> brokerUrls = new ArrayList<String>();

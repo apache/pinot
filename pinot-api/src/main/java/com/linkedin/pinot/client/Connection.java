@@ -80,14 +80,17 @@ public class Connection {
     final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(pickRandomBroker(), statement);
 
     return new Future<ResultSetGroup>() {
+      @Override
       public boolean cancel(boolean mayInterruptIfRunning) {
         return responseFuture.cancel(mayInterruptIfRunning);
       }
 
+      @Override
       public boolean isCancelled() {
         return responseFuture.isCancelled();
       }
 
+      @Override
       public boolean isDone() {
         return responseFuture.isDone();
       }
@@ -97,7 +100,7 @@ public class Connection {
         try {
           return get(1000L, TimeUnit.DAYS);
         } catch (TimeoutException e) {
-          throw new InterruptedException();
+          throw new ExecutionException(e);
         }
       }
 

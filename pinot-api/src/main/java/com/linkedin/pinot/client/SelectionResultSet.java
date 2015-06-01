@@ -21,8 +21,7 @@ import org.json.JSONObject;
 
 
 /**
- * TODO Document me!
- *
+ * Selection result set, which contains the results of a selection query.
  */
 class SelectionResultSet extends AbstractResultSet {
   private JSONArray _resultsArray;
