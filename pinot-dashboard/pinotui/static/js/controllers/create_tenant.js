@@ -9,15 +9,13 @@ pinotApp.controller('createTenantController', function($scope, $routeParams) {
     $.ajax(URLUTILS.forCreateTenant(fabric), {
       data: json,
       contentType: 'application/json',
-      type: 'POST'
-    }, function(data) {
-      validateAjaxCall(data, function() {
-        console.log(data)
-        if (data.success)
+      type: 'POST',
+      success:  function(data) {
+        validateAjaxCall(data, function() {
+          alert('Post request successful');
           window.location = '#/fabric/'+fabric;
-        else
-          alert('failed creating tenant. check controller logs')
-      });
+        });
+      }
     });
   }
 });

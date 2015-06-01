@@ -1,7 +1,9 @@
 pinotApp.controller('createTableController', function($scope, $routeParams) {
+  var fabric = $routeParams.fabricName;
+  var cluster = $routeParams.clusterName;
   $scope.cluster = {
-    'name': $routeParams.clusterName,
-    'fabric': $routeParams.fabricName,
+    'name': cluster,
+    'fabric': fabric,
   }
   $scope.table = {}
   $scope.table.push_frequency = 'days';
@@ -12,7 +14,17 @@ pinotApp.controller('createTableController', function($scope, $routeParams) {
 
   $scope.table.type = 'offline';
 
-  $scope.create = function(data) {
-    console.log(data)
+  $scope.create = function(form) {
+    var json = JSON.stringify(form);
+    $.ajax(URLUTILS.forCreateTable(fabric, cluster), {
+      data: json,
+      contentType: 'application/json',
+      type: 'POST',
+      success: function(data) {
+      validateAjaxCall(data, function() {
+        alert('Post request successful');
+        window.location = '#/resource/'+fabric+'/'+cluster;
+      });
+    }});
   }
 });

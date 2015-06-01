@@ -117,6 +117,7 @@ def list_fabrics():
   except PinotException as e:
     return jsonify(dict(success=False, error_message='Failed getting fabrics: {0}'.format(e)))
 
+
 @pinotui.route('/create/tenant/<string:fabric>', methods=['POST'])
 def create_tenant(fabric):
   try:
@@ -151,10 +152,20 @@ def create_tenant(fabric):
 
 
 @pinotui.route('/create/table/<string:fabric>/<string:resource>', methods=['POST'])
-def create_table(fabric):
-  resource = PinotResource(config, logger, fabric, cluster)
+def create_table(fabric, cluster):
+  try:
+    resource = PinotResource(config, logger, fabric, cluster)
+  except PinotException as e:
+    return jsonify(dict(success=False, error_message='Failed getting resource: {0}'.format(e)))
 
   data = request.get_json(force=True)
+
+  try:
+    result = resource.create_table(data)
+  except PinotException as e:
+    return jsonify(dict(success=False, error_message='Failed creating table: {0}'.format(e)))
+
+  return jsonify(dict(success=result, error_message=''))
 
 
 # Store our blueprint's static content in a different path to not conflict with

@@ -100,13 +100,59 @@ class PinotResource(object):
 
     return tables
 
+  def create_table(self, settings):
+
+    try:
+      data = {
+        'tableName': settings['name'],
+        'tableConfig': {
+          'retention.TimeUnit': settings['retention_unit'],
+          'retention.TimeValue': settings['retention_value'],
+          'segment.pushFrequency': settings['push_frequency'],
+          'segment.pushType': settings['push_type'],
+          'replication': settings['replication'],
+          'schemaName': settings['schema']
+        },
+        'tableIndexConfig': {
+          'invertedIndexColumns': settings['inverted_index_columns'],
+          'loadMode': settings['loadmode'],
+          'lazyLoad': settings['lazyload']
+        },
+        'tenants': {
+          'broker': settings['broker_tenant'],
+          'server': settings['server_tenant'],
+        },
+        'tableType': settings['type'],
+        'metadata': {
+          'd2.name': settings['d2']
+        }
+      }
+    except KeyError as e:
+      raise PinotException('Missing key: {0}'.format(e))
+
+    url = '{0}/tables'.format(self.config.get_controller_url(self.fabric))
+
+    try:
+      result = requests.post(url, json=data)
+    except RequestException as e:
+      raise PinotException(e)
+
+    if result.status_code != 200:
+      raise PinotException(result.text)
+
+    return True
+
   def delete_segment(self, segment_name):
     url = '{0}/datafiles/{1}/{2}'.format(self.config.get_controller_url(self.fabric), self.resource, segment_name)
     try:
       result = requests.delete(url)
     except RequestException as e:
       raise PinotException(e)
-    return result.status_code == 200
+
+    if result.status_code != 200:
+      raise PinotException(result.text)
+
+    return True
 
   def delete(self):
     url = '{0}/datafiles/{1}'.format(self.config.get_controller_url(self.fabric), self.resource)
@@ -114,4 +160,8 @@ class PinotResource(object):
       result = requests.delete(url)
     except RequestException as e:
       raise PinotException(e)
-    return result.status_code == 200
+
+    if result.status_code != 200:
+      raise PinotException(result.text)
+
+    return True
