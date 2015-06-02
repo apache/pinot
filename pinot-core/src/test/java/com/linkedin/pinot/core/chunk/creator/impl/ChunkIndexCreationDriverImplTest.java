@@ -69,8 +69,8 @@ public class ChunkIndexCreationDriverImplTest {
             .getFileFromResourceUrl(ChunkIndexCreationDriverImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(
-            "/tmp/mirrorTwoDotO"), "daysSinceEpoch", TimeUnit.DAYS, "mirror");
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+            TimeUnit.DAYS, "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -81,9 +81,9 @@ public class ChunkIndexCreationDriverImplTest {
   @Test
   public void test2() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
 
-    final DataSource ds = segment.getDataSource("viewerPrivacySetting");
+    final DataSource ds = segment.getDataSource("column1");
     final Block bl = ds.nextBlock();
     final BlockValSet valSet = bl.getBlockValueSet();
     final BlockSingleValIterator it = (BlockSingleValIterator) valSet.iterator();
@@ -95,13 +95,13 @@ public class ChunkIndexCreationDriverImplTest {
   @Test
   public void test3() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
 
-    final DataSource ds = segment.getDataSource("viewerCompanies");
+    final DataSource ds = segment.getDataSource("column7");
     final Block bl = ds.nextBlock();
     final BlockValSet valSet = bl.getBlockValueSet();
     final int maxValue =
-        ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataFor("viewerCompanies")
+        ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataFor("column7")
             .getMaxNumberOfMultiValues();
 
     final BlockMultiValIterator it = (BlockMultiValIterator) valSet.iterator();
@@ -115,14 +115,14 @@ public class ChunkIndexCreationDriverImplTest {
   @Test(enabled = false)
   public void test4() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
-    final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerId");
+        (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    final ImmutableDictionaryReader d = segment.getDictionaryFor("column1");
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add(d.get(new Random().nextInt(d.length())).toString());
-    final Predicate p = new EqPredicate("viewerId", rhs);
+    final Predicate p = new EqPredicate("column1", rhs);
 
-    final DataSource ds = segment.getDataSource("viewerId", p);
+    final DataSource ds = segment.getDataSource("column1", p);
 
     final Block bl = ds.nextBlock();
     final BlockDocIdSet idSet = bl.getBlockDocIdSet();
@@ -141,13 +141,13 @@ public class ChunkIndexCreationDriverImplTest {
   @Test(enabled = false)
   public void test5() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add("-100");
-    final Predicate p = new EqPredicate("viewerId", rhs);
+    final Predicate p = new EqPredicate("column1", rhs);
 
-    final DataSource ds = segment.getDataSource("viewerId", p);
+    final DataSource ds = segment.getDataSource("column1", p);
 
     final Block bl = ds.nextBlock();
     final BlockDocIdSet idSet = bl.getBlockDocIdSet();
@@ -166,14 +166,14 @@ public class ChunkIndexCreationDriverImplTest {
   @Test(enabled = false)
   public void test6() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
-    final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerOccupations");
+        (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    final ImmutableDictionaryReader d = segment.getDictionaryFor("column7");
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add(d.get(new Random().nextInt(d.length())).toString());
-    final Predicate p = new EqPredicate("viewerOccupations", rhs);
+    final Predicate p = new EqPredicate("column7", rhs);
 
-    final DataSource ds = segment.getDataSource("viewerOccupations", p);
+    final DataSource ds = segment.getDataSource("column7", p);
 
     final Block bl = ds.nextBlock();
     final BlockDocIdSet idSet = bl.getBlockDocIdSet();
