@@ -339,24 +339,24 @@ public class AggregationQueriesTest {
 
     Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
         .toString());
-    Assert.assertEquals(24574.0 * numSegments,
+    Assert.assertEquals(1343930646015719300000000.00000,
         Double.parseDouble(brokerResponse.getAggregationResults().get(1).getString("value")));
 
     Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
         .toString());
-    Assert.assertEquals(53.0, Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value")));
+    Assert.assertEquals(8637957270245934100.0, Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value")));
 
     Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
         .toString());
-    Assert.assertEquals(1.0, Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value")));
+    Assert.assertEquals(614819680033322500.0, Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value")));
 
     Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
         .toString());
-    Assert.assertEquals(2.45715, Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value")));
+    Assert.assertEquals(6718981331945402400.0, Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value")));
 
-    Assert.assertEquals("distinctCount_dim_memberIndustry",
+    Assert.assertEquals("distinctCount_column12",
         brokerResponse.getAggregationResults().get(5).getString("function").toString());
-    Assert.assertEquals(147, Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
+    Assert.assertEquals(146, Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
 
     Assert.assertEquals("distinctCount_met_impressionCount",
         brokerResponse.getAggregationResults().get(6).getString("function").toString());
@@ -372,7 +372,7 @@ public class AggregationQueriesTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
-    aggregationsInfo.add(getDistinctCountAggregationInfo("dim_memberIndustry"));
+    aggregationsInfo.add(getDistinctCountAggregationInfo("column12"));
     aggregationsInfo.add(getDistinctCountAggregationInfo("met_impressionCount"));
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     return brokerRequest;
@@ -385,15 +385,15 @@ public class AggregationQueriesTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
-    aggregationsInfo.add(getDistinctCountAggregationInfo("dim_memberIndustry"));
+    aggregationsInfo.add(getDistinctCountAggregationInfo("column12"));
     aggregationsInfo.add(getDistinctCountAggregationInfo("met_impressionCount"));
     return aggregationsInfo;
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
     final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
-    dataSourceMap.put("dim_memberIndustry", _indexSegment.getDataSource("dim_memberIndustry"));
+    dataSourceMap.put("column11", _indexSegment.getDataSource("column11"));
+    dataSourceMap.put("column12", _indexSegment.getDataSource("column12"));
     dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     return dataSourceMap;
   }
@@ -469,8 +469,8 @@ public class AggregationQueriesTest {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    final String filterColumn = "dim_memberGender";
-    final String filterVal = "u";
+    final String filterColumn = "column11";
+    final String filterVal = "U";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");
