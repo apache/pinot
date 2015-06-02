@@ -59,19 +59,19 @@ public class RealtimeSegmentTest {
   public static void before() throws Exception {
     filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
     fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
-    fieldTypeMap.put("viewerId", FieldType.DIMENSION);
-    fieldTypeMap.put("vieweeId", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerPrivacySetting", FieldType.DIMENSION);
-    fieldTypeMap.put("vieweePrivacySetting", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerObfuscationType", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerCompanies", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerOccupations", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerRegionCode", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerIndustry", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerSchool", FieldType.DIMENSION);
+    fieldTypeMap.put("column1", FieldType.DIMENSION);
+    fieldTypeMap.put("column2", FieldType.DIMENSION);
+    fieldTypeMap.put("column3", FieldType.DIMENSION);
+    fieldTypeMap.put("column4", FieldType.DIMENSION);
+    fieldTypeMap.put("column5", FieldType.DIMENSION);
+    fieldTypeMap.put("column6", FieldType.DIMENSION);
+    fieldTypeMap.put("column7", FieldType.DIMENSION);
+    fieldTypeMap.put("column8", FieldType.DIMENSION);
+    fieldTypeMap.put("column9", FieldType.DIMENSION);
+    fieldTypeMap.put("column10", FieldType.DIMENSION);
     fieldTypeMap.put("weeksSinceEpochSunday", FieldType.DIMENSION);
     fieldTypeMap.put("daysSinceEpoch", FieldType.DIMENSION);
-    fieldTypeMap.put("minutesSinceEpoch", FieldType.TIME);
+    fieldTypeMap.put("column13", FieldType.TIME);
     fieldTypeMap.put("count", FieldType.METRIC);
     schema = SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);
 
@@ -91,7 +91,7 @@ public class RealtimeSegmentTest {
 
   @Test
   public void test1() throws Exception {
-    DataSource ds = segment.getDataSource("viewerId");
+    DataSource ds = segment.getDataSource("column1");
     Block b = ds.nextBlock();
     BlockValSet set = b.getBlockValueSet();
     BlockSingleValIterator it = (BlockSingleValIterator) set.iterator();
@@ -108,7 +108,7 @@ public class RealtimeSegmentTest {
 
     BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1);
     List<String> rhs = new ArrayList<String>();
-    rhs.add("1");
+    rhs.add("890662862");
     Predicate predicate = new EqPredicate("count", rhs);
     op.setPredicate(predicate);
 
@@ -122,7 +122,7 @@ public class RealtimeSegmentTest {
     int counter = 0;
     while (docId != Constants.EOF) {
       blockValIterator.skipTo(docId);
-      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 1);
+      Assert.assertEquals(ds1.getDictionary().get(blockValIterator.nextIntVal()), 890662862);
       docId = iterator.next();
       counter++;
     }
@@ -135,7 +135,7 @@ public class RealtimeSegmentTest {
 
     BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1);
     List<String> rhs = new ArrayList<String>();
-    rhs.add("1");
+    rhs.add("890662862");
     Predicate predicate = new NEqPredicate("count", rhs);
 
     op.setPredicate(predicate);

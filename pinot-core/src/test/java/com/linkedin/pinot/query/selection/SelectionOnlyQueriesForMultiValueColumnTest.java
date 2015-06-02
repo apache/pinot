@@ -224,7 +224,6 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
-    System.out.println(brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
@@ -339,7 +338,6 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      //new String[] { "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 1 : [ 2147483647 ] : 26770944 : OCCUPATION_COMPANY : [ 2147483647 ]", "1 : 5 : [ 593959 ] : 75329042 : COMPANY : [ 225 ]" };
       new String [] {"890282370 : 890662862 : AKXcXcIqsqOJFsdwxZ : [ 2147483647 ] : [ 2147483647 ] : 890662862",
       "890282370 : 890662862 : AKXcXcIqsqOJFsdwxZ : [ 2147483647 ] : [ 2147483647 ] : 890662862",
       "890282370 : 890662862 : AKXcXcIqsqOJFsdwxZ : [ 2147483647 ] : [ 2147483647 ] : 890662862",
