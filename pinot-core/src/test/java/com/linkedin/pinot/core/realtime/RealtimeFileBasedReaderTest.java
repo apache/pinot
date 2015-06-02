@@ -61,19 +61,19 @@ public class RealtimeFileBasedReaderTest {
   public static void before() throws Exception {
     filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
     fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
-    fieldTypeMap.put("viewerId", FieldType.DIMENSION);
-    fieldTypeMap.put("vieweeId", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerPrivacySetting", FieldType.DIMENSION);
-    fieldTypeMap.put("vieweePrivacySetting", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerObfuscationType", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerCompanies", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerOccupations", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerRegionCode", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerIndustry", FieldType.DIMENSION);
-    fieldTypeMap.put("viewerSchool", FieldType.DIMENSION);
-    fieldTypeMap.put("weeksSinceEpochSunday", FieldType.DIMENSION);
-    fieldTypeMap.put("daysSinceEpoch", FieldType.DIMENSION);
-    fieldTypeMap.put("minutesSinceEpoch", FieldType.TIME);
+    fieldTypeMap.put("column1", FieldType.DIMENSION);
+    fieldTypeMap.put("column2", FieldType.DIMENSION);
+    fieldTypeMap.put("column3", FieldType.DIMENSION);
+    fieldTypeMap.put("column4", FieldType.DIMENSION);
+    fieldTypeMap.put("column5", FieldType.DIMENSION);
+    fieldTypeMap.put("column6", FieldType.DIMENSION);
+    fieldTypeMap.put("column7", FieldType.DIMENSION);
+    fieldTypeMap.put("column8", FieldType.DIMENSION);
+    fieldTypeMap.put("column9", FieldType.DIMENSION);
+    fieldTypeMap.put("column10", FieldType.DIMENSION);
+    fieldTypeMap.put("column11", FieldType.DIMENSION);
+    fieldTypeMap.put("column12", FieldType.DIMENSION);
+    fieldTypeMap.put("column13", FieldType.TIME);
     fieldTypeMap.put("count", FieldType.METRIC);
     schema = SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);
 
@@ -95,8 +95,7 @@ public class RealtimeFileBasedReaderTest {
     }
 
     RealtimeSegmentConverter conveter =
-        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "seomg-segment",
-            null);
+        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "seomg-segment", null);
     conveter.build();
 
     offlineSegment = Loaders.IndexSegment.load(new File("/tmp/realtime").listFiles()[0], ReadMode.mmap);
