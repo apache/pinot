@@ -135,10 +135,17 @@ public class ThirdEyeJob {
   private static final String DEFAULT_CLEANUP_SKIP = "false";
   private static final String DEFAULT_SKIP_MISSING = "true";
   private static final String INPUT_PATHS_JOINER = ",";
+  private static final String DATA_FOLDER_JOINER = "_";
 
   private enum FlowSpec {
     DIMENSION_INDEX,
     METRIC_INDEX
+  }
+
+  private enum FlowSchedule {
+    HOURLY,
+    DAILY,
+    MONTHLY
   }
 
   private enum PhaseSpec {
@@ -505,6 +512,12 @@ public class ThirdEyeJob {
             ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
             thirdeyeCleanupSkip);
 
+        String schedule =
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+        config.setProperty(
+            ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName(), schedule);
+
+
 
         return config;
       }
@@ -660,6 +673,44 @@ public class ThirdEyeJob {
     }
 
     return Joiner.on(INPUT_PATHS_JOINER).join(filteredInputs);
+  }
+
+  private void purgeLowerGranularity(DateTime minTime, DateTime maxTime, String schedule, Path dimensionIndexdir, Path metricIndexDir) throws IOException {
+    DateTime start = minTime;
+    DateTime end ;
+    FileSystem fileSystem = FileSystem.get(new Configuration());
+
+    while (!start.isEqual(maxTime.getMillis()))
+    {
+      if (schedule.equals(FlowSchedule.DAILY.name())) {
+        end = start.plusHours(1);
+      }
+      else if (schedule.equals(FlowSchedule.MONTHLY.name())) {
+        end = start.plusDays(1);
+      }
+      else {
+        return;
+      }
+
+      Path folder = new Path(Joiner.on(DATA_FOLDER_JOINER).join(
+          StarTreeConstants.DATA_DIR_PREFIX,
+          StarTreeConstants.DATE_TIME_FORMATTER.print(start),
+          StarTreeConstants.DATE_TIME_FORMATTER.print(end)));
+
+      Path dimensionFolder = new Path(dimensionIndexdir, folder);
+      Path metricFolder = new Path(metricIndexDir, folder);
+
+      if (fileSystem.exists(dimensionFolder)) {
+        LOGGER.info("Deleting folder {} with overlapping data and lower granularity than {}", dimensionFolder, schedule);
+        fileSystem.delete(dimensionFolder, true);
+      }
+      if (fileSystem.exists(metricFolder)) {
+        LOGGER.info("Deleting folder {} with overlapping data and lower granularity than {}", metricFolder, schedule);
+        fileSystem.delete(metricFolder, true);
+      }
+      start = end;
+    }
+
   }
 
 
@@ -916,6 +967,12 @@ public class ThirdEyeJob {
 
           }
         }
+
+        String schedule = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+        LOGGER.info("schedule : {} ",schedule);
+
+        purgeLowerGranularity(minTime, maxTime, schedule, dimensionIndexdir, metricIndexDir);
+
       }
     }
     else // Hadoop job
@@ -957,6 +1014,8 @@ public class ThirdEyeJob {
     }
 
   }
+
+
 
   public static void main(String[] args) throws Exception {
     if (args.length != 2) {
