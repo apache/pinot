@@ -91,6 +91,9 @@ public class AvroRecordReader implements RecordReader {
   private GenericRow getGenericRow(GenericRecord rawRecord) {
     for (final Field field : _dataStream.getSchema().getFields()) {
       FieldSpec spec = _schemaExtractor.getSchema().getFieldSpecFor(field.name());
+      if (spec == null) {
+        continue;
+      }
       Object value = rawRecord.get(field.name());
       if (value instanceof Utf8) {
         value = ((Utf8) value).toString();

@@ -83,13 +83,6 @@ public class SimpleRequestHandler implements RequestHandler {
           return _queryExecutor.processQuery(queryRequest);
         }
       });
-      LOGGER.debug("******************************");
-      if (instanceResponse != null) {
-        LOGGER.debug("instanceResponse : {}", instanceResponse.toString());
-      } else {
-        LOGGER.debug("instanceResponse : null");
-      }
-      LOGGER.debug("******************************");
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);
       _serverMetrics.addMeteredValue(null, ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
