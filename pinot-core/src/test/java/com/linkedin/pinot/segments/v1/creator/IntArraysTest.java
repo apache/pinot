@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
+import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import java.io.File;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -65,9 +67,9 @@ public class IntArraysTest {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
             TimeUnit.DAYS, "test");
-    config.setTimeColumnName("daysSinceEpoch");
+    config.setTimeColumnName("weeksSinceEpochSunday");
     driver.init(config);
     driver.build();
 
@@ -81,7 +83,7 @@ public class IntArraysTest {
     }
   }
 
-  @Test(enabled = false)
+  @Test
   public void test1() throws Exception {
     final IndexSegmentImpl heapSegment =
         (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);
@@ -96,14 +98,14 @@ public class IntArraysTest {
       final DataFileReader mmapArray = mmapSegment.getForwardIndexReaderFor(column);
 
       if (metadataMap.get(column).isSingleValue()) {
-        final FixedBitCompressedSVForwardIndexReader svHeapReader = (FixedBitCompressedSVForwardIndexReader) heapArray;
-        final FixedBitCompressedSVForwardIndexReader mvMmapReader = (FixedBitCompressedSVForwardIndexReader) mmapArray;
+        final SingleColumnSingleValueReader svHeapReader = (SingleColumnSingleValueReader) heapArray;
+        final SingleColumnSingleValueReader mvMmapReader = (SingleColumnSingleValueReader) mmapArray;
         for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
           Assert.assertEquals(mvMmapReader.getInt(i), svHeapReader.getInt(i));
         }
       } else {
-        final FixedBitCompressedMVForwardIndexReader svHeapReader = (FixedBitCompressedMVForwardIndexReader) heapArray;
-        final FixedBitCompressedMVForwardIndexReader mvMmapReader = (FixedBitCompressedMVForwardIndexReader) mmapArray;
+        final SingleColumnMultiValueReader svHeapReader = (SingleColumnMultiValueReader) heapArray;
+        final SingleColumnMultiValueReader mvMmapReader = (SingleColumnMultiValueReader) mmapArray;
         for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
           final int[] i_1 = new int[1000];
           final int[] j_i = new int[1000];
