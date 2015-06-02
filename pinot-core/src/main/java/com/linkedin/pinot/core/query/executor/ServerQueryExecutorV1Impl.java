@@ -226,6 +226,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     } catch (Exception e) {
       // Return the default timeout value
+      LOGGER.warn("Caught exception while obtaining resource timeout", e);
     }
     return _defaultTimeOutMs;
   }

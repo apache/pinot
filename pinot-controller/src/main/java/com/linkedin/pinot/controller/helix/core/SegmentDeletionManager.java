@@ -102,6 +102,7 @@ public class SegmentDeletionManager {
             , segmentToInstancesMapFromIdealStates.toString(), segmentToInstancesMapFromExternalView.toString());
       }
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while processing segment " + segmentId, e);
       isSegmentReadyToDelete = true;
     }
     if (isSegmentReadyToDelete) {

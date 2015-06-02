@@ -28,9 +28,12 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ZKMetadataProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataProvider.class);
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
   private static String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
@@ -123,6 +126,7 @@ public class ZKMetadataProvider {
     try {
       return AbstractTableConfig.fromZnRecord(znRecord);
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while getting offline table configuration", e);
       return null;
     }
   }
@@ -136,6 +140,7 @@ public class ZKMetadataProvider {
     try {
       return AbstractTableConfig.fromZnRecord(znRecord);
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while getting realtime table configuration", e);
       return null;
     }
   }

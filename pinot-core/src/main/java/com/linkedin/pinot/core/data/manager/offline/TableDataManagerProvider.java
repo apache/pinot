@@ -49,7 +49,7 @@ public class TableDataManagerProvider {
       }
     } catch (Exception ex) {
       throw new RuntimeException("Not support tableDataManager type with - "
-          + tableDataManagerConfig.getTableDataManagerType());
+          + tableDataManagerConfig.getTableDataManagerType(), ex);
     }
   }
 

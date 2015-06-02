@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -160,7 +161,8 @@ public class PinotHelixResourceManager {
             ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker();
       }
     } catch (Exception e) {
-      throw new RuntimeException("Failed to deserialize the tableConfig from propertyStore");
+      LOGGER.error("Caught exception", e);
+      Utils.rethrowException(e);
     }
     final List<String> instanceIds = new ArrayList<String>();
     instanceIds.addAll(getAllInstancesForBrokerTenant(brokerTenantName));

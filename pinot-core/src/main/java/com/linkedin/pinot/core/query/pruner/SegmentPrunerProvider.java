@@ -45,7 +45,7 @@ public class SegmentPrunerProvider {
         return segmentPruner;
       }
     } catch (Exception ex) {
-      throw new RuntimeException("Not support SegmentPruner type with - " + prunerClassName);
+      throw new RuntimeException("Not support SegmentPruner type with - " + prunerClassName, ex);
     }
     throw new UnsupportedOperationException("No SegmentPruner type with - " + prunerClassName);
   }

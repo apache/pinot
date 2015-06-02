@@ -54,7 +54,7 @@ public class PinotTableRestletResource extends ServerResource {
       try {
         manager.addTable(config);
       } catch (Exception e) {
-        e.printStackTrace();
+        LOGGER.error("Caught exception while adding table", e);
         return new StringRepresentation("Failed: " + e.getMessage());
       }
       return new StringRepresentation("Success");
