@@ -481,24 +481,16 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
       final double[] aggResult = aggregationResult.get(j);
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
-        System.out.println("i = " + i);
-        System.out.println("aggResult = " + aggResult[i]);
-        double aDouble = brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
-            .getDouble("value");
-        System.out.println("aDouble = " + aDouble);
         Assert.assertEquals(aggResult[i],
-            aDouble);
+            brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
+                .getDouble("value"));
         if ((i < 14 && aggResult[i] == aggResult[i + 1]) || (i > 0 && aggResult[i] == aggResult[i - 1])) {
           //do nothing, as we have multiple groups within same value.
         } else {
-          System.out.println("i = " + i);
-          System.out.println("groupResult[i] = " + groupResult[i]);
-          String string = brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
-              .getString("group");
-          System.out.println("string = " + string);
           Assert.assertEquals(
               groupResult[i],
-              string);
+              brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
+                  .getString("group"));
         }
       }
     }
