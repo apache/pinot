@@ -399,6 +399,12 @@ public class ThirdEyeJob {
             StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(),
             getDimensionIndexDir(root, collection, dimensionIndexDirRef) + File.separator
                 + STARTREE_GENERATION.getName());
+
+        boolean skipMissing = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SKIP_MISSING.getName(), DEFAULT_SKIP_MISSING));
+        if (skipMissing) {
+          inputPaths = getFilteredInputPaths(inputPaths);
+        }
+
         config.setProperty(
             StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_INPUT_PATH.toString(),
             inputPaths);
