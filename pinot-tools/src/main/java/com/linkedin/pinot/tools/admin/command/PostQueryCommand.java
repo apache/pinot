@@ -31,8 +31,8 @@ import org.slf4j.LoggerFactory;
 public class PostQueryCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
-  @Option(name="-brokerUrl", required=true, metaVar="<http>", usage="http address for broker.")
-  private String _brokerUrl;
+  @Option(name="-brokerPort", required=true, metaVar="<int>", usage="http port for broker.")
+  private String _brokerPort;
 
   @Option(name="-query", required=true, metaVar="<string>", usage="Query string to perform.")
   private String _query;
@@ -48,6 +48,8 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
   public String getName() {
     return "PostQuery";
   }
+
+  private String _brokerUrl = "http://localhost:" + _brokerPort;
 
   @Override
   public String toString() {

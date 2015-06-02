@@ -32,20 +32,19 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
   private String _clusterName = null;
 
-  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Zookeeper http address.")
-  private String _zkAddress = null;
+  @Option(name="-brokerPort", required=false, metaVar="<int>", usage="Broker port number to use for query.")
+  private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
 
   @Option(name="-brokerInstName", required=false, metaVar="<string>", usage="Instance name of the broker.")
   private String _brokerInstName = "Broker_localhost_";
 
-  @Option(name="-brokerHostName", required=false, metaVar="<string>", usage="Host name where broker is running.")
-  private String _brokerHostName = "localhost";
-
-  @Option(name="-queryPort", required=false, metaVar="<int>", usage="Broker port number to use for query.")
-  private int _queryPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
+  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="HTTP address of Zookeeper.")
+  private String _zkAddress = null;
 
   @Option(name="-help", required=false, help=true, usage="Print this message.")
   private boolean _help = false;
+
+  private String _brokerHostName = "localhost";
 
   public boolean getHelp() {
     return _help;
@@ -58,8 +57,8 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("StartBrokerCommand -brokerInstName " + _brokerInstName + " -brokerHostName " + _brokerHostName +
-        " -queryPort " + _queryPort);
+    return ("StartBrokerCommand -brokerInstName " + _brokerInstName + " -brokerPort " + _brokerPort +
+        " -brokerInstName " + _brokerInstName + " -zkAddress " + _zkAddress);
   }
 
   @Override
@@ -73,7 +72,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   }
 
   public StartBrokerCommand setPort(int port) {
-    _queryPort = port;
+    _brokerPort = port;
     return this;
   }
 
@@ -85,9 +84,9 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Override
   public boolean execute() throws Exception {
     Configuration configuration = new PropertiesConfiguration();
-    String brokerInstanceName = _brokerInstName + "_" + _brokerHostName + "_" + _queryPort;
+    String brokerInstanceName = _brokerInstName + "_" + _brokerHostName + "_" + _brokerPort;
 
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _queryPort);
+    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
     configuration.setProperty("instanceId", brokerInstanceName);
     configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
 

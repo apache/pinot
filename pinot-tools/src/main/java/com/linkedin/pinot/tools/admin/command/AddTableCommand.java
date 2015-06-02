@@ -39,12 +39,13 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
   private String _filePath;
 
-  @Option(name = "-controllerAddress", required = true, metaVar = "<http>",
-      usage = "Http address of Controller (with port).")
-  private String _controllerAddress = null;
+  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
+  private String _controllerPort = null;
 
   @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   private boolean _help = false;
+
+  private String _controllerAddress;
 
   @Override
   public boolean getHelp() {
@@ -58,7 +59,7 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddTable -filePath " + _filePath  + " -controllerAddress " + _controllerAddress);
+    return ("AddTable -filePath " + _filePath  + " -controllerPort " + _controllerPort);
   }
 
   @Override
@@ -67,16 +68,17 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   }
 
   public AddTableCommand setFilePath(String filePath) {
-    this._filePath = filePath;
+    _filePath = filePath;
     return this;
   }
 
   public AddTableCommand setControllerAddress(String controllerAddress) {
-    this._controllerAddress = controllerAddress;
+    _controllerAddress = controllerAddress;
     return this;
   }
 
   public boolean execute(JsonNode node) throws UnsupportedEncodingException, IOException, JSONException {
+    _controllerAddress = "http://localhost:" + _controllerPort;
     String res =
         AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(),
             node.toString());

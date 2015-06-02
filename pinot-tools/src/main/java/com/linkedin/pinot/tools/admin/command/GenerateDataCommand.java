@@ -55,7 +55,7 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
   @Option(name="-schemaFile", required=true, metaVar= "<string>", usage="File containing schema for data.")
   private String _schemaFile = null;
 
-  @Option(name="-schemaAnnotation", required=false, metaVar="<string>", usage="File containing dim/metrics for columns.")
+  @Option(name="-schemaAnnotationFile", required=false, metaVar="<string>", usage="File containing dim/metrics for columns.")
   private String _schemaAnnFile;
 
   @Option(name="-outDir", required=true, metaVar= "<string>", usage="Directory where data would be generated.")

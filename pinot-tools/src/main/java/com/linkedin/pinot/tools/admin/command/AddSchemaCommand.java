@@ -27,14 +27,11 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 
 
 public class AddSchemaCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-controllerHost", required = true, metaVar = "<string>", usage = "Hostname for controller.")
-  private String _controllerHost = null;
-
   @Option(name = "-controllerPort", required = true, metaVar = "<String>", usage = "Hostname for controller.")
   private String _controllerPort;
 
-  @Option(name = "-schemaFilePath", required = true, metaVar = "<string>", usage = "Path to segment directory.")
-  private String _schemaFilePath = null;
+  @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "Path to schema file.")
+  private String _schemaFile = null;
 
   @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   private boolean _help = false;
@@ -44,6 +41,8 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
     return _help;
   }
 
+  private String _controllerHost = "http://localhost";
+
   @Override
   public String getName() {
     return "AddSchema";
@@ -52,7 +51,7 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
   @Override
   public String toString() {
     return ("AddSchema -controllerHost " + _controllerHost  + " -controllerPort " + _controllerPort +
-        " -schemaFilePath " + _schemaFilePath);
+        " -schemaFilePath " + _schemaFile);
   }
 
   @Override
@@ -61,26 +60,26 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
   }
 
   public AddSchemaCommand setControllerHost(String controllerHost) {
-    this._controllerHost = controllerHost;
+    _controllerHost = controllerHost;
     return this;
   }
 
   public AddSchemaCommand setControllerPort(String controllerPort) {
-    this._controllerPort = controllerPort;
+    _controllerPort = controllerPort;
     return this;
   }
 
   public AddSchemaCommand setSchemaFilePath(String schemaFilePath) {
-    this._schemaFilePath = schemaFilePath;
+    _schemaFile = schemaFilePath;
     return this;
   }
 
   @Override
   public boolean execute() throws Exception {
-    File schemaFile = new File(_schemaFilePath);
+    File schemaFile = new File(_schemaFile);
 
     if (!schemaFile.exists()) {
-      throw new FileNotFoundException("file does not exist, + " + _schemaFilePath);
+      throw new FileNotFoundException("file does not exist, + " + _schemaFile);
     }
 
     Schema s = Schema.fromFile(schemaFile);

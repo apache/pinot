@@ -27,8 +27,8 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 public class AddTenantCommand extends AbstractBaseCommand implements Command {
   private static final Logger _logger = LoggerFactory.getLogger(AddTenantCommand.class);
 
-  @Option(name = "-controllerAddress", required = true, metaVar = "<http>", usage = "Http address of Controller (with port).")
-  private String _controllerAddress = null;
+  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
+  private String _controllerPort = null;
 
   @Option(name = "-name", required = true, metaVar = "<string>", usage = "Name of the tenant to be created")
   private String _name;
@@ -47,6 +47,8 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Option(name = "-help", required = false, help = true, usage = "Print this message.")
   private boolean help = false;
+
+  private String _controllerAddress = "http://localhost:" + _controllerPort;
 
   public AddTenantCommand setControllerUrl(String url) {
     _controllerAddress = url;

@@ -50,7 +50,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Option(name = "-format", required = false, metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
   private FileFormat _format = FileFormat.AVRO;
 
-  @Option(name = "-recordReaderConfigFile", required = false, metaVar = "<string>", usage = "Config file for record readers")
+  @Option(name = "-readerConfigFile", required = false, metaVar = "<string>", usage = "Config file for record readers")
   private String _recordReaderConfigFile;
 
   @Option(name = "-tableName", required = true, metaVar = "<string>", usage = "Name of the table.")

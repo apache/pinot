@@ -31,9 +31,6 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
  *
  */
 public class UploadDataCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-controllerHost", required = true, metaVar = "<string>", usage = "Hostname for controller.")
-  private String _controllerHost = null;
-
   @Option(name = "-controllerPort", required = true, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = null;
 
@@ -47,6 +44,8 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
     return _help;
   }
 
+  private String _controllerHost = "localhost";
+
   @Override
   public String getName() {
     return "UploadData";
@@ -54,8 +53,7 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("UploadDataCommand -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort +
-        " -segmentDir " + _segmentDir);
+    return ("UploadDataCommand " + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir);
   }
 
   @Override

@@ -150,7 +150,7 @@ public class ChaosMonkeyIntegrationTest {
         getResource("chaos-monkey-schema-annotations.json"));
     runAdministratorCommand(new String[]{
         "GenerateData", "-numRecords", TOTAL_RECORD_COUNT, "-numFiles", SEGMENT_COUNT, "-schemaFile", schemaFile,
-        "-schemaAnnotation", schemaAnnotationsFile, "-overwrite", "-outDir", AVRO_DIR
+        "-schemaAnnotationFile", schemaAnnotationsFile, "-overwrite", "-outDir", AVRO_DIR
     }).waitFor();
   }
 
@@ -158,7 +158,7 @@ public class ChaosMonkeyIntegrationTest {
     String createTableFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
         getResource("chaos-monkey-create-table.json"));
     runAdministratorCommand(new String[]{
-        "AddTable", "-controllerAddress", "http://localhost:39000", "-filePath", createTableFile
+        "AddTable", "-controllerPort", "39000", "-filePath", createTableFile
     }).waitFor();
   }
 
@@ -173,7 +173,7 @@ public class ChaosMonkeyIntegrationTest {
 
   private void uploadData() throws InterruptedException {
     runAdministratorCommand(new String[]{
-        "UploadData", "-controllerHost", "localhost", "-controllerPort", "39000", "-segmentDir", SEGMENT_DIR
+        "UploadData", "-controllerPort", "39000", "-segmentDir", SEGMENT_DIR
     }).waitFor();
   }
 

@@ -59,7 +59,7 @@ public class AbstractBaseCommand {
       if (f.isAnnotationPresent(Option.class)) {
         Option option = f.getAnnotation(Option.class);
 
-        System.out.println(String.format("\t%-15s %-15s: %s (required=%s)", option.name(), option.metaVar(),
+        System.out.println(String.format("\t%-25s %-30s: %s (required=%s)", option.name(), option.metaVar(),
             option.usage(), option.required()));
       }
     }

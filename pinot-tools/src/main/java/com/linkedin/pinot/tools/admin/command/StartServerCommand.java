@@ -32,8 +32,8 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
   private String _clusterName = null;
 
-  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
-  private String _zkAddress = null;
+  @Option(name="-serverPort", required=false, metaVar="<int>", usage="Port number to start the server at.")
+  private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
   @Option(name="-dataDir", required=true, metaVar="<string>", usage="Path to directory containing data.")
   private String _dataDir = null;
@@ -41,9 +41,8 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-segmentDir", required=true, metaVar="<string>", usage="Path to directory containing segments.")
   private String _segmentDir = null;
 
-  //DEFAULT_SERVER_NETTY_PORT
-  @Option(name="-port", required=false, metaVar="<int>", usage="Port number to start the server at.")
-  private int _port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
+  private String _zkAddress = null;
 
   @Option(name="-help", required=false, help=true, usage="Print this message.")
   private boolean _help = false;
@@ -63,7 +62,7 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   }
 
   public StartServerCommand setPort(int port) {
-    _port = port;
+    _serverPort = port;
     return this;
   }
 
@@ -79,8 +78,8 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("StartServerCommand -clusterName " + _clusterName + " -zkAddress " + _zkAddress +
-        " -dataDir " + _dataDir + " -segmentDir " + _segmentDir);
+    return ("StartServerCommand -clusterName " + _clusterName + " -serverPort " + _serverPort +
+        " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
   }
 
   @Override
@@ -97,9 +96,9 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   public boolean execute() throws Exception {
     final Configuration configuration = new PropertiesConfiguration();
 
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _port);
-    configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _port + "/index");
-    configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _port + "/segmentTar");
+    configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
+    configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
+    configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
 
     final HelixServerStarter pinotHelixStarter =
         new HelixServerStarter(_clusterName, _zkAddress, configuration);
