@@ -17,9 +17,9 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -70,10 +70,10 @@ public class OfflineTableDataManager implements TableDataManager {
   private int _numberOfTableQueryExecutorThreads;
   private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
 
-  private final Map<String, OfflineSegmentDataManager> _segmentsMap = new HashMap<String, OfflineSegmentDataManager>();
+  private final Map<String, OfflineSegmentDataManager> _segmentsMap = new ConcurrentHashMap<String, OfflineSegmentDataManager>();
   private final List<String> _activeSegments = new ArrayList<String>();
   private final List<String> _loadingSegments = new ArrayList<String>();
-  private Map<String, AtomicInteger> _referenceCounts = new HashMap<String, AtomicInteger>();
+  private Map<String, AtomicInteger> _referenceCounts = new ConcurrentHashMap<String, AtomicInteger>();
 
   private Counter _currentNumberOfSegments = Metrics.newCounter(OfflineTableDataManager.class,
       CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
@@ -276,11 +276,9 @@ public class OfflineTableDataManager implements TableDataManager {
   @Override
   public List<SegmentDataManager> getAllSegments() {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
-    synchronized (getGlobalLock()) {
-      for (OfflineSegmentDataManager segment : _segmentsMap.values()) {
-        incrementCount(segment.getSegmentName());
-        ret.add(segment);
-      }
+    for (OfflineSegmentDataManager segment : _segmentsMap.values()) {
+      incrementCount(segment.getSegmentName());
+      ret.add(segment);
     }
     return ret;
   }
@@ -297,12 +295,10 @@ public class OfflineTableDataManager implements TableDataManager {
   @Override
   public List<SegmentDataManager> getSegments(List<String> segmentList) {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
-    synchronized (getGlobalLock()) {
-      for (String segmentName : segmentList) {
-        if (_segmentsMap.containsKey(segmentName)) {
-          incrementCount(segmentName);
-          ret.add(_segmentsMap.get(segmentName));
-        }
+    for (String segmentName : segmentList) {
+      if (_segmentsMap.containsKey(segmentName)) {
+        incrementCount(segmentName);
+        ret.add(_segmentsMap.get(segmentName));
       }
     }
     return ret;
@@ -311,9 +307,7 @@ public class OfflineTableDataManager implements TableDataManager {
   @Override
   public OfflineSegmentDataManager getSegment(String segmentName) {
     if (_segmentsMap.containsKey(segmentName)) {
-      synchronized (getGlobalLock()) {
-        incrementCount(segmentName);
-      }
+      incrementCount(segmentName);
       return _segmentsMap.get(segmentName);
     } else {
       return null;
@@ -322,10 +316,8 @@ public class OfflineTableDataManager implements TableDataManager {
 
   @Override
   public void returnSegmentReaders(List<String> segmentList) {
-    synchronized (getGlobalLock()) {
-      for (String segmentId : segmentList) {
-        decrementCount(segmentId);
-      }
+    for (String segmentId : segmentList) {
+      decrementCount(segmentId);
     }
   }
 
