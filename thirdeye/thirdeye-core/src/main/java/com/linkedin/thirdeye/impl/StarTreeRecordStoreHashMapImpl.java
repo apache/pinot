@@ -7,6 +7,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
   private final StarTreeConfig config;
@@ -14,6 +16,7 @@ public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
   private final AtomicLong minTime;
   private final AtomicLong maxTime;
   private final MetricSchema metricSchema;
+  private final ReadWriteLock lock;
 
   public StarTreeRecordStoreHashMapImpl(StarTreeConfig config) {
     this.config = config;
@@ -21,30 +24,46 @@ public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
     this.minTime = new AtomicLong(-1);
     this.maxTime = new AtomicLong(-1);
     this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
+    this.lock = new ReentrantReadWriteLock(true);
   }
 
   @Override
   public void update(StarTreeRecord record) {
-    MetricTimeSeries existing = store.putIfAbsent(record.getDimensionKey(), record.getMetricTimeSeries());
-    if (existing != null) {
-      existing.aggregate(record.getMetricTimeSeries());
+    lock.writeLock().lock();
+    try {
+      MetricTimeSeries existing = store.putIfAbsent(record.getDimensionKey(), record.getMetricTimeSeries());
+      if (existing != null) {
+        existing.aggregate(record.getMetricTimeSeries());
+      }
+      setMinTime(Collections.min(record.getMetricTimeSeries().getTimeWindowSet()));
+      setMaxTime(Collections.max(record.getMetricTimeSeries().getTimeWindowSet()));
+    } finally {
+      lock.writeLock().unlock();
     }
-    setMinTime(Collections.min(record.getMetricTimeSeries().getTimeWindowSet()));
-    setMaxTime(Collections.max(record.getMetricTimeSeries().getTimeWindowSet()));
   }
 
   @Override
   public Iterator<StarTreeRecord> iterator() {
-    List<StarTreeRecord> records = new ArrayList<>(store.size());
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : store.entrySet()) {
-      records.add(new StarTreeRecordImpl(config, entry.getKey(), entry.getValue()));
+    lock.readLock().lock();
+    try {
+      List<StarTreeRecord> records = new ArrayList<>(store.size());
+      for (Map.Entry<DimensionKey, MetricTimeSeries> entry : store.entrySet()) {
+        records.add(new StarTreeRecordImpl(config, entry.getKey(), entry.getValue()));
+      }
+      return records.iterator();
+    } finally {
+      lock.readLock().unlock();
     }
-    return records.iterator();
   }
 
   @Override
   public void clear() {
-    store.clear();
+    lock.writeLock().lock();
+    try {
+      store.clear();
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override
@@ -59,12 +78,22 @@ public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
 
   @Override
   public int getRecordCount() {
-    return store.size();
+    lock.readLock().lock();
+    try {
+      return store.size();
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
   public int getRecordCountEstimate() {
-    return store.size();
+    lock.readLock().lock();
+    try {
+      return store.size();
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
@@ -79,41 +108,51 @@ public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
 
   @Override
   public String getMaxCardinalityDimension(Collection<String> blacklist) {
-    String maxName = null;
-    int max = 0;
+    lock.readLock().lock();
+    try {
+      String maxName = null;
+      int max = 0;
 
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      Set<String> values = getDimensionValues(dimensionSpec.getName());
-      if (values.size() >= max) {
-        max = values.size();
-        maxName = dimensionSpec.getName();
+      for (DimensionSpec dimensionSpec : config.getDimensions()) {
+        Set<String> values = getDimensionValues(dimensionSpec.getName());
+        if (values.size() >= max) {
+          max = values.size();
+          maxName = dimensionSpec.getName();
+        }
       }
-    }
 
-    return maxName;
+      return maxName;
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
   public Set<String> getDimensionValues(String dimensionName) {
-    int dimensionIndex = -1;
-    for (int i = 0; i < config.getDimensions().size(); i++) {
-      if (config.getDimensions().get(i).getName().equals(dimensionName)) {
-        dimensionIndex = i;
-        break;
+    lock.readLock().lock();
+    try {
+      int dimensionIndex = -1;
+      for (int i = 0; i < config.getDimensions().size(); i++) {
+        if (config.getDimensions().get(i).getName().equals(dimensionName)) {
+          dimensionIndex = i;
+          break;
+        }
       }
+
+      if (dimensionIndex == -1) {
+        throw new IllegalArgumentException("No such dimension " + dimensionName);
+      }
+
+      Set<String> values = new HashSet<>();
+
+      for (DimensionKey key : store.keySet()) {
+        values.add(key.getDimensionValues()[dimensionIndex]);
+      }
+
+      return values;
+    } finally {
+      lock.readLock().unlock();
     }
-
-    if (dimensionIndex == -1) {
-      throw new IllegalArgumentException("No such dimension " + dimensionName);
-    }
-
-    Set<String> values = new HashSet<>();
-
-    for (DimensionKey key : store.keySet()) {
-      values.add(key.getDimensionValues()[dimensionIndex]);
-    }
-
-    return values;
   }
 
   @Override
@@ -138,54 +177,64 @@ public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
 
   @Override
   public MetricTimeSeries getTimeSeries(StarTreeQuery query) {
-    MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+    lock.readLock().lock();
+    try {
+      MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : store.entrySet()) {
-      boolean matches = true;
+      for (Map.Entry<DimensionKey, MetricTimeSeries> entry : store.entrySet()) {
+        boolean matches = true;
 
-      for (int i = 0; i < config.getDimensions().size(); i++) {
-        String queryValue = query.getDimensionKey().getDimensionValues()[i];
-        String recordValue = entry.getKey().getDimensionValues()[i];
-        if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue)) {
-          matches = false;
-          break;
+        for (int i = 0; i < config.getDimensions().size(); i++) {
+          String queryValue = query.getDimensionKey().getDimensionValues()[i];
+          String recordValue = entry.getKey().getDimensionValues()[i];
+          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue)) {
+            matches = false;
+            break;
+          }
+        }
+
+        if (matches) {
+          timeSeries.aggregate(entry.getValue(), query.getTimeRange());
         }
       }
 
-      if (matches) {
-        timeSeries.aggregate(entry.getValue());
-      }
+      return timeSeries;
+    } finally {
+      lock.readLock().unlock();
     }
-
-    return timeSeries;
   }
 
   @Override
   public Map<String, Map<String, Integer>> getForwardIndex() {
-    Map<String, Map<String, Integer>> forwardIndex = new HashMap<>();
+    lock.readLock().lock();
+    try {
+      Map<String, Map<String, Integer>> forwardIndex = new HashMap<>();
 
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      Map<String, Integer> dimensionIndex = new HashMap<>();
-      dimensionIndex.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
-      dimensionIndex.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
-      forwardIndex.put(dimensionSpec.getName(), dimensionIndex);
-    }
+      for (DimensionSpec dimensionSpec : config.getDimensions()) {
+        Map<String, Integer> dimensionIndex = new HashMap<>();
+        dimensionIndex.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+        dimensionIndex.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+        forwardIndex.put(dimensionSpec.getName(), dimensionIndex);
+      }
 
-    int currentId = StarTreeConstants.FIRST_VALUE;
+      int currentId = StarTreeConstants.FIRST_VALUE;
 
-    for (DimensionKey key : store.keySet()) {
-      for (int i = 0; i < config.getDimensions().size(); i++) {
-        String name = config.getDimensions().get(i).getName();
-        String value = key.getDimensionValues()[i];
-        Integer id = forwardIndex.get(name).get(value);
-        if (id == null) {
-          forwardIndex.get(name).put(value, currentId);
-          currentId++;
+      for (DimensionKey key : store.keySet()) {
+        for (int i = 0; i < config.getDimensions().size(); i++) {
+          String name = config.getDimensions().get(i).getName();
+          String value = key.getDimensionValues()[i];
+          Integer id = forwardIndex.get(name).get(value);
+          if (id == null) {
+            forwardIndex.get(name).put(value, currentId);
+            currentId++;
+          }
         }
       }
-    }
 
-    return forwardIndex;
+      return forwardIndex;
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   private void setMinTime(long localMinTime) {

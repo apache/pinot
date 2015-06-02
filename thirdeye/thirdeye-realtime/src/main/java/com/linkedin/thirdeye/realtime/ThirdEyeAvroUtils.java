@@ -17,7 +17,7 @@ import java.util.Properties;
 public class ThirdEyeAvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeAvroUtils.class);
   private static final String NAME_SEPARATOR = "\\.";
-  private static final String NULL_DIMENSION_VALUE = "";
+  private static final String NULL_VALUE = "";
   private static final String INVALID_DIMENSION_VALUE = "INVALID";
   private static final String AUTO_METRIC_COUNT = "__COUNT";
 
@@ -43,7 +43,7 @@ public class ThirdEyeAvroUtils {
     String terminalField = fieldNames[fieldNames.length - 1];
     Object dimensionObj = current.get(terminalField);
     if (dimensionObj == null) {
-      return NULL_DIMENSION_VALUE;
+      return NULL_VALUE;
     }
     return dimensionObj.toString();
   }
@@ -56,6 +56,9 @@ public class ThirdEyeAvroUtils {
 
     // Extract from record
     String metricStr = getRecordValue(metricSpec.getName(), record);
+    if (NULL_VALUE.equals(metricStr)) {
+      return 0;
+    }
     return NumberUtils.valueOf(metricStr, metricSpec.getType());
   }
 
@@ -122,7 +125,7 @@ public class ThirdEyeAvroUtils {
     for (int i = 0; i < config.getDimensions().size(); i++) {
       DimensionSpec dimensionSpec = config.getDimensions().get(i);
       String dimensionValue = getRecordValue(dimensionSpec.getName(), record);
-      if (!NULL_DIMENSION_VALUE.equals(dimensionValue) && dimensionSpec.getType() != null) {
+      if (!NULL_VALUE.equals(dimensionValue) && dimensionSpec.getType() != null) {
         switch (dimensionSpec.getType()) {
           case EMAIL_DOMAIN:
             dimensionValue = parseEmailDomain(dimensionValue, dimensionSpec.getConfig());

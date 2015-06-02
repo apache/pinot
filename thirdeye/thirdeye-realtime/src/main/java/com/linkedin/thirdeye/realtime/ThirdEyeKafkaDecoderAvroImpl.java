@@ -8,6 +8,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +18,8 @@ import java.util.Arrays;
 
 public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
 {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaDecoderAvroImpl.class);
+
   public static final String PROP_RECORD_OFFSET = "record.offset";
   public static final String PROP_SCHEMA_URI = "schema.uri";
 
@@ -41,6 +45,8 @@ public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
     InputStream schemaInputStream = URI.create(schemaUri).toURL().openStream();
     Schema schema = Schema.parse(schemaInputStream);
     schemaInputStream.close();
+
+    LOG.info("Init decoder for {} with schema {}", starTreeConfig.getCollection(), schema);
 
     // Set decoder
     this.datumReader = new GenericDatumReader<GenericRecord>(schema);

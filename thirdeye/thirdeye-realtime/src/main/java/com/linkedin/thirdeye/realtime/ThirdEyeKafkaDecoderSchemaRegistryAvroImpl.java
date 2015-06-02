@@ -63,6 +63,7 @@ public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafka
       inputStream.close();
       reader = new GenericDatumReader<GenericRecord>(schema);
       readers.put(md5, reader);
+      LOGGER.info("Cached schema for {} (md5={}): {}", starTreeConfig.getCollection(), md5, schema);
     }
 
     // Decode record
