@@ -72,10 +72,6 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
     <dependency>

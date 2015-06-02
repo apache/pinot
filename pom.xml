@@ -281,23 +281,8 @@
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
-        <artifactId>netty-common</artifactId>
-        <version>4.0.19.Final</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-buffer</artifactId>
-        <version>4.0.19.Final</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-handler</artifactId>
-        <version>4.0.19.Final</version>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport</artifactId>
-        <version>4.0.19.Final</version>
+        <artifactId>netty-all</artifactId>
+        <version>4.0.27.Final</version>
       </dependency>
       <dependency>
         <groupId>it.unimi.dsi</groupId>
@@ -384,6 +369,11 @@
         <groupId>log4j</groupId>
         <artifactId>log4j</artifactId>
         <version>1.2.17</version>
+      </dependency>
+      <dependency>
+        <groupId>com.ning</groupId>
+        <artifactId>async-http-client</artifactId>
+        <version>1.9.22</version>
       </dependency>
 
       <!-- Transitive dependencies with inconsistent version numbers -->
