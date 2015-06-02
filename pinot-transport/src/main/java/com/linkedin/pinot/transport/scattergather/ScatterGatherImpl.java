@@ -390,6 +390,11 @@ public class ScatterGatherImpl implements ScatterGather {
         byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
         LOGGER.info("Timeout is :" + _timeoutMS);
         conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
+        while (!conn.validate()) {
+          _connPool.destroyObject(_server, conn);
+          c = _connPool.checkoutObject(_server);
+          conn = _connPool.checkoutObject(_server).getOne(_timeoutMS, TimeUnit.MILLISECONDS);
+        }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
         _responseFuture = conn.sendRequest(req, _request.getRequestId(), _timeoutMS);
         _isSent.set(true);

@@ -19,7 +19,6 @@ import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
@@ -77,12 +76,11 @@ public class SimpleRequestHandler implements RequestHandler {
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, deserRequestTime - queryStartTime);
       LOGGER.info("instance request : {}", queryRequest);
       brokerRequest = queryRequest.getQuery();
-      instanceResponse = _serverMetrics.timePhase(queryRequest.getQuery(), ServerQueryPhase.QUERY_PROCESSING, new Callable<DataTable>() {
-        @Override
-        public DataTable call() throws Exception {
-          return _queryExecutor.processQuery(queryRequest);
-        }
-      });
+
+      long startTime = System.nanoTime();
+      instanceResponse = _queryExecutor.processQuery(queryRequest);
+      long totalNanos = System.nanoTime() - startTime;
+      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.QUERY_PROCESSING, totalNanos);
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);
       _serverMetrics.addMeteredValue(null, ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
