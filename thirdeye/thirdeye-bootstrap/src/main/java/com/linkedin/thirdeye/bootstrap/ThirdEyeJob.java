@@ -126,8 +126,8 @@ import com.linkedin.thirdeye.impl.storage.IndexMetadata;
  * <td>Filter all input paths in input.paths which do not exist if set to true</td>
  * </tr>
  * * <tr>
- * <td>thirdeye.change.permission</td>
- * <td>Change permissions of thirdeye output folders to world readable</td>
+ * <td>thirdeye.folder.permission</td>
+ * <td>The permissions to be set on thirdeye output folders</td>
  * </tr>
  * </table>
  */
