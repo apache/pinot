@@ -54,7 +54,7 @@ public class CSVRecordReader implements RecordReader {
     _schema = schema;
 
     _config = config;
-    _delimiterString = _config.getCsvDelimiter();
+    _delimiterString = (_config != null) ? _config.getCsvDelimiter() : ",";
   }
 
   @Override
@@ -112,7 +112,7 @@ public class CSVRecordReader implements RecordReader {
   }
 
   private String getValueForColumn(CSVRecord record, String column) {
-    if (_config.columnIsDate(column)) {
+    if ((_config != null) && (_config.columnIsDate(column))) {
       return dateToDaysSinceEpochMilli(record.get(column)).toString();
     } else {
       return record.get(column);
@@ -120,7 +120,7 @@ public class CSVRecordReader implements RecordReader {
   }
 
   private Long dateToDaysSinceEpochMilli(String token) {
-    if (token == null) {
+    if ((token == null) || (_config == null)) {
       return 0L;
     }
 
