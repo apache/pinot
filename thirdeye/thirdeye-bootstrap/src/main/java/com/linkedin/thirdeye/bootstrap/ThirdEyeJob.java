@@ -675,12 +675,27 @@ public class ThirdEyeJob {
     return Joiner.on(INPUT_PATHS_JOINER).join(filteredInputs);
   }
 
-  private void purgeLowerGranularity(DateTime minTime, DateTime maxTime, String schedule, Path dimensionIndexdir, Path metricIndexDir) throws IOException {
+  private void purgeLowerGranularity(DateTime minTime, DateTime maxTime, String schedule, Path dimensionIndexDir, Path metricIndexDir) throws IOException {
+
+    LOGGER.info("Created folder with higher granularity {} ", new Path(dimensionIndexDir,
+        Joiner.on(DATA_FOLDER_JOINER).join(
+          StarTreeConstants.DATA_DIR_PREFIX,
+          StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
+          StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime))
+          ));
+
+    LOGGER.info("Created folder with higher granularity {} ", new Path(metricIndexDir,
+        Joiner.on(DATA_FOLDER_JOINER).join(
+          StarTreeConstants.DATA_DIR_PREFIX,
+          StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
+          StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime))
+          ));
+
     DateTime start = minTime;
     DateTime end ;
     FileSystem fileSystem = FileSystem.get(new Configuration());
 
-    while (!start.isEqual(maxTime.getMillis()))
+    while (start.compareTo(maxTime) < 0)
     {
       if (schedule.equals(FlowSchedule.DAILY.name())) {
         end = start.plusHours(1);
@@ -697,15 +712,15 @@ public class ThirdEyeJob {
           StarTreeConstants.DATE_TIME_FORMATTER.print(start),
           StarTreeConstants.DATE_TIME_FORMATTER.print(end)));
 
-      Path dimensionFolder = new Path(dimensionIndexdir, folder);
+      Path dimensionFolder = new Path(dimensionIndexDir, folder);
       Path metricFolder = new Path(metricIndexDir, folder);
 
       if (fileSystem.exists(dimensionFolder)) {
-        LOGGER.info("Deleting folder {} with overlapping data and lower granularity than {}", dimensionFolder, schedule);
+        LOGGER.info("Deleting folder {} with overlapping data and lower granularity", dimensionFolder);
         fileSystem.delete(dimensionFolder, true);
       }
       if (fileSystem.exists(metricFolder)) {
-        LOGGER.info("Deleting folder {} with overlapping data and lower granularity than {}", metricFolder, schedule);
+        LOGGER.info("Deleting folder {} with overlapping data and lower granularity", metricFolder);
         fileSystem.delete(metricFolder, true);
       }
       start = end;
@@ -906,15 +921,15 @@ public class ThirdEyeJob {
         int cleanupDaysAgo = Integer.valueOf(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(), DEFAULT_CLEANUP_DAYS_AGO));
         DateTime cleanupDaysAgoDate = (new DateTime()).minusDays(cleanupDaysAgo);
 
-        Path dimensionIndexdir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.DIMENSION_INDEX);
+        Path dimensionIndexDir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.DIMENSION_INDEX);
         Path metricIndexDir = new Path(getCollectionDir(root, collection) + File.separator + FlowSpec.METRIC_INDEX);
 
-        LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoDate.getMillis(), dimensionIndexdir, metricIndexDir);
+        LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoDate.getMillis(), dimensionIndexDir, metricIndexDir);
 
         FileSystem fileSystem = FileSystem.get(new Configuration());
 
         // list folders in dimensionDir starting with data_
-        FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexdir, new PathFilter() {
+        FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexDir, new PathFilter() {
 
           @Override
           public boolean accept(Path path) {
@@ -971,7 +986,7 @@ public class ThirdEyeJob {
         String schedule = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
         LOGGER.info("schedule : {} ",schedule);
 
-        purgeLowerGranularity(minTime, maxTime, schedule, dimensionIndexdir, metricIndexDir);
+        purgeLowerGranularity(minTime, maxTime, schedule, dimensionIndexDir, metricIndexDir);
 
       }
     }
