@@ -79,7 +79,7 @@ public class CrcUtilsTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
-            "daysSinceEpoch", TimeUnit.DAYS, "mirror");
+            "daysSinceEpoch", TimeUnit.DAYS, "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

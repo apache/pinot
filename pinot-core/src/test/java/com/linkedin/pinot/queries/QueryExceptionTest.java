@@ -69,9 +69,9 @@ public class QueryExceptionTest {
 
   @BeforeClass
   public void setup() throws Exception {
-    CONFIG_BUILDER = new TestingServerPropertiesBuilder("mirror");
+    CONFIG_BUILDER = new TestingServerPropertiesBuilder("testTable");
 
-    setupSegmentFor("mirror");
+    setupSegmentFor("testTable");
 
     final PropertiesConfiguration serverConf = CONFIG_BUILDER.build();
     serverConf.setDelimiterParsingDisabled(false);
@@ -84,8 +84,8 @@ public class QueryExceptionTest {
     File segmentFile = new File(INDEX_DIR, "segment").listFiles()[0];
     segmentName = segmentFile.getName();
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
-    instanceDataManager.getTableDataManager("mirror");
-    instanceDataManager.getTableDataManager("mirror").addSegment(indexSegment);
+    instanceDataManager.getTableDataManager("testTable");
+    instanceDataManager.getTableDataManager("testTable").addSegment(indexSegment);
 
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
     QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
@@ -119,7 +119,7 @@ public class QueryExceptionTest {
 
   @Test
   public void testSingleQuery() throws RecognitionException, Exception {
-    String query = "select count(*) from mirror where viewerId='24516187'";
+    String query = "select count(*) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
@@ -135,7 +135,7 @@ public class QueryExceptionTest {
 
   @Test
   public void testQueryParsingFailedQuery() throws RecognitionException, Exception {
-    String query = "select sudm(blablaa) from mirror where viewerId='24516187'";
+    String query = "select sudm(blablaa) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
@@ -152,7 +152,7 @@ public class QueryExceptionTest {
 
   @Test
   public void testQueryPlanFailedQuery() throws RecognitionException, Exception {
-    String query = "select sum(blablaa) from mirror where viewerId='24516187'";
+    String query = "select sum(blablaa) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
@@ -169,7 +169,7 @@ public class QueryExceptionTest {
 
   @Test
   public void testQueryExecuteFailedQuery() throws RecognitionException, Exception {
-    String query = "select count(*) from mirror where viewerId='24516187' group by bla";
+    String query = "select count(*) from testTable where column1='24516187' group by bla";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));

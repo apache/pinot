@@ -144,14 +144,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void runNoH2ComparisonQuery(String pqlQuery) throws Exception {
     JSONObject ret = postQuery(pqlQuery);
     ret.put("pql", pqlQuery);
-    System.out.println(ret.toString(1));
     try {
       Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
       Assert.assertEquals(ret.getLong("totalDocs"), TOTAL_DOCS);
     } catch (AssertionError e) {
-      System.out.println("**********************************");
-      System.out.println(ret.toString(1));
-      System.out.println("**********************************");
+      LOGGER.error("********** pql: {}, result: {}", ret.toString(1), e);
       throw e;
     }
   }
@@ -206,10 +203,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
         JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
         if (firstAggregationResult.has("value")) {
-          LOGGER.info("Trying to execute sql query: " + sqlQueries.get(0));
+          LOGGER.debug("Trying to execute sql query: " + sqlQueries.get(0));
           statement.execute(sqlQueries.get(0));
           ResultSet rs = statement.getResultSet();
-          LOGGER.info("Trying to get result from sql: " + rs);
+          LOGGER.debug("Trying to get result from sql: " + rs);
           // Single value result for the aggregation, compare with the actual value
           String bqlValue = firstAggregationResult.getString("value");
 
@@ -222,8 +219,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             sqlValue = sqlValue.replaceAll("\\..*", "");
           }
 
-          LOGGER.info("bql value: " + bqlValue);
-          LOGGER.info("sql value: " + sqlValue);
+          LOGGER.debug("bql value: " + bqlValue);
+          LOGGER.debug("sql value: " + sqlValue);
           if (GATHER_FAILED_QUERIES) {
             if (!EqualityUtils.isEqual(bqlValue, sqlValue)) {
               saveFailedQuery(pqlQuery, sqlQueries,
@@ -256,7 +253,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               LOGGER.info("Trying to execute sql query: " + sqlQueries.get(aggregationGroupIndex));
               statement.execute(sqlQueries.get(aggregationGroupIndex));
               ResultSet rs = statement.getResultSet();
-              LOGGER.info("Trying to get result from sql: " + rs);
+              LOGGER.debug("Trying to get result from sql: " + rs);
               rs.beforeFirst();
               try {
                 while (rs.next()) {
@@ -269,9 +266,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               } catch (Exception e) {
                 LOGGER.error("Catch exception when constructing H2 results for group by query", e);
               }
-              LOGGER.info("Trying to get result from sql: " + correctValues.toString());
-              LOGGER.info("Trying to compare result from bql: " + actualValues);
-              LOGGER.info("Trying to compare result from sql: " + correctValues);
+              LOGGER.debug("Trying to get result from sql: " + correctValues.toString());
+              LOGGER.debug("Trying to compare result from bql: " + actualValues);
+              LOGGER.debug("Trying to compare result from sql: " + correctValues);
 
               if (correctValues.size() < 10000) {
                 // Check that Pinot results are contained in the SQL results
@@ -344,7 +341,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         Assert.fail("Query did not return valid JSON while running query " + pqlQuery, exception);
       }
     }
-    System.out.println();
   }
 
   public static void createH2SchemaAndInsertAvroFiles(List<File> avroFiles, Connection connection) {
@@ -448,7 +444,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         }
         dataFileReader.close();
       }
-      System.out.println("Insertion took " + (System.currentTimeMillis() - start));
+      LOGGER.info("Insertion took " + (System.currentTimeMillis() - start));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -506,7 +502,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
       final File baseDirectory, final File segmentTarDir, final String tableName) {
     int segmentCount = avroFiles.size();
-    System.out.println("Building " + segmentCount + " segments in parallel");
+    LOGGER.info("Building " + segmentCount + " segments in parallel");
     for (int i = 1; i <= segmentCount; ++i) {
       final int segmentIndex = i - 1;
       final int segmentNumber = i + baseSegmentIndex;
@@ -516,7 +512,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         public void run() {
           try {
             // Build segment
-            System.out.println("Starting to build segment " + segmentNumber);
+            LOGGER.info("Starting to build segment " + segmentNumber);
             File outputDir = new File(baseDirectory, "segment-" + segmentNumber);
             final SegmentGeneratorConfig genConfig =
                 SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
@@ -532,7 +528,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             String segmentName = outputDir.list()[0];
             TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName,
                 new File(segmentTarDir, segmentName).getAbsolutePath());
-            System.out.println("Completed segment " + segmentNumber + " : " + segmentName);
+            LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -559,7 +555,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       try {
         runNoH2ComparisonQuery(query);
       } catch (Exception e) {
-        System.out.println("pql is : " + query);
+        LOGGER.error("Getting error query: {}" + query);
         throw new RuntimeException(e.getMessage());
       }
     }
@@ -569,10 +565,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   public void testHardcodedQuerySet() throws Exception {
     for (String query : getHardCodedQuerySet()) {
       try {
-        System.out.println(query);
+        LOGGER.info("Trying to send query : {}", query);
         runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
       } catch (Exception e) {
-        // TODO: handle exception
+        LOGGER.error("Getting erro for query : {}", query);
       }
 
     }
@@ -587,7 +583,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
 
     for (QueryGenerator.Query query : queries) {
-      System.out.println(query.generatePql());
+      LOGGER.info("Trying to send query : {}", query.generatePql());
       runQuery(query.generatePql(), query.generateH2Sql());
     }
   }
@@ -601,7 +597,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
 
     for (QueryGenerator.Query query : queries) {
-      System.out.println(query.generatePql());
+      LOGGER.info("Trying to send query : {}", query.generatePql());
       runQuery(query.generatePql(), query.generateH2Sql());
     }
   }

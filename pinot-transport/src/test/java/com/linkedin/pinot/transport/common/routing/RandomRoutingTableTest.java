@@ -42,7 +42,7 @@ public class RandomRoutingTableTest {
 
   @Test
   public void testHelixExternalViewBasedRoutingTable() throws Exception {
-    String tableName = "mirrorActivity_OFFLINE";
+    String tableName = "testTable_OFFLINE";
     String fileName = RandomRoutingTableTest.class.getClassLoader().getResource("SampleExternalView.json").getFile();
     System.out.println(fileName);
     InputStream evInputStream = new FileInputStream(fileName);
@@ -69,13 +69,13 @@ public class RandomRoutingTableTest {
         arrays[i++] = serversMap.get(serverInstance).getSegments().size();
       }
       for (int j = 0; i < arrays.length; ++j) {
-        Assert.assertTrue(arrays[j] / totalRuns <= 30);
+        Assert.assertTrue(arrays[j] / totalRuns <= 31);
         Assert.assertTrue(arrays[j] / totalRuns >= 28);
       }
       //System.out.println(Arrays.toString(arrays) + " : " + new StandardDeviation().evaluate(arrays) + " : " + new Mean().evaluate(arrays));
     }
     for (int i = 0; i < globalArrays.length; ++i) {
-      Assert.assertTrue(globalArrays[i] / totalRuns <= 30);
+      Assert.assertTrue(globalArrays[i] / totalRuns <= 31);
       Assert.assertTrue(globalArrays[i] / totalRuns >= 28);
     }
     System.out.println(Arrays.toString(globalArrays) + " : " + new StandardDeviation().evaluate(globalArrays) + " : " + new Mean().evaluate(globalArrays));

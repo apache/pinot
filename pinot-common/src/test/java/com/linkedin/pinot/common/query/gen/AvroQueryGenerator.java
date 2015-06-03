@@ -417,47 +417,4 @@ public class AvroQueryGenerator {
     return ret;
   }
 
-  public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException {
-    AvroQueryGenerator gen = setUpTestQueries("mirror", args[0]);
-
-    final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(100);
-    final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(100);
-
-    for (final TestSimpleAggreationQuery q : simpleAggFuncsQ) {
-      System.out.println(q);
-    }
-
-    for (final TestGroupByAggreationQuery q : groupByAggQ) {
-      System.out.println(q);
-    }
-  }
-
-  private static AvroQueryGenerator setUpTestQueries(String resource, String filePath) throws FileNotFoundException, IOException {
-    final List<String> dims = new ArrayList<String>();
-    dims.add("viewerId");
-    dims.add("viewerType");
-    dims.add("vieweeId");
-    dims.add("viewerCompany");
-    dims.add("viewerCountry");
-    dims.add("viewerRegionCode");
-    dims.add("viewerIndustry");
-    dims.add("viewerOccupation");
-    dims.add("viewerSchool");
-    dims.add("viewerSeniority");
-    dims.add("viewerPrivacySetting");
-    dims.add("viewerObfuscationType");
-    dims.add("vieweePrivacySetting");
-    dims.add("weeksSinceEpochSunday");
-    dims.add("daysSinceEpoch");
-    dims.add("hoursSinceEpoch");
-
-    final List<String> mets = new ArrayList<String>();
-    mets.add("count");
-
-    final String time = "minutesSinceEpoch";
-    AvroQueryGenerator avroQueryGen = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource);
-    avroQueryGen.init();
-    avroQueryGen.generateSimpleAggregationOnSingleColumnFilters();
-    return avroQueryGen;
-  }
 }

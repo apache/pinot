@@ -70,12 +70,16 @@ public class ChunkIndexCreationDriverImplTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.DAYS, "mirror");
+            TimeUnit.DAYS, "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
+  }
+
+  public void tearDown() {
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   @Test

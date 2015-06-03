@@ -91,7 +91,7 @@ public class TestingServerPropertiesBuilder {
   }
 
   public static void main(String[] args) throws IOException {
-    final TestingServerPropertiesBuilder bld = new TestingServerPropertiesBuilder("mirror", "midas");
+    final TestingServerPropertiesBuilder bld = new TestingServerPropertiesBuilder("testTable");
     bld.build();
   }
 }
