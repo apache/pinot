@@ -14,7 +14,8 @@ public enum ThirdEyeJobConstants {
   INPUT_PATHS("input.paths"),
   THIRDEYE_CLEANUP_DAYSAGO("thirdeye.cleanup.daysago"),
   THIRDEYE_CLEANUP_SKIP("thirdeye.cleanup.skip"),
-  THIRDEYE_SKIP_MISSING("thirdeye.skip.missing");
+  THIRDEYE_SKIP_MISSING("thirdeye.skip.missing"),
+  THIRDEYE_CHANGE_PERMISSION("thirdeye.change.permission");
 
   private final String propertyName;
 
