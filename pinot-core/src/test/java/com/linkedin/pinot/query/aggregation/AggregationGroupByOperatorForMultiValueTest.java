@@ -25,12 +25,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.Assert;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -75,6 +76,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 public class AggregationGroupByOperatorForMultiValueTest {
 
+  protected static Logger LOGGER = LoggerFactory.getLogger(AggregationGroupByOperatorForMultiValueTest.class);
   private final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
       + "TestAggregationGroupByOperatorForMultiValue");
@@ -127,7 +129,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
       driver.init(config);
       driver.build();
 
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+      LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
     }
   }
@@ -147,7 +149,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     driver.init(config);
     driver.build();
 
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+    LOGGER.info("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
@@ -156,7 +158,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
   private void setupQuery() {
     _aggregationInfos = getAggregationsInfo();
     final List<String> groupbyColumns = new ArrayList<String>();
-    groupbyColumns.add("viewerCompanies");
+    groupbyColumns.add("column6");
     _groupBy = new GroupBy();
     _groupBy.setColumns(groupbyColumns);
     _groupBy.setTopN(10);
@@ -185,7 +187,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("AggregationResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
   }
 
@@ -212,9 +214,8 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
-    System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
@@ -237,15 +238,13 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
-    System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
-    System.out.println("Combined Result : ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
   }
 
@@ -270,9 +269,8 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
-    System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
@@ -294,26 +292,22 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
-    System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
-    System.out.println("Combined Result : ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
     final DataTable dataTable = block.getAggregationGroupByResultDataTable();
 
-    System.out.println("Decode AggregationResult from DataTable: ");
-
     final List<Map<String, Serializable>> results =
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(dataTable);
-    System.out.println("Decode AggregationResult from DataTable: ");
+
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(results.get(i));
+      LOGGER.info("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
     }
   }
 
@@ -326,9 +320,9 @@ public class AggregationGroupByOperatorForMultiValueTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
@@ -347,7 +341,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    System.out.println(jsonResult);
+    LOGGER.info("Result: {}", jsonResult);
   }
 
   @Test
@@ -359,10 +353,10 @@ public class AggregationGroupByOperatorForMultiValueTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
+    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    Assert.assertEquals(resultBlock.getNumDocsScanned(), 5721);
     Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
@@ -382,7 +376,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    System.out.println(jsonResult);
+    LOGGER.info("Result: {}", jsonResult);
   }
 
   @Test
@@ -397,14 +391,14 @@ public class AggregationGroupByOperatorForMultiValueTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    System.out.println(instanceResponse);
+    LOGGER.info("instanceResponse: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -420,14 +414,14 @@ public class AggregationGroupByOperatorForMultiValueTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    System.out.println(instanceResponse);
+    LOGGER.info("instanceResponse: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     assertEmptyBrokerResponse(brokerResponse);
   }
 
@@ -435,7 +429,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     Assert.assertEquals(100000 * numSegments, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
-      Assert.assertEquals("[\"viewerOccupations\",\"viewerCompanies\"]", brokerResponse.getAggregationResults().get(i)
+      Assert.assertEquals("[\"column7\",\"column6\"]", brokerResponse.getAggregationResults().get(i)
           .getJSONArray("groupByColumns").toString());
       Assert.assertEquals(15, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
     }
@@ -446,16 +440,18 @@ public class AggregationGroupByOperatorForMultiValueTest {
     Assert.assertEquals("max_count", brokerResponse.getAggregationResults().get(2).getString("function").toString());
     Assert.assertEquals("min_count", brokerResponse.getAggregationResults().get(3).getString("function").toString());
     Assert.assertEquals("avg_count", brokerResponse.getAggregationResults().get(4).getString("function").toString());
-    Assert.assertEquals("distinctCount_vieweeId", brokerResponse.getAggregationResults().get(5).getString("function")
+    Assert.assertEquals("distinctCount_column2", brokerResponse.getAggregationResults().get(5).getString("function")
         .toString());
 
     // Assertion on Aggregation Results
     final List<double[]> aggregationResult = getAggregationResult(numSegments);
     final List<String[]> groupByResult = getGroupResult();
     for (int j = 0; j < _numAggregations; ++j) {
+      LOGGER.info("For aggregation function: {}", _aggregationInfos.get(j));
       final double[] aggResult = aggregationResult.get(j);
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
+        LOGGER.info("Comparing group: {}", i);
         Assert.assertEquals(aggResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
             .getJSONObject(i).getDouble("value"));
         if (groupResult.length < 2) {
@@ -478,7 +474,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
-      Assert.assertEquals("[\"viewerOccupations\",\"viewerCompanies\"]", brokerResponse.getAggregationResults().get(i)
+      Assert.assertEquals("[\"column7\",\"column6\"]", brokerResponse.getAggregationResults().get(i)
           .getJSONArray("groupByColumns").toString());
       Assert.assertEquals(0, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
     }
@@ -489,7 +485,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     Assert.assertEquals("max_count", brokerResponse.getAggregationResults().get(2).getString("function").toString());
     Assert.assertEquals("min_count", brokerResponse.getAggregationResults().get(3).getString("function").toString());
     Assert.assertEquals("avg_count", brokerResponse.getAggregationResults().get(4).getString("function").toString());
-    Assert.assertEquals("distinctCount_vieweeId", brokerResponse.getAggregationResults().get(5).getString("function")
+    Assert.assertEquals("distinctCount_column2", brokerResponse.getAggregationResults().get(5).getString("function")
         .toString());
   }
 
@@ -520,19 +516,19 @@ public class AggregationGroupByOperatorForMultiValueTest {
   }
 
   private static String[] getCountGroupResult() {
-    return new String[] { "[\"2147483647\",\"2147483647\"]", "[\"363\",\"2147483647\"]", "[\"523\",\"2147483647\"]", "[\"469\",\"2147483647\"]", "[\"564\",\"2147483647\"]", "[\"288\",\"2147483647\"]", "[\"246\",\"2147483647\"]", "[\"225\",\"2147483647\"]", "[\"523\",\"3311739\"]", "[\"314\",\"3311739\"]", "[\"246\",\"3311739\"]", "[\"478\",\"3311739\"]", "[\"211\",\"2147483647\"]", "[\"332\",\"2147483647\"]", "[\"496\",\"2147483647\"]" };
+    return new String[] { "[\"2147483647\",\"2147483647\"]", "[\"363\",\"2147483647\"]", "[\"523\",\"2147483647\"]", "[\"469\",\"2147483647\"]", "[\"564\",\"2147483647\"]", "[\"288\",\"2147483647\"]", "[\"246\",\"2147483647\"]", "[\"225\",\"2147483647\"]", "[\"478\",\"3311739\"]", "[\"314\",\"3311739\"]", "[\"246\",\"3311739\"]", "[\"523\",\"3311739\"]", "[\"211\",\"2147483647\"]", "[\"332\",\"2147483647\"]", "[\"496\",\"2147483647\"]" };
   }
 
   private static double[] getSumResult(int numSegments) {
-    return new double[] { 45806 * numSegments, 1621 * numSegments, 1182 * numSegments, 1080 * numSegments, 1041 * numSegments, 712 * numSegments, 622 * numSegments, 545 * numSegments, 418 * numSegments, 418 * numSegments, 418 * numSegments, 418 * numSegments, 295 * numSegments, 256 * numSegments, 254 * numSegments };
+    return new double[] { 40797703056772.0 * numSegments, 1443764499302.0 * numSegments, 1052763502884.0 * numSegments, 961915890960.0 * numSegments, 927180039342.0 * numSegments, 634151957744.0 * numSegments, 553992300164.0 * numSegments, 485411259790.0 * numSegments, 372297076316.0 * numSegments, 372297076316.0 * numSegments, 372297076316.0 * numSegments, 372297076316.0 * numSegments, 262745544290.0 * numSegments, 228009692672.0 * numSegments, 226228366948.0 * numSegments };
   }
 
   private static String[] getSumGroupResult() {
-    return new String[] { "[\"2147483647\",\"2147483647\"]", "[\"363\",\"2147483647\"]", "[\"523\",\"2147483647\"]", "[\"469\",\"2147483647\"]", "[\"564\",\"2147483647\"]", "[\"288\",\"2147483647\"]", "[\"246\",\"2147483647\"]", "[\"225\",\"2147483647\"]", "[\"523\",\"3311739\"]", "[\"314\",\"3311739\"]", "[\"246\",\"3311739\"]", "[\"478\",\"3311739\"]", "[\"211\",\"2147483647\"]", "[\"332\",\"2147483647\"]", "[\"496\",\"2147483647\"]" };
+    return new String[] { "[\"2147483647\",\"2147483647\"]", "[\"363\",\"2147483647\"]", "[\"523\",\"2147483647\"]", "[\"469\",\"2147483647\"]", "[\"564\",\"2147483647\"]", "[\"288\",\"2147483647\"]", "[\"246\",\"2147483647\"]", "[\"225\",\"2147483647\"]", "[\"478\",\"3311739\"]", "[\"314\",\"3311739\"]", "[\"246\",\"3311739\"]", "[\"523\",\"3311739\"]", "[\"211\",\"2147483647\"]", "[\"332\",\"2147483647\"]", "[\"496\",\"2147483647\"]" };
   }
 
   private static double[] getMaxResult() {
-    return new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    return new double[] { 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862 };
   }
 
   private static String[] getMaxGroupResult() {
@@ -540,7 +536,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
   }
 
   private static double[] getMinResult() {
-    return new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    return new double[] { 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862 };
   }
 
   private static String[] getMinGroupResult() {
@@ -548,7 +544,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
   }
 
   private static double[] getAvgResult() {
-    return new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    return new double[] { 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862, 890662862 };
   }
 
   private static String[] getAvgGroupResult() {
@@ -560,7 +556,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
   }
 
   private static String[] getDistinctCountGroupResult() {
-    return new String[] { "[\"2147483647\",\"2147483647\"]", "[\"363\",\"2147483647\"]", "[\"523\",\"2147483647\"]", "[\"469\",\"2147483647\"]", "[\"564\",\"2147483647\"]", "[\"288\",\"2147483647\"]", "[\"246\",\"2147483647\"]", "[\"523\",\"3311739\"]", "[\"314\",\"3311739\"]", "[\"246\",\"3311739\"]", "[\"478\",\"3311739\"]", "[\"225\",\"2147483647\"]", "[\"211\",\"2147483647\"]", "[\"332\",\"2147483647\"]", "[\"496\",\"2147483647\"]" };
+    return new String[] { "[\"2147483647\",\"2147483647\"]", "[\"363\",\"2147483647\"]", "[\"523\",\"2147483647\"]", "[\"469\",\"2147483647\"]", "[\"564\",\"2147483647\"]", "[\"288\",\"2147483647\"]", "[\"246\",\"2147483647\"]", "[\"478\",\"3311739\"]", "[\"314\",\"3311739\"]", "[\"246\",\"3311739\"]", "[\"523\",\"3311739\"]", "[\"225\",\"2147483647\"]", "[\"211\",\"2147483647\"]", "[\"332\",\"2147483647\"]", "[\"496\",\"2147483647\"]" };
   }
 
   private static BrokerRequest getAggregationGroupByNoFilterBrokerRequest() {
@@ -578,17 +574,26 @@ public class AggregationGroupByOperatorForMultiValueTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
-    aggregationsInfo.add(getDistinctCountAggregationInfo("vieweeId"));
+    aggregationsInfo.add(getDistinctCountAggregationInfo("column2"));
     return aggregationsInfo;
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
     final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("viewerOccupations", _indexSegment.getDataSource("viewerOccupations"));
-    dataSourceMap.put("viewerCompanies", _indexSegment.getDataSource("viewerCompanies"));
-    dataSourceMap.put("count", _indexSegment.getDataSource("count"));
-    dataSourceMap.put("vieweeId", _indexSegment.getDataSource("vieweeId"));
+    dataSourceMap.put("column1", _indexSegment.getDataSource("column1"));
+    dataSourceMap.put("column2", _indexSegment.getDataSource("column2"));
+    dataSourceMap.put("column3", _indexSegment.getDataSource("column3"));
+    dataSourceMap.put("column4", _indexSegment.getDataSource("column4"));
+    dataSourceMap.put("column5", _indexSegment.getDataSource("column5"));
+    dataSourceMap.put("column6", _indexSegment.getDataSource("column6"));
+    dataSourceMap.put("column7", _indexSegment.getDataSource("column7"));
+    dataSourceMap.put("column8", _indexSegment.getDataSource("column8"));
+    dataSourceMap.put("column9", _indexSegment.getDataSource("column9"));
+    dataSourceMap.put("column10", _indexSegment.getDataSource("column10"));
+    dataSourceMap.put("daysSinceEpoch", _indexSegment.getDataSource("daysSinceEpoch"));
+    dataSourceMap.put("weeksSinceEpochSunday", _indexSegment.getDataSource("weeksSinceEpochSunday"));
 
+    dataSourceMap.put("count", _indexSegment.getDataSource("count"));
     return dataSourceMap;
   }
 
@@ -656,8 +661,8 @@ public class AggregationGroupByOperatorForMultiValueTest {
   private static GroupBy getGroupBy() {
     final GroupBy groupBy = new GroupBy();
     final List<String> columns = new ArrayList<String>();
-    columns.add("viewerOccupations");
-    columns.add("viewerCompanies");
+    columns.add("column7");
+    columns.add("column6");
     groupBy.setColumns(columns);
     groupBy.setTopN(15);
     return groupBy;
@@ -674,8 +679,8 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    final String filterColumn = "vieweeId";
-    final String filterVal = "356899";
+    final String filterColumn = "column2";
+    final String filterVal = "2080179800";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");
@@ -708,7 +713,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
   private static BrokerRequest setEmptyFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    final String filterColumn = "vieweeId";
+    final String filterColumn = "column2";
     final String filterVal = "14125399";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
