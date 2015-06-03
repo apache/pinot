@@ -141,10 +141,10 @@ public class ThirdEyeJob {
   private static final String DEFAULT_CLEANUP_DAYS_AGO = "7";
   private static final String DEFAULT_CLEANUP_SKIP = "false";
   private static final String DEFAULT_SKIP_MISSING = "true";
-  private static final String DEFAULT_CHANGE_PERMISSION = "true";
+  private static final String DEFAULT_FOLDER_PERMISSION = "755";
+  private static final String FOLDER_PERMISSION_REGEX = "0?[1-7]{3}";
   private static final String INPUT_PATHS_JOINER = ",";
   private static final String DATA_FOLDER_JOINER = "_";
-  private static final String THIRDEYE_FOLDER_PERMISSION = "755";
 
   private enum FlowSpec {
     DIMENSION_INDEX,
@@ -916,22 +916,25 @@ public class ThirdEyeJob {
         throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
       }
 
-      boolean changePermission = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CHANGE_PERMISSION.getName(), DEFAULT_CHANGE_PERMISSION));
-      if (changePermission)
+      String thirdeyeFolderPermission = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FOLDER_PERMISSION.getName(), DEFAULT_FOLDER_PERMISSION);
+      if (!thirdeyeFolderPermission.matches(FOLDER_PERMISSION_REGEX))
       {
-        String dimensionIndexDir = PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getDimensionIndexDir
-            (root, collection, Joiner.on(DATA_FOLDER_JOINER).join(
-                StarTreeConstants.DATA_DIR_PREFIX,
-                StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
-                StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime)));
-
-        FsShell shell = new FsShell(new Configuration());
-        LOGGER.info("Changing permission of {} to {}", dimensionIndexDir, THIRDEYE_FOLDER_PERMISSION);
-        shell.run(new String[]{"-chmod","-R",THIRDEYE_FOLDER_PERMISSION,dimensionIndexDir});
-        LOGGER.info("Changing permission of {} to {}", metricIndexDir, THIRDEYE_FOLDER_PERMISSION);
-        shell.run(new String[]{"-chmod","-R",THIRDEYE_FOLDER_PERMISSION,metricIndexDir});
-
+        throw new IllegalArgumentException("Invalid folder permission mode. Must provide octal "+FOLDER_PERMISSION_REGEX);
       }
+
+      String dimensionIndexDir = PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getDimensionIndexDir
+          (root, collection, Joiner.on(DATA_FOLDER_JOINER).join(
+              StarTreeConstants.DATA_DIR_PREFIX,
+              StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
+              StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime)));
+
+      FsShell shell = new FsShell(new Configuration());
+      LOGGER.info("Changing permission of {} to {}", dimensionIndexDir, thirdeyeFolderPermission);
+      shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, dimensionIndexDir});
+      LOGGER.info("Changing permission of {} to {}", metricIndexDir, thirdeyeFolderPermission);
+      shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, metricIndexDir});
+
+
 
     }
     else if (PhaseSpec.CLEANUP.equals(phaseSpec))
