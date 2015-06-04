@@ -447,16 +447,20 @@ function extractHeatMapData(rawData) {
             var cellObj = $(cell)
 
             // Get cell stats
-            var statsList = JSON.parse(cellObj.attr('stats'))
-            var cellStats = {}
-            $.each(statsNamesMapping, function(name, idx) {
-                cellStats[name] = statsList[idx]
-            })
+            try {
+                var statsList = JSON.parse(cellObj.attr('stats'))
+                var cellStats = {}
+                $.each(statsNamesMapping, function(name, idx) {
+                    cellStats[name] = statsList[idx]
+                })
 
-            data[id].push({
-                value: cellObj.attr('value'),
-                stats: cellStats
-            })
+                data[id].push({
+                    value: cellObj.attr('value'),
+                    stats: cellStats
+                })
+            } catch (e) {
+                console.error('Corrupt heat map cell data', cellObj, e)
+            }
         })
     })
 
