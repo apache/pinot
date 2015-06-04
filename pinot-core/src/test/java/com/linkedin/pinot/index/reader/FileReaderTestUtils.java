@@ -24,13 +24,13 @@ import java.io.InputStreamReader;
 public class FileReaderTestUtils {
 
   public static int getNumOpenFiles(File f) throws IOException {
-    Process plsof = new ProcessBuilder(new String[] { "lsof", "|", "grep", f.getAbsolutePath() }).start();
+    Process plsof = new ProcessBuilder(new String[] { "lsof" }).start();
     BufferedReader plsofReader = new BufferedReader(new InputStreamReader(plsof.getInputStream()));
     String line;
     int numOpenFiles = 0;
     while ((line = plsofReader.readLine()) != null) {
-      //System.out.println(line);
       if (line.contains(f.getAbsolutePath())) {
+        //System.out.println(line);
         numOpenFiles++;
       }
     }
