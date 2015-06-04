@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -23,12 +22,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.util.CustomBitSet;
+
 
 /**
  *
@@ -45,8 +44,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  *
  */
 public class FixedBitWidthRowColDataFileReader {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(FixedBitWidthRowColDataFileReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthRowColDataFileReader.class);
 
   RandomAccessFile file;
   private int rows;
@@ -65,6 +63,7 @@ public class FixedBitWidthRowColDataFileReader {
   private final CustomBitSet customBitSet;
 
   private int totalSizeInBytes;
+  private boolean isMmap;
 
   /**
    *
@@ -167,11 +166,13 @@ public class FixedBitWidthRowColDataFileReader {
       throws IOException {
     init(rows, cols, columnSizesInBits, signed);
     file = new RandomAccessFile(dataFile, "rw");
+    this.isMmap = isMmap;
     if (isMmap) {
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes);
     } else {
       byteBuffer = ByteBuffer.allocateDirect(totalSizeInBytes);
       file.getChannel().read(byteBuffer);
+      file.close();
     }
     ownsByteBuffer = true;
     customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
@@ -192,6 +193,7 @@ public class FixedBitWidthRowColDataFileReader {
       int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
     this.byteBuffer = buffer;
     ownsByteBuffer = false;
+    this.isMmap = false;
     init(rows, cols, columnSizesInBits, signed);
     customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
   }
@@ -278,10 +280,14 @@ public class FixedBitWidthRowColDataFileReader {
     return colSizesInBits;
   }
 
-  public void close() {
-    IOUtils.closeQuietly(file);
+  public void close() throws IOException {
     if (ownsByteBuffer) {
-      MmapUtils.unloadByteBuffer(byteBuffer);
+      if (isMmap) {
+        MmapUtils.unloadByteBuffer(byteBuffer);
+        file.close();
+      } else {
+        byteBuffer.clear();
+      }
     }
   }
 

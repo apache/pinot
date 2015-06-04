@@ -16,7 +16,6 @@
 package com.linkedin.pinot.index.reader;
 
 import java.io.File;
-import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -54,7 +53,7 @@ public class FixedByteSkipListSCMVReaderTest {
     }
 
     for (int i = 0; i < data.length; i++) {
-      System.out.print("(" +i + "," + startOffsets[i] + "," + lengths[i] + ")");
+      System.out.print("(" + i + "," + startOffsets[i] + "," + lengths[i] + ")");
       System.out.println(",");
     }
     System.out.println(Arrays.toString(startOffsets));
@@ -65,27 +64,32 @@ public class FixedByteSkipListSCMVReaderTest {
       writer.setIntArray(i, data[i]);
     }
     writer.close();
-    RandomAccessFile raf = new RandomAccessFile(f, "rw");
-    System.out.println("file size: " + raf.getChannel().size());
-    FixedByteSkipListSCMVReader reader;
-    reader = new FixedByteSkipListSCMVReader(f, numDocs, totalNumValues, Integer.SIZE / 8, true);
+
     int[] readValues = new int[maxMultiValues];
+    FixedByteSkipListSCMVReader heapReader = new FixedByteSkipListSCMVReader(f, numDocs, totalNumValues, Integer.SIZE / 8, false);
     for (int i = 0; i < data.length; i++) {
-      try {
-        int numValues = reader.getIntArray(i, readValues);
-        Assert.assertEquals(numValues, data[i].length);
-        for (int j = 0; j < numValues; j++) {
-          Assert.assertEquals(readValues[j], data[i][j], "");
-        }
-      } catch (AssertionError error) {
-        error.printStackTrace();
-        int numValues = reader.getIntArray(i, readValues);
-        System.out.println(numValues);
-        throw error;
+      int numValues = heapReader.getIntArray(i, readValues);
+      Assert.assertEquals(numValues, data[i].length);
+      for (int j = 0; j < numValues; j++) {
+        Assert.assertEquals(readValues[j], data[i][j], "");
       }
     }
-    reader.close();
-    raf.close();
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+    heapReader.close();
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+
+    FixedByteSkipListSCMVReader mmapReader = new FixedByteSkipListSCMVReader(f, numDocs, totalNumValues, Integer.SIZE / 8, true);
+    for (int i = 0; i < data.length; i++) {
+      int numValues = mmapReader.getIntArray(i, readValues);
+      Assert.assertEquals(numValues, data[i].length);
+      for (int j = 0; j < numValues; j++) {
+        Assert.assertEquals(readValues[j], data[i][j], "");
+      }
+    }
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+    mmapReader.close();
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+
     f.delete();
   }
 }

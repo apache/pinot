@@ -31,6 +31,8 @@ import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -75,6 +77,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
 
+  protected static Logger LOGGER = LoggerFactory.getLogger(AggregationGroupByWithDictionaryAndTrieTreeOperatorTest.class);
   private final String AVRO_DATA = "data/test_sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
       + "TestAggregationGroupByWithDictionaryAndTrieTreeOperator");
@@ -122,7 +125,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     driver.init(config);
     driver.build();
 
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+    LOGGER.info("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
@@ -158,7 +161,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
       driver.init(config);
       driver.build();
 
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+      LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
       final File indexSegmentDir = new File(segmentDir, driver.getSegmentName());
       _indexSegmentList.add(ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap));
     }
@@ -184,10 +187,10 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
-    System.out.println("running query: ");
+    LOGGER.info("running query: ");
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result: {}", block.getAggregationGroupByOperatorResult().get(i));
     }
 
   }
@@ -214,9 +217,8 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
-    System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result1: {}", block.getAggregationGroupByOperatorResult().get(i));
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -240,16 +242,14 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
 
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
-    System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result 2: {}", block1.getAggregationGroupByOperatorResult().get(i));
     }
 
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
-    System.out.println("Combined Result : ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Combined Result: {}", block.getAggregationGroupByOperatorResult().get(i));
     }
 
   }
@@ -276,9 +276,8 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
-    System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result 1: {}", block.getAggregationGroupByOperatorResult().get(i));
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -302,25 +301,22 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
 
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
-    System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Result 2: {}", block1.getAggregationGroupByOperatorResult().get(i));
     }
 
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
-    System.out.println("Combined Result : ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.info("Combined Result: {}", block.getAggregationGroupByOperatorResult().get(i));
     }
 
     final DataTable dataTable = block.getAggregationGroupByResultDataTable();
 
     final List<Map<String, Serializable>> results =
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(dataTable);
-    System.out.println("Decode AggregationResult from DataTable: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(results.get(i));
+      LOGGER.info("Decoded Result: {}", results.get(i));
     }
   }
 
@@ -332,10 +328,10 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     rootPlanNode.showTree("");
     final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    System.out.println(resultBlock.getAggregationGroupByResultDataTable());
+    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("Result: {}", resultBlock.getAggregationGroupByResultDataTable());
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
@@ -353,15 +349,8 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
     final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
-    //    System.out.println("********************************");
-    //    for (int i = 0; i < reducedResults.size(); ++i) {
-    //      Map<String, Serializable> groupByResult = reducedResults.get(i);
-    //      System.out.println(groupByResult);
-    //    }
-    //    System.out.println("********************************");
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    System.out.println(jsonResult);
-    //    System.out.println("********************************");
+    LOGGER.info("Json Result: {}", jsonResult);
   }
 
   @Test
@@ -372,10 +361,10 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     rootPlanNode.showTree("");
     final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    System.out.println(resultBlock.getAggregationGroupByResultDataTable());
+    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("Result: {}", resultBlock.getAggregationGroupByResultDataTable());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
     Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
 
@@ -395,15 +384,9 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
     final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
-    //    System.out.println("********************************");
-    //    for (int i = 0; i < reducedResults.size(); ++i) {
-    //      Map<String, Serializable> groupByResult = reducedResults.get(i);
-    //      System.out.println(groupByResult);
-    //    }
-    //    System.out.println("********************************");
+
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    System.out.println(jsonResult);
-    //    System.out.println("********************************");
+    LOGGER.info("Result: {}", jsonResult);
   }
 
   @Test
@@ -418,14 +401,14 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    System.out.println(instanceResponse);
+    LOGGER.info("Instance Response: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    LOGGER.info("Broker Response: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -441,14 +424,14 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    System.out.println(instanceResponse);
+    LOGGER.info("Instance Response: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    LOGGER.info("Broker Response: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     assertEmptyBrokerResponse(brokerResponse);
   }
 
@@ -547,7 +530,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   }
 
   private static String[] getCountGroupResult() {
-    return new String[] { "[\"i\",\"\"]","[\"D\",\"\"]","[\"i\",\"CqC\"]","[\"i\",\"QMl\"]","[\"i\",\"bVnY\"]","[\"i\",\"iV\"]","[\"i\",\"zZe\"]","[\"i\",\"xDLG\"]","[\"i\",\"VsKz\"]","[\"i\",\"mNh\"]","[\"i\",\"ez\"]","[\"i\",\"rNcu\"]","[\"i\",\"EXYv\"]","[\"i\",\"gpyD\"]","[\"i\",\"yhq\"]" };
+    return new String[] { "[\"i\",\"\"]", "[\"D\",\"\"]", "[\"i\",\"CqC\"]", "[\"i\",\"QMl\"]", "[\"i\",\"bVnY\"]", "[\"i\",\"iV\"]", "[\"i\",\"zZe\"]", "[\"i\",\"xDLG\"]", "[\"i\",\"VsKz\"]", "[\"i\",\"mNh\"]", "[\"i\",\"ez\"]", "[\"i\",\"rNcu\"]", "[\"i\",\"EXYv\"]", "[\"i\",\"gpyD\"]", "[\"i\",\"yhq\"]" };
 
   }
 
@@ -556,7 +539,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   }
 
   private static String[] getSumGroupResult() {
-    return new String[] { "[\"i\",\"\"]","[\"D\",\"\"]","[\"i\",\"CqC\"]","[\"i\",\"QMl\"]","[\"i\",\"bVnY\"]","[\"i\",\"iV\"]","[\"i\",\"zZe\"]","[\"i\",\"xDLG\"]","[\"i\",\"VsKz\"]","[\"i\",\"mNh\"]","[\"i\",\"ez\"]","[\"i\",\"rNcu\"]","[\"i\",\"EXYv\"]","[\"i\",\"yhq\"]","[\"i\",\"gpyD\"]" };
+    return new String[] { "[\"i\",\"\"]", "[\"D\",\"\"]", "[\"i\",\"CqC\"]", "[\"i\",\"QMl\"]", "[\"i\",\"bVnY\"]", "[\"i\",\"iV\"]", "[\"i\",\"zZe\"]", "[\"i\",\"xDLG\"]", "[\"i\",\"VsKz\"]", "[\"i\",\"mNh\"]", "[\"i\",\"ez\"]", "[\"i\",\"rNcu\"]", "[\"i\",\"EXYv\"]", "[\"i\",\"yhq\"]", "[\"i\",\"gpyD\"]" };
   }
 
   private static double[] getMaxResult() {
@@ -564,7 +547,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   }
 
   private static String[] getMaxGroupResult() {
-    return new String[] { "[\"i\",\"yH\"]","[\"U\",\"mNh\"]","[\"i\",\"OYMU\"]","[\"D\",\"opm\"]","[\"D\",\"Gac\"]","[\"i\",\"ZQa\"]","[\"i\",\"gpyD\"]","[\"D\",\"Pcb\"]","[\"i\",\"mNh\"]","[\"U\",\"LjAS\"]","[\"U\",\"bVnY\"]","[\"D\",\"aN\"]","[\"D\",\"iV\"]","[\"U\",\"Vj\"]","[\"D\",\"KsKZ\"]" };
+    return new String[] { "[\"i\",\"yH\"]", "[\"U\",\"mNh\"]", "[\"i\",\"OYMU\"]", "[\"D\",\"opm\"]", "[\"D\",\"Gac\"]", "[\"i\",\"ZQa\"]", "[\"i\",\"gpyD\"]", "[\"D\",\"Pcb\"]", "[\"i\",\"mNh\"]", "[\"U\",\"LjAS\"]", "[\"U\",\"bVnY\"]", "[\"D\",\"aN\"]", "[\"D\",\"iV\"]", "[\"U\",\"Vj\"]", "[\"D\",\"KsKZ\"]" };
   }
 
   private static double[] getMinResult() {
@@ -572,7 +555,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   }
 
   private static String[] getMinGroupResult() {
-    return new String[] { "[\"D\",\"Gac\"]","[\"i\",\"mNh\"]","[\"i\",\"VsKz\"]","[\"D\",\"\"]","[\"i\",\"yhq\"]","[\"D\",\"CqC\"]","[\"U\",\"\"]","[\"i\",\"jb\"]","[\"D\",\"bVnY\"]","[\"i\",\"\"]","[\"i\",\"QMl\"]","[\"i\",\"Pcb\"]","[\"i\",\"EXYv\"]","[\"i\",\"bVnY\"]","[\"i\",\"zZe\"]" };
+    return new String[] { "[\"D\",\"Gac\"]", "[\"i\",\"mNh\"]", "[\"i\",\"VsKz\"]", "[\"D\",\"\"]", "[\"i\",\"yhq\"]", "[\"D\",\"CqC\"]", "[\"U\",\"\"]", "[\"i\",\"jb\"]", "[\"D\",\"bVnY\"]", "[\"i\",\"\"]", "[\"i\",\"QMl\"]", "[\"i\",\"Pcb\"]", "[\"i\",\"EXYv\"]", "[\"i\",\"bVnY\"]", "[\"i\",\"zZe\"]" };
   }
 
   private static double[] getAvgResult() {
@@ -580,7 +563,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   }
 
   private static String[] getAvgGroupResult() {
-    return new String[] { "[\"U\",\"yhq\"]","[\"U\",\"mNh\"]","[\"U\",\"Vj\"]","[\"U\",\"OYMU\"]","[\"U\",\"zZe\"]","[\"U\",\"jb\"]","[\"D\",\"aN\"]","[\"U\",\"bVnY\"]","[\"U\",\"iV\"]","[\"i\",\"LjAS\"]","[\"D\",\"xDLG\"]","[\"U\",\"EXYv\"]","[\"D\",\"iV\"]","[\"D\",\"Gac\"]","[\"D\",\"QMl\"]" };
+    return new String[] { "[\"U\",\"yhq\"]", "[\"U\",\"mNh\"]", "[\"U\",\"Vj\"]", "[\"U\",\"OYMU\"]", "[\"U\",\"zZe\"]", "[\"U\",\"jb\"]", "[\"D\",\"aN\"]", "[\"U\",\"bVnY\"]", "[\"U\",\"iV\"]", "[\"i\",\"LjAS\"]", "[\"D\",\"xDLG\"]", "[\"U\",\"EXYv\"]", "[\"D\",\"iV\"]", "[\"D\",\"Gac\"]", "[\"D\",\"QMl\"]" };
   }
 
   private static double[] getDistinctCountResult() {
@@ -588,7 +571,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
   }
 
   private static String[] getDistinctCountGroupResult() {
-    return new String[] { "[\"i\",\"\"]","[\"D\",\"\"]","[\"i\",\"zZe\"]","[\"i\",\"QMl\"]","[\"i\",\"bVnY\"]","[\"i\",\"iV\"]","[\"i\",\"VsKz\"]","[\"i\",\"CqC\"]","[\"i\",\"EXYv\"]","[\"i\",\"xDLG\"]","[\"i\",\"yhq\"]","[\"U\",\"\"]","[\"D\",\"EXYv\"]","[\"D\",\"LjAS\"]","[\"i\",\"rNcu\"]" };
+    return new String[] { "[\"i\",\"\"]", "[\"D\",\"\"]", "[\"i\",\"zZe\"]", "[\"i\",\"QMl\"]", "[\"i\",\"bVnY\"]", "[\"i\",\"iV\"]", "[\"i\",\"VsKz\"]", "[\"i\",\"CqC\"]", "[\"i\",\"EXYv\"]", "[\"i\",\"xDLG\"]", "[\"i\",\"yhq\"]", "[\"U\",\"\"]", "[\"D\",\"EXYv\"]", "[\"D\",\"LjAS\"]", "[\"i\",\"rNcu\"]" };
   }
 
   private static BrokerRequest getAggregationGroupByNoFilterBrokerRequest() {

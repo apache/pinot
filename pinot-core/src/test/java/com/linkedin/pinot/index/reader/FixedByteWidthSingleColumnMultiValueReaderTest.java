@@ -18,14 +18,13 @@ package com.linkedin.pinot.index.reader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.RandomAccessFile;
 import java.util.Random;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthSingleColumnMultiValueReader;
+
 
 public class FixedByteWidthSingleColumnMultiValueReaderTest {
 
@@ -58,21 +57,33 @@ public class FixedByteWidthSingleColumnMultiValueReaderTest {
     }
     dos.flush();
     dos.close();
-    RandomAccessFile raf = new RandomAccessFile(f, "rw");
-    System.out.println("file size: " + raf.getChannel().size());
-    FixedByteWidthSingleColumnMultiValueReader reader;
-    reader = new FixedByteWidthSingleColumnMultiValueReader(f, data.length,
-        4, true);
+
     int[] readValues = new int[100];
+
+    FixedByteWidthSingleColumnMultiValueReader heapReader = new FixedByteWidthSingleColumnMultiValueReader(f, data.length, 4, false);
     for (int i = 0; i < data.length; i++) {
-      int numValues = reader.getIntArray(i, readValues);
+      int numValues = heapReader.getIntArray(i, readValues);
       Assert.assertEquals(numValues, data[i].length);
-      for(int j=0;j<numValues;j++){
+      for (int j = 0; j < numValues; j++) {
         Assert.assertEquals(readValues[j], data[i][j]);
       }
     }
-    reader.close();
-    raf.close();
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+    heapReader.close();
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+
+    FixedByteWidthSingleColumnMultiValueReader mmapReader = new FixedByteWidthSingleColumnMultiValueReader(f, data.length, 4, true);
+    for (int i = 0; i < data.length; i++) {
+      int numValues = mmapReader.getIntArray(i, readValues);
+      Assert.assertEquals(numValues, data[i].length);
+      for (int j = 0; j < numValues; j++) {
+        Assert.assertEquals(readValues[j], data[i][j]);
+      }
+    }
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+    mmapReader.close();
+    Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+
     f.delete();
   }
 }

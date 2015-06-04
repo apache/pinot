@@ -21,13 +21,13 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader;
+
 
 /**
  * Reads a column where each row can have multiple values. Lets say we want to
@@ -67,13 +67,15 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  */
 public class FixedByteWidthSingleColumnMultiValueReader implements
     SingleColumnMultiValueReader {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(FixedByteWidthSingleColumnMultiValueReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteWidthSingleColumnMultiValueReader.class);
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
   private RandomAccessFile raf;
   private FixedByteWidthRowColDataFileReader headerSectionReader;
   private FixedByteWidthRowColDataFileReader dataSectionReader;
+  private boolean isMMap;
+  private ByteBuffer headerSectionByteBuffer;
+  private ByteBuffer dataSectionByteBuffer;
 
   /**
    *
@@ -86,19 +88,17 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
       int columnSizeInBytes, boolean isMMap) throws Exception {
     // compute the header size= numDocs * size of int * 2
     int headerSize = numDocs * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    ByteBuffer byteBuffer;
+
+    this.isMMap = isMMap;
     raf = new RandomAccessFile(file, "rw");
     if (isMMap) {
-      byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0,
-          headerSize);
-
+      headerSectionByteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, headerSize);
     } else {
-      byteBuffer = ByteBuffer.allocateDirect((int) headerSize);
-      raf.getChannel().read(byteBuffer);
-
+      headerSectionByteBuffer = ByteBuffer.allocateDirect((int) headerSize);
+      raf.getChannel().read(headerSectionByteBuffer);
     }
     headerSectionReader = new FixedByteWidthRowColDataFileReader(
-        byteBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] {
+        headerSectionByteBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] {
             SIZE_OF_INT, SIZE_OF_INT });
 
     // to calculate total number of values across all docs, we need to read
@@ -107,18 +107,16 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
     int length = headerSectionReader.getInt(numDocs - 1, 1);
     int totalNumValues = startIndex + length;
     int dataSize = totalNumValues * columnSizeInBytes;
-    ByteBuffer dataBuffer;
-
     if (isMMap) {
-      dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
+      dataSectionByteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
           headerSize, dataSize);
     } else {
-      dataBuffer = ByteBuffer.allocateDirect((int) dataSize);
-      raf.getChannel().read(dataBuffer, headerSize);
+      dataSectionByteBuffer = ByteBuffer.allocateDirect((int) dataSize);
+      raf.getChannel().read(dataSectionByteBuffer, headerSize);
+      raf.close();
     }
-    dataSectionReader = new FixedByteWidthRowColDataFileReader(dataBuffer,
+    dataSectionReader = new FixedByteWidthRowColDataFileReader(dataSectionByteBuffer,
         totalNumValues, 1, new int[] { columnSizeInBytes });
-
   }
 
   @Override
@@ -128,10 +126,15 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
   }
 
   @Override
-  public void close() {
-    IOUtils.closeQuietly(raf);
-    headerSectionReader.close();
-    dataSectionReader.close();
+  public void close() throws IOException {
+    if (isMMap) {
+      MmapUtils.unloadByteBuffer(headerSectionByteBuffer);
+      MmapUtils.unloadByteBuffer(dataSectionByteBuffer);
+      raf.close();
+    } else {
+      headerSectionByteBuffer.clear();
+      dataSectionByteBuffer.clear();
+    }
   }
 
   @Override

@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 
+
 public class FixedBitRowColDataWriterReaderTest {
   @Test
   public void testSiingleColUnsigned() throws Exception {
@@ -49,11 +50,26 @@ public class FixedBitRowColDataWriterReaderTest {
       }
       writer.close();
 
-      FixedBitWidthRowColDataFileReader reader = FixedBitWidthRowColDataFileReader
+      // Test heap mode
+      FixedBitWidthRowColDataFileReader heapReader = FixedBitWidthRowColDataFileReader
           .forHeap(file, rows, cols, columnSizesInBits);
       for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(reader.getInt(i, 0), data[i]);
+        Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
       }
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+      heapReader.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
+      // Test mmap mode
+      FixedBitWidthRowColDataFileReader mmapReader = FixedBitWidthRowColDataFileReader
+          .forMmap(file, rows, cols, columnSizesInBits);
+      for (int i = 0; i < rows; i++) {
+        Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
+      }
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 2);
+      mmapReader.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
       maxBits = maxBits + 1;
       file.delete();
     }
@@ -83,11 +99,26 @@ public class FixedBitRowColDataWriterReaderTest {
       }
       writer.close();
 
-      FixedBitWidthRowColDataFileReader reader = FixedBitWidthRowColDataFileReader
+      // Test heap mode
+      FixedBitWidthRowColDataFileReader heapReader = FixedBitWidthRowColDataFileReader
           .forHeap(file, rows, cols, columnSizesInBits, new boolean[] { true });
       for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(reader.getInt(i, 0), data[i]);
+        Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
       }
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+      heapReader.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
+      // Test mmap mode
+      FixedBitWidthRowColDataFileReader mmapReader = FixedBitWidthRowColDataFileReader
+          .forMmap(file, rows, cols, columnSizesInBits, new boolean[] { true });
+      for (int i = 0; i < rows; i++) {
+        Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
+      }
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 2);
+      mmapReader.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
       maxBits = maxBits + 1;
       file.delete();
     }

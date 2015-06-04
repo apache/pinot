@@ -29,6 +29,8 @@ import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -71,6 +73,7 @@ import com.linkedin.pinot.util.TestUtils;
 
 public class AggregationQueriesTest {
 
+  protected static Logger LOGGER = LoggerFactory.getLogger(AggregationQueriesTest.class);
   private final String AVRO_DATA = "data/test_sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueries");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator
@@ -117,7 +120,7 @@ public class AggregationQueriesTest {
     driver.init(config);
     driver.build();
 
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+    LOGGER.info("built at : {}",  INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
@@ -142,7 +145,7 @@ public class AggregationQueriesTest {
       driver.init(config);
       driver.build();
 
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+      LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
     }
   }
@@ -174,7 +177,7 @@ public class AggregationQueriesTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationResult().get(i));
+      LOGGER.info("Result : {}", block.getAggregationResult().get(i));
     }
   }
 
@@ -201,9 +204,8 @@ public class AggregationQueriesTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
 
-    System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationResult().get(i));
+      LOGGER.info("Result 1: {}", block.getAggregationResult().get(i));
     }
     /////////////////////////////////////////////////////////////////////////
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList1 =
@@ -227,15 +229,13 @@ public class AggregationQueriesTest {
 
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationOperator1.nextBlock();
 
-    System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block1.getAggregationResult().get(i));
+      LOGGER.info("Result 2: {}", block1.getAggregationResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationNoFilterBrokerRequest(), block, block1);
 
-    System.out.println("Combined Result : ");
     for (int i = 0; i < _numAggregations; ++i) {
-      System.out.println(block.getAggregationResult().get(i));
+      LOGGER.info("Combined Result : {}", block.getAggregationResult().get(i));
     }
   }
 
@@ -248,9 +248,9 @@ public class AggregationQueriesTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    LOGGER.info("RunningTime : {}",  resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}",  resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}",  resultBlock.getTotalDocs());
 
     final ReduceService reduceService = new DefaultReduceService();
 
@@ -268,7 +268,7 @@ public class AggregationQueriesTest {
     final BrokerResponse reducedResults =
         reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
 
-    System.out.println(reducedResults);
+    LOGGER.info("Reduced Result : {}", reducedResults);
   }
 
   @Test
@@ -280,9 +280,9 @@ public class AggregationQueriesTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    LOGGER.info("RunningTime : {}",  resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}",  resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}",  resultBlock.getTotalDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
     Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
 
@@ -302,7 +302,7 @@ public class AggregationQueriesTest {
     final BrokerResponse reducedResults =
         reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
 
-    System.out.println(reducedResults);
+    LOGGER.info("Reduced Result : {}", reducedResults);
   }
 
   @Test
@@ -317,14 +317,14 @@ public class AggregationQueriesTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    System.out.println(instanceResponse);
+    LOGGER.info("Instance Response : {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
-    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    LOGGER.info("Result : {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.info("Time used : {}",  brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 

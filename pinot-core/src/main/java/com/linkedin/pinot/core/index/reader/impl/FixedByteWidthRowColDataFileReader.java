@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
-
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -26,11 +24,11 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader;
+import com.linkedin.pinot.common.utils.MmapUtils;
+
 
 /**
  *
@@ -47,8 +45,7 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  *
  */
 public class FixedByteWidthRowColDataFileReader implements Closeable {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(FixedByteWidthRowColDataFileReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteWidthRowColDataFileReader.class);
 
   RandomAccessFile file;
   private final int rows;
@@ -57,6 +54,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
   private int rowSize;
   private ByteBuffer byteBuffer;
   private final int[] columnSizes;
+  private final boolean isMMap;
 
   /**
    *
@@ -102,6 +100,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     this.rows = rows;
     this.cols = cols;
     this.columnSizes = columnSizes;
+    this.isMMap = isMmap;
     colOffSets = new int[columnSizes.length];
     rowSize = 0;
     for (int i = 0; i < columnSizes.length; i++) {
@@ -117,6 +116,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     } else {
       byteBuffer = ByteBuffer.allocateDirect((int) totalSize);
       file.getChannel().read(byteBuffer);
+      file.close();
     }
   }
 
@@ -125,6 +125,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     this.rows = rows;
     this.cols = cols;
     this.columnSizes = columnSizes;
+    this.isMMap = false;
     colOffSets = new int[columnSizes.length];
     rowSize = 0;
     for (int i = 0; i < columnSizes.length; i++) {
@@ -237,7 +238,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
    * @return
    */
   public String getString(int row, int col) {
-    return new String(getBytes(row, col),Charset.forName("UTF-8"));
+    return new String(getBytes(row, col), Charset.forName("UTF-8"));
   }
 
   /**
@@ -268,10 +269,13 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     return columnSizes;
   }
 
-  public void close() {
-    IOUtils.closeQuietly(file);
-    file = null;
-    MmapUtils.unloadByteBuffer(byteBuffer);
+  public void close() throws IOException {
+    if (isMMap) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+      file.close();
+    } else {
+      byteBuffer.clear();
+    }
   }
 
   public boolean open() {

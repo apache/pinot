@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
+
 @Test
 public class FixedBitWidthRowColDataFileReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthRowColDataFileReaderTest.class);
@@ -66,8 +67,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         if (readInt != values[i]) {
           readInt = customBitSet.readInt(bitPos, bitPos + maxBits);
         }
-        System.out
-            .println(i + "  Expected:" + values[i] + " Actual:" + readInt);
+        System.out.println(i + "  Expected:" + values[i] + " Actual:" + readInt);
         Assert.assertEquals(readInt, values[i]);
       }
       System.out.println("END MAX BITS:" + maxBits);
@@ -109,15 +109,29 @@ public class FixedBitWidthRowColDataFileReaderTest {
         FileOutputStream fos = new FileOutputStream(file);
         fos.write(byteArray);
         fos.close();
-        FixedBitWidthRowColDataFileReader reader;
-        reader = FixedBitWidthRowColDataFileReader.forMmap(file, numElements,
+
+        FixedBitWidthRowColDataFileReader heapReader = FixedBitWidthRowColDataFileReader.forHeap(file, numElements,
             1, new int[] { maxBits });
         for (int i = 0; i < numElements; i++) {
-          int readInt = reader.getInt(i, 0);
-          System.out.println(i + "  Expected:" + values[i] + " Actual:"
-              + readInt);
+          int readInt = heapReader.getInt(i, 0);
+          System.out.println(i + "  Expected:" + values[i] + " Actual:" + readInt);
           Assert.assertEquals(readInt, values[i]);
         }
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+        heapReader.close();
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
+        FixedBitWidthRowColDataFileReader mmapReader = FixedBitWidthRowColDataFileReader.forMmap(file, numElements,
+            1, new int[] { maxBits });
+        for (int i = 0; i < numElements; i++) {
+          int readInt = mmapReader.getInt(i, 0);
+          System.out.println(i + "  Expected:" + values[i] + " Actual:" + readInt);
+          Assert.assertEquals(readInt, values[i]);
+        }
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 2);
+        mmapReader.close();
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
         System.out.println("END MAX BITS:" + maxBits);
       } finally {
         file.delete();
@@ -167,19 +181,32 @@ public class FixedBitWidthRowColDataFileReaderTest {
         FileOutputStream fos = new FileOutputStream(file);
         fos.write(byteArray);
         fos.close();
-        FixedBitWidthRowColDataFileReader reader;
-        reader = FixedBitWidthRowColDataFileReader.forMmap(file, numElements,
+
+        FixedBitWidthRowColDataFileReader heapReader = FixedBitWidthRowColDataFileReader.forHeap(file, numElements,
             1, new int[] { maxBits }, new boolean[] { true });
         for (int i = 0; i < numElements; i++) {
-          int readInt = reader.getInt(i, 0);
-          System.out.println(i + "  Expected:" + values[i] + " Actual:"
-              + readInt);
+          int readInt = heapReader.getInt(i, 0);
+          System.out.println(i + "  Expected:" + values[i] + " Actual:" + readInt);
           Assert.assertEquals(readInt, values[i]);
         }
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+        heapReader.close();
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
+        FixedBitWidthRowColDataFileReader mmapReader = FixedBitWidthRowColDataFileReader.forMmap(file, numElements,
+            1, new int[] { maxBits }, new boolean[] { true });
+        for (int i = 0; i < numElements; i++) {
+          int readInt = mmapReader.getInt(i, 0);
+          System.out.println(i + "  Expected:" + values[i] + " Actual:" + readInt);
+          Assert.assertEquals(readInt, values[i]);
+        }
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 2);
+        mmapReader.close();
+        Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+
         System.out.println("END MAX BITS:" + maxBits);
       } finally {
         file.delete();
-
       }
 
     }

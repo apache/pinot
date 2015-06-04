@@ -16,11 +16,10 @@
 package com.linkedin.pinot.core.index.reader.impl;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-
-import org.apache.commons.io.IOUtils;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
@@ -63,6 +62,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   private int totalNumValues;
   private int docsPerChunk;
   private int numDocs;
+  private boolean isMmap;
 
   public FixedBitSkipListSCMVReader(File file, int numDocs, int totalNumValues, int columnSizeInBits, boolean signed,
       boolean isMmap) throws Exception {
@@ -76,6 +76,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     rawDataSize = (totalNumValues * columnSizeInBits + 7) / 8;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     raf = new RandomAccessFile(file, "rw");
+    this.isMmap = isMmap;
     if (isMmap) {
       chunkOffsetsBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize);
       bitsetBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize);
@@ -104,7 +105,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
       rawDataReader =
           FixedBitWidthRowColDataFileReader.forByteBuffer(rawDataBuffer, totalNumValues, 1,
               new int[] { columnSizeInBits }, new boolean[] { signed });
-
+      raf.close();
     }
   }
 
@@ -145,12 +146,17 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   }
 
   @Override
-  public void close() {
-    IOUtils.closeQuietly(raf);
-    raf = null;
-    MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
-    MmapUtils.unloadByteBuffer(bitsetBuffer);
-    MmapUtils.unloadByteBuffer(rawDataBuffer);
+  public void close() throws IOException {
+    if (isMmap) {
+      MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+      MmapUtils.unloadByteBuffer(bitsetBuffer);
+      MmapUtils.unloadByteBuffer(rawDataBuffer);
+      raf.close();
+    } else {
+      chunkOffsetsBuffer.clear();
+      bitsetBuffer.clear();
+      rawDataBuffer.clear();
+    }
   }
 
   public int getDocsPerChunk() {

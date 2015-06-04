@@ -123,11 +123,13 @@ public final class CustomBitSet {
   }
 
   public byte[] toByteArray() {
-    return buf.array();
+    byte[] dst = new byte[buf.capacity()];
+    buf.get(dst);
+    return dst;
   }
 
   public String toString() {
-    byte[] array = buf.array();
+    byte[] array = toByteArray();
     StringBuilder sb = new StringBuilder();
     sb.append("[");
     for (byte b : array) {
@@ -174,7 +176,7 @@ public final class CustomBitSet {
     }
 
     int currentBitPosition = nextSetBit(bytePosition * 8);
-    while(0 < numberOfBitsToSkip && currentBitPosition != -1) {
+    while (0 < numberOfBitsToSkip && currentBitPosition != -1) {
       currentBitPosition = nextSetBit(currentBitPosition + 1);
       numberOfBitsToSkip--;
     }

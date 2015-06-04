@@ -54,7 +54,7 @@ public class FixedBitCompressedSVForwardIndexReader implements SingleColumnSingl
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     dataFileReader.close();
   }
 

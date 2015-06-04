@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -24,14 +23,15 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+
 
 /**
  * Reads a column where each row can have multiple values. Lets say we want to
@@ -69,10 +69,8 @@ import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileRea
  *
  *
  */
-public class FixedBitCompressedMVForwardIndexReader implements
-    SingleColumnMultiValueReader {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(FixedBitCompressedMVForwardIndexReader.class);
+public class FixedBitCompressedMVForwardIndexReader implements SingleColumnMultiValueReader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitCompressedMVForwardIndexReader.class);
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
   private RandomAccessFile raf;
@@ -80,7 +78,9 @@ public class FixedBitCompressedMVForwardIndexReader implements
   private FixedBitWidthRowColDataFileReader dataSectionReader;
   private int rows;
   private int totalNumValues;
-  private ByteBuffer dataBuffer;
+  private ByteBuffer dataSectionBuffer;
+  private ByteBuffer headerSectionBuffer;
+  private boolean isMmap;
 
   /**
    * @param file
@@ -114,20 +114,16 @@ public class FixedBitCompressedMVForwardIndexReader implements
     // compute the header size= numDocs * size of int * 2
     rows = numDocs;
     final int headerSize = numDocs * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    ByteBuffer byteBuffer;
     raf = new RandomAccessFile(file, "rw");
+    this.isMmap = isMMap;
     if (isMMap) {
-      byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0,
-          headerSize);
-
+      headerSectionBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, headerSize);
     } else {
-      byteBuffer = ByteBuffer.allocateDirect(headerSize);
-      raf.getChannel().read(byteBuffer);
-
+      headerSectionBuffer = ByteBuffer.allocateDirect(headerSize);
+      raf.getChannel().read(headerSectionBuffer);
     }
     headerSectionReader = new FixedByteWidthRowColDataFileReader(
-        byteBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] {
-            SIZE_OF_INT, SIZE_OF_INT });
+        headerSectionBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT, SIZE_OF_INT });
 
     // to calculate total number of values across all docs, we need to read
     // the last two entries in the header (start index, length)
@@ -137,13 +133,13 @@ public class FixedBitCompressedMVForwardIndexReader implements
     final int dataSizeInBytes = ((totalNumValues * columnSizeInBits) + 7) / 8;
 
     if (isMMap) {
-      dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
-          headerSize, dataSizeInBytes);
+      dataSectionBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, headerSize, dataSizeInBytes);
     } else {
-      dataBuffer = ByteBuffer.allocateDirect(dataSizeInBytes);
-      raf.getChannel().read(dataBuffer, headerSize);
+      dataSectionBuffer = ByteBuffer.allocateDirect(dataSizeInBytes);
+      raf.getChannel().read(dataSectionBuffer, headerSize);
+      raf.close();
     }
-    dataSectionReader =  FixedBitWidthRowColDataFileReader.forByteBuffer(dataBuffer,
+    dataSectionReader = FixedBitWidthRowColDataFileReader.forByteBuffer(dataSectionBuffer,
         totalNumValues, 1, new int[] { columnSizeInBits }, signed);
   }
 
@@ -155,7 +151,6 @@ public class FixedBitCompressedMVForwardIndexReader implements
     return rows;
   }
 
-
   @Override
   public DataFileMetadata getMetadata() {
     // TODO Auto-generated method stub
@@ -163,9 +158,15 @@ public class FixedBitCompressedMVForwardIndexReader implements
   }
 
   @Override
-  public void close() throws IOException{
-    IOUtils.closeQuietly(raf);
-    MmapUtils.unloadByteBuffer(dataBuffer);
+  public void close() throws IOException {
+    if (isMmap) {
+      MmapUtils.unloadByteBuffer(dataSectionBuffer);
+      MmapUtils.unloadByteBuffer(headerSectionBuffer);
+      raf.close();
+    } else {
+      dataSectionBuffer.clear();
+      headerSectionBuffer.clear();
+    }
   }
 
   @Override

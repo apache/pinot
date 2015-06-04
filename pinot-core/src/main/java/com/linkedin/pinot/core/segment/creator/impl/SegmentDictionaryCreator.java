@@ -46,7 +46,7 @@ public class SegmentDictionaryCreator implements Closeable {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     dataReader.close();
   }
 

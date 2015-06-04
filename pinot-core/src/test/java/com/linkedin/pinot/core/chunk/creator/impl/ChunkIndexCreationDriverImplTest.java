@@ -23,6 +23,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -78,6 +79,7 @@ public class ChunkIndexCreationDriverImplTest {
     driver.build();
   }
 
+  @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(INDEX_DIR);
   }

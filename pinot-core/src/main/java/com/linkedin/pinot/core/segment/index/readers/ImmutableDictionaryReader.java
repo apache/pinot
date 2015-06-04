@@ -77,7 +77,7 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   @Override
   public abstract String toString(int dictionaryId);
 
-  public void close() {
+  public void close() throws IOException {
     dataFileReader.close();
   }
 

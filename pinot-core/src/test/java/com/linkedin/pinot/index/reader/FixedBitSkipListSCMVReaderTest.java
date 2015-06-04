@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
 
+
 public class FixedBitSkipListSCMVReaderTest {
 
   @Test
@@ -55,8 +56,7 @@ public class FixedBitSkipListSCMVReaderTest {
       }
       System.out.println(Arrays.toString(startOffsets));
       System.out.println(Arrays.toString(lengths));
-      FixedBitSkipListSCMVWriter writer =
-          new FixedBitSkipListSCMVWriter(f, numDocs, totalNumValues, maxBits);
+      FixedBitSkipListSCMVWriter writer = new FixedBitSkipListSCMVWriter(f, numDocs, totalNumValues, maxBits);
 
       for (int i = 0; i < data.length; i++) {
         writer.setIntArray(i, data[i]);
@@ -65,18 +65,35 @@ public class FixedBitSkipListSCMVReaderTest {
 
       final RandomAccessFile raf = new RandomAccessFile(f, "rw");
       System.out.println("file size: " + raf.getChannel().size());
-      FixedBitSkipListSCMVReader reader;
-      reader = new FixedBitSkipListSCMVReader(f, numDocs, totalNumValues, maxBits, false, false);
+      raf.close();
+
+      // Test heap mode
+      FixedBitSkipListSCMVReader heapReader = new FixedBitSkipListSCMVReader(f, numDocs, totalNumValues, maxBits, false, false);
       final int[] readValues = new int[maxNumValues];
       for (int i = 0; i < data.length; i++) {
-        final int numValues = reader.getIntArray(i, readValues);
+        final int numValues = heapReader.getIntArray(i, readValues);
         Assert.assertEquals(numValues, data[i].length);
         for (int j = 0; j < numValues; j++) {
           Assert.assertEquals(readValues[j], data[i][j]);
         }
       }
-      reader.close();
-      raf.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      heapReader.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+
+      // Test mmap mode
+      FixedBitSkipListSCMVReader mmapReader = new FixedBitSkipListSCMVReader(f, numDocs, totalNumValues, maxBits, false, true);
+      for (int i = 0; i < data.length; i++) {
+        final int numValues = mmapReader.getIntArray(i, readValues);
+        Assert.assertEquals(numValues, data[i].length);
+        for (int j = 0; j < numValues; j++) {
+          Assert.assertEquals(readValues[j], data[i][j]);
+        }
+      }
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+      mmapReader.close();
+      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+
       f.delete();
       maxBits = maxBits + 1;
     }
