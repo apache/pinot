@@ -100,4 +100,8 @@ public abstract class MutableDictionaryReader implements Dictionary {
     }
     System.out.println("************************************");
   }
+
+  public boolean isEmpty() {
+    return dictionaryIdBiMap.isEmpty();
+  }
 }

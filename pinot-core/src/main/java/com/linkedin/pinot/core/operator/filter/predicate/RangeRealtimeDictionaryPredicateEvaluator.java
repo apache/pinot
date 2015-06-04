@@ -26,8 +26,13 @@ public class RangeRealtimeDictionaryPredicateEvaluator extends AbstractPredicate
 
   public RangeRealtimeDictionaryPredicateEvaluator(RangePredicate predicate, MutableDictionaryReader dictionary) {
     List<Integer> ids = new ArrayList<Integer>();
-    String rangeStart = "";
-    String rangeEnd = "";
+    String rangeStart;
+    String rangeEnd;
+
+    if (dictionary.isEmpty()) {
+      matchingIds = new int[0];
+      return;
+    }
 
     final boolean incLower = predicate.includeLowerBoundary();
     final boolean incUpper = predicate.includeUpperBoundary();
