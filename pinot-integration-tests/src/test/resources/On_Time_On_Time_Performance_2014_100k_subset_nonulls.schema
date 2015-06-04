@@ -1,6 +1,6 @@
 {
   "metricFieldSpecs" : [
-    
+
   ],
   "dimensionFieldSpecs" : [
     {
@@ -24,17 +24,17 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "ArrDelay",
       "singleValueField": true
     },
     {
-      "dataType": "INT",   
+      "dataType": "INT",
       "name": "ArrDelayMinutes",
       "singleValueField": true
     },
     {
-      "dataType": "INT", 
+      "dataType": "INT",
       "name": "ArrTime",
       "singleValueField": true
     },
@@ -49,17 +49,17 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",  
+      "dataType": "INT",
       "name": "CRSArrTime",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "CRSDepTime",
       "singleValueField": true
     },
     {
-      "dataType": "INT",   
+      "dataType": "INT",
       "name": "CRSElapsedTime",
       "singleValueField": true
     },
@@ -69,17 +69,17 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",  
+      "dataType": "INT",
       "name": "Cancelled",
       "singleValueField": true
     },
     {
-      "dataType": "STRING", 
+      "dataType": "STRING",
       "name": "Carrier",
       "singleValueField": true
     },
     {
-      "dataType": "INT",   
+      "dataType": "INT",
       "name": "CarrierDelay",
       "singleValueField": true
     },
@@ -89,7 +89,7 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DayofMonth",
       "singleValueField": true
     },
@@ -104,7 +104,7 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DepTime",
       "singleValueField": true
     },
@@ -114,22 +114,22 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DepartureDelayGroups",
       "singleValueField": true
     },
     {
-      "dataType": "STRING",      
+      "dataType": "STRING",
       "name": "Dest",
       "singleValueField": true
     },
     {
-      "dataType": "INT", 
+      "dataType": "INT",
       "name": "DestAirportID",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DestAirportSeqID",
       "singleValueField": true
     },
@@ -139,12 +139,12 @@
       "singleValueField": true
     },
     {
-      "dataType": "STRING",      
+      "dataType": "STRING",
       "name": "DestCityName",
       "singleValueField": true
     },
     {
-      "dataType": "STRING",      
+      "dataType": "STRING",
       "name": "DestState",
       "singleValueField": true
     },
@@ -154,92 +154,92 @@
       "singleValueField": true
     },
     {
-      "dataType": "STRING", 
+      "dataType": "STRING",
       "name": "DestStateName",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DestWac",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "Distance",
       "singleValueField": true
     },
     {
-      "dataType": "INT",  
+      "dataType": "INT",
       "name": "DistanceGroup",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivActualElapsedTime",
       "singleValueField": true
     },
     {
-      "dataType": "INT", 
+      "dataType": "INT",
       "name": "DivAirportIDs",
       "singleValueField": false
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivAirportLandings",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivAirportSeqIDs",
       "singleValueField": false
     },
     {
-      "dataType": "STRING",      
+      "dataType": "STRING",
       "name": "DivAirports",
       "singleValueField": false
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivArrDelay",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivDistance",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivLongestGTimes",
       "singleValueField": false
     },
     {
-      "dataType": "INT", 
+      "dataType": "INT",
       "name": "DivReachedDest",
       "singleValueField": true
     },
     {
-      "dataType": "STRING",      
+      "dataType": "STRING",
       "name": "DivTailNums",
       "singleValueField": false
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivTotalGTimes",
       "singleValueField": false
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivWheelsOffs",
       "singleValueField": false
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "DivWheelsOns",
       "singleValueField": false
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "Diverted",
       "singleValueField": true
     },
@@ -259,12 +259,12 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "Flights",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "LateAircraftDelay",
       "singleValueField": true
     },
@@ -284,12 +284,12 @@
       "singleValueField": true
     },
     {
-      "dataType": "STRING",      
+      "dataType": "STRING",
       "name": "Origin",
       "singleValueField": true
     },
     {
-      "dataType": "INT",      
+      "dataType": "INT",
       "name": "OriginAirportID",
       "singleValueField": true
     },
@@ -401,6 +401,5 @@
       "name": "DaysSinceEpoch"
     }
   },
-  "schemaName" : "fightDataSchema",
-  "schemaVersion" : 1009
+  "schemaName" : "fightDataSchema"
 }

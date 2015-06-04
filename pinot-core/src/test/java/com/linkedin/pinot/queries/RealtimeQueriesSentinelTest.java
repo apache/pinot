@@ -84,7 +84,6 @@ public class RealtimeQueriesSentinelTest {
 
     PINOT_SCHEMA = getTestSchema();
     PINOT_SCHEMA.setSchemaName("realtimeSchema");
-    PINOT_SCHEMA.setSchemaVersion(10L);
     AVRO_RECORD_TRANSFORMER = new AvroRecordToPinotRowGenerator(PINOT_SCHEMA);
     final IndexSegment indexSegment = getRealtimeSegment();
 

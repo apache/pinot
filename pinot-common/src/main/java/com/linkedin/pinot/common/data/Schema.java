@@ -61,7 +61,6 @@ public class Schema {
   private List<DimensionFieldSpec> dimensionFieldSpecs;
   private TimeFieldSpec timeFieldSpec;
   private String schemaName;
-  private Long schemaVersion;
 
   @JsonIgnore(true)
   private Set<String> dimensions;
@@ -87,7 +86,7 @@ public class Schema {
   }
 
   public static ZNRecord toZNRecord(Schema schema) throws IllegalArgumentException, IllegalAccessException {
-    ZNRecord record = new ZNRecord(String.valueOf(schema.getSchemaVersion()));
+    ZNRecord record = new ZNRecord(schema.getSchemaName());
     record.setSimpleField("schemaJSON", schema.getJSONSchema());
     return record;
   }
@@ -267,17 +266,6 @@ public class Schema {
     this.schemaName = schemaName;
   }
 
-  public long getSchemaVersion() {
-    if (schemaVersion == null) {
-      return -1;
-    }
-    return schemaVersion;
-  }
-
-  public void setSchemaVersion(long schemaVersion) {
-    this.schemaVersion = schemaVersion;
-  }
-
   @Override
   public String toString() {
     JSONObject ret = new JSONObject();
@@ -286,7 +274,6 @@ public class Schema {
       ret.put("dimensionFieldSpecs", new ObjectMapper().writeValueAsString(dimensionFieldSpecs));
       ret.put("timeFieldSpec", new ObjectMapper().writeValueAsString(timeFieldSpec));
       ret.put("schemaName", schemaName);
-      ret.put("schemaVersion", schemaVersion);
     } catch (Exception e) {
       LOGGER.error("error processing toString on Schema : ", this.schemaName, e);
       return null;
@@ -304,11 +291,6 @@ public class Schema {
 
     public SchemaBuilder setSchemaName(String schemaName) {
       schema.setSchemaName(schemaName);
-      return this;
-    }
-
-    public SchemaBuilder setSchemaVersion(String version) {
-      schema.setSchemaVersion(Long.parseLong(version));
       return this;
     }
 
@@ -378,8 +360,7 @@ public class Schema {
 
     return isEqual(dimensions, other.dimensions) && isEqual(timeFieldSpec, other.timeFieldSpec)
         && isEqual(metrics, other.metrics) && isEqual(schemaName, other.schemaName)
-        && isEqual(schemaVersion, other.schemaVersion) && isEqual(metricFieldSpecs, other.metricFieldSpecs)
-        && isEqual(dimensionFieldSpecs, other.dimensionFieldSpecs);
+        && isEqual(metricFieldSpecs, other.metricFieldSpecs) && isEqual(dimensionFieldSpecs, other.dimensionFieldSpecs);
   }
 
   @Override
@@ -390,7 +371,6 @@ public class Schema {
     result = hashCodeOf(result, dimensions);
     result = hashCodeOf(result, metrics);
     result = hashCodeOf(result, schemaName);
-    result = hashCodeOf(result, schemaVersion);
     return result;
   }
 }

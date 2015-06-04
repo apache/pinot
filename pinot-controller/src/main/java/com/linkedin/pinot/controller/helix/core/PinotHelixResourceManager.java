@@ -15,10 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +46,7 @@ import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.OfflineTableConfig;
@@ -70,7 +69,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentO
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ServerType;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
@@ -121,15 +119,15 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
   }
 
-  public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId, String localDiskDir) {
+  public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
+      String localDiskDir) {
     this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, 10000L, false);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
-    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
-        controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
-        controllerConf.getExternalViewOnlineToOfflineTimeout(),
-        controllerConf.tenantIsolationEnabled());
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getControllerHost() + "_"
+        + controllerConf.getControllerPort(), controllerConf.getDataDir(), controllerConf
+        .getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled());
   }
 
   public synchronized void start() throws Exception {
@@ -790,14 +788,9 @@ public class PinotHelixResourceManager {
    */
   public void addSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = Schema.toZNRecord(schema);
-    String name = StringUtil.join("/", schema.getSchemaName(), String.valueOf(schema.getSchemaVersion()));
-
+    String name = schema.getSchemaName();
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    if (propertyStoreHelper.exist(name)) {
-      throw new IllegalAccessException("schema : " + schema.getSchemaName() + " version : " + schema.getSchemaVersion()
-          + " exist");
-    }
     propertyStoreHelper.set(name, record);
   }
 
@@ -812,17 +805,8 @@ public class PinotHelixResourceManager {
   public Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    String path = StringUtil.join("/", propertyStoreHelper.getRelativePath(), schemaName);
-    List<String> schemas = _propertyStore.getChildNames(path, AccessOption.PERSISTENT);
-    List<Integer> schemasIds = new ArrayList<Integer>();
-    for (String id : schemas) {
-      schemasIds.add(Integer.parseInt(id));
-    }
-    Collections.sort(schemasIds);
-    String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
-    LOGGER.info("found schema {} with version {}", schemaName, latest);
-
-    ZNRecord record = propertyStoreHelper.get(schemaName + "/" + latest);
+    LOGGER.info("found schema {} ", schemaName);
+    ZNRecord record = propertyStoreHelper.get(schemaName);
     return Schema.fromZNRecord(record);
   }
 
@@ -844,13 +828,16 @@ public class PinotHelixResourceManager {
     TableType type = TableType.valueOf(config.getTableType().toUpperCase());
     if (isSingleTenantCluster()) {
       tenantConfig = new TenantConfig();
-      tenantConfig.setBroker(ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+      tenantConfig.setBroker(ControllerTenantNameBuilder
+          .getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       switch (type) {
         case OFFLINE:
-          tenantConfig.setServer(ControllerTenantNameBuilder.getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+          tenantConfig.setServer(ControllerTenantNameBuilder
+              .getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
           break;
         case REALTIME:
-          tenantConfig.setServer(ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+          tenantConfig.setServer(ControllerTenantNameBuilder
+              .getRealtimeTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
           break;
         default:
           throw new RuntimeException("UnSupported table type");
@@ -977,8 +964,7 @@ public class PinotHelixResourceManager {
       String brokerTenant =
           ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
       if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant).isEmpty()) {
-        throw new RuntimeException("broker tenant : " + tableConfig.getTenantConfig().getBroker()
-            + " is not existed!");
+        throw new RuntimeException("broker tenant : " + tableConfig.getTenantConfig().getBroker() + " is not existed!");
       }
       LOGGER.info("Trying to update BrokerDataResource IdealState!");
       final IdealState idealState =
@@ -1093,8 +1079,7 @@ public class PinotHelixResourceManager {
                 _helixClusterName, getPropertyStore(), ControllerTenantNameBuilder
                     .getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig().getServer()));
         _helixAdmin.setResourceIdealState(_helixClusterName,
-            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()),
-            idealState);
+            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()), idealState);
         res.status = STATUS.success;
       }
     } catch (final Exception e) {
@@ -1299,7 +1284,8 @@ public class PinotHelixResourceManager {
     _helixAdmin.enableInstance(_helixClusterName, instanceName, toggle);
     long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
     boolean toggleSucceed = false;
-    String beforeToggleStates = (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
+    String beforeToggleStates =
+        (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
 
     while (System.currentTimeMillis() < deadline) {
       toggleSucceed = true;
@@ -1312,7 +1298,8 @@ public class PinotHelixResourceManager {
           return PinotResourceManagerResponse.SUCCESS_RESPONSE;
         }
       }
-      PropertyKey instanceCurrentStatesKey = _helixDataAccessor.keyBuilder().currentStates(instanceName, liveInstance.getSessionId());
+      PropertyKey instanceCurrentStatesKey =
+          _helixDataAccessor.keyBuilder().currentStates(instanceName, liveInstance.getSessionId());
       List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
       if (instanceCurrentStates == null) {
         return PinotResourceManagerResponse.SUCCESS_RESPONSE;

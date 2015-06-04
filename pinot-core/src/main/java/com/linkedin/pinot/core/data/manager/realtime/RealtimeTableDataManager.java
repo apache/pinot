@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -44,7 +42,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
@@ -118,11 +115,9 @@ public class RealtimeTableDataManager implements TableDataManager {
     }
     _readMode = ReadMode.valueOf(_tableDataManagerConfig.getReadMode());
     _indexLoadingConfigMetadata = _tableDataManagerConfig.getIndexLoadingConfigMetadata();
-    LOGGER
-        .info("Initialized RealtimeTableDataManager: table : " + _tableName + " with :\n\tData Directory: "
-            + _tableDataDir + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
-            + ((_numberOfTableQueryExecutorThreads > 0) ? _numberOfTableQueryExecutorThreads : "cached")
-            + " threads");
+    LOGGER.info("Initialized RealtimeTableDataManager: table : " + _tableName + " with :\n\tData Directory: "
+        + _tableDataDir + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
+        + ((_numberOfTableQueryExecutorThreads > 0) ? _numberOfTableQueryExecutorThreads : "cached") + " threads");
   }
 
   @Override
@@ -196,21 +191,8 @@ public class RealtimeTableDataManager implements TableDataManager {
               // this is a new segment, lets create an instance of RealtimeSegmentDataManager
               PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
                   PinotHelixPropertyStoreZnRecordProvider.forSchema(propertyStore);
-              String path =
-                  StringUtil.join("/", propertyStoreHelper.getRelativePath(), tableConfig.getValidationConfig()
-                      .getSchemaName());
-              List<String> schemas = propertyStore.getChildNames(path, AccessOption.PERSISTENT);
-              List<Integer> schemasIds = new ArrayList<Integer>();
-              for (String id : schemas) {
-                schemasIds.add(Integer.parseInt(id));
-              }
-              Collections.sort(schemasIds);
-              String latest = String.valueOf(schemasIds.get(schemasIds.size() - 1));
-              LOGGER.info("found schema {} with version {}", tableConfig.getValidationConfig().getSchemaName(), latest);
-
-              ZNRecord record =
-                  propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName() + "/" + latest);
-
+              ZNRecord record = propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName());
+              LOGGER.info("found schema {} ", tableConfig.getValidationConfig().getSchemaName());
               SegmentDataManager manager =
                   new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, tableConfig,
                       instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record));

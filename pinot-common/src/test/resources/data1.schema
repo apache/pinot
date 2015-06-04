@@ -33,6 +33,5 @@
       "name" : "outgoingName1"
     }
   },
-  "schemaName" : "schemaName",
-  "schemaVersion" : 1009
+  "schemaName" : "schemaName"
 }
