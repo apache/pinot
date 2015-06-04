@@ -143,6 +143,9 @@ public class ThirdEyeJob {
   private static final String DEFAULT_SKIP_MISSING = "true";
   private static final String DEFAULT_FOLDER_PERMISSION = "755";
   private static final String FOLDER_PERMISSION_REGEX = "0?[1-7]{3}";
+  private static final String DEFAULT_POLL_ENABLE = "false";
+  private static final String DEFAULT_POLL_FREQUENCY = "60000";
+  private static final String DEFAULT_POLL_TIMEOUT = "3600000";
   private static final String INPUT_PATHS_JOINER = ",";
   private static final String DATA_FOLDER_JOINER = "_";
 
@@ -173,6 +176,23 @@ public class ThirdEyeJob {
       Properties getJobProperties(Properties inputConfig, String root, String collection,
           FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths) {
         return inputConfig;
+      }
+    },
+    WAIT {
+      @Override
+      Class<?> getKlazz() {
+        return null;
+      }
+
+      @Override
+      String getDescription() {
+        return "Polls a pre-determined amount of time for the existence of input paths";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection, FlowSpec flowSpec,
+          DateTime minTime, DateTime maxTime, String inputPaths) throws Exception {
+        return null;
       }
     },
     ANALYSIS {
@@ -764,6 +784,7 @@ public class ThirdEyeJob {
 
         FlowSpec flowSpec = null;
     switch (phaseSpec) {
+    case WAIT:
     case ANALYSIS:
     case AGGREGATION:
     case ROLLUP_PHASE1:
@@ -936,9 +957,40 @@ public class ThirdEyeJob {
 
 
 
-    }
-    else if (PhaseSpec.CLEANUP.equals(phaseSpec))
-    {
+    } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
+
+      boolean pollEnable = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_ENABLE.getName(), DEFAULT_POLL_ENABLE));
+      LOGGER.info("Poll enable {}",pollEnable);
+      if (pollEnable) {
+
+        FileSystem fileSystem = FileSystem.get(new Configuration());
+
+        long elapsedTime = 0;
+        long pollStart = (new DateTime()).getMillis();
+        long pollFrequency = Long.parseLong(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_FREQUENCY.getName(), DEFAULT_POLL_FREQUENCY));
+        long pollTimeout = Long.parseLong(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_TIMEOUT.getName(), DEFAULT_POLL_TIMEOUT));
+        LOGGER.info("Polling input paths {} with poll frequency {} and poll timeout {}",inputPaths, pollFrequency, pollTimeout);
+
+        String[] inputs = inputConfig.getProperty(ThirdEyeJobConstants.INPUT_PATHS.getName()).split(INPUT_PATHS_JOINER);
+        for (String input : inputs) {
+          Path inputPath = new Path(input);
+
+          LOGGER.info("Beginning polling for path {}", inputPath);
+
+          while (!fileSystem.exists(inputPath) && elapsedTime < pollTimeout) {
+            LOGGER.info("Path {} doesn't exist, will check again after {} milliseconds", inputPath, pollFrequency);
+            TimeUnit.MILLISECONDS.sleep(pollFrequency);
+            elapsedTime = new DateTime().getMillis() - pollStart;
+          }
+
+          if (fileSystem.exists(inputPath)) {
+            LOGGER.info("Path {} is available", inputPath);
+          } else {
+            throw new IllegalStateException("Timed out waiting for input paths");
+          }
+        }
+      }
+    } else if (PhaseSpec.CLEANUP.equals(phaseSpec)) {
 
       boolean cleanupSkip = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_SKIP.getName(), DEFAULT_CLEANUP_SKIP));
       LOGGER.info("cleanup skip {}", cleanupSkip);

@@ -15,7 +15,10 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_CLEANUP_DAYSAGO("thirdeye.cleanup.daysago"),
   THIRDEYE_CLEANUP_SKIP("thirdeye.cleanup.skip"),
   THIRDEYE_SKIP_MISSING("thirdeye.skip.missing"),
-  THIRDEYE_FOLDER_PERMISSION("thirdeye.folder.permission");
+  THIRDEYE_FOLDER_PERMISSION("thirdeye.folder.permission"),
+  THIRDEYE_POLL_ENABLE("thirdeye.poll.enable"),
+  THIRDEYE_POLL_FREQUENCY("thirdeye.poll.frequency"),
+  THIRDEYE_POLL_TIMEOUT("thirdeye.poll.timeout");
 
   private final String propertyName;
 
