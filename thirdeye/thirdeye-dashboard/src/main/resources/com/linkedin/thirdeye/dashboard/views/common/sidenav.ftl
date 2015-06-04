@@ -93,7 +93,8 @@
                     <i
                         class="uk-icon-info-circle"
                         data-uk-tooltip
-                        title="Sum points at the given interval"
+                        title="Aggregation window (e.g. all events in 3 hour
+                        period)"
                     >
                     </i>
                   </label>
@@ -117,7 +118,8 @@
                         <i
                             class="uk-icon-info-circle"
                             data-uk-tooltip
-                            title="Unweighted mean over a previous range"
+                            title="Average over a sliding window (e.g. last 7
+                            days)"
                         >
                         </i>
 
