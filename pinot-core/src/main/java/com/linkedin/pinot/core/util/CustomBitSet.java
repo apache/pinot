@@ -42,7 +42,7 @@ public final class CustomBitSet {
       throw new IllegalArgumentException("need at least one byte");
     }
     this.nrBytes = nrBytes;
-    buf = ByteBuffer.allocate(nrBytes);
+    buf = ByteBuffer.allocateDirect(nrBytes);
   }
 
   private CustomBitSet(final int numBytes, final ByteBuffer buffer) {

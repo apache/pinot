@@ -32,17 +32,34 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  *
  */
 public class PerfBenchmarkRunner {
+
+  public static void startComponents(boolean zk, boolean controller, boolean broker, boolean server) throws Exception {
+    //create conf with default values
+    PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
+    conf.setStartBroker(broker);
+    conf.setStartController(controller);
+    conf.setStartServer(server);
+    conf.setStartZookeeper(zk);
+    conf.setUploadIndexes(false);
+    conf.setRunQueries(false);
+    conf.setServerInstanceSegmentTarDir(null);
+    conf.setServerInstanceDataDir(null);
+    conf.setConfigureResources(false);
+    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    driver.run();
+  }
+
   /**
    * The segments are already extracted into a directory
    * @throws Exception 
    */
-  public static void setupWithPreLoadedSegments(String directory, String offlineTableName) throws Exception {
+  public static void startServerWithPreLoadedSegments(String directory, String offlineTableName) throws Exception {
     //create conf with default values
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
-    conf.setStartBroker(true);
-    conf.setStartController(true);
+    conf.setStartBroker(false);
+    conf.setStartController(false);
     conf.setStartServer(true);
-    conf.setStartZookeeper(true);
+    conf.setStartZookeeper(false);
     conf.setUploadIndexes(false);
     conf.setRunQueries(false);
     conf.setServerInstanceSegmentTarDir(null);
@@ -65,10 +82,13 @@ public class PerfBenchmarkRunner {
 
   public static void main(String[] args) throws Exception {
     if (args.length > 0) {
-      if (args[0].equalsIgnoreCase("setupWithPreLoadedSegments")) {
+      if (args[0].equalsIgnoreCase("startServerWithPreLoadedSegments")) {
         String offlineTableName = args[1];
         String indexRootDirectory = args[2];
-        setupWithPreLoadedSegments(indexRootDirectory, offlineTableName);
+        startServerWithPreLoadedSegments(indexRootDirectory, offlineTableName);
+      }
+      if (args[0].equalsIgnoreCase("startAllButServer")) {
+        startComponents(true, true, true, false);
       }
     } else {
       System.err.println("Expected one of [setupWithPreLoadedSegments]");

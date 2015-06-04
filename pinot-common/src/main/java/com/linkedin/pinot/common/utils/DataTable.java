@@ -26,6 +26,7 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -45,6 +46,8 @@ import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
  * Read only Datatable. Use DataTableBuilder to build the data table
  */
 public class DataTable {
+  private static final Charset UTF8 = Charset.forName("UTF-8");
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTable.class);
 
   int numRows;
@@ -305,10 +308,10 @@ public class DataTable {
       final DataOutputStream out = new DataOutputStream(baos);
       out.writeInt(metadata.size());
       for (Entry<String, String> entry : metadata.entrySet()) {
-        byte[] keyBytes = entry.getKey().getBytes();
+        byte[] keyBytes = entry.getKey().getBytes(UTF8);
         out.writeInt(keyBytes.length);
         out.write(keyBytes);
-        byte[] valueBytes = entry.getValue().getBytes();
+        byte[] valueBytes = entry.getValue().getBytes(UTF8);
         out.writeInt(valueBytes.length);
         out.write(valueBytes);
       }
@@ -344,14 +347,14 @@ public class DataTable {
       final DataOutputStream out = new DataOutputStream(baos);
       out.writeInt(dictionary.size());
       for (String key : dictionary.keySet()) {
-        byte[] bytes = key.getBytes();
+        byte[] bytes = key.getBytes(UTF8);
         out.writeInt(bytes.length);
         out.write(bytes);
         Map<Integer, String> map = dictionary.get(key);
         out.writeInt(map.size());
         for (Entry<Integer, String> entry : map.entrySet()) {
           out.writeInt(entry.getKey());
-          byte[] valueBytes = entry.getValue().getBytes();
+          byte[] valueBytes = entry.getValue().getBytes(UTF8);
           out.writeInt(valueBytes.length);
           out.write(valueBytes);
         }

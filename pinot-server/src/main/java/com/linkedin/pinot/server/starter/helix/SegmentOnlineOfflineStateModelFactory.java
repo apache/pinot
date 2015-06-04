@@ -45,7 +45,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
@@ -53,7 +52,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 /**
  * Data Server layer state model to take over how to operate on:
  * 1. Add a new segment
- * 2. Refresh an existed now servring segment.
+ * 2. Refresh an existed now serving segment.
  * 3. Delete an existed segment.
  *
  *
@@ -66,9 +65,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   private static String HELIX_CLUSTER_NAME;
   private static int SEGMENT_LOAD_MAX_RETRY_COUNT;
   private static long SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS;
+  private ZkHelixPropertyStore<ZNRecord> propertyStore;
 
   public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId,
-      DataManager instanceDataManager, SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties) {
+      DataManager instanceDataManager, SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties, 
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    this.propertyStore = propertyStore;
     HELIX_CLUSTER_NAME = helixClusterName;
     INSTANCE_ID = instanceId;
     INSTANCE_DATA_MANAGER = instanceDataManager;
@@ -147,9 +149,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String tableName = message.getResourceName();
 
-      ZkHelixPropertyStore<ZNRecord> propertyStore =
-          ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
-
       SegmentZKMetadata realtimeSegmentZKMetadata =
           ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentId);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
@@ -165,8 +164,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String tableName = message.getResourceName();
 
-      ZkHelixPropertyStore<ZNRecord> propertyStore =
-          ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentId);

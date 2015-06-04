@@ -58,6 +58,7 @@ import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
@@ -86,6 +87,8 @@ public class PerfBenchmarkDriver {
   private String serverInstanceSegmentTarDir;
 
   private String serverInstanceName;
+
+  private PinotHelixResourceManager helixResourceManager;
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
     this.conf = conf;
@@ -227,6 +230,12 @@ public class PerfBenchmarkDriver {
       LOGGER.info("Skipping start controller step. Assumes controller is already started");
       return;
     }
+    ControllerConf conf = getControllerConf();
+    controllerStarter = new ControllerStarter(conf);
+    controllerStarter.start();
+  }
+
+  private ControllerConf getControllerConf() {
     ControllerConf conf = new ControllerConf();
     conf.setHelixClusterName(clusterName);
     conf.setZkStr(zkAddress);
@@ -234,8 +243,7 @@ public class PerfBenchmarkDriver {
     conf.setControllerPort(String.valueOf(controllerPort));
     conf.setDataDir(controllerDataDir);
     conf.setControllerVipHost("localhost");
-    controllerStarter = new ControllerStarter(conf);
-    controllerStarter.start();
+    return conf;
   }
 
   public void configureResources() throws Exception {
@@ -257,12 +265,14 @@ public class PerfBenchmarkDriver {
     // create broker tenant
     Tenant brokerTenant =
         new TenantBuilder(brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(numInstances).build();
-    controllerStarter.getHelixResourceManager().createBrokerTenant(brokerTenant);
+    helixResourceManager = new PinotHelixResourceManager(getControllerConf());
+    helixResourceManager.start();
+    helixResourceManager.createBrokerTenant(brokerTenant);
     // create server tenant
     Tenant serverTenant =
         new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
             .setOfflineInstances(numInstances).build();
-    controllerStarter.getHelixResourceManager().createServerTenant(serverTenant);
+    helixResourceManager.createServerTenant(serverTenant);
     // upload schema 
 
     // create table
@@ -270,11 +280,11 @@ public class PerfBenchmarkDriver {
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName,
             numReplicas, segmentAssignmentStrategy).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
-    controllerStarter.getHelixResourceManager().addTable(offlineTableConfig);
+    helixResourceManager.addTable(offlineTableConfig);
   }
 
   public void addSegment(SegmentMetadata metadata) {
-    controllerStarter.getHelixResourceManager().addSegment(metadata,
+    helixResourceManager.addSegment(metadata,
         "http://" + controllerHost + ":" + controllerPort + "/" + metadata.getName());
   }
 

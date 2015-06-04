@@ -93,7 +93,7 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
           headerSize);
 
     } else {
-      byteBuffer = ByteBuffer.allocate((int) headerSize);
+      byteBuffer = ByteBuffer.allocateDirect((int) headerSize);
       raf.getChannel().read(byteBuffer);
 
     }
@@ -113,7 +113,7 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
       dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
           headerSize, dataSize);
     } else {
-      dataBuffer = ByteBuffer.allocate((int) dataSize);
+      dataBuffer = ByteBuffer.allocateDirect((int) dataSize);
       raf.getChannel().read(dataBuffer, headerSize);
     }
     dataSectionReader = new FixedByteWidthRowColDataFileReader(dataBuffer,

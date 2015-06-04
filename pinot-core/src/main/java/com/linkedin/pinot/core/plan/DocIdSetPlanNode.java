@@ -50,7 +50,7 @@ public class DocIdSetPlanNode implements PlanNode {
   }
 
   @Override
-  public synchronized Operator run() {
+  public Operator run() {
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
       if (_filterNode != null) {

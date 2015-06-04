@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -77,6 +78,6 @@ static TypeReference typeReference = new TypeReference<Map<String, Object>>() {
   public byte[] toBytes() throws IOException {
     StringWriter writer = new StringWriter();
     OBJECT_MAPPER.writeValue(writer, _fieldMap);
-    return writer.toString().getBytes();
+    return writer.toString().getBytes(Charset.forName("UTF-8"));
   }
 }

@@ -121,7 +121,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
           headerSize);
 
     } else {
-      byteBuffer = ByteBuffer.allocate(headerSize);
+      byteBuffer = ByteBuffer.allocateDirect(headerSize);
       raf.getChannel().read(byteBuffer);
 
     }
@@ -140,7 +140,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
       dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
           headerSize, dataSizeInBytes);
     } else {
-      dataBuffer = ByteBuffer.allocate(dataSizeInBytes);
+      dataBuffer = ByteBuffer.allocateDirect(dataSizeInBytes);
       raf.getChannel().read(dataBuffer, headerSize);
     }
     dataSectionReader =  FixedBitWidthRowColDataFileReader.forByteBuffer(dataBuffer,

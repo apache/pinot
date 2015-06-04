@@ -46,7 +46,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  */
 public class FixedBitWidthRowColDataFileReader {
   private static final Logger LOGGER = LoggerFactory
-      .getLogger(GenericRowColumnDataFileReader.class);
+      .getLogger(FixedBitWidthRowColDataFileReader.class);
 
   RandomAccessFile file;
   private int rows;
@@ -170,7 +170,7 @@ public class FixedBitWidthRowColDataFileReader {
     if (isMmap) {
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes);
     } else {
-      byteBuffer = ByteBuffer.allocate(totalSizeInBytes);
+      byteBuffer = ByteBuffer.allocateDirect(totalSizeInBytes);
       file.getChannel().read(byteBuffer);
     }
     ownsByteBuffer = true;

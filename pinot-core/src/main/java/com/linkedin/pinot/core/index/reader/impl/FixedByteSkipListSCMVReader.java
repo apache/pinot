@@ -94,19 +94,19 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
           new FixedByteWidthRowColDataFileReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });
     } else {
       //chunk offsets
-      chunkOffsetsBuffer = ByteBuffer.allocate(chunkOffsetHeaderSize);
+      chunkOffsetsBuffer = ByteBuffer.allocateDirect(chunkOffsetHeaderSize);
       raf.getChannel().read(chunkOffsetsBuffer);
       chunkOffsetsReader =
           new FixedByteWidthRowColDataFileReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER,
               new int[] { SIZE_OF_INT });
 
       //bitset buffer
-      bitsetBuffer = ByteBuffer.allocate(bitsetSize);
+      bitsetBuffer = ByteBuffer.allocateDirect(bitsetSize);
       raf.getChannel().read(bitsetBuffer);
       customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
 
       //raw data
-      rawDataBuffer = ByteBuffer.allocate(rawDataSize);
+      rawDataBuffer = ByteBuffer.allocateDirect(rawDataSize);
       raf.getChannel().read(rawDataBuffer);
       rawDataReader =
           new FixedByteWidthRowColDataFileReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });

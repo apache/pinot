@@ -48,7 +48,7 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  */
 public class FixedByteWidthRowColDataFileReader implements Closeable {
   private static final Logger LOGGER = LoggerFactory
-      .getLogger(GenericRowColumnDataFileReader.class);
+      .getLogger(FixedByteWidthRowColDataFileReader.class);
 
   RandomAccessFile file;
   private final int rows;
@@ -115,7 +115,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
           .map(FileChannel.MapMode.READ_ONLY, 0, totalSize)
           .order(ByteOrder.BIG_ENDIAN);
     } else {
-      byteBuffer = ByteBuffer.allocate((int) totalSize);
+      byteBuffer = ByteBuffer.allocateDirect((int) totalSize);
       file.getChannel().read(byteBuffer);
     }
   }
