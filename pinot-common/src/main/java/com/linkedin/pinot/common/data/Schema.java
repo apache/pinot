@@ -252,7 +252,7 @@ public class Schema {
 
   @JsonIgnore(true)
   public String getTimeColumnName() {
-    return timeFieldSpec.getName();
+    return (timeFieldSpec != null) ? timeFieldSpec.getName() : null;
   }
 
   public TimeFieldSpec getTimeFieldSpec() {
