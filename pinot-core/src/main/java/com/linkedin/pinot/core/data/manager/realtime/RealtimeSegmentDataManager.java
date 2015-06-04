@@ -162,7 +162,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
 
-          TimeUnit timeUnit = schema.getTimeSpec().getOutgoingGranularitySpec().getTimeType();
+          TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
           swap();
           RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
           metadaToOverrite.setTableName(segmentMetadata.getTableName());

@@ -22,21 +22,22 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,16 +53,21 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
  * 3. the real world business logic: dimensions, metrics and timeStamps.
  * Different indexing and query strategies are used for different data schema types.
  *
- *
  */
+
 public class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
-  private Map<String, FieldSpec> fieldSpecMap = new HashMap<String, FieldSpec>();
-  private String timeColumnName;
-  private List<String> dimensions;
-  private List<String> metrics;
+  private List<MetricFieldSpec> metricFieldSpecs;
+  private List<DimensionFieldSpec> dimensionFieldSpecs;
+  private TimeFieldSpec timeFieldSpec;
   private String schemaName;
   private Long schemaVersion;
+
+  @JsonIgnore(true)
+  private Set<String> dimensions;
+
+  @JsonIgnore(true)
+  private Set<String> metrics;
 
   @JsonIgnore(true)
   private String jsonSchema;
@@ -87,99 +93,170 @@ public class Schema {
   }
 
   public Schema() {
-    this.dimensions = new LinkedList<String>();
-    this.metrics = new LinkedList<String>();
+    dimensions = new HashSet<String>();
+    metrics = new HashSet<String>();
+    dimensionFieldSpecs = new ArrayList<DimensionFieldSpec>();
+    metricFieldSpecs = new ArrayList<MetricFieldSpec>();
+    timeFieldSpec = null;
   }
 
+  public List<MetricFieldSpec> getMetricFieldSpecs() {
+    return metricFieldSpecs;
+  }
+
+  public void setMetricFieldSpecs(List<MetricFieldSpec> metricFieldSpecs) {
+    for (MetricFieldSpec spec : metricFieldSpecs) {
+      addSchema(spec.getName(), spec);
+    }
+  }
+
+  public List<DimensionFieldSpec> getDimensionFieldSpecs() {
+    return dimensionFieldSpecs;
+  }
+
+  public void setDimensionFieldSpecs(List<DimensionFieldSpec> dimensionFieldSpecs) {
+    for (DimensionFieldSpec spec : dimensionFieldSpecs) {
+      addSchema(spec.getName(), spec);
+    }
+  }
+
+  public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
+    this.timeFieldSpec = timeFieldSpec;
+  }
+
+  @JsonIgnore(true)
   public void setJSONSchema(String schemaJSON) {
     jsonSchema = schemaJSON;
   }
 
+  @JsonIgnore(true)
   public String getJSONSchema() {
     return jsonSchema;
   }
 
-  protected void setFieldSpecMap(Map<String, FieldSpec> fieldSpecMap) {
-    this.fieldSpecMap = fieldSpecMap;
-  }
-
-  protected void setDimensions(List<String> dimensions) {
-    this.dimensions = dimensions;
-  }
-
-  protected void setMetrics(List<String> metrics) {
-    this.metrics = metrics;
-  }
-
+  @JsonIgnore(true)
   public void addSchema(String columnName, FieldSpec fieldSpec) {
     if (fieldSpec.getName() == null) {
       fieldSpec.setName(columnName);
     }
 
-    if (fieldSpecMap.containsKey(columnName)) {
-      return;
-    }
-
     if (columnName != null) {
-      fieldSpecMap.put(columnName, fieldSpec);
-
       if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
-        dimensions.add(columnName);
-        Collections.sort(dimensions);
+        if (dimensions.add(columnName)) {
+          dimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
+        }
       } else if (fieldSpec.getFieldType() == FieldType.METRIC) {
-        metrics.add(columnName);
-        Collections.sort(metrics);
+        if (metrics.add(columnName)) {
+          metricFieldSpecs.add((MetricFieldSpec) fieldSpec);
+        }
       } else if (fieldSpec.getFieldType() == FieldType.TIME) {
-        timeColumnName = columnName;
+        timeFieldSpec = (TimeFieldSpec) fieldSpec;
       }
     }
   }
 
-  public void removeSchema(String columnName) {
-    if (fieldSpecMap.containsKey(columnName)) {
-      fieldSpecMap.remove(columnName);
-    }
-  }
-
+  @JsonIgnore(true)
   public boolean isExisted(String columnName) {
-    return fieldSpecMap.containsKey(columnName);
+    if (dimensions.contains(columnName)) {
+      return true;
+    }
+    if (metrics.contains(columnName)) {
+      return true;
+    }
+    if (timeFieldSpec != null && timeFieldSpec.getName().equals(columnName)) {
+      return true;
+    }
+    return false;
   }
 
-  @JsonIgnore
+  @JsonIgnore(true)
   public Collection<String> getColumnNames() {
-    return fieldSpecMap.keySet();
+    Set<String> ret = new HashSet<String>();
+    ret.addAll(metrics);
+    ret.addAll(dimensions);
+    if (timeFieldSpec != null) {
+      ret.add(timeFieldSpec.getName());
+    }
+    return ret;
   }
 
+  @JsonIgnore(true)
   public int size() {
-    return fieldSpecMap.size();
+    return metricFieldSpecs.size() + dimensionFieldSpecs.size() + (timeFieldSpec == null ? 0 : 1);
   }
 
+  @JsonIgnore(true)
   public FieldSpec getFieldSpecFor(String column) {
-    return fieldSpecMap.get(column);
+    if (dimensions.contains(column)) {
+      return getDimensionSpec(column);
+    }
+    if (metrics.contains(column)) {
+      return getMetricSpec(column);
+    }
+    if (timeFieldSpec != null && timeFieldSpec.getName().equals(column)) {
+      return getTimeFieldSpec();
+    }
+
+    return null;
   }
 
-  @JsonIgnore
+  @JsonIgnore(true)
+  public MetricFieldSpec getMetricSpec(final String metricName) {
+    return (MetricFieldSpec) CollectionUtils.find(metricFieldSpecs, new Predicate() {
+      @Override
+      public boolean evaluate(Object object) {
+        if (object instanceof MetricFieldSpec) {
+          MetricFieldSpec spec = (MetricFieldSpec) object;
+          return spec.getName().equals(metricName);
+        }
+
+        return false;
+      }
+    });
+  }
+
+  @JsonIgnore(true)
+  public DimensionFieldSpec getDimensionSpec(final String dimensionName) {
+    return (DimensionFieldSpec) CollectionUtils.find(dimensionFieldSpecs, new Predicate() {
+      @Override
+      public boolean evaluate(Object object) {
+        if (object instanceof DimensionFieldSpec) {
+          DimensionFieldSpec spec = (DimensionFieldSpec) object;
+          return spec.getName().equals(dimensionName);
+        }
+        return false;
+      }
+    });
+  }
+
+  @JsonIgnore(true)
   public Collection<FieldSpec> getAllFieldSpecs() {
-    return fieldSpecMap.values();
+    List<FieldSpec> ret = new ArrayList<FieldSpec>();
+    ret.addAll(metricFieldSpecs);
+    ret.addAll(dimensionFieldSpecs);
+    if (timeFieldSpec != null) {
+      ret.add(timeFieldSpec);
+    }
+    return ret;
   }
 
-  @JsonIgnore
+  @JsonIgnore(true)
   public List<String> getDimensionNames() {
-    return dimensions;
+    return new ArrayList<String>(dimensions);
   }
 
-  @JsonIgnore
+  @JsonIgnore(true)
   public List<String> getMetricNames() {
-    return metrics;
+    return new ArrayList<String>(metrics);
   }
 
+  @JsonIgnore(true)
   public String getTimeColumnName() {
-    return timeColumnName;
+    return timeFieldSpec.getName();
   }
 
-  @JsonIgnore
-  public TimeFieldSpec getTimeSpec() {
-    return (TimeFieldSpec) fieldSpecMap.get(timeColumnName);
+  public TimeFieldSpec getTimeFieldSpec() {
+    return timeFieldSpec;
   }
 
   public String getSchemaName() {
@@ -190,66 +267,32 @@ public class Schema {
     this.schemaName = schemaName;
   }
 
-  @JsonIgnore
   public long getSchemaVersion() {
     if (schemaVersion == null) {
       return -1;
     }
     return schemaVersion;
-
   }
 
   public void setSchemaVersion(long schemaVersion) {
     this.schemaVersion = schemaVersion;
   }
 
-  // Added getters for Json annotator to work for args4j.
-  public Map<String, FieldSpec> getFieldSpecMap() {
-    return fieldSpecMap;
-  }
-
-  public List<String> getDimensions() {
-    return dimensions;
-  }
-
-  public List<String> getMetrics() {
-    return metrics;
-  }
-
-  public void setTimeColumnName(String timeColumnName) {
-    this.timeColumnName = timeColumnName;
-  }
-
   @Override
   public String toString() {
-    final StringBuilder result = new StringBuilder();
-    final String newLine = System.getProperty("line.separator");
-
-    result.append(this.getClass().getName());
-    result.append(" Object {");
-    result.append(newLine);
-
-    //determine fields declared in this class only (no fields of superclass)
-    final Field[] fields = this.getClass().getDeclaredFields();
-
-    //print field names paired with their values
-    for (final Field field : fields) {
-      result.append("  ");
-      try {
-        result.append(field.getName());
-        result.append(": ");
-        //requires access to private field:
-        result.append(field.get(this));
-      } catch (final IllegalAccessException ex) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn("Caught exception while processing field " + field, ex);
-        }
-      }
-      result.append(newLine);
+    JSONObject ret = new JSONObject();
+    try {
+      ret.put("metricFieldSpecs", new ObjectMapper().writeValueAsString(metricFieldSpecs));
+      ret.put("dimensionFieldSpecs", new ObjectMapper().writeValueAsString(dimensionFieldSpecs));
+      ret.put("timeFieldSpec", new ObjectMapper().writeValueAsString(timeFieldSpec));
+      ret.put("schemaName", schemaName);
+      ret.put("schemaVersion", schemaVersion);
+    } catch (Exception e) {
+      LOGGER.error("error processing toString on Schema : ", this.schemaName, e);
+      return null;
     }
-    result.append("}");
 
-    return result.toString();
+    return ret.toString();
   }
 
   public static class SchemaBuilder {
@@ -333,16 +376,21 @@ public class Schema {
 
     Schema other = (Schema) o;
 
-    return isEqual(fieldSpecMap, other.fieldSpecMap) && isEqual(timeColumnName, other.timeColumnName)
-        && isEqual(dimensions, other.dimensions) && isEqual(metrics, other.metrics);
+    return isEqual(dimensions, other.dimensions) && isEqual(timeFieldSpec, other.timeFieldSpec)
+        && isEqual(metrics, other.metrics) && isEqual(schemaName, other.schemaName)
+        && isEqual(schemaVersion, other.schemaVersion) && isEqual(metricFieldSpecs, other.metricFieldSpecs)
+        && isEqual(dimensionFieldSpecs, other.dimensionFieldSpecs);
   }
 
   @Override
   public int hashCode() {
-    int result = hashCodeOf(fieldSpecMap);
-    result = hashCodeOf(result, timeColumnName);
+    int result = hashCodeOf(dimensionFieldSpecs);
+    result = hashCodeOf(result, metricFieldSpecs);
+    result = hashCodeOf(result, timeFieldSpec);
     result = hashCodeOf(result, dimensions);
     result = hashCodeOf(result, metrics);
+    result = hashCodeOf(result, schemaName);
+    result = hashCodeOf(result, schemaVersion);
     return result;
   }
 }

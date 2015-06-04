@@ -21,6 +21,7 @@ import java.io.IOException;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -33,7 +34,7 @@ public class TestSchema {
   private static File schemaFile;
 
   @BeforeClass
-  public void setup() throws JsonParseException, JsonMappingException, IOException {
+  public void setup() throws JsonParseException, JsonMappingException, IOException, JSONException {
     schemaFile = new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("data1.schema")));
     schema = Schema.fromFile(schemaFile);
   }

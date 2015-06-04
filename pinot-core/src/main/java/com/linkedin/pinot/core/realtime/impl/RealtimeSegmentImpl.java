@@ -93,8 +93,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
-    incomingTimeColumnName = dataSchema.getTimeSpec().getIncomingTimeColumnName();
-    outgoingTimeColumnName = dataSchema.getTimeSpec().getOutGoingTimeColumnName();
+    incomingTimeColumnName = dataSchema.getTimeFieldSpec().getIncomingTimeColumnName();
+    outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName();
     this.capacity = capacity;
 
     for (FieldSpec col : dataSchema.getAllFieldSpecs()) {

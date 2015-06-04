@@ -45,7 +45,7 @@ public class RealtimeSegmentConverter {
     }
     this.tableName = tableName;
     this.segmentName = segmentName;
-    TimeFieldSpec original = schema.getTimeSpec();
+    TimeFieldSpec original = schema.getTimeFieldSpec();
     TimeGranularitySpec incoming = original.getIncomingGranularitySpec();
     // incoming.setDataType(DataType.LONG);
 
@@ -76,9 +76,9 @@ public class RealtimeSegmentConverter {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(dataSchema);
     genConfig.setInputFilePath(null);
 
-    genConfig.setTimeColumnName(dataSchema.getTimeSpec().getOutGoingTimeColumnName());
+    genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName());
 
-    genConfig.setTimeUnitForSegment(dataSchema.getTimeSpec().getOutgoingGranularitySpec().getTimeType());
+    genConfig.setTimeUnitForSegment(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     genConfig.setSegmentVersion(SegmentVersion.v1);
     genConfig.setTableName(tableName);
     genConfig.setIndexOutputDir(outputPath);

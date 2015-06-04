@@ -82,7 +82,9 @@ public class RealtimeQueriesSentinelTest {
   @BeforeClass
   public void setup() throws Exception {
 
-    PINOT_SCHEMA = getTestSchema(getSchemaMap());
+    PINOT_SCHEMA = getTestSchema();
+    PINOT_SCHEMA.setSchemaName("realtimeSchema");
+    PINOT_SCHEMA.setSchemaVersion(10L);
     AVRO_RECORD_TRANSFORMER = new AvroRecordToPinotRowGenerator(PINOT_SCHEMA);
     final IndexSegment indexSegment = getRealtimeSegment();
 
@@ -142,8 +144,7 @@ public class RealtimeQueriesSentinelTest {
   @Test
   public void test1() throws RecognitionException, Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    String query =
-        "select sum('count') from testTable where column13='1540094560' group by column3 top 100 limit 0";
+    String query = "select sum('count') from testTable where column13='1540094560' group by column3 top 100 limit 0";
     Map<Object, Double> fromAvro = new HashMap<Object, Double>();
     fromAvro.put(null, 2.0D);
     fromAvro.put("", 1.2469280068E10D);
@@ -298,79 +299,7 @@ public class RealtimeQueriesSentinelTest {
     return realtimeSegmentZKMetadata;
   }
 
-  private Map<String, String> getSchemaMap() {
-    Map<String, String> schemaMap = new HashMap<String, String>();
-    schemaMap.put("schema.column13.fieldType", "TIME");
-    schemaMap.put("schema.daysSinceEpoch.fieldType", "DIMENSION");
-    schemaMap.put("schema.column9.isSingleValue", "true");
-    schemaMap.put("schema.column1.dataType", "INT");
-    schemaMap.put("schema.column13.dataType", "INT");
-    schemaMap.put("schema.column3.fieldType", "DIMENSION");
-    schemaMap.put("schema.column8.isSingleValue", "true");
-    schemaMap.put("schema.column9.columnName", "column9");
-    schemaMap.put("schema.column7.dataType", "INT");
-    schemaMap.put("schema.column7.fieldType", "DIMENSION");
-    schemaMap.put("schema.column9.dataType", "INT");
-    schemaMap.put("schema.column5.isSingleValue", "true");
-    schemaMap.put("schema.column4.columnName", "column4");
-    schemaMap.put("schema.column10.columnName", "column10");
-    schemaMap.put("schema.column10.isSingleValue", "true");
-    schemaMap.put("schema.column5.delimeter", ",");
-    schemaMap.put("schema.daysSinceEpoch.isSingleValue", "true");
-    schemaMap.put("schema.column4.delimeter", ",");
-    schemaMap.put("schema.column3.isSingleValue", "true");
-    schemaMap.put("schema.column10.delimeter", ",");
-    schemaMap.put("schema.column10.dataType", "INT");
-    schemaMap.put("schema.column2.dataType", "INT");
-    schemaMap.put("schema.column10.fieldType", "DIMENSION");
-    schemaMap.put("schema.column3.delimeter", ",");
-    schemaMap.put("schema.daysSinceEpoch.columnName", "daysSinceEpoch");
-    schemaMap.put("schema.column9.fieldType", "DIMENSION");
-    schemaMap.put("schema.count.fieldType", "METRIC");
-    schemaMap.put("schema.weeksSinceEpochSunday.isSingleValue", "true");
-    schemaMap.put("schema.minutesSinceEpoch.timeUnit", "MINUTES");
-    schemaMap.put("schema.count.columnName", "count");
-    schemaMap.put("schema.daysSinceEpoch.dataType", "INT");
-    schemaMap.put("schema.column2.fieldType", "DIMENSION");
-    schemaMap.put("schema.column2.isSingleValue", "true");
-    schemaMap.put("schema.column6.isSingleValue", "false");
-    schemaMap.put("schema.column7.columnName", "column7");
-    schemaMap.put("schema.count.dataType", "INT");
-    schemaMap.put("schema.column2.delimeter", ",");
-    schemaMap.put("schema.column8.dataType", "INT");
-    schemaMap.put("schema.weeksSinceEpochSunday.dataType", "INT");
-    schemaMap.put("schema.column3.columnName", "column3");
-    schemaMap.put("schema.column6.columnName", "column6");
-    schemaMap.put("schema.column5.fieldType", "DIMENSION");
-    schemaMap.put("schema.column3.dataType", "STRING");
-    schemaMap.put("schema.column4.fieldType", "DIMENSION");
-    schemaMap.put("schema.minutesSinceEpoch.columnName", "minutesSinceEpoch");
-    schemaMap.put("schema.weeksSinceEpochSunday.fieldType", "DIMENSION");
-    schemaMap.put("schema.column4.dataType", "STRING");
-    schemaMap.put("schema.column5.columnName", "column5");
-    schemaMap.put("schema.column5.dataType", "STRING");
-    schemaMap.put("schema.column6.delimeter", ",");
-    schemaMap.put("schema.column1.fieldType", "DIMENSION");
-    schemaMap.put("schema.column6.dataType", "INT");
-    schemaMap.put("schema.column1.delimeter", ",");
-    schemaMap.put("schema.weeksSinceEpochSunday.delimeter", ",");
-    schemaMap.put("schema.column1.isSingleValue", "true");
-    schemaMap.put("schema.column8.delimeter", ",");
-    schemaMap.put("schema.column4.isSingleValue", "true");
-    schemaMap.put("schema.column8.columnName", "column8");
-    schemaMap.put("schema.column6.fieldType", "DIMENSION");
-    schemaMap.put("schema.column9.delimeter", ",");
-    schemaMap.put("schema.weeksSinceEpochSunday.columnName", "weeksSinceEpochSunday");
-    schemaMap.put("schema.column8.fieldType", "DIMENSION");
-    schemaMap.put("schema.daysSinceEpoch.delimeter", ",");
-    schemaMap.put("schema.column7.delimeter", ",");
-    schemaMap.put("schema.column7.isSingleValue", "false");
-    schemaMap.put("schema.column1.columnName", "column1");
-    schemaMap.put("schema.column2.columnName", "column2");
-    return schemaMap;
-  }
-
-  private com.linkedin.pinot.common.data.Schema getTestSchema(Map<String, String> schemaMap) throws Exception {
+  private com.linkedin.pinot.common.data.Schema getTestSchema() throws Exception {
     HashMap<String, FieldType> fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
     fieldTypeMap.put("column1", FieldType.DIMENSION);
     fieldTypeMap.put("column2", FieldType.DIMENSION);

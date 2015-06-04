@@ -39,13 +39,13 @@ public class TimeFieldSpec extends FieldSpec {
   }
 
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec) {
-    super(incominGranularitySpec.getColumnName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
+    super(incominGranularitySpec.getName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
-    super(incominGranularitySpec.getColumnName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
+    super(incominGranularitySpec.getName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = outgoingGranularitySpec;
   }
@@ -58,14 +58,45 @@ public class TimeFieldSpec extends FieldSpec {
     return incomingGranularitySpec.equals(outgoingGranularitySpec);
   }
 
-  @JsonIgnore
-  public String getIncomingTimeColumnName() {
-    return incomingGranularitySpec.getColumnName();
+  @Override
+  public String getName() {
+    return getOutgoingGranularitySpec().getName();
   }
 
-  @JsonIgnore
+  @Override
+  public String getDelimiter() {
+    return null;
+  }
+
+  @Override
+  public FieldType getFieldType() {
+    return FieldType.TIME;
+  }
+
+  @Override
+  public DataType getDataType() {
+    return getOutgoingGranularitySpec().getDataType();
+  }
+
+  @Override
+  public boolean isSingleValueField() {
+    return true;
+  }
+
+  public String getIncomingTimeColumnName() {
+    return incomingGranularitySpec.getName();
+  }
+
   public String getOutGoingTimeColumnName() {
-    return outgoingGranularitySpec.getColumnName();
+    return outgoingGranularitySpec.getName();
+  }
+
+  public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
+    this.incomingGranularitySpec = incomingGranularitySpec;
+  }
+
+  public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
+    this.outgoingGranularitySpec = outgoingGranularitySpec;
   }
 
   public TimeGranularitySpec getIncomingGranularitySpec() {
@@ -73,6 +104,9 @@ public class TimeFieldSpec extends FieldSpec {
   }
 
   public TimeGranularitySpec getOutgoingGranularitySpec() {
+    if (outgoingGranularitySpec == null) {
+      outgoingGranularitySpec = incomingGranularitySpec;
+    }
     return outgoingGranularitySpec;
   }
 }

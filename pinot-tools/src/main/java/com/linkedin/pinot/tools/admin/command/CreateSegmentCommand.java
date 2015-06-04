@@ -193,8 +193,8 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
               config.setTimeColumnName(schema.getTimeColumnName());
             }
 
-            if (schema.getTimeSpec() != null) {
-              config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
+            if (schema.getTimeFieldSpec() != null) {
+              config.setTimeUnitForSegment(schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType());
             } else {
               config.setTimeUnitForSegment(TimeUnit.DAYS);
             }

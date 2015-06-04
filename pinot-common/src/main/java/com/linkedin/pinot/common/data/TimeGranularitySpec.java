@@ -19,20 +19,21 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
+
 public class TimeGranularitySpec {
 
   DataType dataType;
   TimeUnit timeType;
-  String columnName;
+  String name;
 
   // Default constructor required by JSON de-serielizer.
   public TimeGranularitySpec() {
   }
 
-  public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String columnName) {
+  public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String name) {
     this.dataType = dataType;
     this.timeType = timeType;
-    this.columnName = columnName;
+    this.name = name;
   }
 
   public DataType getDataType() {
@@ -51,22 +52,25 @@ public class TimeGranularitySpec {
     this.timeType = timeType;
   }
 
-  protected String getColumnName() {
-    return columnName;
+  public String getName() {
+    return name;
   }
 
-  public void setColumnName(String columnName) {
-    this.columnName = columnName;
+  public void setName(String columnName) {
+    this.name = columnName;
   }
 
   @Override
   public boolean equals(Object object) {
-    if (!(object instanceof TimeGranularitySpec))
+    if (!(object instanceof TimeGranularitySpec)) {
       return false;
+    }
 
     TimeGranularitySpec spec = (TimeGranularitySpec) object;
-    if (this.getColumnName().equals(spec.getColumnName()) && spec.getDataType() == this.getDataType() && this.getTimeType() == spec.getTimeType())
+    if (this.getName().equals(spec.getName()) && spec.getDataType() == this.getDataType()
+        && this.getTimeType() == spec.getTimeType()) {
       return true;
+    }
 
     return false;
   }
@@ -75,7 +79,7 @@ public class TimeGranularitySpec {
   public int hashCode() {
     int result = dataType != null ? dataType.hashCode() : 0;
     result = 31 * result + (timeType != null ? timeType.hashCode() : 0);
-    result = 31 * result + (columnName != null ? columnName.hashCode() : 0);
+    result = 31 * result + (name != null ? name.hashCode() : 0);
     return result;
   }
 }

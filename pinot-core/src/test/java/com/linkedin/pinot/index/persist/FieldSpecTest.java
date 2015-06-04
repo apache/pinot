@@ -22,9 +22,9 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 
 
@@ -59,8 +59,10 @@ public class FieldSpecTest {
   public void testSchemaBuilder() {
     Schema schema =
         new SchemaBuilder().addSingleValueDimension("svDimension", DataType.INT)
-        .addMultiValueDimension("mvDimension", DataType.STRING, ",").addMetric("metric", DataType.INT)
-        .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG).build();
+            .addMultiValueDimension("mvDimension", DataType.STRING, ",").addMetric("metric", DataType.INT)
+            .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG).build();
+
+    System.out.println(schema);
 
     Assert.assertEquals(schema.getFieldSpecFor("svDimension").isSingleValueField(), true);
     Assert.assertEquals(schema.getFieldSpecFor("svDimension").getDataType(), DataType.INT);

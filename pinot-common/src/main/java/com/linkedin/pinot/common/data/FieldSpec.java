@@ -16,14 +16,13 @@
 package com.linkedin.pinot.common.data;
 
 import org.apache.avro.Schema.Type;
-import org.codehaus.jackson.annotate.JsonTypeInfo;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 
 // Json annotation required for abstract classes.
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
+//@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 public abstract class FieldSpec {
   private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.valueOf(Integer.MIN_VALUE);
@@ -41,7 +40,7 @@ public abstract class FieldSpec {
   DataType _dataType;
   boolean _isSingleValueField;
   String _delimiter;
-  Object _defaultNullValue = null;
+  Object _defaultNullValue;
 
   public FieldSpec() {
 
@@ -55,7 +54,8 @@ public abstract class FieldSpec {
     _delimiter = delimeter;
   }
 
-  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter, Object defaultNullValue) {
+  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter,
+      Object defaultNullValue) {
     _name = name;
     _fieldType = fType;
     _dataType = dType;
@@ -250,7 +250,7 @@ public abstract class FieldSpec {
     if (_defaultNullValue != null) {
       return _defaultNullValue;
     }
-    switch (_fieldType) {
+    switch (getFieldType()) {
       case METRIC:
         switch (_dataType) {
           case INT:
@@ -269,7 +269,7 @@ public abstract class FieldSpec {
             break;
         }
       default:
-        switch (_dataType) {
+        switch (getDataType()) {
           case INT:
           case INT_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_INT;
