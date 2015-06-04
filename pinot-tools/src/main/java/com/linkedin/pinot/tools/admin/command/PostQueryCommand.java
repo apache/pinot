@@ -49,21 +49,14 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     return "PostQuery";
   }
 
-  private String _brokerUrl = "http://localhost:" + _brokerPort;
-
   @Override
   public String toString() {
-    return ("PostQueryCommand -brokerUrl " + _brokerUrl + " -query " + _query);
+    return ("PostQueryCommand -brokerPort " + _brokerPort + " -query " + _query);
   }
 
   @Override
   public void cleanup() {
 
-  }
-
-  public PostQueryCommand setBrokerUrl(String brokerUrl) {
-    _brokerUrl = brokerUrl;
-    return this;
   }
 
   public PostQueryCommand setQuery(String query) {
@@ -75,7 +68,9 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     final JSONObject json = new JSONObject();
     json.put("pql",  _query);
 
-    final URLConnection conn = new URL(_brokerUrl + "/query").openConnection();
+    String brokerUrl = "http://localhost:" + _brokerPort;
+
+    final URLConnection conn = new URL(brokerUrl + "/query").openConnection();
     conn.setDoOutput(true);
 
     final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));

@@ -70,16 +70,16 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
     Map<String, String> processes = new HashMap<String, String>();
     String prefix = System.getProperty("java.io.tmpdir") + File.separator;
 
-    if (_controller) {
-      processes.put("PinotController", prefix + ".pinotAdminController.pid");
-    }
-
     if (_server) {
       processes.put("PinotServer", prefix + ".pinotAdminServer.pid");
     }
 
     if (_broker) {
       processes.put("PinotBroker", prefix + ".pinotAdminBroker.pid");
+    }
+
+    if (_controller) {
+      processes.put("PinotController", prefix + ".pinotAdminController.pid");
     }
 
     if (_zooKeeper) {
