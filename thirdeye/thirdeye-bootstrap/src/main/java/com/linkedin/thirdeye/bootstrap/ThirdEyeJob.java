@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
@@ -960,43 +961,45 @@ public class ThirdEyeJob {
     } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
 
       // Check if we need to poll for any input paths
-      FileSystem fileSystem = FileSystem.get(new Configuration());
-      String[] inputs = inputConfig.getProperty(ThirdEyeJobConstants.INPUT_PATHS.getName()).split(INPUT_PATHS_JOINER);
-      List<Path> missingInputs = new ArrayList<Path>();
-      for (String input : inputs)
-      {
-        if (!fileSystem.exists(new Path(input)))
-        {
-          missingInputs.add(new Path(input));
-          LOGGER.info("Missing input {}", input);
-        }
-      }
 
       boolean pollEnable = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_ENABLE.getName(), DEFAULT_POLL_ENABLE));
 
-      if (missingInputs.size() > 0 && pollEnable) {
+      if (pollEnable) {
+
+        FileSystem fileSystem = FileSystem.get(new Configuration());
 
         long elapsedTime = 0;
         long pollStart = (new DateTime()).getMillis();
         long pollFrequency = Long.parseLong(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_FREQUENCY.getName(), DEFAULT_POLL_FREQUENCY));
         long pollTimeout = Long.parseLong(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_TIMEOUT.getName(), DEFAULT_POLL_TIMEOUT));
 
-        for (Path inputPath : missingInputs) {
+        String[] inputs = inputConfig.getProperty(ThirdEyeJobConstants.INPUT_PATHS.getName()).split(INPUT_PATHS_JOINER);
+        List<String> missingInputs;
 
-          LOGGER.info("Polling for path {}", inputPath);
-
-          while (!fileSystem.exists(inputPath) && elapsedTime < pollTimeout) {
-            LOGGER.info("Path {} doesn't exist, will check again after {} milliseconds", inputPath, pollFrequency);
-            TimeUnit.MILLISECONDS.sleep(pollFrequency);
-            elapsedTime = new DateTime().getMillis() - pollStart;
+        while (elapsedTime < pollTimeout)
+        {
+          missingInputs = new ArrayList<String>();
+          for (String input : inputs) {
+            if (!fileSystem.exists(new Path(input))) {
+              missingInputs.add(input);
+              LOGGER.info("Missing input {}", input);
+            }
           }
-
-          if (fileSystem.exists(inputPath)) {
-            LOGGER.info("Path {} is available", inputPath);
-          } else {
-            throw new IllegalStateException("Timed out waiting for input paths");
+          if (missingInputs.size() == 0) {
+            LOGGER.info("All paths available");
+            break;
           }
+          LOGGER.info("Poll after {} milliseconds", pollFrequency);
+          TimeUnit.MILLISECONDS.sleep(pollFrequency);
+          elapsedTime = new DateTime().getMillis() - pollStart;
+          LOGGER.info("Time elapsed {} milliseconds", elapsedTime);
+          inputs = missingInputs.toArray(new String[missingInputs.size()]);
         }
+
+        if (elapsedTime > pollTimeout) {
+          LOGGER.info("Timed out waiting for input");
+        }
+
       }
     } else if (PhaseSpec.CLEANUP.equals(phaseSpec)) {
 
