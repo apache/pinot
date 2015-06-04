@@ -68,7 +68,9 @@
                 </div>
 
                 <div class="uk-form-row">
-                    <label class="uk-form-label">Baseline</label>
+                    <label class="uk-form-label">
+                        Baseline
+                    </label>
                     <div class="uk-form-controls">
                         <input id="sidenav-baseline-size" type="number" min="0" value="1" class="uk-form-width-small" />
                         <div class="uk-button uk-form-select" data-uk-form-select>
@@ -86,7 +88,15 @@
                 </div>
 
                 <div class="uk-form-row">
-                  <label class="uk-form-label">Aggregate</label>
+                  <label class="uk-form-label">
+                    Aggregate
+                    <i
+                        class="uk-icon-info-circle"
+                        data-uk-tooltip
+                        title="Sum points at the given interval"
+                    >
+                    </i>
+                  </label>
                   <div class="uk-form-controls">
                     <input id="sidenav-aggregate-size" type="number" min="1" value="1" class="uk-form-width-small" />
                     <div class="uk-button uk-form-select" data-uk-form-select>
@@ -104,6 +114,13 @@
                     <label class="uk-form-label">
                         Moving Average
                         <input type="checkbox" id="sidenav-moving-average"/>
+                        <i
+                            class="uk-icon-info-circle"
+                            data-uk-tooltip
+                            title="Unweighted mean over a previous range"
+                        >
+                        </i>
+
                     </label>
                     <div id="sidenav-moving-average-controls" class="uk-form-controls">
                         <input id="sidenav-moving-average-size" type="number" min="1" value="7" class="uk-form-width-small" />
