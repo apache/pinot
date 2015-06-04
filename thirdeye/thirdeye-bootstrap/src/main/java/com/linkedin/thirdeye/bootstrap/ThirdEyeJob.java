@@ -959,23 +959,31 @@ public class ThirdEyeJob {
 
     } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
 
-      boolean pollEnable = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_ENABLE.getName(), DEFAULT_POLL_ENABLE));
-      LOGGER.info("Poll enable {}",pollEnable);
-      if (pollEnable) {
+      // Check if we need to poll for any input paths
+      FileSystem fileSystem = FileSystem.get(new Configuration());
+      String[] inputs = inputConfig.getProperty(ThirdEyeJobConstants.INPUT_PATHS.getName()).split(INPUT_PATHS_JOINER);
+      List<Path> missingInputs = new ArrayList<Path>();
+      for (String input : inputs)
+      {
+        if (!fileSystem.exists(new Path(input)))
+        {
+          missingInputs.add(new Path(input));
+          LOGGER.info("Missing input {}", input);
+        }
+      }
 
-        FileSystem fileSystem = FileSystem.get(new Configuration());
+      boolean pollEnable = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_ENABLE.getName(), DEFAULT_POLL_ENABLE));
+
+      if (missingInputs.size() > 0 && pollEnable) {
 
         long elapsedTime = 0;
         long pollStart = (new DateTime()).getMillis();
         long pollFrequency = Long.parseLong(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_FREQUENCY.getName(), DEFAULT_POLL_FREQUENCY));
         long pollTimeout = Long.parseLong(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_POLL_TIMEOUT.getName(), DEFAULT_POLL_TIMEOUT));
-        LOGGER.info("Polling input paths {} with poll frequency {} and poll timeout {}",inputPaths, pollFrequency, pollTimeout);
 
-        String[] inputs = inputConfig.getProperty(ThirdEyeJobConstants.INPUT_PATHS.getName()).split(INPUT_PATHS_JOINER);
-        for (String input : inputs) {
-          Path inputPath = new Path(input);
+        for (Path inputPath : missingInputs) {
 
-          LOGGER.info("Beginning polling for path {}", inputPath);
+          LOGGER.info("Polling for path {}", inputPath);
 
           while (!fileSystem.exists(inputPath) && elapsedTime < pollTimeout) {
             LOGGER.info("Path {} doesn't exist, will check again after {} milliseconds", inputPath, pollFrequency);
