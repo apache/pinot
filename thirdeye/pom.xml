@@ -13,7 +13,6 @@
       <module>thirdeye-bootstrap</module>
       <module>thirdeye-tools</module>
       <module>thirdeye-anomaly</module>
-      <module>thirdeye-visualization</module>
       <module>thirdeye-realtime</module>
     <module>thirdeye-query</module>
     <module>thirdeye-dashboard</module>

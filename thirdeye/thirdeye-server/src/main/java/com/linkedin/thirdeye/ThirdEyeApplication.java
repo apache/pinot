@@ -1,15 +1,11 @@
 package com.linkedin.thirdeye;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.healthcheck.TimeRangeContiguityHealthCheck;
 import com.linkedin.thirdeye.healthcheck.KafkaConsumerLagHealthCheck;
 import com.linkedin.thirdeye.healthcheck.KafkaDataLagHealthCheck;
-import com.linkedin.thirdeye.healthcheck.StarTreeHealthCheck;
-import com.linkedin.thirdeye.healthcheck.TimeRangeHealthCheck;
 import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import com.linkedin.thirdeye.managed.KafkaConsumerManager;
@@ -148,32 +144,15 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     });
 
     // Health checks
-    environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
-                                        new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
-    environment.healthChecks().register(TimeRangeHealthCheck.NAME,
-                                        new TimeRangeHealthCheck(rootDir, starTreeManager));
-    environment.healthChecks().register(StarTreeHealthCheck.NAME,
-                                        new StarTreeHealthCheck(rootDir, starTreeManager));
-    environment.healthChecks().register(TimeRangeContiguityHealthCheck.NAME,
-                                        new TimeRangeContiguityHealthCheck(rootDir, starTreeManager));
     environment.healthChecks().register(KafkaDataLagHealthCheck.NAME,
                                         new KafkaDataLagHealthCheck(kafkaConsumerManager));
     environment.healthChecks().register(KafkaConsumerLagHealthCheck.NAME,
                                         new KafkaConsumerLagHealthCheck(kafkaConsumerManager));
 
     // Resources
-    TimeSeriesResource timeSeriesResource = new TimeSeriesResource(starTreeManager);
-    FunnelResource funnelResource = new FunnelResource(starTreeManager);
-    HeatMapResource heatMapResource = new HeatMapResource(starTreeManager, parallelQueryExecutor);
     environment.jersey().register(new CollectionsResource(
         starTreeManager, environment.metrics(), dataUpdateManager, rootDir));
     environment.jersey().register(new AdminResource());
-    environment.jersey().register(new AggregateResource(starTreeManager));
-    environment.jersey().register(timeSeriesResource);
-    environment.jersey().register(funnelResource);
-    environment.jersey().register(heatMapResource);
-    environment.jersey().register(new DashboardResource(
-        starTreeManager, timeSeriesResource, funnelResource, heatMapResource, config.getFeedbackAddress()));
     environment.jersey().register(new QueryResource(new ThirdEyeQueryExecutor(parallelQueryExecutor, starTreeManager)));
 
     // Tasks
@@ -193,8 +172,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     private TimeGranularity anomalyDetectionInterval;
 
-    private String feedbackAddress;
-
     public void setRootDir(String rootDir)
     {
       this.rootDir = rootDir;
@@ -213,11 +190,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setAnomalyDetectionInterval(TimeGranularity anomalyDetectionInterval)
     {
       this.anomalyDetectionInterval = anomalyDetectionInterval;
-    }
-
-    public void setFeedbackAddress(String feedbackAddress)
-    {
-      this.feedbackAddress = feedbackAddress;
     }
 
     @JsonProperty
@@ -241,12 +213,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public TimeGranularity getAnomalyDetectionInterval()
     {
       return anomalyDetectionInterval;
-    }
-
-    @JsonProperty
-    public String getFeedbackAddress()
-    {
-      return feedbackAddress;
     }
   }
 
