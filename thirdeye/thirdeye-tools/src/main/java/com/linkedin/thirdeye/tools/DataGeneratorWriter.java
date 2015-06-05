@@ -21,8 +21,8 @@ import com.linkedin.thirdeye.api.MetricSpec;
 
 public class DataGeneratorWriter {
 
-  DataGeneratorConfig config;
-  HashMap<String, ArrayList<String>> dimensionValues;
+  private DataGeneratorConfig config;
+  private HashMap<String, ArrayList<String>> dimensionValues;
 
   private static final Joiner PATH_JOINER = Joiner.on(File.separator);
 

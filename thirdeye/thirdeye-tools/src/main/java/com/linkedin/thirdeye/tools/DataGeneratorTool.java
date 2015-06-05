@@ -34,21 +34,12 @@ public class DataGeneratorTool {
     }
 
     config = new DataGeneratorConfig();
-    config.minTime = commandLine.hasOption("minTime")
-            ? commandLine.getOptionValue("minTime")
-            : null;
-    config.maxTime = commandLine.hasOption("maxTime")
-            ? commandLine.getOptionValue("maxTime")
-            : null;
-    config.numRecords = commandLine.hasOption("numRecords")
-            ? Long.valueOf(commandLine.getOptionValue("numRecords"))
-            : 0;
-    config.numFiles = commandLine.hasOption("numFiles")
-            ? Integer.valueOf(commandLine.getOptionValue("numFiles"))
-            : 0;
-    config.cardinality = commandLine.hasOption("cardinality")
-            ? commandLine.getOptionValue("cardinality")
-            : null;
+
+    config.minTime = commandLine.getOptionValue("minTime", null);
+    config.maxTime = commandLine.getOptionValue("maxTime", null);
+    config.numRecords = Integer.valueOf(commandLine.getOptionValue("numRecords", "0"));
+    config.numFiles = Integer.valueOf(commandLine.getOptionValue("numFiles", "0"));
+    config.cardinality = commandLine.getOptionValue("cardinality", null);
     config.starTreeConfig = StarTreeConfig.decode(new FileInputStream(commandLine.getArgs()[0]));
     config.schemaFile = new File(commandLine.getArgs()[1]);
     config.outputDataDirectory = new File(commandLine.getArgs()[2]);
