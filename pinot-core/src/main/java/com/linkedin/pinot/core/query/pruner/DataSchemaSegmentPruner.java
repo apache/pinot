@@ -20,6 +20,8 @@ import org.apache.commons.configuration.Configuration;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
@@ -37,6 +39,10 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
     Schema schema = segment.getSegmentMetadata().getSchema();
+    // Check filtering columns
+    if (!filterQueryMatchedSchema(schema, brokerRequest.getFilterQuery(), brokerRequest.getFilterSubQueryMap())) {
+      return true;
+    }
     // Check aggregation function columns.
     if (brokerRequest.getAggregationsInfo() != null) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
@@ -77,6 +83,20 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
       return false;
     }
     // unsupported query type.
+    return true;
+  }
+
+  private boolean filterQueryMatchedSchema(Schema schema, FilterQuery filterQuery, FilterQueryMap filterQueryMap) {
+    if (filterQuery.getNestedFilterQueryIds() == null || filterQuery.getNestedFilterQueryIds().isEmpty()) {
+      return schema.isExisted(filterQuery.getColumn());
+    } else {
+      for (Integer queryId : filterQuery.getNestedFilterQueryIds()) {
+        FilterQuery fq = filterQueryMap.getFilterQueryMap().get(queryId);
+        if (!filterQueryMatchedSchema(schema, fq, filterQueryMap)) {
+          return false;
+        }
+      }
+    }
     return true;
   }
 

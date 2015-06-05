@@ -43,7 +43,6 @@ public class CombinePlanNode implements PlanNode {
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
-  private static ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
 
   public CombinePlanNode(BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
     _brokerRequest = brokerRequest;
@@ -72,7 +71,7 @@ public class CombinePlanNode implements PlanNode {
       final CountDownLatch latch = new CountDownLatch(_planNodeList.size());
       final ConcurrentLinkedQueue<Operator> queue = new ConcurrentLinkedQueue<Operator>();
       for (final PlanNode planNode : _planNodeList) {
-        cachedThreadPool.execute(new Runnable() {
+        _executorService.execute(new Runnable() {
           @Override
           public void run() {
             Operator operator = planNode.run();
