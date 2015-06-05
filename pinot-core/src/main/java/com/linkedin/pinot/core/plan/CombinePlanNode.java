@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -74,9 +73,14 @@ public class CombinePlanNode implements PlanNode {
         _executorService.execute(new Runnable() {
           @Override
           public void run() {
-            Operator operator = planNode.run();
-            queue.add(operator);
-            latch.countDown();
+            try {
+              Operator operator = planNode.run();
+              queue.add(operator);
+            } catch (Exception e) {
+              LOGGER.error("Getting exception when trying to run a planNode", e);
+            } finally {
+              latch.countDown();
+            }
           }
         });
       }

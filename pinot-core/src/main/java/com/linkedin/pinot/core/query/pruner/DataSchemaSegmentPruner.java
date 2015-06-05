@@ -40,7 +40,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
     Schema schema = segment.getSegmentMetadata().getSchema();
     // Check filtering columns
-    if (!filterQueryMatchedSchema(schema, brokerRequest.getFilterQuery(), brokerRequest.getFilterSubQueryMap())) {
+    if (brokerRequest.getFilterQuery() != null && !filterQueryMatchedSchema(schema, brokerRequest.getFilterQuery(), brokerRequest.getFilterSubQueryMap())) {
       return true;
     }
     // Check aggregation function columns.
