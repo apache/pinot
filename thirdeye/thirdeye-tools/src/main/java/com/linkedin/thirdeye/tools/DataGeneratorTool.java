@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.tools;
 
 import java.io.File;
+import java.io.FileInputStream;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public class DataGeneratorTool {
 
@@ -46,16 +49,16 @@ public class DataGeneratorTool {
     config.cardinality = commandLine.hasOption("cardinality")
             ? commandLine.getOptionValue("cardinality")
             : null;
-    config.starTreeConfigFile = new File(commandLine.getArgs()[0]);
+    config.starTreeConfig = StarTreeConfig.decode(new FileInputStream(commandLine.getArgs()[0]));
     config.schemaFile = new File(commandLine.getArgs()[1]);
     config.outputDataDirectory = new File(commandLine.getArgs()[2]);
+    config.setOptions();
 
     DataGeneratorTool dataGenTool = new DataGeneratorTool();
     dataGenTool.generateData(config);
   }
 
   public void generateData(DataGeneratorConfig config) throws Exception {
-    config.init();
     writer = new DataGeneratorWriter(config);
     writer.init();
     writer.generate();

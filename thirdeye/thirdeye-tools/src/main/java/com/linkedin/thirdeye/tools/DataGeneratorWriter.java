@@ -16,6 +16,8 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.RandomStringUtils;
 
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 
 public class DataGeneratorWriter {
 
@@ -30,19 +32,20 @@ public class DataGeneratorWriter {
 
   public void init() {
     createDimensionValuesPool();
+    //createMetricValuesPool();
   }
 
   // Generate a pool of random values according to cardinality for each dimension
   private void createDimensionValuesPool() {
     dimensionValues = new HashMap<String, ArrayList<String>>();
     String str;
-    for (int dimensionIdx = 0; dimensionIdx < config.dimensions.size(); dimensionIdx++) {
+    for (int dimensionIdx = 0; dimensionIdx < config.starTreeConfig.getDimensions().size(); dimensionIdx++) {
       Set<String> uniqueValues = new HashSet<String>();
       for (int cardinalityCount = 0; cardinalityCount < config.dimensionCardinality[dimensionIdx]; cardinalityCount++) {
         while (uniqueValues.contains((str = RandomStringUtils.randomAlphabetic(dimensionIdx + 1)))) { ; }
         uniqueValues.add("d"+dimensionIdx+"_"+str);
       }
-      dimensionValues.put(config.dimensions.get(dimensionIdx), new ArrayList<String>(uniqueValues));
+      dimensionValues.put(config.starTreeConfig.getDimensions().get(dimensionIdx).getName(), new ArrayList<String>(uniqueValues));
     }
   }
 
@@ -52,18 +55,11 @@ public class DataGeneratorWriter {
       final GenericDatumWriter<GenericData.Record> datum = new GenericDatumWriter<GenericData.Record>(schemaJson);
       DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<GenericData.Record>(datum);
 
-      Map<String, Random> dimensionRandomMap = new HashMap<String, Random>();
-      Map<String, Random> metricRandomMap = new HashMap<String, Random>();
-      for (String dimension : config.dimensions)
-        dimensionRandomMap.put(dimension, new Random());
-      for (String metric : config.metrics)
-        metricRandomMap.put(metric, new Random());
-
       Map<String, Double> minMap = new HashMap<String, Double>();
       Map<String, Double> maxMap = new HashMap<String, Double>();
-      for (String dimension : config.dimensions) {
-        minMap.put(dimension, (double) 0);
-        maxMap.put(dimension, (double) (dimensionValues.get(dimension).size() - 1));
+      for (DimensionSpec dimension : config.starTreeConfig.getDimensions()) {
+        minMap.put(dimension.getName(), (double) 0);
+        maxMap.put(dimension.getName(), (double) (dimensionValues.get(dimension.getName()).size() - 1));
       }
 
       int recordNo = 0;
@@ -85,15 +81,16 @@ public class DataGeneratorWriter {
           GenericData.Record outRecord = new GenericData.Record(schemaJson);
 
           // Write time
-          outRecord.put(config.timeColumn, time);
+          outRecord.put(config.starTreeConfig.getTime().getColumnName(), time);
 
+          Random rand = new Random();
           // Write dimensions
-          for (String dimension : config.dimensions) {
-            Random rand = dimensionRandomMap.get(dimension);
+          for (DimensionSpec dimensionSpec : config.starTreeConfig.getDimensions()) {
+            String dimension = dimensionSpec.getName();
             int cardinality = dimensionValues.get(dimension).size();
             double mean = (cardinality)/2;
             double variance = cardinality/2;
-            double gaussianPick = mean + rand.nextGaussian()*variance;
+            double gaussianPick = mean + rand.nextGaussian() * variance;
 
             if (gaussianPick < minMap.get(dimension))
               minMap.put(dimension, gaussianPick);
@@ -107,8 +104,8 @@ public class DataGeneratorWriter {
           }
 
           // Write metrics
-          for (String metric : config.metrics) {
-            Random rand = metricRandomMap.get(metric);
+          for (MetricSpec metricSpec : config.starTreeConfig.getMetrics()) {
+            String metric = metricSpec.getName();
             long metricValue = rand.nextInt(100);
             outRecord.put(metric, metricValue);
           }
