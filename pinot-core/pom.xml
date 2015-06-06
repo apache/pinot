@@ -76,10 +76,6 @@
       <artifactId>pinot-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-util</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>

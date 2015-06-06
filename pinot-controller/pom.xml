@@ -40,10 +40,6 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-util</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>

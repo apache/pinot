@@ -26,7 +26,6 @@
   <modules>
     <module>pinot-broker</module>
     <module>pinot-common</module>
-    <module>pinot-util</module>
     <module>pinot-api</module>
     <module>pinot-server</module>
     <module>pinot-core</module>
@@ -131,11 +130,6 @@
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-common</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-util</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
