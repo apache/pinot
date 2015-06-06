@@ -20,60 +20,63 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.LiveInstanceChangeListener;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 
 
-public class LiveInstancesListener implements ExternalViewChangeListener {
+public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListener {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(LiveInstancesListener.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LiveInstancesChangeListenerImpl.class);
 
-  private final String clusterName;
   private long timeout;
   private final Map<String, String> liveInstanceToSessionIdMap;
   private KeyedPool<ServerInstance, NettyClientConnection> connectionPool;
 
-  public LiveInstancesListener(String clusterName) {
-    this.clusterName = clusterName;
+  public LiveInstancesChangeListenerImpl(String clusterName) {
     this.liveInstanceToSessionIdMap = new HashMap<String, String>();
   }
 
-  public void init(final KeyedPool<ServerInstance, NettyClientConnection> connectionPool) {
+  public void init(final KeyedPool<ServerInstance, NettyClientConnection> connectionPool, final long timeout) {
     this.connectionPool = connectionPool;
+    this.timeout = timeout;
   }
 
   @Override
-  public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
-    List<LiveInstance> liveInstances =
-        changeContext.getManager().getHelixDataAccessor()
-            .getChildValues(new PropertyKey.Builder(clusterName).liveInstances());
+  public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext changeContext) {
+    if (connectionPool == null) {
+      LOGGER.info("init hasn't been called yet on the live instances listener...");
+      return;
+    }
+
+    LOGGER.info("Connection pool found, moving on...");
 
     for (LiveInstance instance : liveInstances) {
 
-      String instanceId = instance.getId();
+      LOGGER.info("working on instance : " + instance.getInstanceName());
+      String instanceId = instance.getInstanceName();
       String sessionId = instance.getSessionId();
 
-      if (instanceId.indexOf(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) != -1) {
+      if (instanceId.startsWith("Broker_")) {
+        LOGGER.info("skipping broker instances {}", instanceId);
         continue;
       }
 
-      String namePortStr = instanceId.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
-      String hostName = namePortStr.split(ServerToSegmentSetMap.NAME_PORT_DELIMITER)[0];
+      LOGGER.info("found instance Id : {} with session Id : {}", instanceId, sessionId);
+
+      String namePortStr = instanceId.split("Server_")[1];
+      String hostName = namePortStr.split("_")[0];
       int port;
       try {
-        port = Integer.parseInt(namePortStr.split(ServerToSegmentSetMap.NAME_PORT_DELIMITER)[1]);
+        port = Integer.parseInt(namePortStr.split("_")[1]);
       } catch (Exception e) {
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
       }
@@ -117,5 +120,4 @@ public class LiveInstancesListener implements ExternalViewChangeListener {
       }
     }
   }
-
 }

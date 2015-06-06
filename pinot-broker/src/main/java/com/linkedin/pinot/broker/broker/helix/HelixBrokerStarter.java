@@ -63,6 +63,7 @@ public class HelixBrokerStarter {
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final BrokerServerBuilder _brokerServerBuilder;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private final LiveInstancesChangeListenerImpl _liveInstancesListener;
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
@@ -74,6 +75,8 @@ public class HelixBrokerStarter {
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
+    _liveInstancesListener = new LiveInstancesChangeListenerImpl(helixClusterName);
+
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
     final String brokerId =
         _pinotHelixProperties.getString(
@@ -113,6 +116,7 @@ public class HelixBrokerStarter {
     _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting, brokerId, _helixManager);
     addInstanceTagIfNeeded(helixClusterName, brokerId);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
+    _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
 
   }
 
@@ -169,7 +173,7 @@ public class HelixBrokerStarter {
     }
     final BrokerServerBuilder brokerServerBuilder =
         new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
-            _helixExternalViewBasedRouting.getTimeBoundaryService());
+            _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
     brokerServerBuilder.start();

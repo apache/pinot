@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.broker.broker;
 
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -36,8 +33,11 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
@@ -93,6 +93,7 @@ public class BrokerServerBuilder {
 
   private Server _server;
   private final Configuration _config;
+  private final LiveInstancesChangeListenerImpl listener;
 
   public static enum State {
     INIT,
@@ -105,11 +106,12 @@ public class BrokerServerBuilder {
   // Running State Of broker
   private AtomicReference<State> _state = new AtomicReference<State>();
 
-  public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting, TimeBoundaryService timeBoundaryService)
-      throws ConfigurationException {
+  public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting,
+      TimeBoundaryService timeBoundaryService, LiveInstancesChangeListenerImpl listener) throws ConfigurationException {
     _config = configuration;
     _routingTable = helixExternalViewBasedRouting;
     _timeBoundaryService = timeBoundaryService;
+    this.listener = listener;
   }
 
   public void buildNetwork() throws ConfigurationException {
@@ -172,8 +174,9 @@ public class BrokerServerBuilder {
     }
     LOGGER.info("Broker timeout is - " + brokerTimeOut + " ms");
 
-    _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(), _brokerMetrics,
-        brokerTimeOut);
+    _requestHandler =
+        new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(),
+            _brokerMetrics, brokerTimeOut);
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 
@@ -211,6 +214,9 @@ public class BrokerServerBuilder {
     _connPool.start();
     _routingTable.start();
     _state.set(State.RUNNING);
+    if (listener != null) {
+      listener.init(_connPool, DEFAULT_BROKER_TIME_OUT);
+    }
     LOGGER.info("Network running !!");
 
     LOGGER.info("Starting Jetty server !!");
