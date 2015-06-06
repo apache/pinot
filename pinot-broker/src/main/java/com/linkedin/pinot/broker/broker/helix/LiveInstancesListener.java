@@ -40,17 +40,18 @@ public class LiveInstancesListener implements ExternalViewChangeListener {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LiveInstancesListener.class);
 
-  private final KeyedPool<ServerInstance, NettyClientConnection> connectionPool;
   private final String clusterName;
-  private final long timeout;
+  private long timeout;
   private final Map<String, String> liveInstanceToSessionIdMap;
+  private KeyedPool<ServerInstance, NettyClientConnection> connectionPool;
 
-  public LiveInstancesListener(KeyedPool<ServerInstance, NettyClientConnection> connectionPool, String clusterName,
-      long timeout) {
-    this.connectionPool = connectionPool;
+  public LiveInstancesListener(String clusterName) {
     this.clusterName = clusterName;
     this.liveInstanceToSessionIdMap = new HashMap<String, String>();
-    this.timeout = timeout;
+  }
+
+  public void init(final KeyedPool<ServerInstance, NettyClientConnection> connectionPool) {
+    this.connectionPool = connectionPool;
   }
 
   @Override

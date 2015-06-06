@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.reslet.resources.v2;
+package com.linkedin.pinot.controller.api.restlet.resources;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONObject;

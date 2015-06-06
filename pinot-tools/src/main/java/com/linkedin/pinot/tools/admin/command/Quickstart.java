@@ -173,7 +173,6 @@ public class Quickstart {
     bld.append("You can also run the query on the terminal by typing RUN || run <QUERY>");
 
     System.out.println(bld.toString());
-    System.out.println(tempDir.getAbsolutePath());
   }
 
   public File getSchemaFile() {

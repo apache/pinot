@@ -1,4 +1,4 @@
-package com.linkedin.pinot.controller.api.reslet.resources.v2;
+package com.linkedin.pinot.controller.api.restlet.resources;
 
 import java.io.File;
 import java.io.IOException;

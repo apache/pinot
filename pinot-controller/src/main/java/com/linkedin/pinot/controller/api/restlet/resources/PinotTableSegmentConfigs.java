@@ -1,4 +1,4 @@
-package com.linkedin.pinot.controller.api.reslet.resources.v2;
+package com.linkedin.pinot.controller.api.restlet.resources;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,14 +17,14 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
-public class PinotTableMetadataConfigs extends ServerResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableMetadataConfigs.class);
+public class PinotTableSegmentConfigs extends ServerResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSegmentConfigs.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
   private final File tempDir;
 
-  public PinotTableMetadataConfigs() throws IOException {
+  public PinotTableSegmentConfigs() throws IOException {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
@@ -51,12 +51,13 @@ public class PinotTableMetadataConfigs extends ServerResource {
 
     try {
       config = AbstractTableConfig.init(entity.getText());
-      manager.updateMetadataConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
-          config.getCustomConfigs());
+      manager.updateSegmentsValidationAndRetentionConfigFor(config.getTableName(),
+          TableType.valueOf(config.getTableType()), config.getValidationConfig());
       return new StringRepresentation("done");
     } catch (final Exception e) {
-      LOGGER.error("errpr updating medata configs for table {}", config.getTableName(), e);
+      LOGGER.error("errpr updating segments configs for table {}", config.getTableName(), e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
+
   }
 }

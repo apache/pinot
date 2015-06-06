@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.api;
 
-import java.io.File;
-
 import org.restlet.Application;
 import org.restlet.Context;
 import org.restlet.Request;
@@ -28,23 +26,20 @@ import org.restlet.resource.Directory;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotControllerHealthCheck;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
-import com.linkedin.pinot.controller.api.reslet.resources.PqlQueryResource;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotSchemaResletResource;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotSegmentResletResource;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotSegmentUploadRestletResource;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableIndexingConfigs;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableInstances;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableMetadataConfigs;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableRestletResource;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableSchema;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableSegmentConfigs;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableTenantConfigs;
-import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTenantRestletResource;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotControllerHealthCheck;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotInstance;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotSchemaResletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentResletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableIndexingConfigs;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableInstances;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableMetadataConfigs;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableRestletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSchema;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSegmentConfigs;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTableTenantConfigs;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTenantRestletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
 
 
 /**
@@ -146,14 +141,5 @@ public class ControllerRestApplication extends Application {
     router.attach("/query", webdir);
 
     return router;
-  }
-
-  public static void main(String[] args) throws Exception {
-    final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File(
-            "/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"), ReadMode.heap);
-    while (true) {
-
-    }
   }
 }

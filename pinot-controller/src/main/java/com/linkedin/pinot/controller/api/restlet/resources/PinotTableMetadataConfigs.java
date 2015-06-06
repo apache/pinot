@@ -1,4 +1,4 @@
-package com.linkedin.pinot.controller.api.reslet.resources.v2;
+package com.linkedin.pinot.controller.api.restlet.resources;
 
 import java.io.File;
 import java.io.IOException;
@@ -6,7 +6,7 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Get;
+import org.restlet.resource.Put;
 import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,15 +17,14 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
-public class PinotTableSchema extends ServerResource {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSchema.class);
+public class PinotTableMetadataConfigs extends ServerResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableMetadataConfigs.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
   private final File tempDir;
 
-  public PinotTableSchema() throws IOException {
+  public PinotTableMetadataConfigs() throws IOException {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
@@ -41,30 +40,23 @@ public class PinotTableSchema extends ServerResource {
   }
 
   @Override
-  @Get
-  public Representation get() {
+  @Put("json")
+  public Representation put(Representation entity) {
     final String tableName = (String) getRequest().getAttributes().get("tableName");
+    if (tableName == null) {
+      return new StringRepresentation("tableName is not present");
+    }
 
-    if (manager.hasRealtimeTable(tableName)) {
-      try {
-        AbstractTableConfig config = manager.getTableConfig(tableName, TableType.REALTIME);
-        return new StringRepresentation(manager.getSchema(config.getValidationConfig().getSchemaName()).getJSONSchema()
-            .toString());
-      } catch (Exception e) {
-        LOGGER.error("error fetching schema for a realtime table : {} ", tableName, e);
-        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-      }
-    } else {
-      AbstractTableConfig config;
-      try {
-        config = manager.getTableConfig(tableName, TableType.OFFLINE);
-        return new StringRepresentation(manager.getSchema(config.getValidationConfig().getSchemaName()).getJSONSchema()
-            .toString());
-      } catch (Exception e) {
-        LOGGER.error("error fetching schema for a offline table : {} ", tableName, e);
-        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-      }
+    AbstractTableConfig config = null;
+
+    try {
+      config = AbstractTableConfig.init(entity.getText());
+      manager.updateMetadataConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
+          config.getCustomConfigs());
+      return new StringRepresentation("done");
+    } catch (final Exception e) {
+      LOGGER.error("errpr updating medata configs for table {}", config.getTableName(), e);
+      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
-
 }

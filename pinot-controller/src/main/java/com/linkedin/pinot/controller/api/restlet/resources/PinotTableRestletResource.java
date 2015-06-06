@@ -1,4 +1,4 @@
-package com.linkedin.pinot.controller.api.reslet.resources.v2;
+package com.linkedin.pinot.controller.api.restlet.resources;
 
 import java.io.File;
 import java.io.IOException;
@@ -89,7 +89,6 @@ public class PinotTableRestletResource extends ServerResource {
 
       if (manager.hasOfflineTable(tableName)) {
         AbstractTableConfig config = manager.getTableConfig(tableName, TableType.OFFLINE);
-        System.out.println("****************** : " + config.toJSON() + " ****************** ");
         ret.put("offline", config.toJSON());
       }
 
