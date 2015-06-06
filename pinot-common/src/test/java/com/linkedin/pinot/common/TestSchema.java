@@ -21,6 +21,7 @@ import java.io.IOException;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -44,5 +45,12 @@ public class TestSchema {
       JsonMappingException, IOException {
     ZNRecord record = Schema.toZNRecord(schema);
     Schema.fromZNRecord(record);
+  }
+
+  @Test
+  public void test2() throws Exception {
+    String schemaString = new ObjectMapper().writeValueAsString(schema);
+    Schema newSchema = new ObjectMapper().readValue(schemaString, Schema.class);
+
   }
 }

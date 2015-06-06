@@ -41,27 +41,31 @@ import com.linkedin.pinot.tools.data.generator.DataGenerator;
 import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
 import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
 
+
 /**
  * Class to implement GenerateData command.
  *
  */
 public class GenerateDataCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-numRecords", required=true, metaVar="<int>", usage="Number of records to generate.")
+  @Option(name = "-numRecords", required = true, metaVar = "<int>", usage = "Number of records to generate.")
   private int _numRecords = 0;
 
-  @Option(name="-numFiles", required=true, metaVar="<int>", usage="Number of files to generate.")
+  @Option(name = "-numFiles", required = true, metaVar = "<int>", usage = "Number of files to generate.")
   private int _numFiles = 0;
 
-  @Option(name="-schemaFile", required=true, metaVar= "<string>", usage="File containing schema for data.")
+  @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile = null;
 
-  @Option(name="-schemaAnnotationFile", required=false, metaVar="<string>", usage="File containing dim/metrics for columns.")
+  @Option(name = "-schemaAnnotationFile", required = false, metaVar = "<string>", usage = "File containing dim/metrics for columns.")
   private String _schemaAnnFile;
 
-  @Option(name="-outDir", required=true, metaVar= "<string>", usage="Directory where data would be generated.")
+  @Option(name = "-outDir", required = true, metaVar = "<string>", usage = "Directory where data would be generated.")
   private String _outDir = null;
 
-  @Option(name="-overwrite", required=false, usage="Overwrite, if directory exists")
+  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
+  private boolean _help = false;
+
+  @Option(name = "-overwrite", required = false, usage = "Overwrite, if directory exists")
   boolean _overwrite;
 
   @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
@@ -138,7 +142,8 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
     }
 
     ObjectMapper objectMapper = new ObjectMapper();
-    saList = objectMapper.readValue(new File(file), new TypeReference<List<SchemaAnnotation>>(){});
+    saList = objectMapper.readValue(new File(file), new TypeReference<List<SchemaAnnotation>>() {
+    });
 
     for (SchemaAnnotation sa : saList) {
       String column = sa.getColumn();
@@ -151,15 +156,15 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
     }
   }
 
-  private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String>columns,
+  private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
       HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes,
-      HashMap<String, TimeUnit>timeUnits, HashMap<String, Integer> cardinality,
+      HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality,
       HashMap<String, IntRange> range) {
-    for (final FieldSpec fs: schema.getAllFieldSpecs()) {
+    for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
       columns.add(col);
-      dataTypes.put(col,  fs.getDataType());
+      dataTypes.put(col, fs.getDataType());
       fieldTypes.put(col, fs.getFieldType());
 
       switch (fs.getFieldType()) {
@@ -171,7 +176,7 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
 
         case METRIC:
           if (range.get(col) == null) {
-            range.put(col,  new IntRange(1, 1000));
+            range.put(col, new IntRange(1, 1000));
           }
           break;
 
@@ -190,16 +195,16 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
         timeUnits, FileFormat.AVRO, _outDir, _overwrite);
   }
 
-  public static void main(String [] args) throws JsonGenerationException, JsonMappingException, IOException {
+  public static void main(String[] args) throws JsonGenerationException, JsonMappingException, IOException {
     SchemaBuilder schemaBuilder = new SchemaBuilder();
 
-    schemaBuilder.addSingleValueDimension("name",  DataType.STRING);
-    schemaBuilder.addSingleValueDimension("age",  DataType.INT);
-    schemaBuilder.addMetric("percent",  DataType.FLOAT);
-    schemaBuilder.addTime("days",  TimeUnit.DAYS, DataType.LONG);
+    schemaBuilder.addSingleValueDimension("name", DataType.STRING);
+    schemaBuilder.addSingleValueDimension("age", DataType.INT);
+    schemaBuilder.addMetric("percent", DataType.FLOAT);
+    schemaBuilder.addTime("days", TimeUnit.DAYS, DataType.LONG);
 
     Schema schema = schemaBuilder.build();
     ObjectMapper objectMapper = new ObjectMapper();
-    System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(schema));
+    System.out.println(objectMapper.writeValueAsString(schema));
   }
 }

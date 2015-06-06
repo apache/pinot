@@ -83,10 +83,12 @@ public class TimeFieldSpec extends FieldSpec {
     return true;
   }
 
+  @JsonIgnore(true)
   public String getIncomingTimeColumnName() {
     return incomingGranularitySpec.getName();
   }
 
+  @JsonIgnore(true)
   public String getOutGoingTimeColumnName() {
     return outgoingGranularitySpec.getName();
   }

@@ -43,7 +43,7 @@ public class FileUploadUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadUtils.class);
   private static final String SEGMENTS_PATH = "segments";
 
-  public static void sendFile(final String host, final String port, final String path, final String fileName,
+  public static int sendFile(final String host, final String port, final String path, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
     HttpClient client = new HttpClient();
     try {
@@ -75,6 +75,7 @@ public class FileUploadUtils {
         }
         throw new HttpException(errorString);
       }
+      return post.getStatusCode();
     } catch (Exception e) {
       LOGGER.error("Caught exception while sending file", e);
       Utils.rethrowException(e);
@@ -82,9 +83,9 @@ public class FileUploadUtils {
     }
   }
 
-  public static void sendSegmentFile(final String host, final String port, final String fileName,
+  public static int sendSegmentFile(final String host, final String port, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
-    sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes);
+    return sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes);
   }
 
   public static long getFile(String url, File file) {

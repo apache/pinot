@@ -27,6 +27,7 @@ import com.google.common.base.Joiner;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
@@ -149,7 +150,19 @@ public class SegmentGeneratorConfig {
   }
 
   public TimeUnit getTimeUnitForSegment() {
-    return TimeUnit.valueOf(properties.get(MetadataKeys.Segment.TIME_UNIT).toString());
+    if (properties.containsKey(MetadataKeys.Segment.TIME_UNIT)) {
+      return TimeUnit.valueOf(properties.get(MetadataKeys.Segment.TIME_UNIT).toString());
+    } else {
+      if (schema.getTimeFieldSpec() != null) {
+        if (schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {
+          return schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
+        }
+        if (schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
+          return schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType();
+        }
+      }
+      return TimeUnit.DAYS;
+    }
   }
 
   public void setCustom(String key, String value) {

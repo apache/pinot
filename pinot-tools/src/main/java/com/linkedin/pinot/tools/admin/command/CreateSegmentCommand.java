@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
@@ -166,9 +166,9 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       return false;
     }
 
-    final RecordReaderConfig recordReaderConfig;
+    final CSVRecordReaderConfig recordReaderConfig;
     if (_recordReaderConfigFile != null) {
-      recordReaderConfig = new ObjectMapper().readValue(new File(_recordReaderConfigFile), RecordReaderConfig.class);
+      recordReaderConfig = new ObjectMapper().readValue(new File(_recordReaderConfigFile), CSVRecordReaderConfig.class);
     } else {
       recordReaderConfig = null;
     }

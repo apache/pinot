@@ -38,6 +38,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
+
 public class CSVRecordReader implements RecordReader {
   private static final Logger _logger = LoggerFactory.getLogger(CSVRecordReader.class);
 
@@ -47,13 +48,13 @@ public class CSVRecordReader implements RecordReader {
 
   private CSVParser _parser = null;
   private Iterator<CSVRecord> _iterator = null;
-  RecordReaderConfig _config = null;
+  CSVRecordReaderConfig _config = null;
 
-  public CSVRecordReader(String dataFile, RecordReaderConfig config, Schema schema) {
+  public CSVRecordReader(String dataFile, RecordReaderConfig recordReaderConfig, Schema schema) {
     _fileName = dataFile;
     _schema = schema;
 
-    _config = config;
+    _config = (CSVRecordReaderConfig) recordReaderConfig;
     _delimiterString = (_config != null) ? _config.getCsvDelimiter() : ",";
   }
 
@@ -90,7 +91,7 @@ public class CSVRecordReader implements RecordReader {
       String column = fieldSpec.getName();
       String token = getValueForColumn(record, column);
 
-      Object value=null;
+      Object value = null;
       if (fieldSpec.isSingleValueField()) {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
       } else {

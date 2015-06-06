@@ -40,7 +40,7 @@ import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.core.data.readers.CSVRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
@@ -129,7 +129,7 @@ public class Quickstart {
     config.setIndexOutputDir(new File(tempDir, "segments").getAbsolutePath());
     config.setSegmentName("baseballStats_1");
 
-    RecordReaderConfig readerConfig = new RecordReaderConfig();
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setCsvDateColumns(new HashSet<String>());
     readerConfig.setCsvDelimiter(",");
 

@@ -21,6 +21,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -72,7 +73,7 @@ public class Schema {
   private String jsonSchema;
 
   public static Schema fromFile(final File schemaFile) throws JsonParseException, JsonMappingException, IOException {
-    JsonNode node = new ObjectMapper().readTree(schemaFile);
+    JsonNode node = new ObjectMapper().readTree(new FileInputStream(schemaFile));
     Schema schema = new ObjectMapper().readValue(node, Schema.class);
     schema.setJSONSchema(node.toString());
     return schema;
