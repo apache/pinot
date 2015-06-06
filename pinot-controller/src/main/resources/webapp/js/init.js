@@ -36,7 +36,7 @@ $(document).ready(function() {
   HELPERS.printTables(function() {
     $('.table-name-entry').click(function(e) {
       var tableName = e.currentTarget.attributes[1].nodeValue;
-      HELPERS.decorateTableSchema(tableName);
+      HELPERS.decorateTableSchema(tableName, rH);
       EDITOR.setValue('');
       HELPERS.populateDefaultQuery(tableName);
       $("#execute-query").click();
@@ -71,19 +71,20 @@ var HELPERS = {
     });
   },
 
-  decorateTableSchema : function(tableName) {
+  decorateTableSchema : function(tableName, th) {
     $.get("/tables/" + tableName + "/schema/", function(data){
       var schema = JSON.parse(data);
-      var columnNames = Object.keys(schema.fieldSpecMap);
-      var res = [];
-      
-      for (var i = 0; i < columnNames.length; i++) {
-        res[i] = { name : columnNames[i], dataType : schema.fieldSpecMap[columnNames[i]].dataType, fieldType : schema.fieldSpecMap[columnNames[i]].fieldType}
-      }
       var source   = $("#table-schema-template").html();
       var template = Handlebars.compile(source);
-      var d = template({"columns" : res});
+      var d = template(schema);
       $(".schema-detail-view").html(d);
+      $("#table-schema").DataTable({
+        "searching":false,
+        "scrollY": th + "px",
+        "scrollCollapse": true,
+        "paging": false,
+        "info": false
+      });
     });
   },
   

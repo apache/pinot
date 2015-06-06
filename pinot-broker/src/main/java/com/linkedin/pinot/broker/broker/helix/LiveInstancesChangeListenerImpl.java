@@ -90,6 +90,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
             // destroy all existing connection
             for (Map.Entry<ServerInstance, NettyClientConnection> entry : c.get().entrySet()) {
               if (!entry.getValue().validate()) {
+                LOGGER.info("destroying a connection for : {} ", instanceId);
                 connectionPool.destroyObject(ins, entry.getValue());
               }
             }
@@ -108,6 +109,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
             if (!conn.validate()) {
               for (Map.Entry<ServerInstance, NettyClientConnection> entry : c.get().entrySet()) {
                 if (!entry.getValue().validate()) {
+                  LOGGER.info("destroying a connection for : {} ", instanceId);
                   connectionPool.destroyObject(ins, entry.getValue());
                 }
               }

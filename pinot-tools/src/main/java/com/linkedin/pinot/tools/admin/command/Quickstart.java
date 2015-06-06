@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import java.awt.Desktop;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -22,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.HashSet;
 
 import org.apache.commons.io.FileUtils;
@@ -216,6 +218,15 @@ public class Quickstart {
         }
       }
     });
+
+    Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
+    if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
+      try {
+        desktop.browse(new URI("http://localhost:9000/query/"));
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }
 
     System.out.println("quickstart setup complete");
     try {

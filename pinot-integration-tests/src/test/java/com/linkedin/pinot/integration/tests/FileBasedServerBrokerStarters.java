@@ -86,9 +86,10 @@ public class FileBasedServerBrokerStarters {
 
     for (final String table : TABLE_NAMES) {
       brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "numNodesPerReplica"), "1");
-      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "serversForNode.0"), "localhost:" + SERVER_PORT);
-      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "serversForNode.default"), "localhost:"
+      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "serversForNode.0"), "localhost:"
           + SERVER_PORT);
+      brokerConfiguration.addProperty(getKey("pinot.broker.transport.routing", table, "serversForNode.default"),
+          "localhost:" + SERVER_PORT);
     }
     // client properties
     brokerConfiguration.addProperty("pinot.broker.client.enableConsole", "true");
@@ -103,23 +104,25 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty(getKey("pinot.server.instance", "id"), "0");
     serverConfiguration.addProperty(getKey("pinot.server.instance", "bootstrap.segment.dir"), SERVER_BOOTSTRAP_DIR);
     serverConfiguration.addProperty(getKey("pinot.server.instance", "dataDir"), SERVER_INDEX_DIR);
-    serverConfiguration.addProperty(getKey("pinot.server.instance", "tableName"), StringUtils.join(TABLE_NAMES, ',').trim());
+    serverConfiguration.addProperty(getKey("pinot.server.instance", "tableName"), StringUtils.join(TABLE_NAMES, ',')
+        .trim());
     for (final String table : TABLE_NAMES) {
       serverConfiguration.addProperty(getKey("pinot.server.instance", table.trim(), "numQueryExecutorThreads"), "50");
       serverConfiguration.addProperty(getKey("pinot.server.instance", table.trim(), "dataManagerType"), "offline");
-      serverConfiguration.addProperty(getKey("pinot.server.instance", table.trim(), "readMode"), SERVER_INDEX_READ_MODE);
+      serverConfiguration
+          .addProperty(getKey("pinot.server.instance", table.trim(), "readMode"), SERVER_INDEX_READ_MODE);
     }
-    serverConfiguration.addProperty("pinot.server.instance.data.manager.class", FileBasedInstanceDataManager.class.getName());
-    serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class", ColumnarSegmentMetadataLoader.class.getName());
+    serverConfiguration.addProperty("pinot.server.instance.data.manager.class",
+        FileBasedInstanceDataManager.class.getName());
+    serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class",
+        ColumnarSegmentMetadataLoader.class.getName());
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",
-        StringUtil.join(",",
-            TimeSegmentPruner.class.getSimpleName(),
-            DataSchemaSegmentPruner.class.getSimpleName()));
+        StringUtil.join(",", TimeSegmentPruner.class.getSimpleName(), DataSchemaSegmentPruner.class.getSimpleName()));
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.TimeSegmentPruner.id", "0");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
-    serverConfiguration
-        .addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
-    serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class", SimpleRequestHandlerFactory.class.getName());
+    serverConfiguration.addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
+    serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class",
+        SimpleRequestHandlerFactory.class.getName());
     serverConfiguration.addProperty("pinot.server.netty.port", SERVER_PORT);
     serverConfiguration.setDelimiterParsingDisabled(false);
     return serverConfiguration;
@@ -127,7 +130,8 @@ public class FileBasedServerBrokerStarters {
 
   @SuppressWarnings("unchecked")
   private void log(PropertiesConfiguration props, String configsFor) {
-    LOGGER.info("******************************* configs for : " + configsFor + " : ********************************************");
+    LOGGER.info("******************************* configs for : " + configsFor
+        + " : ********************************************");
 
     final Iterator<String> keys = props.getKeys();
 
@@ -136,7 +140,8 @@ public class FileBasedServerBrokerStarters {
       LOGGER.info(key + " : " + props.getProperty(key));
     }
 
-    LOGGER.info("******************************* configs end for : " + configsFor + " : ****************************************");
+    LOGGER.info("******************************* configs end for : " + configsFor
+        + " : ****************************************");
   }
 
   private void startServer() {
@@ -182,7 +187,7 @@ public class FileBasedServerBrokerStarters {
     System.out.println("************************ 2");
     serverInstance.init(new ServerConf(server), new MetricsRegistry());
     System.out.println("************************ 3");
-    bld = new BrokerServerBuilder(broker, null, null);
+    bld = new BrokerServerBuilder(broker, null, null, null);
     System.out.println("************************ 4");
     bld.buildNetwork();
     System.out.println("************************ 5");
