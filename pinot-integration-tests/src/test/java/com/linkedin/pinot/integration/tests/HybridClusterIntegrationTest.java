@@ -49,10 +49,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.KafkaTestUtils;
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
 
 
@@ -84,8 +84,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
-    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile);
+    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(), null,
+        null, avroFile);
   }
 
   @BeforeClass
@@ -129,8 +129,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
 
     // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        schemaFile, avroFiles.get(0));
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
+        avroFiles.get(0));
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);
@@ -172,7 +172,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     final CountDownLatch latch = new CountDownLatch(1);
     HelixManager manager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
-            ZkTestUtils.DEFAULT_ZK_STR);
+            ZkStarter.DEFAULT_ZK_STR);
     manager.connect();
     manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
       @Override

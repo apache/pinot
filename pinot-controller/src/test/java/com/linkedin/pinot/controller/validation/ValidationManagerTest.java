@@ -30,12 +30,12 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -49,7 +49,7 @@ public class ValidationManagerTest {
 
   private String HELIX_CLUSTER_NAME = "TestValidationManager";
 
-  private String ZK_STR = ZkTestUtils.DEFAULT_ZK_STR;
+  private String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
   private String CONTROLLER_INSTANCE_NAME = "localhost_11984";
 
   private ZkClient _zkClient;
@@ -58,7 +58,7 @@ public class ValidationManagerTest {
 
   @BeforeTest
   public void setUp() throws Exception {
-    ZkTestUtils.startLocalZkServer();
+    ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager =
@@ -77,8 +77,8 @@ public class ValidationManagerTest {
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
 
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, null, null,
-            "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, null, null, "timestamp",
+            "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
@@ -124,7 +124,7 @@ public class ValidationManagerTest {
   public void shutDown() {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
-    ZkTestUtils.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer();
   }
 
   @Test

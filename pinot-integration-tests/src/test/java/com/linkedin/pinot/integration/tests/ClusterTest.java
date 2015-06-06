@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
@@ -42,6 +41,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
@@ -75,7 +75,7 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(18099 + i));
         configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
         overrideBrokerConf(configuration);
-        _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkTestUtils.DEFAULT_ZK_STR, configuration));
+        _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkStarter.DEFAULT_ZK_STR, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -96,7 +96,7 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
             Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
         overrideOfflineServerConf(configuration);
-        _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration));
+        _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -133,9 +133,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
     JSONObject request =
-        ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant,
-            timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
-            "BalanceNumSegmentAssignmentStrategy");
+        ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName,
+            "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy");
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 
@@ -182,9 +181,9 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
 
     JSONObject request =
-        ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
-            timeColumnName, timeColumnType, "rententionTimeUnit", "900", 1, "BalanceNumSegmentAssignmentStrategy",
-            metadata, schemaName);
+        ControllerRequestBuilder
+            .buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeColumnType,
+                "rententionTimeUnit", "900", 1, "BalanceNumSegmentAssignmentStrategy", metadata, schemaName);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;

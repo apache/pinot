@@ -272,13 +272,21 @@ public class Schema {
     try {
       ret.put("metricFieldSpecs", new ObjectMapper().writeValueAsString(metricFieldSpecs));
       ret.put("dimensionFieldSpecs", new ObjectMapper().writeValueAsString(dimensionFieldSpecs));
-      ret.put("timeFieldSpec", new ObjectMapper().writeValueAsString(timeFieldSpec));
+      if (timeFieldSpec != null) {
+        JSONObject time = new JSONObject();
+        time.put("incomingGranularitySpec",
+            new ObjectMapper().writeValueAsString(timeFieldSpec.getIncomingGranularitySpec()));
+        time.put("outgoingGranularitySpec",
+            new ObjectMapper().writeValueAsString(timeFieldSpec.getOutgoingGranularitySpec()));
+        ret.put("timeFieldSpec", time);
+      } else {
+        ret.put("timeFieldSpec", new JSONObject());
+      }
       ret.put("schemaName", schemaName);
     } catch (Exception e) {
       LOGGER.error("error processing toString on Schema : ", this.schemaName, e);
       return null;
     }
-
     return ret.toString();
   }
 

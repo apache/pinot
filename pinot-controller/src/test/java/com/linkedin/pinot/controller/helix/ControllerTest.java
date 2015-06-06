@@ -35,7 +35,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 
@@ -93,11 +93,11 @@ public abstract class ControllerTest {
   }
 
   protected void startZk() {
-    ZkTestUtils.startLocalZkServer();
+    ZkStarter.startLocalZkServer();
   }
 
   protected void stopZk() {
-    ZkTestUtils.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer();
   }
 
   /**
@@ -107,11 +107,11 @@ public abstract class ControllerTest {
     assert _controllerStarter == null;
     ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
 
-    _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
+    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     if (_zkClient.exists("/" + getHelixClusterName())) {
       _zkClient.deleteRecursive("/" + getHelixClusterName());
     }
-    _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, config);
+    _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, config);
     _helixAdmin = _controllerStarter.getHelixResourceManager().getHelixAdmin();
     _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
   }

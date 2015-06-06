@@ -39,6 +39,7 @@ import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableIndexingC
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableInstances;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableMetadataConfigs;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableRestletResource;
+import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableSchema;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableSegmentConfigs;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTableTenantConfigs;
 import com.linkedin.pinot.controller.api.reslet.resources.v2.PinotTenantRestletResource;
@@ -89,6 +90,8 @@ public class ControllerRestApplication extends Application {
     // GET
     router.attach("/tables/{tableName}", PinotTableRestletResource.class);
     router.attach("/tables/{tableName}/instances", PinotTableInstances.class);
+    router.attach("/tables/{tableName}/schema", PinotTableSchema.class);
+    router.attach("/tables/{tableName}/schema/", PinotTableSchema.class);
 
     router.attach("/tables/{tableName}/segments", PinotSegmentResletResource.class);
     router.attach("/tables/{tableName}/segments/{segmentName}", PinotSegmentResletResource.class);

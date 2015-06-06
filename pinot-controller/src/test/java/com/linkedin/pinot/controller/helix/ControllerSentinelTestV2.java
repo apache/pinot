@@ -26,10 +26,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 
@@ -44,11 +44,13 @@ public class ControllerSentinelTestV2 extends ControllerTest {
   @BeforeClass
   public void setup() throws Exception {
     startZk();
-    _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
+    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     startController();
     _pinotResourceManager = _controllerStarter.getHelixResourceManager();
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 20, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 20, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkStarter.DEFAULT_ZK_STR, 20, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkStarter.DEFAULT_ZK_STR, 20, true);
   }
 
   @AfterClass
@@ -70,26 +72,42 @@ public class ControllerSentinelTestV2 extends ControllerTest {
     String tableName = "testTable";
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 3);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), payload.toString());
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(), 1);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getInstanceSet(tableName + "_OFFLINE").size(), 20);
+    Assert.assertEquals(
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getPartitionSet().size(), 1);
+    Assert.assertEquals(
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getInstanceSet(tableName + "_OFFLINE").size(), 20);
 
     // Adding segments
     for (int i = 0; i < 10; ++i) {
-      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE").getNumPartitions(), i);
+      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE")
+          .getNumPartitions(), i);
       addOneOfflineSegment(tableName);
-      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE").getNumPartitions(), i + 1);
+      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE")
+          .getNumPartitions(), i + 1);
     }
 
     // Delete table
     sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName));
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(), 0);
-
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)).size(),
-        20);
     Assert.assertEquals(
-        _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)).size(), 20);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, ControllerTenantNameBuilder.getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)).size(),
-        20);
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getPartitionSet().size(), 0);
+
+    Assert.assertEquals(
+        _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME,
+            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME))
+            .size(), 20);
+    Assert.assertEquals(
+        _helixAdmin
+            .getInstancesInClusterWithTag(
+                HELIX_CLUSTER_NAME,
+                ControllerTenantNameBuilder
+                    .getRealtimeTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)).size(), 20);
+    Assert.assertEquals(
+        _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME,
+            ControllerTenantNameBuilder.getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME))
+            .size(), 20);
   }
 
   private void addOneOfflineSegment(String resourceName) {

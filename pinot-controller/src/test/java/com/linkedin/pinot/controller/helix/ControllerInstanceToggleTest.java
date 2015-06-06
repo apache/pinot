@@ -27,9 +27,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
@@ -46,11 +46,13 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   @BeforeClass
   public void setup() throws Exception {
     startZk();
-    _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
+    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     startController();
     _pinotResourceManager = _controllerStarter.getHelixResourceManager();
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 20, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 20, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkStarter.DEFAULT_ZK_STR, 20, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkStarter.DEFAULT_ZK_STR, 20, true);
   }
 
   @AfterClass
@@ -73,22 +75,29 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     String tableName = "testTable";
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 20);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), payload.toString());
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(), 1);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getInstanceSet(tableName + "_OFFLINE").size(), 20);
+    Assert.assertEquals(
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getPartitionSet().size(), 1);
+    Assert.assertEquals(
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getInstanceSet(tableName + "_OFFLINE").size(), 20);
 
     // Adding segments
     for (int i = 0; i < 10; ++i) {
-      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE").getNumPartitions(), i);
+      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE")
+          .getNumPartitions(), i);
       addOneOfflineSegment(tableName);
       Thread.sleep(2000);
-      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE").getNumPartitions(), i + 1);
+      Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName + "_OFFLINE")
+          .getNumPartitions(), i + 1);
     }
 
     Thread.sleep(2000);
     // Disable Instance
     int i = 20;
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE")) {
-      ExternalView resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
+      ExternalView resourceExternalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i--);
       sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceDisable(instanceName));
@@ -102,7 +111,8 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // Enable Instance
     i = 0;
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE")) {
-      ExternalView resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
+      ExternalView resourceExternalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i++);
       sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceEnable(instanceName));
@@ -116,12 +126,14 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // Disable BrokerInstance
     i = 20;
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER")) {
-      ExternalView resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      ExternalView resourceExternalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i--);
       sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceDisable(instanceName));
       Thread.sleep(2000);
-      resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      resourceExternalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i);
       LOGGER.info("Current running broker instance: " + instanceSet.size());
@@ -130,12 +142,14 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // Enable BrokerInstance
     i = 0;
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER")) {
-      ExternalView resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      ExternalView resourceExternalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i++);
       sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceEnable(instanceName));
       Thread.sleep(2000);
-      resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      resourceExternalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i);
       LOGGER.info("Current running broker instance: " + instanceSet.size());
@@ -143,7 +157,9 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // Delete table
     sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName));
     Thread.sleep(2000);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet().size(), 0);
+    Assert.assertEquals(
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getPartitionSet().size(), 0);
 
   }
 

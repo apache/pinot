@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -61,20 +60,22 @@ public class PinotTableInstances extends ServerResource {
         if (manager.hasOfflineTable(tableName)) {
           JSONObject e = new JSONObject();
           e.put("tableType", "offline");
-          e.put(
-              "instances",
-              new JSONObject(new ObjectMapper().writeValueAsString(manager.getBrokerInstancesForTable(tableName,
-                  TableType.OFFLINE))));
+          JSONArray a = new JSONArray();
+          for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
           brokers.add(e);
         }
 
         if (manager.hasRealtimeTable(tableName)) {
           JSONObject e = new JSONObject();
-          e.put("tableType", "offline");
-          e.put(
-              "instances",
-              new JSONObject(new ObjectMapper().writeValueAsString(manager.getBrokerInstancesForTable(tableName,
-                  TableType.REALTIME))));
+          e.put("tableType", "realtime");
+          JSONArray a = new JSONArray();
+          for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
           brokers.add(e);
         }
       }
@@ -83,20 +84,22 @@ public class PinotTableInstances extends ServerResource {
         if (manager.hasOfflineTable(tableName)) {
           JSONObject e = new JSONObject();
           e.put("tableType", "offline");
-          e.put(
-              "instances",
-              new JSONObject(new ObjectMapper().writeValueAsString(manager.getServerInstancesForTable(tableName,
-                  TableType.OFFLINE))));
+          JSONArray a = new JSONArray();
+          for (String ins : manager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
           servers.add(e);
         }
 
         if (manager.hasRealtimeTable(tableName)) {
           JSONObject e = new JSONObject();
-          e.put("tableType", "offline");
-          e.put(
-              "instances",
-              new JSONObject(new ObjectMapper().writeValueAsString(manager.getServerInstancesForTable(tableName,
-                  TableType.REALTIME))));
+          e.put("tableType", "realtime");
+          JSONArray a = new JSONArray();
+          for (String ins : manager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
           servers.add(e);
         }
       }

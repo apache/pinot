@@ -27,8 +27,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -64,16 +64,16 @@ public class PinotFileUploadTest extends ControllerTest {
     startController();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkTestUtils.DEFAULT_ZK_STR, 5, true);
+        ZkStarter.DEFAULT_ZK_STR, 5, true);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkTestUtils.DEFAULT_ZK_STR, 5, true);
+        ZkStarter.DEFAULT_ZK_STR, 5, true);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER")
-        .size(), 5);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 5);
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, null, null, 2, "RandomAssignmentStrategy").toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, null, null, 2, "RandomAssignmentStrategy")
+            .toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 

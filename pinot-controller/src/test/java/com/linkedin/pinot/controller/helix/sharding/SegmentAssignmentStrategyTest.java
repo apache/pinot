@@ -30,10 +30,10 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -44,7 +44,7 @@ import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 public class SegmentAssignmentStrategyTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAssignmentStrategyTest.class);
 
-  private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;
+  private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String TABLE_NAME_BALANCED = "testResourceBalanced";
   private final static String TABLE_NAME_RANDOM = "testResourceRandom";
@@ -57,34 +57,40 @@ public class SegmentAssignmentStrategyTest {
 
   @BeforeTest
   public void setup() throws Exception {
-    ZkTestUtils.startLocalZkServer();
+    ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_SERVER);
     final String zkPath = "/" + HELIX_CLUSTER_NAME;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
     final String instanceId = "localhost_helixController";
-    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
+    _pinotHelixResourceManager =
+        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
     _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
     _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
 
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numServerInstance, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numBrokerInstance, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER,
+        _numServerInstance, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER,
+        _numBrokerInstance, true);
     Thread.sleep(3000);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(), _numServerInstance);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(), _numServerInstance);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(),
+        _numServerInstance);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(),
+        _numServerInstance);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), _numBrokerInstance);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(),
+        _numBrokerInstance);
   }
 
   @AfterTest
   public void tearDown() {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
-    ZkTestUtils.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer();
   }
 
   @Test
@@ -93,8 +99,8 @@ public class SegmentAssignmentStrategyTest {
 
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_RANDOM, null,
-            null, numReplicas, "RandomAssignmentStrategy").toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_RANDOM, null, null, numReplicas,
+            "RandomAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
@@ -102,7 +108,8 @@ public class SegmentAssignmentStrategyTest {
     for (int i = 0; i < 10; ++i) {
       addOneSegment(TABLE_NAME_RANDOM);
       Thread.sleep(2000);
-      final Set<String> taggedInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
+      final Set<String> taggedInstances =
+          _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
@@ -123,8 +130,8 @@ public class SegmentAssignmentStrategyTest {
     final int numReplicas = 3;
     // Adding table
     String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_BALANCED, null,
-            null, numReplicas, "BalanceNumSegmentAssignmentStrategy").toString();
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_BALANCED, null, null, numReplicas,
+            "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
@@ -132,7 +139,8 @@ public class SegmentAssignmentStrategyTest {
     for (int i = 0; i < 100; ++i) {
       addOneSegment(TABLE_NAME_BALANCED);
       Thread.sleep(2000);
-      final Set<String> taggedInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
+      final Set<String> taggedInstances =
+          _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);

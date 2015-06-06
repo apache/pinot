@@ -1218,15 +1218,13 @@ public class PinotHelixResourceManager {
   }
 
   public boolean hasRealtimeTable(String tableName) {
-    String actualTableName = new TableNameBuilder(TableType.REALTIME).forTable(tableName);
-    List<String> tables = _propertyStore.getChildNames("/tables", AccessOption.PERSISTENT);
-    return tables.contains(actualTableName);
+    String actualTableName = tableName + "_REALTIME";
+    return getAllPinotTableNames().contains(actualTableName);
   }
 
   public boolean hasOfflineTable(String tableName) {
-    String actualTableName = new TableNameBuilder(TableType.OFFLINE).forTable(tableName);
-    List<String> tables = _propertyStore.getChildNames("/tables", AccessOption.PERSISTENT);
-    return tables.contains(actualTableName);
+    String actualTableName = tableName + "_OFFLINE";
+    return getAllPinotTableNames().contains(actualTableName);
   }
 
   public AbstractTableConfig getTableConfig(String tableName, TableType type) throws JsonParseException,

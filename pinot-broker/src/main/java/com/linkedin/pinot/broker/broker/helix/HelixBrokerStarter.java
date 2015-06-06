@@ -66,8 +66,10 @@ public class HelixBrokerStarter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
-  private static final String DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.offline";
-  private static final String DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.realtime";
+  private static final String DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY =
+      "pinot.broker.routing.table.builder.default.offline";
+  private static final String DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY =
+      "pinot.broker.routing.table.builder.default.realtime";
   private static final String ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
@@ -94,7 +96,8 @@ public class HelixBrokerStarter {
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
     _helixExternalViewBasedRouting =
-        new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder, tableToRoutingTableBuilderMap, _propertyStore);
+        new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder,
+            tableToRoutingTableBuilderMap, _propertyStore);
 
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
@@ -118,7 +121,8 @@ public class HelixBrokerStarter {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.isEmpty()) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        _helixAdmin.addInstanceTag(clusterName, instanceName,
+            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       }
@@ -163,8 +167,9 @@ public class HelixBrokerStarter {
     if (config == null) {
       config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     }
-    final BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
-        _helixExternalViewBasedRouting.getTimeBoundaryService());
+    final BrokerServerBuilder brokerServerBuilder =
+        new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
+            _helixExternalViewBasedRouting.getTimeBoundaryService());
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
     brokerServerBuilder.start();
@@ -190,15 +195,18 @@ public class HelixBrokerStarter {
     return _brokerServerBuilder;
   }
 
-  public static void main(String[] args) throws Exception {
-
+  public static HelixBrokerStarter startDefault() throws Exception {
     Configuration configuration = new PropertiesConfiguration();
     int port = 5001;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
     configuration.addProperty("pinot.broker.time.out", 500 * 1000L);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("pinotControllerV2", "localhost:2121", configuration);
-    Thread.sleep(1000);
+        new HelixBrokerStarter("quickstart", "localhost:2122", configuration);
+    return pinotHelixBrokerStarter;
+  }
+
+  public static void main(String[] args) throws Exception {
+    startDefault();
   }
 }

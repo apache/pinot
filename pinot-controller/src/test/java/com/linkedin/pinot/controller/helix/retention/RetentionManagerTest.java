@@ -38,13 +38,13 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
@@ -61,7 +61,7 @@ public class RetentionManagerTest {
 
   private final static String HELIX_CLUSTER_NAME = "TestRetentionManager";
 
-  private static final String ZK_STR = ZkTestUtils.DEFAULT_ZK_STR;
+  private static final String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
   private static final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
@@ -77,10 +77,11 @@ public class RetentionManagerTest {
 
   @BeforeTest
   public void setup() throws Exception {
-    ZkTestUtils.startLocalZkServer();
+    ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
 
-    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 10000L, true);
+    _pinotHelixResourceManager =
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 10000L, true);
     _pinotHelixResourceManager.start();
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
@@ -88,7 +89,8 @@ public class RetentionManagerTest {
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     _helixZkManager = _pinotHelixResourceManager.getHelixZkManager();
 
-    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
+    String OfflineTableConfigJson =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
   }
@@ -101,7 +103,7 @@ public class RetentionManagerTest {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
     _zkClient.close();
-    ZkTestUtils.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer();
   }
 
   public void cleanupSegments() throws InterruptedException {

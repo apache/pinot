@@ -125,21 +125,26 @@ public class ControllerStarter {
     }
   }
 
-  public static void main(String[] args) throws InterruptedException {
+  public static ControllerStarter startDefault() {
     final ControllerConf conf = new ControllerConf();
     conf.setControllerHost("localhost");
     conf.setControllerPort("9000");
     conf.setDataDir("/tmp/PinotController");
-    conf.setZkStr("localhost:2121");
-    conf.setHelixClusterName("pinotControllerV2");
+    conf.setZkStr("localhost:2122");
+    conf.setHelixClusterName("quickstart");
+    conf.setQueryConsolePath("file://" + ControllerStarter.class.getClassLoader().getResource("webapp").getFile());
     conf.setControllerVipHost("localhost");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
-    conf.setTenantIsolationEnabled(false);
+    conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);
 
     System.out.println(conf.getQueryConsole());
     starter.start();
+    return starter;
+  }
 
+  public static void main(String[] args) throws InterruptedException {
+    startDefault();
   }
 }

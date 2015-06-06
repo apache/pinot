@@ -83,8 +83,9 @@ public class HelixServerStarter {
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);
     final StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(helixClusterName, instanceId, _serverInstance.getInstanceDataManager(),
-            new ColumnarSegmentMetadataLoader(), pinotHelixProperties, zkPropertyStore);
+        new SegmentOnlineOfflineStateModelFactory(helixClusterName, instanceId,
+            _serverInstance.getInstanceDataManager(), new ColumnarSegmentMetadataLoader(), pinotHelixProperties,
+            zkPropertyStore);
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixAdmin = _helixManager.getClusterManagmentTool();
@@ -96,8 +97,10 @@ public class HelixServerStarter {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        _helixAdmin.addInstanceTag(clusterName, instanceName,
+            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        _helixAdmin.addInstanceTag(clusterName, instanceName,
+            TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
       }
@@ -125,14 +128,18 @@ public class HelixServerStarter {
     _serverInstance.shutDown();
   }
 
-  public static void main(String[] args) throws Exception {
+  public static HelixServerStarter startDefault() throws Exception {
     final Configuration configuration = new PropertiesConfiguration();
     final int port = 8003;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
     long currentTimeMillis = System.currentTimeMillis();
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
-    final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter("pinotControllerV2", "localhost:2121", configuration);
+    final HelixServerStarter pinotHelixStarter = new HelixServerStarter("quickstart", "localhost:2122", configuration);
+    return pinotHelixStarter;
+  }
+
+  public static void main(String[] args) throws Exception {
+    startDefault();
   }
 }

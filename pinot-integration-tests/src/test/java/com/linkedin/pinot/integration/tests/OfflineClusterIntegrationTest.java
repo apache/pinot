@@ -40,9 +40,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
 
 
@@ -135,7 +135,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     final CountDownLatch latch = new CountDownLatch(1);
     HelixManager manager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
-            ZkTestUtils.DEFAULT_ZK_STR);
+            ZkStarter.DEFAULT_ZK_STR);
     manager.connect();
     manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
       @Override

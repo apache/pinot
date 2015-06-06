@@ -32,13 +32,13 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
 import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 
@@ -50,23 +50,24 @@ public class TimeBoundaryServiceTest {
 
   @BeforeTest
   public void beforeTest() {
-    ZkTestUtils.startLocalZkServer();
+    ZkStarter.startLocalZkServer();
 
     _zkClient =
-        new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkTestUtils.DEFAULT_ZK_STR, "/")),
+        new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     String helixClusterName = "TestTimeBoundaryService";
     _zkClient.deleteRecursive("/" + helixClusterName + "/PROPERTYSTORE");
     _zkClient.createPersistent("/" + helixClusterName + "/PROPERTYSTORE", true);
-    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/" + helixClusterName
-        + "/PROPERTYSTORE", null);
+    _propertyStore =
+        new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/" + helixClusterName
+            + "/PROPERTYSTORE", null);
 
   }
 
   @AfterTest
   public void afterTest() {
     _zkClient.close();
-    ZkTestUtils.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer();
   }
 
   @Test
@@ -99,14 +100,16 @@ public class TimeBoundaryServiceTest {
 
   private ExternalView constructExternalView(String tableName) {
     ExternalView externalView = new ExternalView(tableName);
-    List<OfflineSegmentZKMetadata> offlineResourceZKMetadataListForResource = ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableName);
+    List<OfflineSegmentZKMetadata> offlineResourceZKMetadataListForResource =
+        ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableName);
     for (OfflineSegmentZKMetadata segmentMetadata : offlineResourceZKMetadataListForResource) {
       externalView.setState(segmentMetadata.getSegmentName(), "localhost", "ONLINE");
     }
     return externalView;
   }
 
-  private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+  private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableName) {
     for (int i = 0; i < numSegments; ++i) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
       offlineSegmentZKMetadata.setSegmentName(tableName + "_" + System.currentTimeMillis() + "_" + i);
@@ -159,6 +162,7 @@ public class TimeBoundaryServiceTest {
     offlineTableConfigJson.put("metadata", metadata);
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(offlineTableConfigJson.toString());
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName, AbstractTableConfig.toZnRecord(offlineTableConfig));
+    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName,
+        AbstractTableConfig.toZnRecord(offlineTableConfig));
   }
 }

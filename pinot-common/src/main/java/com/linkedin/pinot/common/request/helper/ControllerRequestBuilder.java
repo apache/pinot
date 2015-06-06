@@ -28,7 +28,8 @@ public class ControllerRequestBuilder {
 
   public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
       throws JSONException {
-    Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numberOfInstances).build();
+    Tenant tenant =
+        new TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numberOfInstances).build();
     return tenant.toJSON();
   }
 
@@ -58,7 +59,7 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("segmentPushFrequency", "daily");
     segmentsConfig.put("segmentPushType", "APPEND");
     segmentsConfig.put("replication", numReplicas);
-    segmentsConfig.put("schemaName", "tableSchema");
+    segmentsConfig.put("schemaName", "baseball");
     segmentsConfig.put("timeColumnName", timeColumnName);
     segmentsConfig.put("timeType", timeType);
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);

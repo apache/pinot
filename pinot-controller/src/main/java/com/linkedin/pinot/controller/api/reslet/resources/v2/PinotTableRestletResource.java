@@ -2,8 +2,8 @@ package com.linkedin.pinot.controller.api.reslet.resources.v2;
 
 import java.io.File;
 import java.io.IOException;
-
 import java.util.List;
+
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -74,7 +75,7 @@ public class PinotTableRestletResource extends ServerResource {
         JSONArray tableArray = new JSONArray();
         List<String> tableNames = manager.getAllPinotTableNames();
         for (String pinotTableName : tableNames) {
-          tableArray.add(pinotTableName);
+          tableArray.add(TableNameBuilder.extractRawTableName(pinotTableName));
         }
         object.put("tables", tableArray);
         return new StringRepresentation(object.toString());
@@ -84,14 +85,17 @@ public class PinotTableRestletResource extends ServerResource {
       }
     }
     try {
-      JSONArray ret = new JSONArray();
+      JSONObject ret = new JSONObject();
 
       if (manager.hasOfflineTable(tableName)) {
-        ret.add(manager.getTableConfig(tableName, TableType.OFFLINE).toJSON());
+        AbstractTableConfig config = manager.getTableConfig(tableName, TableType.OFFLINE);
+        System.out.println("****************** : " + config.toJSON() + " ****************** ");
+        ret.put("offline", config.toJSON());
       }
 
       if (manager.hasRealtimeTable(tableName)) {
-        ret.add(manager.getTableConfig(tableName, TableType.REALTIME).toJSON());
+        AbstractTableConfig config = manager.getTableConfig(tableName, TableType.REALTIME);
+        ret.put("realtime", config.toJSON());
       }
 
       return new StringRepresentation(ret.toString());

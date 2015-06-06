@@ -36,11 +36,11 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -64,26 +64,31 @@ public class HelixBrokerStarterTest {
 
   @BeforeTest
   public void setUp() throws Exception {
-    ZkTestUtils.startLocalZkServer();
-    _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
+    ZkStarter.startLocalZkServer();
+    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     final String instanceId = "localhost_helixController";
-    _pinotResourceManager = new PinotHelixResourceManager(ZkTestUtils.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
+    _pinotResourceManager =
+        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true);
     _pinotResourceManager.start();
 
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkTestUtils.DEFAULT_ZK_STR);
+    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkStarter.DEFAULT_ZK_STR);
     _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     Thread.sleep(3000);
     final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
-    _helixBrokerStarter = new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, pinotHelixBrokerProperties);
+    _helixBrokerStarter =
+        new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, pinotHelixBrokerProperties);
 
     Thread.sleep(1000);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 5, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, 1, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkStarter.DEFAULT_ZK_STR, 5, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkStarter.DEFAULT_ZK_STR, 1, true);
 
     final String tableName = "company";
-    JSONObject buildCreateOfflineTableV2JSON = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 1);
+    JSONObject buildCreateOfflineTableV2JSON =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 1);
     AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
     _pinotResourceManager.addTable(config);
 
@@ -101,7 +106,7 @@ public class HelixBrokerStarterTest {
   public void tearDown() {
     _pinotResourceManager.stop();
     _zkClient.close();
-    ZkTestUtils.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer();
   }
 
   @Test
@@ -119,8 +124,8 @@ public class HelixBrokerStarterTest {
     Thread.sleep(2000);
     HelixExternalViewBasedRouting helixExternalViewBasedRouting =
         _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Assert.assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataTableSet().toArray()),
-        "[company_OFFLINE]");
+    Assert
+        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataTableSet().toArray()), "[company_OFFLINE]");
 
     final String tableName = "cap";
     JSONObject buildCreateOfflineTableV2JSON =

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.common.ZkTestUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -65,9 +63,11 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
@@ -192,8 +192,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           return;
         }
         if (GATHER_FAILED_QUERIES) {
-          saveFailedQuery(pqlQuery, sqlQueries,
-              "Got exceptions in pql query " + pqlQuery + ", got " + response);
+          saveFailedQuery(pqlQuery, sqlQueries, "Got exceptions in pql query " + pqlQuery + ", got " + response);
         } else {
           Assert.fail("Got exceptions in pql query: " + pqlQuery);
         }
@@ -223,8 +222,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           LOGGER.debug("sql value: " + sqlValue);
           if (GATHER_FAILED_QUERIES) {
             if (!EqualityUtils.isEqual(bqlValue, sqlValue)) {
-              saveFailedQuery(pqlQuery, sqlQueries,
-                  "Values did not match for query " + pqlQuery + ", expected " + sqlValue + ", got " + bqlValue);
+              saveFailedQuery(pqlQuery, sqlQueries, "Values did not match for query " + pqlQuery + ", expected "
+                  + sqlValue + ", got " + bqlValue);
             }
           } else {
             Assert.assertEquals(bqlValue, sqlValue, "Values did not match for query " + pqlQuery);
@@ -276,31 +275,30 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
                 for (String pinotKey : pinotKeys) {
                   if (GATHER_FAILED_QUERIES) {
                     if (!correctValues.containsKey((pinotKey))) {
-                      saveFailedQuery(pqlQuery, sqlQueries,
-                          "Result group '" + pinotKey + "' returned by Pinot was not returned by H2 for query " +
-                              pqlQuery, "Bql values: " + actualValues, "Sql values: " + correctValues);
+                      saveFailedQuery(pqlQuery, sqlQueries, "Result group '" + pinotKey
+                          + "' returned by Pinot was not returned by H2 for query " + pqlQuery, "Bql values: "
+                          + actualValues, "Sql values: " + correctValues);
                       break;
                     } else {
                       double actualValue = Double.parseDouble(actualValues.get(pinotKey));
                       double correctValue = Double.parseDouble(correctValues.get(pinotKey));
                       if (1.0 < Math.abs(actualValue - correctValue)) {
-                        saveFailedQuery(pqlQuery, sqlQueries,
-                            "Results differ between Pinot and H2 for query " + pqlQuery + ", expected " +
-                                correctValue + ", got " + actualValue + " for group " +
-                                pinotKey, "Bql values: " + actualValues, "Sql values: " + correctValues);
+                        saveFailedQuery(pqlQuery, sqlQueries, "Results differ between Pinot and H2 for query "
+                            + pqlQuery + ", expected " + correctValue + ", got " + actualValue + " for group "
+                            + pinotKey, "Bql values: " + actualValues, "Sql values: " + correctValues);
                         break;
                       }
                     }
                   } else {
-                    Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey +
-                        "' returned by Pinot was not returned by H2 for query " + pqlQuery);
+                    Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey
+                        + "' returned by Pinot was not returned by H2 for query " + pqlQuery);
                     Assert.assertEquals(
                         Double.parseDouble(actualValues.get(pinotKey)),
                         Double.parseDouble(correctValues.get(pinotKey)),
                         1.0d,
-                        "Results differ between Pinot and H2 for query " + pqlQuery + ", expected " +
-                            correctValues.get(pinotKey) + ", got " + actualValues.get(pinotKey) + " for group " +
-                            pinotKey + "\nBql values: " + actualValues + "\nSql values: " + correctValues);
+                        "Results differ between Pinot and H2 for query " + pqlQuery + ", expected "
+                            + correctValues.get(pinotKey) + ", got " + actualValues.get(pinotKey) + " for group "
+                            + pinotKey + "\nBql values: " + actualValues + "\nSql values: " + correctValues);
                   }
                 }
               } else {
@@ -320,11 +318,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               if (rowCount != 0) {
                 // Resultset not empty, while Pinot has no results
                 if (GATHER_FAILED_QUERIES) {
-                  saveFailedQuery(pqlQuery, sqlQueries,
-                      "Pinot did not return any results while " + rowCount + " rows were expected for query " + pqlQuery);
+                  saveFailedQuery(pqlQuery, sqlQueries, "Pinot did not return any results while " + rowCount
+                      + " rows were expected for query " + pqlQuery);
                 } else {
-                  Assert.fail("Pinot did not return any results while " + rowCount + " results were expected for query "
-                      + pqlQuery);
+                  Assert.fail("Pinot did not return any results while " + rowCount
+                      + " results were expected for query " + pqlQuery);
                 }
               }
             }
@@ -526,8 +524,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
             // Tar segment
             String segmentName = outputDir.list()[0];
-            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName,
-                new File(segmentTarDir, segmentName).getAbsolutePath());
+            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName, new File(
+                segmentTarDir, segmentName).getAbsolutePath());
             LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName);
           } catch (Exception e) {
             throw new RuntimeException(e);
@@ -619,42 +617,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected String[] getHardCodedQuerySet() {
     String[] queries =
-        new String[] {
-            "SELECT AirTime, avg(TotalAddGTime) FROM 'mytable'  WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000",
-            "SELECT count(*) FROM 'mytable'  WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2') ",
-            "SELECT count(*) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') ",
-            "SELECT ArrDelay, avg(DestCityMarketID) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000",
-            "SELECT OriginAirportSeqID, min(CRSArrTime) FROM 'mytable'  WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000",
-            "SELECT NASDelay, DestAirportSeqID, min(DayOfWeek) FROM 'mytable'  WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000",
-            "SELECT DestState, avg(DistanceGroup) FROM 'mytable'  GROUP BY DestState LIMIT 10000",
-            "SELECT ActualElapsedTime, DestCityMarketID, sum(OriginAirportSeqID) FROM 'mytable'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000",
-            "SELECT sum(CarrierDelay) FROM 'mytable'  WHERE      CRSDepTime < '1047' OR DestWac = '84'   LIMIT 16",
-            "SELECT Year, sum(CarrierDelay) FROM 'mytable'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000",
-            "select count(*) from 'mytable'", "select sum(DepDelay) from 'mytable'",
-            "select count(DepDelay) from 'mytable'",
-            "select min(DepDelay) from 'mytable'",
-            "select max(DepDelay) from 'mytable'",
-            "select avg(DepDelay) from 'mytable'",
-            "select Carrier, count(*) from 'mytable' group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where ArrDelay > 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where Cancelled = 1 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay < 15 group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where ArrDelay <= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where DepDelay between 5 and 15 group by Carrier  ",
-            "select Carrier, count(*) from 'mytable' where DepDelay in (2, 8, 42) group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where DepDelay not in (4, 16) group by Carrier ",
-            "select Carrier, count(*) from 'mytable' where Cancelled <> 1 group by Carrier ",
-            "select Carrier, min(ArrDelay) from 'mytable' group by Carrier ",
-            "select Carrier, max(ArrDelay) from 'mytable' group by Carrier ",
-            "select Carrier, sum(ArrDelay) from 'mytable' group by Carrier ",
-            "select TailNum, avg(ArrDelay) from 'mytable' group by TailNum ",
-            "select FlightNum, avg(ArrDelay) from 'mytable' group by FlightNum ",
-            "select distinctCount(Carrier) from 'mytable' where TailNum = 'D942DN' ",
-            "SELECT count(*) FROM 'mytable'  WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'  "
-        };
+        new String[] { "SELECT AirTime, avg(TotalAddGTime) FROM 'mytable'  WHERE DivAirportLandings BETWEEN 0 AND 0 OR Quarter IN (2, 2, 4, 2, 3, 1, 1, 1) GROUP BY AirTime LIMIT 10000", "SELECT count(*) FROM 'mytable'  WHERE DayofMonth IN ('19', '10', '28', '1', '25', '2') ", "SELECT count(*) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') ", "SELECT ArrDelay, avg(DestCityMarketID) FROM 'mytable'  WHERE TaxiOut IN ('35', '70', '29', '74', '126', '106', '70', '134', '118', '43') OR DayofMonth IN ('19', '10', '28', '1', '25') GROUP BY ArrDelay LIMIT 10000", "SELECT OriginAirportSeqID, min(CRSArrTime) FROM 'mytable'  WHERE TaxiOut BETWEEN 140 AND 26 OR DestCityName >= 'Gainesville, FL' GROUP BY OriginAirportSeqID LIMIT 10000", "SELECT NASDelay, DestAirportSeqID, min(DayOfWeek) FROM 'mytable'  WHERE DaysSinceEpoch IN ('16426', '16176', '16314', '16321') GROUP BY NASDelay, DestAirportSeqID LIMIT 10000", "SELECT DestState, avg(DistanceGroup) FROM 'mytable'  GROUP BY DestState LIMIT 10000", "SELECT ActualElapsedTime, DestCityMarketID, sum(OriginAirportSeqID) FROM 'mytable'  WHERE DestStateName > 'Oklahoma' GROUP BY ActualElapsedTime, DestCityMarketID LIMIT 10000", "SELECT sum(CarrierDelay) FROM 'mytable'  WHERE      CRSDepTime < '1047' OR DestWac = '84'   LIMIT 16", "SELECT Year, sum(CarrierDelay) FROM 'mytable'  WHERE DestWac BETWEEN '84' AND '37' OR CRSDepTime < '1047' GROUP BY Year LIMIT 10000", "select count(*) from 'mytable'", "select sum(DepDelay) from 'mytable'", "select count(DepDelay) from 'mytable'", "select min(DepDelay) from 'mytable'", "select max(DepDelay) from 'mytable'", "select avg(DepDelay) from 'mytable'", "select Carrier, count(*) from 'mytable' group by Carrier  ", "select Carrier, count(*) from 'mytable' where ArrDelay > 15 group by Carrier  ", "select Carrier, count(*) from 'mytable' where Cancelled = 1 group by Carrier  ", "select Carrier, count(*) from 'mytable' where DepDelay >= 15 group by Carrier  ", "select Carrier, count(*) from 'mytable' where DepDelay < 15 group by Carrier ", "select Carrier, count(*) from 'mytable' where ArrDelay <= 15 group by Carrier  ", "select Carrier, count(*) from 'mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier  ", "select Carrier, count(*) from 'mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier ", "select Carrier, count(*) from 'mytable' where DepDelay between 5 and 15 group by Carrier  ", "select Carrier, count(*) from 'mytable' where DepDelay in (2, 8, 42) group by Carrier ", "select Carrier, count(*) from 'mytable' where DepDelay not in (4, 16) group by Carrier ", "select Carrier, count(*) from 'mytable' where Cancelled <> 1 group by Carrier ", "select Carrier, min(ArrDelay) from 'mytable' group by Carrier ", "select Carrier, max(ArrDelay) from 'mytable' group by Carrier ", "select Carrier, sum(ArrDelay) from 'mytable' group by Carrier ", "select TailNum, avg(ArrDelay) from 'mytable' group by TailNum ", "select FlightNum, avg(ArrDelay) from 'mytable' group by FlightNum ", "select distinctCount(Carrier) from 'mytable' where TailNum = 'D942DN' ", "SELECT count(*) FROM 'mytable'  WHERE OriginStateName BETWEEN 'U.S. Pacific Trust Territories and Possessions' AND 'Maryland'  " };
     return queries;
   }
 
@@ -662,7 +625,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     if (_pinotConnection == null) {
       synchronized (BaseClusterIntegrationTest.class) {
         if (_pinotConnection == null) {
-          _pinotConnection = ConnectionFactory.fromZookeeper(ZkTestUtils.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+          _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
         }
       }
     }
@@ -670,7 +633,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected long getCurrentServingNumDocs() {
     ensurePinotConnectionIsCreated();
-    com.linkedin.pinot.client.ResultSet resultSet = _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0").getResultSet(0);
+    com.linkedin.pinot.client.ResultSet resultSet =
+        _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0").getResultSet(0);
     return resultSet.getInt(0);
   }
 

@@ -50,7 +50,6 @@ public class PinotSchemaResletResource extends ServerResource {
   @Override
   @Get
   public Representation get() {
-
     try {
       final String schemaName = (String) getRequest().getAttributes().get("schemaName");
       if (schemaName != null) {

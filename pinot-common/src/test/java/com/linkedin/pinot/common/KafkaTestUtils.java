@@ -17,11 +17,15 @@ package com.linkedin.pinot.common;
 
 import java.io.File;
 import java.util.Properties;
+
 import kafka.admin.TopicCommand;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
+
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.FileUtils;
+
+import com.linkedin.pinot.common.utils.ZkStarter;
 
 
 /**
@@ -31,14 +35,15 @@ import org.apache.commons.io.FileUtils;
 public class KafkaTestUtils {
   public static final int DEFAULT_KAFKA_PORT = 19092;
   public static final int DEFAULT_BROKER_ID = 0;
-  public static final String DEFAULT_ZK_STR = ZkTestUtils.DEFAULT_ZK_STR + "/kafka";
+  public static final String DEFAULT_ZK_STR = ZkStarter.DEFAULT_ZK_STR + "/kafka";
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
   public static Properties getDefaultKafkaConfiguration() {
     return new Properties();
   }
 
-  public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr, final Properties configuration) {
+  public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr,
+      final Properties configuration) {
     // Create the ZK nodes for Kafka, if needed
     int indexOfFirstSlash = zkStr.indexOf('/');
     if (indexOfFirstSlash != -1) {
@@ -70,7 +75,7 @@ public class KafkaTestUtils {
   }
 
   public static void createTopic(String kafkaTopic, String zkStr) {
-    TopicCommand.main(new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1",
-        "--partitions", "10", "--topic", kafkaTopic});
+    TopicCommand
+        .main(new String[] { "--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic", kafkaTopic });
   }
 }
