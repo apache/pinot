@@ -59,7 +59,7 @@ public class NettyServerMetrics implements TransportServerMetrics {
         MetricsHelper.newHistogram(registry, new MetricName(group, "", PROCESSING_LATENCY_MS), false);
   }
 
-  public synchronized void addServingStats(long requestSize, long responseSize, long numRequests, boolean error,
+  public void addServingStats(long requestSize, long responseSize, long numRequests, boolean error,
       long processingLatencyMs, long sendResponseLatencyMs) {
     _requestsReceived.inc(numRequests);
     _bytesReceived.inc(requestSize);

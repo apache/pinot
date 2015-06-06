@@ -161,7 +161,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private List<IndexSegment> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
     LOGGER
-        .info("InstanceRequest request {} segments : {}", instanceRequest.getSearchSegments().size(), Arrays.toString(instanceRequest.getSearchSegments().toArray(new String[0])));
+        .info("InstanceRequest request {} segments", instanceRequest.getSearchSegments().size());
 
     final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
     final TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
@@ -169,9 +169,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return new ArrayList<IndexSegment>();
     }
     final List<SegmentDataManager> matchedSegmentDataManagerFromServer = tableDataManager.getSegments(instanceRequest.getSearchSegments());
-    LOGGER.info("TableDataManager found {} segments before pruning : {}", matchedSegmentDataManagerFromServer.size(),
-
-        Arrays.toString(matchedSegmentDataManagerFromServer.toArray(new SegmentDataManager[0])));
+    LOGGER.info("TableDataManager found {} segments before pruning", matchedSegmentDataManagerFromServer.size());
     final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
     for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
       final IndexSegment indexSegment = segmentDataManager.getSegment();

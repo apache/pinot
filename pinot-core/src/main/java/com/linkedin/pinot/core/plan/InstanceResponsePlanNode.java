@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
  *
  */
 public class InstanceResponsePlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponsePlanNode.class);
   private CombinePlanNode _planNode;
 
   public void setPlanNode(CombinePlanNode combinePlanNode) {
