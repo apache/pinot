@@ -17,6 +17,8 @@ package com.linkedin.pinot.tools.admin;
 
 import java.lang.reflect.Field;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -31,6 +33,7 @@ import com.linkedin.pinot.tools.admin.command.Command;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.GenerateDataCommand;
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+import com.linkedin.pinot.tools.admin.command.Quickstart;
 import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
 import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
 import com.linkedin.pinot.tools.admin.command.StartServerCommand;
@@ -44,6 +47,7 @@ import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
  *
  */
 public class PinotAdministrator {
+
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
@@ -58,7 +62,8 @@ public class PinotAdministrator {
       @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
       @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
       @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
-      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class)
+      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
+      @SubCommand(name = "Quickstart", impl = Quickstart.class)
   })
   Command _subCommand;
   // @formatter:on

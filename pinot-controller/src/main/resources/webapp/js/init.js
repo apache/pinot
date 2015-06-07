@@ -41,7 +41,7 @@ $(document).ready(function() {
       HELPERS.populateDefaultQuery(tableName);
       $("#execute-query").click();
     });
-  });
+  }, qH);
 
   $("#execute-query").click(function() {
     // execute query and draw the results
@@ -54,7 +54,7 @@ $(document).ready(function() {
 });
 
 var HELPERS = {
-  printTables : function(callback) {
+  printTables : function(callback, qh) {
     $.get("/tables", function(data) {
       var source   = $("#table-names-template").html();
       var template = Handlebars.compile(source);
@@ -62,7 +62,7 @@ var HELPERS = {
       $(".schema-list-view").html(d);
       $("#table-names").DataTable({
         "searching":true,
-        "scrollY": "200px",
+        "scrollY": qh + "px",
         "scrollCollapse": true,
         "paging": false,
         "info": false

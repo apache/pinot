@@ -19,7 +19,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 
-import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
 
 import com.linkedin.pinot.common.data.Schema;
@@ -27,13 +26,18 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 
 
 public class AddSchemaCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-controllerPort", required = true, metaVar = "<String>", usage = "Hostname for controller.")
+
+  @Option(name = "-controllerPort", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost = "http://localhost";
+
+  @Option(name = "-controllerPort", required = true, metaVar = "<String>", usage = "port name for controller.")
   private String _controllerPort;
 
   @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "Path to schema file.")
   private String _schemaFile = null;
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -46,8 +50,6 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
     return "Add schema specified in the schema file to the controller";
   }
 
-  private String _controllerHost = "http://localhost";
-
   @Override
   public String getName() {
     return "AddSchema";
@@ -55,8 +57,8 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddSchema -controllerHost " + _controllerHost  + " -controllerPort " + _controllerPort +
-        " -schemaFilePath " + _schemaFile);
+    return ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+        + " -schemaFilePath " + _schemaFile);
   }
 
   @Override

@@ -56,5 +56,10 @@
       <outputDirectory>bin</outputDirectory>
       <fileMode>0755</fileMode>
     </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-controller/src/main/resources</directory>
+      <outputDirectory>repo</outputDirectory>
+    </fileSet>
   </fileSets>
 </assembly>

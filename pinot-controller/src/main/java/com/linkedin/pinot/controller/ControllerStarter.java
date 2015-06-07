@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller;
 
+import java.io.File;
+
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
@@ -126,20 +128,34 @@ public class ControllerStarter {
   }
 
   public static ControllerStarter startDefault() {
+    return startDefault(null);
+  }
+
+  public static ControllerStarter startDefault(File webappPath) {
     final ControllerConf conf = new ControllerConf();
     conf.setControllerHost("localhost");
     conf.setControllerPort("9000");
     conf.setDataDir("/tmp/PinotController");
     conf.setZkStr("localhost:2122");
     conf.setHelixClusterName("quickstart");
-    conf.setQueryConsolePath("file://" + ControllerStarter.class.getClassLoader().getResource("webapp").getFile());
+    if (webappPath == null) {
+      String path = ControllerStarter.class.getClassLoader().getResource("webapp").getFile();
+      if (!path.startsWith("file://")) {
+        path = "file://" + path;
+      }
+      System.out.println("********************* : " + path);
+      conf.setQueryConsolePath(path);
+    } else {
+      conf.setQueryConsolePath("file://" + webappPath.getAbsolutePath());
+      System.out.println("********************* : " + "file://" + webappPath.getAbsolutePath());
+    }
+
     conf.setControllerVipHost("localhost");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);
 
-    System.out.println(conf.getQueryConsole());
     starter.start();
     return starter;
   }
