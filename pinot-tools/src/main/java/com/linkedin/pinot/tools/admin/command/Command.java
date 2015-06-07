@@ -23,6 +23,7 @@ package com.linkedin.pinot.tools.admin.command;
 public interface Command {
   public boolean execute() throws Exception;
   public void printUsage();
+  public String description();
 
   // Should return true if -help option is specified for the command, false otherwise.
   // This is to facilitate PinotAdministrator to print help for individual commands.

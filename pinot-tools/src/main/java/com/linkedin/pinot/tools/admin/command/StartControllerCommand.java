@@ -29,9 +29,6 @@ import com.linkedin.pinot.controller.ControllerStarter;
  *
  */
 public class StartControllerCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
-  private String _clusterName = null;
-
   @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
   private String _controllerPort = null;
 
@@ -41,7 +38,9 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
   private String _zkAddress = null;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private String _clusterName = "PinotCluster";
+
+  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -85,12 +84,12 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   }
 
   @Override
-  public boolean execute() throws Exception {
-    if (_help) {
-      printUsage();
-      return true;
-    }
+  public String description() {
+    return "Star the Pinot Controller Process at the specified port.";
+  }
 
+  @Override
+  public boolean execute() throws Exception {
     final ControllerConf conf = new ControllerConf();
 
     conf.setControllerHost("localhost");

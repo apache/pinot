@@ -34,9 +34,6 @@ import com.google.common.io.Files;
  *
  */
 public class StartZookeeperCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-zkHost", required=false, metaVar="<string>", usage="Host to start zookeeper server on.")
-  private String _zkHost = "localhost";
-
   @Option(name="-zkPort", required=false, metaVar="<int>", usage="Port to start zookeeper server on.")
   private int _zkPort=2181;
 
@@ -52,7 +49,7 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
   @Option(name="-minSessionTimeout", required=false, metaVar="<int>", usage="Min session timeout.")
   private int _minSessionTimeout = 60000;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
   @Override
@@ -67,7 +64,7 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
 
   @Override
   public String toString() {
-    return ("StartZookeeper -zkHost " + _zkHost + " -zkPort " + _zkPort + " -dataDir " + _dataDir +
+    return ("StartZookeeper -zkPort " + _zkPort + " -dataDir " + _dataDir +
         " -logDir " + _logDir + " -tickTime " + _tickTime + " -minSessionTimeout " + _minSessionTimeout);
 
   }
@@ -83,12 +80,16 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
     }
   }
 
+  @Override
+  public String description() {
+    return "Start the Zookeeper process at the specified port.";
+  }
+
   private ZkServer _zkServer;
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
   private File _tmpdir;
 
-  public void init(String zkHost, int zkPort, String dataDir, String logDir) {
-    _zkHost = zkHost;
+  public void init(int zkPort, String dataDir, String logDir) {
     _zkPort = zkPort;
     _dataDir = dataDir;
     _logDir = logDir;

@@ -37,7 +37,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
   @Option(name="-query", required=true, metaVar="<string>", usage="Query string to perform.")
   private String _query;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -57,6 +57,11 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
   @Override
   public void cleanup() {
 
+  }
+
+  @Override
+  public String description() {
+    return "Query the uploaded Pinot segments.";
   }
 
   public PostQueryCommand setQuery(String query) {

@@ -45,8 +45,8 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-realTimeInstanceCount", required = true, metaVar = "<int>", usage = "Number of realtime instances.")
   private int _realtimeInstanceCount;
 
-  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
-  private boolean help = false;
+  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  private boolean _help = false;
 
   private String _controllerAddress = "http://localhost:" + _controllerPort;
 
@@ -101,7 +101,7 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean getHelp() {
-    return help;
+    return _help;
   }
 
   @Override
@@ -109,5 +109,10 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
     return ("AddTenant -controllerAddress " + _controllerAddress + " -name " + _name +
         " -role " + _role + " -instanceCount " + _instanceCount + " -offlineInstanceCount " +
         _offlineInstanceCount + " -realTimeInstanceCount " + _realtimeInstanceCount);
+  }
+
+  @Override
+  public String description() {
+    return "Add tenant as per the specification provided.";
   }
 }

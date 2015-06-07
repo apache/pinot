@@ -42,7 +42,7 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
   private String _controllerPort = null;
 
-  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -55,6 +55,11 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   @Override
   public String getName() {
     return "AddTable";
+  }
+
+  @Override
+  public String description() {
+    return "Add table specified in the json file, to the controller.";
   }
 
   @Override

@@ -30,14 +30,14 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
  *
  *
  */
-public class UploadDataCommand extends AbstractBaseCommand implements Command {
+public class UploadSegmentCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-controllerPort", required = true, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = null;
 
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -48,12 +48,12 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String getName() {
-    return "UploadData";
+    return "UploadSegment";
   }
 
   @Override
   public String toString() {
-    return ("UploadDataCommand " + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir);
+    return ("UploadSegment " + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir);
   }
 
   @Override
@@ -61,17 +61,22 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
 
   }
 
-  public UploadDataCommand setControllerHost(String controllerHost) {
+  @Override
+  public String description() {
+    return "Upload the Pinot segments.";
+  }
+
+  public UploadSegmentCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
     return this;
   }
 
-  public UploadDataCommand setControllerPort(String controllerPort) {
+  public UploadSegmentCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
     return this;
   }
 
-  public UploadDataCommand setSegmentDir(String segmentDir) {
+  public UploadSegmentCommand setSegmentDir(String segmentDir) {
     _segmentDir = segmentDir;
     return this;
   }

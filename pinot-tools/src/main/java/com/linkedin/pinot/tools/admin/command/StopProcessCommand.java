@@ -42,8 +42,13 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
   @Option(name="-zooKeeper", required=false, usage="Stop the ZooKeeper process.")
   private boolean _zooKeeper = false;
 
-  @Option(name="-help", required=false, usage="Stop the PinotServer.")
+  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Stop the PinotServer.")
   private boolean _help = false;
+
+  @Override
+  public String description() {
+    return "Stop the specified processes.";
+  }
 
   public StopProcessCommand stopController() {
     _controller = true;
@@ -103,7 +108,6 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
   public boolean getHelp() {
     return _help;
   }
-
 
   @Override
   public String getName() {

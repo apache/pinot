@@ -29,10 +29,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
  *
  */
 public class StartBrokerCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
-  private String _clusterName = null;
-
-  @Option(name="-brokerPort", required=false, metaVar="<int>", usage="Broker port number to use for query.")
+  @Option(name="-brokerPort", required=true, metaVar="<int>", usage="Broker port number to use for query.")
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
 
   @Option(name="-brokerInstName", required=false, metaVar="<string>", usage="Instance name of the broker.")
@@ -41,7 +38,9 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-zkAddress", required=true, metaVar="<http>", usage="HTTP address of Zookeeper.")
   private String _zkAddress = null;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private String _clusterName = "PinotCluster";
+
+  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
   private String _brokerHostName = "localhost";
@@ -64,6 +63,11 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Override
   public void cleanup() {
 
+  }
+
+  @Override
+  public String description() {
+    return "Start the Pinot Broker process at the specified port";
   }
 
   public StartBrokerCommand setClusterName(String clusterName) {

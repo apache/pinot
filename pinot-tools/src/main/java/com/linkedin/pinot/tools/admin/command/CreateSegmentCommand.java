@@ -68,7 +68,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Option(name = "-overwrite", required = false, metaVar = "<string>", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
 
-  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
   boolean _help = false;
 
   public boolean getHelp() {
@@ -108,8 +108,9 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Override
   public String toString() {
     return ("CreateSegmentCommand -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
-        " -tableName " + _tableName + " -segmentName " +
-        _segmentName + " -outDir " + _outDir);
+        " -format " + _format + " -readerConfigFile " + _recordReaderConfigFile +
+        " -tableName " + _tableName + " -segmentName " + _segmentName + " -outDir " + _outDir +
+        " -overwrite " + _overwrite);
   }
 
   @Override
@@ -119,6 +120,11 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
   @Override
   public void cleanup() {
+  }
+
+  @Override
+  public String description() {
+    return "Create pinot segments from provided avro/csv/json input data.";
   }
 
   @Override

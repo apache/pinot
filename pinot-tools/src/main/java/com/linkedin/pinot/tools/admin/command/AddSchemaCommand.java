@@ -33,12 +33,17 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "Path to schema file.")
   private String _schemaFile = null;
 
-  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
   public boolean getHelp() {
     return _help;
+  }
+
+  @Override
+  public String description() {
+    return "Add schema specified in the schema file to the controller";
   }
 
   private String _controllerHost = "http://localhost";

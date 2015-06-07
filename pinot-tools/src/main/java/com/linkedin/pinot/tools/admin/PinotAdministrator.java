@@ -36,7 +36,7 @@ import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
 import com.linkedin.pinot.tools.admin.command.StartServerCommand;
 import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
-import com.linkedin.pinot.tools.admin.command.UploadDataCommand;
+import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
 
 
 /**
@@ -49,29 +49,29 @@ public class PinotAdministrator {
   @SubCommands({
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
-      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
-      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
+      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
       @SubCommand(name = "StartController", impl = StartControllerCommand.class),
+      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
+      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
       @SubCommand(name = "AddTable", impl = AddTableCommand.class),
       @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
       @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
-      @SubCommand(name = "UploadData", impl = UploadDataCommand.class),
+      @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
       @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
-      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
       @SubCommand(name = "StopProcess", impl = StopProcessCommand.class)
   })
   Command _subCommand;
   // @formatter:on
 
-  @Option(name = "-help", required = false, help = true)
-  boolean help = false;
+  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  boolean _help = false;
 
   public void execute(String[] args) throws Exception {
     try {
       CmdLineParser parser = new CmdLineParser(this);
       parser.parseArgument(args);
 
-      if ((_subCommand == null) || help) {
+      if ((_subCommand == null) || _help) {
         printUsage();
       } else if (_subCommand.getHelp()) {
         _subCommand.printUsage();
@@ -100,7 +100,15 @@ public class PinotAdministrator {
         SubCommands subCommands = f.getAnnotation(SubCommands.class);
 
         for (SubCommand subCommand : subCommands.value()) {
-          System.out.println("\t" + subCommand.name());
+          Class<?> subCommandClass = subCommand.impl();
+          Command command = null;
+
+          try {
+            command = (Command) subCommandClass.newInstance();
+            System.out.println("\t" + subCommand.name() + "\t<" + command.description() + ">");
+          } catch (Exception e) {
+            System.out.println("Internal Error: Error instantiating class.");
+          }
         }
       }
     }

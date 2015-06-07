@@ -29,10 +29,7 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
  *
  */
 public class StartServerCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
-  private String _clusterName = null;
-
-  @Option(name="-serverPort", required=false, metaVar="<int>", usage="Port number to start the server at.")
+  @Option(name="-serverPort", required=true, metaVar="<int>", usage="Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
   @Option(name="-dataDir", required=true, metaVar="<string>", usage="Path to directory containing data.")
@@ -44,7 +41,9 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
   private String _zkAddress = null;
 
-  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private String _clusterName = "PinotCluster";
+
+  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -90,6 +89,11 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Override
   public void cleanup() {
 
+  }
+
+  @Override
+  public String description() {
+    return "Start the Pinot Server process at the specified port.";
   }
 
   @Override
