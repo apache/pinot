@@ -67,7 +67,7 @@ public class NettyClientMetrics implements TransportClientMetrics {
     _connectMsGauge = MetricsHelper.newGauge(registry, new MetricName(group, "", CONNECT_TIME), new ConnectMsGauge());
   }
 
-  public synchronized void addRequestResponseStats(long bytesSent, long numRequests, long bytesReceived,
+  public void addRequestResponseStats(long bytesSent, long numRequests, long bytesReceived,
       boolean isError, long sendRequestMs, long responseLatencyMs) {
     _requestsSent.inc(numRequests);
     _bytesSent.inc(bytesSent);
