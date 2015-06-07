@@ -62,9 +62,6 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
   @Option(name = "-outDir", required = true, metaVar = "<string>", usage = "Directory where data would be generated.")
   private String _outDir = null;
 
-  @Option(name = "-help", required = false, help = true, usage = "Print this message.")
-  private boolean _help = false;
-
   @Option(name = "-overwrite", required = false, usage = "Overwrite, if directory exists")
   boolean _overwrite;
 
