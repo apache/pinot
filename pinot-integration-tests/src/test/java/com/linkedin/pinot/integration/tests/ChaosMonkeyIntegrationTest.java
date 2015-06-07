@@ -125,20 +125,20 @@ public class ChaosMonkeyIntegrationTest {
 
   private Process startController() {
     return runAdministratorCommand(new String[]{
-        "StartController", "-clusterName", "ChaosMonkeyCluster", "-zkAddress", "localhost:2191",
+        "StartController", "-zkAddress", "localhost:2191",
         "-controllerPort", "39000", "-dataDir", "/tmp/ChaosMonkeyClusterController"
     });
   }
 
   private Process startBroker() {
     return runAdministratorCommand(new String[]{
-        "StartBroker", "-clusterName", "ChaosMonkeyCluster", "-zkAddress", "localhost:2191"
+        "StartBroker", "-brokerPort", "8099", "-zkAddress", "localhost:2191"
     });
   }
 
   private Process startServer() {
     return runAdministratorCommand(new String[]{
-        "StartServer", "-clusterName", "ChaosMonkeyCluster", "-zkAddress", "localhost:2191",
+        "StartServer", "-serverPort", "8098", "-zkAddress", "localhost:2191",
         "-dataDir", "/tmp/ChaosMonkeyCluster/data", "-segmentDir", "/tmp/ChaosMonkeyCluster/segments"
     });
   }
@@ -173,7 +173,7 @@ public class ChaosMonkeyIntegrationTest {
 
   private void uploadData() throws InterruptedException {
     runAdministratorCommand(new String[]{
-        "UploadData", "-controllerPort", "39000", "-segmentDir", SEGMENT_DIR
+        "UploadSegment", "-controllerPort", "39000", "-segmentDir", SEGMENT_DIR
     }).waitFor();
   }
 
