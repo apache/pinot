@@ -239,6 +239,12 @@ function renderFunnel(container, options) {
             data[i].data[0][1] -= data[i+1].data[0][1]
         }
 
+        if(data.length == 1) {
+            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+            warning.append($('<p></p>', { html: 'Please add multiple metrics to make a proper funnel' }))
+            container.append(warning)
+            return;
+        }
         container.plot(data, {
             series: {
                 funnel: {
@@ -258,11 +264,6 @@ function renderFunnel(container, options) {
                 container: options.legendContainer
             }
         })
-        if(data.length == 1) {
-            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-            warning.append($('<p></p>', { html: 'Please add multiple metrics to make a proper funnel' }))
-            container.prepend(warning)
-        }
     }
 
     $.ajax({
