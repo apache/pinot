@@ -68,7 +68,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   private ZkHelixPropertyStore<ZNRecord> propertyStore;
 
   public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId,
-      DataManager instanceDataManager, SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties, 
+      DataManager instanceDataManager, SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     this.propertyStore = propertyStore;
     HELIX_CLUSTER_NAME = helixClusterName;
@@ -164,7 +164,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String tableName = message.getResourceName();
 
-
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentId);
 
@@ -187,7 +186,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             try {
               if (!isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
                 LOGGER.info("Trying to bootstrap segment from local!");
-                INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer);
+                AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
+                INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer, tableConfig);
                 return;
               }
             } catch (Exception e) {
@@ -207,11 +207,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           for (retryCount = 0; retryCount < SEGMENT_LOAD_MAX_RETRY_COUNT; ++retryCount) {
             long attemptStartTime = System.currentTimeMillis();
             try {
+              AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
               final String uri = offlineSegmentZKMetadata.getDownloadUrl();
               final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
               final SegmentMetadata segmentMetadata =
                   SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-              INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+              INSTANCE_DATA_MANAGER.addSegment(segmentMetadata, tableConfig);
 
               // Successfully loaded the segment, break out of the retry loop
               break;

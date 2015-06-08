@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.server.integration;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.linkedin.pinot.util.TestUtils;
-
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
@@ -37,7 +34,6 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -51,6 +47,8 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
+import com.linkedin.pinot.util.TestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class IntegrationTest {
@@ -244,8 +242,6 @@ public class IntegrationTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
     return query;
   }
 
@@ -255,8 +251,6 @@ public class IntegrationTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
     return query;
   }
 
@@ -266,8 +260,6 @@ public class IntegrationTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
     return query;
   }
 
@@ -277,13 +269,7 @@ public class IntegrationTest {
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
     return query;
-  }
-
-  private FilterQuery getFilterQuery() {
-    return new FilterQuery();
   }
 
   private AggregationInfo getCountAggregationInfo() {

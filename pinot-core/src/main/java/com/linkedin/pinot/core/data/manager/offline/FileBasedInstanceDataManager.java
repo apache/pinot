@@ -144,7 +144,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       File bootstrapSegmentDir = new File(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
       if (bootstrapSegmentDir.exists()) {
         for (File segment : bootstrapSegmentDir.listFiles()) {
-          addSegment(_segmentMetadataLoader.load(segment));
+          addSegment(_segmentMetadataLoader.load(segment), null);
           LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
         }
       } else {
@@ -190,7 +190,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
+  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception {
     String tableName = segmentMetadata.getTableName();
     LOGGER.info("Trying to add segment : " + segmentMetadata.getName());
     if (_tableDataManagerMap.containsKey(tableName)) {

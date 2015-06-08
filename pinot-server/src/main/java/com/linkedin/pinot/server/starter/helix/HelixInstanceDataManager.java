@@ -164,7 +164,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
+  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception {
     if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
@@ -180,7 +180,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
       synchronized (_globalLock) {
         if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(null, tableName);
+          addTableIfNeed(tableConfig, tableName);
         }
       }
     }

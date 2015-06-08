@@ -105,6 +105,11 @@
     },
     {
       "dataType": "INT",
+      "name": "DepDelayMinutes",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
       "name": "DepTime",
       "singleValueField": true
     },
