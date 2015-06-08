@@ -75,7 +75,7 @@ public class FixedBitWidthSingleColumnMultiValueReaderTest {
       dos.flush();
       dos.close();
 
-      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
       final int[] readValues = new int[100];
 
       FixedBitCompressedMVForwardIndexReader heapReader = new FixedBitCompressedMVForwardIndexReader(f, data.length, maxBits, false);
@@ -86,9 +86,9 @@ public class FixedBitWidthSingleColumnMultiValueReaderTest {
           Assert.assertEquals(readValues[j], data[i][j]);
         }
       }
-      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
       heapReader.close();
-      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
       FixedBitCompressedMVForwardIndexReader mmapReader = new FixedBitCompressedMVForwardIndexReader(f, data.length, maxBits, true);
       for (int i = 0; i < data.length; i++) {
@@ -98,9 +98,9 @@ public class FixedBitWidthSingleColumnMultiValueReaderTest {
           Assert.assertEquals(readValues[j], data[i][j]);
         }
       }
-      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
       mmapReader.close();
-      Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
       f.delete();
       maxBits = maxBits + 1;
