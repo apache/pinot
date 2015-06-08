@@ -28,8 +28,6 @@ import java.util.concurrent.TimeUnit;
 @Produces(MediaType.TEXT_HTML)
 public class DashboardResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
-  private static final long DEFAULT_CURRENT_OFFSET = TimeUnit.MILLISECONDS.convert(3, TimeUnit.HOURS);
-  private static final long DEFAULT_BASELINE_DELTA = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
   private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
@@ -109,23 +107,43 @@ public class DashboardResource {
   }
 
   @GET
-  @Path("/dashboard/{collection}/{metricFunction}/{metricViewType}/{dimensionViewType}")
-  public Response getDashboardView(
+  @Path("/dashboard/{collection}/{metricFunction}/{metricViewType}/{dimensionViewType}/{baselineOffsetMillis}")
+  public View getDashboardView(
       @PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction,
       @PathParam("metricViewType") MetricViewType metricViewType,
-      @PathParam("dimensionViewType")DimensionViewType dimensionViewType,
+      @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
+      @PathParam("baselineOffsetMillis") Long baselineOffsetMillis,
       @Context UriInfo uriInfo) throws Exception {
-    long currentTime = System.currentTimeMillis();
-    return Response.seeOther(URI.create(PATH_JOINER.join(
-        "",
-        "dashboard",
-        collection,
+    // Get segment metadata
+    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
+    if (segments.isEmpty()) {
+      throw new NotFoundException("No data loaded in server for " + collection);
+    }
+
+    // Find the latest and earliest data times
+    DateTime earliestDataTime = null;
+    DateTime latestDataTime = null;
+    for (SegmentDescriptor segment : segments) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+        earliestDataTime = segment.getStartDataTime();
+      }
+      if (segment.getEndDataTime() != null && (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0)) {
+        latestDataTime = segment.getEndDataTime();
+      }
+    }
+
+    if (earliestDataTime == null || latestDataTime == null) {
+      throw new NotFoundException("No data loaded in server for " + collection);
+    }
+
+    return getDashboardView(collection,
         metricFunction,
         metricViewType,
         dimensionViewType,
-        currentTime - DEFAULT_CURRENT_OFFSET - DEFAULT_BASELINE_DELTA,
-        currentTime - DEFAULT_CURRENT_OFFSET))).build();
+        latestDataTime.getMillis() - baselineOffsetMillis,
+        latestDataTime.getMillis(),
+        uriInfo);
   }
 
   @GET
