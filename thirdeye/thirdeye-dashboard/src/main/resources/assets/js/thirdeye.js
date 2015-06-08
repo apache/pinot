@@ -241,7 +241,7 @@ function renderFunnel(container, options) {
 
         if(data.length == 1) {
             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-            warning.append($('<p></p>', { html: 'Please add multiple metrics to make a proper funnel' }))
+            warning.append($('<p></p>', { html: 'A funnel must consist of more than one metric.' }))
             container.append(warning)
             return;
         }
