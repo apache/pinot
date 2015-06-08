@@ -1,8 +1,0 @@
-{
-  "dimensionNames" : [ "browserName", "locale", "countryCode", "emailDomain", "isSuccess", "errorStatus", "environment", "source", "deviceName"],
-  "metricNames" : [ "numberOfImportedContacts", "numberOfSuggestedMemberConnections", "numberOfMemberConnectionsSent", "numberOfSuggestedGuestInvitations", "numberOfGuestInvitationsSent" ],
-  "metricTypes" : [ "INT", "INT", "INT", "INT", "INT" ],
-  "timeColumnName" : "hoursSinceEpoch",
-  "timeUnit" : "HOURS",
-  "aggregationGranularity" : "HOURS"
-}
