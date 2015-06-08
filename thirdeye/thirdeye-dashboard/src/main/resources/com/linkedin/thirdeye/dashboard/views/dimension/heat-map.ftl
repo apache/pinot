@@ -21,16 +21,45 @@
             Heat Map Info
             <a class="uk-modal-close uk-close uk-align-right"></a>
         </div>
-        <h3>Contribution Heat Maps</h3>
+
+        <h3>Contribution</h3>
         <p>
-            Contributions Heat maps are based on the Current Ratio / Previous
-            Ratio. <br /> If the item in the heat map has a border it is more
-            likely to be an outlier. <br /> 
+          The contribution heat map view is a measure of the difference in each
+          dimension value's relative contribution to the total. This is useful
+          to determine whether or not there is movement among the dimension
+          values (i.e. one value contributes relatively more at the current
+          time with respect to the baseline time).
         </p>
-        <h3>Volume Heat Maps</h3>
         <p>
-            Items are ordered based on current value and colored based on
-            previous value,<br /> allowing you to see how an item is affected.
+          The cells are ordered left-to-right, top-to-bottom by the signed
+          magnitude of their contribution change. The cells are colored according
+          to their 
+          <a href="http://en.wikipedia.org/wiki/Cumulative_distribution_function">CDF value</a>,
+          so darker cells represent dimension values that make up a bigger component of the total.
+        </p>
+        <p>
+          The formula for the contribution difference in each cell is: <br/>
+          <pre>newValue / sum(newValues) - oldValue / sum(oldValues)</pre>
+        </p>
+
+        <h3>Volume</h3>
+        <p>
+          The volume heat map view is a measure of each dimension value's raw
+          contribution to the total. This is useful in quantifying exactly
+          where drops or increases occurred. The sum of all values in the heat
+          map equals the change in the aggregate metric.
+        </p>
+        <p>
+          The cells are ordered left-to-right, top-to-bottom by their current
+          raw volume, and colored based on the 
+          <a href="http://en.wikipedia.org/wiki/Cumulative_distribution_function">CDF value</a> 
+          of their baseline value. Thus lighter cells that are higher in the
+          heat map represent a positive change, and darker cells that are lower
+          in the heat map represent a negative change.
+        </p>
+        <p>
+          The formula for the volume difference in each cell is: <br/>
+          <pre>(newValue - oldValue) / sum(oldValues)</pre>
         </p>
     </div>
 </div>
