@@ -67,6 +67,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -120,7 +121,7 @@ public class AggregationQueriesTest {
     driver.init(config);
     driver.build();
 
-    LOGGER.info("built at : {}",  INDEX_DIR.getAbsolutePath());
+    LOGGER.info("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
@@ -248,9 +249,9 @@ public class AggregationQueriesTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    LOGGER.info("RunningTime : {}",  resultBlock.getTimeUsedMs());
-    LOGGER.info("NumDocsScanned : {}",  resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}",  resultBlock.getTotalDocs());
+    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
 
     final ReduceService reduceService = new DefaultReduceService();
 
@@ -280,9 +281,9 @@ public class AggregationQueriesTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    LOGGER.info("RunningTime : {}",  resultBlock.getTimeUsedMs());
-    LOGGER.info("NumDocsScanned : {}",  resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}",  resultBlock.getTotalDocs());
+    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
     Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
 
@@ -324,7 +325,7 @@ public class AggregationQueriesTest {
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("Result : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}",  brokerResponse.getTimeUsedMs());
+    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -339,20 +340,24 @@ public class AggregationQueriesTest {
 
     Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
         .toString());
-    Assert.assertEquals(1343930646015719300000000.00000,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(1).getString("value")));
+
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(1343930646015719300000000.00000,
+        Double.parseDouble(brokerResponse.getAggregationResults().get(1).getString("value"))));
 
     Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
         .toString());
-    Assert.assertEquals(8637957270245934100.0, Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value")));
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(8637957270245934100.0, 
+        Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value"))));
 
     Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
         .toString());
-    Assert.assertEquals(614819680033322500.0, Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value")));
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(614819680033322500.0, 
+        Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value"))));
 
     Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
         .toString());
-    Assert.assertEquals(6718981331945402400.0, Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value")));
+    Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(6718981331945402400.0, 
+        Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value"))));
 
     Assert.assertEquals("distinctCount_column12",
         brokerResponse.getAggregationResults().get(5).getString("function").toString());

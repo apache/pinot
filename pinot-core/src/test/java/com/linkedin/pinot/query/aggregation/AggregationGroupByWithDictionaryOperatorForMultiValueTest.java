@@ -70,6 +70,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -460,8 +461,8 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
         LOGGER.info("Comparing group: {}", i);
-        Assert.assertEquals(aggResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
-            .getJSONObject(i).getDouble("value"));
+        Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(aggResult[i],
+            brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i).getDouble("value")));
         if (groupResult.length < 2) {
           continue;
         }

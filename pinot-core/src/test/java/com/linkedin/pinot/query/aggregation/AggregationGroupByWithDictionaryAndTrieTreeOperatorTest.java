@@ -71,6 +71,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -464,9 +465,8 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
       final double[] aggResult = aggregationResult.get(j);
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
-        Assert.assertEquals(aggResult[i],
-            brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
-                .getDouble("value"));
+        Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(aggResult[i],
+            brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i).getDouble("value")));
         if ((i < 14 && aggResult[i] == aggResult[i + 1]) || (i > 0 && aggResult[i] == aggResult[i - 1])) {
           //do nothing, as we have multiple groups within same value.
         } else {
