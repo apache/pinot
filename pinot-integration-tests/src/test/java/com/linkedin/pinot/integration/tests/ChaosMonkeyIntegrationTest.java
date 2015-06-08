@@ -31,7 +31,6 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -45,7 +44,7 @@ public class ChaosMonkeyIntegrationTest {
   private String AVRO_DIR = "/tmp/temp-avro-" + getClass().getName();
   private String SEGMENT_DIR = "/tmp/temp-segment-" + getClass().getName();
   private static final String TOTAL_RECORD_COUNT = "1000";
-  private static final String SEGMENT_COUNT = "50";
+  private static final String SEGMENT_COUNT = "25";
 
   private Process runAdministratorCommand(String[] args) {
     String classpath = System.getProperty("java.class.path");
@@ -214,28 +213,28 @@ public class ChaosMonkeyIntegrationTest {
 
     sleep(5000L);
 
-    long timeInSixtySeconds = System.currentTimeMillis() + 60000L;
+    long timeInTwoMinutes = System.currentTimeMillis() + 120000L;
     int currentRecordCount = countRecords();
     int expectedRecordCount = Integer.parseInt(TOTAL_RECORD_COUNT);
-    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInSixtySeconds) {
+    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
       sleep(1000L);
       currentRecordCount = countRecords();
     }
-    Assert.assertEquals(currentRecordCount, expectedRecordCount, "All segments did not load within 60 seconds");
+    Assert.assertEquals(currentRecordCount, expectedRecordCount, "All segments did not load within 120 seconds");
 
     sendSignalToProcess(zookeeper, Signal.SIGSTOP);
     sleep(freezeLength);
     sendSignalToProcess(zookeeper, Signal.SIGCONT);
     sleep(5000L);
 
-    timeInSixtySeconds = System.currentTimeMillis() + 60000L;
+    timeInTwoMinutes = System.currentTimeMillis() + 120000L;
     currentRecordCount = countRecords();
-    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInSixtySeconds) {
+    while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
       sleep(1000L);
       currentRecordCount = countRecords();
     }
     Assert.assertEquals(currentRecordCount, expectedRecordCount,
-        "Record count still inconsistent 60 seconds after zookeeper restart");
+        "Record count still inconsistent 120 seconds after zookeeper restart");
   }
 
   @AfterMethod

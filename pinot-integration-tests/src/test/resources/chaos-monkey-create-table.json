@@ -2,7 +2,7 @@
   "tableName":"myTable",
   "segmentsConfig" : {
     "retentionTimeUnit":"DAYS",
-    "retentionTimeValue":"700",
+    "retentionTimeValue":"7000000",
     "segmentPushFrequency":"daily",
     "segmentPushType":"APPEND",
     "replication" : "3",
