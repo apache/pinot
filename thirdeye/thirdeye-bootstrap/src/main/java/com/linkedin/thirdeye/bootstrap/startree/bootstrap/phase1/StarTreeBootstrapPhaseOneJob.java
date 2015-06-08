@@ -43,6 +43,9 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +105,8 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     Map<UUID, List<int[]>> nodeIdToleafRecordsMap;
     boolean debug = false;
 
+    private DateTimeFormatter dateTimeFormatter;
+
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       LOGGER.info("StarTreeBootstrapPhaseOneJob.BootstrapMapper.setup()");
@@ -120,6 +125,16 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         aggregationTimeUnit = TimeUnit.valueOf(config.getAggregationGranularity());
         aggregationGranularitySize = config.getAggregationGranularitySize();
         dimensionValues = new String[dimensionNames.size()];
+
+        if (starTreeConfig.getTime().getFormat() != null) {
+          // Check that input time unit / size is 1 MILLISECONDS
+          if (!(inputTimeUnitSize == 1 && TimeUnit.MILLISECONDS.equals(sourceTimeUnit))) {
+            throw new IllegalArgumentException("Input time granularity must be 1 MILLISECONDS if format is provided: "
+                + "granularity is " + inputTimeUnitSize + " " + sourceTimeUnit + " and "
+                + "format is " + starTreeConfig.getTime().getFormat());
+          }
+          dateTimeFormatter = DateTimeFormat.forPattern(starTreeConfig.getTime().getFormat());
+        }
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -199,21 +214,23 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       }
 
       // check if the time column has appropriate values and drop the record with zero timestamp.
-      try {
-        Long time = Long.parseLong(timeObj.toString());
-        if (time == 0) {
-          LOGGER.error("Dropping record because " + config.getTimeColumnName() + " is set to 0");
-          context.getCounter(StarTreeBootstrapPhase1Counter.ZERO_TIME_RECORDS).increment(1);
-          return;
-        }
-        if (time < 0)
+      if (dateTimeFormatter == null) { // i.e. we should interpret the time column as a long
+        try {
+          Long time = Long.parseLong(timeObj.toString());
+          if (time == 0) {
+            LOGGER.error("Dropping record because " + config.getTimeColumnName() + " is set to 0");
+            context.getCounter(StarTreeBootstrapPhase1Counter.ZERO_TIME_RECORDS).increment(1);
+            return;
+          }
+          if (time < 0)
+            throw new IllegalStateException("Value for dimension "
+                + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
+                + " cannot be parsed");
+        } catch (NumberFormatException ex) {
           throw new IllegalStateException("Value for dimension "
               + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
               + " cannot be parsed");
-      } catch (NumberFormatException ex) {
-        throw new IllegalStateException("Value for dimension "
-            + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
-            + " cannot be parsed");
+        }
       }
 
       long start = System.currentTimeMillis();
@@ -229,11 +246,23 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         dimensionValuesMap.put(dimensionName, dimensionValue);
       }
       DimensionKey key = new DimensionKey(dimensionValues);
-      Long sourceTimeWindow =
-          Long.parseLong(record.datum().get(config.getTimeColumnName()).toString());
-      sourceTimeWindow = sourceTimeWindow * inputTimeUnitSize;
-      long timeWindow = aggregationTimeUnit.convert(sourceTimeWindow, sourceTimeUnit);
-      timeWindow = timeWindow / aggregationGranularitySize;
+
+      // Extract time column
+      String timeStr = record.datum().get(config.getTimeColumnName()).toString();
+      Long timeWindow;
+      if (dateTimeFormatter == null) {
+        // Time is raw long
+        Long sourceTimeWindow = Long.parseLong(timeStr);
+        sourceTimeWindow = sourceTimeWindow * inputTimeUnitSize;
+        timeWindow = aggregationTimeUnit.convert(sourceTimeWindow, sourceTimeUnit);
+        timeWindow /= aggregationGranularitySize;
+      } else {
+        // We parse time into milliseconds, then convert to aggregation granularity
+        DateTime sourceTimeWindow = dateTimeFormatter.parseDateTime(timeStr);
+        timeWindow = aggregationTimeUnit.convert(sourceTimeWindow.getMillis(), TimeUnit.MILLISECONDS);
+        timeWindow /= aggregationGranularitySize;
+      }
+
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);
