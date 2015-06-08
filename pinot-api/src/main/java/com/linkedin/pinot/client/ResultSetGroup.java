@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.client;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
 import java.util.ArrayList;
 import java.util.List;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 
@@ -37,7 +37,12 @@ public class ResultSetGroup {
 
     int aggregationResultCount = brokerResponse.getAggregationResultsSize();
     for (int i = 0; i < aggregationResultCount; i++) {
-      JSONObject aggregationResult = brokerResponse.getAggregationResults().get(i);
+      JSONObject aggregationResult = null;
+      try {
+        aggregationResult = brokerResponse.getAggregationResults().getJSONObject(i);
+      } catch (JSONException e) {
+        throw new PinotClientException(e);
+      }
       if (aggregationResult.has("value")) {
         _resultSets.add(new AggregationResultSet(aggregationResult));
       } else if (aggregationResult.has("groupByResult")) {

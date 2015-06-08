@@ -21,7 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
-import org.apache.helix.manager.zk.ByteArraySerializer;
+import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 import org.json.JSONObject;
 
 
@@ -44,7 +44,7 @@ public class ConnectionFactory {
   public static Connection fromZookeeper(String zkUrl) {
     try {
       ZkClient client = new ZkClient(zkUrl);
-      client.setZkSerializer(new ByteArraySerializer());
+      client.setZkSerializer(new BytesPushThroughSerializer());
       byte[] brokerResourceNodeData = client.readData("/EXTERNALVIEW/brokerResource", true);
       JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
       JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");

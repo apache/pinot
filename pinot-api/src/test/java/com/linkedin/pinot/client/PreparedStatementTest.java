@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.client;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -50,7 +49,7 @@ public class PreparedStatementTest {
     public BrokerResponse executeQuery(String brokerAddress, String query)
         throws PinotClientException {
       _lastQuery = query;
-      return new BrokerResponse();
+      return BrokerResponse.empty();
     }
 
     @Override

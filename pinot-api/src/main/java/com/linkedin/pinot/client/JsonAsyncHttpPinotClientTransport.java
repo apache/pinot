@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.client;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
 import java.util.concurrent.ExecutionException;

@@ -15,9 +15,8 @@
  */
 package com.linkedin.pinot.client;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
+import java.io.InputStream;
 import java.util.concurrent.Future;
-import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -124,7 +123,14 @@ public class ResultSetGroupTest {
     public BrokerResponse executeQuery(String brokerAddress, String query)
         throws PinotClientException {
       try {
-        String jsonText = IOUtils.toString(getClass().getResourceAsStream(_resource));
+        StringBuilder builder = new StringBuilder();
+        InputStream stream = getClass().getResourceAsStream(_resource);
+        int lastByte = stream.read();
+        while (lastByte != -1) {
+          builder.append((char)lastByte);
+          lastByte = stream.read();
+        }
+        String jsonText = builder.toString();
         return BrokerResponse.fromJson(new JSONObject(jsonText));
       } catch (Exception e) {
         Assert.fail("Unexpected exception", e);

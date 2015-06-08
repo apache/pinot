@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.client;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
 import java.util.concurrent.Future;
 
 

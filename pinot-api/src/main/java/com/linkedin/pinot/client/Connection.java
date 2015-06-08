@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.client;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
@@ -62,7 +61,7 @@ public class Connection {
   public ResultSetGroup execute(String statement) throws PinotClientException {
     BrokerResponse response = _transport.executeQuery(pickRandomBroker(), statement);
 
-    if (!response.getExceptions().isEmpty()) {
+    if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }
 
