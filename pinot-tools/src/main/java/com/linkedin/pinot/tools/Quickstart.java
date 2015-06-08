@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package com.linkedin.pinot.tools;
 
 import java.awt.Desktop;
 import java.io.BufferedReader;
@@ -25,15 +25,22 @@ import java.io.InputStreamReader;
 import java.net.URI;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.log4j.Level;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.tools.admin.command.AbstractBaseCommand;
+import com.linkedin.pinot.tools.admin.command.Command;
+import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 
 
-public class Quickstart extends AbstractBaseCommand implements Command {
+public class Quickstart {
+  private static Logger LOGGER = LoggerFactory.getLogger(Quickstart.class); 
 
   public Quickstart() {
 
   }
 
-  @Override
   public boolean execute() throws Exception {
     File dataFile =
         new File(Quickstart.class.getClassLoader().getResource("sample_data/baseball.csv").toExternalForm());
@@ -123,19 +130,9 @@ public class Quickstart extends AbstractBaseCommand implements Command {
     }
     return false;
   }
-
-  @Override
-  public String description() {
-    return "A quickstart that starts server, broker and controller and then pushes some sample data to play around with";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return false;
-  }
-
+ 
   public static void main(String[] args) throws Exception {
-
+     org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR); 
     Quickstart st = new Quickstart();
     st.execute();
 

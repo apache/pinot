@@ -6,7 +6,7 @@
    "singleValueField": true
   },
   {
-   "dataType": "STRING",
+   "dataType": "INT",
    "name": "yearID",
    "singleValueField": true
   },

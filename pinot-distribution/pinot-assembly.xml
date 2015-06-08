@@ -22,6 +22,7 @@
   <id>bin</id>
   <formats>
     <format>zip</format>
+    <format>dir</format>
   </formats>
   <includeBaseDirectory>false</includeBaseDirectory>
   <dependencySets>
@@ -45,6 +46,21 @@
     </dependencySet>
   </dependencySets>
   <fileSets>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-controller/src/main/resources/webapp</directory>
+      <outputDirectory>query_console</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/conf</directory>
+      <outputDirectory>conf</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data</directory>
+      <outputDirectory>sample_data</outputDirectory>
+    </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-tools/target/pinot-tools-pkg/repo</directory>
