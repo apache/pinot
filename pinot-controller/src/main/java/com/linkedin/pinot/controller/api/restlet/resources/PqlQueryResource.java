@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
@@ -72,7 +73,9 @@ public class PqlQueryResource extends ServerResource {
       compiledJSON = compiler.compile(pqlString);
     } catch (final RecognitionException e) {
       LOGGER.error("Caught exception while processing get request", e);
-      return new StringRepresentation(QueryException.PQL_PARSING_ERROR.toString());
+      ProcessingException parsingException = QueryException.PQL_PARSING_ERROR.deepCopy();
+      parsingException.setMessage(e.toString());
+      return new StringRepresentation(parsingException.toString());
     }
 
     if (!compiledJSON.has("collection")) {
