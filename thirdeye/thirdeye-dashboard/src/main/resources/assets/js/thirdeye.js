@@ -259,29 +259,15 @@ function renderFunnel(container, options) {
             }
         })
         if(data.length == 1) {
-            container.children().filter(function(idx, item) {
-                if(item.tagName.toLowerCase() === 'canvas') {
-                    item.style.top = '50px'
-                }
-            })
+            var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+            warning.append($('<p></p>', { html: 'Please add multiple metrics to make a proper funnel' }))
+            container.prepend(warning)
         }
     }
 
     $.ajax({
         url: url,
         statusCode: {
-            200: function(){
-                var metrics = path.metricFunction
-                                .replace(/^[^(]*\(/, "") // trim everything before first parenthesis
-                                .replace(/\)[^(]*$/, "") // trim everything after last parenthesis
-                                 .split(','); 
-                if(metrics.length === 1) {
-                    var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-                    warning.append($('<p></p>', { html: 'Please add multiple metrics to make a proper funnel' }))
-                    warning.css('margin-bottom', '10px')
-                    container.prepend(warning)
-                } 
-            },
             404: function() {
                 container.empty()
                 var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })

@@ -118,12 +118,14 @@
 
 #metric-funnel-baseline-placeholder {
     width: 45%;
+    clear: both;
     float: left;
     margin-bottom: 2%;
 }
 
 #metric-funnel-current-placeholder {
     width: 45%;
+    clear: both;
     float: right;
     margin-bottom: 2%;
 }
@@ -143,6 +145,10 @@
 
 .metric-table-time:hover {
     cursor: pointer;
+}
+
+.flot-base, .flot-overlay {
+  position: relative !important;
 }
 
 /* Dimension */
