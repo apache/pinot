@@ -34,8 +34,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.media.jai.operator.MinDescriptor;
-
 public class DataUpdateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataUpdateManager.class);
 
@@ -544,12 +542,4 @@ public class DataUpdateManager {
     series.aggregate(timeSeries);
   }
 
-  public static void main(String[] args) throws Exception {
-    DataUpdateManager dum = new DataUpdateManager(new File("/Users/npawar/myprojects/datasets/metadatatest"), true);
-    dum.updateData("abook",
-        "MONTHLY",
-        DateTime.parse("2015-06-01"),
-        DateTime.parse("2015-07-01"),
-        new byte[10]);
-  }
 }
