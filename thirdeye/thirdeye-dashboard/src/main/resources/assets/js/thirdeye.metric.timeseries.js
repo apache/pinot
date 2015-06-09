@@ -20,10 +20,12 @@ $(document).ready(function() {
     if (path.metricViewType == 'TIME_SERIES_OVERLAY') {
       options.windowMillis = toMillis(1, 'WEEKS') // TODO make configurable
       options.mode = 'own' // default show baseline w/ its metric
+      $("#metric-time-series-split").hide();
     }
 
     var container = $("#metric-time-series-placeholder")
     var tooltip = $("#metric-time-series-tooltip")
+
 
     // split button
     $("#metric-time-series-split").click(function(event) {
