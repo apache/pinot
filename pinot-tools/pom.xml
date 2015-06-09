@@ -71,6 +71,10 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.github.nkzawa</groupId>
+      <artifactId>socket.io-client</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
