@@ -116,6 +116,7 @@ public class HelixBrokerStarter {
     _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting, brokerId, _helixManager);
     addInstanceTagIfNeeded(helixClusterName, brokerId);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
+    _helixManager.addInstanceConfigChangeListener(_helixBrokerRoutingTable);
     _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
 
   }

@@ -146,7 +146,7 @@ public class HelixServerStarter {
   public void stop() {
     setShuttingDownStatus(true);
     try {
-      Thread.sleep(1000);
+      Thread.sleep(5000);
     } catch (Exception e) {
       LOGGER.error("error trying to sleep waiting for external view to change : ", e);
     }
