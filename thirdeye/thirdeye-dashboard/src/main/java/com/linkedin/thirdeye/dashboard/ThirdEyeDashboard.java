@@ -1,10 +1,8 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.dashboard.resources.FlotTimeSeriesResource;
-import com.linkedin.thirdeye.dashboard.resources.MetadataResource;
+import com.linkedin.thirdeye.dashboard.resources.*;
 import com.linkedin.thirdeye.dashboard.task.ClearCachesTask;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
-import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
@@ -14,6 +12,7 @@ import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
 import org.apache.http.client.HttpClient;
 
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 
 public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguration> {
@@ -55,6 +54,15 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
         environment.getObjectMapper()));
 
     environment.jersey().register(new MetadataResource(config.getServerUri(), dataCache));
+
+    if (config.getCustomDashboardRoot() != null) {
+      File customDashboardDir = new File(config.getCustomDashboardRoot());
+      environment.jersey().register(new CustomDashboardResource(
+          customDashboardDir,
+          config.getServerUri(),
+          queryCache,
+          dataCache));
+    }
 
     environment.admin().addTask(new ClearCachesTask(dataCache, queryCache));
   }

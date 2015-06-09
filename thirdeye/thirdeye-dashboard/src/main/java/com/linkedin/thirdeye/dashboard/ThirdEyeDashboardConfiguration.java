@@ -11,6 +11,8 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
   @NotNull
   private String serverUri; // TODO: Support talking to multiple servers
 
+  private String customDashboardRoot; // directory where all {dashboard}.yml files are saved
+
   @Valid
   @NotNull
   @JsonProperty
@@ -26,5 +28,13 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
 
   public void setServerUri(String serverUri) {
     this.serverUri = serverUri;
+  }
+
+  public String getCustomDashboardRoot() {
+    return customDashboardRoot;
+  }
+
+  public void setCustomDashboardRoot(String customDashboardRoot) {
+    this.customDashboardRoot = customDashboardRoot;
   }
 }
