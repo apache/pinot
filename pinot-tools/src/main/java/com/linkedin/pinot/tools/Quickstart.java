@@ -42,40 +42,44 @@ public class Quickstart {
   }
 
   public boolean execute() throws Exception {
-    File dataFile =
-        new File(Quickstart.class.getClassLoader().getResource("sample_data/baseball.csv").toExternalForm());
-
+    File dataDir =
+        new File(Quickstart.class.getClassLoader().getResource("sample_data").toURI());
+    File tableCreationJsonFileName = new File(Quickstart.class.getClassLoader().
+         getResource("sample_data/baseballTable.json").toURI());
     File tempDirOne = new File("/tmp/" + System.currentTimeMillis());
     tempDirOne.mkdir();
 
-    if (true) {
+    if (false) {
       InputStream s = Quickstart.class.getClassLoader().getResource("sample_data/baseball.csv").openStream();
       IOUtils.copy(s, new FileOutputStream(new File(tempDirOne, "baseball.csv")));
-      dataFile = new File(tempDirOne, "baseball.csv");
+      dataDir = new File(tempDirOne, "baseball.csv");
     }
 
     File schemaFile =
-        new File(Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema").toExternalForm());
+        new File(Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema").toURI());
 
-    if (true) {
+    if (false) {
       InputStream s = Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema").openStream();
       IOUtils.copy(s, new FileOutputStream(new File(tempDirOne, "baseball.schema")));
       schemaFile = new File(tempDirOne, "baseball.schema");
     }
 
     System.out.println("schema file : " + schemaFile.getAbsolutePath());
-    System.out.println("data file : " + dataFile.getAbsolutePath());
+    System.out.println("data file : " + dataDir.getAbsolutePath());
     File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
     String tableName = "baseballStats";
-    final QuickstartRunner runner = new QuickstartRunner(schemaFile, dataFile, tempDir, tableName);
+    final QuickstartRunner runner = new QuickstartRunner(schemaFile, dataDir, tempDir,
+        tableName, tableCreationJsonFileName.getAbsolutePath());
     runner.clean();
+
+
     System.out.println("**************************** : starting all");
     runner.startAll();
     System.out.println("**************************** : started all");
     runner.addSchema();
     System.out.println("**************************** : schema added");
     runner.addTable();
-    System.out.println("**************************** : tabled added");
+    System.out.println("**************************** : table added");
     runner.buildSegment();
     System.out.println("**************************** : segment build");
     runner.pushSegment();

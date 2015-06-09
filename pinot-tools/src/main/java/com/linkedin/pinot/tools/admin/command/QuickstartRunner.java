@@ -16,33 +16,27 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.HashSet;
 
 import org.apache.commons.io.FileUtils;
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.core.data.readers.CSVRecordReader;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 public class QuickstartRunner {
+  private static final String _clusterName = "QuickStartCluster";
+  private final static String _zkAddress = "localhost:2181";
+
+  private final static String _localHost = "localhost";
+  private final static String _controllerPort = "9000";
+  private final static String _controllerAddress = "http://localhost:9000";
+  private final static String _segmentName = "baseballStats";
+
+  private final static int _zkPort = 2181;
+  private final static int _brokerPort = 8099;
+  private final static int _serverPort = 8098;
 
   protected enum quickstartCommands {
     run,
@@ -50,34 +44,51 @@ public class QuickstartRunner {
     help;
   }
 
-  private ControllerStarter controller;
-  private BrokerServerBuilder broker;
-  private HelixServerStarter server;
+  private final File _schemaFile, _dataDir, _tempDir;
+  private final String _tableName;
+  private boolean _isStopped = false;
+  private String _tableCreateRequestJsonFile;
 
-  private final File schemaFile, dataFile, tempDir;
-  private final String tableName;
-  private boolean isStopped = false;
-
-  public QuickstartRunner(File schemaFile, File dataFile, File tempDir, String tableName) throws Exception {
-    this.schemaFile = schemaFile;
-    this.dataFile = dataFile;
-    this.tempDir = tempDir;
-    this.tableName = tableName;
+  public QuickstartRunner(File schemaFile, File dataDir, File tempDir, String tableName,
+      String tableCreateRequestJsonFile) throws Exception {
+    this._schemaFile = schemaFile;
+    this._dataDir = dataDir;
+    this._tempDir = tempDir;
+    this._tableName = tableName;
+    _tableCreateRequestJsonFile = tableCreateRequestJsonFile;
     clean();
   }
 
-  public void startAll() throws Exception {
-    ZkStarter.startLocalZkServer(2122);
-    if (ControllerStarter.class.getClassLoader().getResource("repo/webapp") != null) {
-      File webappPath = new File(ControllerStarter.class.getClassLoader().getResource("repo/webapp").toExternalForm());
-      System.out.println(webappPath.getAbsolutePath() + "***********************************************");
-      controller = ControllerStarter.startDefault(webappPath);
-    } else {
-      controller = ControllerStarter.startDefault();
-    }
+  void StartZookeeper() throws IOException {
+    StartZookeeperCommand zkStarter = new StartZookeeperCommand();
+    zkStarter.setPort(_zkPort);
+    zkStarter.execute();
+  }
 
-    broker = HelixBrokerStarter.startDefault().getBrokerServerBuilder();
-    server = HelixServerStarter.startDefault();
+  void StartController() throws Exception {
+    StartControllerCommand controllerStarter = new StartControllerCommand();
+    controllerStarter.setControllerPort(_controllerPort).setZkAddress(_zkAddress).setClusterName(_clusterName);
+    controllerStarter.execute();
+  }
+
+  void StartBroker() throws Exception {
+    StartBrokerCommand brokerStarter = new StartBrokerCommand();
+    brokerStarter.setClusterName(_clusterName).setPort(_brokerPort).setZkAddress(_zkAddress);
+    brokerStarter.execute();
+  }
+
+  void StartServer() throws Exception{
+    StartServerCommand serverStarter = new StartServerCommand();
+    serverStarter.setClusterName(_clusterName).setZkAddress(_zkAddress).setPort(_serverPort).
+      setDataDir("/tmp/PinotServerData").setSegmentDir("/tmp/PinotServerSegment");
+    serverStarter.execute();
+  }
+
+  public void startAll() throws Exception {
+    StartZookeeper();
+    StartController();
+    StartBroker();
+    StartServer();
   }
 
   public void clean() throws Exception {
@@ -87,73 +98,56 @@ public class QuickstartRunner {
     FileUtils.deleteDirectory(controllerDir);
     FileUtils.deleteDirectory(serverDir1);
     FileUtils.deleteDirectory(serverDir2);
-    FileUtils.deleteDirectory(tempDir);
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   public void stop() throws Exception {
-    if (isStopped) {
+    if (_isStopped) {
       return;
     }
 
-    if (server != null) {
-      server.stop();
-    }
+    StopProcessCommand stopper = new StopProcessCommand();
+    stopper.stopController().stopBroker().stopServer().stopZookeeper();
+    stopper.execute();
 
-    if (broker != null) {
-      broker.stop();
-    }
-
-    if (controller != null) {
-      controller.stop();
-    }
-
-    ZkStarter.stopLocalZkServer(true);
-
-    isStopped = true;
+    _isStopped = true;
   }
 
-  public void addSchema() throws FileNotFoundException {
-    FileUploadUtils.sendFile("localhost", "9000", "schemas", schemaFile.getName(), new FileInputStream(schemaFile),
-        schemaFile.length());
+  public void addSchema() throws Exception {
+    AddSchemaCommand schemaAdder = new AddSchemaCommand();
+    schemaAdder.setControllerHost(_localHost).setControllerPort(_controllerPort).
+      setSchemaFilePath(_schemaFile.getAbsolutePath());
+
+    schemaAdder.execute();
   }
 
-  public void addTable() throws JSONException, UnsupportedEncodingException, IOException {
-    JSONObject request = ControllerRequestBuilder.addOfflineTableRequest(tableName, "", "", 1);
-    AbstractBaseCommand.sendPostRequest("http://localhost:9000/tables", request.toString());
+  public void addTable() throws Exception {
+    AddTableCommand tableAdder = new AddTableCommand();
+    tableAdder.setFilePath(_tableCreateRequestJsonFile).setControllerPort(_controllerPort);
+    tableAdder.execute();
   }
 
   public void buildSegment() throws Exception {
-    Schema schema = Schema.fromFile(schemaFile);
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setTableName("baseballStats");
-    config.setInputFileFormat(FileFormat.CSV);
-    config.setIndexOutputDir(new File(tempDir, "segments").getAbsolutePath());
-    config.setSegmentName("baseballStats_1");
-
-    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
-    readerConfig.setCsvDateColumns(new HashSet<String>());
-    readerConfig.setCsvDelimiter(",");
-
-    CSVRecordReader reader = new CSVRecordReader(dataFile.getAbsolutePath(), readerConfig, schema);
-
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, reader);
-    driver.build();
-
-    File tarsDir = new File(tempDir, "tars");
-    tarsDir.mkdir();
-    TarGzCompressionUtils.createTarGzOfDirectory(new File(tempDir, "segments").listFiles()[0].getAbsolutePath(),
-        new File(tarsDir, "baseballStats_1").getAbsolutePath());
+    CreateSegmentCommand segmentBuilder = new CreateSegmentCommand();
+    segmentBuilder.setDataDir(_dataDir.getAbsolutePath()).setFormat(FileFormat.CSV).
+      setSchemaFile(_schemaFile.getAbsolutePath()).setTableName(_tableName).setSegmentName(_segmentName).
+      setOutputDir(new File(_tempDir, "segments").getAbsolutePath()).setOverwrite(true);
+    segmentBuilder.execute();
   }
 
-  public void pushSegment() throws FileNotFoundException {
-    for (File file : new File(tempDir, "tars").listFiles()) {
-      FileUploadUtils.sendSegmentFile("localhost", "9000", file.getName(), new FileInputStream(file), file.length());
-    }
+  public void pushSegment() throws Exception {
+    UploadSegmentCommand segmentUploader = new UploadSegmentCommand();
+
+    segmentUploader.setControllerHost(_localHost).setControllerPort(_controllerPort).
+      setSegmentDir(new File(_tempDir, "segments").getAbsolutePath());
+    segmentUploader.execute();
   }
 
   public JSONObject runQuery(String query) throws Exception {
-    return AbstractBaseCommand.postQuery(query, "http://localhost:5001");
+    PostQueryCommand queryCommand = new PostQueryCommand();
+    queryCommand.setBrokerPort(Integer.toString(_brokerPort)).setQuery(query);
+    String result = queryCommand.run();
+    return new JSONObject(result);
   }
 
   public void printUsageAndInfo() {
@@ -179,19 +173,18 @@ public class QuickstartRunner {
   }
 
   public File getSchemaFile() {
-    return schemaFile;
+    return _schemaFile;
   }
 
   public File getDataFile() {
-    return dataFile;
+    return _dataDir;
   }
 
   public File getTempDir() {
-    return tempDir;
+    return _tempDir;
   }
 
   public String getTableName() {
-    return tableName;
+    return _tableName;
   }
-
 }

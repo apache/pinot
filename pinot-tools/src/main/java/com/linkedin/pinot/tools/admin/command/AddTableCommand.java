@@ -77,8 +77,8 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
-  public AddTableCommand setControllerAddress(String controllerAddress) {
-    _controllerAddress = controllerAddress;
+  public AddTableCommand setControllerPort(String controllerPort) {
+    _controllerPort = controllerPort;
     return this;
   }
 

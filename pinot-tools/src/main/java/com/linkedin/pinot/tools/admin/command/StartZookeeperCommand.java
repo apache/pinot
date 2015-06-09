@@ -85,6 +85,31 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
     return "Start the Zookeeper process at the specified port.";
   }
 
+  StartZookeeperCommand setPort(int port) {
+    _zkPort = port;
+    return this;
+  }
+
+  StartZookeeperCommand setDataDir(String dataDir) {
+    _dataDir = dataDir;
+    return this;
+  }
+
+  StartZookeeperCommand setTickTime(int tickTime) {
+    _tickTime = tickTime;
+    return this;
+  }
+
+  StartZookeeperCommand setMinSessionTimeout(int timeOut) {
+    _minSessionTimeout = timeOut;
+    return this;
+  }
+
+  StartZookeeperCommand setLogDir(String logDir) {
+    _logDir = logDir;
+    return this;
+  }
+
   private ZkServer _zkServer;
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
   private File _tmpdir;

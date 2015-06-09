@@ -1,0 +1,21 @@
+{
+  "tableIndexConfig": {
+    "invertedIndexColumns":["column1","column2"],
+    "loadMode":"HEAP",
+    "lazyLoad":"false"
+   },
+   "tenants":{"server":"","broker":""},
+   "tableType":"OFFLINE","metadata":{"customConfigs":{"d2Name":"xlntBetaPinot"}},
+   "segmentsConfig":{
+     "retentionTimeUnit":"DAYS",
+     "segmentPushFrequency":"daily",
+     "replication":1,
+     "timeColumnName":"timeColumnName",
+     "retentionTimeValue":"700",
+     "timeType":"timeType",
+     "segmentPushType":"APPEND",
+     "schemaName":"baseball",
+     "segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy"
+   },
+   "tableName":"baseballStats"
+}

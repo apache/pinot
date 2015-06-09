@@ -33,7 +33,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
 
   @Option(name="-brokerInstName", required=false, metaVar="<string>", usage="Instance name of the broker.")
-  private String _brokerInstName = "Broker_localhost_";
+  private String _brokerInstName = "Broker";
 
   @Option(name="-zkAddress", required=true, metaVar="<http>", usage="HTTP address of Zookeeper.")
   private String _zkAddress = null;
@@ -43,6 +43,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
+  @Option(name="-brokerHostName", required=false, metaVar="<string>", usage="Instance host name of the broker.")
   private String _brokerHostName = "localhost";
 
   public boolean getHelp() {
@@ -88,7 +89,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Override
   public boolean execute() throws Exception {
     Configuration configuration = new PropertiesConfiguration();
-    String brokerInstanceName = _brokerInstName + "_" + _brokerHostName + "_" + _brokerPort;
+    String brokerInstanceName = _brokerInstName  + "_" + _brokerHostName+ "_" + _brokerPort;
 
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
     configuration.setProperty("instanceId", brokerInstanceName);

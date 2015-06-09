@@ -64,6 +64,11 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     return "Query the uploaded Pinot segments.";
   }
 
+  public PostQueryCommand setBrokerPort(String port) {
+    _brokerPort = port;
+    return this;
+  }
+
   public PostQueryCommand setQuery(String query) {
     _query = query;
     return this;
@@ -74,7 +79,6 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     json.put("pql",  _query);
 
     String brokerUrl = "http://localhost:" + _brokerPort;
-
     final URLConnection conn = new URL(brokerUrl + "/query").openConnection();
     conn.setDoOutput(true);
 

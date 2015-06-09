@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.antlr.runtime.RecognitionException;
+import org.apache.helix.model.InstanceConfig;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
@@ -91,6 +92,7 @@ public class PqlQueryResource extends ServerResource {
     }
 
     final String instanceId;
+    final InstanceConfig config;
     try {
       final List<String> instanceIds = manager.getBrokerInstancesFor(resource);
       if (instanceIds.isEmpty()) {
@@ -98,18 +100,15 @@ public class PqlQueryResource extends ServerResource {
       } else {
         Collections.shuffle(instanceIds);
         instanceId = instanceIds.get(0);
+        config = manager.getHelixInstanceConfig(instanceId);
       }
     } catch (final Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
     }
 
-    final String[] splStrings = instanceId.split("_");
 
-    final String host = "http://" + splStrings[1];
-    final String port = splStrings[2];
-
-    final String resp = sendPQLRaw(host + ":" + port + "/query", pqlString);
+    final String resp = sendPQLRaw("http://" + config.getHostName().split("_")[1] + ":" + config.getPort() + "/query", pqlString);
 
     return new StringRepresentation(resp);
   }

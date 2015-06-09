@@ -147,6 +147,10 @@ public class PinotHelixResourceManager {
     _helixZkManager.disconnect();
   }
 
+  public InstanceConfig getHelixInstanceConfig(String instanceId) {
+    return _helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
+  }
+
   public List<String> getBrokerInstancesFor(String tableName) {
     String brokerTenantName = null;
     try {

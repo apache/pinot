@@ -85,6 +85,16 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     return this;
   }
 
+  public CreateSegmentCommand setFormat(FileFormat format) {
+    _format = format;
+    return this;
+  }
+
+  public CreateSegmentCommand setReaderConfigFile(String file) {
+    _recordReaderConfigFile = file;
+    return this;
+  }
+
   public CreateSegmentCommand setTableName(String tableName) {
     _tableName = tableName;
     return this;
