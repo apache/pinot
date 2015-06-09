@@ -48,9 +48,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.KafkaTestUtils;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
@@ -101,11 +101,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Start Zk and Kafka
     startZk();
     kafkaStarter =
-        KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
-            KafkaTestUtils.DEFAULT_ZK_STR, KafkaTestUtils.getDefaultKafkaConfiguration());
+        KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
+            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaTestUtils.createTopic(KAFKA_TOPIC, KafkaTestUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
 
     // Start the Pinot cluster
     startController();
@@ -129,7 +129,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
 
     // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
         avroFiles.get(0));
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
@@ -213,7 +213,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     latch.await();
 
     // Load realtime data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles, KafkaTestUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
+    pushAvroIntoKafka(realtimeAvroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
 
     // Wait until the Pinot event count matches with the number of events in the Avro files
     int pinotRecordCount, h2RecordCount;
@@ -245,7 +245,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopServer();
-    KafkaTestUtils.stopServer(kafkaStarter);
+    KafkaStarterUtils.stopServer(kafkaStarter);
     try {
       stopZk();
     } catch (Exception e) {

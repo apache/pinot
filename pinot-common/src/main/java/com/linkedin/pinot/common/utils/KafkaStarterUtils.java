@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common;
+package com.linkedin.pinot.common.utils;
 
 import java.io.File;
 import java.util.Properties;
@@ -25,14 +25,12 @@ import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.FileUtils;
 
-import com.linkedin.pinot.common.utils.ZkStarter;
-
 
 /**
  * Utilities to start Kafka during unit tests.
  *
  */
-public class KafkaTestUtils {
+public class KafkaStarterUtils {
   public static final int DEFAULT_KAFKA_PORT = 19092;
   public static final int DEFAULT_BROKER_ID = 0;
   public static final String DEFAULT_ZK_STR = ZkStarter.DEFAULT_ZK_STR + "/kafka";

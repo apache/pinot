@@ -38,8 +38,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.KafkaTestUtils;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -70,11 +70,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Start ZK and Kafka
     startZk();
     kafkaStarter =
-        KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
-            KafkaTestUtils.DEFAULT_ZK_STR, KafkaTestUtils.getDefaultKafkaConfiguration());
+        KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
+            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaTestUtils.createTopic(KAFKA_TOPIC, KafkaTestUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
 
     // Start the Pinot cluster
     startController();
@@ -97,7 +97,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
 
     // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
         schemaFile, avroFiles.get(0));
 
     // Load data into H2
@@ -123,7 +123,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        pushAvroIntoKafka(avroFiles, KafkaTestUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
+        pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
       }
     });
 
@@ -198,7 +198,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopServer();
-    KafkaTestUtils.stopServer(kafkaStarter);
+    KafkaStarterUtils.stopServer(kafkaStarter);
     try {
       stopZk();
     } catch (Exception e) {

@@ -455,6 +455,11 @@
         <artifactId>jackson-xc</artifactId>
         <version>1.8.8</version>
       </dependency>
+      <dependency>
+        <groupId>org.twitter4j</groupId>
+        <artifactId>twitter4j-core</artifactId>
+        <version>4.0.3</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
