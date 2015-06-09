@@ -338,7 +338,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
           (minDataTime, maxDataTime, minDataTimeMillis, maxDataTimeMillis,
               config.getTimeUnit(), config.getBucketSize());
 
-       LOGGER.info("END: processing {}", nodeId);
+      LOGGER.info("END: processing {}", nodeId);
     }
 
     @Override
@@ -374,8 +374,10 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.TREE_FILE_NAME));
 
       // add metadata
-      FixedBufferUtil.writeMetadataBootstrap(indexMetadata, new File(localOutputDataDir));
-      builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.METADATA_FILE_NAME));
+      if (indexMetadata != null) {
+        FixedBufferUtil.writeMetadataBootstrap(indexMetadata, new File(localOutputDataDir));
+        builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.METADATA_FILE_NAME));
+      }
 
       Collection<File> dimFiles = FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);
       for (File f : dimFiles) {
