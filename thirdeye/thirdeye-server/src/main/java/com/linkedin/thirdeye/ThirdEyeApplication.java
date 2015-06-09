@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.ws.rs.DefaultValue;
+
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeApplication.class);
@@ -75,7 +77,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
-    final DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir);
+    final DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir, config.isAutoExpire());
 
     final KafkaConsumerManager kafkaConsumerManager = new KafkaConsumerManager(
         rootDir,
@@ -159,6 +161,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
     environment.admin().addTask(new KafkaTask(kafkaConsumerManager));
     environment.admin().addTask(new MergeTask(starTreeManager, dataUpdateManager));
+    environment.admin().addTask(new ExpireTask(dataUpdateManager));
   }
 
   public static class Config extends Configuration
@@ -169,6 +172,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     private boolean autoRestore;
 
     private boolean autoConsume;
+
+    private boolean autoExpire = true;
 
     private TimeGranularity anomalyDetectionInterval;
 
@@ -185,6 +190,11 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setAutoConsume(boolean autoConsume)
     {
       this.autoConsume = autoConsume;
+    }
+
+    public void setAutoExpire(boolean autoExpire)
+    {
+      this.autoExpire = autoExpire;
     }
 
     public void setAnomalyDetectionInterval(TimeGranularity anomalyDetectionInterval)
@@ -207,6 +217,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public boolean isAutoConsume()
     {
       return autoConsume;
+    }
+
+    @JsonProperty
+    public boolean isAutoExpire()
+    {
+      return autoExpire;
     }
 
     @JsonProperty

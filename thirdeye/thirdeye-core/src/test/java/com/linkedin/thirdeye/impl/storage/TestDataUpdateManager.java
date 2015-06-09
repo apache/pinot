@@ -30,7 +30,7 @@ public class TestDataUpdateManager {
   @BeforeClass
   public void beforeClass() throws Exception {
     rootDir = new File(System.getProperty("java.io.tmpdir"), TestDataUpdateManager.class.getCanonicalName());
-    dataUpdateManager = new DataUpdateManager(rootDir);
+    dataUpdateManager = new DataUpdateManager(rootDir, false);
     schedule = "TEST";
     treeId = UUID.randomUUID().toString();
     minTime = new DateTime(0);

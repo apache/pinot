@@ -40,7 +40,7 @@ public class TestCollectionsResource {
     try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
     try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
 
-    testCollectionsResource = new  CollectionsResource(mockStarTreeManager, mockMetricRegistry, new DataUpdateManager(rootDir), rootDir);
+    testCollectionsResource = new  CollectionsResource(mockStarTreeManager, mockMetricRegistry, new DataUpdateManager(rootDir, false), rootDir);
 
     collection = "dummy";
   }

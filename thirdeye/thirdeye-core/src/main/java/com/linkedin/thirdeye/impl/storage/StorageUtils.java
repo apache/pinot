@@ -6,9 +6,11 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.impl.NumberUtils;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormatter;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -84,6 +86,20 @@ public class StorageUtils
         + "_" + schedule
         + "_" + StarTreeConstants.DATE_TIME_FORMATTER.print(minTime)
         + "_" + (maxTime == null ? "LATEST" : StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime));
+  }
+
+  public static String getDataDirPrefix(String schedule) {
+
+    return StarTreeConstants.DATA_DIR_PREFIX
+        + "_" + schedule;
+  }
+
+  public static boolean isExpirable(String dataDir, String expireSchedule, DateTime expireUptoDate) {
+    String schedule = dataDir.split("_")[1];
+    String maxTime = dataDir.split("_")[3];
+
+    return (schedule.equals(expireSchedule)
+        && maxTime.compareTo(StarTreeConstants.DATE_TIME_FORMATTER.print(expireUptoDate)) <= 0);
   }
 
   public static void prefixFilesWithTime(File dir,
@@ -278,4 +294,5 @@ public class StorageUtils
 
     return false;
   }
+
 }

@@ -53,7 +53,7 @@ public class StandAloneKafkaConsumer {
     // Components
     final ExecutorService consumerExecutors = Executors.newSingleThreadExecutor();
     final ScheduledExecutorService taskScheduler = Executors.newSingleThreadScheduledExecutor();
-    DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir);
+    DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir, false);
     MetricRegistry metricRegistry = new MetricRegistry();
 
     // Tree

@@ -34,10 +34,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.media.jai.operator.MinDescriptor;
+
 public class DataUpdateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataUpdateManager.class);
 
   private final File rootDir;
+  private final boolean autoExpire;
   private final ConcurrentMap<String, Lock> collectionLocks;
 
   /**
@@ -45,9 +48,11 @@ public class DataUpdateManager {
    *
    * @param rootDir
    *  The root directory on the file system under which collection data is stored
+   * @param autoExpire
    */
-  public DataUpdateManager(File rootDir) {
+  public DataUpdateManager(File rootDir, boolean autoExpire) {
     this.rootDir = rootDir;
+    this.autoExpire = autoExpire;
     this.collectionLocks = new ConcurrentHashMap<String, Lock>();
   }
 
@@ -183,6 +188,34 @@ public class DataUpdateManager {
         if (!dataDir.setLastModified(System.currentTimeMillis())) {
           LOGGER.warn("setLastModified on dataDir failed - watch service will not be triggered!");
         }
+
+        if (autoExpire) {
+          // Expire segments with lower granularity
+          final DateTime expireUptoDate = minTime;
+          String lowerSchedule = null;
+          if (schedule.equals(StarTreeConstants.SCHEDULE.DAILY.name())) {
+            lowerSchedule = StarTreeConstants.SCHEDULE.HOURLY.name();
+          } else if (schedule.equals(StarTreeConstants.SCHEDULE.MONTHLY.name())) {
+            lowerSchedule = StarTreeConstants.SCHEDULE.DAILY.name();
+          }
+
+          if (lowerSchedule != null) {
+            final String expireSchedule = lowerSchedule;
+            File[] expireDirs = collectionDir.listFiles(new FilenameFilter() {
+              @Override
+              public boolean accept(File dir, String name) {
+                return name.startsWith(StorageUtils.getDataDirPrefix()) && StorageUtils.isExpirable(name, expireSchedule, expireUptoDate);
+              }
+            });
+
+            for (File expireDir : expireDirs) {
+              String[] tokens = expireDir.getName().split("_");
+              LOGGER.info("Deleting lower granularity segment {}",expireDir);
+              deleteData(collection, tokens[1], StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[2]), StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]));
+            }
+          }
+        }
+
       } finally {
         FileUtils.forceDelete(tmpDir);
         LOGGER.info("Deleted tmp dir {}", tmpDir);
@@ -509,5 +542,14 @@ public class DataUpdateManager {
       map.put(key, series);
     }
     series.aggregate(timeSeries);
+  }
+
+  public static void main(String[] args) throws Exception {
+    DataUpdateManager dum = new DataUpdateManager(new File("/Users/npawar/myprojects/datasets/metadatatest"), true);
+    dum.updateData("abook",
+        "MONTHLY",
+        DateTime.parse("2015-06-01"),
+        DateTime.parse("2015-07-01"),
+        new byte[10]);
   }
 }
