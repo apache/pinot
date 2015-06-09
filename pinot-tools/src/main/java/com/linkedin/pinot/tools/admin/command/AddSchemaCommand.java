@@ -27,8 +27,8 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 
 public class AddSchemaCommand extends AbstractBaseCommand implements Command {
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<String>", usage = "host name for controller.")
-  private String _controllerHost = "http://localhost";
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost = "localhost";
 
   @Option(name = "-controllerPort", required = true, metaVar = "<String>", usage = "port name for controller.")
   private String _controllerPort;
