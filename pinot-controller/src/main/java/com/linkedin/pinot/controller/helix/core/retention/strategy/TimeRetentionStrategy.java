@@ -18,11 +18,11 @@ package com.linkedin.pinot.controller.helix.core.retention.strategy;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -63,6 +63,9 @@ public class TimeRetentionStrategy implements RetentionStrategy {
     }
     try {
       TimeUnit segmentTimeUnit = segmentZKMetadata.getTimeUnit();
+      if (segmentTimeUnit == null) {
+        return false;
+      }
       long endsMills = segmentTimeUnit.toMillis(segmentZKMetadata.getEndTime());
       Duration segmentTimeUntilNow = new Duration(endsMills, System.currentTimeMillis());
       if (_retentionDuration.isShorterThan(segmentTimeUntilNow)) {
