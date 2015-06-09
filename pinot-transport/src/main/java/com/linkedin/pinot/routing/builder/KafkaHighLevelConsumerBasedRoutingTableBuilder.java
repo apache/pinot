@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
@@ -37,16 +38,22 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTa
   }
 
   @Override
-  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView) {
+  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigList) {
+
+    RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
+
     Set<String> segments = externalView.getPartitionSet();
     List<ServerToSegmentSetMap> routingTable = new ArrayList<ServerToSegmentSetMap>();
     Map<String, Map<String, Set<String>>> groupIdToRouting = new HashMap<String, Map<String, Set<String>>>();
     for (String segment : segments) {
       Map<String, String> instanceMap = externalView.getStateMap(segment);
       for (String instance : instanceMap.keySet()) {
-        if (instanceMap.get(instance).equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)) {
+        if (instanceMap.get(instance).equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)
+            || pruner.isShuttingDown(instance)) {
           continue;
         }
+
         String groupId = SegmentNameBuilder.Realtime.extractGroupIdName(segment);
         if (!groupIdToRouting.containsKey(groupId)) {
           groupIdToRouting.put(groupId, new HashMap<String, Set<String>>());

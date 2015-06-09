@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -25,12 +22,19 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceConfigChangeListener;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 
@@ -40,28 +44,45 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
  *
  *
  */
-public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
+public class HelixBrokerRoutingTable implements ExternalViewChangeListener, InstanceConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerRoutingTable.class);
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final String _instanceId;
   private final HelixManager _helixManager;
+  private final Builder keyBuilder;
 
-  public HelixBrokerRoutingTable(HelixExternalViewBasedRouting helixExternalViewBasedRouting, String instanceId, HelixManager helixManager) {
+  public HelixBrokerRoutingTable(HelixExternalViewBasedRouting helixExternalViewBasedRouting, String instanceId,
+      HelixManager helixManager) {
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
     _instanceId = instanceId;
     _helixManager = helixManager;
+    keyBuilder = _helixManager.getHelixDataAccessor().keyBuilder();
   }
 
   @Override
   public synchronized void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
+    refresh();
+  }
+
+  private void refresh() {
     LOGGER.info("HelixBrokerRoutingTable.onExternalViewChange");
+
+    PropertyKey externalViews = keyBuilder.externalViews();
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    List<ExternalView> externalViewList = helixDataAccessor.getChildValues(externalViews);
+
+    List<InstanceConfig> instanceConfigList = helixDataAccessor.getChildValues(keyBuilder.instanceConfigs());
+
     Set<String> servingClusterList = getServingDataResource(externalViewList);
     for (ExternalView externalView : externalViewList) {
       String resourceName = externalView.getResourceName();
       if (servingClusterList.contains(resourceName)) {
-        LOGGER.info("Trying to update ExternalView for data resource : " + resourceName + ", ExternalView: " + externalView);
-        _helixExternalViewBasedRouting.markDataResourceOnline(resourceName,
-            HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(), resourceName));
+        LOGGER.info("Trying to update ExternalView for data resource : " + resourceName + ", ExternalView: "
+            + externalView);
+        _helixExternalViewBasedRouting.markDataResourceOnline(
+            resourceName,
+            HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(),
+                _helixManager.getClusterName(), resourceName), instanceConfigList);
       }
     }
   }
@@ -73,8 +94,8 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
         Set<String> dataResources = externalView.getPartitionSet();
         for (String dataResource : dataResources) {
           Map<String, String> dataResourceToServingBrokerMap = externalView.getStateMap(dataResource);
-          if (dataResourceToServingBrokerMap.containsKey(_instanceId) &&
-              "ONLINE".equals(dataResourceToServingBrokerMap.get(_instanceId))) {
+          if (dataResourceToServingBrokerMap.containsKey(_instanceId)
+              && "ONLINE".equals(dataResourceToServingBrokerMap.get(_instanceId))) {
             servingDataResourceSet.add(dataResource);
           }
         }
@@ -82,5 +103,10 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
     }
     LOGGER.info("Current serving data resource : " + Arrays.toString(servingDataResourceSet.toArray(new String[0])));
     return servingDataResourceSet;
+  }
+
+  @Override
+  public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
+    refresh();
   }
 }

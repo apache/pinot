@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
@@ -53,7 +54,9 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
 
   @Override
   public synchronized List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName,
-      ExternalView externalView) {
+      ExternalView externalView, List<InstanceConfig> instanceConfigList) {
+
+    RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
 
     List<Map<String, Set<String>>> routingTables = new ArrayList<Map<String, Set<String>>>();
     for (int i = 0; i < _numberOfRoutingTables; ++i) {
@@ -64,7 +67,7 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
     for (String segment : segmentSet) {
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
       for (String instance : instanceToStateMap.keySet().toArray(new String[0])) {
-        if (!instanceToStateMap.get(instance).equals("ONLINE")) {
+        if (!instanceToStateMap.get(instance).equals("ONLINE") || pruner.isShuttingDown(instance)) {
           instanceToStateMap.remove(instance);
         }
       }

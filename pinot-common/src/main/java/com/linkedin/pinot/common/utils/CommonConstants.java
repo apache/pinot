@@ -25,6 +25,8 @@ import com.google.common.collect.Sets;
 
 public class CommonConstants {
   public static class Helix {
+    public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
+
     public static final String PREFIX_OF_BROKER_RESOURCE_TAG = "broker_";
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";

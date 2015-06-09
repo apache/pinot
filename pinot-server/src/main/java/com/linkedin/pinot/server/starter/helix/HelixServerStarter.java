@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -24,7 +26,10 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -61,11 +66,16 @@ public class HelixServerStarter {
   private ServerConf _serverConf;
   private ServerInstance _serverInstance;
 
+  private final String _helixClusterName;
+  private final String _instanceId;
+
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
 
+    _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
-    final String instanceId =
+
+    _instanceId =
         pinotHelixProperties.getString(
             "instanceId",
             CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
@@ -75,21 +85,31 @@ public class HelixServerStarter {
                 + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
                     CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT));
 
-    pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
+    pinotHelixProperties.addProperty("pinot.server.instance.id", _instanceId);
     startServerInstance(pinotHelixProperties);
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer);
+        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);
     final StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(helixClusterName, instanceId,
+        new SegmentOnlineOfflineStateModelFactory(helixClusterName, _instanceId,
             _serverInstance.getInstanceDataManager(), new ColumnarSegmentMetadataLoader(), pinotHelixProperties,
             zkPropertyStore);
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    addInstanceTagIfNeeded(helixClusterName, instanceId);
+    addInstanceTagIfNeeded(helixClusterName, _instanceId);
+    setShuttingDownStatus(false);
+  }
+
+  private void setShuttingDownStatus(boolean shuttingDown) {
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(ConfigScopeProperty.PARTICIPANT, _helixClusterName).forParticipant(_instanceId)
+            .build();
+    Map<String, String> propToUpdate = new HashMap<String, String>();
+    propToUpdate.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, String.valueOf(shuttingDown));
+    _helixAdmin.setConfig(scope, propToUpdate);
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
@@ -124,6 +144,12 @@ public class HelixServerStarter {
   }
 
   public void stop() {
+    setShuttingDownStatus(true);
+    try {
+      Thread.sleep(1000);
+    } catch (Exception e) {
+      LOGGER.error("error trying to sleep waiting for external view to change : ", e);
+    }
     _helixManager.disconnect();
     _serverInstance.shutDown();
   }

@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,7 +101,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Shutdown HelixExternalViewBasedRouting!");
   }
 
-  public synchronized void markDataResourceOnline(String tableName, ExternalView externalView) {
+  public synchronized void markDataResourceOnline(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigList) {
     if (externalView == null) {
       return;
     }
@@ -142,7 +144,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Trying to compute routing table for table : " + tableName + ",by : " + routingTableBuilder);
     try {
       List<ServerToSegmentSetMap> serverToSegmentSetMap =
-          routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView);
+          routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigList);
 
       _brokerRoutingTable.put(tableName, serverToSegmentSetMap);
     } catch (Exception e) {

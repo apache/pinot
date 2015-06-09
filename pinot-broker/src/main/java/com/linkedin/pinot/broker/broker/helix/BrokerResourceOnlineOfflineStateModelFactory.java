@@ -15,11 +15,13 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import java.util.List;
 
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
@@ -28,6 +30,8 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 
@@ -63,13 +67,18 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
+
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+        Builder keyBuilder = _helixManager.getHelixDataAccessor().keyBuilder();
         String resourceName = message.getPartitionName();
+        HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+        List<InstanceConfig> instanceConfigList = helixDataAccessor.getChildValues(keyBuilder.instanceConfigs());
+
         _helixExternalViewBasedRouting.markDataResourceOnline(
             resourceName,
             HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(),
-                _helixManager.getClusterName(), resourceName));
+                _helixManager.getClusterName(), resourceName), instanceConfigList);
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
         Utils.rethrowException(e);

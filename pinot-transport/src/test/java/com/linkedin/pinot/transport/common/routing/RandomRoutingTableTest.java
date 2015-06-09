@@ -17,6 +17,7 @@ package com.linkedin.pinot.transport.common.routing;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeSet;
@@ -27,6 +28,7 @@ import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -52,7 +54,7 @@ public class RandomRoutingTableTest {
     RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(routingStrategy, null, null, null);
     ExternalView externalView = new ExternalView(externalViewRecord);
-    routingTable.markDataResourceOnline(tableName, externalView);
+    routingTable.markDataResourceOnline(tableName, externalView, new ArrayList<InstanceConfig>());
 
     double[] globalArrays = new double[9];
 
@@ -78,7 +80,8 @@ public class RandomRoutingTableTest {
       Assert.assertTrue(globalArrays[i] / totalRuns <= 31);
       Assert.assertTrue(globalArrays[i] / totalRuns >= 28);
     }
-    System.out.println(Arrays.toString(globalArrays) + " : " + new StandardDeviation().evaluate(globalArrays) + " : " + new Mean().evaluate(globalArrays));
+    System.out.println(Arrays.toString(globalArrays) + " : " + new StandardDeviation().evaluate(globalArrays) + " : "
+        + new Mean().evaluate(globalArrays));
   }
 
 }

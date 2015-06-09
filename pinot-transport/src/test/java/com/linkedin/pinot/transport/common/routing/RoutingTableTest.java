@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -47,12 +48,12 @@ public class RoutingTableTest {
     externalView.setState("segment1", "dataServer_instance_2", "ONLINE");
     externalView.setState("segment2", "dataServer_instance_2", "ONLINE");
     externalView.setState("segment2", "dataServer_instance_0", "ONLINE");
-    routingTable.markDataResourceOnline("testResource0_OFFLINE", externalView);
+    routingTable.markDataResourceOnline("testResource0_OFFLINE", externalView, new ArrayList<InstanceConfig>());
     ExternalView externalView1 = new ExternalView("testResource1_OFFLINE");
     externalView1.setState("segment10", "dataServer_instance_0", "ONLINE");
     externalView1.setState("segment11", "dataServer_instance_1", "ONLINE");
     externalView1.setState("segment12", "dataServer_instance_2", "ONLINE");
-    routingTable.markDataResourceOnline("testResource1_OFFLINE", externalView1);
+    routingTable.markDataResourceOnline("testResource1_OFFLINE", externalView1, new ArrayList<InstanceConfig>());
     ExternalView externalView2 = new ExternalView("testResource2_OFFLINE");
     externalView2.setState("segment20", "dataServer_instance_0", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_0", "ONLINE");
@@ -63,7 +64,7 @@ public class RoutingTableTest {
     externalView2.setState("segment20", "dataServer_instance_2", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_2", "ONLINE");
     externalView2.setState("segment22", "dataServer_instance_2", "ONLINE");
-    routingTable.markDataResourceOnline("testResource2_OFFLINE", externalView2);
+    routingTable.markDataResourceOnline("testResource2_OFFLINE", externalView2, new ArrayList<InstanceConfig>());
 
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource0_OFFLINE", "[segment0, segment1, segment2]", 3);
@@ -100,75 +101,77 @@ public class RoutingTableTest {
 
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, routingStrategy, null, null);
     ExternalView externalView = new ExternalView("testResource0_REALTIME");
-    externalView.setState(
-        SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "0", "0"), "dataServer_instance_0", "ONLINE");
-    externalView.setState(
-        SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "1", "1"), "dataServer_instance_1", "ONLINE");
-    externalView.setState(
-        SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "0", "2"), "dataServer_instance_2", "ONLINE");
-    externalView.setState(
-        SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "1", "3"), "dataServer_instance_3", "ONLINE");
-    externalView.setState(
-        SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "0", "4"), "dataServer_instance_4", "ONLINE");
-    externalView.setState(
-        SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5"), "dataServer_instance_5", "ONLINE");
-    routingTable.markDataResourceOnline("testResource0_REALTIME", externalView);
+    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "0", "0"),
+        "dataServer_instance_0", "ONLINE");
+    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "1", "1"),
+        "dataServer_instance_1", "ONLINE");
+    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "0", "2"),
+        "dataServer_instance_2", "ONLINE");
+    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "1", "3"),
+        "dataServer_instance_3", "ONLINE");
+    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "0", "4"),
+        "dataServer_instance_4", "ONLINE");
+    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5"),
+        "dataServer_instance_5", "ONLINE");
+    routingTable.markDataResourceOnline("testResource0_REALTIME", externalView, new ArrayList<InstanceConfig>());
     ExternalView externalView1 = new ExternalView("testResource1_REALTIME");
-    externalView1.setState(
-        SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10"), "dataServer_instance_10", "ONLINE");
-    externalView1.setState(
-        SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "1", "11"), "dataServer_instance_11", "ONLINE");
-    externalView1.setState(
-        SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12"), "dataServer_instance_12", "ONLINE");
-    routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1);
+    externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10"),
+        "dataServer_instance_10", "ONLINE");
+    externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "1", "11"),
+        "dataServer_instance_11", "ONLINE");
+    externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12"),
+        "dataServer_instance_12", "ONLINE");
+    routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1, new ArrayList<InstanceConfig>());
     ExternalView externalView2 = new ExternalView("testResource2_REALTIME");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20"), "dataServer_instance_20", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "1", "21"), "dataServer_instance_21", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "2", "22"), "dataServer_instance_22", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "0", "23"), "dataServer_instance_23", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "1", "24"), "dataServer_instance_24", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "2", "25"), "dataServer_instance_25", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "0", "26"), "dataServer_instance_26", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "1", "27"), "dataServer_instance_27", "ONLINE");
-    externalView2.setState(
-        SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28"), "dataServer_instance_28", "ONLINE");
-    routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2);
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20"),
+        "dataServer_instance_20", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "1", "21"),
+        "dataServer_instance_21", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "2", "22"),
+        "dataServer_instance_22", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "0", "23"),
+        "dataServer_instance_23", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "1", "24"),
+        "dataServer_instance_24", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "2", "25"),
+        "dataServer_instance_25", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "0", "26"),
+        "dataServer_instance_26", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "1", "27"),
+        "dataServer_instance_27", "ONLINE");
+    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28"),
+        "dataServer_instance_28", "ONLINE");
+    routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2, new ArrayList<InstanceConfig>());
 
     for (int numRun = 0; numRun < 100; ++numRun) {
-      assertResourceRequest(routingTable, "testResource0_REALTIME", new String[] {
-          "[" + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "0", "0")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "1", "1") + "]",
-          "[" + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "0", "2") + ", " +
-              SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "1", "3") + "]",
-          "[" + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "0", "4") + ", " +
-              SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5") + "]" }, 2);
+      assertResourceRequest(
+          routingTable,
+          "testResource0_REALTIME",
+          new String[] { "[" + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "0", "0")
+              + ", " + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "1", "1") + "]", "["
+              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "0", "2")
+              + ", "
+              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "1", "3") + "]", "["
+              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "0", "4") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5") + "]" }, 2);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
-      assertResourceRequest(routingTable, "testResource1_REALTIME", new String[] {
-          "[" + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "1", "11")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12") + "]" }, 3);
+      assertResourceRequest(routingTable, "testResource1_REALTIME",
+          new String[] { "[" + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10")
+              + ", " + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "1", "11") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12") + "]" }, 3);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
-      assertResourceRequest(routingTable, "testResource2_REALTIME", new String[] {
-          "[" + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "1", "21")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "2", "22") + "]",
-          "[" + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "0", "23")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "1", "24")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "2", "25") + "]",
-          "[" + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "0", "26")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "1", "27")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28") + "]"
-      }, 3);
+      assertResourceRequest(routingTable, "testResource2_REALTIME",
+          new String[] { "[" + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20")
+              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "1", "21") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "2", "22") + "]", "["
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "0", "23") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "1", "24") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "2", "25") + "]", "["
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "0", "26") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "1", "27") + ", "
+              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28") + "]" }, 3);
     }
   }
 

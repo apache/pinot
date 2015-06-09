@@ -19,6 +19,7 @@ import java.util.List;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
@@ -40,5 +41,6 @@ public interface RoutingTableBuilder {
    * @param externalView
    * @return List of routing table used to
    */
-  List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView);
+  List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigList);
 }
