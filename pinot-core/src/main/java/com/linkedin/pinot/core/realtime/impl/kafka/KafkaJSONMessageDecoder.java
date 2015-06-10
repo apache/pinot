@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,17 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
       Map<String, Object> rowEntries = new HashMap<String, Object>();
       for (FieldSpec dimension : schema.getDimensionFieldSpecs()) {
         if (message.has(dimension.getName())) {
-          Object entry = stringToDataType(dimension.getDataType(), message.getString(dimension.getName()));
+          Object entry;
+          if (dimension.isSingleValueField()) {
+            entry = stringToDataType(dimension.getDataType(), message.getString(dimension.getName()));
+          } else {
+            JSONArray jsonArray = message.getJSONArray(dimension.getName());
+            Object[] array = new Object[jsonArray.length()];
+            for (int i = 0; i < array.length; i++) {
+              array[i] = stringToDataType(dimension.getDataType(), jsonArray.getString(i));
+            }
+            entry = array;
+          }
           rowEntries.put(dimension.getName(), entry);
         } else {
           Object entry = AvroRecordReader.getDefaultNullValue(dimension);
