@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,6 +26,10 @@ import java.util.Set;
 
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +68,8 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
     this.pinotClusterManager.getPropertyStore().stop();
   }
 
-  private synchronized void eval() {
+  private synchronized void eval() throws JsonParseException, JsonMappingException, JsonProcessingException,
+      JSONException, IOException {
     // fetch current ideal state snapshot
 
     Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
@@ -88,7 +94,6 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         } catch (Exception e) {
           LOGGER.error("error fetching instances", e);
         }
-
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
@@ -98,8 +103,9 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         }
       } else {
         Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
-        instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getHelixAdmin().getInstancesInClusterWithTag(
-            pinotClusterManager.getHelixClusterName(), resource));
+        instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getServerInstancesForTable(resource,
+            TableType.REALTIME));
+
         for (String partition : state.getPartitionSet()) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
               ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
@@ -137,8 +143,8 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
             realtimeSegmentMetadataToAdd);
         //update ideal state next
         IdealState s =
-            PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId,
-                idealStateMap.get(resourceName), instanceName);
+            PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, idealStateMap.get(resourceName),
+                instanceName);
         pinotClusterManager.getHelixAdmin().setResourceIdealState(pinotClusterManager.getHelixClusterName(),
             resourceName, PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, s, instanceName));
       }
