@@ -37,6 +37,8 @@ import org.kohsuke.args4j.Option;
  *
  */
 public class AbstractBaseCommand {
+  static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
+
   public AbstractBaseCommand() {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override

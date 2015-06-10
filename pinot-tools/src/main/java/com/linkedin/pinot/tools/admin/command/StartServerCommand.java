@@ -24,27 +24,30 @@ import org.kohsuke.args4j.Option;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
+
 /**
  * Class to implement StartServer command.
  *
  */
 public class StartServerCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-serverPort", required=true, metaVar="<int>", usage="Port number to start the server at.")
+  @Option(name = "-serverPort", required = false, metaVar = "<int>", usage = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
-  @Option(name="-dataDir", required=true, metaVar="<string>", usage="Path to directory containing data.")
-  private String _dataDir = null;
+  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
+  private String _dataDir = "/tmp/pinotServerData";
 
-  @Option(name="-segmentDir", required=true, metaVar="<string>", usage="Path to directory containing segments.")
-  private String _segmentDir = null;
+  @Option(name = "-segmentDir", required = false, metaVar = "<string>",
+      usage = "Path to directory containing segments.")
+  private String _segmentDir = "/tmp/pinotSegments";
 
-  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
-  private String _zkAddress = null;
+  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  private String _zkAddress = DEFAULT_ZK_ADDRESS;
+
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
+  private boolean _help = false;
 
   private String _clusterName = "PinotCluster";
-
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
-  private boolean _help = false;
 
   public boolean getHelp() {
     return _help;
@@ -77,8 +80,8 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("StartServerCommand -clusterName " + _clusterName + " -serverPort " + _serverPort +
-        " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
+    return ("StartServerCommand -clusterName " + _clusterName + " -serverPort " + _serverPort + " -dataDir " + _dataDir
+        + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
   }
 
   @Override
@@ -104,8 +107,7 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
     configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
 
-    final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter(_clusterName, _zkAddress, configuration);
+    final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminServer.pid");
     return true;

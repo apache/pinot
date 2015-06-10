@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-
 import java.io.File;
 
 import org.apache.helix.manager.zk.ZkClient;
@@ -24,23 +23,26 @@ import org.kohsuke.args4j.Option;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 
+
 /**
  * Class to implement StartController command.
  *
  */
 public class StartControllerCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
-  private String _controllerPort = null;
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
+      usage = "Port number to start the controller at.")
+  private String _controllerPort = "9000";
 
-  @Option(name="-dataDir", required=false, metaVar="<string>", usage="Path to directory containging data.")
+  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
   private String _dataDir = "/tmp/PinotController";
 
-  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
-  private String _zkAddress = null;
+  @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
+  private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
   private String _clusterName = "PinotCluster";
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -74,8 +76,8 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public String toString() {
-    return ("StartControllerCommand -clusterName " + _clusterName +
-        " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+    return ("StartControllerCommand -clusterName " + _clusterName + " -controllerPort " + _controllerPort
+        + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
   }
 
   @Override
