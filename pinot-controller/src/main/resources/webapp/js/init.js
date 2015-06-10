@@ -27,7 +27,7 @@ $(document).ready(function() {
   var windowHeight = $(window).height();
   var documentHeight = $(document).height();
 
-  var qH = (.20) * windowHeight;
+  var qH = (.20) * windowHeight + 10;
   var rH = (.60) * windowHeight;
 
   $('.query-box').css('min-height', qH + 'px');

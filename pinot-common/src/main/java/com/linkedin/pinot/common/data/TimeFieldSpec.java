@@ -90,7 +90,7 @@ public class TimeFieldSpec extends FieldSpec {
 
   @JsonIgnore(true)
   public String getOutGoingTimeColumnName() {
-    return outgoingGranularitySpec.getName();
+    return getOutgoingGranularitySpec().getName();
   }
 
   public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {

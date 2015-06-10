@@ -143,11 +143,9 @@ public class ControllerStarter {
       if (!path.startsWith("file://")) {
         path = "file://" + path;
       }
-      System.out.println("********************* : " + path);
       conf.setQueryConsolePath(path);
     } else {
       conf.setQueryConsolePath("file://" + webappPath.getAbsolutePath());
-      System.out.println("********************* : " + "file://" + webappPath.getAbsolutePath());
     }
 
     conf.setControllerVipHost("localhost");

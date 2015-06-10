@@ -35,33 +35,33 @@ public abstract class FieldSpec {
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = Float.valueOf(0);
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = Double.valueOf(0);
 
-  String _name;
-  FieldType _fieldType;
-  DataType _dataType;
-  boolean _isSingleValueField;
-  String _delimiter;
-  Object _defaultNullValue;
+  String name;
+  FieldType fieldType;
+  DataType dataType;
+  boolean isSingleValueField = true;
+  String delimiter = ",";
+  Object defaultNullValue;
 
   public FieldSpec() {
 
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter) {
-    _name = name;
-    _fieldType = fType;
-    _dataType = dType;
-    _isSingleValueField = singleValue;
-    _delimiter = delimeter;
+    this.name = name;
+    this.fieldType = fType;
+    this.dataType = dType;
+    this.isSingleValueField = singleValue;
+    this.delimiter = delimeter;
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter,
       Object defaultNullValue) {
-    _name = name;
-    _fieldType = fType;
-    _dataType = dType;
-    _isSingleValueField = singleValue;
-    _delimiter = delimeter;
-    _defaultNullValue = defaultNullValue;
+    this.name = name;
+    fieldType = fType;
+    dataType = dType;
+    isSingleValueField = singleValue;
+    delimiter = delimeter;
+    this.defaultNullValue = defaultNullValue;
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
@@ -73,53 +73,53 @@ public abstract class FieldSpec {
   }
 
   public void setName(String name) {
-    _name = name;
+    this.name = name;
   }
 
   public String getName() {
-    return _name;
+    return name;
   }
 
   public String getDelimiter() {
-    return _delimiter;
+    return delimiter;
   }
 
   public void setDelimiter(String delimeter) {
-    _delimiter = delimeter;
+    delimiter = delimeter;
   }
 
   public FieldType getFieldType() {
-    return _fieldType;
+    return fieldType;
   }
 
   public void setFieldType(FieldType fieldType) {
-    _fieldType = fieldType;
+    this.fieldType = fieldType;
   }
 
   public DataType getDataType() {
-    return _dataType;
+    return dataType;
   }
 
   public void setDataType(DataType dataType) {
-    _dataType = dataType;
+    this.dataType = dataType;
   }
 
   public boolean isSingleValueField() {
-    return _isSingleValueField;
+    return isSingleValueField;
   }
 
   public void setSingleValueField(boolean isSingleValueField) {
-    _isSingleValueField = isSingleValueField;
+    this.isSingleValueField = isSingleValueField;
   }
 
   public void setDefaultNullValue(Object defaultNullValue) {
-    _defaultNullValue = defaultNullValue;
+    this.defaultNullValue = defaultNullValue;
   }
 
   @Override
   public String toString() {
-    return "< data type : " + _dataType + " , field type : " + _fieldType
-        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimiter
+    return "< data type : " + dataType + " , field type : " + fieldType
+        + ((isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + delimiter
         + " >";
   }
 
@@ -247,12 +247,12 @@ public abstract class FieldSpec {
   }
 
   public Object getDefaultNullValue() {
-    if (_defaultNullValue != null) {
-      return _defaultNullValue;
+    if (defaultNullValue != null) {
+      return defaultNullValue;
     }
     switch (getFieldType()) {
       case METRIC:
-        switch (_dataType) {
+        switch (dataType) {
           case INT:
           case INT_ARRAY:
             return DEFAULT_METRIC_NULL_VALUE_OF_INT;
@@ -289,6 +289,6 @@ public abstract class FieldSpec {
             break;
         }
     }
-    throw new UnsupportedOperationException("Not supported data type for null value - " + _dataType);
+    throw new UnsupportedOperationException("Not supported data type for null value - " + dataType);
   }
 }
