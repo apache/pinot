@@ -189,6 +189,11 @@ public class ValidationManager {
       return Collections.emptyList();
     }
 
+    // Default segment granularity to day level if its small than hours.
+    if (frequency.getMillis() < Duration.standardHours(1).getMillis()) {
+      frequency = Duration.standardDays(1);
+    }
+
     // If there are less than two segments, none can be missing
     if (segmentIntervals.size() < 2) {
       return Collections.emptyList();

@@ -224,6 +224,18 @@ public class ValidationManagerTest {
     Assert.assertEquals(missingIntervalsForJan1st2nd4th5th.size(), 1);
   }
 
+  @Test
+  public void testExtremeSenario() {
+    List<Interval> intervals = new ArrayList<Interval>();
+    intervals.add(new Interval(1, 2));
+    intervals.add(new Interval(Integer.MAX_VALUE - 5, Integer.MAX_VALUE));
+    intervals.add(new Interval(Integer.MAX_VALUE / 2 - 5, Integer.MAX_VALUE / 2));
+    Duration frequency = new Duration(1);
+
+    List<Interval> computeMissingIntervals = ValidationManager.computeMissingIntervals(intervals, frequency);
+    Assert.assertEquals(computeMissingIntervals.size(), 22);
+  }
+
   private class DummyMetadata implements SegmentMetadata {
     private String _resourceName;
     private String _indexType;
