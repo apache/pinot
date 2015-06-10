@@ -74,7 +74,6 @@ public class PinotSchemaResletResource extends ServerResource {
   @Post
   public Representation post(Representation entity) {
     Representation rep = null;
-    System.out.println(conf.toString());
     File dataFile = null;
     try {
 
