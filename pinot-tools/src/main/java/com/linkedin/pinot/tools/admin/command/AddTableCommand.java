@@ -39,8 +39,8 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
   private String _filePath;
 
-  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
-  private String _controllerPort = null;
+  @Option(name="-controllerPort", required=false, metaVar="<int>", usage="Port number to start the controller at.")
+  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;

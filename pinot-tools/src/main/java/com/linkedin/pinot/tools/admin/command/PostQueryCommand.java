@@ -27,12 +27,14 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+
 
 public class PostQueryCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
-  @Option(name="-brokerPort", required=true, metaVar="<int>", usage="http port for broker.")
-  private String _brokerPort;
+  @Option(name="-brokerPort", required=false, metaVar="<int>", usage="http port for broker.")
+  private String _brokerPort = Integer.toString(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
 
   @Option(name="-query", required=true, metaVar="<string>", usage="Query string to perform.")
   private String _query;

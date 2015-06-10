@@ -31,7 +31,7 @@ import com.linkedin.pinot.controller.ControllerStarter;
 public class StartControllerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-controllerPort", required = false, metaVar = "<int>",
       usage = "Port number to start the controller at.")
-  private String _controllerPort = "9000";
+  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
   private String _dataDir = "/tmp/PinotController";

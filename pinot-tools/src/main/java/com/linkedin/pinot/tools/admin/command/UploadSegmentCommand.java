@@ -31,8 +31,8 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
  *
  */
 public class UploadSegmentCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-controllerPort", required = true, metaVar = "<int>", usage = "Port number for controller.")
-  private String _controllerPort = null;
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
+  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;

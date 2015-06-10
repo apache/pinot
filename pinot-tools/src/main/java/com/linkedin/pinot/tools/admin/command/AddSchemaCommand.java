@@ -30,8 +30,8 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost = "localhost";
 
-  @Option(name = "-controllerPort", required = true, metaVar = "<String>", usage = "port name for controller.")
-  private String _controllerPort;
+  @Option(name = "-controllerPort", required = false, metaVar = "<String>", usage = "port name for controller.")
+  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "Path to schema file.")
   private String _schemaFile = null;
