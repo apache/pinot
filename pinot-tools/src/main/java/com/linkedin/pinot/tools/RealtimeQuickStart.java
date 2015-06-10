@@ -46,7 +46,7 @@ public class RealtimeQuickStart {
         KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
-    KafkaStarterUtils.createTopic("meetupRsvpEvents", KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR);
 
     final QuickstartRunner runner =
         new QuickstartRunner(schema, null, new File("/tm/" + System.currentTimeMillis()), "meetupRsvp",
@@ -58,9 +58,9 @@ public class RealtimeQuickStart {
 
     runner.addSchema();
     runner.addTable();
-    printStatus(color.CYAN, "Added schema and talbe");
+    printStatus(color.CYAN, "Added schema and table");
 
-    printStatus(color.YELLOW, "Reatlime quickstart setup complete");
+    printStatus(color.YELLOW, "Realtime quickstart setup complete");
 
     final MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
     meetupRSVPProvider.run();

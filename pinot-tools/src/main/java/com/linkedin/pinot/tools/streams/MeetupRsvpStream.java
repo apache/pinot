@@ -110,7 +110,7 @@ public class MeetupRsvpStream {
 
                   if (keepPublishing) {
                     KeyedMessage<String, byte[]> data =
-                        new KeyedMessage<String, byte[]>("meetupRsvpEvents", extracted.toString().getBytes("UTF-8"));
+                        new KeyedMessage<String, byte[]>("meetupRSVPEvents", extracted.toString().getBytes("UTF-8"));
                     producer.send(data);
                   }
                 } catch (Exception e) {
