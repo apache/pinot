@@ -139,7 +139,7 @@ Open Pinot Query Console at http://localhost:9000/query and run queries. Here ar
 /*Total number of documents in the table*/
 select count(*) from meetupRsvp limit 0 
 
-/Top 10 cities with the most rsvp*/	
+/*Top 10 cities with the most rsvp*/	
 select sum(rsvp_count) from meetupRsvp group by group_city top 10 limit 0 
 
 /*Show 10 most recent rsvps*/
