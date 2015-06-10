@@ -17,8 +17,6 @@ package com.linkedin.pinot.tools.admin;
 
 import java.lang.reflect.Field;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -40,6 +38,8 @@ import com.linkedin.pinot.tools.admin.command.StartServerCommand;
 import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
+import com.linkedin.pinot.tools.admin.command.StartKafkaCommand;
+import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 
 
 /**
@@ -54,6 +54,8 @@ public class PinotAdministrator {
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
       @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
+      @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
+      @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class),
       @SubCommand(name = "StartController", impl = StartControllerCommand.class),
       @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
       @SubCommand(name = "StartServer", impl = StartServerCommand.class),

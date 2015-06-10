@@ -42,6 +42,9 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
   @Option(name="-zooKeeper", required=false, usage="Stop the ZooKeeper process.")
   private boolean _zooKeeper = false;
 
+  @Option(name="-kafka", required=false, usage="Stop the Kafka process.")
+  private boolean _kafka = false;
+
   @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Stop the PinotServer.")
   private boolean _help = false;
 
@@ -91,6 +94,10 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
       processes.put("Zookeeper", prefix + ".zooKeeper.pid");
     }
 
+    if (_kafka) {
+      processes.put("Kafka", prefix + ".kafka.pid");
+    }
+
     boolean ret = true;
     for (Map.Entry<String, String> entry : processes.entrySet()) {
       try {
@@ -131,6 +138,10 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
 
     if (_zooKeeper) {
       stringBuilder.append(" -zooKeeper");
+    }
+
+    if (_kafka) {
+      stringBuilder.append(" -kafka");
     }
 
     return stringBuilder.toString();
