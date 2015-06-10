@@ -24,7 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -47,43 +46,47 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
       String text = new String(payload, "UTF-8");
       JSONObject message = new JSONObject(text);
       Map<String, Object> rowEntries = new HashMap<String, Object>();
-      for (FieldSpec dimension : schema.getDimensionFieldSpecs()) {
-        if (message.has(dimension.getName())) {
+      for (FieldSpec dimensionSpec : schema.getDimensionFieldSpecs()) {
+        if (message.has(dimensionSpec.getName())) {
           Object entry;
-          if (dimension.isSingleValueField()) {
-            entry = stringToDataType(dimension.getDataType(), message.getString(dimension.getName()));
+          if (dimensionSpec.isSingleValueField()) {
+            entry = stringToDataType(dimensionSpec, message.getString(dimensionSpec.getName()));
           } else {
-            JSONArray jsonArray = message.getJSONArray(dimension.getName());
+            JSONArray jsonArray = message.getJSONArray(dimensionSpec.getName());
             Object[] array = new Object[jsonArray.length()];
             for (int i = 0; i < array.length; i++) {
-              array[i] = stringToDataType(dimension.getDataType(), jsonArray.getString(i));
+              array[i] = stringToDataType(dimensionSpec, jsonArray.getString(i));
             }
-            entry = array;
+            if (array.length == 0) {
+              entry = new Object[] { AvroRecordReader.getDefaultNullValue(dimensionSpec) };
+            } else {
+              entry = array;
+            }
           }
-          rowEntries.put(dimension.getName(), entry);
+          rowEntries.put(dimensionSpec.getName(), entry);
         } else {
-          Object entry = AvroRecordReader.getDefaultNullValue(dimension);
-          rowEntries.put(dimension.getName(), entry);
+          Object entry = AvroRecordReader.getDefaultNullValue(dimensionSpec);
+          rowEntries.put(dimensionSpec.getName(), entry);
         }
       }
 
-      for (FieldSpec metric : schema.getMetricFieldSpecs()) {
-        if (message.has(metric.getName())) {
-          Object entry = stringToDataType(metric.getDataType(), message.getString(metric.getName()));
-          rowEntries.put(metric.getName(), entry);
+      for (FieldSpec metricSpec : schema.getMetricFieldSpecs()) {
+        if (message.has(metricSpec.getName())) {
+          Object entry = stringToDataType(metricSpec, message.getString(metricSpec.getName()));
+          rowEntries.put(metricSpec.getName(), entry);
         } else {
-          Object entry = AvroRecordReader.getDefaultNullValue(metric);
-          rowEntries.put(metric.getName(), entry);
+          Object entry = AvroRecordReader.getDefaultNullValue(metricSpec);
+          rowEntries.put(metricSpec.getName(), entry);
         }
       }
 
-      TimeFieldSpec spec = schema.getTimeFieldSpec();
-      if (message.has(spec.getName())) {
-        Object entry = stringToDataType(spec.getDataType(), message.getString(spec.getName()));
-        rowEntries.put(spec.getName(), entry);
+      TimeFieldSpec timeSpec = schema.getTimeFieldSpec();
+      if (message.has(timeSpec.getName())) {
+        Object entry = stringToDataType(timeSpec, message.getString(timeSpec.getName()));
+        rowEntries.put(timeSpec.getName(), entry);
       } else {
-        Object entry = AvroRecordReader.getDefaultNullValue(spec);
-        rowEntries.put(spec.getName(), entry);
+        Object entry = AvroRecordReader.getDefaultNullValue(timeSpec);
+        rowEntries.put(timeSpec.getName(), entry);
       }
 
       GenericRow row = new GenericRow();
@@ -95,12 +98,12 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
     return null;
   }
 
-  private Object stringToDataType(DataType type, String inString) {
+  private Object stringToDataType(FieldSpec spec, String inString) {
     if (inString == null) {
-      return null;
+      return AvroRecordReader.getDefaultNullValue(spec);
     }
 
-    switch (type) {
+    switch (spec.getDataType()) {
       case INT:
         return new Integer(Integer.parseInt(inString));
       case LONG:

@@ -22,14 +22,11 @@ import org.apache.log4j.Level;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class Quickstart {
-  private static Logger LOGGER = LoggerFactory.getLogger(Quickstart.class);
 
   public Quickstart() {
 

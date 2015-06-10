@@ -45,6 +45,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
       usage = "Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }
@@ -113,7 +114,6 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     }
 
     final ControllerStarter starter = new ControllerStarter(conf);
-    System.out.println(conf.getQueryConsole());
 
     starter.start();
 
