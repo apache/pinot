@@ -169,7 +169,7 @@ public class RetentionManager {
     try {
       offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
     } catch (Exception e) {
-      LOGGER.error("Error getting offline table config from property store!");
+      LOGGER.error("Error getting offline table config from property store!", e);
       return tableToDeletionStrategyMap;
     }
     if (offlineTableConfig.getValidationConfig().getSegmentPushType().equalsIgnoreCase("REFRESH")) {
@@ -193,7 +193,7 @@ public class RetentionManager {
     try {
       realtimeTableConfig = ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
     } catch (Exception e) {
-      LOGGER.error("Error getting realtime table config from property store!");
+      LOGGER.error("Error getting realtime table config from property store!", e);
       return tableToDeletionStrategyMap;
     }
     try {

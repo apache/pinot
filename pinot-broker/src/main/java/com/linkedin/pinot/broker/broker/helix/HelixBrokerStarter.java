@@ -159,6 +159,7 @@ public class HelixBrokerStarter {
       String routingTableBuilderKey = routingTableBuilderConfig.getString("class", null);
       routingTableBuilder = RoutingTableBuilderFactory.get(routingTableBuilderKey);
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while building routing table", e);
       return null;
     }
     if (routingTableBuilder == null) {

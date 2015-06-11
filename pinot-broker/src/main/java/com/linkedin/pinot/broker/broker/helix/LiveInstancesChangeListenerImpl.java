@@ -78,6 +78,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
       try {
         port = Integer.parseInt(namePortStr.split("_")[1]);
       } catch (Exception e) {
+        LOGGER.warn("Port for server instance " + instanceId + " does not appear to be numeric", e);
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
       }
       ServerInstance ins = new ServerInstance(hostName, port);

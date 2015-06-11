@@ -288,7 +288,7 @@ public class BrokerRequestHandler {
             instanceResponseMap.put(e.getKey(), r2);
           } catch (Exception ex) {
             LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
-                + ex.getMessage());
+                + ex.getMessage(), ex);
             _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
           }
         }
@@ -392,7 +392,7 @@ public class BrokerRequestHandler {
               instanceResponseMap.put(decoratedServerInstance, r2);
             } catch (Exception ex) {
               LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
-                  + ex.getMessage());
+                  + ex.getMessage(), ex);
               _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
             }
           }

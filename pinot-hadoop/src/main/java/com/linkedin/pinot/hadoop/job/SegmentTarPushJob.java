@@ -89,8 +89,7 @@ public class SegmentTarPushJob extends Configured {
           LOGGER.info("Response code: {}", responseCode);
         } catch (Exception e) {
           LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
-          LOGGER.error(e.getMessage());
-          e.printStackTrace();
+          LOGGER.error("Caught exception during upload", e);
           throw new RuntimeException("Got Error during send tar files to push hosts!");
         }
       } finally {

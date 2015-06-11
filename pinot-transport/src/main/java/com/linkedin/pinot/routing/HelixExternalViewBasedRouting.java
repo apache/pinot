@@ -148,13 +148,13 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
       _brokerRoutingTable.put(tableName, serverToSegmentSetMap);
     } catch (Exception e) {
-      LOGGER.error("Failed to compute/update the routing table" + e.getCause());
+      LOGGER.error("Failed to compute/update the routing table" + e.getCause(), e);
     }
     try {
       LOGGER.info("Trying to compute time boundary service for table : " + tableName);
       _timeBoundaryService.updateTimeBoundaryService(externalView);
     } catch (Exception e) {
-      LOGGER.error("Failed to update the TimeBoundaryService : " + e.getCause());
+      LOGGER.error("Failed to update the TimeBoundaryService : " + e.getCause(), e);
     }
 
   }
