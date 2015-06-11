@@ -10,7 +10,6 @@ import com.linkedin.thirdeye.impl.TarGzCompressionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
-import org.joda.time.base.AbstractInstant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +49,7 @@ public class DataUpdateManager {
    * @param rootDir
    *  The root directory on the file system under which collection data is stored
    * @param autoExpire
-   * If set to true, deletes lower granularity non-overlapping segments
+   * If set to true, deletes lower granularity overlapping segments
    */
   public DataUpdateManager(File rootDir, boolean autoExpire) {
     this.rootDir = rootDir;

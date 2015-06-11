@@ -77,11 +77,6 @@ public class TestDataUpdateManager {
   }
 
   @Test
-  public void testAutoExpire() throws Exception {
-    dataUpdateManager = new DataUpdateManager(rootDir, true);
-  }
-
-  @Test
   public void testDeleteData() throws Exception {
     // Create some collection data dir
     File collectionDir = new File(rootDir, collection);

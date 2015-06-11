@@ -109,11 +109,6 @@ public class StorageUtils
     return StarTreeConstants.DATE_TIME_FORMATTER.withZone(zone).parseDateTime(dataDir.split("_")[3]);
   }
 
-  public static boolean isHigherGranularityDir(String dataDir) {
-    return dataDir.startsWith(getDataDirPrefix()) &&
-        StarTreeConstants.Schedule.valueOf(getSchedule(dataDir)).getLowerSchedule() != null;
-  }
-
   public static boolean isExpirable(File pathname, String lowerDir) {
      return  pathname.getName().startsWith(lowerDir) && ((new DateTime().getMillis()-pathname.lastModified()) > QUIESCENCE_TIME);
   }
