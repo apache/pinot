@@ -172,7 +172,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     private boolean autoConsume;
 
-    private boolean autoExpire = true;
+    private boolean autoExpire;
 
     private TimeGranularity anomalyDetectionInterval;
 

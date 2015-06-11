@@ -10,12 +10,14 @@ import com.linkedin.thirdeye.impl.TarGzCompressionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
+import org.joda.time.base.AbstractInstant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -41,12 +43,14 @@ public class DataUpdateManager {
   private final boolean autoExpire;
   private final ConcurrentMap<String, Lock> collectionLocks;
 
+
   /**
    * A utility to manage data on the file system.
    *
    * @param rootDir
    *  The root directory on the file system under which collection data is stored
    * @param autoExpire
+   * If set to true, deletes lower granularity non-overlapping segments
    */
   public DataUpdateManager(File rootDir, boolean autoExpire) {
     this.rootDir = rootDir;
@@ -106,6 +110,43 @@ public class DataUpdateManager {
       LOGGER.info("Unlocked collection {} using lock {} for data delete", collection, lock);
     }
   }
+
+  public void deleteData(String collection, String schedule, DateTime maxTime) throws IOException {
+    Lock lock = collectionLocks.get(collection);
+    if (lock == null) {
+      collectionLocks.putIfAbsent(collection, new ReentrantLock());
+      lock = collectionLocks.get(collection);
+    }
+
+    lock.lock();
+    LOGGER.info("Locked collection {} using lock {} for data delete", collection, lock);
+    try {
+      // Find files prefixed with the parameters (i.e. not including treeId)
+      final String dataDirPrefix = StorageUtils.getDataDirPrefix(schedule);
+      final DateTime maxDateTime = maxTime;
+      File collectionDir = new File(rootDir, collection);
+      File[] matchingDirs = collectionDir.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.startsWith(dataDirPrefix) &&
+              StorageUtils.getMaxTime(maxDateTime.getZone(), name).compareTo(maxDateTime) <= 0;
+        }
+      });
+
+      if (matchingDirs == null || matchingDirs.length == 0) {
+        throw new FileNotFoundException("No directory with prefix " + dataDirPrefix +" and maxTime less than " + maxTime);
+      }
+
+      for (File dataDir : matchingDirs) {
+        FileUtils.forceDelete(dataDir); // n.b. will trigger watch on collection dir
+        LOGGER.info("Deleted {}", dataDir);
+      }
+    } finally {
+      lock.unlock();
+      LOGGER.info("Unlocked collection {} using lock {} for data delete", collection, lock);
+    }
+  }
+
   public void updateData(String collection,
                          String schedule,
                          DateTime minTime,
@@ -188,32 +229,8 @@ public class DataUpdateManager {
         }
 
         if (autoExpire) {
-          // Expire segments with lower granularity
-          final DateTime expireUptoDate = minTime;
-          String lowerSchedule = null;
-          if (schedule.equals(StarTreeConstants.SCHEDULE.DAILY.name())) {
-            lowerSchedule = StarTreeConstants.SCHEDULE.HOURLY.name();
-          } else if (schedule.equals(StarTreeConstants.SCHEDULE.MONTHLY.name())) {
-            lowerSchedule = StarTreeConstants.SCHEDULE.DAILY.name();
-          }
-
-          if (lowerSchedule != null) {
-            final String expireSchedule = lowerSchedule;
-            File[] expireDirs = collectionDir.listFiles(new FilenameFilter() {
-              @Override
-              public boolean accept(File dir, String name) {
-                return name.startsWith(StorageUtils.getDataDirPrefix()) && StorageUtils.isExpirable(name, expireSchedule, expireUptoDate);
-              }
-            });
-
-            for (File expireDir : expireDirs) {
-              String[] tokens = expireDir.getName().split("_");
-              LOGGER.info("Deleting lower granularity segment {}",expireDir);
-              deleteData(collection, tokens[1], StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[2]), StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]));
-            }
-          }
+          expireSegments(collectionDir, minTime, maxTime, schedule);
         }
-
       } finally {
         FileUtils.forceDelete(tmpDir);
         LOGGER.info("Deleted tmp dir {}", tmpDir);
@@ -222,6 +239,44 @@ public class DataUpdateManager {
       lock.unlock();
       LOGGER.info("Unlocked collection {} using lock {} for data update", collection, lock);
     }
+  }
+
+  public void expireSegments(File collectionDir, DateTime minTime, DateTime maxTime, String schedule) throws IOException {
+
+    final String dataSchedule = schedule;
+    File[] higherDataDirs = collectionDir.listFiles(new FilenameFilter() {
+
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.startsWith(StorageUtils.getDataDirPrefix()) &&
+            StorageUtils.getSchedule(name).equals(dataSchedule) &&
+        StarTreeConstants.Schedule.valueOf(dataSchedule).getLowerSchedule() != null;
+      }
+    });
+
+    for (File higherDataDir : higherDataDirs) {
+
+        String lowerSchedule = StarTreeConstants.Schedule.valueOf(StorageUtils.getSchedule(higherDataDir.getName())).getLowerSchedule();
+        DateTime maxDateTime = StorageUtils.getMaxTime(maxTime.getZone(), higherDataDir.getName());
+        DateTime startDateTime = StorageUtils.getMinTime(minTime.getZone(), higherDataDir.getName());
+
+        while (startDateTime.compareTo(maxDateTime) < 0) {
+          DateTime endDateTime = StarTreeConstants.Schedule.valueOf(lowerSchedule).getEndDateTime(startDateTime);
+          final String lowerDir = StorageUtils.getDataDirPrefix(lowerSchedule, startDateTime, endDateTime);
+
+          File[] lowerDataDir = collectionDir.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+              return StorageUtils.isExpirable(pathname, lowerDir);
+            }
+          });
+          for (File expireDataDir : lowerDataDir) {
+            LOGGER.info("Deleting segment {}", expireDataDir);
+            FileUtils.deleteDirectory(expireDataDir);
+          }
+          startDateTime = endDateTime;
+        }
+      }
   }
 
   /**
@@ -541,5 +596,4 @@ public class DataUpdateManager {
     }
     series.aggregate(timeSeries);
   }
-
 }

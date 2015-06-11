@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.api;
 
+import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -29,9 +30,44 @@ public final class StarTreeConstants
 
   public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 
-  public enum SCHEDULE {
-    HOURLY,
-    DAILY,
-    MONTHLY
+  public enum Schedule {
+    HOURLY {
+      @Override
+      public String getLowerSchedule() {
+        return null;
+      }
+
+      @Override
+      public DateTime getEndDateTime(DateTime start) {
+        return start.plusHours(1);
+      }
+    },
+    DAILY {
+      @Override
+      public String getLowerSchedule() {
+        return HOURLY.name();
+      }
+
+      @Override
+      public DateTime getEndDateTime(DateTime start) {
+        return start.plusDays(1);
+      }
+    },
+    MONTHLY {
+      @Override
+      public String getLowerSchedule() {
+        return DAILY.name();
+      }
+
+      @Override
+      public DateTime getEndDateTime(DateTime start) {
+        return start.plusMonths(1);
+      }
+    };
+
+    public abstract String getLowerSchedule();
+
+    public abstract DateTime getEndDateTime(DateTime start);
+
   }
 }

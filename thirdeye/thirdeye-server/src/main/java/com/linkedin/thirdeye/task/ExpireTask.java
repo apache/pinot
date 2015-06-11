@@ -29,17 +29,20 @@ public class ExpireTask extends Task {
     Collection<String> minTimeParam = params.get("minTime");
     Collection<String> maxTimeParam = params.get("maxTime");
 
-    if (collectionParam == null || collectionParam.isEmpty() || scheduleParam == null || scheduleParam.isEmpty() ||
-        minTimeParam == null || minTimeParam.isEmpty() || maxTimeParam == null || maxTimeParam.isEmpty())
+    if (collectionParam.isEmpty() || scheduleParam.isEmpty() || maxTimeParam.isEmpty())
     {
-      throw new IllegalArgumentException("Must provide collection, schedule, minTime and maxTime");
+      throw new IllegalArgumentException("Must provide collection, schedule and maxTime");
     }
     String collection = collectionParam.iterator().next();
     String schedule = scheduleParam.iterator().next();
-    DateTime minTime = DateTime.parse(minTimeParam.iterator().next());
     DateTime maxTime = DateTime.parse(maxTimeParam.iterator().next());
 
-    dataUpdateManager.deleteData(collection, schedule, minTime, maxTime);
+    if (!minTimeParam.isEmpty()) {
+      DateTime minTime = DateTime.parse(minTimeParam.iterator().next());
+      dataUpdateManager.deleteData(collection, schedule, minTime, maxTime);
+    } else {
+      dataUpdateManager.deleteData(collection, schedule, maxTime);
+    }
 
   }
 

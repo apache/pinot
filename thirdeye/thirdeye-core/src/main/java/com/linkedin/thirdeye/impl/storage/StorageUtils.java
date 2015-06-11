@@ -10,7 +10,7 @@ import com.linkedin.thirdeye.impl.NumberUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.DateTimeZone;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -26,6 +26,9 @@ import java.util.List;
 
 public class StorageUtils
 {
+
+  private static long QUIESCENCE_TIME = 300000;
+
   /** Adds a dimension combination to the end of a dimension store */
   public static void addToDimensionStore(StarTreeConfig config,
                                          ByteBuffer buffer,
@@ -94,12 +97,25 @@ public class StorageUtils
         + "_" + schedule;
   }
 
-  public static boolean isExpirable(String dataDir, String expireSchedule, DateTime expireUptoDate) {
-    String schedule = dataDir.split("_")[1];
-    String maxTime = dataDir.split("_")[3];
+  public static String getSchedule(String dataDir) {
+    return dataDir.split("_")[1];
+  }
 
-    return (schedule.equals(expireSchedule)
-        && maxTime.compareTo(StarTreeConstants.DATE_TIME_FORMATTER.print(expireUptoDate)) <= 0);
+  public static DateTime getMinTime (DateTimeZone zone, String dataDir) {
+    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(zone).parseDateTime(dataDir.split("_")[2]);
+  }
+
+  public static DateTime getMaxTime (DateTimeZone zone, String dataDir) {
+    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(zone).parseDateTime(dataDir.split("_")[3]);
+  }
+
+  public static boolean isHigherGranularityDir(String dataDir) {
+    return dataDir.startsWith(getDataDirPrefix()) &&
+        StarTreeConstants.Schedule.valueOf(getSchedule(dataDir)).getLowerSchedule() != null;
+  }
+
+  public static boolean isExpirable(File pathname, String lowerDir) {
+     return  pathname.getName().startsWith(lowerDir) && ((new DateTime().getMillis()-pathname.lastModified()) > QUIESCENCE_TIME);
   }
 
   public static void prefixFilesWithTime(File dir,
