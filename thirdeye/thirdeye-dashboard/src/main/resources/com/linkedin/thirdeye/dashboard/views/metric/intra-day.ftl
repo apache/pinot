@@ -22,10 +22,8 @@
                     <th></th>
                     <#assign groupIdx = 0>
                     <#list (metricView.view.metricNames)!metricNames as metricName>
-                        <#assign groupId = (groupIdx % 3) % 2>
-                        <th class="metric-table-group-${groupId}">${metricName}</th>
-                        <th class="metric-table-group-${groupId}"></th>
-                        <th class="metric-table-group-${groupId}"></th>
+                        <#assign groupId = (groupIdx % 2)>
+                        <th colspan="3" class="uk-text-center metric-table-group-${groupId}">${metricName}</th>
                         <#assign groupIdx = groupIdx + 1>
                     </#list>
                 </tr>
@@ -33,7 +31,7 @@
                     <th></th>
                     <#assign groupIdx = 0>
                     <#list (metricView.view.metricNames)!metricNames as metricName>
-                        <#assign groupId = (groupIdx % 3) % 2>
+                        <#assign groupId = (groupIdx % 2)>
                         <th class="metric-table-group-${groupId}">Current</th>
                         <th class="metric-table-group-${groupId}">Baseline</th>
                         <th class="metric-table-group-${groupId}">Ratio</th>
@@ -48,7 +46,7 @@
                         <#-- This renders time in UTC (moment.js used to convert to local) -->
                         <td class="metric-table-time" title="${row.baselineTime}" currentUTC="${row.currentTime}">${row.currentTime}</td>
                         <#list 0..(row.numColumns-1) as i>
-                            <#assign groupId = (i % 3) % 2>
+                            <#assign groupId = (i % 2)>
                             <td class="metric-table-group-${groupId}">${row.current[i]?string!"N/A"}</td>
                             <td class="metric-table-group-${groupId}">${row.baseline[i]?string!"N/A"}</td>
                                 <#if row.ratio[i]??>
