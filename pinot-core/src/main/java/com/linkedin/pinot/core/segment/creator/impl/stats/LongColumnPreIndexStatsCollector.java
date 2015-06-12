@@ -46,7 +46,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        longSet.add(((Long) e).longValue());
+        longSet.add(((Number) e).longValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -55,8 +55,10 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
       return;
     }
 
-    addressSorted(entry);
-    longSet.add(((Long) entry).longValue());
+    long value = ((Number) entry).longValue();
+    addressSorted(value);
+    longSet.add(value);
+
   }
 
   @Override

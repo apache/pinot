@@ -57,7 +57,7 @@ public class SegmentDictionaryCreator implements Closeable {
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
-          final int entry = ((Integer) sortedList[i]).intValue();
+          final int entry = ((Number) sortedList[i]).intValue();
           intDictionaryWrite.setInt(i, 0, entry);
         }
         intDictionaryWrite.close();
@@ -71,7 +71,7 @@ public class SegmentDictionaryCreator implements Closeable {
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
-          final float entry = ((Float) sortedList[i]).floatValue();
+          final float entry = ((Number) sortedList[i]).floatValue();
           floatDictionaryWrite.setFloat(i, 0, entry);
         }
         floatDictionaryWrite.close();
@@ -84,7 +84,7 @@ public class SegmentDictionaryCreator implements Closeable {
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
-          final long entry = ((Long) sortedList[i]).longValue();
+          final long entry = ((Number) sortedList[i]).longValue();
           longDictionaryWrite.setLong(i, 0, entry);
         }
         longDictionaryWrite.close();
@@ -97,7 +97,7 @@ public class SegmentDictionaryCreator implements Closeable {
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
-          final double entry = ((Double) sortedList[i]).doubleValue();
+          final double entry = ((Number) sortedList[i]).doubleValue();
           doubleDictionaryWrite.setDouble(i, 0, entry);
         }
         doubleDictionaryWrite.close();
@@ -108,7 +108,8 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         for (final Object e : sortedList) {
-          int length = ((String) e).getBytes(Charset.forName("UTF-8")).length;
+          String val = e.toString();
+          int length = val.getBytes(Charset.forName("UTF-8")).length;
           if (stringColumnMaxLength < length) {
             stringColumnMaxLength = length;
           }

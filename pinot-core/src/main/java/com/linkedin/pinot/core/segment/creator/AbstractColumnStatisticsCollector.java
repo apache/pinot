@@ -57,7 +57,8 @@ public abstract class AbstractColumnStatisticsCollector {
 
   public AbstractColumnStatisticsCollector(FieldSpec spec) {
     fieldSpec = spec;
-    previousValue = addressNull(previousValue, fieldSpec.getDataType());
+    addressNull(previousValue, fieldSpec.getDataType());
+    previousValue = null;
   }
 
   public int getMaxNumberOfMultiValues() {
@@ -65,21 +66,25 @@ public abstract class AbstractColumnStatisticsCollector {
   }
 
   public void addressSorted(Object entry) {
-    if (((Comparable) entry).compareTo(previousValue) != 0) {
-      numberOfChanges++;
-    }
-    if (((Comparable) entry).compareTo(previousValue) < 0) {
-      prevBiggerThanNextCount++;
-    }
+    if (isSorted) {
+      if (previousValue != null) {
+        if (((Comparable) entry).compareTo(previousValue) != 0) {
+          numberOfChanges++;
+        }
+        if (((Comparable) entry).compareTo(previousValue) < 0) {
+          prevBiggerThanNextCount++;
+        }
 
-    if (!entry.equals(previousValue) && previousValue != null) {
-      final Comparable prevValue = (Comparable) previousValue;
-      final Comparable origin = (Comparable) entry;
-      if (origin.compareTo(prevValue) < 0) {
-        isSorted = false;
+        if (!entry.equals(previousValue) && previousValue != null) {
+          final Comparable prevValue = (Comparable) previousValue;
+          final Comparable origin = (Comparable) entry;
+          if (origin.compareTo(prevValue) < 0) {
+            isSorted = false;
+          }
+        }
       }
+      previousValue = entry;
     }
-    previousValue = entry;
   }
 
   public boolean isSorted() {
@@ -109,8 +114,10 @@ public abstract class AbstractColumnStatisticsCollector {
 
   public Object addressNull(Object entry, DataType e) {
     if (entry == null) {
-      if (e == DataType.STRING || e == DataType.BOOLEAN) {
+      if (e == DataType.STRING) {
         entry = V1Constants.Str.NULL_STRING;
+      } else if (e == DataType.BOOLEAN) {
+        entry = V1Constants.Str.NULL_BOOLEAN;
       } else if (e == DataType.DOUBLE) {
         entry = V1Constants.Numbers.NULL_DOUBLE;
       } else if (e == DataType.FLOAT) {

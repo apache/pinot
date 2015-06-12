@@ -43,6 +43,7 @@ public class V1Constants {
     public static final char STRING_PAD_CHAR = '%';
     public static final java.lang.String CHAR_SET = "UTF-8";
     public static final String NULL_STRING = "nil";
+    public static final String NULL_BOOLEAN = Boolean.toString(false);
   }
 
   public static class Idx {

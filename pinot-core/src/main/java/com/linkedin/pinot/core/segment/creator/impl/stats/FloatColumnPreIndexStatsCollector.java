@@ -45,7 +45,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        floatSet.add(((Float) e).floatValue());
+        floatSet.add(((Number) e).floatValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -54,8 +54,9 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       return;
     }
 
-    addressSorted(entry);
-    floatSet.add(((Float) entry).floatValue());
+    float value = ((Number) entry).floatValue();
+    addressSorted(value);
+    floatSet.add(value);
   }
 
   @Override

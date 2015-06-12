@@ -48,7 +48,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        stringSet.add(((String) e));
+        stringSet.add(e.toString());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -57,8 +57,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       return;
     }
 
-    addressSorted(entry);
-    stringSet.add((String) entry);
+    String value = entry.toString();
+    addressSorted(value);
+    stringSet.add(value);
   }
 
   @Override

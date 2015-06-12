@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
-import com.linkedin.pinot.util.TestUtils;
-
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,24 +35,33 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import com.linkedin.pinot.util.TestUtils;
 
 
 public class DictionariesTest {
@@ -190,5 +197,167 @@ public class DictionariesTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testIntColumnPreIndexStatsCollector() throws Exception {
+    FieldSpec spec = new DimensionFieldSpec("column1", DataType.INT, true);
+    AbstractColumnStatisticsCollector statsCollector = new IntColumnPreIndexStatsCollector(spec);
+    statsCollector.collect(new Integer(1));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Long(3));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Double(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Integer(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(40));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(20));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(((Number) statsCollector.getMinValue()).intValue(), 1);
+    Assert.assertEquals(((Number) statsCollector.getMaxValue()).intValue(), 40);
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testFloatColumnPreIndexStatsCollector() throws Exception {
+    FieldSpec spec = new DimensionFieldSpec("column1", DataType.FLOAT, true);
+    AbstractColumnStatisticsCollector statsCollector = new FloatColumnPreIndexStatsCollector(spec);
+    statsCollector.collect(new Integer(1));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Long(3));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Double(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Integer(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(40));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(20));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(((Number) statsCollector.getMinValue()).intValue(), 1);
+    Assert.assertEquals(((Number) statsCollector.getMaxValue()).intValue(), 40);
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testLongColumnPreIndexStatsCollector() throws Exception {
+    FieldSpec spec = new DimensionFieldSpec("column1", DataType.LONG, true);
+    AbstractColumnStatisticsCollector statsCollector = new LongColumnPreIndexStatsCollector(spec);
+    statsCollector.collect(new Integer(1));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Long(3));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Double(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Integer(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(40));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(20));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(((Number) statsCollector.getMinValue()).intValue(), 1);
+    Assert.assertEquals(((Number) statsCollector.getMaxValue()).intValue(), 40);
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testDoubleColumnPreIndexStatsCollector() throws Exception {
+    FieldSpec spec = new DimensionFieldSpec("column1", DataType.DOUBLE, true);
+    AbstractColumnStatisticsCollector statsCollector = new DoubleColumnPreIndexStatsCollector(spec);
+    statsCollector.collect(new Integer(1));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Long(3));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Double(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Integer(4));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new Float(2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(40));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new Double(20));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(((Number) statsCollector.getMinValue()).intValue(), 1);
+    Assert.assertEquals(((Number) statsCollector.getMaxValue()).intValue(), 40);
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testStringColumnPreIndexStatsCollectorForRandomString() throws Exception {
+    FieldSpec spec = new DimensionFieldSpec("column1", DataType.STRING, true);
+    AbstractColumnStatisticsCollector statsCollector = new StringColumnPreIndexStatsCollector(spec);
+    statsCollector.collect("a");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("b");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("c");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("d");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("d");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("b");
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect("z");
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect("u");
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals((statsCollector.getMinValue()).toString(), "a");
+    Assert.assertEquals((statsCollector.getMaxValue()).toString(), "z");
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testStringColumnPreIndexStatsCollectorForBoolean() throws Exception {
+    FieldSpec spec = new DimensionFieldSpec("column1", DataType.BOOLEAN, true);
+    AbstractColumnStatisticsCollector statsCollector = new StringColumnPreIndexStatsCollector(spec);
+    statsCollector.collect("false");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("false");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("false");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("true");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("true");
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect("false");
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect("false");
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect("true");
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 2);
+    Assert.assertEquals((statsCollector.getMinValue()).toString(), "false");
+    Assert.assertEquals((statsCollector.getMaxValue()).toString(), "true");
+    Assert.assertFalse(statsCollector.isSorted());
   }
 }

@@ -45,7 +45,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       for (Object e : (Object[]) entry) {
-        intAVLTreeSet.add(((Integer) e).intValue());
+        intAVLTreeSet.add(((Number) e).intValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -54,9 +54,9 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       return;
     }
 
-    intAVLTreeSet.add(((Integer) entry).intValue());
-    addressSorted(entry);
-
+    int value = ((Number) entry).intValue();
+    addressSorted(value);
+    intAVLTreeSet.add(value);
   }
 
   @Override
@@ -72,7 +72,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     if (sealed) {
       return max;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalAccessException("you must seal the collector first before asking for max value");
   }
 
   @Override
@@ -80,7 +80,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     if (sealed) {
       return sortedIntList;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalAccessException("you must seal the collector first before asking for unique value set");
   }
 
   @Override
@@ -88,7 +88,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     if (sealed) {
       return intAVLTreeSet.size();
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
   }
 
   @Override
