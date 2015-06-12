@@ -154,6 +154,10 @@ select sum(rsvp_count) from meetupRsvp group by event_name top 10 limit 0
 
 At LinkedIn, it powers more than 50+ applications such as  Who Viewed My Profile, Who Viewed My Jobs and many more, with interactive-level response times. Pinot ingests close to a Billion per day in real time and processes 100 million queries per day.
 
+## Discussion Group
+Please join or post questions to this group. 
+https://groups.google.com/forum/#!forum/pinot_users
+
 ## Documentation
 - [Home](https://github.com/linkedin/pinot/wiki/Home)
 - [How to use Pinot](https://github.com/linkedin/pinot/wiki/How-To-Use-Pinot)
