@@ -106,6 +106,7 @@ public class RealtimeQuickStart {
       @Override
       public void run() {
         try {
+          printStatus(color.GREEN, "***** shutting down realtime quickstart *****");
           meetupRSVPProvider.stopPublishing();
           runner.stop();
           runner.clean();

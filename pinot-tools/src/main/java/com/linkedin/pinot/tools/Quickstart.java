@@ -141,6 +141,7 @@ public class Quickstart {
       @Override
       public void run() {
         try {
+          printStatus(color.GREEN, "***** shutting down offline quick start *****");
           runner.clean();
           runner.stop();
         } catch (Exception e) {

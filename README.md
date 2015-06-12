@@ -1,5 +1,7 @@
 ## Introduction to Pinot
 
+[![Join the chat at https://gitter.im/linkedin/pinot](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/linkedin/pinot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Pinot is a realtime distributed OLAP datastore, which is used at LinkedIn to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
 
 ## What is it for (and not)?
@@ -153,6 +155,10 @@ select sum(rsvp_count) from meetupRsvp group by event_name top 10 limit 0
 ## Pinot usage
 
 At LinkedIn, it powers more than 50+ applications such as  Who Viewed My Profile, Who Viewed My Jobs and many more, with interactive-level response times. Pinot ingests close to a Billion per day in real time and processes 100 million queries per day.
+
+## Discussion Group
+Please join or post questions to this group. 
+https://groups.google.com/forum/#!forum/pinot_users
 
 ## Documentation
 - [Home](https://github.com/linkedin/pinot/wiki/Home)
