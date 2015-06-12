@@ -40,13 +40,19 @@ public class AbstractBaseCommand {
   static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
   static final String DEFAULT_CONTROLLER_PORT = "9000";
 
+  public AbstractBaseCommand(boolean addShutdownHook) {
+    if (addShutdownHook) {
+      Runtime.getRuntime().addShutdownHook(new Thread() {
+        @Override
+        public void run() {
+          cleanup();
+        }
+      });
+    }
+  }
+
   public AbstractBaseCommand() {
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        cleanup();
-      }
-    });
+    this(true);
   }
 
   public void cleanup() {

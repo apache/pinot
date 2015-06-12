@@ -21,7 +21,6 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 
 
@@ -77,10 +76,10 @@ public class QuickstartRunner {
     brokerStarter.execute();
   }
 
-  void StartServer() throws Exception{
+  void StartServer() throws Exception {
     StartServerCommand serverStarter = new StartServerCommand();
-    serverStarter.setClusterName(_clusterName).setZkAddress(_zkAddress).setPort(_serverPort).
-      setDataDir("/tmp/PinotServerData").setSegmentDir("/tmp/PinotServerSegment");
+    serverStarter.setClusterName(_clusterName).setZkAddress(_zkAddress).setPort(_serverPort)
+        .setDataDir("/tmp/PinotServerData").setSegmentDir("/tmp/PinotServerSegment");
     serverStarter.execute();
   }
 
@@ -106,7 +105,7 @@ public class QuickstartRunner {
       return;
     }
 
-    StopProcessCommand stopper = new StopProcessCommand();
+    StopProcessCommand stopper = new StopProcessCommand(false);
     stopper.stopController().stopBroker().stopServer().stopZookeeper();
     stopper.execute();
 
@@ -115,8 +114,8 @@ public class QuickstartRunner {
 
   public void addSchema() throws Exception {
     AddSchemaCommand schemaAdder = new AddSchemaCommand();
-    schemaAdder.setControllerHost(_localHost).setControllerPort(_controllerPort).
-      setSchemaFilePath(_schemaFile.getAbsolutePath());
+    schemaAdder.setControllerHost(_localHost).setControllerPort(_controllerPort)
+        .setSchemaFilePath(_schemaFile.getAbsolutePath());
 
     schemaAdder.execute();
   }
@@ -129,17 +128,17 @@ public class QuickstartRunner {
 
   public void buildSegment() throws Exception {
     CreateSegmentCommand segmentBuilder = new CreateSegmentCommand();
-    segmentBuilder.setDataDir(_dataDir.getAbsolutePath()).setFormat(FileFormat.CSV).
-      setSchemaFile(_schemaFile.getAbsolutePath()).setTableName(_tableName).setSegmentName(_segmentName).
-      setOutputDir(new File(_tempDir, "segments").getAbsolutePath()).setOverwrite(true);
+    segmentBuilder.setDataDir(_dataDir.getAbsolutePath()).setFormat(FileFormat.CSV)
+        .setSchemaFile(_schemaFile.getAbsolutePath()).setTableName(_tableName).setSegmentName(_segmentName)
+        .setOutputDir(new File(_tempDir, "segments").getAbsolutePath()).setOverwrite(true);
     segmentBuilder.execute();
   }
 
   public void pushSegment() throws Exception {
     UploadSegmentCommand segmentUploader = new UploadSegmentCommand();
 
-    segmentUploader.setControllerHost(_localHost).setControllerPort(_controllerPort).
-      setSegmentDir(new File(_tempDir, "segments").getAbsolutePath());
+    segmentUploader.setControllerHost(_localHost).setControllerPort(_controllerPort)
+        .setSegmentDir(new File(_tempDir, "segments").getAbsolutePath());
     segmentUploader.execute();
   }
 

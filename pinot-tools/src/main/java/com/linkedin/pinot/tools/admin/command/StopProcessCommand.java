@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.kohsuke.args4j.Option;
 
+
 /**
  * Class for command to stop a process.
  * Relies on pid written by process, and works on local-host only.
@@ -30,23 +31,31 @@ import org.kohsuke.args4j.Option;
  *
  */
 public class StopProcessCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-controller", required=false, usage="Stop the PinotController process.")
+  @Option(name = "-controller", required = false, usage = "Stop the PinotController process.")
   private boolean _controller = false;
 
-  @Option(name="-server", required=false, usage="Stop the PinotServer process.")
+  @Option(name = "-server", required = false, usage = "Stop the PinotServer process.")
   private boolean _server = false;
 
-  @Option(name="-broker", required=false, usage="Stop the PinotBroker process.")
+  @Option(name = "-broker", required = false, usage = "Stop the PinotBroker process.")
   private boolean _broker = false;
 
-  @Option(name="-zooKeeper", required=false, usage="Stop the ZooKeeper process.")
+  @Option(name = "-zooKeeper", required = false, usage = "Stop the ZooKeeper process.")
   private boolean _zooKeeper = false;
 
-  @Option(name="-kafka", required=false, usage="Stop the Kafka process.")
+  @Option(name = "-kafka", required = false, usage = "Stop the Kafka process.")
   private boolean _kafka = false;
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Stop the PinotServer.")
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Stop the PinotServer.")
   private boolean _help = false;
+
+  public StopProcessCommand() {
+  }
+
+  public StopProcessCommand(boolean noCleapUpRequired) {
+    super(false);
+  }
 
   @Override
   public String description() {
