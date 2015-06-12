@@ -27,6 +27,8 @@ import java.util.List;
 public class StorageUtils
 {
 
+  /** Time for file watchers to fire up.
+   * If a lower granularity folder was modified within this time, do not delete it */
   private static long QUIESCENCE_TIME = 300000;
 
   /** Adds a dimension combination to the end of a dimension store */
@@ -101,16 +103,16 @@ public class StorageUtils
     return dataDir.split("_")[1];
   }
 
-  public static DateTime getMinTime (DateTimeZone zone, String dataDir) {
-    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(zone).parseDateTime(dataDir.split("_")[2]);
+  public static DateTime getMinTime (String dataDir) {
+    return StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(dataDir.split("_")[2]);
   }
 
-  public static DateTime getMaxTime (DateTimeZone zone, String dataDir) {
-    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(zone).parseDateTime(dataDir.split("_")[3]);
+  public static DateTime getMaxTime (String dataDir) {
+    return StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(dataDir.split("_")[3]);
   }
 
   public static boolean isExpirable(File pathname, String lowerDir) {
-     return  pathname.getName().startsWith(lowerDir) && ((new DateTime().getMillis()-pathname.lastModified()) > QUIESCENCE_TIME);
+     return  pathname.getName().startsWith(lowerDir) && ((System.currentTimeMillis() - pathname.lastModified()) > QUIESCENCE_TIME);
   }
 
   public static void prefixFilesWithTime(File dir,

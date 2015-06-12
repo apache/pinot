@@ -128,7 +128,7 @@ public class DataUpdateManager {
         @Override
         public boolean accept(File dir, String name) {
           return name.startsWith(dataDirPrefix) &&
-              StorageUtils.getMaxTime(maxDateTime.getZone(), name).compareTo(maxDateTime) <= 0;
+              StorageUtils.getMaxTime(name).compareTo(maxDateTime) <= 0;
         }
       });
 
@@ -256,8 +256,8 @@ public class DataUpdateManager {
     for (File higherDataDir : higherDataDirs) {
 
         String lowerSchedule = StarTreeConstants.Schedule.valueOf(StorageUtils.getSchedule(higherDataDir.getName())).getLowerSchedule();
-        DateTime maxDateTime = StorageUtils.getMaxTime(maxTime.getZone(), higherDataDir.getName());
-        DateTime startDateTime = StorageUtils.getMinTime(minTime.getZone(), higherDataDir.getName());
+        DateTime maxDateTime = StorageUtils.getMaxTime(higherDataDir.getName());
+        DateTime startDateTime = StorageUtils.getMinTime(higherDataDir.getName());
 
         while (startDateTime.compareTo(maxDateTime) < 0) {
           DateTime endDateTime = StarTreeConstants.Schedule.valueOf(lowerSchedule).getEndDateTime(startDateTime);
