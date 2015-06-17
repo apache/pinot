@@ -1,23 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-
     Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
-
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
     You may obtain a copy of the License at
-
             http://www.apache.org/licenses/LICENSE-2.0
-
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.linkedin.pinot</groupId>
     <artifactId>pinot</artifactId>
@@ -72,10 +66,8 @@
     <properties>
         <build.profile.id>dev</build.profile.id>
         <sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
-        <jacoco.it.execution.data.file>${project.build.directory}/coverage-reports/jacoco-it.exec
-        </jacoco.it.execution.data.file>
-        <jacoco.ut.execution.data.file>${project.build.directory}/coverage-reports/jacoco-ut.exec
-        </jacoco.ut.execution.data.file>
+        <jacoco.it.execution.data.file>${project.build.directory}/coverage-reports/jacoco-it.exec</jacoco.it.execution.data.file>
+        <jacoco.ut.execution.data.file>${project.build.directory}/coverage-reports/jacoco-ut.exec</jacoco.ut.execution.data.file>
         <jdk.version>1.7</jdk.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Only unit tests are run by default. -->
@@ -126,10 +118,7 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-        <repository>
-            <id>cloudera cdh repo</id>
-            <url>https://repository.cloudera.com/content/groups/cloudera-repos</url>
-        </repository>
+
     </repositories>
 
     <dependencyManagement>
@@ -316,11 +305,6 @@
                 <version>1.4.1</version>
             </dependency>
             <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-core</artifactId>
-                <version>0.20.204.0</version>
-            </dependency>
-            <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>4.1.3</version>
@@ -410,8 +394,8 @@
             <!-- Hadoop  -->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-common</artifactId>
-                <version>2.7.0</version>
+                <artifactId>hadoop-client</artifactId>
+                <version>2.6.0-cdh5.4.2</version>
                 <exclusions>
                     <exclusion>
                         <groupId>org.codehaus.jackson</groupId>
@@ -430,16 +414,6 @@
                         <artifactId>jackson-xc</artifactId>
                     </exclusion>
                 </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-hdfs</artifactId>
-                <version>2.7.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-mapreduce-client-core</artifactId>
-                <version>2.7.0</version>
             </dependency>
             <dependency>
                 <groupId>org.codehaus.jackson</groupId>
@@ -639,8 +613,7 @@
                         <phase>site</phase>
                         <configuration>
                             <!-- Specific configuration for the aggregate report -->
-                            <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response
-                            </excludePackageNames>
+                            <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
                             <skip>false</skip>
                         </configuration>
                     </execution>
@@ -727,8 +700,7 @@
                         <id>non-aggregate</id>
                         <configuration>
                             <!-- Specific configuration for the non aggregate report -->
-                            <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response
-                            </excludePackageNames>
+                            <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
                             <skip>true</skip>
                         </configuration>
                         <reports>
@@ -738,8 +710,7 @@
                     <reportSet>
                         <id>aggregate</id>
                         <configuration>
-                            <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response
-                            </excludePackageNames>
+                            <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
                             <skip>true</skip>
                         </configuration>
                         <reports>
