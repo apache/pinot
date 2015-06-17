@@ -124,7 +124,10 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-
+        <repository>
+            <id>cloudera cdh repo</id>
+            <url>https://repository.cloudera.com/content/groups/cloudera-repos</url>
+        </repository>
     </repositories>
 
     <dependencyManagement>
