@@ -23,6 +23,7 @@ cscope.*
 target/
 .idea
 *.iml
+*.log
 .settings/
 out/
 .DS_Store
