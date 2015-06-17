@@ -128,7 +128,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-core</artifactId>
+      <artifactId>hadoop-client</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
