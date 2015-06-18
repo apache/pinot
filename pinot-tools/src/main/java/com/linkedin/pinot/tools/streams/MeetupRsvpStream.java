@@ -45,10 +45,8 @@ public class MeetupRsvpStream {
   private boolean keepPublishing = true;
   private ClientManager client;
 
-  public MeetupRsvpStream() throws IOException, URISyntaxException {
-    File tableCreationJsonFileName =
-        new File(MeetupRsvpStream.class.getClassLoader().getResource("sample_data/rsvp_pinot_schema.json").toURI());
-    schema = Schema.fromFile(tableCreationJsonFileName);
+  public MeetupRsvpStream(File schemaFile) throws IOException, URISyntaxException {
+    schema = Schema.fromFile(schemaFile);
 
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
@@ -127,10 +125,5 @@ public class MeetupRsvpStream {
     } catch (Exception e) {
       //e.printStackTrace();
     }
-  }
-
-  public static void main(String[] args) throws IOException, URISyntaxException {
-    MeetupRsvpStream rscp = new MeetupRsvpStream();
-    rscp.run();
   }
 }
