@@ -14,13 +14,7 @@
  ******************************************************************************/
 package com.linkedin.pinot.common.utils;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
+import com.linkedin.pinot.common.Utils;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
@@ -35,7 +29,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.Utils;
+import java.io.*;
 
 
 public class FileUploadUtils {
@@ -90,6 +84,7 @@ public class FileUploadUtils {
 
   public static long getFile(String url, File file) {
     try {
+      LOGGER.info("Get file from:" + url + " to local file:" + file.getAbsolutePath());
       HttpClient httpClient = new HttpClient();
       GetMethod httpget = new GetMethod(url);
       httpClient.executeMethod(httpget);
