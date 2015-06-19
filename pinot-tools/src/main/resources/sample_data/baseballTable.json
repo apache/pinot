@@ -10,9 +10,9 @@
      "retentionTimeUnit":"DAYS",
      "segmentPushFrequency":"daily",
      "replication":1,
-     "timeColumnName":"timeColumnName",
+     "timeColumnName":"",
      "retentionTimeValue":"700",
-     "timeType":"timeType",
+     "timeType":"",
      "segmentPushType":"APPEND",
      "schemaName":"baseball",
      "segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy"

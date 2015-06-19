@@ -19,6 +19,10 @@ import static com.linkedin.pinot.tools.Quickstart.prettyprintResponse;
 import static com.linkedin.pinot.tools.Quickstart.printStatus;
 
 import java.io.File;
+import java.net.URISyntaxException;
+
+import org.apache.commons.io.FileUtils;
+import org.json.JSONException;
 
 import kafka.server.KafkaServerStartable;
 
@@ -30,13 +34,24 @@ import com.linkedin.pinot.tools.streams.MeetupRsvpStream;
 
 
 public class RealtimeQuickStart {
+  private File _quickStartDataDir;
 
-  public static void main(String[] args) throws Exception {
-    File schema =
-        new File(RealtimeQuickStart.class.getClassLoader().getResource("sample_data/rsvp_pinot_schema.json").toURI());
-    File tableCreate =
-        new File(RealtimeQuickStart.class.getClassLoader().getResource("sample_data/rsvp_create_table_request.json")
-            .toURI());
+  public void  execute() throws JSONException, Exception {
+      _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+      String quickStartDataDirName = _quickStartDataDir.getName();
+
+      if (!_quickStartDataDir.exists()) {
+        _quickStartDataDir.mkdir();
+      }
+
+    File schema = new File(quickStartDataDirName + "/rsvp_pinot_schema.json");
+    File tableCreate = new File(quickStartDataDirName + "/rsvp_create_table_request.json");
+
+    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().
+        getResource("sample_data/rsvp_pinot_schema.json"), schema);
+
+    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().
+        getResource("sample_data/rsvp_create_table_request.json"), tableCreate);
 
     printStatus(color.CYAN, "Starting Kafka");
 
@@ -62,7 +77,7 @@ public class RealtimeQuickStart {
 
     printStatus(color.YELLOW, "Realtime quickstart setup complete");
 
-    final MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
+    final MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(schema);
     meetupRSVPProvider.run();
     printStatus(color.CYAN, "Starting meetup data stream and publishing to kafka");
 
@@ -108,6 +123,7 @@ public class RealtimeQuickStart {
         try {
           printStatus(color.GREEN, "***** shutting down realtime quickstart *****");
           meetupRSVPProvider.stopPublishing();
+          FileUtils.deleteDirectory(_quickStartDataDir);
           runner.stop();
           runner.clean();
           KafkaStarterUtils.stopServer(kafkaStarter);
@@ -128,5 +144,15 @@ public class RealtimeQuickStart {
     printStatus(color.YELLOW, "running since an hour, stopping now");
 
   }
+
+    public static void main(String[] args) {
+      RealtimeQuickStart rst = new RealtimeQuickStart();
+      try {
+        rst.execute();
+      } catch (Exception e) {
+        System.out.println(e.getMessage());
+        e.printStackTrace();
+      }
+    }
 
 }

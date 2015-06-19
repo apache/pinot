@@ -88,6 +88,11 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
   }
 
   private TimeUnit getTimeUnitFromString(String timeTypeString) {
+    // If input data does not have a time column, no need to fire an exception.
+    if ((timeTypeString == null) || timeTypeString.isEmpty()) {
+      return null;
+    }
+
     TimeUnit timeUnit = null;
     try {
       timeUnit = TimeUnit.valueOf(timeTypeString);

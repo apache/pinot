@@ -16,7 +16,9 @@
 package com.linkedin.pinot.tools;
 
 import java.io.File;
+import java.net.URL;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Level;
 import org.json.JSONArray;
@@ -27,6 +29,7 @@ import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class Quickstart {
+  private File _quickStartDataDir;
 
   public Quickstart() {
 
@@ -109,18 +112,30 @@ public class Quickstart {
   }
 
   public boolean execute() throws Exception {
-    File dataDir = new File(Quickstart.class.getClassLoader().getResource("sample_data").toURI());
-    File tableCreationJsonFileName =
-        new File(Quickstart.class.getClassLoader().getResource("sample_data/baseballTable.json").toURI());
+    _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+    String quickStartDataDirName = _quickStartDataDir.getName();
+
+    if (!_quickStartDataDir.exists()) {
+      _quickStartDataDir.mkdir();
+    }
+
+    File schemaFile = new File(quickStartDataDirName + "/baseball.schema");
+    File dataFile = new File(quickStartDataDirName + "/baseball.csv");
+    File tableCreationJsonFileName = new File(quickStartDataDirName + "/baseballTable.json");
+
+    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema"), schemaFile);
+    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball.csv"), dataFile);
+    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseballTable.json"),
+        tableCreationJsonFileName);
+
     File tempDirOne = new File("/tmp/" + System.currentTimeMillis());
     tempDirOne.mkdir();
-
-    File schemaFile = new File(Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema").toURI());
 
     File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
     String tableName = "baseballStats";
     final QuickstartRunner runner =
-        new QuickstartRunner(schemaFile, dataDir, tempDir, tableName, tableCreationJsonFileName.getAbsolutePath());
+        new QuickstartRunner(schemaFile, _quickStartDataDir, tempDir, tableName,
+            tableCreationJsonFileName.getAbsolutePath());
     runner.clean();
     runner.startAll();
     printStatus(color.CYAN, "Deployed Zookeeper");
@@ -142,6 +157,7 @@ public class Quickstart {
       public void run() {
         try {
           printStatus(color.GREEN, "***** shutting down offline quick start *****");
+          FileUtils.deleteDirectory(_quickStartDataDir);
           runner.clean();
           runner.stop();
         } catch (Exception e) {
