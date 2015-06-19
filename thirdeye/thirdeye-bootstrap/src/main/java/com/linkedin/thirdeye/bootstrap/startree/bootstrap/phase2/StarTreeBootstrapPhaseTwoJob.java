@@ -329,14 +329,14 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
       // Create metadata object
       long minDataTimeMillis = TimeUnit.MILLISECONDS.convert
-          (minDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getTimeUnit()));
+          (minDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getAggregationGranularity()));
 
       long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert
-          (maxDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getTimeUnit()));
+          (maxDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getAggregationGranularity()));
 
       indexMetadata = new IndexMetadata
           (minDataTime, maxDataTime, minDataTimeMillis, maxDataTimeMillis,
-              config.getTimeUnit(), config.getBucketSize());
+              config.getAggregationGranularity(), config.getBucketSize());
 
       LOGGER.info("END: processing {}", nodeId);
     }
