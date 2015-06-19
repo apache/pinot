@@ -15,13 +15,14 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import java.io.File;
-
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerStarter;
 import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
+import java.io.File;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 
 /**
@@ -94,14 +95,20 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Override
   public boolean execute() throws Exception {
     final ControllerConf conf = new ControllerConf();
+    String hostname = "localhost";
+    try {
+      hostname = InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      e.printStackTrace();
+    }
 
-    conf.setControllerHost("localhost");
+    conf.setControllerHost(hostname);
     conf.setControllerPort(_controllerPort);
     conf.setDataDir(_dataDir);
     conf.setZkStr(_zkAddress);
 
     conf.setHelixClusterName(_clusterName);
-    conf.setControllerVipHost("localhost");
+    conf.setControllerVipHost(hostname);
 
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
