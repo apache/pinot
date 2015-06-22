@@ -39,10 +39,15 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
   private String _filePath;
 
-  @Option(name="-controllerPort", required=false, metaVar="<int>", usage="Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
+      usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
+  private boolean _exec;
+
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -64,7 +69,7 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddTable -filePath " + _filePath  + " -controllerPort " + _controllerPort);
+    return ("AddTable -filePath " + _filePath + " -controllerPort " + _controllerPort);
   }
 
   @Override
@@ -82,8 +87,20 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
+  public AddTableCommand setExecute(boolean exec) {
+    _exec = exec;
+    return this;
+  }
+
   public boolean execute(JsonNode node) throws UnsupportedEncodingException, IOException, JSONException {
     _controllerAddress = "http://localhost:" + _controllerPort;
+
+    if (!_exec) {
+      System.out.println("Dry Running Command: " + toString());
+      System.out.println("Use the -exec option to actually execute the command.");
+      return true;
+    }
+
     String res =
         AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(),
             node.toString());
@@ -94,7 +111,7 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
-    JsonNode node = new ObjectMapper().readTree(new FileInputStream (_filePath));
+    JsonNode node = new ObjectMapper().readTree(new FileInputStream(_filePath));
     return execute(node);
   }
 }

@@ -115,14 +115,14 @@ public class QuickstartRunner {
   public void addSchema() throws Exception {
     AddSchemaCommand schemaAdder = new AddSchemaCommand();
     schemaAdder.setControllerHost(_localHost).setControllerPort(_controllerPort)
-        .setSchemaFilePath(_schemaFile.getAbsolutePath());
+        .setSchemaFilePath(_schemaFile.getAbsolutePath()).setExecute(true);
 
     schemaAdder.execute();
   }
 
   public void addTable() throws Exception {
     AddTableCommand tableAdder = new AddTableCommand();
-    tableAdder.setFilePath(_tableCreateRequestJsonFile).setControllerPort(_controllerPort);
+    tableAdder.setFilePath(_tableCreateRequestJsonFile).setControllerPort(_controllerPort).setExecute(true);
     tableAdder.execute();
   }
 

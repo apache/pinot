@@ -41,3 +41,4 @@ pinot-dashboard/config.yml
 pinot-dashboard/logs/*
 pinot-dashboard/dist
 pinot-dashboard/pinotui.egg-info
+*.log
