@@ -124,9 +124,11 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddTenant -controllerAddress " + _controllerAddress + " -name " + _name + " -role " + _role
+    String retString = ("AddTenant -controllerAddress " + _controllerAddress + " -name " + _name + " -role " + _role
         + " -instanceCount " + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount
         + " -realTimeInstanceCount " + _realtimeInstanceCount);
+
+    return ((_exec) ? (retString + " -exec") : retString);
   }
 
   @Override

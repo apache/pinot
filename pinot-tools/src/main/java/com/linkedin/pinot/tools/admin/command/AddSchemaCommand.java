@@ -60,8 +60,10 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+    String retString = ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
         + " -schemaFilePath " + _schemaFile);
+
+    return ((_exec) ? (retString + " -exec") : retString);
   }
 
   @Override

@@ -69,7 +69,9 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddTable -filePath " + _filePath + " -controllerPort " + _controllerPort);
+    String retString = ("AddTable -filePath " + _filePath + " -controllerPort " + _controllerPort);
+
+    return ((_exec) ? (retString + " -exec") : retString);
   }
 
   @Override
