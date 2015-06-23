@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -22,6 +23,7 @@ import java.util.UUID;
 import java.util.Map.Entry;
 
 public class StarTreeUtils {
+
   public static int getPartitionId(UUID nodeId, int numPartitions) {
     return (Integer.MAX_VALUE & nodeId.hashCode()) % numPartitions;
   }
@@ -213,5 +215,25 @@ public class StarTreeUtils {
           .get(leafRecord[i]);
     }
     return ret;
+  }
+
+
+  public static int getDepth(StarTreeNode root) {
+    if (root == null) {
+      return 0;
+    }
+
+    int maxDepth = 0;
+    List<Integer> depths = new ArrayList<Integer>();
+    for (StarTreeNode child : root.getChildren()) {
+      depths.add(getDepth(child));
+    }
+    depths.add(getDepth(root.getOtherNode()));
+    depths.add(getDepth(root.getStarNode()));
+
+    if (depths.size() != 0) {
+      maxDepth = Collections.max(depths);
+    }
+    return 1 + maxDepth;
   }
 }
