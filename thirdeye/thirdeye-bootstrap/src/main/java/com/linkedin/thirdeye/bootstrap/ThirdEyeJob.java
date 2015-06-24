@@ -648,7 +648,7 @@ public class ThirdEyeJob {
       if (indexMetadata.getMinDataTime() != null && indexMetadata.getMinDataTime() < min)
       {
         min = indexMetadata.getMinDataTime();
-        minMillis = indexMetadata.getMaxDataTimeMillis();
+        minMillis = indexMetadata.getMinDataTimeMillis();
       }
       if (indexMetadata.getMaxDataTime() != null && indexMetadata.getMaxDataTime() > max)
       {
