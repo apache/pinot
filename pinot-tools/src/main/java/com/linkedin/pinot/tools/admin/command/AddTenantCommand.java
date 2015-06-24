@@ -27,6 +27,9 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 public class AddTenantCommand extends AbstractBaseCommand implements Command {
   private static final Logger _logger = LoggerFactory.getLogger(AddTenantCommand.class);
 
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost = "localhost";
+
   @Option(name = "-controllerPort", required = false, metaVar = "<int>",
       usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
@@ -53,7 +56,7 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
       usage = "Print this message.")
   private boolean _help = false;
 
-  private String _controllerAddress = "http://localhost:" + _controllerPort;
+  private String _controllerAddress;
 
   public AddTenantCommand setControllerUrl(String url) {
     _controllerAddress = url;
@@ -93,6 +96,8 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
+    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
+
     if (!_exec) {
       System.out.println("Dry Running Command: " + toString());
       System.out.println("Use the -exec option to actually execute the command.");
@@ -124,7 +129,8 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    String retString = ("AddTenant -controllerAddress " + _controllerAddress + " -name " + _name + " -role " + _role
+    String retString = ("AddTenant -controllerHost " + _controllerHost + " -controllerPort "
+        + _controllerPort + " -name " + _name + " -role " + _role
         + " -instanceCount " + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount
         + " -realTimeInstanceCount " + _realtimeInstanceCount);
 

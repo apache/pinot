@@ -39,6 +39,9 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
   private String _filePath;
 
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost = "localhost";
+
   @Option(name = "-controllerPort", required = false, metaVar = "<int>",
       usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
@@ -69,7 +72,8 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    String retString = ("AddTable -filePath " + _filePath + " -controllerPort " + _controllerPort);
+    String retString = ("AddTable -filePath " + _filePath + " -controllerHost " + _controllerHost +
+        " -controllerPort " + _controllerPort);
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -95,7 +99,7 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
   }
 
   public boolean execute(JsonNode node) throws UnsupportedEncodingException, IOException, JSONException {
-    _controllerAddress = "http://localhost:" + _controllerPort;
+    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
 
     if (!_exec) {
       System.out.println("Dry Running Command: " + toString());
