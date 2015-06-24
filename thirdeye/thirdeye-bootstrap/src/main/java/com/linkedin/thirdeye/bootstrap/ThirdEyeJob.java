@@ -149,6 +149,7 @@ public class ThirdEyeJob {
   private static final String DEFAULT_POLL_TIMEOUT = "3600000";
   private static final String INPUT_PATHS_JOINER = ",";
   private static final String DATA_FOLDER_JOINER = "_";
+  private static final String TEMPORARY_FOLDER = "_temporary";
 
   private enum FlowSpec {
     DIMENSION_INDEX,
@@ -980,7 +981,7 @@ public class ThirdEyeJob {
         {
           missingInputs = new ArrayList<String>();
           for (String input : inputs) {
-            if (!fileSystem.exists(new Path(input))) {
+            if (!fileSystem.exists(new Path(input)) || fileSystem.exists(new Path(input, TEMPORARY_FOLDER))) {
               missingInputs.add(input);
               LOGGER.info("Missing input {}", input);
             }

@@ -35,6 +35,9 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-schemaFile", required = true, metaVar = "<string>", usage = "Path to schema file.")
   private String _schemaFile = null;
 
+  @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
+  private boolean _exec;
+
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
@@ -56,8 +59,10 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+    String retString = ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
         + " -schemaFilePath " + _schemaFile);
+
+    return ((_exec) ? (retString + " -exec") : retString);
   }
 
   @Override
@@ -80,8 +85,19 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
+  public AddSchemaCommand setExecute(boolean exec) {
+    _exec = exec;
+    return this;
+  }
+
   @Override
   public boolean execute() throws Exception {
+    if (!_exec) {
+      System.out.println("Dry Running Command: " + toString());
+      System.out.println("Use the -exec option to actually execute the command.");
+      return true;
+    }
+
     File schemaFile = new File(_schemaFile);
 
     if (!schemaFile.exists()) {

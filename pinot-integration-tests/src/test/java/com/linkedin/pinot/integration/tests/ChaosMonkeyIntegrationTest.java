@@ -157,7 +157,7 @@ public class ChaosMonkeyIntegrationTest {
     String createTableFile = TestUtils.getFileFromResourceUrl(ChaosMonkeyIntegrationTest.class.getClassLoader().
         getResource("chaos-monkey-create-table.json"));
     runAdministratorCommand(new String[]{
-        "AddTable", "-controllerPort", "39000", "-filePath", createTableFile
+        "AddTable", "-controllerPort", "39000", "-filePath", createTableFile, "-exec"
     }).waitFor();
   }
 
