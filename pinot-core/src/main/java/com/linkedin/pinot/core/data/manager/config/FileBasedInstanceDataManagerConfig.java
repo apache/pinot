@@ -37,21 +37,21 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
 
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
-  public static String INSTANCE_ID = "id";
+  private static final String INSTANCE_ID = "id";
   // Key of instance data directory
-  public static String INSTANCE_DATA_DIR = "dataDir";
+  private static final String INSTANCE_DATA_DIR = "dataDir";
   // Key of instance segment tar directory
-  public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
+  private static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
-  public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
+  private static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
   // Key of table names that will be holding from initialization.
-  public static String INSTANCE_TABLE_NAME = "tableName";
+  private static final String INSTANCE_TABLE_NAME = "tableName";
   // Key of table data directory
-  public static String kEY_OF_TABLE_DATA_DIRECTORY = "directory";
+  private static final String KEY_OF_TABLE_DATA_DIRECTORY = "directory";
   // Key of table data directory
-  public static String kEY_OF_TABLE_NAME = "name";
+  private static final String KEY_OF_TABLE_NAME = "name";
   // Key of instance level segment read mode.
-  public static String READ_MODE = "readMode";
+  private static final String READ_MODE = "readMode";
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_TABLE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -63,9 +63,9 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
     checkRequiredKeys();
     for (String tableName : getTableNames()) {
       Configuration tableConfig = _instanceDataManagerConfiguration.subset(tableName);
-      tableConfig.addProperty(kEY_OF_TABLE_NAME, tableName);
-      if (!tableConfig.containsKey(kEY_OF_TABLE_DATA_DIRECTORY)) {
-        tableConfig.addProperty(kEY_OF_TABLE_DATA_DIRECTORY, getInstanceDataDir() + "/" + tableName
+      tableConfig.addProperty(KEY_OF_TABLE_NAME, tableName);
+      if (!tableConfig.containsKey(KEY_OF_TABLE_DATA_DIRECTORY)) {
+        tableConfig.addProperty(KEY_OF_TABLE_DATA_DIRECTORY, getInstanceDataDir() + "/" + tableName
             + "/index/node" + getInstanceId());
       }
       _tableDataManagerConfigMap.put(tableName, new TableDataManagerConfig(tableConfig));

@@ -22,9 +22,12 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ZkStarter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT;
 
@@ -83,13 +86,14 @@ public class ZkStarter {
           try {
             _zookeeperServerMain.initializeAndRun(args);
           } catch (QuorumPeerConfig.ConfigException e) {
-            e.printStackTrace();
+            LOGGER.warn("Caught exception while starting ZK", e);
           } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.warn("Caught exception while starting ZK", e);
           }
         }
       }.start();
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while starting ZK", e);
       throw new RuntimeException(e);
     }
 
@@ -122,6 +126,7 @@ public class ZkStarter {
           org.apache.commons.io.FileUtils.deleteDirectory(new File(_zkDataDir));
         }
       } catch (Exception e) {
+        LOGGER.warn("Caught exception while stopping ZK server", e);
         throw new RuntimeException(e);
       }
     }
