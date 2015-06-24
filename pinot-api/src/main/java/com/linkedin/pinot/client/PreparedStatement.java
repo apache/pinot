@@ -20,7 +20,6 @@ import java.util.concurrent.Future;
 
 /**
  * A prepared statement, which is used to escape query parameters sent to Pinot.
- *
  */
 public class PreparedStatement {
   private final Connection _connection;
@@ -43,8 +42,7 @@ public class PreparedStatement {
 
   private String fillStatementWithParameters() {
     String statement = _statement;
-    for (int i = 0; i < _parameters.length; i++) {
-      String parameter = _parameters[i];
+    for (String parameter : _parameters) {
       statement = statement.replaceFirst("\\?", parameter);
     }
     return statement;

@@ -91,6 +91,5 @@
  * }
  *
  * resultSet.close();}</pre>
- *
  */
 package com.linkedin.pinot.client;

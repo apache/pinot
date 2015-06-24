@@ -27,7 +27,6 @@ import org.json.JSONObject;
 
 /**
  * Creates connections to Pinot, given various initialization methods.
- *
  */
 public class ConnectionFactory {
   static PinotClientTransportFactory _transportFactory = new JsonAsyncHttpPinotClientTransportFactory();
@@ -81,7 +80,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
-    return new Connection(Arrays.asList(properties.getProperty("brokerList")), _transportFactory.buildTransport());
+    return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")), _transportFactory.buildTransport());
   }
 
   /**

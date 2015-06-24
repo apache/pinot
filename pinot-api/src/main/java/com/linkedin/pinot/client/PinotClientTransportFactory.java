@@ -17,7 +17,6 @@ package com.linkedin.pinot.client;
 
 /**
  * Factory for client transports.
- *
  */
 interface PinotClientTransportFactory {
   PinotClientTransport buildTransport();

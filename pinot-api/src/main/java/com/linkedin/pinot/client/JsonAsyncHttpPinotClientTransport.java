@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * JSON encoded Pinot client transport over AsyncHttpClient.
- *
  */
 class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
@@ -44,7 +43,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   }
 
   @Override
-  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query) {
+  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, final String query) {
     try {
       final JSONObject json = new JSONObject();
       json.put("pql", query);
@@ -75,6 +74,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
           try {
             return get(1000L, TimeUnit.DAYS);
           } catch (TimeoutException e) {
+            LOGGER.error("Caught timeout during synchronous get", e);
             throw new InterruptedException();
           }
         }
@@ -83,11 +83,11 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
         public BrokerResponse get(long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
           try {
-            LOGGER.info("Sending query to {}", url);
+            LOGGER.debug("Sending query {} to {}", query, url);
 
             Response httpResponse = response.get(timeout, unit);
 
-            LOGGER.info("Completed query, HTTP status is {}", httpResponse.getStatusCode());
+            LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 
             if (httpResponse.getStatusCode() != 200) {
               throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() +

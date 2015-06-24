@@ -22,7 +22,6 @@ import org.json.JSONObject;
 /**
  * A Pinot query result set for aggregation results without group by clauses, of which there is one of per aggregation
  * function in the query.
- *
  */
 class AggregationResultSet extends AbstractResultSet {
   private final JSONObject _jsonObject;

@@ -17,7 +17,6 @@ package com.linkedin.pinot.client;
 
 /**
  * A Pinot result group, representing an aggregation function in the original query.
- *
  */
 public interface ResultSet {
   /**
