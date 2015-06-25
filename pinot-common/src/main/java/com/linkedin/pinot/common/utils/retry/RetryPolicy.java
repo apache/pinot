@@ -13,14 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.client;
+package com.linkedin.pinot.common.utils.retry;
+
+import java.util.concurrent.Callable;
+
 
 /**
- * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
+ * Retry policy, encapsulating the logic needed to retry an operation until it succeeds.
+ *
+ * @author jfim
  */
-class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
-  @Override
-  public PinotClientTransport buildTransport() {
-    return new JsonAsyncHttpPinotClientTransport();
-  }
+public interface RetryPolicy {
+  /**
+   * Attempts to do the operation until it succeeds, aborting if an exception is thrown by the operation.
+   *
+   * @param operation The operation to attempt, which returns true on success and false on failure.
+   * @return true if the operation succeeded or false if the number of retries
+   */
+  boolean attempt(Callable<Boolean> operation);
 }

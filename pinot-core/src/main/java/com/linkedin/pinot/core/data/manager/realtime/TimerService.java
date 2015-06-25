@@ -19,6 +19,5 @@ import java.util.Timer;
 
 
 public class TimerService {
-  public static Timer timer = new Timer("RealtimeIndexingSegmentDataManager", true);
-
+  public static final Timer timer = new Timer("RealtimeIndexingSegmentDataManager", true);
 }

@@ -17,7 +17,6 @@ package com.linkedin.pinot.client;
 
 /**
  * Pinot client exception.
- *
  */
 public class PinotClientException extends RuntimeException {
   public PinotClientException(String message) {

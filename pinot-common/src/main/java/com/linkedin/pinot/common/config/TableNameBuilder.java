@@ -21,8 +21,8 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 public class TableNameBuilder {
 
-  public static TableNameBuilder OFFLINE_TABLE_NAME_BUILDER = new TableNameBuilder(TableType.OFFLINE);
-  public static TableNameBuilder REALTIME_TABLE_NAME_BUILDER = new TableNameBuilder(TableType.REALTIME);
+  public static final TableNameBuilder OFFLINE_TABLE_NAME_BUILDER = new TableNameBuilder(TableType.OFFLINE);
+  public static final TableNameBuilder REALTIME_TABLE_NAME_BUILDER = new TableNameBuilder(TableType.REALTIME);
 
   TableType type;
 

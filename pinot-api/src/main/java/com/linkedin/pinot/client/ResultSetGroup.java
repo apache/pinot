@@ -23,7 +23,6 @@ import org.json.JSONObject;
 
 /**
  * A Pinot result set group, containing the results given back by Pinot for a given query.
- *
  */
 public class ResultSetGroup {
   private final List<ResultSet> _resultSets;
@@ -37,7 +36,7 @@ public class ResultSetGroup {
 
     int aggregationResultCount = brokerResponse.getAggregationResultsSize();
     for (int i = 0; i < aggregationResultCount; i++) {
-      JSONObject aggregationResult = null;
+      JSONObject aggregationResult;
       try {
         aggregationResult = brokerResponse.getAggregationResults().getJSONObject(i);
       } catch (JSONException e) {

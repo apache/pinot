@@ -41,11 +41,6 @@
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
-            <groupId>com.linkedin.thirdeye</groupId>
-            <artifactId>thirdeye-visualization</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <version>2.4</version>

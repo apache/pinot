@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A connection to Pinot, normally created through calls to the {@link ConnectionFactory}.
- *
  */
 public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
