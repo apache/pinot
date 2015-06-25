@@ -191,7 +191,7 @@ public class RetentionManager {
 
     AbstractTableConfig realtimeTableConfig;
     try {
-      realtimeTableConfig = ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
+      realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
     } catch (Exception e) {
       LOGGER.error("Error getting realtime table config from property store!", e);
       return tableToDeletionStrategyMap;
