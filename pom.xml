@@ -480,7 +480,7 @@
                         <!-- Set the target configuration directory to be used in the bin scripts -->
                         <configurationDirectory>conf</configurationDirectory>
                         <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
-                        <copyConfigurationDirectory>false</copyConfigurationDirectory>
+                        <copyConfigurationDirectory>true</copyConfigurationDirectory>
                         <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
                         <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
                         <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
