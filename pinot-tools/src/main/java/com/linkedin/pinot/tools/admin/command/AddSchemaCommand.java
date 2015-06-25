@@ -20,15 +20,19 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
 
 
 public class AddSchemaCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
-  private String _controllerHost = "localhost";
+  private String _controllerHost;
 
   @Option(name = "-controllerPort", required = false, metaVar = "<String>", usage = "port name for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
@@ -93,14 +97,18 @@ public class AddSchemaCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
+    if (_controllerHost == null) {
+      _controllerHost = NetUtil.getHostAddress();
+    }
+
     if (!_exec) {
-      System.out.println("Dry Running Command: " + toString());
-      System.out.println("Use the -exec option to actually execute the command.");
+      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
     File schemaFile = new File(_schemaFile);
-
+    LOGGER.info("Executing command: " + toString());
     if (!schemaFile.exists()) {
       throw new FileNotFoundException("file does not exist, + " + _schemaFile);
     }

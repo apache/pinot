@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,6 +33,8 @@ import org.kohsuke.args4j.Option;
  *
  */
 public class StopProcessCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StopProcessCommand.class);
+
   @Option(name = "-controller", required = false, usage = "Stop the PinotController process.")
   private boolean _controller = false;
 
@@ -84,6 +88,8 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
+    LOGGER.info("Executing command: " + toString());
+
     Map<String, String> processes = new HashMap<String, String>();
     String prefix = System.getProperty("java.io.tmpdir") + File.separator;
 

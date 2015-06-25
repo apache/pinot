@@ -28,18 +28,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.NetUtil;
 
 
 public class PostQueryCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
-  @Option(name="-brokerPort", required=false, metaVar="<int>", usage="http port for broker.")
+  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _brokerHost;
+
+  @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "http port for broker.")
   private String _brokerPort = Integer.toString(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
 
-  @Option(name="-query", required=true, metaVar="<string>", usage="Query string to perform.")
+  @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -53,7 +58,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("PostQueryCommand -brokerPort " + _brokerPort + " -query " + _query);
+    return ("PostQueryCommand -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -query " + _query);
   }
 
   @Override
@@ -78,9 +83,9 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
 
   public String run() throws Exception {
     final JSONObject json = new JSONObject();
-    json.put("pql",  _query);
+    json.put("pql", _query);
 
-    String brokerUrl = "http://localhost:" + _brokerPort;
+    String brokerUrl = "http://" + _brokerHost + ":" + _brokerPort;
     final URLConnection conn = new URL(brokerUrl + "/query").openConnection();
     conn.setDoOutput(true);
 
@@ -102,6 +107,10 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
   }
 
   public boolean execute() throws Exception {
+    if (_brokerHost == null) {
+      _brokerHost = NetUtil.getHostAddress();
+    }
+    LOGGER.info("Executing command: " + toString());
     String result = run();
     LOGGER.info("Result: " + result);
     return true;

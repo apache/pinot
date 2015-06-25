@@ -83,7 +83,6 @@ public class PinotAdministrator {
       } else if (_subCommand.getHelp()) {
         _subCommand.printUsage();
       } else {
-        System.out.println("Executing command: " + _subCommand);
         _subCommand.execute();
       }
 

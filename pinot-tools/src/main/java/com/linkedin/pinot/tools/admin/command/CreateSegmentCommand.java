@@ -42,7 +42,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
  *
  */
 public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
-  private static final Logger _logger = LoggerFactory.getLogger(CreateSegmentCommand.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
   @Option(name = "-dataDir", required = true, metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
@@ -139,6 +139,8 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
   @Override
   public boolean execute() throws Exception {
+    LOGGER.info("Executing command: " + toString());
+
     File dir = new File(_dataDir);
     if (!dir.exists() || !dir.isDirectory()) {
       throw new RuntimeException("Data directory " + _dataDir + " not found.");
@@ -172,7 +174,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     } else if (_format == FileFormat.AVRO) {
       schema = AvroUtils.extractSchemaFromAvro(files[0]);
     } else {
-      _logger.error("Error: Input format requires schema");
+      LOGGER.error("Error: Input format requires schema");
       return false;
     }
 
