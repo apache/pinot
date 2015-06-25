@@ -485,7 +485,7 @@
                         <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
                         <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
                         <!-- Extra JVM arguments that will be included in the bin scripts -->
-                        <extraJvmArguments>-Xms1024m -Xmx1024m</extraJvmArguments>
+                        <extraJvmArguments>-Xms1024m -Xmx10g</extraJvmArguments>
                         <!-- Generate bin scripts for windows and unix pr default -->
                         <platforms>
                             <platform>windows</platform>
