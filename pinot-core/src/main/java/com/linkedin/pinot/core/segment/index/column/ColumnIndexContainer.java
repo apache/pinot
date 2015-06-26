@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -42,6 +44,7 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 
 
 public abstract class ColumnIndexContainer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexContainer.class);
 
   public static ColumnIndexContainer init(String column, File indexDir, ColumnMetadata metadata,
       IndexLoadingConfigMetadata indexLoadingConfigMetadata, ReadMode mode) throws Exception {
@@ -121,6 +124,7 @@ public abstract class ColumnIndexContainer {
 
     // returning inverted index from file only when marker file does not exist and inverted file exist
     if (!inProgress.exists() && invertedIndexFile.exists()) {
+      LOGGER.warn("found inverted index for colummn {}, loading it", column);
       return new BitmapInvertedIndexReader(invertedIndexFile, metadata.getCardinality(), mode == ReadMode.mmap);
     }
 
@@ -132,6 +136,8 @@ public abstract class ColumnIndexContainer {
       // deleting it
       FileUtils.deleteQuietly(invertedIndexFile);
     }
+
+    LOGGER.warn("did not find inverted index for colummn {}, creating it", column);
 
     // creating inverted index for the column now
     InvertedIndexCreator creator =
@@ -157,6 +163,8 @@ public abstract class ColumnIndexContainer {
 
     // delete the marker file
     FileUtils.deleteQuietly(inProgress);
+
+    LOGGER.warn("created inverted index for colummn {}, loading it", column);
     return new BitmapInvertedIndexReader(invertedIndexFile, metadata.getCardinality(), mode == ReadMode.mmap);
   }
 
