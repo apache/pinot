@@ -140,6 +140,7 @@ public class TestRollUpPhase2
     mapDriver = MapDriver.newMapDriver(mapper);
     Configuration configuration = mapDriver.getConfiguration();
     configuration.set(RollupPhaseTwoConstants.ROLLUP_PHASE2_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+    configuration.set(RollupPhaseTwoConstants.ROLLUP_PHASE2_ANALYSIS_PATH.toString(), "dummy analysis path");
     Path configPath = new Path(ClassLoader.getSystemResource(CONF_FILE).toString());
     FileSystem fileSystem = FileSystem.get(configuration);
     StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
@@ -148,6 +149,7 @@ public class TestRollUpPhase2
     reduceDriver = ReduceDriver.newReduceDriver(reducer);
     configuration = reduceDriver.getConfiguration();
     configuration.set(RollupPhaseTwoConstants.ROLLUP_PHASE2_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+
   }
 
   @Test

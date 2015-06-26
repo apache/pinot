@@ -3,15 +3,24 @@ package com.linkedin.thirdeye.bootstrap.rollup.phase2;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_CONFIG_PATH;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_INPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_OUTPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_ANALYSIS_PATH;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
@@ -27,6 +36,8 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +46,7 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 
 public class RollupPhaseTwoJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(RollupPhaseTwoJob.class);
@@ -50,6 +62,7 @@ public class RollupPhaseTwoJob extends Configured {
 
   public static class RollupPhaseTwoMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+    private static final String DIMENSION_VALUES_OBJECT = "dimensionValues";
     private RollupPhaseTwoConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -59,6 +72,7 @@ public class RollupPhaseTwoJob extends Configured {
     Map<String, Integer> dimensionNameToIndexMapping;
     BytesWritable keyWritable;
     BytesWritable valWritable;
+    private Path analysisResults;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -66,6 +80,7 @@ public class RollupPhaseTwoJob extends Configured {
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH.toString()));
+      analysisResults = new Path(configuration.get(ROLLUP_PHASE2_ANALYSIS_PATH.toString()), StarTreeConstants.ANALYSIS_RESULTS_FILE);
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
@@ -118,16 +133,65 @@ public class RollupPhaseTwoJob extends Configured {
 
     }
 
-    private List<DimensionKey> generateCombinations(DimensionKey dimensionKey) {
+    private List<DimensionKey> generateCombinations(DimensionKey dimensionKey) throws IOException {
       String[] dimensionsValues = dimensionKey.getDimensionValues();
       List<DimensionKey> combinations = new ArrayList<DimensionKey>();
       String[] comb = Arrays.copyOf(dimensionsValues, dimensionsValues.length);
+
+      FileSystem fileSystem = FileSystem.get(new Configuration());
+      if (fileSystem.exists(analysisResults)) {
+        getRollupOrder();
+      }
+
       for (String dimensionToRollup : rollupOrder) {
         comb = Arrays.copyOf(comb, comb.length);
         comb[dimensionNameToIndexMapping.get(dimensionToRollup)] = "?";
         combinations.add(new DimensionKey(comb));
       }
       return combinations;
+    }
+
+    /**
+     * Get rollup order from analysis results
+     */
+    private void getRollupOrder() throws IOException {
+
+      try {
+        FileSystem fileSystem = FileSystem.get(new Configuration());
+        JSONParser parser = new JSONParser();
+        JSONObject jsonResult = (JSONObject) parser.parse((new InputStreamReader(fileSystem.open(analysisResults))));
+        jsonResult = (JSONObject) jsonResult.get(DIMENSION_VALUES_OBJECT);
+
+        LOGGER.info("Dimension values object {}", jsonResult);
+
+        Map<String, Integer> dimensionCardinality = new HashMap<String, Integer>();
+        // Generate rollup order according to dimension cardinality
+        for (String dimension : dimensionNames) {
+          dimensionCardinality.put(dimension, ((List<String>) jsonResult.get(dimension)).size());
+        }
+
+        SortedSet<Entry<String, Integer>> sortedDimensionCardinality =
+            new TreeSet<Entry<String, Integer>> (new Comparator<Entry<String, Integer>>() {
+
+             @Override
+             public int compare(Entry<String, Integer> dimension1, Entry<String, Integer> dimension2) {
+               return dimension2.getValue().compareTo(dimension1.getValue());
+             }
+       });
+        sortedDimensionCardinality.addAll(dimensionCardinality.entrySet());
+
+        LOGGER.info("Sorted order {}", sortedDimensionCardinality);
+
+        Iterator<Entry<String, Integer>> it = sortedDimensionCardinality.iterator();
+        rollupOrder = new ArrayList<String>();
+        while (it.hasNext()) {
+          rollupOrder.add(it.next().getKey());
+        }
+      } catch (Exception e){
+        // Continue with earlier rollup config
+        LOGGER.info("exception {}", e);
+      }
+
     }
 
     @Override
@@ -237,6 +301,7 @@ public class RollupPhaseTwoJob extends Configured {
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE2_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE2_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE2_OUTPUT_PATH);
+    getAndSetConfiguration(configuration, ROLLUP_PHASE2_ANALYSIS_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);

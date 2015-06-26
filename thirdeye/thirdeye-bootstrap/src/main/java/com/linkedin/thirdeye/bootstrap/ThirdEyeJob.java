@@ -210,7 +210,8 @@ public class ThirdEyeJob {
 
       @Override
       Properties getJobProperties(Properties inputConfig, String root, String collection,
-          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths) {
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
         Properties config = new Properties();
         config.setProperty(AnalysisJobConstants.ANALYSIS_INPUT_AVRO_SCHEMA.toString(),
             getSchemaPath(root, collection));
@@ -218,7 +219,8 @@ public class ThirdEyeJob {
             getConfigPath(root, collection));
         config.setProperty(AnalysisJobConstants.ANALYSIS_INPUT_PATH.toString(), inputPaths);
         config.setProperty(AnalysisJobConstants.ANALYSIS_OUTPUT_PATH.toString(),
-            getAnalysisPath(root, collection));
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ANALYSIS.getName());
+
 
         return config;
       }
@@ -315,6 +317,9 @@ public class ThirdEyeJob {
         config.setProperty(RollupPhaseTwoConstants.ROLLUP_PHASE2_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + ROLLUP_PHASE2.getName());
+        config.setProperty(RollupPhaseTwoConstants.ROLLUP_PHASE2_ANALYSIS_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + ANALYSIS.getName());
 
         return config;
       }
@@ -567,7 +572,7 @@ public class ThirdEyeJob {
     }
 
     String getAnalysisPath(String root, String collection) {
-      return getCollectionDir(root, collection) + File.separator + "analysis";
+      return getCollectionDir(root, collection) + File.separator + FlowSpec.DIMENSION_INDEX + File.separator + ANALYSIS.getName();
     }
 
     String getMetricIndexDir(String root, String collection, FlowSpec flowSpec, DateTime minTime,
