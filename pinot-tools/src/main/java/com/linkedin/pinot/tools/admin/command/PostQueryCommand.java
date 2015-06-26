@@ -82,6 +82,10 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
   }
 
   public String run() throws Exception {
+    if (_brokerHost == null) {
+      _brokerHost = NetUtil.getHostAddress();
+    }
+    LOGGER.info("Executing command: " + toString());
     final JSONObject json = new JSONObject();
     json.put("pql", _query);
 
@@ -107,10 +111,6 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
   }
 
   public boolean execute() throws Exception {
-    if (_brokerHost == null) {
-      _brokerHost = NetUtil.getHostAddress();
-    }
-    LOGGER.info("Executing command: " + toString());
     String result = run();
     LOGGER.info("Result: " + result);
     return true;
