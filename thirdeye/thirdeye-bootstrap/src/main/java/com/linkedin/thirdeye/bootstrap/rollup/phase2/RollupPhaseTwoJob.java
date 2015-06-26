@@ -5,7 +5,6 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConsta
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_ANALYSIS_PATH;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -17,9 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.SortedMap;
+import java.util.Set;
 import java.util.SortedSet;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -36,8 +34,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +43,7 @@ import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseStats;
 
 public class RollupPhaseTwoJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(RollupPhaseTwoJob.class);
@@ -158,31 +155,21 @@ public class RollupPhaseTwoJob extends Configured {
 
       try {
         FileSystem fileSystem = FileSystem.get(new Configuration());
-        JSONParser parser = new JSONParser();
-        JSONObject jsonResult = (JSONObject) parser.parse((new InputStreamReader(fileSystem.open(analysisResults))));
-        jsonResult = (JSONObject) jsonResult.get(DIMENSION_VALUES_OBJECT);
+        ObjectMapper objectMapper = new ObjectMapper();
+        AnalysisPhaseStats analysisPhaseStats = objectMapper.readValue(new InputStreamReader(fileSystem.open(analysisResults)), AnalysisPhaseStats.class);
 
-        LOGGER.info("Dimension values object {}", jsonResult);
-
-        Map<String, Integer> dimensionCardinality = new HashMap<String, Integer>();
-        // Generate rollup order according to dimension cardinality
-        for (String dimension : dimensionNames) {
-          dimensionCardinality.put(dimension, ((List<String>) jsonResult.get(dimension)).size());
-        }
-
-        SortedSet<Entry<String, Integer>> sortedDimensionCardinality =
-            new TreeSet<Entry<String, Integer>> (new Comparator<Entry<String, Integer>>() {
+        SortedSet<Entry<String, Set<String>>> sortedDimensionCardinality =
+            new TreeSet<Entry<String, Set<String>>> (new Comparator<Entry<String, Set<String>>>() {
 
              @Override
-             public int compare(Entry<String, Integer> dimension1, Entry<String, Integer> dimension2) {
-               return dimension2.getValue().compareTo(dimension1.getValue());
+             public int compare(Entry<String, Set<String>> dimension1, Entry<String, Set<String>> dimension2) {
+               return (new Integer(dimension2.getValue().size())).compareTo(dimension1.getValue().size());
              }
        });
-        sortedDimensionCardinality.addAll(dimensionCardinality.entrySet());
-
+        sortedDimensionCardinality.addAll(analysisPhaseStats.getDimensionValues().entrySet());
         LOGGER.info("Sorted order {}", sortedDimensionCardinality);
 
-        Iterator<Entry<String, Integer>> it = sortedDimensionCardinality.iterator();
+        Iterator<Entry<String, Set<String>>> it = sortedDimensionCardinality.iterator();
         rollupOrder = new ArrayList<String>();
         while (it.hasNext()) {
           rollupOrder.add(it.next().getKey());
