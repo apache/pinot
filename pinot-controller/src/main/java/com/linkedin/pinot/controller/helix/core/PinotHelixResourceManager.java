@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
@@ -64,6 +65,8 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -103,6 +106,9 @@ public class PinotHelixResourceManager {
 
   PinotHelixAdmin _pinotHelixAdmin;
   private HelixDataAccessor _helixDataAccessor;
+
+  private static final Map<String, SegmentAssignmentStrategy> SEGMENT_ASSIGNMENT_STRATEGY_MAP =
+      new HashMap<String, SegmentAssignmentStrategy>();
 
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
@@ -221,8 +227,8 @@ public class PinotHelixResourceManager {
   public synchronized void restartTable(String tableName) {
     final Set<String> allInstances =
         HelixHelper.getAllInstancesForResource(HelixHelper.getTableIdealState(_helixZkManager, tableName));
-    HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, false);
-    HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, true);
+    HelixHelper.setStateForInstanceSet(allInstances, _helixClusterName, _helixAdmin, false);
+    HelixHelper.setStateForInstanceSet(allInstances, _helixClusterName, _helixAdmin, true);
   }
 
   private boolean ifExternalViewChangeReflectedForState(String tableName, String segmentName, String targerStates,
@@ -312,14 +318,7 @@ public class PinotHelixResourceManager {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
       if (idealState.getPartitionSet().contains(segmentId)) {
         LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
-        idealState =
-            PinotTableIdealStateBuilder.dropSegmentFromIdealStateFor(tableName, segmentId, _helixAdmin,
-                _helixClusterName);
-        _helixAdmin.setResourceIdealState(_helixClusterName, tableName, idealState);
-        idealState =
-            PinotTableIdealStateBuilder.removeSegmentFromIdealStateFor(tableName, segmentId, _helixAdmin,
-                _helixClusterName);
-        _helixAdmin.setResourceIdealState(_helixClusterName, tableName, idealState);
+        HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
       } else {
         res.message = "Segment " + segmentId + " not in IDEALSTATE.";
         LOGGER.info("Segment: {} is not in IDEALSTATE", segmentId);
@@ -338,8 +337,8 @@ public class PinotHelixResourceManager {
 
   // **** End Broker level operations ****
   public void startInstances(List<String> instances) {
-    HelixHelper.toggleInstancesWithPinotInstanceList(instances, _helixClusterName, _helixAdmin, false);
-    HelixHelper.toggleInstancesWithPinotInstanceList(instances, _helixClusterName, _helixAdmin, true);
+    HelixHelper.setStateForInstanceList(instances, _helixClusterName, _helixAdmin, false);
+    HelixHelper.setStateForInstanceList(instances, _helixClusterName, _helixAdmin, true);
   }
 
   @Override
@@ -994,7 +993,7 @@ public class PinotHelixResourceManager {
   public void deleteOfflineTable(String tableName) {
     final String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     // Remove from brokerResource
-    HelixHelper.deleteResourceFromBrokerResource(_helixAdmin, _helixClusterName, offlineTableName);
+    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
     // Delete data table
     if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
       return;
@@ -1010,7 +1009,7 @@ public class PinotHelixResourceManager {
   public void deleteRealtimeTable(String tableName) {
     final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     // Remove from brokerResource
-    HelixHelper.deleteResourceFromBrokerResource(_helixAdmin, _helixClusterName, realtimeTableName);
+    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
     // Delete data table
     if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(realtimeTableName)) {
       return;
@@ -1078,7 +1077,7 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public void addSegment(SegmentMetadata segmentMetadata, String downloadUrl) {
+  public void addSegment(final SegmentMetadata segmentMetadata, String downloadUrl) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       if (!matchTableName(segmentMetadata)) {
@@ -1121,14 +1120,7 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
         LOGGER.info("Added segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
 
-        AbstractTableConfig offlineTableConfig =
-            ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getTableName());
-        final IdealState idealState =
-            PinotTableIdealStateBuilder.addNewOfflineSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
-                _helixClusterName, getPropertyStore(), ControllerTenantNameBuilder
-                    .getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig().getServer()));
-        _helixAdmin.setResourceIdealState(_helixClusterName,
-            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()), idealState);
+        addNewOfflineSegment(segmentMetadata);
         res.status = ResponseStatus.success;
       }
     } catch (final Exception e) {
@@ -1136,6 +1128,67 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /**
+   * Helper method to add the passed in offline segment to the helix cluster.
+   * - Gets the segment name and the table name from the passed in segment meta-data.
+   * - Identifies the instance set onto which the segment needs to be added, based on
+   *   segment assignment strategy and replicas in the table config in the property-store.
+   * - Updates ideal state such that the new segment is assigned to required set of instances as per
+   *    the segment assignment strategy and replicas.
+   *
+   * @param segmentMetadata Meta-data for the segment, used to access segmentName and tableName.
+   * @throws JsonParseException
+   * @throws JsonMappingException
+   * @throws JsonProcessingException
+   * @throws JSONException
+   * @throws IOException
+   */
+  private void addNewOfflineSegment(final SegmentMetadata segmentMetadata) throws JsonParseException,
+      JsonMappingException, JsonProcessingException, JSONException, IOException {
+    final AbstractTableConfig offlineTableConfig =
+        ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getTableName());
+
+    final String segmentName = segmentMetadata.getName();
+    final String offlineTableName =
+        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getTableName());
+
+    if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(offlineTableName)) {
+      SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(offlineTableName, SegmentAssignmentStrategyFactory
+          .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
+    }
+    final SegmentAssignmentStrategy segmentAssignmentStrategy = SEGMENT_ASSIGNMENT_STRATEGY_MAP.get(offlineTableName);
+
+    // Passing a callable to this api to avoid helixHelper having which is in pinot-common having to
+    // depend upon pinot-controller.
+    Callable<List<String>> getInstancesForSegment = new Callable<List<String>>() {
+      @Override
+      public List<String> call() throws Exception {
+        final IdealState currentIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, offlineTableName);
+        final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
+
+        if (currentInstanceSet.isEmpty()) {
+          final String serverTenant =
+              ControllerTenantNameBuilder.getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig()
+                  .getServer());
+          final int replicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
+          return segmentAssignmentStrategy.getAssignedInstances(_helixAdmin, _helixClusterName, segmentMetadata,
+              replicas, serverTenant);
+        } else {
+          return new ArrayList<String>(currentIdealState.getInstanceSet(segmentName));
+        }
+      }
+    };
+
+    HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, getInstancesForSegment);
+  }
+
+  /**
+   * Returns true if the table name specified in the segment meta data has a corresponding
+   * realtime or offline table in the helix cluster
+   *
+   * @param segmentMetadata Meta-data for the segment
+   * @return
+   */
   private boolean matchTableName(SegmentMetadata segmentMetadata) {
     if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
       LOGGER.error("SegmentMetadata or table name is null");

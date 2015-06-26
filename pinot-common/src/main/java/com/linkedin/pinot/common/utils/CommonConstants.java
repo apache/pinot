@@ -68,7 +68,7 @@ public class CommonConstants {
       public static final String KAFKA = "kafka";
       public static final String STREAM_PREFIX = "stream";
 
-      public static enum SegmentAssignmentStrategy {
+      public static enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
         BucketizedSegmentAssignmentStrategy;

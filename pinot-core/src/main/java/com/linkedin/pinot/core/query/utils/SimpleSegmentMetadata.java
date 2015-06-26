@@ -28,7 +28,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 
 public class SimpleSegmentMetadata implements SegmentMetadata {
 
-  private static final String SEGMENT_SIZE = "segment.size"; 
+  private static final String SEGMENT_SIZE = "segment.size";
 
   private String _resourceName;
   private String _indexType;
@@ -55,8 +55,11 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private void init(String resourceName, Schema schema) {
     _resourceName = resourceName;
     _schema = schema;
+
+    // Added thread name so that concurrent calls to this method generate unique names.
+    // Assumes multiple calls from same thread do not generate same _crc.
     _crc = System.currentTimeMillis() + "";
-    _segmentName = "SimpleSegment-" + _crc;
+    _segmentName = "SimpleSegment-" + _crc + "-" + Thread.currentThread().getName();
   }
 
   @Override
