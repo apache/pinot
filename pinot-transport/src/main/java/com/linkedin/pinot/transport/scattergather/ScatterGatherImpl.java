@@ -142,12 +142,13 @@ public class ScatterGatherImpl implements ScatterGather {
       response.start(responseFutures);
     } else {
       LOGGER.error("Request (" + ctxt.getRequest().getRequestId() + ") not sent completely within time ("
-          + timeRemaining + " ms) !! Cancelling !!");
+          + timeRemaining + " ms) !! Cancelling !!. NumSentFailed:" + requestDispatchLatch.getCount());
       response.start(null);
 
       // Some requests were not event sent (possibly because of checkout !!)
       // and so we cancel all of them here
       for (SingleRequestHandler h : handlers) {
+        LOGGER.info("Request to {} was sent successfully:{}", h.getServer(), h.isSent());
         h.cancel();
       }
     }
@@ -391,9 +392,11 @@ public class ScatterGatherImpl implements ScatterGather {
         LOGGER.info("Timeout is :" + _timeoutMS);
         conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
         while (!conn.validate()) {
+          LOGGER.warn("Checked out invalid connection, destroying it and checking out new one");
           _connPool.destroyObject(_server, conn);
           c = _connPool.checkoutObject(_server);
           conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
+
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
         _responseFuture = conn.sendRequest(req, _request.getRequestId(), _timeoutMS);
@@ -438,6 +441,10 @@ public class ScatterGatherImpl implements ScatterGather {
 
     public ResponseFuture getResponseFuture() {
       return _responseFuture;
+    }
+
+    public boolean isSent() {
+      return _isSent.get();
     }
   }
 
