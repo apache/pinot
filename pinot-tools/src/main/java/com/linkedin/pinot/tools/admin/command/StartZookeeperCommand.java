@@ -34,6 +34,8 @@ import com.google.common.io.Files;
  *
  */
 public class StartZookeeperCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
+
   @Option(name="-zkPort", required=false, metaVar="<int>", usage="Port to start zookeeper server on.")
   private int _zkPort=2181;
 
@@ -111,7 +113,6 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
   }
 
   private ZkServer _zkServer;
-  private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
   private File _tmpdir;
 
   public void init(int zkPort, String dataDir, String logDir) {
@@ -122,6 +123,7 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
 
   @Override
   public boolean execute() throws IOException {
+    LOGGER.info("Executing command: " + toString());
     _tmpdir = createAutoDeleteTempDir();
 
     File logdir = new File(_tmpdir + File.separator + "translog");

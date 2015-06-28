@@ -20,12 +20,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 
 
 public class AddTenantCommand extends AbstractBaseCommand implements Command {
-  private static final Logger _logger = LoggerFactory.getLogger(AddTenantCommand.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
+
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost;
 
   @Option(name = "-controllerPort", required = false, metaVar = "<int>",
       usage = "Port number to start the controller at.")
@@ -53,7 +57,7 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
       usage = "Print this message.")
   private boolean _help = false;
 
-  private String _controllerAddress = "http://localhost:" + _controllerPort;
+  private String _controllerAddress;
 
   public AddTenantCommand setControllerUrl(String url) {
     _controllerAddress = url;
@@ -93,12 +97,18 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
+    if (_controllerHost == null) {
+      _controllerHost = NetUtil.getHostAddress();
+    }
+    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
+
     if (!_exec) {
-      System.out.println("Dry Running Command: " + toString());
-      System.out.println("Use the -exec option to actually execute the command.");
+      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
+    LOGGER.info("Executing command: " + toString());
     Tenant t =
         new Tenant.TenantBuilder(_name).setRole(_role).setTotalInstances(_instanceCount)
             .setOfflineInstances(_offlineInstanceCount).setRealtimeInstances(_realtimeInstanceCount).build();
@@ -107,7 +117,7 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
         AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
             t.toString());
 
-    _logger.info(res);
+    LOGGER.info(res);
     System.out.print(res);
     return true;
   }
@@ -124,7 +134,8 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    String retString = ("AddTenant -controllerAddress " + _controllerAddress + " -name " + _name + " -role " + _role
+    String retString = ("AddTenant -controllerHost " + _controllerHost + " -controllerPort "
+        + _controllerPort + " -name " + _name + " -role " + _role
         + " -instanceCount " + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount
         + " -realTimeInstanceCount " + _realtimeInstanceCount);
 

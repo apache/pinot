@@ -15,14 +15,15 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 
 
 /**
@@ -30,8 +31,13 @@ import java.net.UnknownHostException;
  *
  */
 public class StartControllerCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
+
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost;
+
   @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+          usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
@@ -43,7 +49,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   private String _clusterName = "PinotCluster";
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+          usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -78,8 +84,8 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public String toString() {
-    return ("StartControllerCommand -clusterName " + _clusterName + " -controllerPort " + _controllerPort
-        + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+    return ("StartControllerCommand -clusterName " + _clusterName + " -controllerHost " + _controllerHost
+            + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
   }
 
   @Override
@@ -95,20 +101,17 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Override
   public boolean execute() throws Exception {
     final ControllerConf conf = new ControllerConf();
-    String hostname = "localhost";
-    try {
-      hostname = InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      e.printStackTrace();
-    }
 
-    conf.setControllerHost(hostname);
+    if (_controllerHost == null) {
+      _controllerHost = NetUtil.getHostAddress();
+    }
+    conf.setControllerHost(_controllerHost);
     conf.setControllerPort(_controllerPort);
     conf.setDataDir(_dataDir);
     conf.setZkStr(_zkAddress);
 
     conf.setHelixClusterName(_clusterName);
-    conf.setControllerVipHost(hostname);
+    conf.setControllerVipHost(_controllerHost);
 
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
@@ -120,6 +123,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
       zkClient.deleteRecursive(helixClusterName);
     }
 
+    LOGGER.info("Executing command: " + toString());
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();

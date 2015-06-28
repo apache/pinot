@@ -20,8 +20,11 @@ import java.io.FileInputStream;
 
 import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 
 
@@ -31,20 +34,24 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
  *
  */
 public class UploadSegmentCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
+
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _controllerHost;
+
   @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
     return _help;
   }
-
-  private String _controllerHost = "localhost";
 
   @Override
   public String getName() {
@@ -53,7 +60,8 @@ public class UploadSegmentCommand extends AbstractBaseCommand implements Command
 
   @Override
   public String toString() {
-    return ("UploadSegment " + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir);
+    return ("UploadSegment -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+        + " -segmentDir " + _segmentDir);
   }
 
   @Override
@@ -83,6 +91,11 @@ public class UploadSegmentCommand extends AbstractBaseCommand implements Command
 
   @Override
   public boolean execute() throws Exception {
+    if (_controllerHost == null) {
+      _controllerHost = NetUtil.getHostAddress();
+    }
+
+    LOGGER.info("Executing command: " + toString());
     File dir = new File(_segmentDir);
     File[] files = dir.listFiles();
 

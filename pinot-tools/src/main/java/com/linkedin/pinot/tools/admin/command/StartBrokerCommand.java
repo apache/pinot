@@ -20,9 +20,12 @@ import java.io.File;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.NetUtil;
 
 
 /**
@@ -30,11 +33,13 @@ import com.linkedin.pinot.common.utils.CommonConstants;
  *
  */
 public class StartBrokerCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
+
+  @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _brokerHost;
+
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
-
-  @Option(name = "-brokerInstName", required = false, metaVar = "<string>", usage = "Instance name of the broker.")
-  private String _brokerInstName = "Broker";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -44,9 +49,6 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
-
-  @Option(name = "-brokerHostName", required = false, metaVar = "<string>", usage = "Instance host name of the broker.")
-  private String _brokerHostName = "localhost";
 
   public boolean getHelp() {
     return _help;
@@ -59,8 +61,8 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("StartBrokerCommand -brokerInstName " + _brokerInstName + " -brokerPort " + _brokerPort
-        + " -brokerInstName " + _brokerInstName + " -zkAddress " + _zkAddress);
+    return ("StartBrokerCommand -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort
+        + " -zkAddress " + _zkAddress);
   }
 
   @Override
@@ -90,13 +92,15 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
-    String brokerInstanceName = _brokerInstName + "_" + _brokerHostName + "_" + _brokerPort;
+    if (_brokerHost == null) {
+      _brokerHost = NetUtil.getHostAddress();
+    }
 
+    Configuration configuration = new PropertiesConfiguration();
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
-    configuration.setProperty("instanceId", brokerInstanceName);
     configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
 
+    LOGGER.info("Executing command: " + toString());
     final HelixBrokerStarter pinotHelixBrokerStarter = new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminBroker.pid");

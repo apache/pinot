@@ -20,8 +20,11 @@ import java.io.File;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
@@ -30,6 +33,11 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
  *
  */
 public class StartServerCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
+
+  @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  private String _serverHost;
+
   @Option(name = "-serverPort", required = false, metaVar = "<int>", usage = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
@@ -80,8 +88,8 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("StartServerCommand -clusterName " + _clusterName + " -serverPort " + _serverPort + " -dataDir " + _dataDir
-        + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
+    return ("StartServerCommand -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort "
+        + _serverPort + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
   }
 
   @Override
@@ -103,10 +111,16 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   public boolean execute() throws Exception {
     final Configuration configuration = new PropertiesConfiguration();
 
+    if (_serverHost == null) {
+      _serverHost = NetUtil.getHostAddress();
+    }
+
+    configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
     configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
 
+    LOGGER.info("Executing command: " + toString());
     final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminServer.pid");

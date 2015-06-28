@@ -29,6 +29,8 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -47,6 +49,8 @@ import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
  *
  */
 public class GenerateDataCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GenerateDataCommand.class);
+
   @Option(name = "-numRecords", required = true, metaVar = "<int>", usage = "Number of records to generate.")
   private int _numRecords = 0;
 
@@ -104,6 +108,8 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
 
   @Override
   public boolean execute() throws Exception {
+    LOGGER.info("Executing command: " + toString());
+
     if ((_numRecords < 0) || (_numFiles < 0)) {
       throw new RuntimeException("Cannot generate negative number of records/files.");
     }
