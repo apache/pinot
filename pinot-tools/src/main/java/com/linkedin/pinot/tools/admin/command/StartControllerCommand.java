@@ -47,6 +47,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
+  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
@@ -116,13 +117,6 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
-
-    ZkClient zkClient = new ZkClient(_zkAddress);
-    String helixClusterName = "/" + _clusterName;
-
-    if (zkClient.exists(helixClusterName)) {
-      zkClient.deleteRecursive(helixClusterName);
-    }
 
     LOGGER.info("Executing command: " + toString());
     final ControllerStarter starter = new ControllerStarter(conf);

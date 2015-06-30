@@ -51,11 +51,13 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
+  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
+  private String _clusterName = "PinotCluster";
+
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
 
-  private String _clusterName = "PinotCluster";
 
   public boolean getHelp() {
     return _help;
