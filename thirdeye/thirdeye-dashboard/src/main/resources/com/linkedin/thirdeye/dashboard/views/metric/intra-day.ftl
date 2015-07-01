@@ -16,7 +16,7 @@
     <#list (metricView.view.metricTables)!metricTables as metricTable>
         <#assign dimensions = metricTable.dimensionValues>
         <#include "../common/dimension-header.ftl">
-        <table class="uk-table">
+        <table class="uk-table uk-table-striped">
             <thead>
                 <tr>
                     <th></th>
