@@ -1,17 +1,6 @@
 $(document).ready(function() {
-    var timeZone = jstz()
     $(".metric-table-time").each(function(i, cell) {
-        var tz = null;
-        if(window.location.hash) {
-            var params = parseHashParameters(window.location.hash)
-            if(params.timezone) {
-                tz = params.timezone.split('-').join('/')
-            } else {
-                tz = timeZone.timezone_name
-            }
-        } else {
-            tz = timeZone.timezone_name
-        }
+        var tz = getTimeZone();
         var cellObj = $(cell)
         var currentTime = moment(cellObj.html())
         var baselineTime = moment(cellObj.attr('title'))

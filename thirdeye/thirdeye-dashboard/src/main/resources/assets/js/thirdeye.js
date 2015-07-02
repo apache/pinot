@@ -628,3 +628,25 @@ function getLocalTimeZone() {
 
     return formatted
 }
+
+/**
+ * Get Time Zone
+ * @function
+ * @public
+ * @returns {String} Local timezone from getLocalTimeZone() or hash params
+ * timezone
+ */
+function getTimeZone() {
+    var timeZone = jstz()
+    if(window.location.hash) {
+        var params = parseHashParameters(window.location.hash)
+        if(params.timezone) {
+            tz = params.timezone.split('-').join('/')
+        } else {
+            tz = timeZone.timezone_name
+        }
+    } else {
+        tz = timeZone.timezone_name
+    }
+    return tz
+}
