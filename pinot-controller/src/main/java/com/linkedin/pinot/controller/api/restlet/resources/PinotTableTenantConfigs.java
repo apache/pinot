@@ -1,5 +1,10 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 
@@ -40,10 +45,22 @@ public class PinotTableTenantConfigs extends ServerResource {
   @Put("json")
   public Representation put(Representation entity) {
     try {
-      throw new UnsupportedOperationException("current tenant config updates are not supported");
+      return updateTenantConfig("dummy");
     } catch (Exception e) {
       LOGGER.error("errpr updating medata configs for table {}", entity, e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
+  }
+
+  @HttpVerb("put")
+  @Summary("Updates the tenant configuration for a table")
+  @Tags({"table"})
+  @Paths({
+      "/tables/{tableName}/tenantConfigs"
+  })
+  private Representation updateTenantConfig(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the tenant configuration", required = true)
+      String tableName) {
+    throw new UnsupportedOperationException("current tenant config updates are not supported");
   }
 }

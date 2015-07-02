@@ -15,7 +15,14 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.controller.api.swagger.Description;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
 import org.restlet.data.Status;
@@ -83,26 +90,39 @@ public class PinotTenantRestletResource extends ServerResource {
   @Override
   @Post("json")
   public Representation post(Representation entity) {
-    StringRepresentation presentation = null;
+    StringRepresentation presentation;
     try {
-      PinotResourceManagerResponse response = null;
       final Tenant tenant = _objectMapper.readValue(entity.getText(), Tenant.class);
-      switch (tenant.getTenantRole()) {
-        case BROKER:
-          response = _pinotHelixResourceMananger.createBrokerTenant(tenant);
-          presentation = new StringRepresentation(response.toString());
-          break;
-        case SERVER:
-          response = _pinotHelixResourceMananger.createServerTenant(tenant);
-          presentation = new StringRepresentation(response.toString());
-          break;
-        default:
-          throw new RuntimeException("Not a valid tenant creation call");
-      }
+      presentation = createTenant(tenant);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing put request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
+    }
+    return presentation;
+  }
+
+  @HttpVerb("post")
+  @Summary("Creates a tenant")
+  @Tags({"tenant"})
+  @Paths({
+      "/tenants",
+      "/tenants/"
+  })
+  private StringRepresentation createTenant(Tenant tenant) {
+    PinotResourceManagerResponse response;
+    StringRepresentation presentation;
+    switch (tenant.getTenantRole()) {
+      case BROKER:
+        response = _pinotHelixResourceMananger.createBrokerTenant(tenant);
+        presentation = new StringRepresentation(response.toString());
+        break;
+      case SERVER:
+        response = _pinotHelixResourceMananger.createServerTenant(tenant);
+        presentation = new StringRepresentation(response.toString());
+        break;
+      default:
+        throw new RuntimeException("Not a valid tenant creation call");
     }
     return presentation;
   }
@@ -113,26 +133,39 @@ public class PinotTenantRestletResource extends ServerResource {
   @Override
   @Put("json")
   public Representation put(Representation entity) {
-    StringRepresentation presentation = null;
+    StringRepresentation presentation;
     try {
-      PinotResourceManagerResponse response = null;
       final Tenant tenant = _objectMapper.readValue(ByteStreams.toByteArray(entity.getStream()), Tenant.class);
-      switch (tenant.getTenantRole()) {
-        case BROKER:
-          response = _pinotHelixResourceMananger.updateBrokerTenant(tenant);
-          presentation = new StringRepresentation(response.toString());
-          break;
-        case SERVER:
-          response = _pinotHelixResourceMananger.updateServerTenant(tenant);
-          presentation = new StringRepresentation(response.toString());
-          break;
-        default:
-          throw new RuntimeException("Not a valid tenant update call");
-      }
+      presentation = updateTenant(tenant);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing put request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
+    }
+    return presentation;
+  }
+
+  @HttpVerb("put")
+  @Summary("Updates a tenant")
+  @Tags({"tenant"})
+  @Paths({
+      "/tenants",
+      "/tenants/"
+  })
+  private StringRepresentation updateTenant(Tenant tenant) {
+    PinotResourceManagerResponse response;
+    StringRepresentation presentation;
+    switch (tenant.getTenantRole()) {
+      case BROKER:
+        response = _pinotHelixResourceMananger.updateBrokerTenant(tenant);
+        presentation = new StringRepresentation(response.toString());
+        break;
+      case SERVER:
+        response = _pinotHelixResourceMananger.updateServerTenant(tenant);
+        presentation = new StringRepresentation(response.toString());
+        break;
+      default:
+        throw new RuntimeException("Not a valid tenant update call");
     }
     return presentation;
   }
@@ -148,38 +181,11 @@ public class PinotTenantRestletResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String tenantName = (String) getRequest().getAttributes().get(TENANT_NAME);
+      final String type = getReference().getQueryAsForm().getValues("type");
       if (tenantName == null) {
-        // Return all the tags.
-        final JSONObject ret = new JSONObject();
-        final String type = getReference().getQueryAsForm().getValues("type");
-        if (type == null || type.equals("server")) {
-          ret.put("SERVER_TENANTS", _pinotHelixResourceMananger.getAllServerTenantNames());
-        }
-        if (type == null || type.equals("broker")) {
-          ret.put("BROKER_TENANTS", _pinotHelixResourceMananger.getAllBrokerTenantNames());
-        }
-        presentation = new StringRepresentation(ret.toString(), MediaType.APPLICATION_JSON);
+        presentation = getAllTenants(type);
       } else {
-        // Return instances related to given tenant name.
-        final String type = getReference().getQueryAsForm().getValues("type");
-
-        JSONObject resourceGetRet = new JSONObject();
-        if (type == null) {
-          resourceGetRet.put("ServerInstances", _pinotHelixResourceMananger.getAllInstancesForServerTenant(tenantName));
-          resourceGetRet.put("BrokerInstances", _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
-        } else {
-          if (type.equals("server")) {
-            resourceGetRet.put("ServerInstances",
-                _pinotHelixResourceMananger.getAllInstancesForServerTenant(tenantName));
-          }
-          if (type.equals("broker")) {
-            resourceGetRet.put("BrokerInstances",
-                _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
-          }
-        }
-        resourceGetRet.put(TENANT_NAME, tenantName);
-
-        presentation = new StringRepresentation(resourceGetRet.toString(), MediaType.APPLICATION_JSON);
+        presentation = getTenant(tenantName, type);
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
@@ -189,51 +195,127 @@ public class PinotTenantRestletResource extends ServerResource {
     return presentation;
   }
 
+  @HttpVerb("get")
+  @Summary("Gets information about a tenant")
+  @Tags({"tenant"})
+  @Paths({
+      "/tenants/{tenantName}",
+      "/tenants/{tenantName}/"
+  })
+  private StringRepresentation getTenant(
+      @Parameter(name = "tenantName", in = "path", description = "The tenant name")
+      String tenantName,
+      @Parameter(name = "type", in = "query", description = "The type of tenant, either SERVER or BROKER")
+      String type) throws JSONException {
+    StringRepresentation presentation;// Return instances related to given tenant name.
+
+    JSONObject resourceGetRet = new JSONObject();
+    if (type == null) {
+      resourceGetRet.put("ServerInstances", _pinotHelixResourceMananger.getAllInstancesForServerTenant(tenantName));
+      resourceGetRet.put("BrokerInstances", _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
+    } else {
+      if (type.equalsIgnoreCase("server")) {
+        resourceGetRet.put("ServerInstances",
+            _pinotHelixResourceMananger.getAllInstancesForServerTenant(tenantName));
+      }
+      if (type.equalsIgnoreCase("broker")) {
+        resourceGetRet.put("BrokerInstances",
+            _pinotHelixResourceMananger.getAllInstancesForBrokerTenant(tenantName));
+      }
+    }
+    resourceGetRet.put(TENANT_NAME, tenantName);
+
+    presentation = new StringRepresentation(resourceGetRet.toString(), MediaType.APPLICATION_JSON);
+    return presentation;
+  }
+
+  @HttpVerb("get")
+  @Summary("Gets information about all tenants")
+  @Tags({"tenant"})
+  @Paths({
+      "/tenants",
+      "/tenants/"
+  })
+  private StringRepresentation getAllTenants(
+      @Parameter(name = "type", in = "query", description = "The type of tenant, either SERVER or BROKER")
+      String type
+  ) throws JSONException {
+    StringRepresentation presentation;// Return all the tags.
+    final JSONObject ret = new JSONObject();
+    if (type == null || type.equalsIgnoreCase("server")) {
+      ret.put("SERVER_TENANTS", _pinotHelixResourceMananger.getAllServerTenantNames());
+    }
+    if (type == null || type.equalsIgnoreCase("broker")) {
+      ret.put("BROKER_TENANTS", _pinotHelixResourceMananger.getAllBrokerTenantNames());
+    }
+    presentation = new StringRepresentation(ret.toString(), MediaType.APPLICATION_JSON);
+    return presentation;
+  }
+
+
   @Override
   @Delete
   public Representation delete() {
-    StringRepresentation presentation = null;
+    StringRepresentation presentation;
     try {
       final String tenantName = (String) getRequest().getAttributes().get(TENANT_NAME);
       final String type = getReference().getQueryAsForm().getValues("type");
-      if (type == null) {
-        presentation =
-            new StringRepresentation("Not specify the type for the tenant name. Please try to append:"
-                + "/?type=SERVER or /?type=BROKER ");
-      } else {
-        TenantRole tenantRole = TenantRole.valueOf(type.toUpperCase());
-        PinotResourceManagerResponse res = null;
-        switch (tenantRole) {
-          case BROKER:
-            if (_pinotHelixResourceMananger.isBrokerTenantDeletable(tenantName)) {
-              res = _pinotHelixResourceMananger.deleteBrokerTenantFor(tenantName);
-            } else {
-              res = new PinotResourceManagerResponse();
-              res.status = STATUS.failure;
-              res.errorMessage = "Broker Tenant is not null, cannot delete it.";
-            }
-            break;
-          case SERVER:
-            if (_pinotHelixResourceMananger.isServerTenantDeletable(tenantName)) {
-              res = _pinotHelixResourceMananger.deleteOfflineServerTenantFor(tenantName);
-              if (res.isSuccessfull()) {
-                res = _pinotHelixResourceMananger.deleteRealtimeServerTenantFor(tenantName);
-              }
-            } else {
-              res = new PinotResourceManagerResponse();
-              res.status = STATUS.failure;
-              res.errorMessage = "Server Tenant is not null, cannot delete it.";
-            }
-            break;
-          default:
-            break;
-        }
-        presentation = new StringRepresentation(res.toString());
-      }
+      presentation = deleteTenant(tenantName, type);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
+    }
+    return presentation;
+  }
+
+  @HttpVerb("delete")
+  @Summary("Deletes a tenant")
+  @Tags({"tenant"})
+  @Description("Deletes a tenant from the cluster")
+  @Paths({
+      "/tenants/{tenantName}",
+      "/tenants/{tenantName}/"
+  })
+  private StringRepresentation deleteTenant(
+      @Parameter(name = "tenantName", in = "path", description = "The tenant id")
+      String tenantName,
+      @Parameter(name = "type", in = "query", description = "The type of tenant, either SERVER or BROKER", required = true)
+      String type) {
+    StringRepresentation presentation;
+    if (type == null) {
+      presentation =
+          new StringRepresentation("Not specify the type for the tenant name. Please try to append:"
+              + "/?type=SERVER or /?type=BROKER ");
+    } else {
+      TenantRole tenantRole = TenantRole.valueOf(type.toUpperCase());
+      PinotResourceManagerResponse res = null;
+      switch (tenantRole) {
+        case BROKER:
+          if (_pinotHelixResourceMananger.isBrokerTenantDeletable(tenantName)) {
+            res = _pinotHelixResourceMananger.deleteBrokerTenantFor(tenantName);
+          } else {
+            res = new PinotResourceManagerResponse();
+            res.status = STATUS.failure;
+            res.errorMessage = "Broker Tenant is not null, cannot delete it.";
+          }
+          break;
+        case SERVER:
+          if (_pinotHelixResourceMananger.isServerTenantDeletable(tenantName)) {
+            res = _pinotHelixResourceMananger.deleteOfflineServerTenantFor(tenantName);
+            if (res.isSuccessfull()) {
+              res = _pinotHelixResourceMananger.deleteRealtimeServerTenantFor(tenantName);
+            }
+          } else {
+            res = new PinotResourceManagerResponse();
+            res.status = STATUS.failure;
+            res.errorMessage = "Server Tenant is not null, cannot delete it.";
+          }
+          break;
+        default:
+          break;
+      }
+      presentation = new StringRepresentation(res.toString());
     }
     return presentation;
   }

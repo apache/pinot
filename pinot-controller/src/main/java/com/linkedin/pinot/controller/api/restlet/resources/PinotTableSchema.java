@@ -1,5 +1,11 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 
@@ -45,6 +51,19 @@ public class PinotTableSchema extends ServerResource {
   public Representation get() {
     final String tableName = (String) getRequest().getAttributes().get("tableName");
 
+    return getTableSchema(tableName);
+  }
+
+  @HttpVerb("get")
+  @Summary("Gets schema for a table")
+  @Tags({"schema", "table"})
+  @Paths({
+      "/tables/{tableName}/schema",
+      "/tables/{tableName}/schema/"
+  })
+  private Representation getTableSchema(
+      @Parameter(name = "tableName", in = "path", description = "Table name for which to get the schema", required = true)
+      String tableName) {
     if (manager.hasRealtimeTable(tableName)) {
       try {
         AbstractTableConfig config = manager.getTableConfig(tableName, TableType.REALTIME);
@@ -66,5 +85,4 @@ public class PinotTableSchema extends ServerResource {
       }
     }
   }
-
 }

@@ -15,21 +15,32 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import it.unimi.dsi.fastutil.ints.IntComparator;
+import it.unimi.dsi.fastutil.ints.IntComparators;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.TreeSet;
+import org.apache.commons.collections.ComparatorUtils;
 import org.restlet.Application;
-import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
 import org.restlet.Restlet;
 import org.restlet.data.MediaType;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Directory;
+import org.restlet.resource.ServerResource;
+import org.restlet.routing.Redirector;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
 import com.linkedin.pinot.controller.api.restlet.resources.PinotControllerHealthCheck;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotInstance;
-import com.linkedin.pinot.controller.api.restlet.resources.PinotSchemaResletResource;
-import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentResletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotSchemaRestletResource;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableIndexingConfigs;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableInstances;
@@ -40,6 +51,8 @@ import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSegmentConf
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableTenantConfigs;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTenantRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,70 +60,50 @@ import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
  */
 
 public class ControllerRestApplication extends Application {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
 
   private static String CONSOLE_WEBAPP_ROOT_PATH;
+  public static Router router;
 
   public ControllerRestApplication(String queryConsolePath) {
     super();
     CONSOLE_WEBAPP_ROOT_PATH = queryConsolePath;
   }
 
-  public ControllerRestApplication(Context context) {
-    super(context);
-  }
-
   @Override
   public Restlet createInboundRoot() {
-    final Router router = new Router(getContext());
+    router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
 
     /**
      * Start Routers 2.0
      */
 
-    router.attach("/tenants", PinotTenantRestletResource.class);
-    router.attach("/tenants/", PinotTenantRestletResource.class);
-    router.attach("/tenants/{tenantName}", PinotTenantRestletResource.class);
-    router.attach("/tenants/{tenantName}/", PinotTenantRestletResource.class);
-    router.attach("/tenants/{tenantName}/instances", PinotTenantRestletResource.class);
-
-    router.attach("/schemas", PinotSchemaResletResource.class);
-    router.attach("/schemas/", PinotSchemaResletResource.class);
-    router.attach("/schemas/{schemaName}", PinotSchemaResletResource.class);
-
-    // POST
-    router.attach("/tables", PinotTableRestletResource.class);
-    router.attach("/tables/", PinotTableRestletResource.class);
+    attachRoutesForClass(router, PinotTenantRestletResource.class);
+    attachRoutesForClass(router, PinotSchemaRestletResource.class);
+    attachRoutesForClass(router, PinotTableRestletResource.class);
 
     // GET
-    router.attach("/tables/{tableName}", PinotTableRestletResource.class);
-    router.attach("/tables/{tableName}/instances", PinotTableInstances.class);
-    router.attach("/tables/{tableName}/schema", PinotTableSchema.class);
-    router.attach("/tables/{tableName}/schema/", PinotTableSchema.class);
-
-    router.attach("/tables/{tableName}/segments", PinotSegmentResletResource.class);
-    router.attach("/tables/{tableName}/segments/{segmentName}", PinotSegmentResletResource.class);
+    attachRoutesForClass(router, PinotTableInstances.class);
+    attachRoutesForClass(router, PinotTableSchema.class);
+    attachRoutesForClass(router, PinotSegmentRestletResource.class);
 
     // PUT
-    router.attach("/tables/{tableName}/segmentsConfigs", PinotTableSegmentConfigs.class);
-    router.attach("/tables/{tableName}/indexingConfigs", PinotTableIndexingConfigs.class);
-    router.attach("/tables/{tableName}/tenantConfigs", PinotTableTenantConfigs.class);
-    router.attach("/tables/{tableName}/metadataConfigs", PinotTableMetadataConfigs.class);
+    attachRoutesForClass(router, PinotTableSegmentConfigs.class);
+    attachRoutesForClass(router, PinotTableIndexingConfigs.class);
+    attachRoutesForClass(router, PinotTableTenantConfigs.class);
+    attachRoutesForClass(router, PinotTableMetadataConfigs.class);
 
     // Uploading Downloading segments
-    router.attach("/segments", PinotSegmentUploadRestletResource.class);
-    router.attach("/segments/", PinotSegmentUploadRestletResource.class);
-    router.attach("/segments/{tableName}", PinotSegmentUploadRestletResource.class);
-    router.attach("/segments/{tableName}/{segmentName}", PinotSegmentUploadRestletResource.class);
+    attachRoutesForClass(router, PinotSegmentUploadRestletResource.class);
+
+    router.attach("/api", SwaggerResource.class);
 
     /**
      *  End Routes 2.0
      */
 
-    router.attach("/instances", PinotInstance.class);
-    router.attach("/instances/", PinotInstance.class);
-    router.attach("/instances/{instanceName}", PinotInstance.class);
-    router.attach("/instances/{instanceName}/", PinotInstance.class);
+    attachRoutesForClass(router, PinotInstance.class);
 
     router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
 
@@ -140,6 +133,35 @@ public class ControllerRestApplication extends Application {
     webdir.setDeeplyAccessible(true);
     router.attach("/query", webdir);
 
+    final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.1.8-M1").toString());
+    swaggerUiDir.setDeeplyAccessible(true);
+    router.attach("/swagger-ui", swaggerUiDir);
+
+    final Redirector redirector = new Redirector(getContext(), "/swagger-ui/index.html?url=/api", Redirector.MODE_CLIENT_TEMPORARY);
+    router.attach("/help", redirector);
+
     return router;
+  }
+
+  private void attachRoutesForClass(Router router, Class<? extends ServerResource> clazz) {
+    TreeSet<String> pathsOrderedByLength = new TreeSet<String>(ComparatorUtils.<String>chainedComparator(new Comparator<String>() {
+      private IntComparator _intComparator = IntComparators.NATURAL_COMPARATOR;
+      @Override
+      public int compare(String o1, String o2) {
+        return _intComparator.compare(o1.length(), o2.length());
+      }
+    }, ComparatorUtils.NATURAL_COMPARATOR));
+
+    for (Method method : clazz.getDeclaredMethods()) {
+      Annotation annotationInstance = method.getAnnotation(Paths.class);
+      if (annotationInstance != null) {
+        pathsOrderedByLength.addAll(Arrays.asList(((Paths) annotationInstance).value()));
+      }
+    }
+
+    for (String routePath : pathsOrderedByLength) {
+      LOGGER.info("Attaching route {} -> {}", routePath, clazz.getSimpleName());
+      router.attach(routePath, clazz);
+    }
   }
 }
