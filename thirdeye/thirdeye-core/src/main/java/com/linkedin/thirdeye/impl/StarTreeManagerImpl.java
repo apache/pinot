@@ -106,7 +106,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
           StarTree starTree = new StarTreeImpl(config, dataDir, root);
           trees.get(collection).put(dataDir, starTree);
           starTree.open();
-          LOGGER.info("Opened tree {} for collection {}", treeFile, collection);
+          LOGGER.info("Opened tree {} for collection {}", dataDir.getName(), collection);
 
           // Read index metadata
           InputStream indexMetadataFile = new FileInputStream(new File(dataDir, StarTreeConstants.METADATA_FILE_NAME));
