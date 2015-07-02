@@ -154,18 +154,16 @@ public class HelixBrokerStarter {
   }
 
   private RoutingTableBuilder getRoutingTableBuilder(Configuration routingTableBuilderConfig) {
-    RoutingTableBuilder routingTableBuilder;
+    RoutingTableBuilder routingTableBuilder = null;
     try {
       String routingTableBuilderKey = routingTableBuilderConfig.getString("class", null);
-      routingTableBuilder = RoutingTableBuilderFactory.get(routingTableBuilderKey);
+      if (routingTableBuilderKey != null) {
+        routingTableBuilder = RoutingTableBuilderFactory.get(routingTableBuilderKey);
+        routingTableBuilder.init(routingTableBuilderConfig);
+      }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while building routing table", e);
-      return null;
     }
-    if (routingTableBuilder == null) {
-      return null;
-    }
-    routingTableBuilder.init(routingTableBuilderConfig);
     return routingTableBuilder;
   }
 

@@ -379,7 +379,6 @@ public class ScatterGatherImpl implements ScatterGather {
       if (_isCancelled.get()) {
         LOGGER.error("Request {} to server {} cancelled even before request is sent !! Not sending request",
             _request.getRequestId(), _server);
-
         _requestDispatchLatch.countDown();
         return;
       }
@@ -389,14 +388,12 @@ public class ScatterGatherImpl implements ScatterGather {
         KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(_server);
 
         byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
-        LOGGER.info("Timeout is :" + _timeoutMS);
         conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
         while (!conn.validate()) {
           LOGGER.warn("Checked out invalid connection, destroying it and checking out new one");
           _connPool.destroyObject(_server, conn);
           c = _connPool.checkoutObject(_server);
           conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
-
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
         _responseFuture = conn.sendRequest(req, _request.getRequestId(), _timeoutMS);
