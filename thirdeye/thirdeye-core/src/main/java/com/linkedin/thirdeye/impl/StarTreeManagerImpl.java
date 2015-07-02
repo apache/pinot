@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import com.linkedin.thirdeye.impl.storage.StorageUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,7 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -202,7 +204,14 @@ public class StarTreeManagerImpl implements StarTreeManager {
 
           for (WatchEvent<?> event : key.pollEvents()) {
             if (event.kind() == OVERFLOW) {
-              LOGGER.info("Received a overflow event");
+              LOGGER.info("Received an overflow event");
+              for (Entry<String, ConcurrentMap<File, StarTree>> collectionEntry : trees.entrySet()) {
+                for (Entry<File, StarTree> mapEntry : collectionEntry.getValue().entrySet()) {
+                  if (!mapEntry.getKey().exists()) {
+                    collectionEntry.getValue().remove(mapEntry.getKey());
+                  }
+                }
+              }
               continue;
             }
 
@@ -211,6 +220,13 @@ public class StarTreeManagerImpl implements StarTreeManager {
             File file = path.toFile();
 
             LOGGER.info("{} {}", ev.kind(), path);
+
+            if (ev.kind().equals(ENTRY_DELETE)) {
+              for (Entry<String, ConcurrentMap<File, StarTree>> entry : trees.entrySet()) {
+                entry.getValue().remove(path.toFile());
+              }
+              continue;
+            }
 
             if (file.getName().startsWith(StorageUtils.getDataDirPrefix())) {
               StorageUtils.waitForModifications(file, REFRESH_WAIT_SLEEP_MILLIS, REFRESH_WAIT_TIMEOUT_MILLIS);
@@ -255,6 +271,8 @@ public class StarTreeManagerImpl implements StarTreeManager {
                 }
               }
             }
+
+
           }
         } catch (Exception e) {
           LOGGER.error("Error while watching collection directory", e);
