@@ -149,8 +149,10 @@ public class StarTreePersistanceUtil {
     if (!bufferFile.createNewFile()) {
       throw new IOException(bufferFile + " already exists");
     }
-    IOUtils.copy(new ByteArrayInputStream(bufferBytes), new FileOutputStream(
-        bufferFile));
+
+    FileOutputStream bufferFileOutputStream = new FileOutputStream(bufferFile);
+    IOUtils.copy(new ByteArrayInputStream(bufferBytes), bufferFileOutputStream);
+    bufferFileOutputStream.close();
   }
 
   /**
@@ -174,8 +176,9 @@ public class StarTreePersistanceUtil {
     if (!indexFile.createNewFile()) {
       throw new IOException(indexFile + " already exists");
     }
-    IOUtils.copy(new ByteArrayInputStream(indexBytes), new FileOutputStream(
-        indexFile));
+    FileOutputStream indexFileOutputStream = new FileOutputStream(indexFile);
+    IOUtils.copy(new ByteArrayInputStream(indexBytes), indexFileOutputStream);
+    indexFileOutputStream.close();
   }
 
   public static List<int[]> readLeafRecords(String dataDir, String nodeId,
