@@ -546,6 +546,7 @@ function renderHeatMap(rawData, container, options) {
                     td.attr('title', $.map(cell.stats, function(val, key) {
                         return key + '=' + val
                     }).join("\n"))
+                    td.attr('dimension', heatMap.dimension);
 
                     // Annotate outliers
                     if (cell.stats['snapshot_category'] == 1) {
@@ -554,7 +555,7 @@ function renderHeatMap(rawData, container, options) {
 
                     // Drill-down click handler
                     td.click(function() {
-                        var name = $("#dimension-view-heat-map-" + heatMapId).attr('dimension')
+                        var name = $(this).attr('dimension')
                         var value = cell.value
                         var dimensionValues = parseDimensionValues(window.location.search)
                         dimensionValues[name] = value
