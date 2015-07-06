@@ -130,29 +130,37 @@ public class StarTreePersistanceUtil {
       List<DimensionSpec> dimensionSpecs,
       Map<String, Map<String, Integer>> forwardIndex,
       Iterable<StarTreeRecord> records, String nodeId) throws IOException {
-    // serialize buffer
-    ByteArrayOutputStream bufferStream = new ByteArrayOutputStream();
-    DataOutputStream bufferDataOutputStream = new DataOutputStream(bufferStream);
-    for (StarTreeRecord record : records) {
-      for (DimensionSpec dimensionSpec : dimensionSpecs) {
-        String dimValue = record.getDimensionKey().getDimensionValue(dimensionSpecs, dimensionSpec.getName());
-        int dimValueId = forwardIndex.get(dimensionSpec.getName()).get(dimValue);
-        bufferDataOutputStream.writeInt(dimValueId);
+
+    FileOutputStream bufferFileOutputStream = null;
+    try {
+      // serialize buffer
+      ByteArrayOutputStream bufferStream = new ByteArrayOutputStream();
+      DataOutputStream bufferDataOutputStream = new DataOutputStream(bufferStream);
+      for (StarTreeRecord record : records) {
+        for (DimensionSpec dimensionSpec : dimensionSpecs) {
+          String dimValue = record.getDimensionKey().getDimensionValue(dimensionSpecs, dimensionSpec.getName());
+          int dimValueId = forwardIndex.get(dimensionSpec.getName()).get(dimValue);
+          bufferDataOutputStream.writeInt(dimValueId);
+        }
+      }
+      bufferDataOutputStream.flush();
+      byte[] bufferBytes = bufferStream.toByteArray();
+
+      // Write buffer
+      File bufferFile = new File(outputDir, nodeId
+          + StarTreeConstants.BUFFER_FILE_SUFFIX);
+      if (!bufferFile.createNewFile()) {
+        throw new IOException(bufferFile + " already exists");
+      }
+
+      bufferFileOutputStream = new FileOutputStream(bufferFile);
+      IOUtils.copy(new ByteArrayInputStream(bufferBytes), bufferFileOutputStream);
+
+    } finally {
+      if (bufferFileOutputStream != null) {
+        bufferFileOutputStream.close();
       }
     }
-    bufferDataOutputStream.flush();
-    byte[] bufferBytes = bufferStream.toByteArray();
-
-    // Write buffer
-    File bufferFile = new File(outputDir, nodeId
-        + StarTreeConstants.BUFFER_FILE_SUFFIX);
-    if (!bufferFile.createNewFile()) {
-      throw new IOException(bufferFile + " already exists");
-    }
-
-    FileOutputStream bufferFileOutputStream = new FileOutputStream(bufferFile);
-    IOUtils.copy(new ByteArrayInputStream(bufferBytes), bufferFileOutputStream);
-    bufferFileOutputStream.close();
   }
 
   /**
@@ -167,18 +175,26 @@ public class StarTreePersistanceUtil {
   public static void saveLeafNodeForwardIndex(String outputDir,
       Map<String, Map<String, Integer>> forwardIndex, String nodeId)
       throws IOException {
-    // serialize index
-    byte[] indexBytes = OBJECT_MAPPER.writeValueAsBytes(forwardIndex);
 
-    // Write index
-    File indexFile = new File(outputDir, nodeId
-        + StarTreeConstants.INDEX_FILE_SUFFIX);
-    if (!indexFile.createNewFile()) {
-      throw new IOException(indexFile + " already exists");
+    FileOutputStream indexFileOutputStream = null;
+    try {
+      // serialize index
+      byte[] indexBytes = OBJECT_MAPPER.writeValueAsBytes(forwardIndex);
+
+      // Write index
+      File indexFile = new File(outputDir, nodeId
+          + StarTreeConstants.INDEX_FILE_SUFFIX);
+      if (!indexFile.createNewFile()) {
+        throw new IOException(indexFile + " already exists");
+      }
+      indexFileOutputStream = new FileOutputStream(indexFile);
+      IOUtils.copy(new ByteArrayInputStream(indexBytes), indexFileOutputStream);
+
+    } finally {
+      if (indexFileOutputStream != null) {
+        indexFileOutputStream.close();
+      }
     }
-    FileOutputStream indexFileOutputStream = new FileOutputStream(indexFile);
-    IOUtils.copy(new ByteArrayInputStream(indexBytes), indexFileOutputStream);
-    indexFileOutputStream.close();
   }
 
   public static List<int[]> readLeafRecords(String dataDir, String nodeId,
