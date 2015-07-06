@@ -179,6 +179,13 @@ $(document).ready(function() {
       $($(".sidenav-metric")[0]).attr('checked', 'checked')
     }
 
+    $(".custom-dashboard-link").click(function(event) {
+        event.preventDefault()
+        var dateTime = $("#sidenav-date").val().split('-').join('/')
+        var href = $(this).attr('href')
+        window.location.pathname = href + '/' + dateTime
+    })
+
     $("#sidenav-submit").click(function(event) {
         event.preventDefault()
 

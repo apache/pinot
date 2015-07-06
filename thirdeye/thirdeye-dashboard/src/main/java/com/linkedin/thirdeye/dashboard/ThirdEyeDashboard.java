@@ -42,11 +42,19 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
 
     QueryCache queryCache = new QueryCache(httpClient, environment.getObjectMapper(), queryExecutor);
 
+    CustomDashboardResource customDashboardResource = null;
+    if (config.getCustomDashboardRoot() != null) {
+      File customDashboardDir = new File(config.getCustomDashboardRoot());
+      customDashboardResource = new CustomDashboardResource(customDashboardDir, config.getServerUri(), queryCache, dataCache);
+      environment.jersey().register(customDashboardResource);
+    }
+
     environment.jersey().register(new DashboardResource(
         config.getServerUri(),
         dataCache,
         queryCache,
-        environment.getObjectMapper()));
+        environment.getObjectMapper(),
+        customDashboardResource));
 
     environment.jersey().register(new FlotTimeSeriesResource(
         config.getServerUri(),
@@ -54,15 +62,6 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
         environment.getObjectMapper()));
 
     environment.jersey().register(new MetadataResource(config.getServerUri(), dataCache));
-
-    if (config.getCustomDashboardRoot() != null) {
-      File customDashboardDir = new File(config.getCustomDashboardRoot());
-      environment.jersey().register(new CustomDashboardResource(
-          customDashboardDir,
-          config.getServerUri(),
-          queryCache,
-          dataCache));
-    }
 
     environment.admin().addTask(new ClearCachesTask(dataCache, queryCache));
   }

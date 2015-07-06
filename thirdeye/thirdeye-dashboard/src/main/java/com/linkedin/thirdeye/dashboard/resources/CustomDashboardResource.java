@@ -45,7 +45,7 @@ public class CustomDashboardResource {
   private final DataCache dataCache;
   private final ObjectMapper yamlObjectMapper;
   private final ObjectMapper objectMapper;
-  private final LoadingCache<String, CustomDashboardSpec> cache;
+  private final LoadingCache<CacheKey, CustomDashboardSpec> cache;
 
   public CustomDashboardResource(File customDashboardRoot,
                                  String serverUri,
@@ -62,21 +62,40 @@ public class CustomDashboardResource {
         .build(new CustomDashboardSpecLoader());
   }
 
-  private class CustomDashboardSpecLoader extends CacheLoader<String, CustomDashboardSpec> {
+  private class CustomDashboardSpecLoader extends CacheLoader<CacheKey, CustomDashboardSpec> {
     @Override
-    public CustomDashboardSpec load(String name) throws Exception {
-      File configFile = new File(customDashboardRoot, name);
+    public CustomDashboardSpec load(CacheKey key) throws Exception {
+      File collectionDir = new File(customDashboardRoot, key.getCollection());
+      File configFile = new File(collectionDir, key.getName());
       return yamlObjectMapper.readValue(configFile, CustomDashboardSpec.class);
     }
+  }
+
+  public List<String> getCustomDashboardNames(String collection) {
+    List<String> names = null;
+
+    File collectionDir = new File(customDashboardRoot, collection);
+    if (!collectionDir.isAbsolute()) {
+      throw new IllegalArgumentException("Not absolute " + collectionDir);
+    }
+
+    if (collectionDir.exists()) {
+      names = Arrays.asList(collectionDir.list());
+    }
+
+    return names;
   }
 
   // Config management
 
   @POST
-  @Path("/config/{name}")
+  @Path("/config/{collection}/{name}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response post(@PathParam("name") String name, byte[] config) {
-    File configFile = new File(customDashboardRoot, name);
+  public Response post(
+      @PathParam("collection") String collection,
+      @PathParam("name") String name, byte[] config) {
+    File collectionDir = new File(customDashboardRoot, collection);
+    File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
@@ -99,10 +118,11 @@ public class CustomDashboardResource {
   }
 
   @GET
-  @Path("/config/{name}")
+  @Path("/config/{collection}/{name}")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  public Response get(@PathParam("name") String name) {
-    File configFile = new File(customDashboardRoot, name);
+  public Response get(@PathParam("collection") String collection, @PathParam("name") String name) {
+    File collectionDir = new File(customDashboardRoot, collection);
+    File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
@@ -123,9 +143,10 @@ public class CustomDashboardResource {
   }
 
   @DELETE
-  @Path("/config/{name}")
-  public Response delete(@PathParam("name") String name) {
-    File configFile = new File(customDashboardRoot, name);
+  @Path("/config/{collection}/{name}")
+  public Response delete(@PathParam("collection") String collection, @PathParam("name") String name) {
+    File collectionDir = new File(customDashboardRoot, collection);
+    File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
@@ -149,13 +170,14 @@ public class CustomDashboardResource {
   // Dashboard rendering
 
   @GET
-  @Path("/dashboard/{name}/{year}/{month}/{day}")
+  @Path("/dashboard/{collection}/{name}/{year}/{month}/{day}")
   public CustomDashboardView getCustomDashboard(
+      @PathParam("collection") String collection,
       @PathParam("name") String name,
       @PathParam("year") Integer year,
       @PathParam("month") Integer month,
       @PathParam("day") Integer day) throws Exception {
-    CustomDashboardSpec spec = cache.get(name);
+    CustomDashboardSpec spec = cache.get(new CacheKey(collection, name));
 
     // Get funnel views
     List<Pair<CustomDashboardComponentSpec, View>> views = new ArrayList<>();
@@ -167,7 +189,6 @@ public class CustomDashboardResource {
         }
       }
 
-      String collection = spec.getCollection();
       List<String> metrics = componentSpec.getMetrics();
       String groupBy = componentSpec.getGroupBy();
 
@@ -387,5 +408,37 @@ public class CustomDashboardResource {
     }
 
     return data;
+  }
+
+  private static class CacheKey {
+    private final String collection;
+    private final String name;
+
+    CacheKey(String collection, String name) {
+      this.collection = collection;
+      this.name = name;
+    }
+
+    String getCollection() {
+      return collection;
+    }
+
+    String getName() {
+      return name;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(collection, name);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof CacheKey)) {
+        return false;
+      }
+      CacheKey k = (CacheKey) o;
+      return k.getName().equals(name) && k.getCollection().equals(collection);
+    }
   }
 }

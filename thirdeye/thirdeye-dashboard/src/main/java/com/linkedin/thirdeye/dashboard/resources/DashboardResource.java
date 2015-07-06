@@ -35,15 +35,18 @@ public class DashboardResource {
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
+  private final CustomDashboardResource customDashboardResource;
 
   public DashboardResource(String serverUri,
                            DataCache dataCache,
                            QueryCache queryCache,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           CustomDashboardResource customDashboardResource) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
+    this.customDashboardResource = customDashboardResource;
   }
 
   @GET
@@ -88,7 +91,13 @@ public class DashboardResource {
       throw new NotFoundException("No data loaded in server for " + collection);
     }
 
-    return new DashboardStartView(schema, earliestDataTime, latestDataTime);
+    // Any custom dashboards that are defined
+    List<String> customDashboardNames = null;
+    if (customDashboardResource != null) {
+      customDashboardNames = customDashboardResource.getCustomDashboardNames(collection);
+    }
+
+    return new DashboardStartView(collection, schema, earliestDataTime, latestDataTime, customDashboardNames);
   }
 
   @GET
@@ -188,6 +197,12 @@ public class DashboardResource {
       throw new NotFoundException("No data loaded in server for " + collection);
     }
 
+    // Any custom dashboards that are defined
+    List<String> customDashboardNames = null;
+    if (customDashboardResource != null) {
+      customDashboardNames = customDashboardResource.getCustomDashboardNames(collection);
+    }
+
     try {
       View metricView = getMetricView(
           collection, metricFunction, metricViewType, baselineMillis, currentMillis, uriInfo);
@@ -196,13 +211,15 @@ public class DashboardResource {
           collection, metricFunction, dimensionViewType, baselineMillis, currentMillis, uriInfo);
 
       return new DashboardView(
+          collection,
           dataCache.getCollectionSchema(serverUri, collection),
           new DateTime(baselineMillis),
           new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
           new DimensionView(dimensionView, dimensionViewType),
           earliestDataTime,
-          latestDataTime);
+          latestDataTime,
+          customDashboardNames);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e;  // sends appropriate HTTP response

@@ -141,6 +141,17 @@
                     <button id="sidenav-submit" class="uk-button uk-button-small uk-button-primary">Go</button>
                 </div>
             </form>
+
+            <#if (customDashboardNames??)>
+              <hr />
+              <ul>
+                <#list customDashboardNames as customDashboardName>
+                <li>
+                  <a class="custom-dashboard-link" href="/custom-dashboard/dashboard/${collection}/${customDashboardName}">${customDashboardName}</a>
+                </li>
+                </#list>
+              </ul>
+            </#if>
         </li>
     </ul>
 </div>
