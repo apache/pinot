@@ -544,7 +544,14 @@ function renderHeatMap(rawData, container, options) {
                     td.css('background-color', options.backgroundColor(cell))
                     td.hover(function() { $(this).css('cursor', 'pointer') })
                     td.attr('title', $.map(cell.stats, function(val, key) {
-                        return key + '=' + val
+                        if (val !== null && (key === 'baseline_cdf_value'
+                            || key === 'current_cdf_value'
+                            || key === 'contribution_difference'
+                            || key === 'volume_difference')) {
+                            return key + '=' + val.toFixed(2)
+                        } else {
+                            return key + '=' + val
+                        }
                     }).join("\n"))
                     td.attr('dimension', heatMap.dimension);
 
