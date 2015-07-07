@@ -1,9 +1,5 @@
 <script src="/assets/js/thirdeye.dimension.timeseries.js"></script>
 
-<div id="dimension-time-series-buttons">
-    <button class="dimension-time-series-button-mode uk-button" type="button">Split</button>
-</div>
-
 <div id="dimension-time-series-area">
     <#list dimensionView.view.dimensions as dimension>
         <h3 class="dimension-time-series-title" dimension="${dimension}"></h3>
