@@ -37,6 +37,9 @@ public class TestStarTreeManagerImpl {
   ObjectMapper objectMapper;
   Map<File, StarTree> starTrees;
   Properties properties;
+  private StarTreeManager manager;
+  private int previousHash;
+  private long timeout = 25000;
 
   @BeforeClass
   public void beforeClass() throws Exception
@@ -92,8 +95,9 @@ public class TestStarTreeManagerImpl {
   @Test
   void testDataRefresh() throws Exception {
 
-    StarTreeManager manager = new StarTreeManagerImpl();
+    manager = new StarTreeManagerImpl();
     manager.restore(rootDir, collection);
+    previousHash = manager.getStarTrees(collection).hashCode();
 
     // create data directory
     File dataDir1 = new File(collectionDir, "data_1");
@@ -101,26 +105,26 @@ public class TestStarTreeManagerImpl {
     FileUtils.moveFile(new File(dataDir1, collection+"-tree.bin"), new File(dataDir1, StarTreeConstants.TREE_FILE_NAME));
     properties.store(new FileOutputStream(new File(dataDir1, StarTreeConstants.METADATA_FILE_NAME)), "properties file");
 
-    TimeUnit.SECONDS.sleep(15);
+    pollForStarTreesUpdate();
 
     starTrees = manager.getStarTrees(collection);
-    Assert.assertEquals(starTrees.size(), 1);
+    Assert.assertEquals("starTrees not updated", starTrees.size(), 1);
     Assert.assertNotNull(starTrees.get(dataDir1));
 
+    previousHash = manager.getStarTrees(collection).hashCode();
     // delete segment
     FileUtils.deleteDirectory(dataDir1);
-
     // create new data directory
     File dataDir2 = new File(collectionDir, "data_2");
     StarTreePersistanceUtil.saveTree(starTree, dataDir2.getPath());
     FileUtils.moveFile(new File(dataDir2, collection+"-tree.bin"), new File(dataDir2, StarTreeConstants.TREE_FILE_NAME));
     properties.store(new FileOutputStream(new File(dataDir2, StarTreeConstants.METADATA_FILE_NAME)), "properties file");
 
-    TimeUnit.SECONDS.sleep(15);
+    pollForStarTreesUpdate();
 
     starTrees = manager.getStarTrees(collection);
     Assert.assertEquals(starTrees.size(), 1);
-    Assert.assertNull(starTrees.get(dataDir1));
+    Assert.assertNull("starTrees did not delete old tree", starTrees.get(dataDir1));
     Assert.assertNotNull(starTrees.get(dataDir2));
 
     FileUtils.deleteDirectory(dataDir1);
@@ -137,6 +141,15 @@ public class TestStarTreeManagerImpl {
   private DimensionKey getDimensionKey(String a, String b, String c)
   {
     return new DimensionKey(new String[] {a, b, c});
+  }
+
+  private void pollForStarTreesUpdate() throws InterruptedException {
+
+    long start = System.currentTimeMillis();
+    while ((System.currentTimeMillis() - start) < timeout && previousHash == manager.getStarTrees(collection).hashCode()) {
+      TimeUnit.MILLISECONDS.sleep(1000);
+    }
+    Assert.assertTrue("Watch system did not trigger", (System.currentTimeMillis() - start) < timeout);
   }
 
 }
