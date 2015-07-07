@@ -168,6 +168,14 @@
     border-collapse: collapse;
 }
 
+#dimension-heat-map-help {
+    float: right;
+}
+
+.cell-up, .cell-down {
+    float: right;
+}
+
 /* Both */
 
 .time-series-legend {
