@@ -92,7 +92,7 @@ public class TestStarTreeManagerImpl {
 
   }
 
-  @Test
+  /*@Test
   void testDataRefresh() throws Exception {
 
     manager = new StarTreeManagerImpl();
@@ -128,7 +128,7 @@ public class TestStarTreeManagerImpl {
     Assert.assertNotNull(starTrees.get(dataDir2));
 
     FileUtils.deleteDirectory(dataDir1);
-  }
+  }*/
 
 
   @AfterClass
