@@ -220,8 +220,14 @@ public class StarTreeManagerImpl implements StarTreeManager {
             File file = path.toFile();
 
             LOGGER.info("{} {}", ev.kind(), path);
+            for (Entry<String, ConcurrentMap<File, StarTree>> collectionEntry : trees.entrySet()) {
+              for (Entry<File, StarTree> mapEntry : collectionEntry.getValue().entrySet()) {
 
-            if (ev.kind().equals(ENTRY_DELETE)) {
+                  LOGGER.info("file : {}", mapEntry.getKey());
+              }
+            }
+
+            if (file.getName().startsWith(StorageUtils.getDataDirPrefix()) && ev.kind().equals(ENTRY_DELETE)) {
               for (Entry<String, ConcurrentMap<File, StarTree>> entry : trees.entrySet()) {
                 entry.getValue().remove(path.toFile());
               }
