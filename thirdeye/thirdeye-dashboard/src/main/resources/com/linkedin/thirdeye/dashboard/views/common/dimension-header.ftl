@@ -7,6 +7,8 @@
             <li>
                 <#if dimensionValue == "*">
                     ${dimensionName}:ALL
+                <#elseif dimensionValue == "?">
+                    <a href="#" class="dimension-link" dimension="${dimensionName}">${dimensionName}:OTHER</a>
                 <#else>
                     <a href="#" class="dimension-link" dimension="${dimensionName}">${dimensionName}:${dimensions[dimensionName]}</a>
                 </#if>

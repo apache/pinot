@@ -17,7 +17,11 @@ $(document).ready(function() {
             }
         },
         display: function(cell) {
-            return cell.value + '<br/>' + (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
+            var value = cell.value
+            if (value === '?') {
+                value = 'OTHER'
+            }
+            return value + '<br/>' + (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
         },
         backgroundColor: function(cell) {
             if (cell.stats['baseline_cdf_value'] == null) {
@@ -43,7 +47,11 @@ $(document).ready(function() {
             }
         },
         display: function(cell) {
-            return cell.value + '<br/>' + (cell.stats['contribution_difference'] * 100).toFixed(2) + '%'
+            var value = cell.value
+            if (value === '?') {
+                value = 'OTHER'
+            }
+            return value + '<br/>' + (cell.stats['contribution_difference'] * 100).toFixed(2) + '%'
         },
         backgroundColor: function(cell) {
             if (cell.stats['contribution_difference'] < 0) {
