@@ -102,25 +102,35 @@ public class TarGzCompressionUtils {
     File f = new File(path);
     String entryName = base + f.getName();
     TarArchiveEntry tarEntry = new TarArchiveEntry(f, entryName);
+    FileInputStream fis = null;
 
-    tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
-    tOut.putArchiveEntry(tarEntry);
+    try {
+      tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
-    if (f.isFile()) {
-      IOUtils.copy(new FileInputStream(f), tOut);
+      tOut.putArchiveEntry(tarEntry);
 
-      tOut.closeArchiveEntry();
-    } else {
-      tOut.closeArchiveEntry();
+      if (f.isFile()) {
+        fis = new FileInputStream(f);
+        IOUtils.copy(fis, tOut);
 
-      File[] children = f.listFiles();
+        tOut.closeArchiveEntry();
+      } else {
+        tOut.closeArchiveEntry();
 
-      if (children != null) {
-        for (File child : children) {
-          addFileToTarGz(tOut, child.getAbsolutePath(), entryName + "/");
+        File[] children = f.listFiles();
+
+        if (children != null) {
+          for (File child : children) {
+            addFileToTarGz(tOut, child.getAbsolutePath(), entryName + "/");
+          }
         }
       }
+    } finally {
+      if (fis != null) {
+        fis.close();
+      }
     }
+
   }
 
   /** Untar an input file into an output file.
