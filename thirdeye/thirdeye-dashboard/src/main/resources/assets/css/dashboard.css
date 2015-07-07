@@ -143,14 +143,6 @@
     clear: both;
 }
 
-.metric-table-time:hover {
-    cursor: pointer;
-}
-
-.flot-base, .flot-overlay {
-  position: relative !important;
-}
-
 /* Dimension */
 
 #dimension-heat-map-area,
