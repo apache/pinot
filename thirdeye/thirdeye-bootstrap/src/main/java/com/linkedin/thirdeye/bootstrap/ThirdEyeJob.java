@@ -514,6 +514,42 @@ public class ThirdEyeJob {
         return null; // unused
       }
     },
+    SERVER_PACKAGE {
+      @Override
+      Class<?> getKlazz() {
+        return null; // unused
+      }
+
+      @Override
+      String getDescription() {
+        return "Packages data to upload to thirdeye.server.uri";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+          throws Exception {
+        return null; // unused
+      }
+    },
+    SERVER_UPLOAD {
+      @Override
+      Class<?> getKlazz() {
+        return null; // unused
+      }
+
+      @Override
+      String getDescription() {
+        return "Pushes packaged data to thirdeye.server.uri";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+          throws Exception {
+        return null; // unused
+      }
+    },
     CLEANUP {
 
       @Override
@@ -711,6 +747,124 @@ public class ThirdEyeJob {
     return Joiner.on(INPUT_PATHS_JOINER).join(filteredInputs);
   }
 
+  private void serverPackage(String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws Exception {
+    FileSystem fileSystem = FileSystem.get(new Configuration());
+
+    // Get config file to package
+    Path configPath =
+        new Path(root + File.separator + collection + File.separator
+            + StarTreeConstants.CONFIG_FILE_NAME);
+
+    // Get data to package
+    String schedule =
+        inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+    String metricIndexDir =
+        PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getMetricIndexDir(root, collection, flowSpec,
+            minTime, maxTime);
+    String bootstrapPhase2Output =
+        metricIndexDir + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName();
+    Path dataPath = new Path(bootstrapPhase2Output);
+    String outputTarGzFile = metricIndexDir + "/data.tar.gz";
+
+    Path outputTarGzFilePath = new Path(outputTarGzFile);
+    if (!fileSystem.exists(outputTarGzFilePath)) {
+      LOGGER.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
+      TarGzBuilder builder = new TarGzBuilder(outputTarGzFile, fileSystem, fileSystem);
+      RemoteIterator<LocatedFileStatus> listFiles = fileSystem.listFiles(dataPath, false);
+
+      List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
+
+      // get merged metadata file
+      while (listFiles.hasNext())
+      {
+        Path path = listFiles.next().getPath();
+        IndexMetadata localIndexMetadata = builder.getMetadataObjectBootstrap(path);
+        if (localIndexMetadata != null) {
+          indexMetadataList.add(localIndexMetadata);
+        }
+      }
+
+      if (indexMetadataList.size() == 0)
+      {
+        throw new IllegalStateException("No metadata files found");
+      }
+
+      Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
+      IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList,
+          minTime.getMillis(), maxTime.getMillis(), schedule);
+      writeMergedIndexMetadataServerPush(fileSystem, metadataPath, mergedIndexMetadata);
+
+      listFiles = fileSystem.listFiles(dataPath, false);
+
+      while (listFiles.hasNext()) {
+        Path path = listFiles.next().getPath();
+        LOGGER.info("Adding {}, to {}", path, outputTarGzFile);
+        if (path.getName().equals(StarTreeConstants.TREE_FILE_NAME) ||
+            path.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
+        {
+          builder.addFileEntry(path);
+        }
+        else
+        {
+          // its either dimensionStore.tar.gz or metricStore-x.tar.gz
+          builder.addTarGzFile(path);
+        }
+      }
+
+      builder.addFileEntry(configPath);
+
+      builder.finish();
+      if (fileSystem.exists(outputTarGzFilePath)) {
+        LOGGER.info("Successfully created {}.", outputTarGzFilePath);
+      } else {
+        throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
+      }
+    } else {
+      LOGGER.info(outputTarGzFile + " already exists. Skipping the tar.gz creation step");
+    }
+  }
+
+  private void serverUpload(String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws IOException {
+    String thirdEyeServerUri =
+        inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName());
+    if (thirdEyeServerUri == null) {
+      throw new IllegalArgumentException("Must provide "
+          + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName() + " in properties");
+    }
+
+    FileSystem fileSystem = FileSystem.get(new Configuration());
+
+    // Push config (may 409 but that's okay)
+    Path configPath =
+        new Path(root + File.separator + collection + File.separator
+            + StarTreeConstants.CONFIG_FILE_NAME);
+    InputStream configData = fileSystem.open(configPath);
+    int responseCode = StarTreeJobUtils.pushConfig(configData, thirdEyeServerUri, collection);
+    configData.close();
+    LOGGER.info("Load {} #=> {}", configPath, responseCode);
+
+    // Push data
+    String schedule =
+        inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+    String metricIndexDir =
+        PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getMetricIndexDir(root, collection, flowSpec,
+            minTime, maxTime);
+    String outputTarGzFile = metricIndexDir + "/data.tar.gz";
+    Path outputTarGzFilePath = new Path(outputTarGzFile);
+
+    if (fileSystem.exists(outputTarGzFilePath)) {
+      LOGGER.info("Uploading {} of size:{} to ThirdEye Server: {}", outputTarGzFile, fileSystem
+          .getFileStatus(outputTarGzFilePath).getLen(), thirdEyeServerUri);
+      FSDataInputStream outputDataStream = fileSystem.open(outputTarGzFilePath);
+      responseCode =
+          StarTreeJobUtils.pushData(outputDataStream, thirdEyeServerUri, collection, minTime,
+              maxTime, schedule);
+      LOGGER.info("Load {} #=> response code: {}", outputTarGzFile, responseCode);
+    } else {
+      throw new RuntimeException("Uploading of" + outputTarGzFile + " failed");
+    }
+  }
+
   private void purgeLowerGranularity(DateTime minTime, DateTime maxTime, String schedule, Path dimensionIndexDir, Path metricIndexDir) throws IOException {
 
     LOGGER.info("Created folder with higher granularity {} ", new Path(dimensionIndexDir,
@@ -804,6 +958,8 @@ public class ThirdEyeJob {
     case STARTREE_BOOTSTRAP_PHASE1:
     case STARTREE_BOOTSTRAP_PHASE2:
     case SERVER_PUSH:
+    case SERVER_PACKAGE:
+    case SERVER_UPLOAD:
     case CLEANUP:
       flowSpec = FlowSpec.METRIC_INDEX;
       break;
@@ -846,105 +1002,13 @@ public class ThirdEyeJob {
     }
 
     if (PhaseSpec.SERVER_PUSH.equals(phaseSpec)) {
-      String thirdEyeServerUri =
-          inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName());
-      if (thirdEyeServerUri == null) {
-        throw new IllegalArgumentException("Must provide "
-            + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName() + " in properties");
-      }
 
-      FileSystem fileSystem = FileSystem.get(new Configuration());
-
-      // Push config (may 409 but that's okay)
-      Path configPath =
-          new Path(root + File.separator + collection + File.separator
-              + StarTreeConstants.CONFIG_FILE_NAME);
-      InputStream configData = fileSystem.open(configPath);
-      int responseCode = StarTreeJobUtils.pushConfig(configData, thirdEyeServerUri, collection);
-      configData.close();
-      LOGGER.info("Load {} #=> {}", configPath, responseCode);
-
-      // Push data
-      String schedule =
-          inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+      serverPackage(root, collection, flowSpec, minTime, maxTime);
+      serverUpload(root, collection, flowSpec, minTime, maxTime);
       String metricIndexDir =
           PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getMetricIndexDir(root, collection, flowSpec,
               minTime, maxTime);
-      String bootstrapPhase2Output =
-          metricIndexDir + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName();
-      Path dataPath = new Path(bootstrapPhase2Output);
-      String outputTarGzFile = metricIndexDir + "/data.tar.gz";
-
-      Path outputTarGzFilePath = new Path(outputTarGzFile);
-      if (!fileSystem.exists(outputTarGzFilePath)) {
-        LOGGER.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
-        TarGzBuilder builder = new TarGzBuilder(outputTarGzFile, fileSystem, fileSystem);
-        RemoteIterator<LocatedFileStatus> listFiles = fileSystem.listFiles(dataPath, false);
-
-        List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
-
-        // get merged metadata file
-        while (listFiles.hasNext())
-        {
-          Path path = listFiles.next().getPath();
-          IndexMetadata localIndexMetadata = builder.getMetadataObjectBootstrap(path);
-          if (localIndexMetadata != null) {
-            indexMetadataList.add(localIndexMetadata);
-          }
-        }
-
-        if (indexMetadataList.size() == 0)
-        {
-          throw new IllegalStateException("No metadata files found");
-        }
-
-        Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
-        IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList,
-            minTime.getMillis(), maxTime.getMillis(), schedule);
-        writeMergedIndexMetadataServerPush(fileSystem, metadataPath, mergedIndexMetadata);
-
-        listFiles = fileSystem.listFiles(dataPath, false);
-
-        while (listFiles.hasNext()) {
-          Path path = listFiles.next().getPath();
-          LOGGER.info("Adding {}, to {}", path, outputTarGzFile);
-          if (path.getName().equals(StarTreeConstants.TREE_FILE_NAME) ||
-              path.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
-          {
-            builder.addFileEntry(path);
-          }
-          else
-          {
-            // its either dimensionStore.tar.gz or metricStore-x.tar.gz
-            builder.addTarGzFile(path);
-          }
-        }
-
-        builder.addFileEntry(configPath);
-
-        builder.finish();
-        if (fileSystem.exists(outputTarGzFilePath)) {
-          LOGGER.info("Successfully created {}.", outputTarGzFilePath);
-        } else {
-          throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
-        }
-      } else {
-        LOGGER.info(outputTarGzFile + " already exists. Skipping the tar.gz creation step");
-      }
-
-      if (fileSystem.exists(outputTarGzFilePath)) {
-        LOGGER.info("Uploading {} of size:{} to ThirdEye Server: {}", outputTarGzFile, fileSystem
-            .getFileStatus(outputTarGzFilePath).getLen(), thirdEyeServerUri);
-        FSDataInputStream outputDataStream = fileSystem.open(outputTarGzFilePath);
-        responseCode =
-            StarTreeJobUtils.pushData(outputDataStream, thirdEyeServerUri, collection, minTime,
-                maxTime, schedule);
-        LOGGER.info("Load {} #=> response code: {}", outputTarGzFile, responseCode);
-      } else {
-        throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
-      }
-
-      String thirdeyeFolderPermission = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FOLDER_PERMISSION.getName(), DEFAULT_FOLDER_PERMISSION);
+     String thirdeyeFolderPermission = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FOLDER_PERMISSION.getName(), DEFAULT_FOLDER_PERMISSION);
       if (!thirdeyeFolderPermission.matches(FOLDER_PERMISSION_REGEX))
       {
         throw new IllegalArgumentException("Invalid folder permission mode. Must provide octal "+FOLDER_PERMISSION_REGEX);
@@ -964,6 +1028,10 @@ public class ThirdEyeJob {
 
 
 
+    } else if (PhaseSpec.SERVER_PACKAGE.equals(phaseSpec)) {
+      serverPackage(root, collection, flowSpec, minTime, maxTime);
+    } else if (PhaseSpec.SERVER_UPLOAD.equals(phaseSpec)) {
+      serverUpload(root, collection, flowSpec, minTime, maxTime);
     } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
 
       // Check if we need to poll for any input paths
