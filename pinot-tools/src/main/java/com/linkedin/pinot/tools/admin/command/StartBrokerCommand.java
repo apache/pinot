@@ -44,6 +44,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
+  @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },

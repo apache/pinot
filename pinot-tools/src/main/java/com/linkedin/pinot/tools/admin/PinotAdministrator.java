@@ -24,12 +24,12 @@ import org.kohsuke.args4j.spi.SubCommand;
 import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
 
-import com.linkedin.pinot.tools.Quickstart;
 import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
 import com.linkedin.pinot.tools.admin.command.Command;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
+import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
 import com.linkedin.pinot.tools.admin.command.GenerateDataCommand;
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
 import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
@@ -65,7 +65,7 @@ public class PinotAdministrator {
       @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
       @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
       @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
-      @SubCommand(name = "Quickstart", impl = Quickstart.class)
+      @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
   })
   Command _subCommand;
   // @formatter:on
