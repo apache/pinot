@@ -496,24 +496,6 @@ public class ThirdEyeJob {
         return config;
       }
     },
-    SERVER_PUSH {
-      @Override
-      Class<?> getKlazz() {
-        return null; // unused
-      }
-
-      @Override
-      String getDescription() {
-        return "Pushes data to thirdeye.server.uri";
-      }
-
-      @Override
-      Properties getJobProperties(Properties inputConfig, String root, String collection,
-          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
-          throws Exception {
-        return null; // unused
-      }
-    },
     SERVER_PACKAGE {
       @Override
       Class<?> getKlazz() {
@@ -755,7 +737,7 @@ public class ThirdEyeJob {
         new Path(root + File.separator + collection + File.separator
             + StarTreeConstants.CONFIG_FILE_NAME);
 
-    // Get data to package
+    // Get data to package : overwrites existing data.tar.gz
     String schedule =
         inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
     String metricIndexDir =
@@ -765,66 +747,57 @@ public class ThirdEyeJob {
         metricIndexDir + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName();
     Path dataPath = new Path(bootstrapPhase2Output);
     String outputTarGzFile = metricIndexDir + "/data.tar.gz";
-
     Path outputTarGzFilePath = new Path(outputTarGzFile);
-    if (!fileSystem.exists(outputTarGzFilePath)) {
-      LOGGER.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
-      TarGzBuilder builder = new TarGzBuilder(outputTarGzFile, fileSystem, fileSystem);
-      RemoteIterator<LocatedFileStatus> listFiles = fileSystem.listFiles(dataPath, false);
 
-      List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
+    LOGGER.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
+    fileSystem.delete(new Path(dataPath, StarTreeConstants.METADATA_FILE_NAME), false);
+    TarGzBuilder builder = new TarGzBuilder(outputTarGzFile, fileSystem, fileSystem);
+    RemoteIterator<LocatedFileStatus> listFiles = fileSystem.listFiles(dataPath, false);
 
-      // get merged metadata file
-      while (listFiles.hasNext())
+    List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
+    // get merged metadata file
+    while (listFiles.hasNext()) {
+      Path path = listFiles.next().getPath();
+      IndexMetadata localIndexMetadata = builder.getMetadataObjectBootstrap(path);
+      if (localIndexMetadata != null) {
+        indexMetadataList.add(localIndexMetadata);
+      }
+    }
+    if (indexMetadataList.size() == 0) {
+      throw new IllegalStateException("No metadata files found");
+    }
+    Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
+    IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList,
+        minTime.getMillis(), maxTime.getMillis(), schedule);
+    writeMergedIndexMetadataServerPush(fileSystem, metadataPath, mergedIndexMetadata);
+
+    listFiles = fileSystem.listFiles(dataPath, false);
+    while (listFiles.hasNext()) {
+      Path path = listFiles.next().getPath();
+      LOGGER.info("Adding {}, to {}", path, outputTarGzFile);
+      if (path.getName().equals(StarTreeConstants.TREE_FILE_NAME) ||
+          path.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
       {
-        Path path = listFiles.next().getPath();
-        IndexMetadata localIndexMetadata = builder.getMetadataObjectBootstrap(path);
-        if (localIndexMetadata != null) {
-          indexMetadataList.add(localIndexMetadata);
-        }
+        builder.addFileEntry(path);
       }
-
-      if (indexMetadataList.size() == 0)
+      else
       {
-        throw new IllegalStateException("No metadata files found");
+        // its either dimensionStore.tar.gz or metricStore-x.tar.gz
+        builder.addTarGzFile(path);
       }
+    }
 
-      Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
-      IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList,
-          minTime.getMillis(), maxTime.getMillis(), schedule);
-      writeMergedIndexMetadataServerPush(fileSystem, metadataPath, mergedIndexMetadata);
+    builder.addFileEntry(configPath);
 
-      listFiles = fileSystem.listFiles(dataPath, false);
-
-      while (listFiles.hasNext()) {
-        Path path = listFiles.next().getPath();
-        LOGGER.info("Adding {}, to {}", path, outputTarGzFile);
-        if (path.getName().equals(StarTreeConstants.TREE_FILE_NAME) ||
-            path.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
-        {
-          builder.addFileEntry(path);
-        }
-        else
-        {
-          // its either dimensionStore.tar.gz or metricStore-x.tar.gz
-          builder.addTarGzFile(path);
-        }
-      }
-
-      builder.addFileEntry(configPath);
-
-      builder.finish();
-      if (fileSystem.exists(outputTarGzFilePath)) {
-        LOGGER.info("Successfully created {}.", outputTarGzFilePath);
-      } else {
-        throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
-      }
+    builder.finish();
+    if (fileSystem.exists(outputTarGzFilePath)) {
+      LOGGER.info("Successfully created {}.", outputTarGzFilePath);
     } else {
-      LOGGER.info(outputTarGzFile + " already exists. Skipping the tar.gz creation step");
+      throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
     }
   }
 
-  private void serverUpload(String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws IOException {
+  private void serverUpload(String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws Exception {
     String thirdEyeServerUri =
         inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName());
     if (thirdEyeServerUri == null) {
@@ -861,8 +834,26 @@ public class ThirdEyeJob {
               maxTime, schedule);
       LOGGER.info("Load {} #=> response code: {}", outputTarGzFile, responseCode);
     } else {
-      throw new RuntimeException("Uploading of" + outputTarGzFile + " failed");
+      throw new RuntimeException("Uploading of " + outputTarGzFile + " failed : package does not exist");
     }
+
+    String thirdeyeFolderPermission = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FOLDER_PERMISSION.getName(), DEFAULT_FOLDER_PERMISSION);
+    if (!thirdeyeFolderPermission.matches(FOLDER_PERMISSION_REGEX))
+    {
+      throw new IllegalArgumentException("Invalid folder permission mode. Must provide octal "+FOLDER_PERMISSION_REGEX);
+    }
+
+    String dimensionIndexDir = PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getDimensionIndexDir
+        (root, collection, Joiner.on(DATA_FOLDER_JOINER).join(
+            StarTreeConstants.DATA_DIR_PREFIX,
+            StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
+            StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime)));
+
+    FsShell shell = new FsShell(new Configuration());
+    LOGGER.info("Changing permission of {} to {}", dimensionIndexDir, thirdeyeFolderPermission);
+    shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, dimensionIndexDir});
+    LOGGER.info("Changing permission of {} to {}", metricIndexDir, thirdeyeFolderPermission);
+    shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, metricIndexDir});
   }
 
   private void purgeLowerGranularity(DateTime minTime, DateTime maxTime, String schedule, Path dimensionIndexDir, Path metricIndexDir) throws IOException {
@@ -957,7 +948,6 @@ public class ThirdEyeJob {
       break;
     case STARTREE_BOOTSTRAP_PHASE1:
     case STARTREE_BOOTSTRAP_PHASE2:
-    case SERVER_PUSH:
     case SERVER_PACKAGE:
     case SERVER_UPLOAD:
     case CLEANUP:
@@ -1001,34 +991,7 @@ public class ThirdEyeJob {
           + ThirdEyeJobConstants.THIRDEYE_TIME_MAX.getName());
     }
 
-    if (PhaseSpec.SERVER_PUSH.equals(phaseSpec)) {
-
-      serverPackage(root, collection, flowSpec, minTime, maxTime);
-      serverUpload(root, collection, flowSpec, minTime, maxTime);
-      String metricIndexDir =
-          PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getMetricIndexDir(root, collection, flowSpec,
-              minTime, maxTime);
-     String thirdeyeFolderPermission = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FOLDER_PERMISSION.getName(), DEFAULT_FOLDER_PERMISSION);
-      if (!thirdeyeFolderPermission.matches(FOLDER_PERMISSION_REGEX))
-      {
-        throw new IllegalArgumentException("Invalid folder permission mode. Must provide octal "+FOLDER_PERMISSION_REGEX);
-      }
-
-      String dimensionIndexDir = PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getDimensionIndexDir
-          (root, collection, Joiner.on(DATA_FOLDER_JOINER).join(
-              StarTreeConstants.DATA_DIR_PREFIX,
-              StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
-              StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime)));
-
-      FsShell shell = new FsShell(new Configuration());
-      LOGGER.info("Changing permission of {} to {}", dimensionIndexDir, thirdeyeFolderPermission);
-      shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, dimensionIndexDir});
-      LOGGER.info("Changing permission of {} to {}", metricIndexDir, thirdeyeFolderPermission);
-      shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, metricIndexDir});
-
-
-
-    } else if (PhaseSpec.SERVER_PACKAGE.equals(phaseSpec)) {
+    if (PhaseSpec.SERVER_PACKAGE.equals(phaseSpec)) {
       serverPackage(root, collection, flowSpec, minTime, maxTime);
     } else if (PhaseSpec.SERVER_UPLOAD.equals(phaseSpec)) {
       serverUpload(root, collection, flowSpec, minTime, maxTime);
