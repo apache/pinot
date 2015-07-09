@@ -86,17 +86,23 @@ public class DataCache {
 
         // Dimensions
         List<String> dimensions = new ArrayList<>();
+        List<String> dimensionAliases = new ArrayList<>();
         for (JsonNode dimension : json.get("dimensions")) {
           dimensions.add(dimension.get("name").asText());
+          dimensionAliases.add(dimension.get("alias").isNull() ? null : dimension.get("alias").asText());
         }
         schema.setDimensions(dimensions);
+        schema.setDimensionAliases(dimensionAliases);
 
         // Metrics
         List<String> metrics = new ArrayList<>();
-        for (JsonNode dimension : json.get("metrics")) {
-          metrics.add(dimension.get("name").asText());
+        List<String> metricAliases = new ArrayList<>();
+        for (JsonNode metric : json.get("metrics")) {
+          metrics.add(metric.get("name").asText());
+          metricAliases.add(metric.get("alias").isNull() ? null : metric.get("alias").asText());
         }
         schema.setMetrics(metrics);
+        schema.setMetricAliases(metricAliases);
       } finally {
         EntityUtils.consume(response.getEntity());
       }

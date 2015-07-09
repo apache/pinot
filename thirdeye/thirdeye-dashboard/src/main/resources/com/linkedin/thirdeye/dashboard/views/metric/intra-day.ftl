@@ -15,6 +15,7 @@
 
     <#list (metricView.view.metricTables)!metricTables as metricTable>
         <#assign dimensions = metricTable.dimensionValues>
+        <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
         <#include "../common/dimension-header.ftl">
         <table class="uk-table uk-table-striped">
             <thead>
@@ -23,7 +24,9 @@
                     <#assign groupIdx = 0>
                     <#list (metricView.view.metricNames)!metricNames as metricName>
                         <#assign groupId = (groupIdx % 2)>
-                        <th colspan="3" class="uk-text-center metric-table-group-${groupId}">${metricName}</th>
+                        <th colspan="3" class="uk-text-center metric-table-group-${groupId}">
+                          ${(metricView.view.metricAliases!metricAliases)[metricName]!metricName}
+                        </th>
                         <#assign groupIdx = groupIdx + 1>
                     </#list>
                 </tr>

@@ -250,6 +250,7 @@ public class DashboardResource {
         LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
         QueryResult result = queryCache.getQueryResult(serverUri, sql);
         return new MetricViewTabular(
+            schema,
             objectMapper,
             result,
             currentMillis - baselineMillis,
@@ -313,7 +314,7 @@ public class DashboardResource {
         for (Map.Entry<String, Future<QueryResult>> entry : resultFutures.entrySet()) {
           results.put(entry.getKey(), entry.getValue().get());
         }
-        return new DimensionViewHeatMap(objectMapper, results);
+        return new DimensionViewHeatMap(schema, objectMapper, results);
       default:
         throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }

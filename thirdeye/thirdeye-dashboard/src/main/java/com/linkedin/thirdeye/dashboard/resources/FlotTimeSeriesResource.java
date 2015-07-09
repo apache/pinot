@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.FlotTimeSeries;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.UriUtils;
@@ -25,11 +27,13 @@ import java.util.concurrent.Future;
 public class FlotTimeSeriesResource {
   private static final String BASELINE_LABEL_PREFIX = "BASELINE_";
   private final String serverUri;
+  private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
 
-  public FlotTimeSeriesResource(String serverUri, QueryCache queryCache, ObjectMapper objectMapper) {
+  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache, ObjectMapper objectMapper) {
     this.serverUri = serverUri;
+    this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
   }
@@ -45,9 +49,10 @@ public class FlotTimeSeriesResource {
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
     Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
     QueryResult queryResult = queryCache.getQueryResult(serverUri, sql).checkEmpty();
-    return FlotTimeSeries.fromQueryResult(objectMapper, queryResult);
+    return FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
   }
 
   @GET
@@ -64,6 +69,7 @@ public class FlotTimeSeriesResource {
     DateTime currentRangeStart = new DateTime(currentMillis - windowMillis);
     DateTime currentRangeEnd = new DateTime(currentMillis);
     Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
     // Generate SQL
     String baselineSeriesSql
@@ -79,9 +85,9 @@ public class FlotTimeSeriesResource {
 
     // Generate series
     List<FlotTimeSeries> baselineSeries
-        = FlotTimeSeries.fromQueryResult(objectMapper, baselineResult.get().checkEmpty(), BASELINE_LABEL_PREFIX);
+        = FlotTimeSeries.fromQueryResult(schema, objectMapper, baselineResult.get().checkEmpty(), BASELINE_LABEL_PREFIX);
     List<FlotTimeSeries> currentSeries
-        = FlotTimeSeries.fromQueryResult(objectMapper, currentResult.get().checkEmpty());
+        = FlotTimeSeries.fromQueryResult(schema, objectMapper, currentResult.get().checkEmpty());
 
     // Shift all baseline results up by window size
     long offsetMillis = currentMillis - baselineMillis;

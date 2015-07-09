@@ -24,7 +24,7 @@
                     <#list collectionSchema.metrics as metric>
                         <label>
                             <input class="sidenav-metric" type="checkbox" value="${metric}"/>
-                            ${metric}
+                            ${collectionSchema.metricAliases[metric_index]!metric}
                         </label>
                         <br/>
                     </#list>

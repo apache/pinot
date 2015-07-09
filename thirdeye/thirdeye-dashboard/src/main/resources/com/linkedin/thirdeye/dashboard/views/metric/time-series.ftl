@@ -7,6 +7,7 @@
 <script src="/assets/js/thirdeye.metric.timeseries.js"></script>
 
 <#assign dimensions = (metricView.view.dimensionValues)!dimensionValues>
+<#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
 <#include "../common/dimension-header.ftl">
 
 <div id="metric-time-series-area">

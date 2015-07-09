@@ -439,8 +439,14 @@ function extractHeatMapData(rawData) {
 
     rawData.find('.dimension-view-heat-map').each(function(i, heatMap) {
         var heatMapObj = $(heatMap)
-        var id = heatMapObj.attr('metric') + '-' + heatMapObj.attr('dimension').split('.').join('-')
-        data[id] = []
+        var id = heatMapObj.attr('metric').split('.').join('-') + '-' + heatMapObj.attr('dimension').split('.').join('-')
+        data[id] = {
+          metric: heatMapObj.attr('metric'),
+          metricDisplay: heatMapObj.attr('metric-display'),
+          dimension: heatMapObj.attr('dimension'),
+          dimensionDisplay: heatMapObj.attr('dimension-display'),
+          cells: []
+        }
 
         // Get stats name mapping
         var statsNamesMapping = {}
@@ -460,7 +466,7 @@ function extractHeatMapData(rawData) {
                     cellStats[name] = statsList[idx]
                 })
 
-                data[id].push({
+                data[id].cells.push({
                     value: cellObj.attr('value'),
                     stats: cellStats
                 })
@@ -485,12 +491,13 @@ function renderHeatMap(rawData, container, options) {
 
     // Group
     var groups = {}
-    $.each(data, function(heatMapId, cells) {
+    $.each(data, function(heatMapId, heatMapSpec) {
+        var cells = heatMapSpec.cells
         var tokens = heatMapId.split('-')
-        var metric = tokens[0]
-        var dimension = tokens[1]
-        var groupKey = options.groupBy == 'DIMENSION' ? dimension : metric
-        var caption = options.groupBy == 'DIMENSION' ? metric : dimension // show the other as caption
+        var metric = heatMapSpec.metric
+        var dimension = heatMapSpec.dimension
+        var groupKey = options.groupBy == 'DIMENSION' ? heatMapSpec.dimensionDisplay : heatMapSpec.metricDisplay
+        var caption = options.groupBy == 'DIMENSION' ? heatMapSpec.metricDisplay : heatMapSpec.dimensionDisplay // show the other as caption
 
         if (!groups[groupKey]) {
             groups[groupKey] = []

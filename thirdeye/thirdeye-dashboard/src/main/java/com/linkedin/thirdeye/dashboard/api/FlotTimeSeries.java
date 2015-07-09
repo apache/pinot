@@ -49,17 +49,27 @@ public class FlotTimeSeries {
     return data;
   }
 
-  public static List<FlotTimeSeries> fromQueryResult(ObjectMapper objectMapper, QueryResult queryResult) throws Exception {
-    return fromQueryResult(objectMapper, queryResult, null);
+  public static List<FlotTimeSeries> fromQueryResult(
+      CollectionSchema schema,
+      ObjectMapper objectMapper,
+      QueryResult queryResult) throws Exception {
+    return fromQueryResult(schema, objectMapper, queryResult, null);
   }
 
   public static List<FlotTimeSeries> fromQueryResult(
+      CollectionSchema schema,
       ObjectMapper objectMapper,
       QueryResult queryResult,
       String labelPrefix) throws Exception {
     List<FlotTimeSeries> allSeries = new ArrayList<>();
 
     String dimensionNamesJson = objectMapper.writeValueAsString(queryResult.getDimensions());
+
+    // Mapping of metric name to alias if exists
+    Map<String, String> aliases = new HashMap<>();
+    for (int i = 0; i < schema.getMetrics().size(); i++) {
+      aliases.put(schema.getMetrics().get(i), schema.getMetricAliases().get(i));
+    }
 
     for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
       Map<String, List<Number[]>> timeSeriesByMetric = new HashMap<>();
@@ -87,7 +97,14 @@ public class FlotTimeSeries {
           label.append(labelPrefix);
         }
 
-        label.append(metricSeriesEntry.getKey());
+        // Metric name or alias
+        String metricName = metricSeriesEntry.getKey();
+        String metricAlias = aliases.get(metricName);
+        if (metricAlias == null) {
+          label.append(metricName);
+        } else {
+          label.append(metricAlias);
+        }
 
         if (queryResult.getData().size() > 1) {
           label.append(" (").append(entry.getKey()).append(")"); // multi-dimensional

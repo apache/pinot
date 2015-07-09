@@ -58,6 +58,7 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
 
     environment.jersey().register(new FlotTimeSeriesResource(
         config.getServerUri(),
+        dataCache,
         queryCache,
         environment.getObjectMapper()));
 

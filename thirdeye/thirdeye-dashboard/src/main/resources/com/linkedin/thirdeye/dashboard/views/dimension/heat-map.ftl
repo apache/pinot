@@ -58,7 +58,9 @@
             <div class="dimension-view-heat-map"
                  id='dimension-view-heat-map-${heatMap.metric}-${heatMap.dimension?replace(".", "-")}'
                  metric='${heatMap.metric}'
+                 metric-display='${heatMap.metricAlias!heatMap.metric}'
                  dimension='${heatMap.dimension}'
+                 dimension-display='${heatMap.dimensionAlias!heatMap.dimension}'
                  stats-names='${heatMap.statsNamesJson}'>
                 <#list heatMap.cells as cell>
                     <div class='dimension-view-heat-map-cell'

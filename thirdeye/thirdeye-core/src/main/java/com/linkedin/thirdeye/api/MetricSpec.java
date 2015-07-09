@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class MetricSpec
 {
   private String name;
+  private String alias;
   private MetricType type;
 
   public MetricSpec() {}
@@ -19,6 +20,11 @@ public class MetricSpec
   public String getName()
   {
     return name;
+  }
+
+  @JsonProperty
+  public String getAlias() {
+    return alias;
   }
 
   @JsonProperty
