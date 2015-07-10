@@ -93,7 +93,7 @@ public class CustomDashboardResource {
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
   public Response post(
       @PathParam("collection") String collection,
-      @PathParam("name") String name, byte[] config) {
+      @PathParam("name") String name, byte[] config) throws Exception {
     File collectionDir = new File(customDashboardRoot, collection);
     File configFile = new File(collectionDir, name);
 
@@ -107,9 +107,16 @@ public class CustomDashboardResource {
       return Response.status(Response.Status.CONFLICT).entity("Config already exists for " + name).build();
     }
 
+    // Create collection dir if it doesn't exist
+    if (!collectionDir.exists()) {
+      FileUtils.forceMkdir(collectionDir);
+      LOG.info("Created {} for custom dashboards", collectionDir);
+    }
+
     // Write new config file
     try (OutputStream outputStream = new FileOutputStream(configFile)) {
       IOUtils.copy(new ByteArrayInputStream(config), outputStream);
+      LOG.info("Created custom dashboard {} for collection {}", name, collection);
     } catch (Exception e) {
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not write to " + configFile).build();
     }
@@ -161,6 +168,7 @@ public class CustomDashboardResource {
     try {
       FileUtils.forceDelete(configFile);
       cache.invalidate(name);
+      LOG.info("Deleted custom dashboard {} for collection {}", name, collection);
       return Response.noContent().build();
     } catch (Exception e) {
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not delete " + configFile).build();
