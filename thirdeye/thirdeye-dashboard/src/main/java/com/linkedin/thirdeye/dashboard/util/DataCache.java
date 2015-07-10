@@ -89,7 +89,7 @@ public class DataCache {
         List<String> dimensionAliases = new ArrayList<>();
         for (JsonNode dimension : json.get("dimensions")) {
           dimensions.add(dimension.get("name").asText());
-          dimensionAliases.add(dimension.get("alias").isNull() ? null : dimension.get("alias").asText());
+          dimensionAliases.add(!dimension.has("alias") || dimension.get("alias").isNull() ? null : dimension.get("alias").asText());
         }
         schema.setDimensions(dimensions);
         schema.setDimensionAliases(dimensionAliases);
@@ -99,7 +99,7 @@ public class DataCache {
         List<String> metricAliases = new ArrayList<>();
         for (JsonNode metric : json.get("metrics")) {
           metrics.add(metric.get("name").asText());
-          metricAliases.add(metric.get("alias").isNull() ? null : metric.get("alias").asText());
+          metricAliases.add(!metric.has("alias") || metric.get("alias").isNull() ? null : metric.get("alias").asText());
         }
         schema.setMetrics(metrics);
         schema.setMetricAliases(metricAliases);
