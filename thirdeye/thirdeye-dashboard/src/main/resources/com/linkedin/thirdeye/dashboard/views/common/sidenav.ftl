@@ -73,17 +73,13 @@
                     </label>
                     <div class="uk-form-controls">
                         <input id="sidenav-baseline-size" type="number" min="0" value="1" class="uk-form-width-small" />
-                        <div class="uk-button uk-form-select" data-uk-form-select>
-                          <span></span>
-                          <i class="uk-icon-caret-down"></i>
-                          <select id="sidenav-baseline-unit">
-                              <#-- value is unit in milliseconds -->
-                              <option unit="HOURS" value="3600000">hour(s)</option>
-                              <option unit="DAYS" value="86400000">day(s)</option>
-                              <option unit="WEEKS" value="604800000" selected="selected">week(s)</option>
-                              <option unit="MONTHS" value="2592000000">month(s)</option>
-                          </select>
-                        </div>
+                        <select id="sidenav-baseline-unit">
+                            <#-- value is unit in milliseconds -->
+                            <option unit="HOURS" value="3600000">hour(s)</option>
+                            <option unit="DAYS" value="86400000">day(s)</option>
+                            <option unit="WEEKS" value="604800000" selected="selected">week(s)</option>
+                            <option unit="MONTHS" value="2592000000">month(s)</option>
+                        </select>
                     </div>
                 </div>
 
@@ -100,14 +96,10 @@
                   </label>
                   <div class="uk-form-controls">
                     <input id="sidenav-aggregate-size" type="number" min="1" value="1" class="uk-form-width-small" />
-                    <div class="uk-button uk-form-select" data-uk-form-select>
-                      <span></span>
-                      <i class="uk-icon-caret-down"></i>
-                      <select id="sidenav-aggregate-unit">
-                        <option value="HOURS" selected="selected">hour(s)</option>
-                        <option value="DAYS">day(s)</option>
-                      </select>
-                    </div>
+                    <select id="sidenav-aggregate-unit">
+                      <option value="HOURS" selected="selected">hour(s)</option>
+                      <option value="DAYS">day(s)</option>
+                    </select>
                   </div>
                 </div>
                 
@@ -126,14 +118,10 @@
                     </label>
                     <div id="sidenav-moving-average-controls" class="uk-form-controls">
                         <input id="sidenav-moving-average-size" type="number" min="1" value="7" class="uk-form-width-small" />
-                        <div class="uk-button uk-form-select" data-uk-form-select>
-                          <span></span>
-                          <i class="uk-icon-caret-down"></i>
-                          <select id="sidenav-moving-average-unit">
-                            <option value="HOURS">hour(s)</option>
-                            <option value="DAYS" selected="selected">day(s)</option>
-                          </select>
-                        </div>
+                        <select id="sidenav-moving-average-unit">
+                          <option value="HOURS">hour(s)</option>
+                          <option value="DAYS" selected="selected">day(s)</option>
+                        </select>
                     </div>
                 </div>
 
