@@ -144,7 +144,7 @@ public class ControllerRestApplication extends Application {
   }
 
   private void attachRoutesForClass(Router router, Class<? extends ServerResource> clazz) {
-    TreeSet<String> pathsOrderedByLength = new TreeSet<String>(ComparatorUtils.<String>chainedComparator(new Comparator<String>() {
+    TreeSet<String> pathsOrderedByLength = new TreeSet<String>(ComparatorUtils.chainedComparator(new Comparator<String>() {
       private IntComparator _intComparator = IntComparators.NATURAL_COMPARATOR;
       @Override
       public int compare(String o1, String o2) {
