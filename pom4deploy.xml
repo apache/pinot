@@ -412,7 +412,7 @@
                     </exclusion>
                     <exclusion>
                         <groupId>org.codehaus.jackson</groupId>
-                `        <artifactId>jackson-core-asl</artifactId>
+                        <artifactId>jackson-core-asl</artifactId>
                     </exclusion>
                     <exclusion>
                         <groupId>org.codehaus.jackson</groupId>
