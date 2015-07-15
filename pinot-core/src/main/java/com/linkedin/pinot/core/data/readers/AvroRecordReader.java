@@ -15,15 +15,12 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.zip.GZIPInputStream;
-
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.extractors.FieldExtractor;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -34,16 +31,21 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 
 public class AvroRecordReader implements RecordReader {
+  private static final Logger _logger = LoggerFactory.getLogger(AvroRecordReader.class);
   private static final String COMMA = ",";
 
   private String _fileName = null;
@@ -143,6 +145,7 @@ public class AvroRecordReader implements RecordReader {
 
   private void updateSchema(Schema schema) {
     for (final FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      _logger.info("fieldSpec=" + fieldSpec.toString());
       fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(fieldSpec.getName())));
       fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(fieldSpec.getName())));
       schema.addSchema(fieldSpec.getName(), fieldSpec);
