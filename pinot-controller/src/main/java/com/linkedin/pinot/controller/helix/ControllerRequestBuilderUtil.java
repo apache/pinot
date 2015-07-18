@@ -176,7 +176,7 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       int numReplicas, String segmentAssignmentStrategy) throws JSONException {
-    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "timeType", "DAYS",
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "daysSinceEpoch", "DAYS",
         "700", numReplicas, segmentAssignmentStrategy);
   }
 }
