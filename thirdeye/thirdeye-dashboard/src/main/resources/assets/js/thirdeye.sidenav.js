@@ -163,7 +163,7 @@ $(document).ready(function() {
         $("#sidenav-baseline-unit").val(diffDescriptor.sizeMillis)
     } else {
         // Start at latest loaded time
-        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis')))
+        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis'))-3600000)
         var dateString = latestDateTime.format("YYYY-MM-DD")
         var timeString = latestDateTime.format("HH:mm")
         $("#sidenav-date").val(dateString)
