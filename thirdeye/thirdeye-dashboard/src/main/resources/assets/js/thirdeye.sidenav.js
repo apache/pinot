@@ -149,7 +149,6 @@ $(document).ready(function() {
 
     // Load existing date / time
     if (path.currentMillis) {
-        var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
         var currentDateTime = moment(parseInt(path.currentMillis))
         var dateString = currentDateTime.format("YYYY-MM-DD")
         var timeString = currentDateTime.format("HH:mm")
@@ -163,9 +162,10 @@ $(document).ready(function() {
         $("#sidenav-baseline-unit").val(diffDescriptor.sizeMillis)
     } else {
         // Start at latest loaded time
-        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis'))-3600000)
+        var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
+        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis'))-aggregateMillis);
         var dateString = latestDateTime.format("YYYY-MM-DD")
-        var timeString = latestDateTime.format("HH:mm")
+        var timeString = latestDateTime.format("HH:mm");
         $("#sidenav-date").val(dateString)
         $("#sidenav-time").val(timeString)
     }
