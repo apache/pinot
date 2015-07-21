@@ -160,7 +160,9 @@ public class RollupPhaseThreeJob extends Configured {
       if (selectedRollup == null)
         throw new IllegalStateException(
             "rollup function could not find any dimension combination that passes threshold - "
-            + "Try a lower threshold, or a different threshold metric");
+            + "Try a lower threshold, or a different threshold metric: " +
+                "rawDimensionKey=" + rawDimensionKey +
+                ";possibleRollupTimeSeriesMap=" + possibleRollupTimeSeriesMap);
       context.write(new BytesWritable(selectedRollup.toBytes()), new BytesWritable(
           rawMetricTimeSeries.toBytes()));
     }

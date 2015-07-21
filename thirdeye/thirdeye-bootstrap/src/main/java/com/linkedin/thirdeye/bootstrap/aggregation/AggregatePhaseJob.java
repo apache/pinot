@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.*;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -37,12 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.RollupThresholdFunction;
-import com.linkedin.thirdeye.api.StarTreeConfig;
 
 /**
  * @author kgopalak <br/>
@@ -71,6 +67,7 @@ public class AggregatePhaseJob extends Configured {
 
   public static class AggregationMapper extends
       Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+    private StarTreeConfig starTreeConfig;
     private AggregationJobConfig config;
     private TimeUnit sourceTimeUnit;
     private TimeUnit aggregationTimeUnit;
@@ -88,7 +85,7 @@ public class AggregatePhaseJob extends Configured {
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
@@ -119,39 +116,21 @@ public class AggregatePhaseJob extends Configured {
         dimensionValues[i] = dimensionValue;
       }
 
-      DimensionKey key = new DimensionKey(dimensionValues);
-      String sourceTimeWindow = record.datum().get(config.getTimeColumnName()).toString();
-      long aggregationTimeWindow = -1;
-      if (rollupThresholdFunction.getRollupAggregationGranularity() != null) {
-        aggregationTimeUnit =
-            TimeUnit.valueOf(rollupThresholdFunction.getRollupAggregationGranularity().getUnit()
-                .toString());
-        aggregationTimeWindow =
-            aggregationTimeUnit.convert(Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-      }
+      StarTreeRecord starTreeRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
 
-      MetricTimeSeries series = new MetricTimeSeries(metricSchema);
-      for (int i = 0; i < metricNames.size(); i++) {
-        String metricName = metricNames.get(i);
-        Object object = record.datum().get(metricName);
-        String metricValueStr = "0";
-        if (object != null) {
-          metricValueStr = object.toString();
-        }
-        try {
-          Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-          series.increment(aggregationTimeWindow, metricName, metricValue);
-
-        } catch (NumberFormatException e) {
-          throw new NumberFormatException("Exception trying to convert " + metricValueStr + " to "
-              + metricTypes.get(i) + " for metricName:" + metricName);
+      // Create flattened series
+      MetricTimeSeries originalSeries = starTreeRecord.getMetricTimeSeries();
+      MetricTimeSeries flattenedSeries = new MetricTimeSeries(metricSchema);
+      for (Long time : originalSeries.getTimeWindowSet()) {
+        for (int i = 0; i < metricNames.size(); i++) {
+          String name = metricNames.get(i);
+          flattenedSeries.increment(-1, name, originalSeries.get(time, name));
         }
       }
-      // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
 
-      byte[] serializedKey = key.toBytes();
+      byte[] serializedKey = starTreeRecord.getDimensionKey().toBytes();
 
-      byte[] serializedMetrics = series.toBytes();
+      byte[] serializedMetrics = flattenedSeries.toBytes();
 
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -217,7 +196,7 @@ public class AggregatePhaseJob extends Configured {
           fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
       outputStream.write(aggregationStats.toString().getBytes());
       outputStream.close();
-    };
+    }
   }
 
   public Job run() throws Exception {

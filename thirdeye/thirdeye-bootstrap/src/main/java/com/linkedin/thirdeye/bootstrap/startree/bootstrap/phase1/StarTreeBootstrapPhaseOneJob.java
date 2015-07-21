@@ -19,6 +19,8 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.*;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -43,19 +45,11 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.StarTreeNode;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.bootstrap.startree.StarTreeJobUtils;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
@@ -205,92 +199,30 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     @Override
     public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
         throws IOException, InterruptedException {
+      long start = System.currentTimeMillis();
 
-      Object timeObj = record.datum().get(config.getTimeColumnName());
-      if (timeObj == null) {
-        LOGGER.error("Dropping record because " + config.getTimeColumnName() + " is set to null");
-        context.getCounter(StarTreeBootstrapPhase1Counter.NULL_TIME_RECORDS).increment(1);
+      StarTreeRecord parsedRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
+      if (parsedRecord == null) {
+        context.getCounter(StarTreeBootstrapPhase1Counter.INVALID_TIME_RECORDS).increment(1);
         return;
       }
 
-      // check if the time column has appropriate values and drop the record with zero timestamp.
-      if (dateTimeFormatter == null) { // i.e. we should interpret the time column as a long
-        try {
-          Long time = Long.parseLong(timeObj.toString());
-          if (time == 0) {
-            LOGGER.error("Dropping record because " + config.getTimeColumnName() + " is set to 0");
-            context.getCounter(StarTreeBootstrapPhase1Counter.ZERO_TIME_RECORDS).increment(1);
-            return;
-          }
-          if (time < 0)
-            throw new IllegalStateException("Value for dimension "
-                + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
-                + " cannot be parsed");
-        } catch (NumberFormatException ex) {
-          throw new IllegalStateException("Value for dimension "
-              + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
-              + " cannot be parsed");
+      // Count metric values
+      for (Long time : parsedRecord.getMetricTimeSeries().getTimeWindowSet()) {
+        for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
+          Number metricValue = parsedRecord.getMetricTimeSeries().get(time, metricSpec.getName());
+          context.getCounter(config.getCollectionName(), metricSpec.getName()).increment(metricValue.longValue());
         }
       }
 
-      long start = System.currentTimeMillis();
-      Map<String, String> dimensionValuesMap = new HashMap<String, String>();
-      for (int i = 0; i < dimensionNames.size(); i++) {
-        String dimensionName = dimensionNames.get(i);
-        String dimensionValue = "";
-        Object val = record.datum().get(dimensionName);
-        if (val != null) {
-          dimensionValue = val.toString();
-        }
-        dimensionValues[i] = dimensionValue;
-        dimensionValuesMap.put(dimensionName, dimensionValue);
-      }
-      DimensionKey key = new DimensionKey(dimensionValues);
-
-      // Extract time column
-      String timeStr = record.datum().get(config.getTimeColumnName()).toString();
-      Long timeWindow;
-      if (dateTimeFormatter == null) {
-        // Time is raw long
-        Long sourceTimeWindow = Long.parseLong(timeStr);
-        sourceTimeWindow = sourceTimeWindow * inputTimeUnitSize;
-        timeWindow = aggregationTimeUnit.convert(sourceTimeWindow, sourceTimeUnit);
-        timeWindow /= aggregationGranularitySize;
-      } else {
-        // We parse time into milliseconds, then convert to aggregation granularity
-        DateTime sourceTimeWindow = dateTimeFormatter.parseDateTime(timeStr);
-        timeWindow = aggregationTimeUnit.convert(sourceTimeWindow.getMillis(), TimeUnit.MILLISECONDS);
-        timeWindow /= aggregationGranularitySize;
-      }
-
-      MetricTimeSeries series = new MetricTimeSeries(metricSchema);
-      for (int i = 0; i < metricNames.size(); i++) {
-        String metricName = metricNames.get(i);
-        Object object = record.datum().get(metricName);
-        String metricValueStr = "0";
-        if (object != null) {
-          metricValueStr = object.toString();
-        }
-        try {
-          Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-          series.increment(timeWindow, metricName, metricValue);
-
-          context.getCounter(config.getCollectionName(), metricName).increment(
-              metricValue.longValue());
-
-        } catch (NumberFormatException e) {
-          throw new NumberFormatException("Exception trying to convert " + metricValueStr + " to "
-              + metricTypes.get(i) + " for metricName:" + metricName);
-        }
-      }
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
       MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
-      StarTreeRecord starTreeRecord = new StarTreeRecordImpl(starTreeConfig, key, emptyTimeSeries);
+      StarTreeRecord starTreeRecord = new StarTreeRecordImpl(starTreeConfig, parsedRecord.getDimensionKey(), emptyTimeSeries);
       StarTreeJobUtils.collectRecords(starTreeConfig, starTreeRootNode, starTreeRecord, collector);
       if (debug) {
-        LOGGER.info("processing {}", key);
-        LOGGER.info("times series {}", series);
+        LOGGER.info("processing {}", parsedRecord.getDimensionKey());
+        LOGGER.info("times series {}", parsedRecord.getMetricTimeSeries());
 
       }
       for (UUID uuid : collector.keySet()) {
@@ -306,7 +238,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         Map<String, Map<Integer, String>> reverseForwardIndex =
             StarTreeUtils.toReverseIndex(forwardIndex);
         int[] bestMatch =
-            StarTreeJobUtils.findBestMatch(key, dimensionNames, leafRecords, forwardIndex);
+            StarTreeJobUtils.findBestMatch(parsedRecord.getDimensionKey(), dimensionNames, leafRecords, forwardIndex);
         String[] dimValues =
             StarTreeUtils.convertToStringValue(reverseForwardIndex, bestMatch, dimensionNames);
         DimensionKey matchedDimensionKey = new DimensionKey(dimValues);
@@ -317,7 +249,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         BootstrapPhaseMapOutputKey outputKey =
             new BootstrapPhaseMapOutputKey(uuid, matchedDimensionKey.toMD5());
         BootstrapPhaseMapOutputValue outputValue =
-            new BootstrapPhaseMapOutputValue(matchedDimensionKey, series);
+            new BootstrapPhaseMapOutputValue(matchedDimensionKey, parsedRecord.getMetricTimeSeries());
         BytesWritable keyWritable = new BytesWritable(outputKey.toBytes());
         BytesWritable valWritable = new BytesWritable(outputValue.toBytes());
         context.write(keyWritable, valWritable);
@@ -527,7 +459,6 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
   }
 
   public static enum StarTreeBootstrapPhase1Counter {
-    ZERO_TIME_RECORDS,
-    NULL_TIME_RECORDS
+    INVALID_TIME_RECORDS
   }
 }
