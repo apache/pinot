@@ -246,6 +246,7 @@ public class StarTreeImpl implements StarTree {
 
   @Override
   public void close() throws IOException {
+    recordStoreFactory.close();
     close(root);
   }
 

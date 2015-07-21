@@ -195,6 +195,7 @@ public class DataUpdateManager {
       String loadId = "load_" + UUID.randomUUID();
       File tmpDir = new File(new File(rootDir, collection), loadId);
 
+      ObjectInputStream treeStream = null;
       try {
         // Extract into tmp dir
         FileUtils.forceMkdir(tmpDir);
@@ -207,7 +208,7 @@ public class DataUpdateManager {
 
         // Read tree to get ID
         File tmpTreeFile = new File(tmpDir, StarTreeConstants.TREE_FILE_NAME);
-        ObjectInputStream treeStream = new ObjectInputStream(new FileInputStream(tmpTreeFile));
+        treeStream = new ObjectInputStream(new FileInputStream(tmpTreeFile));
         StarTreeNode rootNode = (StarTreeNode) treeStream.readObject();
         String treeId = rootNode.getId().toString();
         LOGGER.info("Tree ID for {} is {}", loadId, treeId);
@@ -231,6 +232,7 @@ public class DataUpdateManager {
           expireSegments(collectionDir, minTime, maxTime, schedule);
         }
       } finally {
+        if (treeStream != null) { treeStream.close(); }
         FileUtils.forceDelete(tmpDir);
         LOGGER.info("Deleted tmp dir {}", tmpDir);
       }

@@ -103,6 +103,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
           File treeFile = new File(dataDir, StarTreeConstants.TREE_FILE_NAME);
           ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(treeFile));
           StarTreeNode root = (StarTreeNode) inputStream.readObject();
+          inputStream.close();
 
           // Create tree
           StarTree starTree = new StarTreeImpl(config, dataDir, root);
@@ -223,12 +224,10 @@ public class StarTreeManagerImpl implements StarTreeManager {
 
             if (file.getName().startsWith(StorageUtils.getDataDirPrefix()) && ev.kind().equals(ENTRY_DELETE)) {
               for (Entry<String, ConcurrentMap<File, StarTree>> entry : trees.entrySet()) {
+                entry.getValue().get(path.toFile()).close();
                 entry.getValue().remove(path.toFile());
               }
-              continue;
-            }
-
-            if (file.getName().startsWith(StorageUtils.getDataDirPrefix())) {
+            } else if (file.getName().startsWith(StorageUtils.getDataDirPrefix())) {
               StorageUtils.waitForModifications(file, REFRESH_WAIT_SLEEP_MILLIS, REFRESH_WAIT_TIMEOUT_MILLIS);
 
               synchronized (trees) {
@@ -236,6 +235,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
                 File treeFile = new File(file, StarTreeConstants.TREE_FILE_NAME);
                 ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(treeFile));
                 StarTreeNode root = (StarTreeNode) inputStream.readObject();
+                inputStream.close();
 
                 // Read index metadata
                 InputStream indexMetadataFile = new FileInputStream(new File(file, StarTreeConstants.METADATA_FILE_NAME));
