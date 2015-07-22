@@ -38,7 +38,6 @@ public class TestStarTreeManagerImpl {
   Map<File, StarTree> starTrees;
   Properties properties;
   private StarTreeManager manager;
-  private Map<File, StarTree> previousStarTrees;
   private long timeout = 25000;
 
   @BeforeClass
