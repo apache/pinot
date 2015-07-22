@@ -161,6 +161,36 @@ public class DimensionViewHeatMap extends View {
           cell.addStat(currentDist.cumulativeProbability(current.doubleValue()));
         }
 
+        //Baseline total
+        if (baselineStats.getSum() > 0) {
+          cell.addStat(baselineStats.getSum());
+        } else {
+          cell.addStat(null);
+        }
+
+        //Current total
+        if (currentStats.getSum() > 0) {
+          cell.addStat(currentStats.getSum());
+        } else {
+          cell.addStat(null);
+        }
+
+        // Baseline ratio
+        if (baselineStats.getSum() > 0) {
+          double baselineRatio = baseline == null ? 0 : baseline.doubleValue() / baselineStats.getSum();
+          cell.addStat(baselineRatio);
+        } else {
+          cell.addStat(null);
+        }
+
+        // Current ratio
+        if (currentStats.getSum() > 0) {
+          double currentRatio = current == null ? 0 : current.doubleValue() / currentStats.getSum();
+          cell.addStat(currentRatio);
+        } else {
+          cell.addStat(null);
+        }
+
         // Contribution difference
         if (baselineStats.getSum() > 0 && currentStats.getSum() > 0) {
           double currentContribution = current == null ? 0 : current.doubleValue() / currentStats.getSum();
@@ -185,7 +215,7 @@ public class DimensionViewHeatMap extends View {
         } else {
           cell.addStat(0);
         }
-      }
+    }
 
       heatMaps.add(new HeatMap(objectMapper,
           entry.getKey(),
@@ -198,6 +228,10 @@ public class DimensionViewHeatMap extends View {
               "current_value",
               "baseline_cdf_value",
               "current_cdf_value",
+              "baseline_total",
+              "current_total",
+              "baseline_ratio",
+              "current_ratio",
               "contribution_difference",
               "volume_difference",
               "snapshot_category"

@@ -554,6 +554,8 @@ function renderHeatMap(rawData, container, options) {
                         if (val !== null && (key === 'baseline_cdf_value'
                             || key === 'current_cdf_value'
                             || key === 'contribution_difference'
+                            || key === 'current_ratio'
+                            || key === 'baseline_ratio'
                             || key === 'volume_difference')) {
                             return key + '=' + val.toFixed(2)
                         } else {
