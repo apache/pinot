@@ -91,7 +91,7 @@ public class TestStarTreeManagerImpl {
 
   }
 
-  @Test(enabled = true)
+  @Test
   void testDataRefresh() throws Exception {
 
     manager = new StarTreeManagerImpl();
