@@ -50,6 +50,7 @@ public class HadoopSegmentCreationMapReduceJob {
 
     private Path _currentHdfsWorkDir;
     private String _currentDiskWorkDir;
+    private String _postfix;
 
     // Temporary HDFS path for local machine
     private String _localHdfsSegmentTarPath;
@@ -78,7 +79,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("Current DISK working dir : {}", new File(_currentDiskWorkDir).getAbsolutePath());
       LOGGER.info("*********************************************************************");
       _properties = context.getConfiguration();
-
+      _postfix = _properties.get("segment.name.postfix");
       _outputPath = _properties.get("path.to.output");
       _tableName = _properties.get("segment.table.name");
       if (_outputPath == null || _tableName == null) {
@@ -161,7 +162,11 @@ public class HadoopSegmentCreationMapReduceJob {
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setInputFileFormat(fileFormat);
-      segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+      if (null != _postfix) {
+        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
+      } else {
+        segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+      }
       segmentGeneratorConfig.setRecordeReaderConfig(getReaderConfig(fileFormat));
 
       segmentGeneratorConfig.setIndexOutputDir(_localDiskSegmentDirectory);
