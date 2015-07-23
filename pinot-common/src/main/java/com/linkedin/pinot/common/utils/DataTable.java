@@ -419,7 +419,6 @@ public class DataTable {
       IOUtils.closeQuietly(bos);
     }
     long end = System.nanoTime();
-    LOGGER.info("java ser time:{}", (end - start));
     return bytes;
   }
 
@@ -443,7 +442,6 @@ public class DataTable {
       IOUtils.closeQuietly(bais);
     }
     long end = System.nanoTime();
-    LOGGER.info("java deser time:{}", (end - start));
     return (T) readObject;
 
   }

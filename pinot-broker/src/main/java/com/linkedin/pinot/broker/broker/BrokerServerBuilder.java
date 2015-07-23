@@ -20,6 +20,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -139,9 +140,9 @@ public class BrokerServerBuilder {
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(50);
     // _requestSenderPool = MoreExecutors.sameThreadExecutor();
     final ConnectionPoolConfig cfg = conf.getConnPool();
-    _requestSenderPool =
-        new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg
-            .getThreadPool().getIdleTimeoutMs(), TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+
+    _requestSenderPool = Executors.newCachedThreadPool();
+
     ConnectionPoolConfig connPoolCfg = conf.getConnPool();
 
     _connPool =

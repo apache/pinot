@@ -90,28 +90,5 @@ $(document).ready(function() {
         })
     }
 
-    // split button
-    $(".dimension-time-series-button-mode").click(function(event) {
-        var obj = $(this)
-
-        var mode = null
-        if (obj.hasClass('uk-active')) {
-            mode = 'same'
-            obj.removeClass('uk-active')
-        } else {
-            mode = 'own'
-            obj.addClass('uk-active')
-        }
-
-        var hash = parseHashParameters(window.location.hash)
-        hash['dimensionTimeSeriesMode'] = mode
-        window.location.hash = encodeHashParameters(hash)
-
-        options.mode = mode
-        plotAllSeries()
-
-        return false
-    })
-
     plotAllSeries()
 })

@@ -4,16 +4,30 @@ import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import io.dropwizard.views.View;
 import org.joda.time.DateTime;
 
+import java.util.List;
+
 public class DashboardStartView extends View {
+  private final String collection;
   private final CollectionSchema collectionSchema;
   private final DateTime earliestDataTime;
   private final DateTime latestDataTime;
+  private final List<String> customDashboardNames;
 
-  public DashboardStartView(CollectionSchema collectionSchema, DateTime earliestDataTime, DateTime latestDataTime) {
+  public DashboardStartView(String collection,
+                            CollectionSchema collectionSchema,
+                            DateTime earliestDataTime,
+                            DateTime latestDataTime,
+                            List<String> customDashboardNames) {
     super("dashboard-start.ftl");
+    this.collection = collection;
     this.collectionSchema = collectionSchema;
     this.earliestDataTime = earliestDataTime;
     this.latestDataTime = latestDataTime;
+    this.customDashboardNames = customDashboardNames;
+  }
+
+  public String getCollection() {
+    return collection;
   }
 
   public CollectionSchema getCollectionSchema() {
@@ -26,5 +40,9 @@ public class DashboardStartView extends View {
 
   public DateTime getLatestDataTime() {
     return latestDataTime;
+  }
+
+  public List<String> getCustomDashboardNames() {
+    return customDashboardNames;
   }
 }

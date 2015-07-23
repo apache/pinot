@@ -19,6 +19,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -193,9 +195,17 @@ public class StarTreeGenerationJob extends Configured {
         leafNodes.clear();
         StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTree.getRoot());
         LOGGER.info("Number of leaf Nodes" + prevLeafNodes);
+
       } while (prevLeafNodes != leafNodes.size());
+
+      context.getCounter(StarTreeGenerationCounters.NUM_LEAF_NODES).setValue(starTree.getStats().getLeafCount());
+      context.getCounter(StarTreeGenerationCounters.STARTREE_DEPTH).setValue(StarTreeUtils.getDepth(starTree.getRoot()));
+      context.getCounter(StarTreeGenerationCounters.NODE_COUNT).setValue(starTree.getStats().getNodeCount());
+
       // close will invoke compaction
       starTree.close();
+
+
 
       FileSystem dfs = FileSystem.get(context.getConfiguration());
       Path src, dst;
@@ -266,6 +276,12 @@ public class StarTreeGenerationJob extends Configured {
     job.waitForCompletion(true);
     LOGGER.info("Finished running star tree generation job");
 
+    Counters counters = job.getCounters();
+    for (Enum e : StarTreeGenerationCounters.values()) {
+      Counter counter = counters.findCounter(e);
+      LOGGER.info(counter.getDisplayName() + " : " + counter.getValue());
+    }
+
     return job;
 
   }
@@ -283,5 +299,11 @@ public class StarTreeGenerationJob extends Configured {
       throw new IllegalArgumentException(propName + " required property");
     }
     return propValue;
+  }
+
+  public static enum StarTreeGenerationCounters {
+    STARTREE_DEPTH,
+    NUM_LEAF_NODES,
+    NODE_COUNT
   }
 }

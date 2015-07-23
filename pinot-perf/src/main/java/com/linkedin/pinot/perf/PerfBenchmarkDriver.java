@@ -90,6 +90,8 @@ public class PerfBenchmarkDriver {
 
   private PinotHelixResourceManager helixResourceManager;
 
+  private boolean verbose = false;
+
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
     this.conf = conf;
     zkAddress = conf.getZkHost() + ":" + conf.getZkPort();
@@ -273,7 +275,7 @@ public class PerfBenchmarkDriver {
         new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
             .setOfflineInstances(numInstances).build();
     helixResourceManager.createServerTenant(serverTenant);
-    // upload schema 
+    // upload schema
 
     // create table
     String jsonString =
@@ -349,7 +351,7 @@ public class PerfBenchmarkDriver {
     final String res = sb.toString();
     final JSONObject ret = new JSONObject(res);
     ret.put("totalTime", (stop - start));
-    if (ret.getLong("numDocsScanned") > 0) {
+    if ((ret.getLong("numDocsScanned") > 0) && verbose) {
       LOGGER.info("reqStr = " + reqStr);
       LOGGER.info(" Client side time in ms:" + (stop - start));
       LOGGER.info("numDocScanned : " + ret.getLong("numDocsScanned"));

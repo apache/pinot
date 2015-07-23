@@ -67,9 +67,9 @@ public abstract class AbstractTableConfig {
         loadIndexingConfig(new ObjectMapper().readTree(o.getJSONObject("tableIndexConfig").toString()));
 
     if (tableType.equals("offline")) {
-      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
-    } else if (tableType.equals("realtime")) {
       return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
+    } else if (tableType.equals("realtime")) {
+      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
     }
     throw new UnsupportedOperationException("unknown tableType : " + tableType);
   }

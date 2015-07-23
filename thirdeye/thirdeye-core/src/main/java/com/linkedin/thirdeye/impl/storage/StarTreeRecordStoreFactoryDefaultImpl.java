@@ -36,7 +36,7 @@ import com.linkedin.thirdeye.api.TimeRange;
  * Creates {@link StarTreeRecordStoreDefaultImpl}
  * <p>
  * This factory assumes the following directory structure:
- * 
+ *
  * <pre>
  *     rootDir/
  *        collection/
@@ -51,7 +51,7 @@ import com.linkedin.thirdeye.api.TimeRange;
  *              fileId.buf
  *              fileId.idx
  * </pre>
- * 
+ *
  * </p>
  * <p>
  * "someId" here is a unique identifier for the file, not
@@ -66,19 +66,19 @@ import com.linkedin.thirdeye.api.TimeRange;
  * </p>
  * <p>
  * The dimensionStore/*.idx file contains entries in the following format:
- * 
+ *
  * <pre>
  *      leafId fileId dictStartOffset length bufStartOffset length
  * </pre>
- * 
+ *
  * </p>
  * <p>
  * The metricStore/*.idx file contains entries in the following format:
- * 
+ *
  * <pre>
  *      leafId fileId startOffset length startTime endTime
  * </pre>
- * 
+ *
  * This points to the region in the metricStore/*.buf file that has metric data corresponding to the
  * leafId.
  * </p>
@@ -125,6 +125,8 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
   // index fileId to metric index entries
   private final Map<UUID, Set<MetricIndexEntry>> metricIndexByFile =
       new HashMap<UUID, Set<MetricIndexEntry>>();
+
+  private final List<FileChannel> recordStoreFactoryFileChannels = new ArrayList<FileChannel>();
 
   private File rootDir;
   private boolean isInit;
@@ -373,11 +375,20 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
     return slicedBuffer;
   }
 
-  private static ByteBuffer mapBuffer(File bufferFile) throws IOException {
+  private ByteBuffer mapBuffer(File bufferFile) throws IOException {
     FileChannel channel = new RandomAccessFile(bufferFile, "r").getChannel();
+    recordStoreFactoryFileChannels.add(channel);
     ByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, bufferFile.length());
     buffer.order(ByteOrder.BIG_ENDIAN);
     return buffer;
+  }
+
+  public void close() throws IOException {
+
+    LOGGER.info("Closing record store factory");
+    for (FileChannel recordStoreFactoryFileChannel : recordStoreFactoryFileChannels) {
+      recordStoreFactoryFileChannel.close();
+    }
   }
 
   private static final FileFilter INDEX_FILE_FILTER = new FileFilter() {

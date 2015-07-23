@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.views;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.HeatMap;
 import com.linkedin.thirdeye.dashboard.api.HeatMapCell;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
@@ -17,11 +18,15 @@ import java.util.*;
 public class DimensionViewHeatMap extends View {
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionViewHeatMap.class);
   private static final TypeReference<List<String>> LIST_TYPE_REFERENCE = new TypeReference<List<String>>(){};
+  private final CollectionSchema schema;
   private final ObjectMapper objectMapper;
   private final List<HeatMap> heatMaps;
 
-  public DimensionViewHeatMap(ObjectMapper objectMapper, Map<String, QueryResult> queryResults) throws Exception {
+  public DimensionViewHeatMap(CollectionSchema schema,
+                              ObjectMapper objectMapper,
+                              Map<String, QueryResult> queryResults) throws Exception {
     super("dimension/heat-map.ftl");
+    this.schema = schema;
     this.objectMapper = objectMapper;
     this.heatMaps = new ArrayList<>();
 
@@ -41,6 +46,18 @@ public class DimensionViewHeatMap extends View {
 
     if (queryResult.getData().isEmpty()) {
       return Collections.emptyList();
+    }
+
+    // Aliases
+
+    Map<String, String> metricAliases = new HashMap<>();
+    for (int i = 0; i < schema.getMetrics().size(); i++) {
+      metricAliases.put(schema.getMetrics().get(i), schema.getMetricAliases().get(i));
+    }
+
+    Map<String, String> dimensionAliases = new HashMap<>();
+    for (int i = 0; i < schema.getDimensions().size(); i++) {
+      dimensionAliases.put(schema.getDimensions().get(i), schema.getDimensionAliases().get(i));
     }
 
     // Snapshot
@@ -144,6 +161,36 @@ public class DimensionViewHeatMap extends View {
           cell.addStat(currentDist.cumulativeProbability(current.doubleValue()));
         }
 
+        //Baseline total
+        if (baselineStats.getSum() > 0) {
+          cell.addStat(baselineStats.getSum());
+        } else {
+          cell.addStat(null);
+        }
+
+        //Current total
+        if (currentStats.getSum() > 0) {
+          cell.addStat(currentStats.getSum());
+        } else {
+          cell.addStat(null);
+        }
+
+        // Baseline ratio
+        if (baselineStats.getSum() > 0) {
+          double baselineRatio = baseline == null ? 0 : baseline.doubleValue() / baselineStats.getSum();
+          cell.addStat(baselineRatio);
+        } else {
+          cell.addStat(null);
+        }
+
+        // Current ratio
+        if (currentStats.getSum() > 0) {
+          double currentRatio = current == null ? 0 : current.doubleValue() / currentStats.getSum();
+          cell.addStat(currentRatio);
+        } else {
+          cell.addStat(null);
+        }
+
         // Contribution difference
         if (baselineStats.getSum() > 0 && currentStats.getSum() > 0) {
           double currentContribution = current == null ? 0 : current.doubleValue() / currentStats.getSum();
@@ -168,17 +215,27 @@ public class DimensionViewHeatMap extends View {
         } else {
           cell.addStat(0);
         }
-      }
+    }
 
-      heatMaps.add(new HeatMap(objectMapper, entry.getKey(), dimension, entry.getValue(), Arrays.asList(
-          "baseline_value",
-          "current_value",
-          "baseline_cdf_value",
-          "current_cdf_value",
-          "contribution_difference",
-          "volume_difference",
-          "snapshot_category"
-      )));
+      heatMaps.add(new HeatMap(objectMapper,
+          entry.getKey(),
+          metricAliases.get(entry.getKey()),
+          dimension,
+          dimensionAliases.get(dimension),
+          entry.getValue(),
+          Arrays.asList(
+              "baseline_value",
+              "current_value",
+              "baseline_cdf_value",
+              "current_cdf_value",
+              "baseline_total",
+              "current_total",
+              "baseline_ratio",
+              "current_ratio",
+              "contribution_difference",
+              "volume_difference",
+              "snapshot_category"
+          )));
     }
 
     return heatMaps;

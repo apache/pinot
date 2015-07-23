@@ -35,7 +35,7 @@ public class ConnectionPoolConfig {
   // Idle Timeout (ms) for reaping idle connections
   public static final String IDLE_TIMEOUT_MS_KEY = "idleTimeoutMs";
 
-  private final int DEFAULT_MIN_CONNECTIONS_PER_SERVER = 0;
+  private final int DEFAULT_MIN_CONNECTIONS_PER_SERVER = 10;
   private final int DEFAULT_MAX_CONNECTIONS_PER_SERVER = 30;
   private final int DEFAULT_MAX_BACKLOG_PER_SERVER = 30;
   private static final long DEFAULT_IDLE_TIMEOUT_MS = 6 * 60L * 60 * 1000L; // 6 hours

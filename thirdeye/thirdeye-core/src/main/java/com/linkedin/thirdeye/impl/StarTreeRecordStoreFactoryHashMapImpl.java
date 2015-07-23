@@ -23,4 +23,9 @@ public class StarTreeRecordStoreFactoryHashMapImpl implements StarTreeRecordStor
   public StarTreeRecordStore createRecordStore(UUID nodeId) throws IOException {
     return new StarTreeRecordStoreHashMapImpl(starTreeConfig);
   }
+
+  @Override
+  public void close() throws IOException {
+    // NOP
+  }
 }

@@ -439,8 +439,14 @@ function extractHeatMapData(rawData) {
 
     rawData.find('.dimension-view-heat-map').each(function(i, heatMap) {
         var heatMapObj = $(heatMap)
-        var id = heatMapObj.attr('metric') + '-' + heatMapObj.attr('dimension').split('.').join('-')
-        data[id] = []
+        var id = heatMapObj.attr('metric').split('.').join('-') + '-' + heatMapObj.attr('dimension').split('.').join('-')
+        data[id] = {
+          metric: heatMapObj.attr('metric'),
+          metricDisplay: heatMapObj.attr('metric-display'),
+          dimension: heatMapObj.attr('dimension'),
+          dimensionDisplay: heatMapObj.attr('dimension-display'),
+          cells: []
+        }
 
         // Get stats name mapping
         var statsNamesMapping = {}
@@ -460,7 +466,7 @@ function extractHeatMapData(rawData) {
                     cellStats[name] = statsList[idx]
                 })
 
-                data[id].push({
+                data[id].cells.push({
                     value: cellObj.attr('value'),
                     stats: cellStats
                 })
@@ -485,12 +491,13 @@ function renderHeatMap(rawData, container, options) {
 
     // Group
     var groups = {}
-    $.each(data, function(heatMapId, cells) {
+    $.each(data, function(heatMapId, heatMapSpec) {
+        var cells = heatMapSpec.cells
         var tokens = heatMapId.split('-')
-        var metric = tokens[0]
-        var dimension = tokens[1]
-        var groupKey = options.groupBy == 'DIMENSION' ? dimension : metric
-        var caption = options.groupBy == 'DIMENSION' ? metric : dimension // show the other as caption
+        var metric = heatMapSpec.metric
+        var dimension = heatMapSpec.dimension
+        var groupKey = options.groupBy == 'DIMENSION' ? heatMapSpec.dimensionDisplay : heatMapSpec.metricDisplay
+        var caption = options.groupBy == 'DIMENSION' ? heatMapSpec.metricDisplay : heatMapSpec.dimensionDisplay // show the other as caption
 
         if (!groups[groupKey]) {
             groups[groupKey] = []
@@ -544,8 +551,18 @@ function renderHeatMap(rawData, container, options) {
                     td.css('background-color', options.backgroundColor(cell))
                     td.hover(function() { $(this).css('cursor', 'pointer') })
                     td.attr('title', $.map(cell.stats, function(val, key) {
-                        return key + '=' + val
+                        if (val !== null && (key === 'baseline_cdf_value'
+                            || key === 'current_cdf_value'
+                            || key === 'contribution_difference'
+                            || key === 'current_ratio'
+                            || key === 'baseline_ratio'
+                            || key === 'volume_difference')) {
+                            return key + '=' + val.toFixed(2)
+                        } else {
+                            return key + '=' + val
+                        }
                     }).join("\n"))
+                    td.attr('dimension', heatMap.dimension);
 
                     // Annotate outliers
                     if (cell.stats['snapshot_category'] == 1) {
@@ -554,7 +571,7 @@ function renderHeatMap(rawData, container, options) {
 
                     // Drill-down click handler
                     td.click(function() {
-                        var name = $("#dimension-view-heat-map-" + heatMapId).attr('dimension')
+                        var name = $(this).attr('dimension')
                         var value = cell.value
                         var dimensionValues = parseDimensionValues(window.location.search)
                         dimensionValues[name] = value
@@ -627,4 +644,26 @@ function getLocalTimeZone() {
     formatted += " " + timeZone.timezone_name
 
     return formatted
+}
+
+/**
+ * Get Time Zone
+ * @function
+ * @public
+ * @returns {String} Local timezone from getLocalTimeZone() or hash params
+ * timezone
+ */
+function getTimeZone() {
+    var timeZone = jstz()
+    if(window.location.hash) {
+        var params = parseHashParameters(window.location.hash)
+        if(params.timezone) {
+            tz = params.timezone.split('-').join('/')
+        } else {
+            tz = timeZone.timezone_name
+        }
+    } else {
+        tz = timeZone.timezone_name
+    }
+    return tz
 }

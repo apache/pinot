@@ -1,66 +1,48 @@
 <script src="/assets/js/thirdeye.dimension.heatmap.js"></script>
 
-<div id="dimension-heat-map-buttons">
-    <div class="uk-button-group" data-uk-button-radio>
-        <button id="dimension-heat-map-button-contribution" class="uk-button dimension-heat-map-button" impl="contribution" type="button">Contribution</button>
-        <button id="dimension-heat-map-button-volume" class="uk-button uk-active dimension-heat-map-button" impl="volume" type="button">Volume</button>
-    </div>
-    <a 
-        href="#heat-map-info-modal" 
-        data-uk-modal
-    >
-        <i 
-            class="uk-icon-info-circle"
-        ></i>
-    </a>
+<div id="dimension-heat-map-help">
+    <a href="#dimension-help-modal" data-uk-modal><i class="uk-icon-button uk-icon-question"></i></a>
 </div>
 
-<div id="heat-map-info-modal" class="uk-modal">
+<div id="dimension-help-modal" class="uk-modal">
     <div class="uk-modal-dialog">
-        <div class="uk-modal-header">
-            Heat Map Info
-            <a class="uk-modal-close uk-close uk-align-right"></a>
+        <a class="uk-modal-close uk-close"></a>
+        <h1>Heat Map</h1>
+        <p>
+            The heat map visualization is used to inspect a top-level metric in terms of its
+            different dimension values.
+        </p>
+        <p>
+            Each heat map represents the GROUP BY (dimension) for the current query (shown above the metric view).
+            <br>
+            Clicking a cell of a heat map causes that dimension value to be fixed in the WHERE clause of the query, and all
+            of the heat maps to be re-generated with the new query.
+        </p>
+            <span  class="heat-map-help-img-centered">
+                <img src="/assets/img/heat-map-help-row.png">
+            </span>
+        <br>
+        <section>The cells are:
+            <ul>
+                <li><b>ordered by</b> current volume (highest to lowest),</li>
+                <li><b>colored by</b> the sign of the change (blue means positive, red means negative),</li>
+                <li><b>shaded by</b> previous volume (darker means higher change to the previous volume)</li>
+            </ul>
+        </section>
+
+        <div class="heat-map-help-img-centered">
+            <img src="/assets/img/heat-map-help-cell.png">
         </div>
 
-        <h3>Contribution</h3>
-        <p>
-          The contribution heat map view is a measure of the difference in each
-          dimension value's relative contribution to the total. This is useful
-          to determine whether or not there is movement among the dimension
-          values (i.e. one value contributes relatively more at the current
-          time with respect to the baseline time).
-        </p>
-        <p>
-          The cells are ordered left-to-right, top-to-bottom by the signed
-          magnitude of their contribution change. The cells are colored according
-          to their 
-          <a href="http://en.wikipedia.org/wiki/Cumulative_distribution_function">CDF value</a>,
-          so darker cells represent dimension values that make up a bigger component of the total.
-        </p>
-        <p>
-          The formula for the contribution difference in each cell is: <br/>
-          <pre>newValue / sum(newValues) - oldValue / sum(oldValues)</pre>
-        </p>
-
-        <h3>Volume</h3>
-        <p>
-          The volume heat map view is a measure of each dimension value's raw
-          contribution to the total. This is useful in quantifying exactly
-          where drops or increases occurred. The sum of all values in the heat
-          map equals the change in the aggregate metric.
-        </p>
-        <p>
-          The cells are ordered left-to-right, top-to-bottom by their current
-          raw volume, and colored based on the 
-          <a href="http://en.wikipedia.org/wiki/Cumulative_distribution_function">CDF value</a> 
-          of their baseline value. Thus lighter cells that are higher in the
-          heat map represent a positive change, and darker cells that are lower
-          in the heat map represent a negative change.
-        </p>
-        <p>
-          The formula for the volume difference in each cell is: <br/>
-          <pre>(newValue - oldValue) / sum(oldValues)</pre>
-        </p>
+        <div class="clearfix">
+            <div class="left width-45">
+                The number in the left of each cell is the percent change with respect to the baseline.
+            </div>
+            <div class="right width-45">
+                The number in the right of each cell is the contribution difference; that is, the change in
+                the contribution of one dimension value to the whole.
+            </div>
+        </div>
     </div>
 </div>
 
@@ -77,7 +59,9 @@
             <div class="dimension-view-heat-map"
                  id='dimension-view-heat-map-${heatMap.metric}-${heatMap.dimension?replace(".", "-")}'
                  metric='${heatMap.metric}'
+                 metric-display='${heatMap.metricAlias!heatMap.metric}'
                  dimension='${heatMap.dimension}'
+                 dimension-display='${heatMap.dimensionAlias!heatMap.dimension}'
                  stats-names='${heatMap.statsNamesJson}'>
                 <#list heatMap.cells as cell>
                     <div class='dimension-view-heat-map-cell'

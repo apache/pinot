@@ -15,12 +15,11 @@
  */
 package com.linkedin.pinot.perf;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Callable;
@@ -29,6 +28,8 @@ import java.util.concurrent.Future;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 
@@ -37,18 +38,11 @@ import org.yaml.snakeyaml.Yaml;
  * USAGE: QueryRunner confFile query numberOfTimesToRun
  */
 public class QueryRunner {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
-  public static void multiThreadedQueryRunner(String confFile, String queryFile) throws Exception {
-    PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(confFile));
-    //since its only to run queries, we should ensure no services get started
-    conf.setStartBroker(false);
-    conf.setStartController(false);
-    conf.setStartServer(false);
-    conf.setStartZookeeper(false);
-    conf.setUploadIndexes(false);
-    conf.setRunQueries(true);
-    conf.setConfigureResources(false);
+  public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile) throws Exception {
     final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+
     final List<String> queries = IOUtils.readLines(new FileInputStream(new File(queryFile)));
     final Random random = new Random();
     final int targetQps = 10;
@@ -78,7 +72,49 @@ public class QueryRunner {
 
   }
 
-  public static void runSingleQuery(String confFile, String query, int numRuns) throws Exception {
+  public static void singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
+      throws Exception {
+    File file = new File(queryFile);
+    FileReader fileReader = new FileReader(file);
+    BufferedReader bufferedReader = new BufferedReader(fileReader);
+    String query;
+
+    int numQueries = 0;
+    long totalQueryTime = 0;
+    long totalClientTime = 0;
+
+    while ((query = bufferedReader.readLine()) != null) {
+      JSONObject response = runSingleQuery(conf, query, 1);
+
+      totalQueryTime += response.getLong("timeUsedMs");
+      totalClientTime += response.getLong("totalTime");
+
+      if ((numQueries > 0) && (numQueries % 1000) == 0) {
+        LOGGER.info("Processed  {} queries, Total Query time: {} ms Total Client side time : {} ms.", numQueries,
+            totalQueryTime, totalClientTime);
+      }
+
+      ++numQueries;
+    }
+    LOGGER.info("Processed  {} queries, Total Query time: {} Total Client side time : {}.", numQueries,
+        totalQueryTime, totalClientTime);
+    fileReader.close();
+  }
+
+  public static JSONObject runSingleQuery(PerfBenchmarkDriverConf conf, String query, int numRuns)
+      throws Exception {
+    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    JSONObject response = null;
+
+    for (int i = 0; i < numRuns; i++) {
+      response = driver.postQuery(query);
+    }
+    return response;
+  }
+
+  public static void main(String[] args) throws Exception {
+    String confFile = args[0];
+    String queryFile = args[1];
     PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(confFile));
     //since its only to run queries, we should ensure no services get started
     conf.setStartBroker(false);
@@ -88,19 +124,7 @@ public class QueryRunner {
     conf.setUploadIndexes(false);
     conf.setRunQueries(true);
     conf.setConfigureResources(false);
-    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-
-    for (int i = 0; i < numRuns; i++) {
-      JSONObject response = driver.postQuery(query);
-      System.out.println("Response:" + response);
-      Thread.sleep(100);
-    }
-  }
-
-  public static void main(String[] args) throws Exception {
-    String confFile = args[0];
-    String queryFile = args[1];
-    multiThreadedQueryRunner(confFile, queryFile);
+    multiThreadedQueryRunner(conf, queryFile);
 
   }
 }

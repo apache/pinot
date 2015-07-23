@@ -93,5 +93,7 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
     Assert.assertEquals(config.getTime().getColumnName(), "T");
     Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryDefaultImpl.class.getCanonicalName());
+    Assert.assertEquals(config.getDimensions().get(0).getAlias(), "APrime");
+    Assert.assertEquals(config.getMetrics().get(0).getAlias(), "MPrime");
   }
 }

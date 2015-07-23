@@ -6,6 +6,7 @@ import java.util.Properties;
 
 public class DimensionSpec {
   private String name;
+  private String alias;
   private DimensionType type;
   private Properties config;
 
@@ -25,6 +26,11 @@ public class DimensionSpec {
   @JsonProperty
   public String getName() {
     return name;
+  }
+
+  @JsonProperty
+  public String getAlias() {
+    return alias;
   }
 
   @JsonProperty

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.routing;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -47,14 +48,14 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
-  private final Set<String> _dataTableSet = new HashSet<String>();
+  private final Set<String> _dataTableSet = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
   private final RoutingTableBuilder _defaultOfflineRoutingTableBuilder;
   private final RoutingTableBuilder _defaultRealtimeRoutingTableBuilder;
   private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
 
   private final Map<String, List<ServerToSegmentSetMap>> _brokerRoutingTable =
       new ConcurrentHashMap<String, List<ServerToSegmentSetMap>>();
-  private final Map<String, Long> _routingTableModifiedTimeStampMap = new HashMap<String, Long>();
+  private final Map<String, Long> _routingTableModifiedTimeStampMap = new ConcurrentHashMap<String, Long>();
   private final Random _random = new Random(System.currentTimeMillis());
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
 
@@ -101,7 +102,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Shutdown HelixExternalViewBasedRouting!");
   }
 
-  public synchronized void markDataResourceOnline(String tableName, ExternalView externalView,
+  public void markDataResourceOnline(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigList) {
     if (externalView == null) {
       return;
@@ -159,7 +160,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   }
 
-  public synchronized void markDataResourceOffline(String tableName) {
+  public void markDataResourceOffline(String tableName) {
     LOGGER.info("Trying to remove data table from broker : " + tableName);
     if (_dataTableSet.contains(tableName)) {
       _dataTableSet.remove(tableName);

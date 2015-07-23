@@ -10,4 +10,6 @@ public interface StarTreeRecordStoreFactory
   void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig) throws IOException;
 
   StarTreeRecordStore createRecordStore(UUID nodeId) throws IOException;
+
+  void close() throws IOException;
 }

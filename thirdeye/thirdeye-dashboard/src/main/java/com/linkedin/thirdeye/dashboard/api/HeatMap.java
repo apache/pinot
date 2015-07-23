@@ -9,18 +9,24 @@ import java.util.List;
 public class HeatMap implements Comparable<HeatMap> {
   private final ObjectMapper objectMapper;
   private final String metric;
+  private final String metricAlias;
   private final String dimension;
+  private final String dimensionAlias;
   private final List<HeatMapCell> cells;
   private final List<String> statsNames;
 
   public HeatMap(ObjectMapper objectMapper,
                  String metric,
+                 String metricAlias,
                  String dimension,
+                 String dimensionAlias,
                  List<HeatMapCell> cells,
                  List<String> statsNames) {
     this.objectMapper = objectMapper;
     this.metric = metric;
+    this.metricAlias = metricAlias;
     this.dimension = dimension;
+    this.dimensionAlias = dimensionAlias;
     this.cells = cells;
     this.statsNames = statsNames;
   }
@@ -31,6 +37,14 @@ public class HeatMap implements Comparable<HeatMap> {
 
   public String getDimension() {
     return dimension;
+  }
+
+  public String getDimensionAlias() {
+    return dimensionAlias;
+  }
+
+  public String getMetricAlias() {
+    return metricAlias;
   }
 
   public List<String> getStatsNames() {
@@ -49,7 +63,9 @@ public class HeatMap implements Comparable<HeatMap> {
   public String toString() {
     return Objects.toStringHelper(HeatMap.class)
         .add("metric", metric)
+        .add("metricAlias", metricAlias)
         .add("dimension", dimension)
+        .add("dimensionAlias", dimensionAlias)
         .add("statsNames", statsNames)
         .toString();
   }

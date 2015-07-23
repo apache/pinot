@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.views;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.MetricTableRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
@@ -14,22 +15,29 @@ import java.util.*;
 public class MetricViewTabular extends View {
   private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>(){};
 
+  private final CollectionSchema collectionSchema;
   private final ObjectMapper objectMapper;
   private final QueryResult result;
   private final List<MetricTable> metricTables;
   private final long baselineOffsetMillis;
   private final long intraDayPeriod;
+  private final Map<String, String> metricAliases;
+  private final Map<String, String> dimensionAliases;
 
-  public MetricViewTabular(ObjectMapper objectMapper,
+  public MetricViewTabular(CollectionSchema collectionSchema,
+                           ObjectMapper objectMapper,
                            QueryResult result,
                            long baselineOffsetMillis,
                            long intraDayPeriod) throws Exception {
     super("metric/intra-day.ftl");
+    this.collectionSchema = collectionSchema;
     this.objectMapper = objectMapper;
     this.result = result;
     this.baselineOffsetMillis = baselineOffsetMillis;
     this.intraDayPeriod = intraDayPeriod;
     this.metricTables = generateMetricTables();
+    this.metricAliases = generateMetricAliases();
+    this.dimensionAliases = generateDimensionAliases();
   }
 
   public List<MetricTable> getMetricTables() {
@@ -38,6 +46,30 @@ public class MetricViewTabular extends View {
 
   public List<String> getMetricNames() {
     return result.getMetrics();
+  }
+
+  public Map<String, String> getMetricAliases() {
+    return metricAliases;
+  }
+
+  public Map<String, String> getDimensionAliases() {
+    return dimensionAliases;
+  }
+
+  private Map<String, String> generateMetricAliases() {
+    Map<String, String> aliases = new HashMap<>();
+    for (int i = 0; i < collectionSchema.getMetrics().size(); i++) {
+      aliases.put(collectionSchema.getMetrics().get(i), collectionSchema.getMetricAliases().get(i));
+    }
+    return aliases;
+  }
+
+  private Map<String, String> generateDimensionAliases() {
+    Map<String, String> aliases = new HashMap<>();
+    for (int i = 0; i < collectionSchema.getDimensions().size(); i++) {
+      aliases.put(collectionSchema.getDimensions().get(i), collectionSchema.getDimensionAliases().get(i));
+    }
+    return aliases;
   }
 
   private Map<String, String> getDimensionValues(String dimensionKey) throws Exception {

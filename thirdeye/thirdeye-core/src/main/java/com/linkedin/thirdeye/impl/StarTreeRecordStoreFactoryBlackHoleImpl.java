@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -24,5 +25,10 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
     return new StarTreeRecordStoreBlackHoleImpl(metricSpecs);
+  }
+
+  @Override
+  public void close() throws IOException {
+    // NOP
   }
 }

@@ -56,4 +56,36 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>appassembler-maven-plugin</artifactId>
+        <configuration>
+          <programs>
+            <program>
+              <mainClass>com.linkedin.pinot.perf.PerfBenchmarkTest</mainClass>
+              <name>pinot-perfBenchmark</name>
+            </program>
+          </programs>
+          <binFileExtensions>
+            <unix>.sh</unix>
+          </binFileExtensions>
+          <!-- Set the target configuration directory to be used in the bin scripts -->
+          <configurationDirectory>conf</configurationDirectory>
+          <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
+          <copyConfigurationDirectory>false</copyConfigurationDirectory>
+          <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
+          <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
+          <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
+          <!-- Extra JVM arguments that will be included in the bin scripts -->
+          <extraJvmArguments>-Xms24G -Xmx24G -Dlog4j.configuration=log4j.properties</extraJvmArguments>
+          <!-- Generate bin scripts for windows and unix pr default -->
+          <platforms>
+            <platform>unix</platform>
+          </platforms>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

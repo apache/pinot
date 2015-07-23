@@ -85,17 +85,7 @@ $(document).ready(function() {
 
     // Generate Timezone drop down
     var timezones = moment.tz.names()
-    var currentTimeZone = ""
-    if(window.location.hash) {
-        var params = parseHashParameters(window.location.hash)
-        if( params.timezone  ) {
-            currentTimeZone = params.timezone.split('-').join('/')
-        } else {
-            currentTimeZone = getLocalTimeZone().split(' ')[1]
-        } 
-    } else {
-        currentTimeZone = getLocalTimeZone().split(' ')[1]
-    }
+    var currentTimeZone = getTimeZone()
     $.each(timezones, function(idx, tz){
         $("#sidenav-timezone").append('<option value="' + tz + '">' + tz + '</option>')
         if(tz === currentTimeZone) {
@@ -188,6 +178,13 @@ $(document).ready(function() {
     if (!oneChecked) {
       $($(".sidenav-metric")[0]).attr('checked', 'checked')
     }
+
+    $(".custom-dashboard-link").click(function(event) {
+        event.preventDefault()
+        var dateTime = $("#sidenav-date").val().split('-').join('/')
+        var href = $(this).attr('href')
+        window.location.pathname = href + '/' + dateTime
+    })
 
     $("#sidenav-submit").click(function(event) {
         event.preventDefault()

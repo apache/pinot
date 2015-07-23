@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -60,5 +61,10 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
                                                      config,
                                                      forwardIndex,
                                                      numTimeBuckets);
+  }
+
+  @Override
+  public void close() throws IOException {
+    // NOP
   }
 }

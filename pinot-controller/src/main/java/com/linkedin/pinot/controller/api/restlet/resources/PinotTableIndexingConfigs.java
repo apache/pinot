@@ -1,5 +1,11 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 
@@ -49,13 +55,27 @@ public class PinotTableIndexingConfigs extends ServerResource {
 
     AbstractTableConfig config = null;
     try {
-      config = AbstractTableConfig.init(entity.getText());
-      manager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
-          config.getIndexingConfig());
-      return new StringRepresentation("done");
+      return updateIndexingConfig(tableName, entity, config);
     } catch (final Exception e) {
       LOGGER.error("errpr updating indexing configs for table {}", config.getTableName(), e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
+  }
+
+  @HttpVerb("put")
+  @Summary("Updates the indexing configuration for a table")
+  @Tags({"table"})
+  @Paths({
+      "/tables/{tableName}/indexingConfigs"
+  })
+  private Representation updateIndexingConfig(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the indexing configuration", required = true)
+      String tableName,
+      Representation entity, AbstractTableConfig config)
+      throws Exception {
+    config = AbstractTableConfig.init(entity.getText());
+    manager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
+        config.getIndexingConfig());
+    return new StringRepresentation("done");
   }
 }

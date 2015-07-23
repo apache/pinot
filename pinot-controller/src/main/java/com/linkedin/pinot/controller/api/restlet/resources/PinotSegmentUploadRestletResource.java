@@ -15,11 +15,17 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
@@ -93,42 +99,84 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
 
       if ((tableName == null) && (segmentName == null)) {
-        final JSONArray ret = new JSONArray();
-        for (final File file : baseDataDir.listFiles()) {
-          final String url =
-              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
-                  + file.getName();
-          ret.put(url);
-        }
-        presentation = new StringRepresentation(ret.toString());
-        return presentation;
+        return getAllSegments();
 
       } else if ((tableName != null) && (segmentName == null)) {
-        final JSONArray ret = new JSONArray();
-        File tableDir = new File(baseDataDir, tableName);
-        if (tableDir.exists()) {
-          for (final File file : tableDir.listFiles()) {
-            final String url =
-                "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
-                    + tableName + "/" + file.getName();
-            ret.put(url);
-          }
-        }
-        presentation = new StringRepresentation(ret.toString());
-        return presentation;
+        return getSegmentsForTable(tableName);
       }
 
-      final File dataFile = new File(baseDataDir, StringUtil.join("/", tableName, segmentName));
-      if (dataFile.exists()) {
-        presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
-        return presentation;
-      }
-      presentation = new StringRepresentation("Table or segment is not found!");
+      presentation = getSegmentFile(tableName, segmentName);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing get request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
+    return presentation;
+  }
+
+  @HttpVerb("get")
+  @Summary("Downloads a segment")
+  @Tags({"segment", "table"})
+  @Paths({
+      "/segments/{tableName}/{segmentName}"
+  })
+  private Representation getSegmentFile(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides", required = true)
+      String tableName,
+      @Parameter(name = "segmentName", in = "path", description = "The name of the segment to download", required = true)
+      String segmentName) {
+    Representation presentation;
+    final File dataFile = new File(baseDataDir, StringUtil.join("/", tableName, segmentName));
+    if (dataFile.exists()) {
+      presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
+    } else {
+      presentation = new StringRepresentation("Table or segment is not found!");
+    }
+    return presentation;
+  }
+
+  @HttpVerb("get")
+  @Summary("Lists all segments for a given table")
+  @Tags({"segment", "table"})
+  @Paths({
+      "/segments/{tableName}",
+      "/segments/{tableName}/"
+  })
+  private Representation getSegmentsForTable(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
+      String tableName) {
+    Representation presentation;
+    final JSONArray ret = new JSONArray();
+    File tableDir = new File(baseDataDir, tableName);
+    if (tableDir.exists()) {
+      for (final File file : tableDir.listFiles()) {
+        final String url =
+            "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
+                + tableName + "/" + file.getName();
+        ret.put(url);
+      }
+    }
+    presentation = new StringRepresentation(ret.toString());
+    return presentation;
+  }
+
+  @HttpVerb("get")
+  @Summary("Lists all segments")
+  @Tags({"segment"})
+  @Paths({
+      "/segments",
+      "/segments/"
+  })
+  private Representation getAllSegments() {
+    Representation presentation;
+    final JSONArray ret = new JSONArray();
+    for (final File file : baseDataDir.listFiles()) {
+      final String url =
+          "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
+              + file.getName();
+      ret.put(url);
+    }
+    presentation = new StringRepresentation(ret.toString());
     return presentation;
   }
 
@@ -183,17 +231,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
         // order to ensure the segment is not corrupted
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
-        final SegmentMetadata metadata = new SegmentMetadataImpl(tmpSegmentDir.listFiles()[0]);
-        final File tableDir = new File(baseDataDir, metadata.getTableName());
-        File segmentFile = new File(tableDir, dataFile.getName());
-        if (segmentFile.exists()) {
-          FileUtils.deleteQuietly(segmentFile);
-        }
-        FileUtils.moveFile(dataFile, segmentFile);
-
-        manager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
-        setStatus(Status.SUCCESS_OK);
-        return new StringRepresentation("");
+        return uploadSegment(tmpSegmentDir.listFiles()[0], dataFile);
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
@@ -219,6 +257,28 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     return rep;
   }
 
+  @HttpVerb("post")
+  @Summary("Uploads a segment")
+  @Tags({"segment"})
+  @Paths({
+      "/segments",
+      "/segments/"
+  })
+  private Representation uploadSegment(File indexDir, File dataFile)
+      throws ConfigurationException, IOException {
+    final SegmentMetadata metadata = new SegmentMetadataImpl(indexDir);
+    final File tableDir = new File(baseDataDir, metadata.getTableName());
+    File segmentFile = new File(tableDir, dataFile.getName());
+    if (segmentFile.exists()) {
+      FileUtils.deleteQuietly(segmentFile);
+    }
+    FileUtils.moveFile(dataFile, segmentFile);
+
+    manager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+    setStatus(Status.SUCCESS_OK);
+    return new StringRepresentation("");
+  }
+
   @Override
   @Delete
   public Representation delete() {
@@ -227,27 +287,43 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      if (tableName == null || segmentName == null) {
-        throw new RuntimeException("either table name or segment name is null");
-      }
-      PinotResourceManagerResponse res = null;
-      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
-          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
-        res = manager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
-        rep = new StringRepresentation(res.toString());
-      }
-      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
-          TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
-        res = manager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
-        rep = new StringRepresentation(res.toString());
-      }
-      if (res == null) {
-        rep = new StringRepresentation("Cannot find the segment: " + segmentName + " in table: " + tableName);
-      }
+      rep = deleteSegment(rep, tableName, segmentName);
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
+    }
+    return rep;
+  }
+
+  @HttpVerb("delete")
+  @Summary("Deletes a segment from a table")
+  @Tags({"segment", "table"})
+  @Paths({
+      "/segments/{tableName}/{segmentName}"
+  })
+  private Representation deleteSegment(Representation rep,
+      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides", required = true)
+      String tableName,
+      @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete", required = true)
+      String segmentName) {
+    if (tableName == null || segmentName == null) {
+      throw new RuntimeException("either table name or segment name is null");
+    }
+    PinotResourceManagerResponse res = null;
+    if (ZKMetadataProvider
+        .isSegmentExisted(manager.getPropertyStore(), TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName),
+            segmentName)) {
+      res = manager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
+      rep = new StringRepresentation(res.toString());
+    }
+    if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
+        TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
+      res = manager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
+      rep = new StringRepresentation(res.toString());
+    }
+    if (res == null) {
+      rep = new StringRepresentation("Cannot find the segment: " + segmentName + " in table: " + tableName);
     }
     return rep;
   }

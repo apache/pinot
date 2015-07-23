@@ -1,11 +1,11 @@
 $(document).ready(function() {
-    var timeZone = jstz()
     $(".metric-table-time").each(function(i, cell) {
+        var tz = getTimeZone();
         var cellObj = $(cell)
         var currentTime = moment(cellObj.html())
         var baselineTime = moment(cellObj.attr('title'))
-        cellObj.html(currentTime.tz(timeZone.timezone_name).format())
-        cellObj.attr('title', baselineTime.tz(timeZone.timezone_name).format())
+        cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm:ss'))
+        cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm:ss'))
 
         // Click changes current value to that time
         cellObj.click(function() {

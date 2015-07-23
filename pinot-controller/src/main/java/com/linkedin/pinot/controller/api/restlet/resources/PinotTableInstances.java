@@ -1,9 +1,15 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -49,68 +55,81 @@ public class PinotTableInstances extends ServerResource {
       return new StringRepresentation("tableName is not present");
     }
 
-    JSONObject ret = new JSONObject();
     try {
-      ret.put("tableName", tableName);
-      JSONArray brokers = new JSONArray();
-      JSONArray servers = new JSONArray();
-
-      if (type == null || type.toLowerCase().equals("broker")) {
-
-        if (manager.hasOfflineTable(tableName)) {
-          JSONObject e = new JSONObject();
-          e.put("tableType", "offline");
-          JSONArray a = new JSONArray();
-          for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
-            a.add(ins);
-          }
-          e.put("instances", a);
-          brokers.add(e);
-        }
-
-        if (manager.hasRealtimeTable(tableName)) {
-          JSONObject e = new JSONObject();
-          e.put("tableType", "realtime");
-          JSONArray a = new JSONArray();
-          for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
-            a.add(ins);
-          }
-          e.put("instances", a);
-          brokers.add(e);
-        }
-      }
-
-      if (type == null || type.toLowerCase().equals("server")) {
-        if (manager.hasOfflineTable(tableName)) {
-          JSONObject e = new JSONObject();
-          e.put("tableType", "offline");
-          JSONArray a = new JSONArray();
-          for (String ins : manager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
-            a.add(ins);
-          }
-          e.put("instances", a);
-          servers.add(e);
-        }
-
-        if (manager.hasRealtimeTable(tableName)) {
-          JSONObject e = new JSONObject();
-          e.put("tableType", "realtime");
-          JSONArray a = new JSONArray();
-          for (String ins : manager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
-            a.add(ins);
-          }
-          e.put("instances", a);
-          servers.add(e);
-        }
-      }
-
-      ret.put("brokers", brokers);
-      ret.put("server", servers);
-      return new StringRepresentation(ret.toString());
+      return getTableInstances(tableName, type);
     } catch (Exception e) {
       LOGGER.error("error processing fetch table request, ", e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
 
+  }
+
+  @HttpVerb("get")
+  @Summary("Lists table instances for a given table")
+  @Tags({"instance", "table"})
+  @Paths({
+      "/tables/{tableName}/instances"
+  })
+  private Representation getTableInstances(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list instances", required = true)
+      String tableName, String type)
+      throws JSONException, IOException {
+    JSONObject ret = new JSONObject();
+    ret.put("tableName", tableName);
+    JSONArray brokers = new JSONArray();
+    JSONArray servers = new JSONArray();
+
+    if (type == null || type.toLowerCase().equals("broker")) {
+
+      if (manager.hasOfflineTable(tableName)) {
+        JSONObject e = new JSONObject();
+        e.put("tableType", "offline");
+        JSONArray a = new JSONArray();
+        for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
+          a.add(ins);
+        }
+        e.put("instances", a);
+        brokers.add(e);
+      }
+
+      if (manager.hasRealtimeTable(tableName)) {
+        JSONObject e = new JSONObject();
+        e.put("tableType", "realtime");
+        JSONArray a = new JSONArray();
+        for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
+          a.add(ins);
+        }
+        e.put("instances", a);
+        brokers.add(e);
+      }
+    }
+
+    if (type == null || type.toLowerCase().equals("server")) {
+      if (manager.hasOfflineTable(tableName)) {
+        JSONObject e = new JSONObject();
+        e.put("tableType", "offline");
+        JSONArray a = new JSONArray();
+        for (String ins : manager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
+          a.add(ins);
+        }
+        e.put("instances", a);
+        servers.add(e);
+      }
+
+      if (manager.hasRealtimeTable(tableName)) {
+        JSONObject e = new JSONObject();
+        e.put("tableType", "realtime");
+        JSONArray a = new JSONArray();
+        for (String ins : manager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
+          a.add(ins);
+        }
+        e.put("instances", a);
+        servers.add(e);
+      }
+    }
+
+    ret.put("brokers", brokers);
+    ret.put("server", servers);
+    return new StringRepresentation(ret.toString());
   }
 }

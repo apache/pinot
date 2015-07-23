@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -51,5 +52,10 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   {
     return new StarTreeRecordStoreLogBufferImpl(
             nodeId, config, bufferSize, useDirect, targetLoadFactor);
+  }
+
+  @Override
+  public void close() throws IOException {
+    // NOP
   }
 }

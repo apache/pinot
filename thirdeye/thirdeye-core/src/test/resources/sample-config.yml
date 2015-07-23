@@ -2,11 +2,13 @@ collection: myCollection
 
 dimensions:
   - name: A
+    alias: "APrime"
   - name: B
   - name: C
 
 metrics:
   - name: M
+    alias: "MPrime"
     type: INT
 
 time:

@@ -3,7 +3,7 @@ $(document).ready(function() {
     var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
 
     var options = {
-      mode: hash['timeSeriesMode'] ? hash['timeSeriesMode'] : 'same',
+      mode: 'own',
       click: function(event, pos, item) {
         $('body').css('cursor', 'progress')
         var path = parsePath(window.location.pathname)
@@ -25,30 +25,6 @@ $(document).ready(function() {
 
     var container = $("#metric-time-series-placeholder")
     var tooltip = $("#metric-time-series-tooltip")
-
-
-    // split button
-    $("#metric-time-series-split").click(function(event) {
-        var obj = $(this)
-
-        var mode = null
-        if (obj.hasClass('uk-active')) {
-            mode = 'same'
-            obj.removeClass('uk-active')
-        } else {
-            mode = 'own'
-            obj.addClass('uk-active')
-        }
-
-        var hash = parseHashParameters(window.location.hash)
-        hash['timeSeriesMode'] = mode
-        window.location.hash = encodeHashParameters(hash)
-
-        options.mode = mode
-        renderTimeSeries(container, tooltip, options)
-
-        return false
-    })
 
     $("#metric-time-series-placeholder").html("<p>Loading...</p>")
     renderTimeSeries(container, tooltip, options)

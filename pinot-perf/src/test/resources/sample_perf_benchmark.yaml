@@ -17,7 +17,7 @@
 !!com.linkedin.pinot.perf.PerfBenchmarkDriverConf
 brokerPort: 8099
 cleanOnStartup: false
-clusterName: PerfBenchmark
+clusterName: PinotPerfTestCluster
 controllerDataDir: null
 controllerHost: localhost
 controllerPort: 8100
@@ -37,4 +37,4 @@ startController: true
 startServer: true
 startZookeeper: true
 zkHost: localhost
-zkPort: 2181
+zkPort: 2191

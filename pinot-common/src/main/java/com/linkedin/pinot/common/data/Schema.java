@@ -255,6 +255,22 @@ public class Schema {
     return (timeFieldSpec != null) ? timeFieldSpec.getName() : null;
   }
 
+  @JsonIgnore(true)
+  public TimeUnit getIncomingTimeUnit() throws NullPointerException {
+    if (timeFieldSpec == null || timeFieldSpec.getIncomingGranularitySpec() == null) {
+      throw new NullPointerException();
+    }
+    return timeFieldSpec.getIncomingGranularitySpec().getTimeType();
+  }
+
+  @JsonIgnore(true)
+  public TimeUnit getOutgoingTimeUnit() throws NullPointerException {
+    if (timeFieldSpec == null || timeFieldSpec.getOutgoingGranularitySpec() == null) {
+      throw new NullPointerException();
+    }
+    return timeFieldSpec.getIncomingGranularitySpec().getTimeType();
+  }
+
   public TimeFieldSpec getTimeFieldSpec() {
     return timeFieldSpec;
   }
