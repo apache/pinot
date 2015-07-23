@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.linkedin.pinot.monitor.util.RuntimeMonitor;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
@@ -71,7 +72,7 @@ public class HelixServerStarter {
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
-
+    RuntimeMonitor rm= RuntimeMonitor.getRuntimeMonitor("server");
     _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
 
