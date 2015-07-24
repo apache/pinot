@@ -162,17 +162,17 @@ public class DimensionViewHeatMap extends View {
         }
 
         //Baseline total
-        if (baselineStats.getSum() > 0) {
-          cell.addStat(baselineStats.getSum());
+        if (Double.isNaN(baselineStats.getSum())) {
+            cell.addStat(null);
         } else {
-          cell.addStat(null);
+            cell.addStat(baselineStats.getSum());
         }
 
         //Current total
-        if (currentStats.getSum() > 0) {
-          cell.addStat(currentStats.getSum());
-        } else {
+        if (Double.isNaN(baselineStats.getSum())) {
           cell.addStat(null);
+        } else {
+          cell.addStat(currentStats.getSum());
         }
 
         // Baseline ratio
