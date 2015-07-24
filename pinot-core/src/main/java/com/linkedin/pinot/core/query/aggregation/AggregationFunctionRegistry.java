@@ -30,9 +30,9 @@ import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationNoDictionaryFunction;
+import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Aggregation function registry, that is used to register aggregation functions with the nicknames, so that it can be easily referred
@@ -55,6 +55,7 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("sum", SumAggregationFunction.class);
     keyToFunctionWithDictionary.put("avg", AvgAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcount", DistinctCountAggregationFunction.class);
+    keyToFunctionWithDictionary.put("distinctcounthll", DistinctCountHLLAggregationFunction.class);
   }
 
   static {
