@@ -111,6 +111,89 @@ public class QueriesSentinelTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
+  /**
+   * Console output of the last statement may not appear, maybe a result of intellij idea test console redirection.
+   * To avoid this, always add assert clauses, and do not rely on the console output.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testDistinctCountHLLNoGroupBy() throws Exception {
+    int counter = 0;
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final List<TestSimpleAggreationQuery> aggCalls = new ArrayList<TestSimpleAggreationQuery>();
+    // distinct count(*) not works
+    for (int i = 1; i <= 5; i++) {
+      aggCalls.add(new TestSimpleAggreationQuery("select distinctcount(column" + i + ") from testTable limit 0", 0.0));
+      aggCalls.add(new TestSimpleAggreationQuery("select distinctcounthll(column" + i + ") from testTable limit 0", 0.0));
+    }
+
+    boolean isAccurate = true;
+    double accurateValue = 0;
+    for (TestSimpleAggreationQuery aggCall : aggCalls) {
+      LOGGER.info("running " + counter + " : " + aggCall.pql);
+      final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
+      InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
+      instanceRequest.setSearchSegments(new ArrayList<String>());
+      instanceRequest.getSearchSegments().add(segmentName);
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      instanceResponseMap.clear();
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+
+      double val = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value"));
+      if (isAccurate) {
+        accurateValue = val;
+        isAccurate = false;
+      } else {
+        // it's estimation so we need to test its result within error bound
+        TestUtils.assertApproximation(val, accurateValue, 0.1);
+        isAccurate = true;
+      }
+    }
+  }
+
+  @Test
+  public void testDistinctCountHLLGroupBy() throws Exception {
+    final List<TestGroupByAggreationQuery> groupByCalls = new ArrayList<TestGroupByAggreationQuery>();
+    for (int i = 1; i <= 5; i++) {
+      if (i == 2) {
+        continue;
+      }
+      groupByCalls.add(new TestGroupByAggreationQuery("select distinctcount(column2) from testTable group by column" + i + " limit 0", null));
+      groupByCalls.add(new TestGroupByAggreationQuery("select distinctcounthll(column2) from testTable group by column" + i + " limit 0", null));
+    }
+
+    boolean isAccurate = true;
+    JSONArray accurateValue = null;
+
+    int counter = 0;
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
+      LOGGER.info("running " + counter + " : " + groupBy.pql);
+      final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
+      InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
+      instanceRequest.setSearchSegments(new ArrayList<String>());
+      instanceRequest.getSearchSegments().add(segmentName);
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      instanceResponseMap.clear();
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+
+      JSONArray val = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
+      if (isAccurate) {
+        accurateValue = val;
+        isAccurate = false;
+      } else {
+        // it's estimation so we need to test its result within error bound
+        TestUtils.assertJSONArrayApproximation(val, accurateValue, 0.1);
+        isAccurate = true;
+      }
+    }
+  }
+
   @Test
   public void testAggregation() throws Exception {
     int counter = 0;
