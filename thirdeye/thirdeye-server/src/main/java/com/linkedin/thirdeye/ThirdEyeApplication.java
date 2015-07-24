@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.healthcheck.KafkaConsumerLagHealthCheck;
 import com.linkedin.thirdeye.healthcheck.KafkaDataLagHealthCheck;
@@ -36,6 +38,7 @@ import java.util.concurrent.ScheduledExecutorService;
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeApplication.class);
+  private static final String DATA_TIME_LAG_MILLIS = "dataTimeLagMillis";
 
   @Override
   public String getName()
@@ -90,6 +93,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                                             config.getAnomalyDetectionInterval(),
                                             rootDir);
 
+    final MetricRegistry metricRegistry = environment.metrics();
     environment.lifecycle().manage(anomalyDetectionTaskManager);
     environment.lifecycle().manage(new Managed()
     {
@@ -103,7 +107,17 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
           {
             for (String collection : collections)
             {
+              final String collectionName = collection;
               starTreeManager.restore(rootDir, collection);
+              metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
+                  new Gauge<Long>() {
+
+                    @Override
+                    public Long getValue() {
+
+                      return System.currentTimeMillis() - starTreeManager.getMaxDataTime(collectionName);
+                    }
+                  });
             }
           }
 

@@ -90,16 +90,6 @@ public class CollectionsResource implements Managed
               return lastPostDataMillis.get(collectionName).get();
             }
           });
-
-      // Metric for the latest data time in the latest available on-disk segment
-      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
-          new Gauge<Long>() {
-
-            @Override
-            public Long getValue() {
-              return System.currentTimeMillis() - manager.getMaxDataTime(collectionName);
-            }
-          });
     }
   }
 
@@ -282,7 +272,11 @@ public class CollectionsResource implements Managed
 
             @Override
             public Long getValue() {
-              return System.currentTimeMillis() - manager.getMaxDataTime(collectionName);
+              long maxDataTime = 0;
+              if (manager.getMaxDataTime(collectionName) != null) {
+                maxDataTime = manager.getMaxDataTime(collectionName);
+              }
+              return System.currentTimeMillis() - maxDataTime;
             }
           });
     }

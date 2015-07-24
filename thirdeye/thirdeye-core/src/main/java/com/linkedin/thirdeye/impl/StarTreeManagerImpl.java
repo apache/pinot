@@ -65,7 +65,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
   }
 
   @Override
-  public long getMaxDataTime(String collection) {
+  public Long getMaxDataTime(String collection) {
     return maxDataTime.get(collection);
   }
 

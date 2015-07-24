@@ -28,7 +28,7 @@ public interface StarTreeManager
    *
    * Returns the maxDataTime available in the collection
    */
-  long getMaxDataTime(String collection);
+  Long getMaxDataTime(String collection);
 
   /**
    * Returns the index metadata for a data segment.
