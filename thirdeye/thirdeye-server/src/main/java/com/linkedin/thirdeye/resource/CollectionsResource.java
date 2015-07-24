@@ -54,7 +54,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CollectionsResource implements Managed
 {
   private static final String LAST_POST_DATA_MILLIS = "lastPostDataMillis";
-  private static final String MAX_DATA_TIME_MILLIS = "maxDataTimeMillis";
+  private static final String DATA_TIME_LAG_MILLIS = "dataTimeLagMillis";
   private static final Logger LOG = LoggerFactory.getLogger(CollectionsResource.class);
 
   private final StarTreeManager manager;
@@ -62,7 +62,6 @@ public class CollectionsResource implements Managed
   private final DataUpdateManager dataUpdateManager;
   private final MetricRegistry metricRegistry;
   private final ConcurrentMap<String, AtomicLong> lastPostDataMillis;
-  private final ConcurrentMap<String, AtomicLong> maxDataTimeMillis;
 
   public CollectionsResource(StarTreeManager manager,
                              MetricRegistry metricRegistry,
@@ -74,65 +73,36 @@ public class CollectionsResource implements Managed
     this.dataUpdateManager = dataUpdateManager;
     this.metricRegistry = metricRegistry;
     lastPostDataMillis = new ConcurrentHashMap<String, AtomicLong>();
-    maxDataTimeMillis = new ConcurrentHashMap<String, AtomicLong>();
   }
 
   @Override
   public void start() throws Exception {
 
-    for (final String collection : manager.getCollections())
+    for (String collection : manager.getCollections())
     {
+      final String collectionName = collection;
       // Metric for time we last received a POST to update collection's data
       lastPostDataMillis.putIfAbsent(collection, new AtomicLong(System.currentTimeMillis()));
       metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, LAST_POST_DATA_MILLIS),
           new Gauge<Long>() {
             @Override
             public Long getValue() {
-              return lastPostDataMillis.get(collection).get();
+              return lastPostDataMillis.get(collectionName).get();
             }
           });
 
       // Metric for the latest data time in the latest available on-disk segment
-      File collectionDir = new File(rootDir, collection);
-      File[] dataDirs = collectionDir.listFiles(new FilenameFilter() {
-
-        @Override
-        public boolean accept(File dir, String name) {
-          return name.startsWith(StorageUtils.getDataDirPrefix());
-        }
-      });
-
-      long maxDataMillis = 0L;
-      for (File dataDir : dataDirs) {
-        IndexMetadata indexMetadata = getIndexMetadata(dataDir);
-        if (indexMetadata.getMaxDataTimeMillis() > maxDataMillis) {
-          maxDataMillis = indexMetadata.getMaxDataTimeMillis();
-        }
-      }
-      maxDataTimeMillis.putIfAbsent(collection, new AtomicLong(maxDataMillis));
-      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, MAX_DATA_TIME_MILLIS),
+      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
           new Gauge<Long>() {
 
             @Override
             public Long getValue() {
-              return maxDataTimeMillis.get(collection).get();
+              return System.currentTimeMillis() - manager.getMaxDataTime(collectionName);
             }
           });
     }
   }
 
-
-  private IndexMetadata getIndexMetadata(File dataDir) throws IOException {
-    File indexMetadataFile = new File(dataDir, StarTreeConstants.METADATA_FILE_NAME);
-    Properties properties = new Properties();
-    InputStream inputStream = new FileInputStream(indexMetadataFile);
-    try {
-      properties.load(inputStream);
-    } finally {
-      inputStream.close();
-    }
-    return IndexMetadata.fromProperties(properties);
-  }
 
   @Override
   public void stop() throws Exception {
@@ -306,34 +276,15 @@ public class CollectionsResource implements Managed
       value.set((System.currentTimeMillis()));
     }
 
-    File collectionDir = new File(rootDir, collection);
-    final String schedulePrefix = schedule;
-    final DateTime minTimePrefix = minTime;
-    final DateTime maxTimePrefix = maxTime;
-    File[] dataDirs = collectionDir.listFiles(new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.startsWith(StorageUtils.getDataDirPrefix(schedulePrefix, minTimePrefix, maxTimePrefix));
-      }
-    });
-
-    if (dataDirs.length == 0) {
-      throw new IllegalStateException("server upload failed");
-    }
-    IndexMetadata indexMetadata = getIndexMetadata(dataDirs[0]);
-    AtomicLong maxDataTimeValue = maxDataTimeMillis.putIfAbsent(collection, new AtomicLong(indexMetadata.getMaxDataTimeMillis()));
-    if (maxDataTimeValue == null) {
-      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, MAX_DATA_TIME_MILLIS),
+    if (!metricRegistry.getGauges().containsKey(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS))) {
+      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
           new Gauge<Long>() {
 
             @Override
             public Long getValue() {
-              return maxDataTimeMillis.get(collectionName).get();
+              return System.currentTimeMillis() - manager.getMaxDataTime(collectionName);
             }
           });
-    } else {
-      if (indexMetadata.getMaxDataTimeMillis() > maxDataTimeValue.get())
-      maxDataTimeValue.set(indexMetadata.getMaxDataTimeMillis());
     }
 
     return Response.ok().build();
