@@ -158,8 +158,6 @@ $(document).ready(function() {
       })
     }
 
-
-
     // Load existing date / time
     if (path.currentMillis) {
         var currentDateTime = moment(parseInt(path.currentMillis))
@@ -181,7 +179,6 @@ $(document).ready(function() {
         var timeString = latestDateTime.format("HH:mm");
         $("#sidenav-date").val(dateString)
         $("#sidenav-time").val(timeString)
-
     }
 
     // Select the first metric if none selected
