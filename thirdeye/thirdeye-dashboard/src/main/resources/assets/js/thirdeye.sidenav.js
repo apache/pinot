@@ -92,7 +92,18 @@ $(document).ready(function() {
             $("#sidenav-timezone option:last-child").prop('selected', 1)
         }
     })
-    
+
+    //Display min-,max-data-time in the selected time zone
+    //using moment.js methods, documentation: http://momentjs.com/timezone/docs/
+    var selectedTimeZone = $("#sidenav-timezone").val()
+    var maxDateTimeInUCT = moment.tz(parseInt($("#sidenav-max-time").attr('millis')), "UCT" )
+    var maxDateTimeInSelectedTz = maxDateTimeInUCT.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
+    $("#sidenav-max-time").html(maxDateTimeInSelectedTz)
+
+    var minDateTimeInUCT = moment.tz(parseInt($("#sidenav-min-time").attr('millis')), "UCT" )
+    var minDateTimeInSelectedTz = minDateTimeInUCT.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
+    $("#sidenav-min-time").html(minDateTimeInSelectedTz)
+
     // Load existing metrics selection / function
     if (path.metricFunction) {
       var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
@@ -147,6 +158,8 @@ $(document).ready(function() {
       })
     }
 
+
+
     // Load existing date / time
     if (path.currentMillis) {
         var currentDateTime = moment(parseInt(path.currentMillis))
@@ -168,6 +181,7 @@ $(document).ready(function() {
         var timeString = latestDateTime.format("HH:mm");
         $("#sidenav-date").val(dateString)
         $("#sidenav-time").val(timeString)
+
     }
 
     // Select the first metric if none selected
