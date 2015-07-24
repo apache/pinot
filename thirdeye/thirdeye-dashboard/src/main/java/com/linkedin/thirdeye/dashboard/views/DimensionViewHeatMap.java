@@ -65,7 +65,7 @@ public class DimensionViewHeatMap extends View {
     for (String metricName : queryResult.getMetrics()) {
       snapshotValues.put(metricName, new HashSet<String>());
     }
-    try {
+   /* try {
       String[][] snapshot = SnapshotUtils.snapshot(2, queryResult); // show top 2 movers
       for (int i = 0; i < queryResult.getMetrics().size(); i++) {
         String[] snapshotCombinations = snapshot[i];
@@ -82,7 +82,7 @@ public class DimensionViewHeatMap extends View {
       LOGGER.info("snapshotValues={}", snapshotValues);
     } catch (Exception e) {
       LOGGER.error("Error generating snapshot", e);
-    }
+    }*/
 
     // Initialize metric info
     Map<String, List<HeatMapCell>> allCells = new HashMap<>();
