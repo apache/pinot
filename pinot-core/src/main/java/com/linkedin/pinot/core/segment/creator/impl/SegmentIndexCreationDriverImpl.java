@@ -99,13 +99,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Count the number of documents and gather per-column statistics
     LOGGER.info("Start building StatsCollector!");
     totalDocs = 0;
+    GenericRow row;
+    long start;
+    long stop;
+    long stop1;
     while (recordReader.hasNext()) {
       totalDocs++;
-      long start = System.currentTimeMillis();
-      GenericRow row = recordReader.next();
-      long stop = System.currentTimeMillis();
+      start = System.currentTimeMillis();
+      row = recordReader.next();
+      stop = System.currentTimeMillis();
+      //TODO:  ?
       statsCollector.collectRow(row);
-      long stop1 = System.currentTimeMillis();
+      stop1 = System.currentTimeMillis();
       totalRecordReadTime += (stop - start);
       totalStatsCollectorTime += (stop1 - stop);
     }
@@ -119,11 +124,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader.rewind();
     LOGGER.info("Start building IndexCreator!");
     while (recordReader.hasNext()) {
-      long start = System.currentTimeMillis();
-      GenericRow row = recordReader.next();
-      long stop = System.currentTimeMillis();
+      start = System.currentTimeMillis();
+      row = recordReader.next();
+      stop = System.currentTimeMillis();
       indexCreator.indexRow(row);
-      long stop1 = System.currentTimeMillis();
+      stop1 = System.currentTimeMillis();
       totalRecordReadTime += (stop - start);
       totalIndexTime += (stop1 - stop);
     }
