@@ -15,37 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.CARDINALITY;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.COLUMN_TYPE;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DATA_TYPE;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_NULL_VALUE;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SORTED;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_DOCS;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DIMENSIONS;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.METRICS;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TABLE_NAME;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_NAME;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_INTERVAL;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -58,6 +27,16 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwar
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 
 
 /**
@@ -152,10 +131,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void indexRow(GenericRow row) {
+    Object columnValueToIndex = null;
+    Object dictionaryIndex = null;
     for (final String column : dictionaryCreatorMap.keySet()) {
-
-      Object columnValueToIndex = row.getValue(column);
-      Object dictionaryIndex;
+      columnValueToIndex = row.getValue(column);
       if (dictionaryCache.get(column).containsKey(columnValueToIndex)) {
         dictionaryIndex = dictionaryCache.get(column).get(columnValueToIndex);
       } else {
