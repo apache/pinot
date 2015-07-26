@@ -96,10 +96,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // For each column, build its dictionary and initialize a forwards and an inverted index
+    ColumnIndexCreationInfo indexCreationInfo = null;
     for (final String column : dictionaryCreatorMap.keySet()) {
       dictionaryCreatorMap.get(column).build();
       dictionaryCache.put(column, new HashMap<Object, Object>());
-      ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
+      indexCreationInfo = indexCreationInfoMap.get(column);
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
         if (indexCreationInfo.isSorted()) {
           forwardIndexCreatorMap.put(column,
