@@ -96,12 +96,12 @@ $(document).ready(function() {
     //Display min-,max-data-time in the selected time zone
     //using moment.js methods, documentation: http://momentjs.com/timezone/docs/
     var selectedTimeZone = $("#sidenav-timezone").val()
-    var maxDateTimeInUCT = moment.tz(parseInt($("#sidenav-max-time").attr('millis')), "UCT" )
-    var maxDateTimeInSelectedTz = maxDateTimeInUCT.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
+    var maxDateTimeInUTC = moment.tz(parseInt($("#sidenav-max-time").attr('millis')), "UTC" )
+    var maxDateTimeInSelectedTz = maxDateTimeInUTC.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
     $("#sidenav-max-time").html(maxDateTimeInSelectedTz)
 
-    var minDateTimeInUCT = moment.tz(parseInt($("#sidenav-min-time").attr('millis')), "UCT" )
-    var minDateTimeInSelectedTz = minDateTimeInUCT.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
+    var minDateTimeInUTC = moment.tz(parseInt($("#sidenav-min-time").attr('millis')), "UTC" )
+    var minDateTimeInSelectedTz = minDateTimeInUTC.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
     $("#sidenav-min-time").html(minDateTimeInSelectedTz)
 
     // Load existing metrics selection / function
