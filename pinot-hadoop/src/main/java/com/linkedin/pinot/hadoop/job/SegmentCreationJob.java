@@ -153,7 +153,7 @@ public class SegmentCreationJob extends Configured {
     job.getConfiguration().set("data.schema", new ObjectMapper().writeValueAsString(_dataSchema));
 
     job.setMaxReduceAttempts(1);
-    job.setMaxMapAttempts(0);
+    job.setMaxMapAttempts(3);
     job.setNumReduceTasks(0);
     for (Object key : _properties.keySet()) {
       job.getConfiguration().set(key.toString(), _properties.getProperty(key.toString()));
