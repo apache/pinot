@@ -272,9 +272,9 @@ public class CollectionsResource implements Managed
 
             @Override
             public Long getValue() {
-              long maxDataTime = 0;
-              if (manager.getMaxDataTime(collectionName) != null) {
-                maxDataTime = manager.getMaxDataTime(collectionName);
+              Long maxDataTime = manager.getMaxDataTime(collectionName);
+              if (maxDataTime == null) {
+                maxDataTime = 0L;
               }
               return System.currentTimeMillis() - maxDataTime;
             }
