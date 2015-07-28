@@ -129,7 +129,6 @@
                     <button id="sidenav-submit" class="uk-button uk-button-small uk-button-primary">Go</button>
                 </div>
             </form>
-
             <#if (customDashboardNames??)>
               <hr />
               <ul>
@@ -142,4 +141,10 @@
             </#if>
         </li>
     </ul>
+    <div class="uk-text-center">
+        <button class="uk-button uk-button-small uk-button-secondary uk-padding-remove" >
+           <a class="uk-button-secondary sidenav-feedback-link" href="mailto:thirdeye-dev@linkedin.com?subject=ThirdEye Dashboard Feedback">Send Feedback</a>
+        </button>
+    </div>    
+    
 </div>
