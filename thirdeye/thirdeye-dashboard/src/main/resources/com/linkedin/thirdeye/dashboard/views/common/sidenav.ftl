@@ -129,6 +129,7 @@
                     <button id="sidenav-submit" class="uk-button uk-button-small uk-button-primary">Go</button>
                 </div>
             </form>
+            
             <#if (customDashboardNames??)>
               <hr />
               <ul>
