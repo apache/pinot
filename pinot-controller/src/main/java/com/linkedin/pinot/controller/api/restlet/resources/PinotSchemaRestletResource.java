@@ -77,6 +77,11 @@ public class PinotSchemaRestletResource extends ServerResource {
   private Representation getAllSchemas() {
     List<String> schemaNames = manager.getSchemaNames();
     JSONArray ret = new JSONArray();
+
+    if (schemaNames == null){
+      return new StringRepresentation(ret.toString());
+    }
+
     for (String schema : schemaNames) {
       ret.put(schema);
     }
@@ -96,6 +101,9 @@ public class PinotSchemaRestletResource extends ServerResource {
       throws IOException {
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = manager.getSchema(schemaName);
+    if (schema == null) {
+      return new StringRepresentation("{}");
+    }
     LOGGER.info("schema string is : " + schema.getJSONSchema());
     return new StringRepresentation(schema.getJSONSchema());
   }

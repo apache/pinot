@@ -811,7 +811,7 @@ public class PinotHelixResourceManager {
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
     LOGGER.info("found schema {} ", schemaName);
     ZNRecord record = propertyStoreHelper.get(schemaName);
-    return Schema.fromZNRecord(record);
+    return record != null ? Schema.fromZNRecord(record) : null;
   }
 
   /**
