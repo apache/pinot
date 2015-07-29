@@ -1,0 +1,103 @@
+name: "SU w/w 6 Hourly Revenue Report Ads"
+collection: sample
+
+tables:
+  - metric: cost
+    dimension: channelId
+    filter:
+      metricThreshold: 1000
+      includeDimensions:
+        - 2
+        - 3000
+        - 2000
+    fixedDimensions:
+      campaignType: 14
+    baselineSize: 7
+    baselineUnit: DAYS
+
+  - metric: adImpressionCount
+    dimension: channelId
+    filter:
+      metricThreshold: 5000
+      includeDimensions:
+        - 2
+        - 3000
+        - 2000
+    fixedDimensions:
+      campaignType: 14
+    baselineSize: 7
+    baselineUnit: DAYS
+
+  - metric: adRequestCount
+    dimension: channelId
+    filter:
+      metricThreshold: 5000
+      includeDimensions:
+        - 2
+        - 3000
+        - 2000
+    fixedDimensions:
+      campaignType: 14
+    baselineSize: 7
+    baselineUnit: DAYS
+
+aliases:
+  dimension:
+    channelId: Channel
+  dimensionValues:
+    channelId:
+      2: Desktop
+      3000: Mobile
+      2000: Tablet
+    campaignType:
+      14: Shell
+  metric:
+    cost: Revenue
+    adImpressionCount: Impressions
+    adRequestCount: Requests
+
+schedules:
+  "6 HOURLY SCHEDULE":
+    cron: "5 8 * * * ?"
+    aggregationSize: 6
+    aggregationUnit: HOURS
+    reportWindow: 1
+    lagSize: 2
+    lagUnit: HOURS
+    emailTo: "npawar@linkedin.com"
+    emailFrom: "npawar@linkedin.com"
+    nameTo: "Reports Mailing List"
+    nameFrom: "Thirdeye Reporting"
+  "12 HOURLY SCHEDULE":
+    cron: "5 14 * * * ?"
+    aggregationSize: 12
+    aggregationUnit: HOURS
+    reportWindow: 1
+    lagSize: 2
+    lagUnit: HOURS
+    emailTo: "npawar@linkedin.com"
+    emailFrom: "npawar@linkedin.com"
+    nameTo: "Reports Mailing List"
+    nameFrom: "Thirdeye Reporting"
+  "18 HOURLY SCHEDULE":
+    cron: "5 20 * * * ?"
+    aggregationSize: 18
+    aggregationUnit: HOURS
+    reportWindow: 1
+    lagSize: 2
+    lagUnit: HOURS
+    emailTo: "npawar@linkedin.com"
+    emailFrom: "npawar@linkedin.com"
+    nameTo: "Reports Mailing List"
+    nameFrom: "Thirdeye Reporting"
+  "24 HOURLY SCHEDULE":
+    cron: "5 2 * * * ?"
+    aggregationSize: 24
+    aggregationUnit: HOURS
+    reportWindow: 1
+    lagSize: 2
+    lagUnit: HOURS
+    emailTo: "npawar@linkedin.com"
+    emailFrom: "npawar@linkedin.com"
+    nameTo: "Reports Mailing List"
+    nameFrom: "Thirdeye Reporting"

@@ -1,20 +1,21 @@
-package com.linkedin.thirdeye.anomaly;
-
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.StarTreeConfig;
+package com.linkedin.thirdeye.anomaly.api;
 
 import java.io.IOException;
-import java.util.Properties;
+import java.util.List;
+
+import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public interface AnomalyResultHandler
 {
   /**
    * Initializes this function with the star tree config and arbitrary function config
    */
-  void init(StarTreeConfig starTreeConfig, Properties handlerConfig);
+  void init(StarTreeConfig starTreeConfig, HandlerProperties handlerConfig);
 
   /**
-   * Processes the result of an {@link AnomalyDetectionFunction}
+   * Processes the result of an {@link RuleExpr}
    *
    * <p>
    *   This could be persisting to a database, calling an HTTP endpoint, etc.
@@ -23,5 +24,7 @@ public interface AnomalyResultHandler
    * @throws IOException
    *  If there was an error in handing the result
    */
-  void handle(DimensionKey dimensionKey, AnomalyResult result) throws IOException;
+  void handle(AnomalyDetectionTaskInfo taskInfo, DimensionKey dimensionKey, List<String> metrics,
+      AnomalyResult result) throws IOException;
+
 }
