@@ -58,7 +58,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("PostQueryCommand -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -query " + _query);
+    return ("PostQuery -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -query " + _query);
   }
 
   @Override

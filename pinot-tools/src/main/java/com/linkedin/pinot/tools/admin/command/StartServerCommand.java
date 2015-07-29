@@ -54,6 +54,10 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.",
+      forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
+  private String _configFileName;
+
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
@@ -88,10 +92,20 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
+  public StartServerCommand setConfigFileName(String configFileName) {
+    _configFileName = configFileName;
+    return this;
+  }
+
   @Override
   public String toString() {
-    return ("StartServerCommand -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort "
-        + _serverPort + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
+    if (_configFileName != null) {
+      return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort "
+          + _serverPort + " -configFileName " + _configFileName + " -zkAddress " + _zkAddress);
+    } else {
+      return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort "
+          + _serverPort + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
+    }
   }
 
   @Override
@@ -111,16 +125,23 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() throws Exception {
-    final Configuration configuration = new PropertiesConfiguration();
-
     if (_serverHost == null) {
       _serverHost = NetUtil.getHostAddress();
     }
 
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
-    configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
-    configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
+    Configuration configuration = readConfigFromFile(_configFileName);
+    if (configuration == null) {
+      if (_configFileName != null) {
+        LOGGER.error("Error: Unable to find file {}.", _configFileName);
+        return false;
+      }
+
+      configuration = new PropertiesConfiguration();
+      configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
+      configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
+      configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
+      configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
+    }
 
     LOGGER.info("Executing command: " + toString());
     final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);

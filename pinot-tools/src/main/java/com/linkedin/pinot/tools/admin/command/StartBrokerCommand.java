@@ -47,6 +47,10 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
+      usage = "Broker Starter Config file.", forbids = { "-brokerHost", "-brokerPort" })
+  private String _configFileName;
+
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
@@ -62,8 +66,11 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String toString() {
-    return ("StartBrokerCommand -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort
-        + " -zkAddress " + _zkAddress);
+    if (_configFileName != null) {
+      return ("StartBroker -zkAddress " + _zkAddress + " -configFileName " + _configFileName);
+    } else {
+      return ("StartBroker -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -zkAddress " + _zkAddress);
+    }
   }
 
   @Override
@@ -91,15 +98,28 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
+  public StartBrokerCommand setConfigFileName(String configFileName) {
+    _configFileName = configFileName;
+    return this;
+  }
+
   @Override
   public boolean execute() throws Exception {
     if (_brokerHost == null) {
       _brokerHost = NetUtil.getHostAddress();
     }
 
-    Configuration configuration = new PropertiesConfiguration();
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
-    configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
+    Configuration configuration = readConfigFromFile(_configFileName);
+    if (configuration == null) {
+      if (_configFileName != null) {
+        LOGGER.error("Error: Unable to find file {}.", _configFileName);
+        return false;
+      }
+
+      configuration = new PropertiesConfiguration();
+      configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
+      configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
+    }
 
     LOGGER.info("Executing command: " + toString());
     final HelixBrokerStarter pinotHelixBrokerStarter = new HelixBrokerStarter(_clusterName, _zkAddress, configuration);

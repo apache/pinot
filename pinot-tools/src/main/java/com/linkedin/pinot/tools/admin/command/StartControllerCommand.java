@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
 
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -50,6 +51,11 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
+  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
+      usage = "Controller Starter config file",
+      forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
+  private String _configFileName;
+
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
@@ -79,6 +85,11 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     return this;
   }
 
+  public StartControllerCommand setConfigFileName(String configFileName) {
+    _configFileName = configFileName;
+    return this;
+  }
+
   @Override
   public String getName() {
     return "StartController";
@@ -86,8 +97,12 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public String toString() {
-    return ("StartControllerCommand -clusterName " + _clusterName + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+    if (_configFileName != null) {
+      return ("StartController -configFileName " + _configFileName);
+    } else {
+      return ("StartController -clusterName " + _clusterName + " -controllerHost " + _controllerHost
+          + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+    }
   }
 
   @Override
@@ -102,21 +117,30 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public boolean execute() throws Exception {
-    final ControllerConf conf = new ControllerConf();
-
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
-    conf.setControllerHost(_controllerHost);
-    conf.setControllerPort(_controllerPort);
-    conf.setDataDir(_dataDir);
-    conf.setZkStr(_zkAddress);
 
-    conf.setHelixClusterName(_clusterName);
-    conf.setControllerVipHost(_controllerHost);
+    ControllerConf conf = readConfigFromFile(_configFileName);
+    if (conf == null) {
+      if (_configFileName != null) {
+        LOGGER.error("Error: Unable to find file {}.", _configFileName);
+        return false;
+      }
 
-    conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-    conf.setValidationControllerFrequencyInSeconds(3600);
+      conf = new ControllerConf();
+
+      conf.setControllerHost(_controllerHost);
+      conf.setControllerPort(_controllerPort);
+      conf.setDataDir(_dataDir);
+      conf.setZkStr(_zkAddress);
+
+      conf.setHelixClusterName(_clusterName);
+      conf.setControllerVipHost(_controllerHost);
+
+      conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
+      conf.setValidationControllerFrequencyInSeconds(3600);
+    }
 
     LOGGER.info("Executing command: " + toString());
     final ControllerStarter starter = new ControllerStarter(conf);
@@ -124,6 +148,53 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     starter.start();
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminController.pid");
+    return true;
+  }
+
+  @Override
+  ControllerConf readConfigFromFile(String configFileName) throws ConfigurationException {
+    ControllerConf conf = null;
+
+    if (configFileName != null) {
+      File configFile = new File(_configFileName);
+
+      if (configFile.exists()) {
+        conf = new ControllerConf(configFile);
+      } else {
+        return null;
+      }
+    }
+
+    return (validateConfig(conf)) ? conf : null;
+  }
+
+  private boolean validateConfig(ControllerConf conf) {
+    if (conf == null) {
+      LOGGER.error("Error: Null conf object.");
+      return false;
+    }
+
+    if (conf.getControllerHost() == null) {
+      LOGGER.error("Error: missing hostname, please specify 'controller.host' property in config file.");
+      return false;
+    }
+
+    if (conf.getControllerPort() == null) {
+      LOGGER.error("Error: missing controller port, please specify 'controller.port' property in config file.");
+      return false;
+    }
+
+    if (conf.getZkStr() == null) {
+      LOGGER.error("Error: missing Zookeeper address, please specify 'controller.zk.str' property in config file.");
+      return false;
+    }
+
+    if (conf.getHelixClusterName() == null) {
+      LOGGER
+          .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
+      return false;
+    }
+
     return true;
   }
 }

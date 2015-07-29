@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.admin.command;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -26,6 +27,8 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLConnection;
 
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.kohsuke.args4j.Option;
@@ -137,5 +140,19 @@ public class AbstractBaseCommand {
     ret.put("totalTime", (stop - start));
 
     return ret;
+  }
+
+  PropertiesConfiguration readConfigFromFile(String configFileName) throws ConfigurationException {
+    if (configFileName != null) {
+      File configFile = new File(configFileName);
+
+      if (configFile.exists()) {
+        return new PropertiesConfiguration(configFile);
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
   }
 }
