@@ -63,12 +63,15 @@ public final class CustomBitSet {
   }
 
   public void setBit(final int bitOffset) {
-    if (bitOffset < 0)
-      throw new IllegalArgumentException();
+    if (bitOffset < 0) {
+      throw new IllegalArgumentException("Negative bitOffset value " + bitOffset);
+    }
 
     final int byteToSet = bitOffset / 8;
-    if (byteToSet > nrBytes)
-      throw new IllegalArgumentException();
+    if (byteToSet > nrBytes) {
+      throw new IllegalArgumentException("bitOffset value " + bitOffset + " (byte offset " + byteToSet + ") exceeds buffer capacity of " + nrBytes + " bytes");
+    }
+
     byte b = buf.get(byteToSet);
     byte posBit = (byte) (1 << (7 - (bitOffset % 8)));
     // System.out.println("bitOffset:" + bitOffset + " posBit:" + posBit);
@@ -78,12 +81,13 @@ public final class CustomBitSet {
 
   public void unsetBit(final int bitOffset) {
     if (bitOffset < 0) {
-      throw new IllegalArgumentException();
+      throw new IllegalArgumentException("Negative bitOffset value " + bitOffset);
     }
     final int byteToSet = bitOffset / 8;
     if (byteToSet > nrBytes) {
-      throw new IllegalArgumentException();
+      throw new IllegalArgumentException("bitOffset value " + bitOffset + " (byte offset " + byteToSet + ") exceeds buffer capacity of " + nrBytes + " bytes");
     }
+
     final int offset = bitOffset % 8;
     byte b = buf.get(byteToSet);
     b &= ~(1 << (7 - offset));
