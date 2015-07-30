@@ -53,12 +53,10 @@ public class PinotTableMetadataConfigs extends ServerResource {
       return new StringRepresentation("tableName is not present");
     }
 
-    AbstractTableConfig config = null;
-
     try {
-      return updateTableMetadata(tableName, entity, config);
+      return updateTableMetadata(tableName, entity);
     } catch (final Exception e) {
-      LOGGER.error("errpr updating medata configs for table {}", config.getTableName(), e);
+      LOGGER.error("Caught exception while updating metadata for table {}", tableName, e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
@@ -71,9 +69,9 @@ public class PinotTableMetadataConfigs extends ServerResource {
   })
   private Representation updateTableMetadata(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the metadata configuration", required = true)
-      String tableName, Representation entity, AbstractTableConfig config)
+      String tableName, Representation entity)
       throws Exception {
-    config = AbstractTableConfig.init(entity.getText());
+    AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
     manager.updateMetadataConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
         config.getCustomConfigs());
     return new StringRepresentation("done");
