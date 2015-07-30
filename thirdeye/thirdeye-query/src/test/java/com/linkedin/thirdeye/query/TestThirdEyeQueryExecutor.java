@@ -107,6 +107,8 @@ public class TestThirdEyeQueryExecutor {
 
     ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
 
+    System.out.println(result.getData());
+
     Assert.assertEquals(result.getData().size(), 3); // including other
 
     for (int i = 0; i < 2; i++) {
@@ -114,6 +116,24 @@ public class TestThirdEyeQueryExecutor {
       Assert.assertNotNull(result.getData().get(key));
       checkData(result.getData().get(key), 128);
     }
+  }
+
+  @Test
+  public void testOr_simple() throws Exception {
+    ThirdEyeQuery query = new ThirdEyeQuery()
+        .setCollection(config.getCollection())
+        .setStart(start)
+        .setEnd(end)
+        .addDimensionValue("A", "A0")
+        .addDimensionValue("A", "A1");
+
+    ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
+
+    Assert.assertEquals(result.getData().size(), 1);
+
+    DimensionKey key = new DimensionKey(new String[] { "A0 OR A1", "*", "*" });
+    Assert.assertNotNull(result.getData().get(key));
+    checkData(result.getData().get(key), 256); // A can be A0 or A1, so all
   }
 
   @Test

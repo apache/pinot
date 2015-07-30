@@ -68,6 +68,17 @@ public class TestThirdEyeQueryParser {
   }
 
   @Test
+  public void testValid_oneMetric_orDimensions() throws Exception {
+    query = parse("SELECT m FROM collection WHERE time BETWEEN '2015-01-07' AND '2015-01-08' AND a = 'A1' OR a = 'A2' AND b = 'B1'");
+    Assert.assertEquals(query.getCollection(), "collection");
+    Assert.assertEquals(query.getStart(), start);
+    Assert.assertEquals(query.getEnd(), end);
+    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("m"));
+    Assert.assertEquals(query.getDimensionValues(), ImmutableMultimap.of("a", "A1", "a", "A2", "b", "B1"));
+    Assert.assertTrue(query.getFunctions().isEmpty());
+  }
+
+  @Test
   public void testValid_oneMetric_manyDimensions_betweenAtEnd() throws Exception {
     query = parse("SELECT m FROM collection WHERE a = 'A1' AND b = 'B1' AND time BETWEEN '2015-01-07' AND '2015-01-08'");
     Assert.assertEquals(query.getCollection(), "collection");

@@ -32,6 +32,10 @@
             width: 300px;
         }
 
+        .funnel-table {
+            margin-top: 20px;
+        }
+
         body {
             width: 80%;
             margin-left: auto;
@@ -52,11 +56,32 @@
         </form>
 
         <#list componentViews as componentView>
-            <div class="uk-grid component-view">
             <#if (componentView.first.type == "FUNNEL")>
-                <div class="uk-width-1-2">
                   <h2>${componentView.first.name}</h2>
+
+                  <h3>Legend</h3>
                   <table>
+                      <#list componentView.second.metricLabels as label>
+                        <tr>
+                          <th>${label_index + 1}</th>
+                          <td>${label}</td>
+                        </tr>
+                      </#list>
+                  </table>
+
+                  <#if componentView.first.dimensions??>
+                      <h3>Dimensions</h3>
+                      <table>
+                      <#list componentView.first.dimensions?keys as dimension>
+                        <tr>
+                          <th>${dimension}</th>
+                          <td>${componentView.first.flattenedDimensions[dimension]}</td>
+                        </tr>
+                      </#list>
+                      </table>
+                  </#if>
+
+                  <table class="funnel-table">
                       <col width="60px" />
                       <#list componentView.second.metricLabels as label>
                         <col width="60px" />
@@ -85,41 +110,20 @@
                           </tr>
                       </#list>
                   </table>
-                </div>
 
-                <div class="uk-width-1-2">
-                  <h3>Legend</h3>
-                  <dl class="uk-description-list-horizontal">
-                      <#list componentView.second.metricLabels as label>
-                          <dt>${label_index + 1}</dt>
-                          <dd>${label}</dd>
-                      </#list>
-                  </dl>
-
-                  <#if componentView.first.dimensions??>
-                      <h3>Dimensions</h3>
-                      <dl class="uk-description-list-horizontal">
-                      <#list componentView.first.dimensions?keys as dimension>
-                          <dt>${dimension}</dt>
-                          <dd>${componentView.first.dimensions[dimension]}</dd>
-                      </#list>
-                      </dl>
-                  </#if>
-                </div>
             <#elseif (componentView.first.type == "TIME_SERIES")>
-                <div class="uk-width-1-1">
                   <h2>${componentView.first.name}</h2>
-                </div>
-                <div class="uk-width-1-1">
                   <div class="time-series">
                       <div class="time-series-container"></div>
                       <div class="time-series-data">${componentView.second.jsonString}</div>
                   </div>
-                </div>
             <#else>
                 <p>No component type ${componentView.first.type}</p>
             </#if>
-            </div>
+
+            <#if (componentView_index < componentViews?size - 1)>
+              <hr/>
+            </#if>
         </#list>
 
         <script>

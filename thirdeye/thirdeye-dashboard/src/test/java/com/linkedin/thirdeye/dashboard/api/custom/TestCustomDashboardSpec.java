@@ -38,7 +38,7 @@ public class TestCustomDashboardSpec {
     CustomDashboardComponentSpec sec = spec.getComponents().get(1);
     Assert.assertEquals(sec.getMetrics(), metrics);
     Assert.assertNotNull(sec.getDimensions());
-    Assert.assertEquals(sec.getDimensions().get("A"), "A0");
-    Assert.assertEquals(sec.getDimensions().get("C"), "C1");
+    Assert.assertEquals(sec.getDimensions().get("A").get(0), "A0");
+    Assert.assertEquals(sec.getDimensions().get("C").get(0), "C1");
   }
 }

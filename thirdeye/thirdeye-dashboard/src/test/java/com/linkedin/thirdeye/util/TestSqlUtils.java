@@ -2,11 +2,14 @@ package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.ImmutableSortedMap;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.sun.jersey.core.util.MultivaluedMapImpl;
+import com.sun.jersey.core.util.UnmodifiableMultivaluedMap;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import javax.ws.rs.core.MultivaluedMap;
 import java.util.Map;
 
 public class TestSqlUtils {
@@ -20,14 +23,21 @@ public class TestSqlUtils {
 
   @Test
   public void testGetDimensionWhereClause() {
-    Map<String, String> dimensionValues = ImmutableSortedMap.of("A", "A1", "B", "B1", "C", "!");
+    MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
+    dimensionValues.putSingle("A", "A1");
+    dimensionValues.putSingle("B", "B1");
+    dimensionValues.putSingle("C", "!");
     String dimensionWhereClause = SqlUtils.getDimensionWhereClause(dimensionValues);
     Assert.assertEquals(dimensionWhereClause, "A = 'A1' AND B = 'B1'");
   }
 
   @Test
   public void testGetGroupByClause() {
-    Map<String, String> dimensionValues = ImmutableSortedMap.of("A", "A1", "B", "B1", "C", "!", "D", "!");
+    MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
+    dimensionValues.putSingle("A", "A1");
+    dimensionValues.putSingle("B", "B1");
+    dimensionValues.putSingle("C", "!");
+    dimensionValues.putSingle("D", "!");
     String groupByClause = SqlUtils.getDimensionGroupByClause(dimensionValues);
     Assert.assertEquals(groupByClause, "GROUP BY 'C','D'");
   }

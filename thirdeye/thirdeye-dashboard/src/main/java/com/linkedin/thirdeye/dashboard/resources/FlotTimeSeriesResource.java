@@ -16,6 +16,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,9 +49,8 @@ public class FlotTimeSeriesResource {
       @Context UriInfo uriInfo) throws Exception {
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
+    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, uriInfo.getQueryParameters());
     QueryResult queryResult = queryCache.getQueryResult(serverUri, sql).checkEmpty();
     return FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
   }
@@ -68,7 +68,7 @@ public class FlotTimeSeriesResource {
     DateTime baselineRangeEnd = new DateTime(baselineMillis);
     DateTime currentRangeStart = new DateTime(currentMillis - windowMillis);
     DateTime currentRangeEnd = new DateTime(currentMillis);
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+    MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
     // Generate SQL
