@@ -39,14 +39,22 @@ public final class CustomBitSet {
 
   private CustomBitSet(final int nrBytes) {
     if (nrBytes < 1) {
-      throw new IllegalArgumentException("need at least one byte");
+      throw new IllegalArgumentException("CustomBitSet requires at least one byte of storage, asked for " + nrBytes);
     }
     this.nrBytes = nrBytes;
     buf = ByteBuffer.allocateDirect(nrBytes);
   }
 
-  private CustomBitSet(final int numBytes, final ByteBuffer buffer) {
-    nrBytes = numBytes;
+  private CustomBitSet(final int nrBytes, final ByteBuffer buffer) {
+    if (nrBytes < 1) {
+      throw new IllegalArgumentException("CustomBitSet requires at least one byte of storage, asked for " + nrBytes);
+    }
+    if (buffer.capacity() < nrBytes) {
+      throw new IllegalArgumentException("Requested bit set capacity is " + nrBytes +
+          " bytes, but the underlying byte buffer has a capacity of " + buffer.capacity() +
+          ", which is less than requested");
+    }
+    this.nrBytes = nrBytes;
     this.buf = buffer;
   }
 
