@@ -72,7 +72,7 @@ public class PinotTableMetadataConfigs extends ServerResource {
       String tableName, Representation entity)
       throws Exception {
     AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
-    manager.updateMetadataConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
+    manager.updateMetadataConfigFor(config.getTableName(), TableType.valueOf(config.getTableType().toUpperCase()),
         config.getCustomConfigs());
     return new StringRepresentation("done");
   }
