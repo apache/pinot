@@ -61,8 +61,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
  *    see {@link HyperLogLog#offer(Object)}
  * 3. HyperLogLog directly used as the AggregateResult Type since a wrapper class may affect the speed (inheritance is ok)
  *
- * author: Jiaqi Gu
- *
  */
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DistinctCountHLLAggregationFunction.class);
@@ -84,39 +82,35 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     _distinctCountHLLColumnName = aggregationInfo.getAggregationParams().get("column");
   }
 
-  @Override
-  public HyperLogLog aggregate(Block docIdSetBlock, Block[] block) {
-    HyperLogLog ret = new HyperLogLog(_bitSize);
-    int docId = 0;
+  private void offerValueToHyperLogLog(int docId, Block[] block, HyperLogLog hll) {
     Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
-    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+    boolean isStringType = (block[0].getMetadata().getDataType() == DataType.STRING);
 
-    if (block[0].getMetadata().getDataType() == DataType.STRING) {
-      while ((docId = docIdIterator.next()) != Constants.EOF) {
-        if (blockValIterator.skipTo(docId)) {
-          int dictionaryIndex = blockValIterator.nextIntVal();
-          if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-            // use hash function defined in Hyperloglog, default may not work
-            ret.offer(dictionaryReader.get(dictionaryIndex));
-          } else {
-            ret.offer(Integer.MIN_VALUE);
-          }
+    if (blockValIterator.skipTo(docId)) {
+      int dictionaryIndex = blockValIterator.nextIntVal();
+      if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+        if (isStringType) {
+          hll.offer(dictionaryReader.get(dictionaryIndex));
+        } else {
+          hll.offer(((Number) dictionaryReader.get(dictionaryIndex)));
         }
-      }
-    } else {
-      while ((docId = docIdIterator.next()) != Constants.EOF) {
-        if (blockValIterator.skipTo(docId)) {
-          int dictionaryIndex = blockValIterator.nextIntVal();
-          if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-            // use hash function defined in Hyperloglog, default may not work
-            ret.offer(((Number) dictionaryReader.get(dictionaryIndex)));
-          } else {
-            ret.offer(Integer.MIN_VALUE);
-          }
-        }
+      } else {
+        hll.offer(Integer.MIN_VALUE);
       }
     }
+  }
+
+  @Override
+  public HyperLogLog aggregate(Block docIdSetBlock, Block[] block) {
+    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
+
+    HyperLogLog ret = new HyperLogLog(_bitSize);
+    int docId = 0;
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
+      offerValueToHyperLogLog(docId, block, ret);
+    }
+
     return ret;
   }
 
@@ -125,19 +119,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     if (mergedResult == null) {
       mergedResult = new HyperLogLog(_bitSize);
     }
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    if (blockValIterator.skipTo(docId)) {
-      int dictId = blockValIterator.nextIntVal();
-      if (dictId != Dictionary.NULL_VALUE_INDEX) {
-        if (block[0].getMetadata().getDataType() == DataType.STRING) {
-          mergedResult.offer(block[0].getMetadata().getDictionary().get(dictId));
-        } else {
-          mergedResult.offer(((Number) block[0].getMetadata().getDictionary().get(dictId)));
-        }
-      } else {
-        mergedResult.offer(Integer.MIN_VALUE);
-      }
-    }
+
+    offerValueToHyperLogLog(docId, block, mergedResult);
     return mergedResult;
   }
 
@@ -151,7 +134,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       try {
         hllResult.addAll(aggregationResultList.get(i));
       } catch (CardinalityMergeException e) {
-        e.printStackTrace();
+        LOGGER.error("Caught exception while merging Cardinality using HyperLogLog", e);
+        Utils.rethrowException(e);
       }
     }
     aggregationResultList.clear();
@@ -170,7 +154,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     try {
       aggregationResult0.addAll(aggregationResult1);
     } catch (CardinalityMergeException e) {
-      e.printStackTrace();
+      LOGGER.error("Caught exception while merging Cardinality using HyperLogLog", e);
+      Utils.rethrowException(e);
     }
     return aggregationResult0;
   }
@@ -185,7 +170,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       try {
         reducedResult.addAll(combinedResultList.get(i));
       } catch (CardinalityMergeException e) {
-        e.printStackTrace();
+        LOGGER.error("Caught exception while merging Cardinality using HyperLogLog", e);
+        Utils.rethrowException(e);
       }
     }
     return reducedResult.cardinality();
