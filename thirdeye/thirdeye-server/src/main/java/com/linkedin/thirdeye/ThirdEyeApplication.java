@@ -5,7 +5,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.healthcheck.KafkaConsumerLagHealthCheck;
 import com.linkedin.thirdeye.healthcheck.KafkaDataLagHealthCheck;
-import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
@@ -87,14 +86,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
         dataUpdateManager,
         environment.metrics());
 
-    final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
-            new AnomalyDetectionTaskManager(starTreeManager,
-                                            anomalyDetectionTaskScheduler,
-                                            config.getAnomalyDetectionInterval(),
-                                            rootDir);
-
     final MetricRegistry metricRegistry = environment.metrics();
-    environment.lifecycle().manage(anomalyDetectionTaskManager);
     environment.lifecycle().manage(new Managed()
     {
       @Override
