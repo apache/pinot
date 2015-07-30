@@ -1,1 +1,0 @@
-SELECT * FROM %s WHERE is_active;
