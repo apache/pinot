@@ -1058,6 +1058,8 @@ public class PinotHelixResourceManager {
                     .getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig().getServer()));
         _helixAdmin.setResourceIdealState(_helixClusterName,
             TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()), idealState);
+          //TODO here to test rebalabce
+          _helixAdmin.rebalance(_helixClusterName, idealState, (List) getAllInstancesForTable(segmentMetadata.getTableName()));
         res.status = STATUS.success;
       }
     } catch (final Exception e) {
