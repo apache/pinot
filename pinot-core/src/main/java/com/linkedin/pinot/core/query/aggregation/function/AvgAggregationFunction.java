@@ -17,8 +17,10 @@ package com.linkedin.pinot.core.query.aggregation.function;
 
 import java.io.Serializable;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.List;
 
+import java.util.Locale;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -142,7 +144,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       if ((finalAggregationResult == null) || (Double.isNaN(finalAggregationResult))) {
         return new JSONObject().put("value", Dictionary.NULL_VALUE_INDEX);
       }
-      return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
+      return new JSONObject().put("value", String.format(Locale.US, "%1.5f", finalAggregationResult));
     } catch (JSONException e) {
       LOGGER.error("Caught exception while rendering to JSON", e);
       Utils.rethrowException(e);
@@ -185,7 +187,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     @Override
     public String toString() {
       if (getSecond() != 0) {
-        return new DecimalFormat("####################.##########").format((getFirst() / getSecond()));
+        return new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)).format((getFirst() / getSecond()));
       } else {
         return "0.0";
       }

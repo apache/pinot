@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.aggregation.function;
 import java.io.Serializable;
 import com.linkedin.pinot.common.Utils;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 
 import org.json.JSONException;
@@ -138,7 +139,7 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
       if (finalAggregationResult.isInfinite()) {
         return new JSONObject().put("value", "null");
       }
-      return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
+      return new JSONObject().put("value", String.format(Locale.US, "%1.5f", finalAggregationResult));
     } catch (JSONException e) {
       LOGGER.error("Caught exception while rendering to JSON", e);
       Utils.rethrowException(e);

@@ -19,6 +19,7 @@ import java.io.Serializable;
 import com.linkedin.pinot.common.Utils;
 import java.util.List;
 
+import java.util.Locale;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -129,7 +130,7 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
       if (finalAggregationResult == null) {
         finalAggregationResult = 0.0;
       }
-      return new JSONObject().put("value", String.format("%.5f", finalAggregationResult));
+      return new JSONObject().put("value", String.format(Locale.US, "%.5f", finalAggregationResult));
     } catch (JSONException e) {
       LOGGER.error("Caught exception while rendering to JSON", e);
       Utils.rethrowException(e);

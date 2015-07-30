@@ -19,11 +19,9 @@ import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayPriorityQueue;
 
 import java.io.Serializable;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -54,14 +51,6 @@ public class AggregationGroupByOperatorService {
   private final List<String> _groupByColumns;
   private final int _groupByTopN;
   private final List<AggregationFunction> _aggregationFunctionList;
-
-  public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
-  static {
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT, new DecimalFormat("##########"));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG, new DecimalFormat("####################"));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT, new DecimalFormat("##########.#####"));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE, new DecimalFormat("####################.##########"));
-  }
 
   public AggregationGroupByOperatorService(List<AggregationInfo> aggregationInfos, GroupBy groupByQuery) {
     _aggregationFunctionList = AggregationFunctionFactory.getAggregationFunction(aggregationInfos);
@@ -131,7 +120,6 @@ public class AggregationGroupByOperatorService {
       }
       List<JSONObject> retJsonResultList = new ArrayList<JSONObject>();
       for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
-        DecimalFormat df = DEFAULT_FORMAT_STRING_MAP.get(_aggregationFunctionList.get(i).aggregateResultDataType());
         JSONArray groupByResultsArray = new JSONArray();
 
         int groupSize = _groupByColumns.size();
