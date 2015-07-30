@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.writer.impl;
 
+import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.Closeable;
 import java.io.File;
@@ -109,8 +110,9 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
       this.rowSizeInBits += colSize;
       this.colSizesInBits[i] = colSize;
     }
-    int totalSizeInBits = rowSizeInBits * rows;
-    this.bytesRequired = (totalSizeInBits + 7) / 8;
+    long totalSizeInBits = ((long) rowSizeInBits) * rows;
+    // jfim: We keep the number of bytes required as an int, as Java Buffers cannot be larger than 2GB
+    this.bytesRequired = Ints.checkedCast((totalSizeInBits + 7) / 8);
   }
 
   private void createBuffer(File file) throws FileNotFoundException,
