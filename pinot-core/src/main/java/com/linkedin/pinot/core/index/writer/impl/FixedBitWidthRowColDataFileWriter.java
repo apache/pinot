@@ -138,7 +138,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
    */
   public void setInt(int row, int col, int val) {
     assert val >= minValues[col]  && val <= maxValues[col];
-    int bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
+    long bitOffset = ((long) rowSizeInBits) * row + columnOffsetsInBits[col];
     val = val + offsets[col];
     for (int bitPos = colSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
       if ((val & (1 << bitPos)) != 0) {
