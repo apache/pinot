@@ -21,6 +21,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
@@ -66,6 +67,21 @@ public class GenericRow implements RowEvent {
 
     return b.toString();
   }
+
+  @Override
+  public int hashCode() {
+    return _fieldMap.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof GenericRow)) {
+      return false;
+    }
+    GenericRow r = (GenericRow) o;
+    return _fieldMap.equals(r._fieldMap);
+  }
+
 static TypeReference typeReference = new TypeReference<Map<String, Object>>() {
 };
   public static GenericRow fromBytes(byte[] buffer) throws IOException {

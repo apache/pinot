@@ -58,7 +58,8 @@ public class CrcUtils {
 
       @Override
       public boolean accept(File pathname) {
-        if (pathname.getName().equals(V1Constants.SEGMENT_CREATION_META)) {
+        if (pathname.getName().equals(V1Constants.SEGMENT_CREATION_META)
+            || pathname.getName().equals(V1Constants.STARTREE_DIR)) {
           return false;
         }
         return true;

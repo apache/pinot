@@ -20,14 +20,16 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import com.linkedin.pinot.common.data.*;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import com.linkedin.pinot.core.startree.StarTreeSegmentCreator;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -63,6 +65,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   long totalRecordReadTime = 0;
   long totalIndexTime = 0;
   long totalStatsCollectorTime = 0;
+  boolean isStarTree = false;
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
@@ -82,7 +85,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Initialize index creation
     indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
-    indexCreator = new SegmentColumnarIndexCreator();
+
+    // Check if has star tree
+    List<StarTreeIndexSpec> starTreeIndexSpecList = dataSchema.getStarTreeIndexSpecs();
+    if (starTreeIndexSpecList == null || starTreeIndexSpecList.isEmpty()) {
+      indexCreator = new SegmentColumnarIndexCreator();
+    } else if (starTreeIndexSpecList.size() != 1) {
+      throw new IllegalStateException("Cannot build index with more than one star tree!");
+    } else {
+      indexCreator = new StarTreeSegmentCreator(starTreeIndexSpecList.get(0), recordReader);
+      isStarTree = true;
+    }
 
     // Ensure that the output directory exists
     final File indexDir = new File(config.getIndexOutputDir());
@@ -109,6 +122,25 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       totalRecordReadTime += (stop - start);
       totalStatsCollectorTime += (stop1 - stop);
     }
+
+    // Create dummy row with all values, null for others, zero for metrics if is star tree
+    if (isStarTree) {
+      Map<String, Object> allValues = new HashMap<String, Object>();
+
+      for (MetricFieldSpec spec : dataSchema.getMetricFieldSpecs()) {
+        allValues.put(spec.getName(), 0);
+      }
+
+      for (DimensionFieldSpec spec : dataSchema.getDimensionFieldSpecs()) {
+        Object allValue = StarTreeIndexNode.getAllValue(spec);
+        allValues.put(spec.getName(), allValue);
+      }
+
+      GenericRow allRow = new GenericRow();
+      allRow.init(allValues);
+      statsCollector.collectRow(allRow);
+    }
+
     buildIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", totalDocs);

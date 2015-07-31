@@ -119,9 +119,18 @@ public class SegmentTestUtils {
 
     for (final Field field : dataStream.getSchema().getFields()) {
       final String columnName = field.name();
-      final FieldSpec fieldSpec = new DimensionFieldSpec();
+      final String pinotType = field.getProp("pinotType");
+
+      final FieldSpec fieldSpec;
+      if (pinotType != null && "METRIC".equals(pinotType)) {
+        fieldSpec = new MetricFieldSpec();
+        fieldSpec.setFieldType(FieldType.METRIC);
+      } else {
+        fieldSpec = new DimensionFieldSpec();
+        fieldSpec.setFieldType(FieldType.DIMENSION); // default
+      }
+
       fieldSpec.setName(columnName);
-      fieldSpec.setFieldType(FieldType.DIMENSION);
       fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
       fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
       fieldSpec.setDelimiter(",");

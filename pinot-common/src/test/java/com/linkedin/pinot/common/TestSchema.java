@@ -17,12 +17,16 @@ package com.linkedin.pinot.common;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -52,5 +56,18 @@ public class TestSchema {
     String schemaString = new ObjectMapper().writeValueAsString(schema);
     Schema newSchema = new ObjectMapper().readValue(schemaString, Schema.class);
 
+  }
+
+  @Test
+  public void testSchemaWithStarTree() throws Exception {
+    InputStream inputStream = ClassLoader.getSystemResourceAsStream("data2.with-star-tree.schema");
+    Schema schema = new ObjectMapper().readValue(inputStream, Schema.class);
+    Assert.assertEquals(schema.getStarTreeIndexSpecs().size(), 1);
+
+    StarTreeIndexSpec indexSpec = new StarTreeIndexSpec();
+    indexSpec.setSplitOrder(Arrays.asList("dim2", "dim1", "dim3"));
+    indexSpec.setMaxLeafRecords(100); // the known default
+
+    Assert.assertEquals(schema.getStarTreeIndexSpecs().get(0), indexSpec);
   }
 }

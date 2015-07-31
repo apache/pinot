@@ -31,6 +31,11 @@ public class V1Constants {
   public static final String SEGMENT_PUSH_TIME = "segment.push.time";
   public static final String SEGMENT_REFRESH_TIME = "segment.refresh.time";
 
+  public static final String STARTREE_DIR = "startree";
+  public static final String STARTREE_FILE = "startree.ser";
+  public static final String STARTREE_ALL = "__ALL__";
+  public static final Number STARTREE_ALL_NUMBER = 0;
+
   public static class Numbers {
     // null representatives
     public static final Integer NULL_INT = Integer.MIN_VALUE;
@@ -85,6 +90,13 @@ public class V1Constants {
 
   public static class MetadataKeys {
     public static final String METADATA_FILE_NAME = "metadata.properties";
+
+    public static class StarTree {
+      public static final String SPLIT_ORDER = "startree.split.order";
+      public static final String MAX_LEAF_RECORDS = "startree.max.leaf.records";
+      public static final String SPLIT_EXCLUDES = "startree.split.excludes";
+      public static final String EXCLUDED_DIMENSIONS = "startree.excluded.dimensions";
+    }
 
     public static class Segment {
       public static final String SEGMENT_NAME = "segment.name";

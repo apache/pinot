@@ -61,6 +61,7 @@ public class Schema {
   private List<MetricFieldSpec> metricFieldSpecs;
   private List<DimensionFieldSpec> dimensionFieldSpecs;
   private TimeFieldSpec timeFieldSpec;
+  private List<StarTreeIndexSpec> starTreeIndexSpecs;
   private String schemaName;
 
   @JsonIgnore(true)
@@ -98,6 +99,7 @@ public class Schema {
     dimensionFieldSpecs = new ArrayList<DimensionFieldSpec>();
     metricFieldSpecs = new ArrayList<MetricFieldSpec>();
     timeFieldSpec = null;
+    starTreeIndexSpecs = new ArrayList<StarTreeIndexSpec>();
   }
 
   public List<MetricFieldSpec> getMetricFieldSpecs() {
@@ -122,6 +124,14 @@ public class Schema {
 
   public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     this.timeFieldSpec = timeFieldSpec;
+  }
+
+  public List<StarTreeIndexSpec> getStarTreeIndexSpecs() {
+    return starTreeIndexSpecs;
+  }
+
+  public void setStarTreeIndexSpecs(List<StarTreeIndexSpec> starTreeIndexSpecs) {
+    this.starTreeIndexSpecs = starTreeIndexSpecs;
   }
 
   @JsonIgnore(true)
@@ -381,6 +391,7 @@ public class Schema {
 
     return isEqual(dimensions, other.dimensions) && isEqual(timeFieldSpec, other.timeFieldSpec)
         && isEqual(metrics, other.metrics) && isEqual(schemaName, other.schemaName)
+        && isEqual(starTreeIndexSpecs, other.starTreeIndexSpecs)
         && isEqual(metricFieldSpecs, other.metricFieldSpecs) && isEqual(dimensionFieldSpecs, other.dimensionFieldSpecs);
   }
 
@@ -388,6 +399,7 @@ public class Schema {
   public int hashCode() {
     int result = hashCodeOf(dimensionFieldSpecs);
     result = hashCodeOf(result, metricFieldSpecs);
+    result = hashCodeOf(result, starTreeIndexSpecs);
     result = hashCodeOf(result, timeFieldSpec);
     result = hashCodeOf(result, dimensions);
     result = hashCodeOf(result, metrics);
