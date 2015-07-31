@@ -32,6 +32,7 @@ public class DashboardResource {
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
   private final String serverUri;
+  private final String feedbackEmailAddress;
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
@@ -39,6 +40,7 @@ public class DashboardResource {
 
   public DashboardResource(String serverUri,
                            DataCache dataCache,
+                           String feedbackEmailAddress,
                            QueryCache queryCache,
                            ObjectMapper objectMapper,
                            CustomDashboardResource customDashboardResource) {
@@ -47,6 +49,7 @@ public class DashboardResource {
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
     this.customDashboardResource = customDashboardResource;
+    this.feedbackEmailAddress = feedbackEmailAddress;
   }
 
   @GET
@@ -216,10 +219,11 @@ public class DashboardResource {
           new DateTime(baselineMillis),
           new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType),
+          new DimensionView(dimensionView, dimensionViewType), 
           earliestDataTime,
           latestDataTime,
-          customDashboardNames);
+          customDashboardNames,
+          feedbackEmailAddress);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e;  // sends appropriate HTTP response

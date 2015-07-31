@@ -16,6 +16,7 @@ public class DashboardView extends View {
   private final DateTime earliestDataTime;
   private final DateTime latestDataTime;
   private final List<String> customDashboardNames;
+  private final String feedbackEmailAddress;
 
   public DashboardView(String collection,
                        CollectionSchema collectionSchema,
@@ -25,9 +26,11 @@ public class DashboardView extends View {
                        DimensionView dimensionView,
                        DateTime earliestDataTime,
                        DateTime latestDataTime,
-                       List<String> customDashboardNames) {
+                       List<String> customDashboardNames,
+                       String feedbackEmailAddress) {
     super("dashboard.ftl");
     this.collection = collection;
+    this.feedbackEmailAddress = feedbackEmailAddress;
     this.collectionSchema = collectionSchema;
     this.baselineTime = baselineTime;
     this.currentTime = currentTime;
@@ -41,6 +44,10 @@ public class DashboardView extends View {
   public String getCollection() {
     return collection;
   }
+
+  public String getFeedbackEmailAddress() {
+        return feedbackEmailAddress;
+    }
 
   public CollectionSchema getCollectionSchema() {
     return collectionSchema;

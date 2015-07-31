@@ -52,6 +52,7 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
     environment.jersey().register(new DashboardResource(
         config.getServerUri(),
         dataCache,
+        config.getFeedbackEmailAddress(),
         queryCache,
         environment.getObjectMapper(),
         customDashboardResource));
