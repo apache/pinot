@@ -250,7 +250,7 @@ public abstract class FieldSpec {
     if (defaultNullValue != null) {
       return defaultNullValue;
     }
-    switch (fieldType) {
+    switch (getFieldType()) {
       case METRIC:
         switch (dataType) {
           case INT:
@@ -270,7 +270,7 @@ public abstract class FieldSpec {
         }
       case DIMENSION:
       case TIME:
-        switch (dataType) {
+        switch (getDataType()) {
           case INT:
           case INT_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_INT;
