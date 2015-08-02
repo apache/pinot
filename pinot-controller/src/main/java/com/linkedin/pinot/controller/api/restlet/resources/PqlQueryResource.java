@@ -36,15 +36,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 
@@ -52,16 +49,12 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
  * Dec 8, 2014
  */
 
-public class PqlQueryResource extends ServerResource {
+public class PqlQueryResource extends PinotRestletResourceBase {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);
-  private final ControllerConf conf;
-  private final PinotHelixResourceManager manager;
   private static final PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());;
 
   public PqlQueryResource() {
-    conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
   }
 
   @Override
@@ -94,13 +87,13 @@ public class PqlQueryResource extends ServerResource {
     final String instanceId;
     final InstanceConfig config;
     try {
-      final List<String> instanceIds = manager.getBrokerInstancesFor(resource);
+      final List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(resource);
       if (instanceIds.isEmpty()) {
         return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
       } else {
         Collections.shuffle(instanceIds);
         instanceId = instanceIds.get(0);
-        config = manager.getHelixInstanceConfig(instanceId);
+        config = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
       }
     } catch (final Exception e) {
       LOGGER.error("Caught exception while processing get request", e);

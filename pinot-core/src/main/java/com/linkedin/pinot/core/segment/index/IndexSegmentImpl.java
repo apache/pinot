@@ -113,7 +113,9 @@ public class IndexSegmentImpl implements IndexSegment {
         LOGGER.error("Error when close forward index for column : " + column, e);
       }
       try {
-        indexContainerMap.get(column).getInvertedIndex().close();
+        if (indexContainerMap.get(column).getInvertedIndex() != null) {
+          indexContainerMap.get(column).getInvertedIndex().close();
+        }
       } catch (Exception e) {
         LOGGER.error("Error when close inverted index for column : " + column, e);
       }

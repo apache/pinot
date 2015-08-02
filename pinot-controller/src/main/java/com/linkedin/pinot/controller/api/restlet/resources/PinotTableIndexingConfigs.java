@@ -1,11 +1,5 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 
@@ -13,29 +7,25 @@ import org.apache.commons.io.FileUtils;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Put;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 
 
-public class PinotTableIndexingConfigs extends ServerResource {
+public class PinotTableIndexingConfigs extends PinotRestletResourceBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIndexingConfigs.class);
-  private final ControllerConf conf;
-  private final PinotHelixResourceManager manager;
   private final File baseDataDir;
   private final File tempDir;
 
   public PinotTableIndexingConfigs() throws IOException {
-    conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager =
-        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
-    baseDataDir = new File(conf.getDataDir());
+    baseDataDir = new File(_controllerConf.getDataDir());
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
@@ -74,7 +64,7 @@ public class PinotTableIndexingConfigs extends ServerResource {
       Representation entity, AbstractTableConfig config)
       throws Exception {
     config = AbstractTableConfig.init(entity.getText());
-    manager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
+    _pinotHelixResourceManager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
         config.getIndexingConfig());
     return new StringRepresentation("done");
   }
