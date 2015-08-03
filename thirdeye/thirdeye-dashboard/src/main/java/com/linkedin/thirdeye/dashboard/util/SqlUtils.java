@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.util;
 
 import com.google.common.base.Joiner;
+import com.sun.jersey.core.util.MultivaluedMapImpl;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
@@ -15,6 +16,14 @@ public class SqlUtils {
   private static final Joiner OR = Joiner.on(" OR ");
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
+
+  public static String getSql(String metricFunction,
+                              String collection,
+                              DateTime start,
+                              DateTime end,
+                              Map<String, String> dimensionValues) {
+    return getSql(metricFunction, collection, start, end, toMultivaluedMap(dimensionValues));
+  }
 
   public static String getSql(String metricFunction,
                               String collection,
@@ -83,5 +92,13 @@ public class SqlUtils {
 
   public static String getDateString(DateTime dateTime) {
     return ISODateTimeFormat.dateTimeNoMillis().print(dateTime.toDateTime(DateTimeZone.UTC));
+  }
+
+  public static MultivaluedMap<String, String> toMultivaluedMap(Map<String, String> dimensionValues) {
+    MultivaluedMap<String, String> multiMap = new MultivaluedMapImpl();
+    for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
+      multiMap.putSingle(entry.getKey(), entry.getValue());
+    }
+    return multiMap;
   }
 }
