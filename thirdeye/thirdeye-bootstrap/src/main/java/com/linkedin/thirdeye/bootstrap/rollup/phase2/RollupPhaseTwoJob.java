@@ -92,6 +92,9 @@ public class RollupPhaseTwoJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupOrder = config.getRollupOrder();
+        if (rollupOrder == null) {
+          getRollupOrder();
+        }
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
 
@@ -135,11 +138,6 @@ public class RollupPhaseTwoJob extends Configured {
       String[] dimensionsValues = dimensionKey.getDimensionValues();
       List<DimensionKey> combinations = new ArrayList<DimensionKey>();
       String[] comb = Arrays.copyOf(dimensionsValues, dimensionsValues.length);
-
-      FileSystem fileSystem = FileSystem.get(new Configuration());
-      if (rollupOrder == null) {
-        getRollupOrder();
-      }
 
       for (String dimensionToRollup : rollupOrder) {
         comb = Arrays.copyOf(comb, comb.length);
