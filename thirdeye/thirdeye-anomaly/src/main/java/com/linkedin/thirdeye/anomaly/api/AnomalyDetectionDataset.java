@@ -13,8 +13,10 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
  */
 public abstract class AnomalyDetectionDataset {
 
+  /** List of dimension names */
   protected List<String> dimensions;
 
+  /** List of metric names */
   protected List<String> metrics;
 
   protected Map<DimensionKey, MetricTimeSeries> data = new HashMap<>();

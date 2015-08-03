@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +36,9 @@ public class FixedDimensionIteratorTest {
     Set<String> seen = new HashSet<>();
     int count = 0;
     while (it.hasNext()) {
-      Map<String, String> curr = it.next();
+      // make it sorted
+      TreeMap<String, String> curr = new TreeMap<String, String>(it.next());
+
       StringBuilder sb = new StringBuilder();
       sb.append("[");
       for (Entry<String, String> kv : curr.entrySet()) {
@@ -47,5 +50,12 @@ public class FixedDimensionIteratorTest {
       count++;
     }
     Assert.assertEquals(expectedCount, count);
+  }
+
+  @Test
+  public void emptyIterator() throws Exception {
+    Map<String, List<String>> fixedDimensions = new HashMap<>();
+    FixedDimensionIterator it = new FixedDimensionIterator(fixedDimensions);
+    Assert.assertFalse(it.hasNext());
   }
 }

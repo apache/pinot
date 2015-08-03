@@ -1,4 +1,5 @@
 INSERT IGNORE INTO %s(
+  function_table,
   function_id,
   function_description,
   function_name,
@@ -11,4 +12,4 @@ INSERT IGNORE INTO %s(
   anomaly_score,
   anomaly_volume,
   properties
-) VALUES(?,?,?,?,?,?,?,?,?,?,?,?);
+) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?);

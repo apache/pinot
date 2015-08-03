@@ -4,12 +4,14 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import org.joda.time.DateTime;
+
 /**
  *
  */
 public class AnomalyReportTableRow {
 
-  private long timeWindow;
+  private DateTime timestamp;
   private String date;
   private String dimensions;
   private String description;
@@ -17,16 +19,13 @@ public class AnomalyReportTableRow {
   private Number anomalyScore;
   private Number anomalyVolume;
 
-  private static final DateFormat DATE_FORMAT;
-  static {
-    DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-  }
+  private static final DateFormat DATE_FORMAT =  new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-  public AnomalyReportTableRow(long timeWindow, String dimensions, String description, boolean scoreIsPercent,
+  public AnomalyReportTableRow(DateTime timestamp, String dimensions, String description, boolean scoreIsPercent,
       Number anomalyScore, Number anomalyVolume) {
     super();
-    this.timeWindow = timeWindow;
-    this.date = DATE_FORMAT.format(new Date(timeWindow));
+    this.timestamp = timestamp;
+    this.date = DATE_FORMAT.format(timestamp.toDate());
     this.dimensions = dimensions;
     this.description = description;
     this.scoreIsPercent = scoreIsPercent;
@@ -42,13 +41,13 @@ public class AnomalyReportTableRow {
     this.date = date;
   }
 
-  public long getTimeWindow() {
-    return timeWindow;
+  public DateTime getTimestamp() {
+    return timestamp;
   }
 
-  public void setTimeWindow(long timeWindow) {
-    this.timeWindow = timeWindow;
-    this.date = DATE_FORMAT.format(new Date(timeWindow));
+  public void setTimestamp(DateTime timestamp) {
+    this.timestamp = timestamp;
+    this.date = DATE_FORMAT.format(timestamp.toDate());
   }
 
   public String getDimensions() {
@@ -93,9 +92,8 @@ public class AnomalyReportTableRow {
 
   @Override
   public String toString() {
-    return "\nAnomalyReportTableRow [timeWindow=" + timeWindow + ", date=" + date + ", dimensions=" + dimensions
+    return "AnomalyReportTableRow [timestamp=" + timestamp + ", date=" + date + ", dimensions=" + dimensions
         + ", description=" + description + ", scoreIsPercent=" + scoreIsPercent + ", anomalyScore=" + anomalyScore
-        + ", anomalyVolume=" + anomalyVolume + "]";
+        + ", anomalyVolume=" + anomalyVolume + "]\n";
   }
-
 }

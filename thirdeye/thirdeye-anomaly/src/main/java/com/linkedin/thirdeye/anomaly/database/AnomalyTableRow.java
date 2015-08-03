@@ -12,6 +12,9 @@ public class AnomalyTableRow {
   /** Unique id for anomaly */
   int id;
 
+  /** Name of the function table */
+  String functionTable;
+
   /** Id of the function table entry that produced this anomaly */
   int functionId;
 
@@ -54,6 +57,14 @@ public class AnomalyTableRow {
 
   public void setId(int id) {
     this.id = id;
+  }
+
+  public String getFunctionTable() {
+    return functionTable;
+  }
+
+  public void setFunctionTable(String functionTable) {
+    this.functionTable = functionTable;
   }
 
   public int getFunctionId() {

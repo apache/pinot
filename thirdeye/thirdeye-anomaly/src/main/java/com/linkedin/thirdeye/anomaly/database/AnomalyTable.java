@@ -55,6 +55,7 @@ public class AnomalyTable {
    * @param endTimeWindow
    * @return
    *  List of rows based on query produced
+   * @throws SQLException
    */
   public static List<AnomalyTableRow> selectRows(
       AnomalyDatabaseConfig dbConfig,
@@ -65,7 +66,7 @@ public class AnomalyTable {
       boolean topLevelOnly,
       List<String> orderBy,
       long startTimeWindow,
-      long endTimeWindow) {
+      long endTimeWindow) throws SQLException {
 
     Connection conn = null;
     Statement stmt = null;
@@ -83,6 +84,7 @@ public class AnomalyTable {
       while (rs.next()) {
         AnomalyTableRow row = new AnomalyTableRow();
         row.setId(rs.getInt("id"));
+        row.setFunctionTable(rs.getString("function_table"));
         row.setFunctionId(rs.getInt("function_id"));
         row.setFunctionName(rs.getString("function_name"));
         row.setFunctionDescription(rs.getString("function_description"));
@@ -118,8 +120,10 @@ public class AnomalyTable {
 
       return results;
 
-    } catch (SQLException | JsonProcessingException e) {
-      e.printStackTrace();
+    } catch (SQLException e) {
+      LOGGER.error("there was a problem retrieving rows", e);
+      throw e;
+
     } finally {
       try {
         if (conn != null) {
@@ -132,19 +136,18 @@ public class AnomalyTable {
           rs.close();
         }
       } catch (SQLException e) {
-        e.printStackTrace();
+        LOGGER.error("close exception", e);
       }
     }
-    return null;
-
   }
 
   /**
    * Create anomaly table if it does not exist
    *
    * @param dbConfig
+   * @throws IOException
    */
-  public static void createTable(AnomalyDatabaseConfig dbConfig) {
+  public static void createTable(AnomalyDatabaseConfig dbConfig) throws IOException {
     dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName(), dbConfig.getFunctionTableName()));
   }
 
@@ -163,27 +166,28 @@ public class AnomalyTable {
       conn = dbConfig.getConnection();
 
       preparedStmt = conn.prepareStatement(buildAnomlayTableInsertStmt(dbConfig.getAnomalyTableName()));
-      preparedStmt.setInt(1, row.getFunctionId());
-      preparedStmt.setString(2, row.getFunctionDescription());
-      preparedStmt.setString(3, row.getFunctionName());
-      preparedStmt.setString(4, row.getCollection());
+      preparedStmt.setString(1, row.getFunctionTable());
+      preparedStmt.setInt(2, row.getFunctionId());
+      preparedStmt.setString(3, row.getFunctionDescription());
+      preparedStmt.setString(4, row.getFunctionName());
+      preparedStmt.setString(5, row.getCollection());
 
       SimpleDateFormat sdf = new SimpleDateFormat(dbConfig.getDateFormat());
       sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
       String dateString = sdf.format(row.getTimeWindow());
-      preparedStmt.setString(5, dateString);
+      preparedStmt.setString(6, dateString);
 
-      preparedStmt.setInt(6, row.getNonStarCount());
-      preparedStmt.setString(7, row.getDimensions());
-      preparedStmt.setDouble(8, row.getDimensionsContribution());
-      preparedStmt.setString(9, serializeMetrics(row.getMetrics()));
-      preparedStmt.setDouble(10, row.getAnomalyScore());
-      preparedStmt.setDouble(11, row.getAnomalyVolume());
+      preparedStmt.setInt(7, row.getNonStarCount());
+      preparedStmt.setString(8, row.getDimensions());
+      preparedStmt.setDouble(9, row.getDimensionsContribution());
+      preparedStmt.setString(10, serializeMetrics(row.getMetrics()));
+      preparedStmt.setDouble(11, row.getAnomalyScore());
+      preparedStmt.setDouble(12, row.getAnomalyVolume());
 
       StringWriter writer = new StringWriter();
-      row.getProperties().store(new PrintWriter(writer), "");
+      row.getProperties().store(new PrintWriter(writer), "ResultProperties");
 
-      preparedStmt.setString(12, writer.getBuffer().toString());
+      preparedStmt.setString(13, writer.getBuffer().toString());
 
       preparedStmt.executeUpdate();
     } catch (SQLException | JsonProcessingException e) {
@@ -217,7 +221,7 @@ public class AnomalyTable {
    */
   private static String buildAnomalyTableSelectStatement(AnomalyDatabaseConfig dbconfig, String ruleName,
       String ruleDescription, String collection, boolean topLevelOnly, List<String> orderBy,
-      long startTimeWindow, long endTimeWidnow) throws JsonProcessingException {
+      long startTimeWindow, long endTimeWidnow) {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT * FROM ").append(dbconfig.getAnomalyTableName()).append(" WHERE");
 
@@ -249,12 +253,12 @@ public class AnomalyTable {
     return sb.toString();
   }
 
-  private static String buildAnomalyTableCreateStmt(String anomalyTableName, String ruleTableName) {
+  private static String buildAnomalyTableCreateStmt(String anomalyTableName, String ruleTableName) throws IOException {
     String formatString = ResourceUtils.getResourceAsString("database/anomaly/create-anomaly-table-template.sql");
     return String.format(formatString, anomalyTableName, ruleTableName);
   }
 
-  private static String buildAnomlayTableInsertStmt(String tableName) {
+  private static String buildAnomlayTableInsertStmt(String tableName) throws IOException {
     String formatString = ResourceUtils.getResourceAsString("database/anomaly/insert-into-anomaly-table-template.sql");
     return String.format(formatString, tableName);
   }

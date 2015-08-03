@@ -15,6 +15,9 @@ import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 
+/**
+ * Parses query result from the Third Eye server back into dimension keys and their associated metric time series.
+ */
 public class ThirdEyeServerQueryResult extends AnomalyDetectionDataset {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

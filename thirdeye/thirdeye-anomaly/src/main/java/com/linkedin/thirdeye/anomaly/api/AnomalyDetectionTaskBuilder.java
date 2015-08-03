@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.api;
 
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -39,9 +41,11 @@ public class AnomalyDetectionTaskBuilder {
    *  A list of AnomalyDetectionTasks to execute
    * @throws IllegalAccessException
    * @throws InstantiationException
+   * @throws IOException
+   * @throws SQLException
    */
   public List<AnomalyDetectionTask> buildTasks(TimeRange timeRange, AnomalyDetectionFunctionFactory functionFactory)
-      throws InstantiationException, IllegalAccessException {
+      throws InstantiationException, IllegalAccessException, IOException, SQLException {
 
     List<AnomalyDetectionTask> tasks = new LinkedList<AnomalyDetectionTask>();
 

@@ -26,7 +26,7 @@ public interface AnomalyDetectionFunction {
   /**
    * @return
    *  The minimum length of time needed to perform the anomaly detection function (null == all time). This can be
-   *  interpreted as the size of the training set.
+   *  interpreted as the size of the training set extending from the beginning of the detection interval.
    */
   TimeGranularity getTrainingWindowTimeGranularity();
 
@@ -45,6 +45,7 @@ public interface AnomalyDetectionFunction {
   /**
    * Computes whether or not this dimension combination + metric time series contains anomalies in the
    * detection interval.
+   *
    * @return
    *  The list of anomalies in the series
    */

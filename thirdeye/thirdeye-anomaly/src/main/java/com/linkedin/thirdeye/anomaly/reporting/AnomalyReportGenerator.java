@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.reporting;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,7 +11,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
@@ -49,6 +52,7 @@ public class AnomalyReportGenerator {
 
   /**
    * @param anomalyTableRows
+   *  These should all have the same collection
    * @param topK
    * @return
    *  AnomalyReportTable based on list of AnomalyTableRows provided
@@ -57,8 +61,10 @@ public class AnomalyReportGenerator {
   public AnomalyReportTable getAnomalyTable(List<AnomalyTableRow> anomalyTableRows, int topK) throws IOException {
     List<AnomalyReportTableRow> reportTableRows = new ArrayList<AnomalyReportTableRow>(topK);
 
+    // the order in which dimensions are to be displayed
     List<String> dimensionSchema = null;
 
+    // create rows for top k results
     for (AnomalyTableRow row : anomalyTableRows) {
       ObjectReader reader = OBJECT_MAPPER.reader(Map.class);
       Map<String, String> dimensions = reader.readValue(row.getDimensions());
@@ -72,8 +78,9 @@ public class AnomalyReportGenerator {
         dimensionValues[dimensionSchema.indexOf(e.getKey())] = e.getValue();
       }
 
+      DateTime timestamp = new DateTime(row.getTimeWindow(), DateTimeZone.UTC).toDateTime(DateTimeZone.getDefault());
       AnomalyReportTableRow reportTableRow = new AnomalyReportTableRow(
-          row.getTimeWindow(),
+          timestamp,
           new DimensionKey(dimensionValues).toString(),
           row.getFunctionDescription(),
           row.getFunctionName().toLowerCase().contains("percent"),
@@ -87,6 +94,7 @@ public class AnomalyReportGenerator {
 
     int totalViolationCount = reportTableRows.size();
 
+    // count the number of vioations with all '*' dimensions
     int topLevelViolationCount = 0;
     for (AnomalyTableRow row : anomalyTableRows) {
       if (row.getNonStarCount() == 0) {
@@ -94,11 +102,13 @@ public class AnomalyReportGenerator {
       }
     }
 
+    // create the report table
     AnomalyReportTable result = new AnomalyReportTable();
     result.setReportRows(reportTableRows);
     result.setTopLevelViolationCount(topLevelViolationCount);
     result.setTotalViolationCount(totalViolationCount);
 
+    // show the names of the dimensions in the order they are displayed if there are any anomalies
     if (dimensionSchema != null)
     {
       result.setDimensionSchema(new DimensionKey(dimensionSchema.toArray(new String[0])).toString());
@@ -115,9 +125,10 @@ public class AnomalyReportGenerator {
    * @param endTimeWindow
    * @return
    *  A list of anomaly table rows using default ranking and parameters.
+   * @throws SQLException
    */
   private List<AnomalyTableRow> getAnomalyRowsHelper(AnomalyDatabaseConfig dbConfig, String collection, String metric,
-      long startTimeWindow, long endTimeWindow) {
+      long startTimeWindow, long endTimeWindow) throws IOException {
     Set<String> metrics = null;
     if (metric != null) {
       metrics = new HashSet<>();
@@ -130,7 +141,12 @@ public class AnomalyReportGenerator {
         "ABS(anomaly_score) DESC"
     });
 
-    return AnomalyTable.selectRows(dbConfig, collection, null, null, metrics, false, orderBy, startTimeWindow, endTimeWindow);
+    try {
+      return AnomalyTable.selectRows(dbConfig, collection, null, null, metrics, false, orderBy, startTimeWindow,
+          endTimeWindow);
+    } catch (SQLException e) {
+      throw new IOException(e);
+    }
   }
 
 

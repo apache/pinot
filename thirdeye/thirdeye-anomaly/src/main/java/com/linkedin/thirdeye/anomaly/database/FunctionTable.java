@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.database;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -27,9 +28,11 @@ public class FunctionTable {
    *  A list of rows in the function table referenced in dbConfig
    * @throws InstantiationException
    * @throws IllegalAccessException
+   * @throws IOException
+   * @throws SQLException
    */
   public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig,
-      Class<T> rowClass) throws InstantiationException, IllegalAccessException {
+      Class<T> rowClass) throws InstantiationException, IllegalAccessException, IOException, SQLException {
 
     List<T> functionTableRows = new LinkedList<>();
 
@@ -51,6 +54,7 @@ public class FunctionTable {
 
     } catch (SQLException e) {
       LOGGER.error("load rule sql exception", e);
+      throw e;
     } finally {
       try {
         if (conn != null) {
@@ -66,14 +70,14 @@ public class FunctionTable {
         e.printStackTrace();
       }
     }
-    return null;
   }
 
   /**
    * @param dbConfig
    * @return
+   * @throws IOException
    */
-  private static String buildFunctionTableSelectStmt(AnomalyDatabaseConfig dbConfig) {
+  private static String buildFunctionTableSelectStmt(AnomalyDatabaseConfig dbConfig) throws IOException {
     String formatString = ResourceUtils.getResourceAsString("database/function/select-function-table-template.sql");
     return String.format(formatString, dbConfig.getFunctionTableName());
   }

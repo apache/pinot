@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.anomaly.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -26,12 +25,17 @@ public class FixedDimensionIterator {
 
     int numDimensions = dimensionNames.size();
     offsets = new int[numDimensions];
-    numCombinations = 1;
-    for (int i = 0; i < numDimensions; i++) {
-      String dimension = dimensionNames.get(i);
-      int dimensionSize = fixedDimensions.get(dimension).size();
-      offsets[i] = numCombinations;
-      numCombinations *= dimensionSize;
+    if (numDimensions > 0) {
+      numCombinations = 1;
+      for (int i = 0; i < numDimensions; i++) {
+        String dimension = dimensionNames.get(i);
+        int dimensionSize = fixedDimensions.get(dimension).size();
+        offsets[i] = numCombinations;
+        numCombinations *= dimensionSize;
+      }
+    } else {
+      // edge case where no dimensions are provided
+      numCombinations = 0;
     }
   }
 

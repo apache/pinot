@@ -41,6 +41,11 @@ public class ThirdEyeAnomalyDetection {
     config = mapper.readValue(new File(filename), ThirdEyeAnomalyDetectionConfiguration.class);
   }
 
+  /**
+   * Run the application
+   *
+   * @throws Exception
+   */
   public void run() throws Exception {
     if (config.getExplicitTimeRange() != null) {
       runWithExplicitTimeRange();
@@ -118,7 +123,8 @@ public class ThirdEyeAnomalyDetection {
   private void loadAndRunTasks(ThirdEyeAnomalyDetectionConfiguration thirdEyeAnomalyDetectionConfig,
       TimeRange timeRange) {
 
-    List<AnomalyDetectionDriverConfig> collectionDriverConfigurations = thirdEyeAnomalyDetectionConfig.getCollectionDriverConfigurations();
+    List<AnomalyDetectionDriverConfig> collectionDriverConfigurations =
+        thirdEyeAnomalyDetectionConfig.getCollectionDriverConfigurations();
     AnomalyDatabaseConfig anomalyDatabase = thirdEyeAnomalyDetectionConfig.getAnomalyDatabaseConfig();
 
     AnomalyDetectionFunctionFactory functionFactory;

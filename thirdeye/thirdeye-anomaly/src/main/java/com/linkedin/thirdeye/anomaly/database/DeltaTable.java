@@ -94,8 +94,7 @@ public class DeltaTable {
 
       return result;
     } catch (SQLException e) {
-      LOGGER.error("could not get delta table");
-      e.printStackTrace();
+      LOGGER.error("could not get delta table", e);
     } finally {
       try {
         if (conn != null) {

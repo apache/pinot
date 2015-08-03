@@ -9,6 +9,8 @@ import java.util.TimeZone;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.quartz.CronExpression;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
@@ -25,6 +27,8 @@ import com.linkedin.thirdeye.api.TimeRange;
  */
 public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunctionAbstractWrapper {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionFunctionCronDefinition.class);
+
   private final TimeZone evalTimeZone;;
 
   private final CronExpression cronExpression;
@@ -32,7 +36,12 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
   public AnomalyDetectionFunctionCronDefinition(AnomalyDetectionFunction childFunc, String cronString)
       throws IllegalFunctionException {
     super(childFunc);
-    evalTimeZone = TimeZone.getTimeZone("PST");
+
+    /*
+     *  Use local timezone of the system.
+     */
+    evalTimeZone = TimeZone.getDefault();
+
     try {
       cronExpression = new CronExpression(cronString);
       cronExpression.setTimeZone(evalTimeZone);
@@ -63,7 +72,7 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
       Date dateEvalTz = resultDtEvalTz.toDate();
       if (cronExpression.isSatisfiedBy(dateEvalTz)) {
         timeFilteredResults.add(intermediateResult);
-//        System.out.println(resultDtUTC + " --- " + resultDtEvalTz + " --- " + dateEvalTz);
+        LOGGER.info("cron definition satisfied : {} - {} - {}", resultDtUTC, resultDtEvalTz, dateEvalTz);
       }
     }
     return timeFilteredResults;

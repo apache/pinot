@@ -11,15 +11,13 @@ import org.apache.commons.io.IOUtils;
  */
 public class ResourceUtils {
 
-  public static String getResourceAsString(String resource) {
+  public static String getResourceAsString(String resource) throws IOException {
     InputStream is = ClassLoader.getSystemResourceAsStream(resource);
     StringWriter writer = new StringWriter();
-    try {
-      IOUtils.copy(is, writer);
-    } catch (IOException e) {
-
-    }
+    IOUtils.copy(is, writer);
     return writer.toString();
   }
+
+  private ResourceUtils() {}
 
 }

@@ -31,7 +31,7 @@ public class AnomalyResultHandlerDatabase implements AnomalyResultHandler {
 
   private StarTreeConfig starTreeConfig;
 
-  public AnomalyResultHandlerDatabase(AnomalyDatabaseConfig dbConfig) {
+  public AnomalyResultHandlerDatabase(AnomalyDatabaseConfig dbConfig) throws IOException {
     super();
     this.dbConfig = dbConfig;
     if (dbConfig.isCreateTablesIfNotExists()) {
@@ -45,6 +45,9 @@ public class AnomalyResultHandlerDatabase implements AnomalyResultHandler {
     this.starTreeConfig = starTreeConfig;
   }
 
+  /**
+   * If the result is anomalous, insert a new row in the anomaly table.
+   */
   @Override
   public void handle(AnomalyDetectionTaskInfo taskInfo, DimensionKey dimensionKey, double dimensionKeyContribution,
       Set<String> metrics, AnomalyResult result) throws IOException {
@@ -53,6 +56,7 @@ public class AnomalyResultHandlerDatabase implements AnomalyResultHandler {
     }
 
     AnomalyTableRow row = new AnomalyTableRow();
+    row.setFunctionTable(dbConfig.getFunctionTableName());
     row.setFunctionId(taskInfo.getFunctionId());
     row.setFunctionDescription(taskInfo.getFunctionDescription());
     row.setFunctionName(taskInfo.getFunctionName());

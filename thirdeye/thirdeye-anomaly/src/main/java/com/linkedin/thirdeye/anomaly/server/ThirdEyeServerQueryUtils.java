@@ -38,6 +38,8 @@ public class ThirdEyeServerQueryUtils {
    */
   private static boolean enableCache = true;
   private static ThirdEyeQueryCache<String, StarTreeConfig> starTreeCache = new ThirdEyeQueryCache<>(20);
+
+  // It would be more efficient to cache parsed ThirdEyeQueryResult objects, but MetricTimeSeries is not thread safe.
   private static ThirdEyeQueryCache<String, QueryResult> queryDataCache = new ThirdEyeQueryCache<>(100);
 
   /**

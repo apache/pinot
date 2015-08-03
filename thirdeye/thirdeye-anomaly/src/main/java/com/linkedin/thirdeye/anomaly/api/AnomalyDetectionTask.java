@@ -40,6 +40,7 @@ public class AnomalyDetectionTask implements Runnable {
   /** dimension value SqlUtils uses to express a group by. */
   private static final String GROUP_BY_VALUE = "!";
 
+  /** the name of the metric to use when estimating a dimension key's contribution to the total metric */
   private final String dimensionKeyContributionMetric;
 
   private final StarTreeConfig starTreeConfig;
@@ -51,12 +52,16 @@ public class AnomalyDetectionTask implements Runnable {
   private final List<MetricSpec> metricsRequiredByTask;
 
   /**
+   * @param starTreeConfig
+   *  Configuration for the star-tree
+   * @param collectionDriverConfig
+   *  Configuration for the driver
    * @param taskInfo
+   *  Information identifying the task
    * @param function
+   *  Anomaly detection function to execute
    * @param handler
-   * @param config
-   * @param data
-   * @param timeWindow
+   *  Handler for any anomaly results
    */
   public AnomalyDetectionTask(StarTreeConfig starTreeConfig, AnomalyDetectionDriverConfig collectionDriverConfig,
       AnomalyDetectionTaskInfo taskInfo, AnomalyDetectionFunction function, AnomalyResultHandler handler) {
@@ -66,15 +71,25 @@ public class AnomalyDetectionTask implements Runnable {
     this.collectionDriverConfig = collectionDriverConfig;
     this.taskInfo = taskInfo;
 
+    /*
+     * Use the metric specified in the config
+     */
     if (collectionDriverConfig.getContributionEstimateMetric() != null) {
       dimensionKeyContributionMetric = collectionDriverConfig.getContributionEstimateMetric();
     } else {
-      dimensionKeyContributionMetric = function.getMetrics().iterator().next();
+      /*
+       * Use the first metric in the collection if no metric is specified.
+       */
+      LOGGER.warn("no metric provided for thresholding collection {}", starTreeConfig.getCollection());
+      dimensionKeyContributionMetric = starTreeConfig.getMetrics().get(0).getName();
     }
 
     metricsRequiredByTask = getMetricsRequiredByTask(starTreeConfig, collectionDriverConfig, function);
   }
 
+  /**
+   * Run anomaly detection
+   */
   @Override
   public void run() {
     try {
@@ -158,7 +173,7 @@ public class AnomalyDetectionTask implements Runnable {
   /**
    * @param dimensionValues
    * @return
-   *  The number of group by applied
+   *  The number of group by applied. This is the recursion depth.
    */
   private int getExplorationDepth(Map<String, String> dimensionValues) {
     int count = 0;
@@ -189,9 +204,13 @@ public class AnomalyDetectionTask implements Runnable {
 
   /**
    * @param anomalies
+   *  Any existing anomalies that have been raised in this run
    * @param dimensionKeyContribution
+   *  The estimated contribution of the dimension key
    * @param dimensionKey
+   *  The dimension key that produced the anomaly results
    * @param anomalyResults
+   *  List of anomaly results for current detection interval
    */
   private void handleAnomalyResults(AnomalyTimeSeries anomalies, DimensionKey dimensionKey,
       double dimensionKeyContribution, List<AnomalyResult> anomalyResults)
@@ -208,6 +227,7 @@ public class AnomalyDetectionTask implements Runnable {
        * Only report anomalies in the specified time range
        */
       if (taskInfo.getTimeRange().contains(anomalyResult.getTimeWindow()) == false) {
+        LOGGER.debug("function produced anomaly result not in window {}", taskInfo.getTimeRange());
         continue;
       }
 
@@ -230,19 +250,20 @@ public class AnomalyDetectionTask implements Runnable {
   }
 
   /**
-   * @param beginTimeWindow
-   * @param endTimeWindow
+   * @param dimensionValues
    * @return
+   * @throws IOException
    */
   private AnomalyDetectionDataset getDataset(Map<String, String> dimensionValues) throws IOException {
     long end = taskInfo.getTimeRange().getEnd();
     TimeGranularity functionGranularity = function.getTrainingWindowTimeGranularity();
     long start;
     if (functionGranularity != null) {
+      // compute the start time of the dataset
       start = taskInfo.getTimeRange().getStart() - TimeGranularityUtils.toMillis(functionGranularity)
           - TimeGranularityUtils.toMillis(function.getAggregationTimeGranularity());
     } else {
-      start = 0;
+      start = 0; // all time
     }
     TimeRange queryTimeRange = new TimeRange(start, end);
 

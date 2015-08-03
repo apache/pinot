@@ -88,11 +88,13 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
       }
     }
 
+    // wrap function in consecutive function
     int consecutiveBuckets = ruleBasedFunctionTableRow.getConsecutiveBuckets();
     if (consecutiveBuckets > 1) {
       func = new AnomalyDetectionFunctionConsecutive(func, consecutiveBuckets);
     }
 
+    // wrap function in cron function
     String cronDefinition = ruleBasedFunctionTableRow.getCronDefinition();
     if (cronDefinition != null && cronDefinition.length() > 0) {
       func = new AnomalyDetectionFunctionCronDefinition(func, cronDefinition);

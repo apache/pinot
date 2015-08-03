@@ -27,6 +27,9 @@ public class AnomalyResultHandlerLogger implements AnomalyResultHandler
     // Do nothing
   }
 
+  /**
+   * Naively log anomalies
+   */
   @Override
   public void handle(AnomalyDetectionTaskInfo taskInfo, DimensionKey dimensionKey, double dimensionKeyContribution,
       Set<String> metrics, AnomalyResult result) throws IOException

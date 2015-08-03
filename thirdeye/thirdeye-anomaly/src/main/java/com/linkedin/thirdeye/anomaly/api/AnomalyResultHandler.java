@@ -22,6 +22,16 @@ public interface AnomalyResultHandler
    *   This could be persisting to a database, calling an HTTP endpoint, etc.
    * </p>
    *
+   * @param taskInfo
+   *  Id information for the task
+   * @param dimensionKey
+   *  The dimension key of the series that produced this result
+   * @param dimensionKeyContribution
+   *  The estimated contribution of the dimension key
+   * @param metrics
+   *  The set of metrics that were used to produce this result
+   * @param result
+   *  The anomaly result to handle
    * @throws IOException
    *  If there was an error in handing the result
    */
