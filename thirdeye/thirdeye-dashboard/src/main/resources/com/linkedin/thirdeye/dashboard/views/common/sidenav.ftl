@@ -142,8 +142,10 @@
             </#if>
         </li>
     </ul>
-    <button class="uk-button uk-button-small uk-button-secondary uk-padding-remove uk-margin-top" >
-        <a class="uk-button-secondary sidenav-feedback-link" href="mailto:${feedbackEmailAddress}?subject=ThirdEye Dashboard Feedback">Send Feedback</a>
-    </button>
+    <#if (feedbackEmailAddress??)>
+       <button class="uk-button uk-button-small uk-button-secondary uk-padding-remove uk-margin-top" >
+         <a class="uk-button-secondary sidenav-feedback-link" href="mailto:${feedbackEmailAddress}?subject=ThirdEye Dashboard Feedback">Send Feedback</a>
+       </button>
+    </#if>
     
 </div>
