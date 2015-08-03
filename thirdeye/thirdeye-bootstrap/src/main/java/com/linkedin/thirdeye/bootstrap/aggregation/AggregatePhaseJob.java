@@ -4,6 +4,7 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_INPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_OUTPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_DIMENSION_STATS_PATH;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -152,11 +153,14 @@ public class AggregatePhaseJob extends Configured {
   public static class AggregationReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private AggregationJobConfig config;
+    private List<String> dimensionNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
     AggregationStats aggregationStats;
     String statOutputDir;
+    String dimensionStatsOutputDir;
     private FileSystem fileSystem;
+    private DimensionStats dimensionStats;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -166,10 +170,13 @@ public class AggregatePhaseJob extends Configured {
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
+        dimensionNames = config.getDimensionNames();
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         aggregationStats = new AggregationStats(metricSchema);
+        dimensionStats = new DimensionStats();
         statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString()) + "_stats/";
+        dimensionStatsOutputDir = configuration.get(AGG_DIMENSION_STATS_PATH.toString());
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -179,19 +186,26 @@ public class AggregatePhaseJob extends Configured {
     public void reduce(BytesWritable aggregationKey, Iterable<BytesWritable> timeSeriesIterable,
         Context context) throws IOException, InterruptedException {
       MetricTimeSeries out = new MetricTimeSeries(metricSchema);
-      // AggregationKey key =
-      // AggregationKey.fromBytes(aggregationKey.getBytes());
       for (BytesWritable writable : timeSeriesIterable) {
         MetricTimeSeries series = MetricTimeSeries.fromBytes(writable.copyBytes(), metricSchema);
         out.aggregate(series);
       }
       // record the stats
+      DimensionKey key = DimensionKey.fromBytes(aggregationKey.getBytes());
+      for (int i = 0; i < dimensionNames.size(); i++) {
+        dimensionStats.record(dimensionNames.get(i), key.getDimensionValues()[i]);
+      }
       aggregationStats.record(out);
       byte[] serializedBytes = out.toBytes();
       context.write(aggregationKey, new BytesWritable(serializedBytes));
     }
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
+      FSDataOutputStream dimensionStatsOutputStream =
+          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
+      dimensionStatsOutputStream.close();
+
       FSDataOutputStream outputStream =
           fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
       outputStream.write(aggregationStats.toString().getBytes());
@@ -238,6 +252,7 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_CONFIG_PATH);
     getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
+    getAndSetConfiguration(configuration, AGG_DIMENSION_STATS_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
 
     FileInputFormat.setInputDirRecursive(job, true);
