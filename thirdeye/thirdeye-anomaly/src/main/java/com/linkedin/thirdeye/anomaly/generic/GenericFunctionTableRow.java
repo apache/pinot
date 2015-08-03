@@ -10,8 +10,13 @@ import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
  */
 public final class GenericFunctionTableRow extends FunctionTableRow {
 
+  /** URL of the jar */
   private String jarUrl;
+
+  /** Name of the function class to load */
   private String className;
+
+  /** Initialization properties for function */
   private String functionProperties;
 
   public String getClassName() {

@@ -8,9 +8,16 @@ import java.sql.SQLException;
  */
 public abstract class FunctionTableRow {
 
+  /** An unique id for the function */
   private int functionId;
+
+  /** Name of the function, e.g., 'percent-change', 'arima', etc. */
   private String functionName;
+
+  /** Human understandable description of the function and what it is to compute. e.g., '20% drop in X' */
   private String functionDescription;
+
+  /** The collection to containing data to apply the function to */
   private String collectionName;
 
   public int getFunctionId() {

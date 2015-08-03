@@ -10,18 +10,27 @@ import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
  */
 public final class RuleBasedFunctionTableRow extends FunctionTableRow {
 
+  /** Name of the metric to monitor */
   private String metricName;
+
+  /** Default threshold to apply */
   private double delta;
 
+  /** The granularity at which data is to be provided to the function*/
   private String aggregateUnit;
   private int aggregateSize;
 
+  /** The number of consecutive violations before alerting */
   private int consecutiveBuckets;
+
+  /** Expression to restrict application of the function */
   private String cronDefinition;
 
+  /** The period with which to compare as a baseline, e.g., '1-week' */
   private String baselineUnit;
   private int baselineSize;
 
+  /** Table with dimension specific deltas */
   private String deltaTableName;
 
   public String getMetricName() {

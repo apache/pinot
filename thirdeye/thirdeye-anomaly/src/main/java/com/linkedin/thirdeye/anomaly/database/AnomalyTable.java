@@ -1,16 +1,18 @@
 package com.linkedin.thirdeye.anomaly.database;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
 
 import org.slf4j.Logger;
@@ -19,8 +21,9 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
+import com.linkedin.thirdeye.anomaly.api.ResultProperties;
 import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 
 /**
@@ -32,23 +35,35 @@ public class AnomalyTable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyTable.class);
 
-  public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, String collection, String metric,
-      long startTimeWindow, long endTimeWindow) {
-    List<String> metrics = null;
-    if (metric != null) {
-      metrics = new ArrayList<String>(1);
-      metrics.add(metric);
-    }
-    return selectRows(dbConfig, collection, null, null, metrics, false, startTimeWindow, endTimeWindow);
-  }
+  private static final Joiner COMMA = Joiner.on(',');
 
+  /**
+   * @param dbConfig
+   * @param collection
+   *  Collection conatining anomalies
+   * @param functionName
+   *  SQL pattern for function name to match
+   * @param functionDescription
+   *  SQL pattern for description to match
+   * @param metrics
+   *  The list of metrics used
+   * @param topLevelOnly
+   *  Only anomalies with all * dimensions
+   * @param orderBy
+   *  Components of orderBy clause
+   * @param startTimeWindow
+   * @param endTimeWindow
+   * @return
+   *  List of rows based on query produced
+   */
   public static List<AnomalyTableRow> selectRows(
       AnomalyDatabaseConfig dbConfig,
       String collection,
       String functionName,
       String functionDescription,
-      List<String> metrics,
+      Set<String> metrics,
       boolean topLevelOnly,
+      List<String> orderBy,
       long startTimeWindow,
       long endTimeWindow) {
 
@@ -57,7 +72,7 @@ public class AnomalyTable {
     ResultSet rs = null;
     try {
       String sql = buildAnomalyTableSelectStatement(dbConfig, functionName, functionDescription, collection,
-          metrics, topLevelOnly, startTimeWindow, endTimeWindow);
+          topLevelOnly, orderBy, startTimeWindow, endTimeWindow);
 
       conn = dbConfig.getConnection();
       stmt = conn.createStatement();
@@ -79,8 +94,26 @@ public class AnomalyTable {
         row.setMetrics(deserializeMetrics(rs.getString("metrics")));
         row.setAnomalyScore(rs.getDouble("anomaly_score"));
         row.setAnomalyVolume(rs.getDouble("anomaly_volume"));
-        row.setProperties(rs.getString("properties"));
-        results.add(row);
+
+        ResultProperties properties = new ResultProperties();
+        try {
+          properties.load(new StringReader(rs.getString("properties")));
+        } catch (IOException e) {
+          LOGGER.warn("unable to deserialize anomaly result properties", e);
+          properties = null;
+        }
+
+        row.setProperties(properties);
+
+        // filter on metrics
+        if (metrics != null) {
+          if (row.getMetrics() != null && row.getMetrics().size() == metrics.size()
+            && metrics.containsAll(row.getMetrics())) {
+            results.add(row);
+          }
+        } else {
+          results.add(row);
+        }
       }
 
       return results;
@@ -106,11 +139,23 @@ public class AnomalyTable {
 
   }
 
+  /**
+   * Create anomaly table if it does not exist
+   *
+   * @param dbConfig
+   */
   public static void createTable(AnomalyDatabaseConfig dbConfig) {
     dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName(), dbConfig.getFunctionTableName()));
   }
 
-  public static void insertRow(AnomalyDatabaseConfig dbConfig, AnomalyTableRow row) {
+  /**
+   * Adds the row to the anomaly table referenced in dbConfig
+   *
+   * @param dbConfig
+   * @param row
+   * @throws IOException
+   */
+  public static void insertRow(AnomalyDatabaseConfig dbConfig, AnomalyTableRow row) throws IOException {
     Connection conn = null;
     PreparedStatement preparedStmt = null;
 
@@ -134,7 +179,11 @@ public class AnomalyTable {
       preparedStmt.setString(9, serializeMetrics(row.getMetrics()));
       preparedStmt.setDouble(10, row.getAnomalyScore());
       preparedStmt.setDouble(11, row.getAnomalyVolume());
-      preparedStmt.setString(12, row.getProperties());
+
+      StringWriter writer = new StringWriter();
+      row.getProperties().store(new PrintWriter(writer), "");
+
+      preparedStmt.setString(12, writer.getBuffer().toString());
 
       preparedStmt.executeUpdate();
     } catch (SQLException | JsonProcessingException e) {
@@ -167,8 +216,8 @@ public class AnomalyTable {
    * @throws JsonProcessingException
    */
   private static String buildAnomalyTableSelectStatement(AnomalyDatabaseConfig dbconfig, String ruleName,
-      String ruleDescription, String collection, List<String> metrics, boolean topLevelOnly, long startTimeWindow,
-      long endTimeWidnow) throws JsonProcessingException {
+      String ruleDescription, String collection, boolean topLevelOnly, List<String> orderBy,
+      long startTimeWindow, long endTimeWidnow) throws JsonProcessingException {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT * FROM ").append(dbconfig.getAnomalyTableName()).append(" WHERE");
 
@@ -184,10 +233,6 @@ public class AnomalyTable {
       sb.append(" function_description LIKE '" + ruleDescription + "' AND");
     }
 
-    if (metrics != null) {
-      sb.append(" metrics ='" + serializeMetrics(metrics) + "' AND");
-    }
-
     if (topLevelOnly) {
       sb.append(" non_star_count = 0 AND");
     }
@@ -196,7 +241,9 @@ public class AnomalyTable {
     sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
     sb.append(" time_window BETWEEN '" + sdf.format(startTimeWindow) + "' AND '" + sdf.format(endTimeWidnow)+ "'");
 
-    sb.append(" ORDER BY non_star_count, anomaly_volume DESC, time_window DESC, ABS(anomaly_score) DESC");
+    if (orderBy != null && orderBy.size() > 0) {
+      sb.append(" ORDER BY ").append(COMMA.join(orderBy));
+    }
 
     sb.append(";");
     return sb.toString();
@@ -212,8 +259,8 @@ public class AnomalyTable {
     return String.format(formatString, tableName);
   }
 
-  private static List<String> deserializeMetrics(String metricsString) {
-    ObjectReader reader = OBJECT_MAPPER.reader(List.class);
+  private static Set<String> deserializeMetrics(String metricsString) {
+    ObjectReader reader = OBJECT_MAPPER.reader(Set.class);
     try {
       return reader.readValue(metricsString);
     } catch (IOException e) {
@@ -221,8 +268,7 @@ public class AnomalyTable {
     }
   }
 
-  private static String serializeMetrics(List<String> metrics) throws JsonProcessingException {
-    Collections.sort(metrics);
+  private static String serializeMetrics(Set<String> metrics) throws JsonProcessingException {
     return OBJECT_MAPPER.writer().writeValueAsString(metrics);
   }
 }

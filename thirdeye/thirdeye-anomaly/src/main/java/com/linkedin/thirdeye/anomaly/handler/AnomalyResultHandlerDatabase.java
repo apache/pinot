@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.handler;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,7 @@ public class AnomalyResultHandlerDatabase implements AnomalyResultHandler {
 
   @Override
   public void handle(AnomalyDetectionTaskInfo taskInfo, DimensionKey dimensionKey, double dimensionKeyContribution,
-      List<String> metrics, AnomalyResult result) throws IOException {
+      Set<String> metrics, AnomalyResult result) throws IOException {
     if (result.isAnomaly() == false) {
       return;
     }
@@ -63,7 +64,7 @@ public class AnomalyResultHandlerDatabase implements AnomalyResultHandler {
     row.setMetrics(metrics);
     row.setAnomalyScore(result.getAnomalyScore());
     row.setAnomalyVolume(result.getAnomalyVolume());
-    row.setProperties(result.getProperties().toString());
+    row.setProperties(result.getProperties());
 
     AnomalyTable.insertRow(dbConfig, row);
 

@@ -20,6 +20,14 @@ public class FunctionTable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionTable.class);
 
+  /**
+   * @param dbConfig
+   * @param rowClass
+   * @return
+   *  A list of rows in the function table referenced in dbConfig
+   * @throws InstantiationException
+   * @throws IllegalAccessException
+   */
   public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig,
       Class<T> rowClass) throws InstantiationException, IllegalAccessException {
 

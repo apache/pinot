@@ -2,10 +2,13 @@ package com.linkedin.thirdeye.anomaly.reporting;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,12 +31,29 @@ public class AnomalyReportGenerator {
     this.dbConfig = dbConfig;
   }
 
+  /**
+   * @param collection
+   * @param metric
+   * @param startTime
+   * @param endTime
+   * @param topK
+   * @return
+   *  AnomalyReportTable with default settings and ranking
+   * @throws IOException
+   */
   public AnomalyReportTable getAnomalyTable(String collection, String metric, long startTime, long endTime, int topK)
       throws IOException {
-    List<AnomalyTableRow> anomalyTableRows = AnomalyTable.selectRows(dbConfig, collection, metric, startTime, endTime);
+    List<AnomalyTableRow> anomalyTableRows = getAnomalyRowsHelper(dbConfig, collection, metric, startTime, endTime);
     return getAnomalyTable(anomalyTableRows, topK);
   }
 
+  /**
+   * @param anomalyTableRows
+   * @param topK
+   * @return
+   *  AnomalyReportTable based on list of AnomalyTableRows provided
+   * @throws IOException
+   */
   public AnomalyReportTable getAnomalyTable(List<AnomalyTableRow> anomalyTableRows, int topK) throws IOException {
     List<AnomalyReportTableRow> reportTableRows = new ArrayList<AnomalyReportTableRow>(topK);
 
@@ -86,6 +106,33 @@ public class AnomalyReportGenerator {
 
     return result;
   }
+
+  /**
+   * @param dbConfig
+   * @param collection
+   * @param metric
+   * @param startTimeWindow
+   * @param endTimeWindow
+   * @return
+   *  A list of anomaly table rows using default ranking and parameters.
+   */
+  private List<AnomalyTableRow> getAnomalyRowsHelper(AnomalyDatabaseConfig dbConfig, String collection, String metric,
+      long startTimeWindow, long endTimeWindow) {
+    Set<String> metrics = null;
+    if (metric != null) {
+      metrics = new HashSet<>();
+      metrics.add(metric);
+    }
+    List<String> orderBy = Arrays.asList(new String[]{
+        "non_star_count",
+        "dimensions_contribution DESC",
+        "time_window DESC",
+        "ABS(anomaly_score) DESC"
+    });
+
+    return AnomalyTable.selectRows(dbConfig, collection, null, null, metrics, false, orderBy, startTimeWindow, endTimeWindow);
+  }
+
 
   public static void main(String[] argv) throws IOException {
     AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig("localhost/thirdeye", "rule", "anomaly", "alert", "",

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.handler;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -28,7 +29,7 @@ public class AnomalyResultHandlerLogger implements AnomalyResultHandler
 
   @Override
   public void handle(AnomalyDetectionTaskInfo taskInfo, DimensionKey dimensionKey, double dimensionKeyContribution,
-      List<String> metrics, AnomalyResult result) throws IOException
+      Set<String> metrics, AnomalyResult result) throws IOException
   {
     if (result.isAnomaly())
     {

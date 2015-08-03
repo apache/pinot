@@ -194,9 +194,9 @@ public class AnomalyDetectionTask implements Runnable {
    * @param anomalyResults
    */
   private void handleAnomalyResults(AnomalyTimeSeries anomalies, DimensionKey dimensionKey,
-      double dimensionKeyContribution, List<AnomalyResult> anomalyResults) {
-
-    List<String> metrics = new ArrayList<String>(function.getMetrics());
+      double dimensionKeyContribution, List<AnomalyResult> anomalyResults)
+  {
+    Set<String> metrics = function.getMetrics();
 
     /*
      * Sort the results by time window. This makes for cleaner anomaly ids.

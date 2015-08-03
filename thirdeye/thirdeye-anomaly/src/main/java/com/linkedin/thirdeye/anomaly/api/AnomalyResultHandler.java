@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.api;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionKey;
@@ -25,6 +26,6 @@ public interface AnomalyResultHandler
    *  If there was an error in handing the result
    */
   void handle(AnomalyDetectionTaskInfo taskInfo, DimensionKey dimensionKey, double dimensionKeyContribution,
-      List<String> metrics, AnomalyResult result) throws IOException;
+      Set<String> metrics, AnomalyResult result) throws IOException;
 
 }
