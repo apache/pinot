@@ -12,12 +12,9 @@
         <maven>3.0.0</maven>
     </prerequisites>
 
-    <groupId>com.linkedin.thirdeye</groupId>
     <artifactId>thirdeye-reporting</artifactId>
-    <version>1.0</version>
-    <packaging>jar</packaging>
-
     <name>thirdeye-reporting</name>
+    <url>http://maven.apache.org</url>
 
     <properties>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
