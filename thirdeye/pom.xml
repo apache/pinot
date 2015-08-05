@@ -17,6 +17,7 @@
     <module>thirdeye-query</module>
     <module>thirdeye-dashboard</module>
     <module>thirdeye-reporting</module>
+    <module>thirdeye-client</module>
   </modules>
 
     <properties>
