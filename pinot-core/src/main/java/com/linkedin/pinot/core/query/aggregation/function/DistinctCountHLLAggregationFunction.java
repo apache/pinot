@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -34,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
@@ -84,19 +86,32 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   private void offerValueToHyperLogLog(int docId, Block[] block, HyperLogLog hll) {
     Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    boolean isStringType = (block[0].getMetadata().getDataType() == DataType.STRING);
+    DataType dataType = block[0].getMetadata().getDataType();
 
-    if (blockValIterator.skipTo(docId)) {
-      int dictionaryIndex = blockValIterator.nextIntVal();
-      if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-        if (isStringType) {
-          hll.offer(dictionaryReader.get(dictionaryIndex));
+    if (dataType.isSingleValue()) {
+      BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+      if (blockValIterator.skipTo(docId)) {
+        int dictionaryIndex = blockValIterator.nextIntVal();
+        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+          if (dataType.isNumber()) {
+            hll.offer(((Number) dictionaryReader.get(dictionaryIndex)));
+          } else {
+            hll.offer(dictionaryReader.get(dictionaryIndex));
+          }
         } else {
-          hll.offer(((Number) dictionaryReader.get(dictionaryIndex)));
+          hll.offer(Integer.MIN_VALUE);
         }
-      } else {
-        hll.offer(Integer.MIN_VALUE);
+      }
+    } else {
+      BlockMultiValIterator blockValIterator = (BlockMultiValIterator) block[0].getBlockValueSet().iterator();
+      int[] entries = new int[block[0].getMetadata().getMaxNumberOfMultiValues()];
+      if (blockValIterator.skipTo(docId)) {
+        int size = blockValIterator.nextIntVal(entries);
+        List<String> list = new ArrayList<String>();
+        for (int i = 0; i < size; ++i) {
+          list.add((dictionaryReader.get(entries[i])).toString());
+        }
+        hll.offer(list.toString());
       }
     }
   }
