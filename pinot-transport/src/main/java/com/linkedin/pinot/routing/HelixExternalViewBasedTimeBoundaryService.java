@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.routing;
 
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -93,11 +94,9 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       return null;
     }
 
-    TimeUnit timeUnit = null;
-    try {
-      timeUnit = TimeUnit.valueOf(timeTypeString);
-    } catch (Exception e) {
-    }
+    TimeUnit timeUnit = TimeUtils.timeUnitFromString(timeTypeString);
+
+    // Check legacy time formats
     if (timeUnit == null) {
       if (timeTypeString.equalsIgnoreCase(DAYS_SINCE_EPOCH)) {
         timeUnit = TimeUnit.DAYS;
@@ -112,6 +111,7 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
         timeUnit = TimeUnit.SECONDS;
       }
     }
+
     if (timeUnit == null) {
       throw new RuntimeException("Not supported time type for: " + timeTypeString);
     }

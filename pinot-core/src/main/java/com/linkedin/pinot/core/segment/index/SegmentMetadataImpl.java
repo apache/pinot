@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -43,6 +44,10 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
 
 /**
@@ -165,8 +170,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
       try {
         TimeUnit segmentTimeUnit =
-            TimeUnit.valueOf(_segmentMetadataPropertiesConfiguration
-                .getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+            TimeUtils.timeUnitFromString(_segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
         _timeGranularity = new Duration(segmentTimeUnit.toMillis(1));
         String startTimeString =
             _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
@@ -288,9 +292,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     TimeUnit segmentTimeUnit = TimeUnit.DAYS;
     if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
-      segmentTimeUnit =
-          TimeUnit.valueOf(_segmentMetadataPropertiesConfiguration
-              .getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+      segmentTimeUnit = TimeUtils.timeUnitFromString(_segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
     }
 
     final boolean hasDictionary =

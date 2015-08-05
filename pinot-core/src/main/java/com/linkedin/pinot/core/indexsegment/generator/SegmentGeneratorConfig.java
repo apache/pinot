@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +32,9 @@ import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
+
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
 
 /**
@@ -151,7 +155,7 @@ public class SegmentGeneratorConfig {
 
   public TimeUnit getTimeUnitForSegment() {
     if (properties.containsKey(MetadataKeys.Segment.TIME_UNIT)) {
-      return TimeUnit.valueOf(properties.get(MetadataKeys.Segment.TIME_UNIT).toString());
+      return TimeUtils.timeUnitFromString(properties.get(TIME_UNIT).toString());
     } else {
       if (schema.getTimeFieldSpec() != null) {
         if (schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {

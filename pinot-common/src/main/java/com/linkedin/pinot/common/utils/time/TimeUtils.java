@@ -15,13 +15,36 @@
  */
 package com.linkedin.pinot.common.utils.time;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 
 public class TimeUtils {
+  private static final Map<String, TimeUnit> TIME_UNIT_MAP = new HashMap<>();
+
+  static {
+    for (TimeUnit timeUnit : TimeUnit.values()) {
+      TIME_UNIT_MAP.put(timeUnit.name(), timeUnit);
+    }
+  }
 
   public static long toMillis(String timeUnitString, String timeValue) {
-    TimeUnit timeUnit = TimeUnit.valueOf(timeUnitString);
+    TimeUnit timeUnit = timeUnitFromString(timeUnitString);
     return timeUnit.toMillis(Long.parseLong(timeValue));
+  }
+
+  /**
+   * Turns a time unit string into a TimeUnit, ignoring case.
+   *
+   * @param timeUnitString The time unit string to convert, such as DAYS or SECONDS.
+   * @return The corresponding time unit or null if it doesn't exist
+   */
+  public static TimeUnit timeUnitFromString(String timeUnitString) {
+    if (timeUnitString == null) {
+      return null;
+    } else {
+      return TIME_UNIT_MAP.get(timeUnitString.toUpperCase());
+    }
   }
 }
