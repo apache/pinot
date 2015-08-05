@@ -13,7 +13,6 @@ import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
-import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.impl.StdSchedulerFactory;
@@ -73,11 +72,6 @@ public class ReportScheduler {
               .withDescription(entry.getKey())
               .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron()))
               .build();
-          /*Trigger trigger = TriggerBuilder.newTrigger()
-              .withDescription(entry.getKey())
-              .startNow()
-              .withSchedule(SimpleScheduleBuilder.simpleSchedule().withRepeatCount(0))
-              .build();*/
           LOGGER.info("Scheduling job {} with trigger {}", job.getDescription(), entry.getValue().getCron());
           quartzScheduler.scheduleJob(job, trigger);
         }

@@ -71,8 +71,8 @@ public class ReportEmailSender {
       }
       emailReportMessage.setSubject(reportConfig.getName());
       emailReportMessage.setContent(emailOutput.toString(), "text/html");
-      LOGGER.info("Sending email from {} to {} with body {} ",
-          scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo(), emailOutput.toString());
+      LOGGER.info("Sending email from {} to {}  ",
+          scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo());
 
       Transport.send(emailReportMessage);
 
