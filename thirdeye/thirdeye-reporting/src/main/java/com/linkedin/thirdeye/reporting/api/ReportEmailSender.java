@@ -45,10 +45,10 @@ public class ReportEmailSender {
     try {
 
       FileTemplateLoader ftl = new FileTemplateLoader(
-          new File(templatePath.substring(0, templatePath.lastIndexOf('/'))));
+          new File(templatePath));
       Configuration emailConfiguration = new Configuration();
       emailConfiguration.setTemplateLoader(ftl);
-      Template emailReportTemplate = emailConfiguration.getTemplate(new File(templatePath).getName());
+      Template emailReportTemplate = emailConfiguration.getTemplate(scheduleSpec.getEmailTemplate());
 
       //TODO: Use POJO with accessors to the keys instead of Map<String, Object>
       Map<String, Object> rootMap = new HashMap<String, Object>();

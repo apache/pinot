@@ -17,13 +17,14 @@ public class ScheduleSpec {
   private String nameTo;
   private String nameFrom;
   private boolean findAnomalies;
+  private String emailTemplate;
 
   public ScheduleSpec() {
 
   }
 
   public ScheduleSpec(String cron, int aggregationSize, TimeUnit aggregationUnit, int reportWindow, int lagSize,
-      TimeUnit lagUnit, String emailTo, String emailFrom, boolean findAnomalies) {
+      TimeUnit lagUnit, String emailTo, String emailFrom, boolean findAnomalies, String emailTemplate) {
     this.cron = cron;
     this.aggregationSize = aggregationSize;
     this.aggregationUnit = aggregationUnit;
@@ -33,6 +34,15 @@ public class ScheduleSpec {
     this.emailTo = emailTo;
     this.emailFrom = emailFrom;
     this.findAnomalies = findAnomalies;
+    this.emailTemplate = emailTemplate;
+  }
+
+  public String getEmailTemplate() {
+    return emailTemplate;
+  }
+
+  public void setEmailTemplate(String emailTemplate) {
+    this.emailTemplate = emailTemplate;
   }
 
   public String getCron() {
