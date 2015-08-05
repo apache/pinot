@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.reporting;
+package com.linkedin.thirdeye.reporting.api.anomaly;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -92,7 +92,8 @@ public class AnomalyReportGenerator {
       }
     }
 
-    int totalViolationCount = reportTableRows.size();
+    // get the total number of violations in this time period
+    int totalViolationCount = anomalyTableRows.size();
 
     // count the number of vioations with all '*' dimensions
     int topLevelViolationCount = 0;

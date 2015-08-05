@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.reporting;
+package com.linkedin.thirdeye.reporting.api.anomaly;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;

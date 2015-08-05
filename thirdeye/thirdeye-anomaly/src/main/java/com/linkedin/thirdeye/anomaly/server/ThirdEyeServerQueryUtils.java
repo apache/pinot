@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -37,10 +38,10 @@ public class ThirdEyeServerQueryUtils {
    * Use a LRU cache based on url to result
    */
   private static boolean enableCache = true;
-  private static ThirdEyeQueryCache<String, StarTreeConfig> starTreeCache = new ThirdEyeQueryCache<>(20);
+  private static ThirdEyeQueryCache<String, StarTreeConfig> starTreeCache = new ThirdEyeQueryCache<>(3);
 
   // It would be more efficient to cache parsed ThirdEyeQueryResult objects, but MetricTimeSeries is not thread safe.
-  private static ThirdEyeQueryCache<String, QueryResult> queryDataCache = new ThirdEyeQueryCache<>(100);
+  private static ThirdEyeQueryCache<String, QueryResult> queryDataCache = new ThirdEyeQueryCache<>(25);
 
   /**
    * @param driverConfig
@@ -49,7 +50,8 @@ public class ThirdEyeServerQueryUtils {
    */
   public static synchronized StarTreeConfig getStarTreeConfig(AnomalyDetectionDriverConfig driverConfig)
       throws IOException {
-    String urlString = "http://" + driverConfig.getThirdEyeServerHost() + ":" + driverConfig.getThirdEyeServerPort() + "/collections/"
+    String urlString = "http://" + driverConfig.getThirdEyeServerHost() + ":" + driverConfig.getThirdEyeServerPort()
+        + "/collections/"
       + driverConfig.getCollectionName();
     LOGGER.info("getting star-tree : {}", urlString);
 
@@ -86,6 +88,7 @@ public class ThirdEyeServerQueryUtils {
   public static synchronized ThirdEyeServerQueryResult runQuery(
       AnomalyDetectionDriverConfig collection,
       Map<String, String> dimensionValues,
+      List<DimensionSpec> dimensionSpecs,
       List<MetricSpec> metricSpecs,
       TimeGranularity aggregationGranularity,
       TimeRange timeRange) throws IOException {
@@ -109,7 +112,7 @@ public class ThirdEyeServerQueryUtils {
       QueryResult cachedQueryResult = queryDataCache.get(urlString);
       if (cachedQueryResult != null) {
         LOGGER.info("cache hit for {}", urlString);
-        return new ThirdEyeServerQueryResult(metricSpecs, cachedQueryResult);
+        return new ThirdEyeServerQueryResult(dimensionSpecs, metricSpecs, cachedQueryResult);
       }
     }
 
@@ -117,7 +120,7 @@ public class ThirdEyeServerQueryUtils {
     QueryResult queryResult = OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")),
         QueryResult.class);
 
-    ThirdEyeServerQueryResult result = new ThirdEyeServerQueryResult(metricSpecs, queryResult);
+    ThirdEyeServerQueryResult result = new ThirdEyeServerQueryResult(dimensionSpecs, metricSpecs, queryResult);
 
     // cache the result
     if (enableCache) {

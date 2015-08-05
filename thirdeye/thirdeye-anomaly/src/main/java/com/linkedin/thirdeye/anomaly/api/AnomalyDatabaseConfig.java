@@ -113,15 +113,6 @@ public class AnomalyDatabaseConfig {
     return JDBC_MYSQL_PREFIX;
   }
 
-  private static final String MYSQL_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
-
-  /**
-   * @return
-   */
-  public String getDateFormat() {
-    return MYSQL_DATE_FORMAT;
-  }
-
   private DataSource dataSource;
 
   /**

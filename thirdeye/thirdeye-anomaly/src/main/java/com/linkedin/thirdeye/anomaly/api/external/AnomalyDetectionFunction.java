@@ -46,9 +46,20 @@ public interface AnomalyDetectionFunction {
    * Computes whether or not this dimension combination + metric time series contains anomalies in the
    * detection interval.
    *
+   * @param dimensionKey
+   *  The dimension combination associated with the series
+   * @param series
+   *  The time series to be analyzed including the training data
+   * @param detectionInterval
+   *  The interval of time to produce anomalies for
+   * @param anomalyHistory
+   *  A list of all previous anomaly results produced by this function
+   *
    * @return
-   *  The list of anomalies in the series
+   *  The list of anomalies in the series. Anomaly results with isAnomaly set to false or not in the detectionInterval
+   *  may be ignored by the driver.
    */
-  List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval);
+  List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval,
+      List<AnomalyResult> anomalyHistory);
 
 }

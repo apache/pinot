@@ -33,14 +33,14 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
-import com.linkedin.thirdeye.anomaly.reporting.AnomalyReportGenerator;
-import com.linkedin.thirdeye.anomaly.reporting.AnomalyReportTable;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGenerator;
+import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
 
 public class ReportGenerator implements Job{

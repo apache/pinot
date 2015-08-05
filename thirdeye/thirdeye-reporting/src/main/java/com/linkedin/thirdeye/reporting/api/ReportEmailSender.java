@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.reporting.api;
 
 import java.io.File;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.HashMap;
@@ -16,7 +18,7 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
-import com.linkedin.thirdeye.anomaly.reporting.AnomalyReportTable;
+import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
 import freemarker.cache.FileTemplateLoader;
 import freemarker.template.Configuration;

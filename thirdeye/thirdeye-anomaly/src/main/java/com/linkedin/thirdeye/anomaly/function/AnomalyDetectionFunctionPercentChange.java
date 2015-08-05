@@ -56,7 +56,8 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval) {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,
+      List<AnomalyResult> anomalyHistory) {
     if (series.getSchema().getNames().contains(metricName) == false) {
       throw new FunctionDidNotEvaluateException("'" + metricName + "' does not exist in the MetricTimeSeries");
     }

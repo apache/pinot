@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -22,9 +23,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 import com.linkedin.thirdeye.anomaly.api.ResultProperties;
+import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.TimeRange;
 
 /**
  *
@@ -36,6 +42,14 @@ public class AnomalyTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyTable.class);
 
   private static final Joiner COMMA = Joiner.on(',');
+  private static final Joiner AND = Joiner.on(" AND ");
+
+  private static final SimpleDateFormat DATE_FORMAT;
+
+  static {
+   DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+   DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+  }
 
   /**
    * @param dbConfig
@@ -67,13 +81,33 @@ public class AnomalyTable {
       List<String> orderBy,
       long startTimeWindow,
       long endTimeWindow) throws SQLException {
+    return selectRows(dbConfig, collection, null, functionName, functionDescription, metrics, topLevelOnly,
+        orderBy, new TimeRange(startTimeWindow, endTimeWindow));
+  }
+
+  public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, int functionId, TimeRange timeRange)
+      throws SQLException {
+    List<String> orderBy = Arrays.asList(new String[]{"time_window"});
+    return selectRows(dbConfig, null, functionId, null, null, null, false, orderBy, null);
+  }
+
+  public static List<AnomalyTableRow> selectRows(
+      AnomalyDatabaseConfig dbConfig,
+        String collection,
+        Integer functionId,
+        String functionName,
+        String functionDescription,
+        Set<String> metrics,
+        boolean topLevelOnly,
+        List<String> orderBy,
+        TimeRange timeRange) throws SQLException {
 
     Connection conn = null;
     Statement stmt = null;
     ResultSet rs = null;
     try {
-      String sql = buildAnomalyTableSelectStatement(dbConfig, functionName, functionDescription, collection,
-          topLevelOnly, orderBy, startTimeWindow, endTimeWindow);
+      String sql = buildAnomalyTableSelectStatement(dbConfig, functionId, functionName,
+          functionDescription, collection, topLevelOnly, orderBy, timeRange);
 
       conn = dbConfig.getConnection();
       stmt = conn.createStatement();
@@ -171,12 +205,7 @@ public class AnomalyTable {
       preparedStmt.setString(3, row.getFunctionDescription());
       preparedStmt.setString(4, row.getFunctionName());
       preparedStmt.setString(5, row.getCollection());
-
-      SimpleDateFormat sdf = new SimpleDateFormat(dbConfig.getDateFormat());
-      sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-      String dateString = sdf.format(row.getTimeWindow());
-      preparedStmt.setString(6, dateString);
-
+      preparedStmt.setString(6, DATE_FORMAT.format(row.getTimeWindow()));
       preparedStmt.setInt(7, row.getNonStarCount());
       preparedStmt.setString(8, row.getDimensions());
       preparedStmt.setDouble(9, row.getDimensionsContribution());
@@ -209,8 +238,8 @@ public class AnomalyTable {
 
   /**
    * @param dbconfig
-   * @param ruleName
-   * @param ruleDescription
+   * @param functionName
+   * @param functionDescription
    * @param collection
    * @param metric
    * @param topLevelOnly
@@ -219,31 +248,50 @@ public class AnomalyTable {
    * @return
    * @throws JsonProcessingException
    */
-  private static String buildAnomalyTableSelectStatement(AnomalyDatabaseConfig dbconfig, String ruleName,
-      String ruleDescription, String collection, boolean topLevelOnly, List<String> orderBy,
-      long startTimeWindow, long endTimeWidnow) {
+  private static String buildAnomalyTableSelectStatement(AnomalyDatabaseConfig dbconfig,
+      Integer functionId,
+      String functionName,
+      String functionDescription,
+      String collection,
+      boolean topLevelOnly,
+      List<String> orderBy,
+      TimeRange timeRange)
+  {
     StringBuilder sb = new StringBuilder();
-    sb.append("SELECT * FROM ").append(dbconfig.getAnomalyTableName()).append(" WHERE");
+    sb.append("SELECT * FROM ").append(dbconfig.getAnomalyTableName()).append(" WHERE ");
+
+    List<String> whereClause = new LinkedList<>();
+
+    if (dbconfig.getFunctionTableName() != null) {
+      whereClause.add("function_table = '" + dbconfig.getFunctionTableName() + "'");
+    }
+
+    if (functionId != null) {
+      whereClause.add("function_id = '" + functionId + "'");
+    }
 
     if (collection != null) {
-      sb.append(" collection = '" + collection + "' AND");
+      whereClause.add("collection = '" + collection + "'");
     }
 
-    if (ruleName != null) {
-      sb.append(" function_name = '" + ruleName + "' AND");
+    if (functionName != null) {
+      whereClause.add("function_name = '" + functionName + "'");
     }
 
-    if (ruleDescription != null) {
-      sb.append(" function_description LIKE '" + ruleDescription + "' AND");
+    if (functionDescription != null) {
+      whereClause.add("function_description LIKE '" + functionDescription + "'");
     }
 
     if (topLevelOnly) {
-      sb.append(" non_star_count = 0 AND");
+      whereClause.add("non_star_count = 0");
     }
 
-    SimpleDateFormat sdf = new SimpleDateFormat(dbconfig.getDateFormat());
-    sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-    sb.append(" time_window BETWEEN '" + sdf.format(startTimeWindow) + "' AND '" + sdf.format(endTimeWidnow)+ "'");
+    if (timeRange != null) {
+      whereClause.add("time_window BETWEEN '" + DATE_FORMAT.format(timeRange.getStart()) + "' AND '" +
+          DATE_FORMAT.format(timeRange.getEnd())+ "'");
+    }
+
+    sb.append(AND.join(whereClause));
 
     if (orderBy != null && orderBy.size() > 0) {
       sb.append(" ORDER BY ").append(COMMA.join(orderBy));
