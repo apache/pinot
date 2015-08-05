@@ -48,7 +48,11 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 public class AvroQueryGenerator {
 
-  public static class TestSimpleAggreationQuery {
+  public interface TestAggreationQuery {
+    String getPql();
+  }
+
+  public static class TestSimpleAggreationQuery implements TestAggreationQuery {
     public final String pql;
     public final Double result;
 
@@ -61,9 +65,14 @@ public class AvroQueryGenerator {
     public String toString() {
       return pql + " : " + result;
     }
+
+    @Override
+    public String getPql() {
+      return pql;
+    }
   }
 
-  public static class TestGroupByAggreationQuery {
+  public static class TestGroupByAggreationQuery implements TestAggreationQuery {
     public final String pql;
     public final Map<Object, Double> groupResults;
 
@@ -80,6 +89,11 @@ public class AvroQueryGenerator {
         bld.append(key + ":" + groupResults.get(key) + ",");
       }
       return bld.toString();
+    }
+
+    @Override
+    public String getPql() {
+      return pql;
     }
   }
 

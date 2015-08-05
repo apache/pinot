@@ -31,6 +31,10 @@ import com.linkedin.pinot.core.query.aggregation.function.MinAggregationNoDictio
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.Quantile50;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.Quantile90;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.Quantile95;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.QuantileAccurate50;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +60,11 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("avg", AvgAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcount", DistinctCountAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcounthll", DistinctCountHLLAggregationFunction.class);
+    // quantiles
+    keyToFunctionWithDictionary.put("quantile95", Quantile95.class);
+    keyToFunctionWithDictionary.put("quantile90", Quantile90.class);
+    keyToFunctionWithDictionary.put("quantile50", Quantile50.class);
+    keyToFunctionWithDictionary.put("quantileacc50", QuantileAccurate50.class);
   }
 
   static {
