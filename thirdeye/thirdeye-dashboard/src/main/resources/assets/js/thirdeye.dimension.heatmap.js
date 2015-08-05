@@ -1,11 +1,21 @@
 $(document).ready(function() {
+
+  heatMapSettings();
+  $("#dimension-heat-map-filter").on("change", function(){
+        heatMapSettings();
+  });
+
+
+  function heatMapSettings(){
     var data = $("#dimension-heat-map-data")
     var container = $("#dimension-heat-map-container")
 
     var options = {
-        filter: function(cell) {
-            return Math.abs(cell.stats['volume_difference']) > 0.005 // only show those w/ 0.5% or greater change
-        },
+        filter: $("#dimension-heat-map-filter").prop( "checked" ) ?
+          function(cell) {
+            var volumeDifference = Math.abs(cell.stats['volume_difference'])
+            return  volumeDifference > 0.05
+          } : null,
         comparator: function(a, b) {
             var cmp = b.stats['current_value'] - a.stats['current_value'] // reverse
             if (cmp < 0) {
@@ -49,4 +59,5 @@ $(document).ready(function() {
     }
 
     renderHeatMap(data, container, options)
+   }
 })

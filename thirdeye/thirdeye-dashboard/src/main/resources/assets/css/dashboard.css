@@ -164,8 +164,21 @@
     border-collapse: collapse;
 }
 
-#dimension-heat-map-help {
+.heat-map-icons{
     float: right;
+}
+
+#dimension-heat-map-help{
+    margin-right: 10px;
+}
+
+.dimension-heat-map-filter label{
+    position: relative;
+    left: -25px;
+}
+
+#dimension-heat-map-container td{
+    border: 1px solid #ddd;
 }
 
 .cell-up, .cell-down {
