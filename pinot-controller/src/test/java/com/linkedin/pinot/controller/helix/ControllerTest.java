@@ -57,10 +57,14 @@ public abstract class ControllerTest {
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixManager _helixZkManager;
 
-  public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
+  public JSONObject postQuery(String query, String brokerBaseApiUrl, boolean usePql2Compiler) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
     json.put("trace", isTraceEnabled);
+
+    if (usePql2Compiler) {
+      json.put("dialect", "pql2");
+    }
 
     final long start = System.currentTimeMillis();
     final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();
@@ -92,7 +96,7 @@ public abstract class ControllerTest {
   }
 
   public JSONObject postQuery(String query) throws Exception {
-    return postQuery(query, BROKER_BASE_API_URL);
+    return postQuery(query, BROKER_BASE_API_URL, false);
   }
 
   protected void startZk() {

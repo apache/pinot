@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,8 +32,8 @@ import com.linkedin.pinot.pql.parsers.PQLParser;
 
 public class PQLCompiler extends AbstractCompiler {
   // A map containing facet type and data type info for a facet
-  private Map<String, String[]> _facetInfoMap = new HashMap<String, String[]>();
-  private ThreadLocal<PQLParser> _parser = new ThreadLocal<PQLParser>();
+  private Map<String, String[]> _facetInfoMap = new HashMap<>();
+  private ThreadLocal<PQLParser> _parser = new ThreadLocal<>();
 
   public PQLCompiler(Map<String, String[]> facetInfoMap) {
     _facetInfoMap = facetInfoMap;
@@ -57,6 +58,11 @@ public class PQLCompiler extends AbstractCompiler {
     // printTree(ast);
     // System.out.println(">>> json = " + json.toString());
     return json;
+  }
+
+  @Override
+  public BrokerRequest compileToBrokerRequest(String expression) {
+    return null;
   }
 
   @Override

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.servlet;
 
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.Arrays;
@@ -47,7 +48,8 @@ import com.linkedin.pinot.transport.common.SegmentId;
 
 
 public class PinotClientRequestServlet extends HttpServlet {
-  private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
+  private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<>());
+  private static final Pql2Compiler pql2Compiler = new Pql2Compiler();
 
   private static final long serialVersionUID = -3516093545255816357L;
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequestServlet.class);
@@ -110,8 +112,12 @@ public class PinotClientRequestServlet extends HttpServlet {
     final long startTime = System.nanoTime();
     final BrokerRequest brokerRequest;
     try {
-      final JSONObject compiled = requestCompiler.compile(pql);
-      brokerRequest = convertToBrokerRequest(compiled);
+      if (request.has("dialect") && "pql2".equals(request.getString("dialect"))) {
+        brokerRequest = pql2Compiler.compileToBrokerRequest(pql);
+      } else {
+        final JSONObject compiled = requestCompiler.compile(pql);
+        brokerRequest = convertToBrokerRequest(compiled);
+      }
       if (isTraceEnabled) brokerRequest.setEnableTrace(true);
     } catch (Exception e) {
       BrokerResponse brokerResponse = new BrokerResponse();
@@ -141,7 +147,7 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {
-    final Map<SegmentId, ServerInstance> bucketMap = new HashMap<SegmentId, ServerInstance>();
+    final Map<SegmentId, ServerInstance> bucketMap = new HashMap<>();
     return new BucketingSelection(bucketMap);
   }
 

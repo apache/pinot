@@ -15,8 +15,11 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 
@@ -63,6 +66,18 @@ public class EqualityUtils {
   public static boolean isEqual(Collection left, Collection right) {
     if (left != null && right != null) {
       return left.toString().equals(right.toString());
+    } else {
+      return left == right;
+    }
+  }
+
+  public static boolean isEqualIgnoringOrder(List left, List right) {
+    if (left != null && right != null) {
+      ArrayList sortedLeft = new ArrayList(left);
+      ArrayList sortedRight = new ArrayList(right);
+      Collections.sort(sortedLeft);
+      Collections.sort(sortedRight);
+      return sortedLeft.toString().equals(sortedRight.toString());
     } else {
       return left == right;
     }

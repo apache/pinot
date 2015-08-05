@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
 import org.antlr.runtime.RecognitionException;
 import org.antlr.runtime.tree.CommonTree;
 import org.json.JSONObject;
@@ -27,6 +28,8 @@ public abstract class AbstractCompiler {
   }
 
   public abstract JSONObject compile(String expression) throws RecognitionException;
+
+  public abstract BrokerRequest compileToBrokerRequest(String expression);
 
   public abstract String getErrorMessage(RecognitionException error);
 
