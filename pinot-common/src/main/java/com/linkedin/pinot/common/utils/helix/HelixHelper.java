@@ -126,8 +126,8 @@ public class HelixHelper {
    * @param clusterName Name of the cluster for which to get all the instances for.
    * @return Returns a List of strings containing the instance names for the given cluster.
    */
-  public static List<String> getAllInstances(HelixAdmin admin, String clusterName) {
-    return admin.getInstancesInCluster(clusterName);
+  public static List<String> getAllInstances(HelixAdmin helixAdmin, String clusterName) {
+    return helixAdmin.getInstancesInCluster(clusterName);
   }
 
   /**
@@ -136,11 +136,11 @@ public class HelixHelper {
    * @param idealState IdealState of the resource for which to return the instances of.
    * @return Returns a Set of strings containing the instance names for the given cluster.
    */
-  public static Set<String> getAllInstancesForResource(IdealState state) {
+  public static Set<String> getAllInstancesForResource(IdealState idealState) {
     final Set<String> instances = new HashSet<String>();
 
-    for (final String partition : state.getPartitionSet()) {
-      for (final String instance : state.getInstanceSet(partition)) {
+    for (final String partition : idealState.getPartitionSet()) {
+      for (final String instance : idealState.getInstanceSet(partition)) {
         instances.add(instance);
       }
     }
@@ -259,7 +259,7 @@ public class HelixHelper {
    * Returns the set of online instances from external view.
    *
    * @param resourceExternalView External view for the resource.
-   * @return Set<String> of online instances in the external view for the resource.
+   * @return Set&lt;String&gt; of online instances in the external view for the resource.
    */
   public static Set<String> getOnlineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
@@ -329,14 +329,14 @@ public class HelixHelper {
    * @param getInstancesForSegment Callable returning list of instances where the segment should be uploaded.
    */
   public static void addSegmentToIdealState(HelixManager helixManager, String tableName, final String segmentName,
-      final Callable<List<String>> getIntancesForSegment) {
+      final Callable<List<String>> getInstancesForSegment) {
 
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(IdealState idealState) {
         List<String> targetInstances = null;
         try {
-          targetInstances = getIntancesForSegment.call();
+          targetInstances = getInstancesForSegment.call();
         } catch (Exception e) {
           LOGGER.error("Unable to get new instances for segment uploading.");
           return null;

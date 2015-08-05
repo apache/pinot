@@ -86,7 +86,7 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
    *   List all tables of specified type, type can be one of {offline|realtime}.
    *
    *   Set the state for the specified {tableName} to the specified {state} (enable|disable|drop).
-   *   * - "/tables/{tableName}?state={state}&type={type}"
+   *   * - "/tables/{tableName}?state={state}&amp;type={type}"
    *
    *   Set the state for the specified {tableName} of specified type to the specified {state} (enable|disable|drop).
    *   Type here is type of the table, one of 'offline|realtime'.
