@@ -302,8 +302,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testQuantileNoGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"quantile50", "quantileacc50"},
-            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */},
+            new String[]{"quantileacc50", "quantile50"},
+            new String[]{"AirTime"/* int */, "ArrTime"/* int */},
             null,
             0.05);
   }
@@ -311,13 +311,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testQuantileGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"quantile50", "quantileacc50"},
-            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */},
+            new String[]{"quantileacc50", "quantile50"},
+            new String[]{"AirTime"/* int */, "ArrTime"/* int */},
             "Carrier",
             0.05);
   }
 
 
+  /**
+   *
+   * @param functionNames: accurate function comes first
+   * @param testColumns
+   * @param groupByColumn
+   * @param precision
+   * @throws Exception
+   */
   private void testApproximationQuery(String[] functionNames, String[] testColumns, String groupByColumn, double precision) throws Exception {
     String query;
     boolean hasWhere = true;

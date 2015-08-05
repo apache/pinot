@@ -65,7 +65,8 @@ public class TestUtils {
    * @param actual
    */
   public static void assertApproximation(double estimate, double actual, double precision) {
-    if (estimate < 100 && actual < 100) {
+    int threshold = 1000;
+    if (Math.abs(estimate) < threshold && Math.abs(actual) < threshold) {
       double error = Math.abs(actual - estimate + 0.0);
       LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in difference): " + error);
       LOGGER.info("small value comparison ignored!");
