@@ -22,10 +22,10 @@
       </#list>
   </table><br>
 
-  <#if (row.dimensionSchema)??>
-    Using dimensions: ${row.dimensionSchema}
+  <#if (anomalytable.dimensionSchema)??>
+    Using dimensions: ${anomalytable.dimensionSchema}
   </#if><br>
-
+  <br>
   <table border=1>
       <tr>
         <td width=200><b>Number of (top-level) violations</b></td>

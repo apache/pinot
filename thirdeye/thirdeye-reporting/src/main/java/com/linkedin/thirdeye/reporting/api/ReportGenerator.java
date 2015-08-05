@@ -53,6 +53,7 @@ public class ReportGenerator implements Job{
   private String serverUri;
   private String dashboardUri;
   private ReportConfig reportConfig;
+  private String templatePath;
   private StarTreeConfig starTreeConfig;
 
   @Override
@@ -62,6 +63,7 @@ public class ReportGenerator implements Job{
     try {
       File reportConfigFile = new File(context.getJobDetail().getJobDataMap().get(ReportConstants.CONFIG_FILE_KEY).toString());
       reportConfig = ReportConfig.decode(new FileInputStream(reportConfigFile));
+      templatePath = context.getJobDetail().getJobDataMap().getString(ReportConstants.TEMPLATE_PATH_KEY).toString();
       collection = reportConfig.getCollection();
       serverUri = context.getJobDetail().getJobDataMap().get(ReportConstants.SERVER_URI_KEY).toString();
       dashboardUri = context.getJobDetail().getJobDataMap().getString(ReportConstants.DASHBOARD_URI_KEY.toString());
@@ -76,6 +78,8 @@ public class ReportGenerator implements Job{
       List<Table> tables = new ArrayList<Table>();
       List<AnomalyReportTable> anomalyReportTables = new ArrayList<AnomalyReportTable>();
       for (TableSpec tableSpec : reportConfig.getTables()) {
+
+        LOGGER.info("Collecting data for table {}", tableSpec);
 
         int baselineSize = tableSpec.getBaselineSize();
         TimeUnit baselineUnit = tableSpec.getBaselineUnit();
@@ -137,11 +141,14 @@ public class ReportGenerator implements Job{
         calculateSummaryRow(metricTableRows, tableSpec);
         groupBy = getGroupBy(metricTableRows);
 
-        if (scheduleSpec.isFindAnomalies()) {
+        if (scheduleSpec.isFindAnomalies() && reportConfig.getDbconfig() != null) {
+          LOGGER.info("Finding anomalies...");
           anomalyReportTables.addAll(getAnomalies(tableSpec));
         }
 
         URL thirdeyeUri = getThirdeyeURL(tableSpec, scheduleSpec);
+        LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
+
         Table table = new Table(metricTableRows, tableSpec, groupBy, thirdeyeUri);
         tables.add(table);
       }
@@ -151,7 +158,8 @@ public class ReportGenerator implements Job{
       }
 
 
-      ReportEmailSender reportEmailSender = new ReportEmailSender(tables, scheduleSpec, reportConfig, anomalyReportTables);
+      ReportEmailSender reportEmailSender = new ReportEmailSender(tables, scheduleSpec,
+          reportConfig, anomalyReportTables, templatePath);
       reportEmailSender.emailReport();
 
     } catch (IOException e) {
@@ -167,9 +175,11 @@ public class ReportGenerator implements Job{
 
 
   private List<AnomalyReportTable> getAnomalies(TableSpec tableSpec) throws IOException {
+    DBSpec dbSpec = reportConfig.getDbconfig();
     List<AnomalyReportTable> anomalyTables = new ArrayList<AnomalyReportTable>();
     for (String metric : tableSpec.getMetrics()) {
-      AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig("jhong-ld1/thirdeye", "rule", "anomaly", "alert", "", false);
+      AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig(dbSpec.getUrl(), dbSpec.getFunctionTableName(), dbSpec.getAnomalyTableName(),
+          dbSpec.getUser(), dbSpec.getPassword(), dbSpec.isUseConnectionPool());
       AnomalyReportGenerator anomalyReportGenerator = new AnomalyReportGenerator(dbConfig);
       anomalyTables.add(anomalyReportGenerator.getAnomalyTable(collection, metric, reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20));
     }

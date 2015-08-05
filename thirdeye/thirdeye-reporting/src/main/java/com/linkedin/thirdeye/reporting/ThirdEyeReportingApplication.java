@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.reporting;
 
 import java.io.File;
-import java.util.concurrent.ExecutorService;
 
 import org.quartz.SchedulerException;
 import com.linkedin.thirdeye.reporting.api.ReportScheduler;
@@ -41,6 +40,7 @@ public class ThirdEyeReportingApplication extends Application<ThirdEyeReportingC
                     final Environment environment) throws SchedulerException {
 
      final ReportScheduler reportScheduler = new ReportScheduler(new File(configuration.getReportConfigPath()),
+          configuration.getReportEmailTemplatePath(),
           configuration.getServerUri(),
           configuration.getDashboardUri());
 
@@ -49,7 +49,7 @@ public class ThirdEyeReportingApplication extends Application<ThirdEyeReportingC
         @Override
         public void start() throws Exception {
           reportScheduler.start();
-          }
+        }
 
         @Override
         public void stop() throws Exception {

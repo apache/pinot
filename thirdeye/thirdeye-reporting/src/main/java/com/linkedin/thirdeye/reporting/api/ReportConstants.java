@@ -8,7 +8,8 @@ public final class ReportConstants {
   public static String YAML_FILE_SUFFIX = ".yml";
   public static String CONFIG_FILE_KEY = "CONFIG_FILE_KEY";
   public static String SERVER_URI_KEY = "SERVER_URI_KEY";
-  public static final String DASHBOARD_URI_KEY = "DASHBOARD_URI_KEY";
+  public static String DASHBOARD_URI_KEY = "DASHBOARD_URI_KEY";
+  public static String TEMPLATE_PATH_KEY = "TEMPLATE_PATH_KEY";
   public static String QUERY_EXECUTOR = "QUERY_EXECUTOR_KEY";
   public static String REPORT_CONFIG_OBJECT = "reportConfig";
   public static String TABLES_OBJECT = "tables";

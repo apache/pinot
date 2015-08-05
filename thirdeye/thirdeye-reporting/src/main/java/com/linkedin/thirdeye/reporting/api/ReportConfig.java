@@ -9,6 +9,7 @@ import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 
 public class ReportConfig {
 
@@ -21,9 +22,22 @@ public class ReportConfig {
   private DateTime endTime;
   private DateTime startTime;
   private Map<String, ScheduleSpec> schedules;
+  private DBSpec dbconfig;
+
 
   public ReportConfig() {
 
+  }
+
+
+
+  public DBSpec getDbconfig() {
+    return dbconfig;
+  }
+
+
+  public void setDbconfig(DBSpec dbconfig) {
+    this.dbconfig = dbconfig;
   }
 
   public DateTime getEndTime() {
