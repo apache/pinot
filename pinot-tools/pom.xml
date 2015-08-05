@@ -146,7 +146,7 @@
           <extraJvmArguments>-Xms32G -Xmx32G -Dlog4j.configuration=conf/quickstart-log4j.properties</extraJvmArguments>
           <!-- Generate bin scripts for windows and unix pr default -->
 
-          <assembleDirectory>${project.build.directory}/sbin</assembleDirectory>
+          <!--<assembleDirectory>${project.build.directory}/sbin</assembleDirectory>-->
           <platforms>
             <platform>unix</platform>
           </platforms>

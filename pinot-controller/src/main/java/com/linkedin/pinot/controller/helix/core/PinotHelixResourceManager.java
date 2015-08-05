@@ -1036,7 +1036,7 @@ public class PinotHelixResourceManager {
           }
         } else {
           String msg =
-              "Not refreshing identical segment " + segmentMetadata.getName() + " with creation time "
+              "#######Not refreshing identical segment " + segmentMetadata.getName() + " with creation time "
                   + segmentMetadata.getIndexCreationTime() + " and crc " + segmentMetadata.getCrc();
           LOGGER.info(msg);
           res.status = STATUS.success;
@@ -1049,17 +1049,19 @@ public class PinotHelixResourceManager {
         offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
         LOGGER.info("Added segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
-
+//        LOGGER.info("segment data is:"+segmentMetadata.toString());
         AbstractTableConfig offlineTableConfig =
             ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getTableName());
+        LOGGER.info("above is zk problem");
+        //fixme
         final IdealState idealState =
             PinotTableIdealStateBuilder.addNewOfflineSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
                 _helixClusterName, getPropertyStore(), ControllerTenantNameBuilder
                     .getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig().getServer()));
+        LOGGER.info("above is ideal state");
         _helixAdmin.setResourceIdealState(_helixClusterName,
             TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()), idealState);
-          //TODO here to test rebalabce
-          _helixAdmin.rebalance(_helixClusterName, idealState, (List) getAllInstancesForTable(segmentMetadata.getTableName()));
+        LOGGER.info("##########IDEALSTATE is:"+idealState.toString());
         res.status = STATUS.success;
       }
     } catch (final Exception e) {

@@ -15,12 +15,9 @@
  */
 package com.linkedin.pinot.common.utils.helix;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -34,9 +31,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import java.util.*;
 
 
 public class HelixHelper {
@@ -92,12 +87,14 @@ public class HelixHelper {
 
   public static Set<String> getAllInstancesForResource(IdealState state) {
     final Set<String> instances = new HashSet<String>();
-
+    IdealState.RebalanceMode rebalanceMode = state.getRebalanceMode();
+    state.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
     for (final String partition : state.getPartitionSet()) {
       for (final String instance : state.getInstanceSet(partition)) {
         instances.add(instance);
       }
     }
+    state.setRebalanceMode(rebalanceMode);
     return instances;
   }
 
