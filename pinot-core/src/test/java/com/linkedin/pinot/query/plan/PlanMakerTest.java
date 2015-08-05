@@ -396,9 +396,9 @@ public class PlanMakerTest {
     System.out.println(instanceResponse.getDouble(0, 1));
     System.out.println(instanceResponse.getDouble(0, 2));
     System.out.println(instanceResponse.getDouble(0, 3));
-    System.out.println(instanceResponse.getObject(0, 4));
-    System.out.println(instanceResponse.getObject(0, 5));
-    System.out.println(instanceResponse.getObject(0, 6));
+    System.out.println(instanceResponse.getObject(0, 4).toString());
+    System.out.println(instanceResponse.getObject(0, 5).toString());
+    System.out.println(instanceResponse.getObject(0, 6).toString());
     System.out.println("Query time: " + instanceResponse.getMetadata().get("timeUsedMs"));
     Assert.assertEquals(200001L * _indexSegmentList.size(), instanceResponse.getLong(0, 0));
     Assert.assertEquals(20000100000.0 * _indexSegmentList.size(), instanceResponse.getDouble(0, 1));
