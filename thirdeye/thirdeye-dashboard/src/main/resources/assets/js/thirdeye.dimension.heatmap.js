@@ -13,8 +13,7 @@ $(document).ready(function() {
     var options = {
         filter: $("#dimension-heat-map-filter").prop( "checked" ) ?
           function(cell) {
-            var volumeDifference = Math.abs(cell.stats['volume_difference'])
-            return  volumeDifference > 0.05
+            return  Math.abs(cell.stats['volume_difference']) > 0.005 // only show those w/ 0.5% or greater change
           } : null,
         comparator: function(a, b) {
             var cmp = b.stats['current_value'] - a.stats['current_value'] // reverse
