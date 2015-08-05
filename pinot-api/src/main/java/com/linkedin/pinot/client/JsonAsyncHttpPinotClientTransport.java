@@ -52,57 +52,69 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       final Future<Response> response = _httpClient.preparePost(url).setBody(json.toString()).execute();
 
-      return new Future<BrokerResponse>() {
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-          return response.cancel(mayInterruptIfRunning);
-        }
-
-        @Override
-        public boolean isCancelled() {
-          return response.isCancelled();
-        }
-
-        @Override
-        public boolean isDone() {
-          return response.isDone();
-        }
-
-        @Override
-        public BrokerResponse get()
-            throws InterruptedException, ExecutionException {
-          try {
-            return get(1000L, TimeUnit.DAYS);
-          } catch (TimeoutException e) {
-            LOGGER.error("Caught timeout during synchronous get", e);
-            throw new InterruptedException();
-          }
-        }
-
-        @Override
-        public BrokerResponse get(long timeout, TimeUnit unit)
-            throws InterruptedException, ExecutionException, TimeoutException {
-          try {
-            LOGGER.debug("Sending query {} to {}", query, url);
-
-            Response httpResponse = response.get(timeout, unit);
-
-            LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
-
-            if (httpResponse.getStatusCode() != 200) {
-              throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() +
-                  ", expected 200");
-            }
-
-            String responseBody = httpResponse.getResponseBody();
-            return BrokerResponse.fromJson(new JSONObject(responseBody));
-          } catch (Exception e) {
-            throw new ExecutionException(e);
-          }
-        }
-      };
+      return new BrokerResponseFuture(response, query, url);
     } catch (Exception e) {
       throw new PinotClientException(e);
+    }
+  }
+
+  private static class BrokerResponseFuture implements Future<BrokerResponse> {
+    private final Future<Response> _response;
+    private final String _query;
+    private final String _url;
+
+    public BrokerResponseFuture(Future<Response> response, String query, String url) {
+      _response = response;
+      _query = query;
+      _url = url;
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      return _response.cancel(mayInterruptIfRunning);
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return _response.isCancelled();
+    }
+
+    @Override
+    public boolean isDone() {
+      return _response.isDone();
+    }
+
+    @Override
+    public BrokerResponse get()
+        throws InterruptedException, ExecutionException {
+      try {
+        return get(1000L, TimeUnit.DAYS);
+      } catch (TimeoutException e) {
+        LOGGER.error("Caught timeout during synchronous get", e);
+        throw new InterruptedException();
+      }
+    }
+
+    @Override
+    public BrokerResponse get(long timeout, TimeUnit unit)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      try {
+        LOGGER.debug("Sending query {} to {}", _query, _url);
+
+        Response httpResponse = _response.get(timeout, unit);
+
+        LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
+
+        if (httpResponse.getStatusCode() != 200) {
+          throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() +
+              ", expected 200");
+        }
+
+        String responseBody = httpResponse.getResponseBody();
+        return BrokerResponse.fromJson(new JSONObject(responseBody));
+      } catch (Exception e) {
+        throw new ExecutionException(e);
+      }
     }
   }
 }
