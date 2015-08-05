@@ -44,11 +44,13 @@ public class ReportEmailSender {
 
     try {
 
-      FileTemplateLoader ftl = new FileTemplateLoader(new File(templatePath));
+      FileTemplateLoader ftl = new FileTemplateLoader(
+          new File(templatePath.substring(0, templatePath.lastIndexOf('/'))));
       Configuration emailConfiguration = new Configuration();
       emailConfiguration.setTemplateLoader(ftl);
-      Template emailReportTemplate = emailConfiguration.getTemplate("thirdeye-report-email-template.ftl");
+      Template emailReportTemplate = emailConfiguration.getTemplate(new File(templatePath).getName());
 
+      //TODO: Use POJO with accessors to the keys instead of Map<String, Object>
       Map<String, Object> rootMap = new HashMap<String, Object>();
       rootMap.put(ReportConstants.REPORT_CONFIG_OBJECT, reportConfig);
       rootMap.put(ReportConstants.TABLES_OBJECT, tables);
