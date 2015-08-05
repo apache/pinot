@@ -21,5 +21,5 @@ package com.linkedin.pinot.transport.common;
  */
 public class NoneType {
 
-  public static NoneType NONE = new NoneType();
+  public static final NoneType NONE = new NoneType();
 }
