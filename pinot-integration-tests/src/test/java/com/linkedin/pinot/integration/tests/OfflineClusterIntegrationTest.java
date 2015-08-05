@@ -279,24 +279,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
    */
   @Test
   public void testDistinctCountHLLNoGroupByQuery() throws Exception {
-    String query;
-    String[] testColumns = new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */, "Carrier"/* string */};
-    boolean hasWhere = true;
-    LOGGER.debug("========================== Test Total " + testColumns.length * 2 + " Queries ==========================");
-    for (String column: testColumns) {
-      for (int i = 0; i < 2; i++) {
-        query = "select distinctcount(" + column + ") from 'mytable'";
-        if (hasWhere) {
-          query += " where DaysSinceEpoch >= 16312";
-        }
-        double accurate = Double.parseDouble(getSingleStringValueFromJSONAggregationResults(postQuery(query)));
-        query = query.replace("distinctcount", "distinctcounthll");
-        double estimate = Double.parseDouble(getSingleStringValueFromJSONAggregationResults(postQuery(query)));
-        TestUtils.assertApproximation(estimate, accurate, 0.1);
-        LOGGER.debug("========================== End ==========================");
-        hasWhere = !hasWhere;
-      }
-    }
+    testApproximationQuery(
+            new String[]{"distinctcount", "distinctcounthll"},
+            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */, "Carrier"/* string */},
+            null,
+            0.1);
   }
 
   /**
@@ -305,21 +292,55 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
    */
   @Test
   public void testDistinctCountHLLGroupByQuery() throws Exception {
+    testApproximationQuery(
+            new String[]{"distinctcount", "distinctcounthll"},
+            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */},
+            "Carrier",
+            0.1);
+  }
+
+  @Test
+  public void testQuantileNoGroupByQuery() throws Exception {
+    testApproximationQuery(
+            new String[]{"quantile50", "quantileacc50"},
+            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */},
+            null,
+            0.05);
+  }
+
+  @Test
+  public void testQuantileGroupByQuery() throws Exception {
+    testApproximationQuery(
+            new String[]{"quantile50", "quantileacc50"},
+            new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */},
+            "Carrier",
+            0.05);
+  }
+
+
+  private void testApproximationQuery(String[] functionNames, String[] testColumns, String groupByColumn, double precision) throws Exception {
     String query;
-    String[] testColumns = new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */};
     boolean hasWhere = true;
     LOGGER.debug("========================== Test Total " + testColumns.length * 2 + " Queries ==========================");
     for (String column: testColumns) {
       for (int i = 0; i < 2; i++) {
-        query = "select distinctcount(" + column + ") from 'mytable'";
+        query = "select " + functionNames[0] + "(" + column + ") from 'mytable'";
         if (hasWhere) {
           query += " where DaysSinceEpoch >= 16312";
         }
-        query += " group by Carrier";
-        JSONArray accurate = getGroupByArrayFromJSONAggregationResults(postQuery(query));
-        query = query.replace("distinctcount", "distinctcounthll");
-        JSONArray estimate = getGroupByArrayFromJSONAggregationResults(postQuery(query));
-        TestUtils.assertJSONArrayApproximation(estimate, accurate, 0.1);
+        if (groupByColumn != null) {
+          query += " group by " + groupByColumn;
+          JSONArray accurate = getGroupByArrayFromJSONAggregationResults(postQuery(query));
+          query = query.replace(functionNames[0], functionNames[1]);
+          JSONArray estimate = getGroupByArrayFromJSONAggregationResults(postQuery(query));
+          TestUtils.assertJSONArrayApproximation(estimate, accurate, precision);
+        } else {
+          double accurate = Double.parseDouble(getSingleStringValueFromJSONAggregationResults(postQuery(query)));
+          query = query.replace(functionNames[0], functionNames[1]);
+          double estimate = Double.parseDouble(getSingleStringValueFromJSONAggregationResults(postQuery(query)));
+          TestUtils.assertApproximation(estimate, accurate, precision);
+          //
+        }
         LOGGER.debug("========================== End ==========================");
         hasWhere = !hasWhere;
       }
