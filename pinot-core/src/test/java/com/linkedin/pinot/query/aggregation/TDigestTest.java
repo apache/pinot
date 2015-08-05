@@ -41,8 +41,8 @@ import static org.testng.Assert.assertEquals;
 public class TDigestTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(TDigestTest.class);
     private static final int compressionFactor = 100;
-    private static final HashMap<Byte, TDigestFunction> functionMap = new HashMap<Byte, TDigestFunction>();
-    private static final HashMap<Byte, QuantileAccurateFunction> accurateFunctionMap = new HashMap<Byte, QuantileAccurateFunction>();
+    private static final HashMap<Byte, QuantileTDigestAggregationFunction> functionMap = new HashMap<Byte, QuantileTDigestAggregationFunction>();
+    private static final HashMap<Byte, QuantileAccurateAggregationFunction> accurateFunctionMap = new HashMap<Byte, QuantileAccurateAggregationFunction>();
 
     public static int[] _docIdsArray;
     public static IntArray _docIds;
@@ -60,9 +60,9 @@ public class TDigestTest {
         functionMap.put((byte) 90, new Quantile90());
         functionMap.put((byte) 95, new Quantile95());
 
-        accurateFunctionMap.put((byte) 50, new QuantileAccurateFunction((byte) 50));
-        accurateFunctionMap.put((byte) 90, new QuantileAccurateFunction((byte) 90));
-        accurateFunctionMap.put((byte) 95, new QuantileAccurateFunction((byte) 95));
+        accurateFunctionMap.put((byte) 50, new QuantileAccurateAggregationFunction((byte) 50));
+        accurateFunctionMap.put((byte) 90, new QuantileAccurateAggregationFunction((byte) 90));
+        accurateFunctionMap.put((byte) 95, new QuantileAccurateAggregationFunction((byte) 95));
     }
 
     @BeforeClass
@@ -443,8 +443,8 @@ public class TDigestTest {
     }
 
     // others
-    private TDigestFunction getQuantileAggregationFunction(byte quantile) {
-        TDigestFunction ret = functionMap.get(quantile);
+    private QuantileTDigestAggregationFunction getQuantileAggregationFunction(byte quantile) {
+        QuantileTDigestAggregationFunction ret = functionMap.get(quantile);
         if (ret != null) {
             return ret;
         }

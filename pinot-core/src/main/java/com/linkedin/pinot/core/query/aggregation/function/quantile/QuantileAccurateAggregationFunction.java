@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -41,14 +40,14 @@ import java.util.List;
  * it will sort a large list which incurs significant overhead.
  *
  */
-public class QuantileAccurateFunction implements AggregationFunction<DoubleArrayList, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileAccurateFunction.class);
+public class QuantileAccurateAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileAccurateAggregationFunction.class);
   public static final int DEFAULT_COMPRESSION_FACTOR = 100;
 
   private String _columnName;
   private byte _quantile; // 0-100
 
-  public QuantileAccurateFunction(byte quantile) {
+  public QuantileAccurateAggregationFunction(byte quantile) {
     _quantile = quantile;
   }
 
@@ -64,7 +63,7 @@ public class QuantileAccurateFunction implements AggregationFunction<DoubleArray
     if (blockValIterator.skipTo(docId)) {
       int dictionaryIndex = blockValIterator.nextIntVal();
       if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-        list.add(((Integer) dictionaryReader.get(dictionaryIndex)));
+        list.add(((Number) dictionaryReader.get(dictionaryIndex)).doubleValue());
       } else {
         // ignore this
         LOGGER.info("ignore NULL_VALUE_INDEX");
@@ -75,8 +74,8 @@ public class QuantileAccurateFunction implements AggregationFunction<DoubleArray
   @Override
   public DoubleArrayList aggregate(Block docIdSetBlock, Block[] block) {
     DataType type = block[0].getMetadata().getDataType();
-    if (type != DataType.INT) {
-      throw new RuntimeException("Currently support Int type, get: " + type);
+    if (!type.isNumber()) {
+      throw new RuntimeException("Only number column can be used in quantile, get: " + type);
     }
 
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
@@ -92,8 +91,8 @@ public class QuantileAccurateFunction implements AggregationFunction<DoubleArray
   @Override
   public DoubleArrayList aggregate(DoubleArrayList mergedResult, int docId, Block[] block) {
     DataType type = block[0].getMetadata().getDataType();
-    if (type != DataType.INT) {
-      throw new RuntimeException("Only support Int type, get: " + type);
+    if (!type.isNumber()) {
+      throw new RuntimeException("Only number column can be used in quantile, get: " + type);
     }
 
     if (mergedResult == null) {

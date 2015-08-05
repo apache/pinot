@@ -38,19 +38,19 @@ import java.util.List;
  * Quantile function implemented using TDigest estimation.
  *
  */
-public class TDigestFunction implements AggregationFunction<TDigest,Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TDigestFunction.class);
+public class QuantileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileTDigestAggregationFunction.class);
   public static final int DEFAULT_COMPRESSION_FACTOR = 100;
 
   private String _tDigestColumnName;
   private int _compressionFactor;
   private byte _quantile; // 0-100
 
-  public TDigestFunction(byte quantile) {
+  public QuantileTDigestAggregationFunction(byte quantile) {
     this(quantile, DEFAULT_COMPRESSION_FACTOR);
   }
 
-  public TDigestFunction(byte quantile, int compressionFactor) {
+  public QuantileTDigestAggregationFunction(byte quantile, int compressionFactor) {
     _quantile = quantile;
     _compressionFactor = compressionFactor;
   }
@@ -67,7 +67,7 @@ public class TDigestFunction implements AggregationFunction<TDigest,Double> {
     if (blockValIterator.skipTo(docId)) {
       int dictionaryIndex = blockValIterator.nextIntVal();
       if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-        digest.offer(((Integer) dictionaryReader.get(dictionaryIndex)));
+        digest.offer(((Number) dictionaryReader.get(dictionaryIndex)).doubleValue());
       } else {
         // ignore this
         LOGGER.info("ignore NULL_VALUE_INDEX");
@@ -78,8 +78,8 @@ public class TDigestFunction implements AggregationFunction<TDigest,Double> {
   @Override
   public TDigest aggregate(Block docIdSetBlock, Block[] block) {
     DataType type = block[0].getMetadata().getDataType();
-    if (type != DataType.INT) {
-      throw new RuntimeException("Currently support Int type, get: " + type);
+    if (!type.isNumber()) {
+      throw new RuntimeException("Only number column can be used in quantile, get: " + type);
     }
 
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
@@ -95,8 +95,8 @@ public class TDigestFunction implements AggregationFunction<TDigest,Double> {
   @Override
   public TDigest aggregate(TDigest mergedResult, int docId, Block[] block) {
     DataType type = block[0].getMetadata().getDataType();
-    if (type != DataType.INT) {
-      throw new RuntimeException("TDigest only support Int type, get: " + type);
+    if (!type.isNumber()) {
+      throw new RuntimeException("Only number column can be used in quantile, get: " + type);
     }
 
     if (mergedResult == null) {
@@ -137,9 +137,7 @@ public class TDigestFunction implements AggregationFunction<TDigest,Double> {
     }
 
     TDigest merged = TDigest.merge(combinedResultList);
-    // LOGGER.info("$$$ " + merged.summary.size());
     Double ret = merged.getQuantile(_quantile);
-    // LOGGER.info("### called reduce: " + ret);
     return ret;
   }
 

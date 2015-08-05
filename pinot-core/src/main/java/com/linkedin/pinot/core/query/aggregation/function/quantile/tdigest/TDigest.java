@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.core.query.aggregation.function.quantile.tdigest;
 
 import com.clearspring.analytics.stream.cardinality.ICardinality;
@@ -13,11 +28,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  *
  * The reason we re-implement the TDigest class:
- * 1. merge method of original class does not fit for the extended type
- * 2. the original one does not implement Serializable interface
+ * 1. the original one is not serializable, and we need to implement serialization/externalization methods ourselves.
+ * 2. access control of fields in original class makes it hard to use inheritance/composition
+ *      for implementing new helper methods.
  *
- * Explicitly implement the externalize mechanisms.
  * CompressionFactor is typically in range 100 to 500, the larger it is, the less error, however slower it would be.
+ *
+ * Below are the original comments:
+ *
+ * Adaptive histogram based on something like streaming k-means crossed with Q-digest.
+ * The special characteristics of this algorithm are:
+ * a) smaller summaries than Q-digest
+ * b) works on doubles as well as integers.
+ * c) provides part per million accuracy for extreme quantiles and typically <1000 ppm accuracy for middle quantiles
+ * d) fast
+ * e) simple
+ * f) test coverage > 90%
+ * g) easy to adapt for use with map-reduce
  *
  */
 public class TDigest implements Serializable {
@@ -624,7 +651,6 @@ public class TDigest implements Serializable {
         //_tDigest = com.clearspring.analytics.stream.quantile.TDigest.fromBytes(ByteBuffer.wrap(buf));
         com.clearspring.analytics.stream.quantile.TDigest.fromBytes(ByteBuffer.wrap((byte[]) in.readObject()));
     }*/
-
 
     private Object writeReplace() throws ObjectStreamException {
         return new SerializationHolder(this);
