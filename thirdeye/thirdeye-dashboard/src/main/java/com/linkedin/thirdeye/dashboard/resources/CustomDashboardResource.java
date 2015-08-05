@@ -192,8 +192,8 @@ public class CustomDashboardResource {
     for (CustomDashboardComponentSpec componentSpec : spec.getComponents()) {
       MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
       if (componentSpec.getDimensions() != null) {
-        for (Map.Entry<String, String> entry : componentSpec.getDimensions().entrySet()) {
-          dimensionValues.putSingle(entry.getKey(), entry.getValue());
+        for (Map.Entry<String, List<String>> entry : componentSpec.getDimensions().entrySet()) {
+          dimensionValues.put(entry.getKey(), entry.getValue());
         }
       }
 
@@ -232,13 +232,13 @@ public class CustomDashboardResource {
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
     DateTime current = new DateTime(year, month, day, 0, 0);
     DateTime baseline = current.minusWeeks(1);
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(queryParams);
+    MultivaluedMap<String, String> dimensionValues = queryParams;
 
     if (groupBy != null) {
       if (dimensionValues.containsKey(groupBy)) {
         throw new IllegalArgumentException("Cannot group by fixed dimension");
       }
-      dimensionValues.put(groupBy, "!");
+      dimensionValues.put(groupBy, Arrays.asList("!"));
     }
 
     // Query
@@ -327,11 +327,9 @@ public class CustomDashboardResource {
     DateTime baselineEnd = currentEnd.minusWeeks(1);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(queryParams);
-
     // SQL
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, dimensionValues);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, dimensionValues);
+    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, queryParams);
+    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, queryParams);
 
     // Query
     Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);

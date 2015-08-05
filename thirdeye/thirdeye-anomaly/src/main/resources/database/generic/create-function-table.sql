@@ -1,0 +1,10 @@
+CREATE TABLE function(
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description VARCHAR(1024) NOT NULL,
+  collection VARCHAR(255) NOT NULL,
+  jar_url VARCHAR(2048) NOT NULL,
+  class_name VARCHAR(1024) NOT NULL,
+  properties VARCHAR(60000),
+  is_active BOOLEAN DEFAULT TRUE
+);

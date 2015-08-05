@@ -1,5 +1,10 @@
 package com.linkedin.thirdeye.dashboard.api.custom;
 
+import com.linkedin.thirdeye.dashboard.util.ViewUtils;
+import com.sun.jersey.core.util.MultivaluedMapImpl;
+
+import javax.ws.rs.core.MultivaluedMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -7,7 +12,7 @@ public class CustomDashboardComponentSpec {
   private String name;
   private Type type;
   private List<String> metrics;
-  private Map<String, String> dimensions;
+  private Map<String, List<String>> dimensions;
   private String groupBy;
 
   public enum Type {
@@ -39,11 +44,17 @@ public class CustomDashboardComponentSpec {
     this.metrics = metrics;
   }
 
-  public Map<String, String> getDimensions() {
+  public Map<String, List<String>> getDimensions() {
     return dimensions;
   }
 
-  public void setDimensions(Map<String, String> dimensions) {
+  public Map<String, String> getFlattenedDimensions() {
+    MultivaluedMap<String, String> multivaluedMap = new MultivaluedMapImpl();
+    multivaluedMap.putAll(dimensions);
+    return ViewUtils.flattenDisjunctions(multivaluedMap);
+  }
+
+  public void setDimensions(Map<String, List<String>> dimensions) {
     this.dimensions = dimensions;
   }
 

@@ -362,7 +362,7 @@
             <dependency>
                 <groupId>org.apache.helix</groupId>
                 <artifactId>helix-core</artifactId>
-                <version>0.6.4</version>
+                <version>0.6.5</version>
             </dependency>
             <dependency>
                 <groupId>log4j</groupId>
@@ -465,8 +465,8 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>2.5.1</version>
                     <configuration>
-                        <source>1.6</source>
-                        <target>1.6</target>
+                        <source>1.8</source>
+                        <target>1.8</target>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -480,7 +480,7 @@
                         <!-- Set the target configuration directory to be used in the bin scripts -->
                         <configurationDirectory>conf</configurationDirectory>
                         <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
-                        <copyConfigurationDirectory>true</copyConfigurationDirectory>
+                        <copyConfigurationDirectory>false</copyConfigurationDirectory>
                         <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
                         <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
                         <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>

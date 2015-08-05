@@ -16,16 +16,21 @@
 package com.linkedin.pinot.common.utils.helix;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
+import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -36,17 +41,23 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 
 
 public class HelixHelper {
+  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
-  private static final String DROPPED = "DROPPED";
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
+
+  public static final Map<String, SegmentAssignmentStrategyType> SEGMENT_ASSIGNMENT_STRATEGY_MAP =
+      new HashMap<String, SegmentAssignmentStrategyType>();
 
   /**
    * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
@@ -55,67 +66,109 @@ public class HelixHelper {
    * @param resourceName The resource for which to update the ideal state
    * @param updater A function that returns an updated ideal state given an input ideal state
    */
-  public static void updateIdealState(HelixManager helixManager, String resourceName, Function<IdealState, IdealState>
-      updater) {
-    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = dataAccessor.keyBuilder().idealStates(resourceName);
+  public static void updateIdealState(final HelixManager helixManager, final String resourceName,
+      final Function<IdealState, IdealState> updater, RetryPolicy policy) {
+    policy.attempt(new Callable<Boolean>() {
+      @Override
+      public Boolean call() {
+        HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
+        PropertyKey propertyKey = dataAccessor.keyBuilder().idealStates(resourceName);
 
-    while (true) {
-      // Create an updated version of the ideal state
-      IdealState idealState = dataAccessor.getProperty(propertyKey);
-      IdealState updatedIdealState;
-      try {
-        updatedIdealState = updater.apply((IdealState) dataAccessor.getProperty(propertyKey));
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while updating ideal state", e);
-        return;
-      }
+        // Create an updated version of the ideal state
+        IdealState idealState = dataAccessor.getProperty(propertyKey);
+        PropertyKey key = dataAccessor.keyBuilder().idealStates(resourceName);
+        String path = key.getPath();
+        // Make a copy of the the idealState above to pass it to the updater, instead of querying again,
+        // as the state my change between the queries.
+        IdealState idealStateCopy = new IdealState(idealState.getRecord());
+        IdealState updatedIdealState;
 
-      // If there are changes to apply, apply them
-      if (!EqualityUtils.isEqual(idealState, updatedIdealState) && updatedIdealState != null) {
-        // Break out if update is successful
-        if (dataAccessor.updateProperty(propertyKey, updatedIdealState)) {
-          return;
-        } else {
-          LOGGER.warn("Failed to update ideal state for resource {}, retrying.", resourceName);
+        try {
+          updatedIdealState = updater.apply(idealStateCopy);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while updating ideal state", e);
+          return false;
         }
-      } else {
-        LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
-        return;
+
+        // If there are changes to apply, apply them
+        if (!EqualityUtils.isEqual(idealState, updatedIdealState) && updatedIdealState != null) {
+          BaseDataAccessor<ZNRecord> baseDataAccessor = dataAccessor.getBaseDataAccessor();
+          boolean success;
+
+          try {
+            success =
+                baseDataAccessor.set(path, updatedIdealState.getRecord(), idealState.getRecord().getVersion(),
+                    AccessOption.PERSISTENT);
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception: {} while updating ideal state for resource {}, retrying.", resourceName,
+                e.getMessage());
+            return false;
+          }
+
+          if (success) {
+            return true;
+          } else {
+            LOGGER.warn("Failed to update ideal state for resource {}, retrying.", resourceName);
+            return false;
+          }
+        } else {
+          LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
+          return true;
+        }
       }
-    }
+    });
   }
 
-  public static List<String> getAllInstances(HelixAdmin admin, String clusterName) {
-    return admin.getInstancesInCluster(clusterName);
+  /**
+   * Returns all instances for the given cluster.
+   *
+   * @param helixAdmin The HelixAdmin object used to interact with the Helix cluster
+   * @param clusterName Name of the cluster for which to get all the instances for.
+   * @return Returns a List of strings containing the instance names for the given cluster.
+   */
+  public static List<String> getAllInstances(HelixAdmin helixAdmin, String clusterName) {
+    return helixAdmin.getInstancesInCluster(clusterName);
   }
 
-  public static Set<String> getAllInstancesForResource(IdealState state) {
+  /**
+   * Returns all instances for the given resource.
+   *
+   * @param idealState IdealState of the resource for which to return the instances of.
+   * @return Returns a Set of strings containing the instance names for the given cluster.
+   */
+  public static Set<String> getAllInstancesForResource(IdealState idealState) {
     final Set<String> instances = new HashSet<String>();
 
-    for (final String partition : state.getPartitionSet()) {
-      for (final String instance : state.getInstanceSet(partition)) {
+    for (final String partition : idealState.getPartitionSet()) {
+      for (final String instance : idealState.getInstanceSet(partition)) {
         instances.add(instance);
       }
     }
     return instances;
   }
 
-  public static void toggleInstance(String instanceName, String clusterName, HelixAdmin admin, boolean toggle) {
-    admin.enableInstance(clusterName, instanceName, toggle);
+  /**
+   * Toggle the state of the instance between OFFLINE and ONLINE.
+   *
+   * @param instanceName Name of the instance for which to toggle the state.
+   * @param clusterName Name of the cluster to which the instance belongs.
+   * @param admin HelixAdmin to access the cluster.
+   * @param enable Set enable to true for ONLINE and FALSE for OFFLINE.
+   */
+  public static void setInstanceState(String instanceName, String clusterName, HelixAdmin admin, boolean enable) {
+    admin.enableInstance(clusterName, instanceName, enable);
   }
 
-  public static void toggleInstancesWithPinotInstanceList(List<String> instances, String clusterName, HelixAdmin admin,
-      boolean toggle) {
+  public static void setStateForInstanceList(List<String> instances, String clusterName, HelixAdmin admin,
+      boolean enable) {
     for (final String instance : instances) {
-      toggleInstance(instance, clusterName, admin, toggle);
+      setInstanceState(instance, clusterName, admin, enable);
     }
   }
 
-  public static void toggleInstancesWithInstanceNameSet(Set<String> instances, String clusterName, HelixAdmin admin,
-      boolean toggle) {
+  public static void setStateForInstanceSet(Set<String> instances, String clusterName, HelixAdmin admin, boolean enable) {
     for (final String instanceName : instances) {
-      toggleInstance(instanceName, clusterName, admin, toggle);
+      setInstanceState(instanceName, clusterName, admin, enable);
     }
   }
 
@@ -177,24 +230,37 @@ public class HelixHelper {
     return admin.getResourceIdealState(clusterName, BROKER_RESOURCE);
   }
 
-  public static void deleteResourceFromBrokerResource(HelixAdmin helixAdmin, String helixClusterName, String resourceTag) {
-    LOGGER.info("Trying to mark instance to dropped state");
-    IdealState brokerIdealState = helixAdmin.getResourceIdealState(helixClusterName,
-        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
-      Map<String, String> instanceStateMap = brokerIdealState.getInstanceStateMap(resourceTag);
-      for (String instance : instanceStateMap.keySet()) {
-        brokerIdealState.setPartitionState(resourceTag, instance, DROPPED);
+  /**
+   * Remove a resource (offline/realtime table) from the Broker's ideal state.
+   *
+   * @param helixManager The HelixManager object for accessing helix cluster.
+   * @param resourceTag Name of the resource that needs to be removed from Broker ideal state.
+   */
+  public static void removeResourceFromBrokerIdealState(HelixManager helixManager, final String resourceTag) {
+    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
+      @Override
+      public IdealState apply(IdealState idealState) {
+        if (idealState.getPartitionSet().contains(resourceTag)) {
+          idealState.getPartitionSet().remove(resourceTag);
+          return idealState;
+        } else {
+          return null;
+        }
       }
-      helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
-    }
+    };
+
+    // Removing partitions from ideal state
     LOGGER.info("Trying to remove resource from idealstats");
-    if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
-      brokerIdealState.getPartitionSet().remove(resourceTag);
-      helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
-    }
+    HelixHelper.updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater,
+        DEFAULT_RETRY_POLICY);
   }
 
+  /**
+   * Returns the set of online instances from external view.
+   *
+   * @param resourceExternalView External view for the resource.
+   * @return Set&lt;String&gt; of online instances in the external view for the resource.
+   */
   public static Set<String> getOnlineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
     if (resourceExternalView != null) {
@@ -210,6 +276,12 @@ public class HelixHelper {
     return instanceSet;
   }
 
+  /**
+   * Get a set of offline instance from the external view of the resource.
+   *
+   * @param resourceExternalView External view of the resource
+   * @return Set of string instance names of the offline instances in the external view.
+   */
   public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
     for (String partition : resourceExternalView.getPartitionSet()) {
@@ -221,5 +293,64 @@ public class HelixHelper {
       }
     }
     return instanceSet;
+  }
+
+  /**
+   * Remove the segment from the cluster.
+   *
+   * @param helixManager The HelixManager object to access the helix cluster.
+   * @param tableName Name of the table to which the new segment is to be added.
+   * @param segmentName Name of the new segment to be added
+   */
+  public static void removeSegmentFromIdealState(HelixManager helixManager, String tableName, final String segmentName) {
+    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
+      @Override
+      public IdealState apply(IdealState idealState) {
+        final Set<String> currentInstanceSet = idealState.getInstanceSet(segmentName);
+
+        if (!currentInstanceSet.isEmpty() && idealState.getPartitionSet().contains(segmentName)) {
+          idealState.getPartitionSet().remove(segmentName);
+          return idealState;
+        } else {
+          return null;
+        }
+      }
+    };
+
+    updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
+  }
+
+  /**
+   * Add the new specified segment to the idealState of the specified table in the specified cluster.
+   *
+   * @param helixManager The HelixManager object to access the helix cluster.
+   * @param tableName Name of the table to which the new segment is to be added.
+   * @param segmentName Name of the new segment to be added
+   * @param getInstancesForSegment Callable returning list of instances where the segment should be uploaded.
+   */
+  public static void addSegmentToIdealState(HelixManager helixManager, String tableName, final String segmentName,
+      final Callable<List<String>> getInstancesForSegment) {
+
+    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
+      @Override
+      public IdealState apply(IdealState idealState) {
+        List<String> targetInstances = null;
+        try {
+          targetInstances = getInstancesForSegment.call();
+        } catch (Exception e) {
+          LOGGER.error("Unable to get new instances for segment uploading.");
+          return null;
+        }
+
+        for (final String instance : targetInstances) {
+          idealState.setPartitionState(segmentName, instance, ONLINE);
+        }
+
+        idealState.setNumPartitions(idealState.getNumPartitions() + 1);
+        return idealState;
+      }
+    };
+
+    updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
   }
 }

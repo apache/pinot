@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
+import com.google.common.primitives.Ints;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -164,7 +165,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   }
 
   private int computeLength(int rowOffSetStart) {
-    int rowOffSetEnd = customBitSet.nextSetBitAfter(rowOffSetStart);
+    int rowOffSetEnd = Ints.checkedCast(customBitSet.nextSetBitAfter(rowOffSetStart));
     if (rowOffSetEnd < 0) {
       return totalNumValues - rowOffSetStart;
     }
@@ -177,8 +178,8 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     if (row % docsPerChunk == 0) {
       return chunkIdOffset;
     }
-    int rowOffSetStart = customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
-    return rowOffSetStart;
+    long rowOffSetStart = customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
+    return Ints.checkedCast(rowOffSetStart);
   }
 
   @Override

@@ -92,7 +92,18 @@ $(document).ready(function() {
             $("#sidenav-timezone option:last-child").prop('selected', 1)
         }
     })
-    
+
+    //Display min-,max-data-time in the selected time zone
+    //using moment.js methods, documentation: http://momentjs.com/timezone/docs/
+    var selectedTimeZone = $("#sidenav-timezone").val()
+    var maxDateTimeInUTC = moment.tz(parseInt($("#sidenav-max-time").attr('millis')), "UTC" )
+    var maxDateTimeInSelectedTz = maxDateTimeInUTC.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
+    $("#sidenav-max-time").html(maxDateTimeInSelectedTz)
+
+    var minDateTimeInUTC = moment.tz(parseInt($("#sidenav-min-time").attr('millis')), "UTC" )
+    var minDateTimeInSelectedTz = minDateTimeInUTC.tz(selectedTimeZone).format("YYYY-MM-DD HH:mm z")
+    $("#sidenav-min-time").html(minDateTimeInSelectedTz)
+
     // Load existing metrics selection / function
     if (path.metricFunction) {
       var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
@@ -149,7 +160,6 @@ $(document).ready(function() {
 
     // Load existing date / time
     if (path.currentMillis) {
-        var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
         var currentDateTime = moment(parseInt(path.currentMillis))
         var dateString = currentDateTime.format("YYYY-MM-DD")
         var timeString = currentDateTime.format("HH:mm")
@@ -163,9 +173,10 @@ $(document).ready(function() {
         $("#sidenav-baseline-unit").val(diffDescriptor.sizeMillis)
     } else {
         // Start at latest loaded time
-        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis')))
+        var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
+        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis'))-aggregateMillis);
         var dateString = latestDateTime.format("YYYY-MM-DD")
-        var timeString = latestDateTime.format("HH:mm")
+        var timeString = latestDateTime.format("HH:mm");
         $("#sidenav-date").val(dateString)
         $("#sidenav-time").val(timeString)
     }

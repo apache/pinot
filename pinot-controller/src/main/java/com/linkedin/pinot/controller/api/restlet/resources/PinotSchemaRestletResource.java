@@ -1,10 +1,5 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -21,28 +16,24 @@ import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
 import org.restlet.resource.Post;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 
 
-public class PinotSchemaRestletResource extends ServerResource {
+public class PinotSchemaRestletResource extends PinotRestletResourceBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSchemaRestletResource.class);
-  private final ControllerConf conf;
-  private final PinotHelixResourceManager manager;
   private final File baseDataDir;
   private final File tempDir;
 
   public PinotSchemaRestletResource() throws IOException {
-    conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager =
-        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
-    baseDataDir = new File(conf.getDataDir());
+    baseDataDir = new File(_controllerConf.getDataDir());
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
@@ -75,8 +66,13 @@ public class PinotSchemaRestletResource extends ServerResource {
       "/schemas/"
   })
   private Representation getAllSchemas() {
-    List<String> schemaNames = manager.getSchemaNames();
+    List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
     JSONArray ret = new JSONArray();
+
+    if (schemaNames == null){
+      return new StringRepresentation(ret.toString());
+    }
+
     for (String schema : schemaNames) {
       ret.put(schema);
     }
@@ -95,7 +91,10 @@ public class PinotSchemaRestletResource extends ServerResource {
       String schemaName)
       throws IOException {
     LOGGER.info("looking for schema {}", schemaName);
-    Schema schema = manager.getSchema(schemaName);
+    Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
+    if (schema == null) {
+      return new StringRepresentation("{}");
+    }
     LOGGER.info("schema string is : " + schema.getJSONSchema());
     return new StringRepresentation(schema.getJSONSchema());
   }
@@ -154,7 +153,7 @@ public class PinotSchemaRestletResource extends ServerResource {
       // The content is arbitrarily sent as plain text.
       Schema schema = Schema.fromFile(dataFile);
       try {
-        manager.addSchema(schema);
+        _pinotHelixResourceManager.addSchema(schema);
         rep = new StringRepresentation(dataFile + " sucessfully added", MediaType.TEXT_PLAIN);
       } catch (Exception e) {
         LOGGER.error("error adding schema ", e);

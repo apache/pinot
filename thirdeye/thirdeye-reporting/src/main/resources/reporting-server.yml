@@ -1,0 +1,9 @@
+serverUri: http://localhost:8080
+reportConfigPath: /tmp/reportconfigs
+server:
+ applicationConnectors:
+  - type: http
+    port: 8084
+ adminConnectors:
+  - type: http
+    port: 8085

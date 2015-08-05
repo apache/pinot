@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -39,7 +34,6 @@ import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Delete;
 import org.restlet.resource.Post;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,8 +42,11 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
@@ -60,10 +57,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * sample curl call : curl -F campaignInsights_adsAnalysis-bmCamp_11=@campaignInsights_adsAnalysis-bmCamp_11      http://localhost:8998/segments
  *
  */
-public class PinotSegmentUploadRestletResource extends ServerResource {
+public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
-  private final ControllerConf conf;
-  private final PinotHelixResourceManager manager;
   private final File baseDataDir;
   private final File tempDir;
   private final File tempUntarredPath;
@@ -71,11 +66,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
 
   public PinotSegmentUploadRestletResource() throws IOException {
 
-    conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager =
-        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
-    baseDataDir = new File(conf.getDataDir());
+    baseDataDir = new File(_controllerConf.getDataDir());
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
@@ -87,7 +78,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     if (!tempUntarredPath.exists()) {
       tempUntarredPath.mkdirs();
     }
-    vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()));
+    vip = StringUtil.join("://", "http", StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
     LOGGER.info("controller download url base is : " + vip);
   }
 
@@ -151,7 +142,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     if (tableDir.exists()) {
       for (final File file : tableDir.listFiles()) {
         final String url =
-            "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
+            "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
                 + tableName + "/" + file.getName();
         ret.put(url);
       }
@@ -172,7 +163,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     final JSONArray ret = new JSONArray();
     for (final File file : baseDataDir.listFiles()) {
       final String url =
-          "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/segments/"
+          "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
               + file.getName();
       ret.put(url);
     }
@@ -218,8 +209,8 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
         // The content is arbitrarily sent as plain text.
         rep = new StringRepresentation(dataFile + " sucessfully uploaded", MediaType.TEXT_PLAIN);
         tmpSegmentDir =
-            new File(tempUntarredPath, dataFile.getName() + "-" + conf.getControllerHost() + "_"
-                + conf.getControllerPort() + "-" + System.currentTimeMillis());
+            new File(tempUntarredPath, dataFile.getName() + "-" + _controllerConf.getControllerHost() + "_"
+                + _controllerConf.getControllerPort() + "-" + System.currentTimeMillis());
         LOGGER.info("Untar segment to temp dir: " + tmpSegmentDir);
         if (tmpSegmentDir.exists()) {
           FileUtils.deleteDirectory(tmpSegmentDir);
@@ -274,7 +265,7 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     }
     FileUtils.moveFile(dataFile, segmentFile);
 
-    manager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+    _pinotHelixResourceManager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
     setStatus(Status.SUCCESS_OK);
     return new StringRepresentation("");
   }
@@ -312,14 +303,14 @@ public class PinotSegmentUploadRestletResource extends ServerResource {
     }
     PinotResourceManagerResponse res = null;
     if (ZKMetadataProvider
-        .isSegmentExisted(manager.getPropertyStore(), TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName),
+        .isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName),
             segmentName)) {
-      res = manager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
+      res = _pinotHelixResourceManager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
       rep = new StringRepresentation(res.toString());
     }
-    if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(),
+    if (ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(),
         TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
-      res = manager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
+      res = _pinotHelixResourceManager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
       rep = new StringRepresentation(res.toString());
     }
     if (res == null) {

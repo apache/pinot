@@ -117,7 +117,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
   @Override
   public String toString() {
-    return ("CreateSegmentCommand -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
+    return ("CreateSegment -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
         " -format " + _format + " -readerConfigFile " + _recordReaderConfigFile +
         " -tableName " + _tableName + " -segmentName " + _segmentName + " -outDir " + _outDir +
         " -overwrite " + _overwrite);

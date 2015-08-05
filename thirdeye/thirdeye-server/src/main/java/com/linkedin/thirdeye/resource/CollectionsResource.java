@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.resource;
+  package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
@@ -54,6 +54,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CollectionsResource implements Managed
 {
   private static final String LAST_POST_DATA_MILLIS = "lastPostDataMillis";
+  private static final String DATA_TIME_LAG_MILLIS = "dataTimeLagMillis";
   private static final Logger LOG = LoggerFactory.getLogger(CollectionsResource.class);
 
   private final StarTreeManager manager;
@@ -72,26 +73,24 @@ public class CollectionsResource implements Managed
     this.dataUpdateManager = dataUpdateManager;
     this.metricRegistry = metricRegistry;
     lastPostDataMillis = new ConcurrentHashMap<String, AtomicLong>();
-
   }
 
   @Override
   public void start() throws Exception {
-    for (final String collection : manager.getCollections())
+
+    for (String collection : manager.getCollections())
     {
-
+      final String collectionName = collection;
+      // Metric for time we last received a POST to update collection's data
       lastPostDataMillis.putIfAbsent(collection, new AtomicLong(System.currentTimeMillis()));
-    // Metric for time we last received a POST to update collection's data
-    metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, LAST_POST_DATA_MILLIS),
-                            new Gauge<Long>() {
-                              @Override
-                              public Long getValue()
-                              {
-                                return lastPostDataMillis.get(collection).get();
-                              }
-                            });
+      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, LAST_POST_DATA_MILLIS),
+          new Gauge<Long>() {
+            @Override
+            public Long getValue() {
+              return lastPostDataMillis.get(collectionName).get();
+            }
+          });
     }
-
   }
 
 
@@ -267,6 +266,20 @@ public class CollectionsResource implements Managed
       value.set((System.currentTimeMillis()));
     }
 
+    if (!metricRegistry.getGauges().containsKey(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS))) {
+      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
+          new Gauge<Long>() {
+
+            @Override
+            public Long getValue() {
+              Long maxDataTime = manager.getMaxDataTime(collectionName);
+              if (maxDataTime == null) {
+                maxDataTime = 0L;
+              }
+              return System.currentTimeMillis() - maxDataTime;
+            }
+          });
+    }
 
     return Response.ok().build();
   }

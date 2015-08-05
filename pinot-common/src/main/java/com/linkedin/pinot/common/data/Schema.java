@@ -256,19 +256,15 @@ public class Schema {
   }
 
   @JsonIgnore(true)
-  public TimeUnit getIncomingTimeUnit() throws NullPointerException {
-    if (timeFieldSpec == null || timeFieldSpec.getIncomingGranularitySpec() == null) {
-      throw new NullPointerException();
-    }
-    return timeFieldSpec.getIncomingGranularitySpec().getTimeType();
+  public TimeUnit getIncomingTimeUnit() {
+    return (timeFieldSpec != null && timeFieldSpec.getIncomingGranularitySpec() != null) ?
+        timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   @JsonIgnore(true)
-  public TimeUnit getOutgoingTimeUnit() throws NullPointerException {
-    if (timeFieldSpec == null || timeFieldSpec.getOutgoingGranularitySpec() == null) {
-      throw new NullPointerException();
-    }
-    return timeFieldSpec.getIncomingGranularitySpec().getTimeType();
+  public TimeUnit getOutgoingTimeUnit() {
+    return (timeFieldSpec != null && timeFieldSpec.getOutgoingGranularitySpec() != null) ?
+        timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   public TimeFieldSpec getTimeFieldSpec() {

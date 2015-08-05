@@ -57,7 +57,12 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       return;
     }
 
-    String value = entry.toString();
+    String value;
+    if (entry != null) {
+      value = entry.toString();
+    } else {
+      value = fieldSpec.getDefaultNullValue().toString();
+    }
     addressSorted(value);
     stringSet.add(value);
   }

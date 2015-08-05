@@ -266,9 +266,10 @@ public abstract class FieldSpec {
           case DOUBLE_ARRAY:
             return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
           default:
-            break;
+            throw new UnsupportedOperationException("Unknown default null value for metric of data type " + dataType);
         }
-      default:
+      case DIMENSION:
+      case TIME:
         switch (getDataType()) {
           case INT:
           case INT_ARRAY:
@@ -286,9 +287,10 @@ public abstract class FieldSpec {
           case STRING_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_STRING;
           default:
-            break;
+            throw new UnsupportedOperationException("Unknown default null value for dimension/time column of data type " + dataType);
         }
+      default:
+        throw new UnsupportedOperationException("Not supported data type for null value - " + dataType);
     }
-    throw new UnsupportedOperationException("Not supported data type for null value - " + dataType);
   }
 }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -371,7 +372,7 @@ public class RetentionManagerTest {
     final String segmentName = _testTableName + creationTime;
 
     SegmentMetadata segmentMetadata = new SegmentMetadata() {
-      TimeUnit segmentTimeUnit = TimeUnit.valueOf(timeUnit);
+      TimeUnit segmentTimeUnit = TimeUtils.timeUnitFromString(timeUnit);
       Duration _timeGranularity = new Duration(segmentTimeUnit.toMillis(1));
       Interval _timeInterval = new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTime)),
           segmentTimeUnit.toMillis(Long.parseLong(endTime)));

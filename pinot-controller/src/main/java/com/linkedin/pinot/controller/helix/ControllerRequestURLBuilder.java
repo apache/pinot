@@ -56,11 +56,11 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forInstanceDisable(String instanceName) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName, "?status=disable");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName, "?state=disable");
   }
 
   public String forInstanceEnable(String instanceName) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName, "?status=enable");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName, "?state=enable");
   }
 
   public String forInstanceBulkCreate() {

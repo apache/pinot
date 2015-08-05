@@ -5,11 +5,11 @@
             <table id="sidenav-metadata" class="uk-table">
               <tr>
                 <td class="sidenav-metadata-key">Min Time</td>
-                <td id="sidenav-min-time" millis="${earliestDataTime.millis?c}">${earliestDataTime}</td>
+                <td id="sidenav-min-time" millis="${earliestDataTime.millis?c}"></td>
               </tr>
               <tr>
                 <td class="sidenav-metadata-key">Max Time</td>
-                <td id="sidenav-max-time" millis="${latestDataTime.millis?c}">${latestDataTime}</td>
+                <td id="sidenav-max-time" millis="${latestDataTime.millis?c}"></td>
               </tr>
             </table>
         </li>
@@ -126,10 +126,10 @@
                 </div>
 
                 <div class="uk-form-row">
-                    <button id="sidenav-submit" class="uk-button uk-button-small uk-button-primary">Go</button>
+                    <button id="sidenav-submit" class="uk-button uk-button-small uk-button-primary ">Go</button>
                 </div>
             </form>
-
+            
             <#if (customDashboardNames??)>
               <hr />
               <ul>
@@ -142,4 +142,10 @@
             </#if>
         </li>
     </ul>
+    <#if (feedbackEmailAddress??)>
+       <button class="uk-button uk-button-small uk-button-secondary uk-padding-remove uk-margin-top" >
+         <a class="uk-button-secondary sidenav-feedback-link" href="mailto:${feedbackEmailAddress}?subject=ThirdEye Dashboard Feedback">Send Feedback</a>
+       </button>
+    </#if>
+    
 </div>

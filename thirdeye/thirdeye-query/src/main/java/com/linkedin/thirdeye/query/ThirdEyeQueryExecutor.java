@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.query;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
@@ -17,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ThirdEyeQueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeQueryExecutor.class);
+  private static final Joiner OR_JOINER = Joiner.on(" OR ");
 
   private static final ThirdEyeFunction TO_MILLIS = new ThirdEyeUnitConversionFunction(1, TimeUnit.MILLISECONDS);
 
@@ -204,7 +207,7 @@ public class ThirdEyeQueryExecutor {
     }
 
     // Metrics
-    Map<StarTree, Map<DimensionKey, Future<MetricTimeSeries>>> timeSeriesFutures = new HashMap<>();
+    Map<StarTree, Multimap<DimensionKey, Future<MetricTimeSeries>>> timeSeriesFutures = new HashMap<>();
     final List<StarTree> starTrees = new ArrayList<>(starTreeManager.getStarTrees(config.getCollection()).values());
     StarTree mutableTree = starTreeManager.getMutableStarTree(config.getCollection());
     if (mutableTree != null) {
@@ -216,9 +219,11 @@ public class ThirdEyeQueryExecutor {
         continue;
       }
 
-      timeSeriesFutures.put(starTree, new HashMap<DimensionKey, Future<MetricTimeSeries>>());
+      Multimap<DimensionKey, Future<MetricTimeSeries>> singleKeyResultMap = LinkedListMultimap.create();
+      timeSeriesFutures.put(starTree, singleKeyResultMap);
       for (final DimensionKey dimensionKey : dimensionKeys) {
-        timeSeriesFutures.get(starTree).put(dimensionKey, executorService.submit(new Callable<MetricTimeSeries>() {
+        DimensionKey flattenedKey = flattenDisjunctions(config, query, dimensionKey);
+        timeSeriesFutures.get(starTree).put(flattenedKey, executorService.submit(new Callable<MetricTimeSeries>() {
           @Override
           public MetricTimeSeries call() throws Exception {
             TimeRange timeRange = timeRangesToQuery.get(treeId);
@@ -230,15 +235,17 @@ public class ThirdEyeQueryExecutor {
 
     // Merge results
     Map<DimensionKey, MetricTimeSeries> mergedResults = new HashMap<>();
-    for (Map<DimensionKey, Future<MetricTimeSeries>> resultMap : timeSeriesFutures.values()) {
-      for (Map.Entry<DimensionKey, Future<MetricTimeSeries>> entry : resultMap.entrySet()) {
-        MetricTimeSeries additionalSeries = entry.getValue().get();
-        MetricTimeSeries currentSeries = mergedResults.get(entry.getKey());
-        if (currentSeries == null) {
-          currentSeries = new MetricTimeSeries(additionalSeries.getSchema());
-          mergedResults.put(entry.getKey(), currentSeries);
+    for (Multimap<DimensionKey, Future<MetricTimeSeries>> resultMap : timeSeriesFutures.values()) {
+      for (Map.Entry<DimensionKey, Collection<Future<MetricTimeSeries>>> entry : resultMap.asMap().entrySet()) {
+        for (Future<MetricTimeSeries> seriesFuture : entry.getValue()) {
+          MetricTimeSeries additionalSeries = seriesFuture.get();
+          MetricTimeSeries currentSeries = mergedResults.get(entry.getKey());
+          if (currentSeries == null) {
+            currentSeries = new MetricTimeSeries(additionalSeries.getSchema());
+            mergedResults.put(entry.getKey(), currentSeries);
+          }
+          currentSeries.aggregate(additionalSeries);
         }
-        currentSeries.aggregate(additionalSeries);
       }
     }
 
@@ -330,4 +337,24 @@ public class ThirdEyeQueryExecutor {
     return bucket.getUnit().convert(dateTime.getMillis(), TimeUnit.MILLISECONDS) / bucket.getSize();
   }
 
+  /** Replaces dimensions in all queries involving disjunctions such that they can be grouped */
+  private static DimensionKey flattenDisjunctions(StarTreeConfig config,
+                                                  ThirdEyeQuery query,
+                                                  DimensionKey dimensionKey) {
+    String[] flattenedValues = new String[config.getDimensions().size()];
+
+    for (int i = 0; i < config.getDimensions().size(); i++) {
+      String dimensionName = config.getDimensions().get(i).getName();
+      String dimensionValue = dimensionKey.getDimensionValues()[i];
+
+      Collection queryValues = query.getDimensionValues().get(dimensionName);
+      if (!query.getGroupByColumns().contains(dimensionName) && queryValues.size() > 1) {
+        dimensionValue = OR_JOINER.join(queryValues);
+      }
+
+      flattenedValues[i] = dimensionValue;
+    }
+
+    return new DimensionKey(flattenedValues);
+  }
 }

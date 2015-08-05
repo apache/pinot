@@ -257,8 +257,9 @@ public class ThirdEyeJob {
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + AGGREGATION.getName());
 
-
-
+        config.setProperty(AggregationJobConstants.AGG_DIMENSION_STATS_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + StarTreeConstants.DIMENSION_STATS_FOLDER);
 
         return config;
       }
@@ -319,7 +320,7 @@ public class ThirdEyeJob {
                 + ROLLUP_PHASE2.getName());
         config.setProperty(RollupPhaseTwoConstants.ROLLUP_PHASE2_ANALYSIS_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
-            + ANALYSIS.getName());
+            + StarTreeConstants.DIMENSION_STATS_FOLDER);
 
         return config;
       }

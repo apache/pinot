@@ -33,6 +33,7 @@ public class ThirdEyeQueryParser implements
     SELECT_ITEM,
     DIMENSION_EQUALS_LEFT,
     DIMENSION_EQUALS_RIGHT,
+    OR,
     GROUP_BY,
     FUNCTION_MOVING_AVERAGE,
     FUNCTION_AGGREGATE,
@@ -245,7 +246,10 @@ public class ThirdEyeQueryParser implements
 
   @Override
   public void visit(OrExpression orExpression) {
-    throw new IllegalStateException("Invalid SQL: " + sql);
+    terminalState.push(TerminalState.OR);
+    orExpression.getLeftExpression().accept(this);
+    orExpression.getRightExpression().accept(this);
+    terminalState.pop();
   }
 
   @Override

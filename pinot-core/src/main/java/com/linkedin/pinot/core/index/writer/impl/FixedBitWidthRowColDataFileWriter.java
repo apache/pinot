@@ -48,7 +48,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private int bytesRequired;
 
   public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
-      int[] columnSizesInBits) throws Exception {
+                                           int[] columnSizesInBits) throws Exception {
     init(file, rows, cols, columnSizesInBits);
     createBuffer(file);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
@@ -60,21 +60,21 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
    * @param columnSizesInBits 是一个空数组，长度是列的势
    * */
   public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
-      int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
+                                           int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);
     createBuffer(file);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
   public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
-      int cols, int[] columnSizesInBits) throws Exception {
+                                           int cols, int[] columnSizesInBits) throws Exception {
     init(file, rows, cols, columnSizesInBits);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
   public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
-      int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
-      throws Exception {
+                                           int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
+          throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
@@ -86,7 +86,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   }
 
   private void init(File file, int rows, int cols, int[] columnSizesInBits,
-      boolean[] signed) {
+                    boolean[] signed) {
     this.file = file;
     this.colSizesInBits = new int[cols];
     this.columnOffsetsInBits = new int[cols];
@@ -115,10 +115,10 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   }
 
   private void createBuffer(File file) throws FileNotFoundException,
-      IOException {
+          IOException {
     raf = new RandomAccessFile(file, "rw");
     byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        bytesRequired);
+            bytesRequired);
     byteBuffer.position(0);
     for (int i = 0; i < bytesRequired; i++) {
       byteBuffer.put((byte) 0);

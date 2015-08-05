@@ -38,6 +38,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
   private final ConcurrentMap<UUID, IndexMetadata> allIndexMetadata;
   private final ConcurrentMap<String, StarTree> mutableTrees;
   private final Set<String> openCollections;
+  private final ConcurrentMap<String, Long> maxDataTime;
 
   public StarTreeManagerImpl() {
     this.configs = new ConcurrentHashMap<String, StarTreeConfig>();
@@ -45,6 +46,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
     this.allIndexMetadata = new ConcurrentHashMap<>();
     this.mutableTrees = new ConcurrentHashMap<>();
     this.openCollections = new HashSet<String>();
+    this.maxDataTime = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -60,6 +62,11 @@ public class StarTreeManagerImpl implements StarTreeManager {
   @Override
   public StarTree getMutableStarTree(String collection) {
     return mutableTrees.get(collection);
+  }
+
+  @Override
+  public Long getMaxDataTime(String collection) {
+    return maxDataTime.get(collection);
   }
 
   @Override
@@ -98,6 +105,7 @@ public class StarTreeManagerImpl implements StarTreeManager {
         StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(configFile));
         configs.put(collection, config);
 
+        long maxDataTimeMillis = 0;
         for (File dataDir : dataDirs) {
           // Read tree structure
           File treeFile = new File(dataDir, StarTreeConstants.TREE_FILE_NAME);
@@ -118,7 +126,12 @@ public class StarTreeManagerImpl implements StarTreeManager {
           indexMetadataFile.close();
           IndexMetadata indexMetadata = IndexMetadata.fromProperties(indexMetadataProps);
           allIndexMetadata.put(root.getId(), indexMetadata);
+
+          if (indexMetadata.getMaxDataTimeMillis() > maxDataTimeMillis) {
+            maxDataTimeMillis = indexMetadata.getMaxDataTimeMillis();
+          }
         }
+        maxDataTime.put(collection, maxDataTimeMillis);
 
         // Create mutable in-memory tree
         StarTreeConfig inMemoryConfig = new StarTreeConfig(config.getCollection(),
@@ -244,6 +257,13 @@ public class StarTreeManagerImpl implements StarTreeManager {
                 indexMetadataFile.close();
                 IndexMetadata indexMetadata = IndexMetadata.fromProperties(indexMetadataProps);
                 allIndexMetadata.put(root.getId(), indexMetadata);
+
+                Long previous = maxDataTime.putIfAbsent(config.getCollection(), indexMetadata.getMaxDataTimeMillis());
+                if (previous != null) {
+                  if (indexMetadata.getMaxDataTimeMillis() > previous) {
+                    maxDataTime.put(config.getCollection(), indexMetadata.getMaxDataTimeMillis());
+                  }
+                }
 
                 Map<File, StarTree> existingTrees = trees.get(config.getCollection());
                 if (existingTrees == null) {

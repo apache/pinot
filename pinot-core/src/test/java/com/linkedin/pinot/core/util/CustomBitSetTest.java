@@ -128,7 +128,7 @@ public class CustomBitSetTest {
         expectedIndex = bitsOn.pollFirst();
       }
 
-      int nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
+      long nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
       if (nthBitSetAfter != expectedIndex) {
         System.out.println("Bits set " + bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
         nthBitSetAfter = customBitSet.findNthBitSetAfter(startSearchIndex, nthBitToFind);
@@ -145,7 +145,7 @@ public class CustomBitSetTest {
       for (int searchStartIndex = 0; searchStartIndex < LENGTH; ++searchStartIndex) {
         CustomBitSet customBitSet = CustomBitSet.withBitLength(LENGTH);
         customBitSet.setBit(setBitIndex);
-        int foundSetBitIndex = customBitSet.nextSetBit(searchStartIndex);
+        long foundSetBitIndex = customBitSet.nextSetBit(searchStartIndex);
         if (searchStartIndex <= setBitIndex) {
           Assert.assertEquals(foundSetBitIndex, setBitIndex, "Found bit at index " + foundSetBitIndex
               + " while it was set at " + setBitIndex + " searching from " + searchStartIndex);
@@ -168,7 +168,7 @@ public class CustomBitSetTest {
           CustomBitSet customBitSet = CustomBitSet.withBitLength(LENGTH);
           customBitSet.setBit(setBitIndex);
           customBitSet.setBit(confusingBitIndex);
-          int foundSetBitIndex = customBitSet.nextSetBit(searchStartIndex);
+          long foundSetBitIndex = customBitSet.nextSetBit(searchStartIndex);
           if (searchStartIndex <= setBitIndex) {
             Assert.assertEquals(foundSetBitIndex, setBitIndex, "Found bit at index " + foundSetBitIndex
                 + " while it was set at " + setBitIndex + " searching from " + searchStartIndex);
@@ -192,7 +192,7 @@ public class CustomBitSetTest {
 
     CustomBitSet customBitSet = CustomBitSet.withBitLength(LENGTH);
     customBitSet.setBit(setBitIndex);
-    int foundSetBitIndex = customBitSet.nextSetBit(searchStartIndex);
+    long foundSetBitIndex = customBitSet.nextSetBit(searchStartIndex);
     if (searchStartIndex <= setBitIndex) {
       Assert.assertEquals(foundSetBitIndex, setBitIndex, "Found bit at index " + foundSetBitIndex
           + " while it was set at " + setBitIndex + " searching from " + searchStartIndex);

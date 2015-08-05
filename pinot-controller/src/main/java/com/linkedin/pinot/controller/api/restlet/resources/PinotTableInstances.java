@@ -1,10 +1,5 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
 import java.io.File;
 import java.io.IOException;
 
@@ -14,29 +9,25 @@ import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
 
 
-public class PinotTableInstances extends ServerResource {
+public class PinotTableInstances extends PinotRestletResourceBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableInstances.class);
-  private final ControllerConf conf;
-  private final PinotHelixResourceManager manager;
   private final File baseDataDir;
   private final File tempDir;
 
   public PinotTableInstances() throws IOException {
-    conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager =
-        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
-    baseDataDir = new File(conf.getDataDir());
+    baseDataDir = new File(_controllerConf.getDataDir());
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
@@ -49,8 +40,8 @@ public class PinotTableInstances extends ServerResource {
   @Override
   @Get
   public Representation get() {
-    final String tableName = (String) getRequest().getAttributes().get("tableName");
-    final String type = getQueryValue("type");
+    final String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
+    final String type = getQueryValue(TABLE_TYPE);
     if (tableName == null) {
       return new StringRepresentation("tableName is not present");
     }
@@ -81,22 +72,22 @@ public class PinotTableInstances extends ServerResource {
 
     if (type == null || type.toLowerCase().equals("broker")) {
 
-      if (manager.hasOfflineTable(tableName)) {
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
         JSONObject e = new JSONObject();
         e.put("tableType", "offline");
         JSONArray a = new JSONArray();
-        for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
+        for (String ins : _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
           a.add(ins);
         }
         e.put("instances", a);
         brokers.add(e);
       }
 
-      if (manager.hasRealtimeTable(tableName)) {
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         JSONObject e = new JSONObject();
         e.put("tableType", "realtime");
         JSONArray a = new JSONArray();
-        for (String ins : manager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
+        for (String ins : _pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
           a.add(ins);
         }
         e.put("instances", a);
@@ -105,22 +96,22 @@ public class PinotTableInstances extends ServerResource {
     }
 
     if (type == null || type.toLowerCase().equals("server")) {
-      if (manager.hasOfflineTable(tableName)) {
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
         JSONObject e = new JSONObject();
         e.put("tableType", "offline");
         JSONArray a = new JSONArray();
-        for (String ins : manager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
+        for (String ins : _pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
           a.add(ins);
         }
         e.put("instances", a);
         servers.add(e);
       }
 
-      if (manager.hasRealtimeTable(tableName)) {
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         JSONObject e = new JSONObject();
         e.put("tableType", "realtime");
         JSONArray a = new JSONArray();
-        for (String ins : manager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
+        for (String ins : _pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
           a.add(ins);
         }
         e.put("instances", a);

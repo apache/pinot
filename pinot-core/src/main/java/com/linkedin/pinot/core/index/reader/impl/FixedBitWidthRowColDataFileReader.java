@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
+import com.google.common.primitives.Ints;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -231,7 +232,7 @@ public class FixedBitWidthRowColDataFileReader {
       colSizesInBits[i] = colSize;
       rowSizeInBits += colSize;
     }
-    totalSizeInBytes = ((rowSizeInBits * rows) + 7) / 8;
+    totalSizeInBytes = Ints.checkedCast(((((long) rowSizeInBits) * rows) + 7) / 8);
 
   }
 
@@ -242,14 +243,14 @@ public class FixedBitWidthRowColDataFileReader {
    * @param col
    * @return
    */
-  private int computeBitOffset(int row, int col) {
+  private long computeBitOffset(int row, int col) {
     if (row >= rows || col >= cols) {
       final String message = String.format(
           "Input (%d,%d) is not with in expected range (%d,%d)", row, col,
           rows, cols);
       throw new IndexOutOfBoundsException(message);
     }
-    final int offset = row * rowSizeInBits + colBitOffSets[col];
+    final long offset = ((long) row) * rowSizeInBits + colBitOffSets[col];
     return offset;
   }
 
@@ -260,8 +261,8 @@ public class FixedBitWidthRowColDataFileReader {
    * @return
    */
   public int getInt(int row, int col) {
-    final int startBitOffset = computeBitOffset(row, col);
-    final int endBitOffset = startBitOffset + colSizesInBits[col];
+    final long startBitOffset = computeBitOffset(row, col);
+    final long endBitOffset = startBitOffset + colSizesInBits[col];
     int ret = customBitSet.readInt(startBitOffset, endBitOffset);
     ret = ret - offsets[col];
     return ret;

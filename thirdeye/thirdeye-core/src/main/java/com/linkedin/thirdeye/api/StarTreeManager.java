@@ -25,6 +25,12 @@ public interface StarTreeManager
   StarTree getMutableStarTree(String collection);
 
   /**
+   *
+   * Returns the maxDataTime available in the collection
+   */
+  Long getMaxDataTime(String collection);
+
+  /**
    * Returns the index metadata for a data segment.
    */
   IndexMetadata getIndexMetadata(UUID treeId);
@@ -40,4 +46,5 @@ public interface StarTreeManager
    * Closes all star trees this manager is managing
    */
   void close(String collection) throws IOException;
+
 }

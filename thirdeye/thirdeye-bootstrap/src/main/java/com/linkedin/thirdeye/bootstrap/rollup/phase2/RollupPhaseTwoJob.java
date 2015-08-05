@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
@@ -43,6 +44,7 @@ import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.bootstrap.aggregation.DimensionStats;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseStats;
 
 public class RollupPhaseTwoJob extends Configured {
@@ -59,7 +61,6 @@ public class RollupPhaseTwoJob extends Configured {
 
   public static class RollupPhaseTwoMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
-    private static final String DIMENSION_VALUES_OBJECT = "dimensionValues";
     private RollupPhaseTwoConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -77,7 +78,7 @@ public class RollupPhaseTwoJob extends Configured {
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH.toString()));
-      analysisResults = new Path(configuration.get(ROLLUP_PHASE2_ANALYSIS_PATH.toString()), StarTreeConstants.ANALYSIS_RESULTS_FILE);
+      analysisResults = new Path(configuration.get(ROLLUP_PHASE2_ANALYSIS_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
@@ -91,6 +92,9 @@ public class RollupPhaseTwoJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupOrder = config.getRollupOrder();
+        if (rollupOrder == null) {
+          getRollupOrder();
+        }
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
 
@@ -135,11 +139,6 @@ public class RollupPhaseTwoJob extends Configured {
       List<DimensionKey> combinations = new ArrayList<DimensionKey>();
       String[] comb = Arrays.copyOf(dimensionsValues, dimensionsValues.length);
 
-      FileSystem fileSystem = FileSystem.get(new Configuration());
-      if (fileSystem.exists(analysisResults)) {
-        getRollupOrder();
-      }
-
       for (String dimensionToRollup : rollupOrder) {
         comb = Arrays.copyOf(comb, comb.length);
         comb[dimensionNameToIndexMapping.get(dimensionToRollup)] = "?";
@@ -149,14 +148,22 @@ public class RollupPhaseTwoJob extends Configured {
     }
 
     /**
-     * Get rollup order from analysis results
+     * Get rollup order from dimension stats results
      */
     private void getRollupOrder() throws IOException {
 
       try {
         FileSystem fileSystem = FileSystem.get(new Configuration());
+
+        DimensionStats aggDimensionStats = new DimensionStats();
         ObjectMapper objectMapper = new ObjectMapper();
-        AnalysisPhaseStats analysisPhaseStats = objectMapper.readValue(new InputStreamReader(fileSystem.open(analysisResults)), AnalysisPhaseStats.class);
+
+        FileStatus[] dimensionStatsFiles = fileSystem.listStatus(analysisResults);
+        for (FileStatus fileStatus : dimensionStatsFiles) {
+          Path dimensionStatsFile = fileStatus.getPath();
+          DimensionStats dimensionStats = objectMapper.readValue(new InputStreamReader(fileSystem.open(dimensionStatsFile)), DimensionStats.class);
+          aggDimensionStats.update(dimensionStats);
+        }
 
         SortedSet<Entry<String, Set<String>>> sortedDimensionCardinality =
             new TreeSet<Entry<String, Set<String>>> (new Comparator<Entry<String, Set<String>>>() {
@@ -166,7 +173,7 @@ public class RollupPhaseTwoJob extends Configured {
                return (new Integer(dimension2.getValue().size())).compareTo(dimension1.getValue().size());
              }
        });
-        sortedDimensionCardinality.addAll(analysisPhaseStats.getDimensionValues().entrySet());
+        sortedDimensionCardinality.addAll(aggDimensionStats.getDimensionValues().entrySet());
         LOGGER.info("Sorted order {}", sortedDimensionCardinality);
 
         Iterator<Entry<String, Set<String>>> it = sortedDimensionCardinality.iterator();

@@ -18,7 +18,6 @@ package com.linkedin.pinot.tools.admin.command;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

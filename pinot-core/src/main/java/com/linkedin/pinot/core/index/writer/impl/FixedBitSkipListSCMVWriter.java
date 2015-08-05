@@ -26,6 +26,8 @@ import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,6 +44,8 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  *
  */
 public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSkipListSCMVWriter.class);
+
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 1;
   private int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
@@ -58,8 +62,8 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
   int prevRowId = -1;
   private int chunkOffsetHeaderSize;
   private int bitsetSize;
-  private int rawDataSize;
-  private int totalSize;
+  private long rawDataSize;
+  private long totalSize;
   private int docsPerChunk;
 
   public FixedBitSkipListSCMVWriter(File file, int numDocs, int totalNumValues, int columnSizeInBits) throws Exception {
@@ -68,7 +72,7 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
     this.numChunks = (numDocs + docsPerChunk - 1) / docsPerChunk;
     chunkOffsetHeaderSize = numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     bitsetSize = (totalNumValues + 7) / 8;
-    rawDataSize = (totalNumValues * columnSizeInBits + 7) / 8;
+    rawDataSize = ((long) totalNumValues * columnSizeInBits + 7) / 8;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     raf = new RandomAccessFile(file, "rw");
     chunkOffsetsBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize);
@@ -94,11 +98,11 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
     return bitsetSize;
   }
 
-  public int getRawDataSize() {
+  public long getRawDataSize() {
     return rawDataSize;
   }
 
-  public int getTotalSize() {
+  public long getTotalSize() {
     return totalSize;
   }
 

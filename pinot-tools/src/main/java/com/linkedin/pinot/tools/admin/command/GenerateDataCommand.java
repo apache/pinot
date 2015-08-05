@@ -86,7 +86,7 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
 
   @Override
   public String toString() {
-    return ("GenerateDataCommand -numRecords " + _numRecords + " -numFiles " + " " + _numFiles +
+    return ("GenerateData -numRecords " + _numRecords + " -numFiles " + " " + _numFiles +
         " -schemaFile " + _schemaFile + " -outDir " + _outDir +
         " -schemaAnnotationFile " + _schemaAnnFile);
   }

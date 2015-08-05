@@ -3,10 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.*;
-import com.linkedin.thirdeye.dashboard.util.DataCache;
-import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.util.UriUtils;
+import com.linkedin.thirdeye.dashboard.util.*;
 import com.linkedin.thirdeye.dashboard.views.*;
 import com.sun.jersey.api.NotFoundException;
 import io.dropwizard.views.View;
@@ -15,10 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.*;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
+import javax.ws.rs.core.*;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.Future;
@@ -32,6 +26,7 @@ public class DashboardResource {
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
   private final String serverUri;
+  private final String feedbackEmailAddress;
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
@@ -39,6 +34,7 @@ public class DashboardResource {
 
   public DashboardResource(String serverUri,
                            DataCache dataCache,
+                           String feedbackEmailAddress,
                            QueryCache queryCache,
                            ObjectMapper objectMapper,
                            CustomDashboardResource customDashboardResource) {
@@ -47,6 +43,7 @@ public class DashboardResource {
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
     this.customDashboardResource = customDashboardResource;
+    this.feedbackEmailAddress = feedbackEmailAddress;
   }
 
   @GET
@@ -216,10 +213,11 @@ public class DashboardResource {
           new DateTime(baselineMillis),
           new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType),
+          new DimensionView(dimensionView, dimensionViewType), 
           earliestDataTime,
           latestDataTime,
-          customDashboardNames);
+          customDashboardNames,
+          feedbackEmailAddress);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e;  // sends appropriate HTTP response
@@ -240,7 +238,7 @@ public class DashboardResource {
       @PathParam("baselineMillis") Long baselineMillis,
       @PathParam("currentMillis") Long currentMillis,
       @Context UriInfo uriInfo) throws Exception {
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+    MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
     // Metric view
@@ -259,7 +257,7 @@ public class DashboardResource {
       case TIME_SERIES_OVERLAY:
       case FUNNEL:
         // n.b. will query /flot resource async
-        return new MetricViewTimeSeries(schema, dimensionValues);
+        return new MetricViewTimeSeries(schema, ViewUtils.flattenDisjunctions(dimensionValues));
       default:
         throw new NotFoundException("No metric view implementation for " + metricViewType);
     }
@@ -277,7 +275,7 @@ public class DashboardResource {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+    MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
 
     // Dimension view
     Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
@@ -287,7 +285,7 @@ public class DashboardResource {
         for (String dimension : schema.getDimensions()) {
           if (!dimensionValues.containsKey(dimension)) {
             // Generate SQL (n.b. will query /flot resource async)
-            dimensionValues.put(dimension, "!");
+            dimensionValues.put(dimension, Arrays.asList("!"));
             String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
             LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
             dimensionValues.remove(dimension);
@@ -300,7 +298,7 @@ public class DashboardResource {
         for (String dimension : schema.getDimensions()) {
           if (!dimensionValues.containsKey(dimension)) {
             // Generate SQL
-            dimensionValues.put(dimension, "!");
+            dimensionValues.put(dimension, Arrays.asList("!"));
             String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
             LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
             dimensionValues.remove(dimension);

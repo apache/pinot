@@ -99,7 +99,7 @@ public class PerfBenchmarkRunner {
       }
 
     } else {
-      System.err.println("Expected one of [setupWithPreLoadedSegments]");
+      System.err.println("Expected one of [startAll|startAllButServer|StartServerWithPreLoadedSegments]");
     }
   }
 }

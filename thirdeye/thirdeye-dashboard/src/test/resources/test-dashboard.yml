@@ -15,5 +15,7 @@ components:
     - RATIO(C,B)
     - C
     dimensions:
-      A: A0
-      C: C1
+      A:
+      - A0
+      C:
+      - C1

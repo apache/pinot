@@ -17,11 +17,14 @@ package com.linkedin.pinot.controller.helix;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -117,6 +120,64 @@ public class PinotResourceManagerTest {
                   TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME)).getPartitionSet().size(), i);
       i--;
     }
+  }
+
+  /**
+   * Creates 5 threads that concurrently try to add 20 segments each, and asserts that we have
+   * 100 segments in the end. Then launches 5 threads again that concurrently try to delete all segments,
+   * and makes sure that we have zero segments left in the end.
+   * @throws Exception
+   */
+
+  @Test
+  public void testConcurrentAddingAndDeletingSegments() throws Exception {
+    ExecutorService addSegmentExecutor = Executors.newFixedThreadPool(5);
+
+    for (int i = 0; i < 5; ++i) {
+      addSegmentExecutor.execute(new Runnable() {
+
+        @Override
+        public void run() {
+          for (int i = 0; i < 20; ++i) {
+            addOneSegment(TABLE_NAME);
+            try {
+              Thread.sleep(1000);
+            } catch (InterruptedException e) {
+              Assert.assertFalse(true, "Exception caught during sleep.");
+            }
+          }
+        }
+      });
+    }
+    addSegmentExecutor.shutdown();
+    while (!addSegmentExecutor.isTerminated()) {
+    }
+
+    final String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME);
+    IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
+    Assert.assertEquals(idealState.getPartitionSet().size(), 100);
+
+    ExecutorService deleteSegmentExecutor = Executors.newFixedThreadPool(5);
+    for (final String segment : idealState.getPartitionSet()) {
+      deleteSegmentExecutor.execute(new Runnable() {
+
+        @Override
+        public void run() {
+          deleteOneSegment(offlineTableName, segment);
+          try {
+            Thread.sleep(1000);
+          } catch (InterruptedException e) {
+            Assert.assertFalse(true, "Exception caught during sleep.");
+          }
+        }
+      });
+    }
+    deleteSegmentExecutor.shutdown();
+    while (!deleteSegmentExecutor.isTerminated()) {
+    }
+
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
+    Assert.assertEquals(idealState.getPartitionSet().size(), 0);
   }
 
   public void testWithCmdLines() throws Exception {

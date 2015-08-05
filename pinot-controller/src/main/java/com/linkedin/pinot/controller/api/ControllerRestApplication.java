@@ -17,13 +17,16 @@ package com.linkedin.pinot.controller.api;
 
 import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
 import com.linkedin.pinot.controller.api.swagger.Paths;
+
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import it.unimi.dsi.fastutil.ints.IntComparators;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.TreeSet;
+
 import org.apache.commons.collections.ComparatorUtils;
 import org.restlet.Application;
 import org.restlet.Request;
@@ -38,7 +41,7 @@ import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
 import com.linkedin.pinot.controller.api.restlet.resources.PinotControllerHealthCheck;
-import com.linkedin.pinot.controller.api.restlet.resources.PinotInstance;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotInstanceRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotSchemaRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource;
@@ -51,6 +54,7 @@ import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSegmentConf
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableTenantConfigs;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTenantRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,7 +107,7 @@ public class ControllerRestApplication extends Application {
      *  End Routes 2.0
      */
 
-    attachRoutesForClass(router, PinotInstance.class);
+    attachRoutesForClass(router, PinotInstanceRestletResource.class);
 
     router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
 

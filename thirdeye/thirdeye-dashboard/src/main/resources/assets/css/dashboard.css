@@ -88,6 +88,10 @@
     font-weight: bold;
 }
 
+.sidenav-feedback-link{
+    padding:8px;
+}
+
 /* Metric */
 
 .metric-table-down-cell {
