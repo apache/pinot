@@ -16,18 +16,14 @@
 package com.linkedin.pinot.core.index.writer.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import com.linkedin.pinot.core.util.CustomBitSet;
+import org.apache.commons.io.IOUtils;
+
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-
-import com.linkedin.pinot.core.util.CustomBitSet;
-import org.apache.commons.io.IOUtils;
 
 
 /**
@@ -58,6 +54,11 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
+  /**
+   * forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits }, new boolean[] { hasNulls })
+   * @param cols 1
+   * @param columnSizesInBits 是一个空数组，长度是列的势
+   * */
   public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
       int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);
@@ -131,11 +132,15 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   /**
    *
    * @param row
-   * @param col
+   * @param col 通常情况等于0
    * @param val
    */
   public void setInt(int row, int col, int val) {
     assert val >= minValues[col]  && val <= maxValues[col];
+    // rowSizeInBits = 1
+    // columnOffsetsInBits[0]=0
+    // bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
+    //=> bitOffset =  row
     int bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
     val = val + offsets[col];
     for (int bitPos = colSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
