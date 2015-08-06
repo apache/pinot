@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
 import com.linkedin.thirdeye.api.*;
+
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
@@ -31,6 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 public class TestThirdEyeQueryExecutor {
@@ -69,7 +71,7 @@ public class TestThirdEyeQueryExecutor {
     when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn
     (new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
         0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
-        "HOURLY", TimeUnit.HOURS.toString(), 1));
+        "HOURLY", TimeUnit.HOURS.toString(), 1, IndexFormat.VARIABLE_SIZE));
 
     executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     queryExecutor = new ThirdEyeQueryExecutor(executorService, starTreeManager);
@@ -232,6 +234,7 @@ public class TestThirdEyeQueryExecutor {
         endWall.getMillis(),
         timeGranularity,
         TimeUnit.MILLISECONDS.toString(),
-        1);
+        1,
+        IndexFormat.VARIABLE_SIZE);
   }
 }

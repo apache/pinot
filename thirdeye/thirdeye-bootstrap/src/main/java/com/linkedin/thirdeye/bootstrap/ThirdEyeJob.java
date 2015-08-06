@@ -64,6 +64,7 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
+import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 /**
@@ -687,7 +688,7 @@ public class ThirdEyeJob {
     IndexMetadata mergedIndexMetadata = new IndexMetadata
         (min, max, minMillis, maxMillis,
             startTime, endTime, startTimeMillis, endTimeMillis,
-            schedule, aggregationGranularity, bucketSize);
+            schedule, aggregationGranularity, bucketSize, IndexFormat.VARIABLE_SIZE);
 
     return mergedIndexMetadata;
   }

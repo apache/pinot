@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 public class TestStarTreeManagerImpl {
@@ -86,7 +87,7 @@ public class TestStarTreeManagerImpl {
     starTree.close();
 
     // create metadata
-    IndexMetadata indexMetadata = new IndexMetadata(0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L, "HOURLY", "MILLISECONDS", 1);
+    IndexMetadata indexMetadata = new IndexMetadata(0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L, "HOURLY", "MILLISECONDS", 1, IndexFormat.VARIABLE_SIZE);
     properties = indexMetadata.toProperties();
 
   }

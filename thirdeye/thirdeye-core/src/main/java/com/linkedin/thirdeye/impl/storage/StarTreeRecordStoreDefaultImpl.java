@@ -78,7 +78,7 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
     for (DimensionKey dimensionKey : dimensionKeys)
     {
       Map<DimensionKey, Integer> logicalOffsets = dimensionStore.findMatchingKeys(dimensionKey);
-      MetricTimeSeries timeSeries = metricStore.getTimeSeries(logicalOffsets.values(), null);
+      MetricTimeSeries timeSeries = metricStore.getTimeSeries(new ArrayList(logicalOffsets.values()), null);
       records.add(new StarTreeRecordImpl.Builder()
                           .setDimensionKey(dimensionKey)
                           .setMetricTimeSeries(timeSeries)
@@ -201,6 +201,6 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   private MetricTimeSeries doQuery(StarTreeQuery query)
   {
     Map<DimensionKey, Integer> logicalOffsets = dimensionStore.findMatchingKeys(query.getDimensionKey());
-    return metricStore.getTimeSeries(logicalOffsets.values(), query.getTimeRange());
+    return metricStore.getTimeSeries(new ArrayList(logicalOffsets.values()), query.getTimeRange());
   }
 }

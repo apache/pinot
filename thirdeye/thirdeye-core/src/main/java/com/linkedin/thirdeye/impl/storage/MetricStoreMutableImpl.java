@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -47,7 +48,7 @@ public class MetricStoreMutableImpl implements MetricStore
   }
 
   @Override
-  public MetricTimeSeries getTimeSeries(Collection<Integer> logicalOffsets, TimeRange timeRange)
+  public MetricTimeSeries getTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange)
   {
     MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 

@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -246,18 +247,12 @@ public class TestStarTreeRecordStoreDefaultImpl
 
   private ByteBuffer generateBuffer(TimeRange timeRange)
   {
-    ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
-
     List<MetricTimeSeries> allSeries = generateTimeSeries(timeRange);
-
-    for (MetricTimeSeries timeSeries : allSeries)
-    {
-      StorageUtils.addToMetricStore(config, buffer, timeSeries);
-    }
-
-    buffer.flip();
-
-    return buffer;
+    // System.out.println(allSeries);
+    ByteBuffer metricBuffer = VariableSizeBufferUtil.createMetricBuffer(config, allSeries);
+    String dump = VariableSizeBufferUtil.dump(metricBuffer, metricSchema);
+    // System.out.println(dump);
+    return metricBuffer;
   }
 
   private Number[] getSums(Number m)
