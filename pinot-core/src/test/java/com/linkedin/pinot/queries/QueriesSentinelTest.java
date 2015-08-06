@@ -194,8 +194,8 @@ public class QueriesSentinelTest {
 
     // 5 single-value columns -- column 3 is String type
     for (int i = 1; i <= 2; i++) {
-      aggCalls.add(new TestSimpleAggreationQuery("select quantileacc50(column" + i + ") from testTable limit 0", 0.0));
-      aggCalls.add(new TestSimpleAggreationQuery("select quantile50(column" + i + ") from testTable limit 0", 0.0));
+      aggCalls.add(new TestSimpleAggreationQuery("select percentile50(column" + i + ") from testTable limit 0", 0.0));
+      aggCalls.add(new TestSimpleAggreationQuery("select percentileest50(column" + i + ") from testTable limit 0", 0.0));
     }
 
     runApproximationQueries(aggCalls, 0.05);
@@ -209,8 +209,8 @@ public class QueriesSentinelTest {
       if (i == 2) {
         //continue;
       }
-      groupByCalls.add(new TestGroupByAggreationQuery("select quantileacc50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
-      groupByCalls.add(new TestGroupByAggreationQuery("select quantile50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
+      groupByCalls.add(new TestGroupByAggreationQuery("select percentile50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
+      groupByCalls.add(new TestGroupByAggreationQuery("select percentileest50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
     }
 
     runApproximationQueries(groupByCalls, 0.05);

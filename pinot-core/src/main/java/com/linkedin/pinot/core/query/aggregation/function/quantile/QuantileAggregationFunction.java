@@ -40,14 +40,14 @@ import java.util.List;
  * it will sort a large list which incurs significant overhead.
  *
  */
-public class QuantileAccurateAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileAccurateAggregationFunction.class);
+public class QuantileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileAggregationFunction.class);
   public static final int DEFAULT_COMPRESSION_FACTOR = 100;
 
   private String _columnName;
   private byte _quantile; // 0-100
 
-  public QuantileAccurateAggregationFunction(byte quantile) {
+  public QuantileAggregationFunction(byte quantile) {
     _quantile = quantile;
   }
 

@@ -20,8 +20,8 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionRegistry;
 /**
  * register function in {@link AggregationFunctionRegistry}
  */
-public class QuantileAccurate50 extends QuantileAccurateAggregationFunction {
-    public QuantileAccurate50() {
+public class Percentileest50 extends QuantileTDigestAggregationFunction {
+    public Percentileest50() {
         super((byte) 50);
     }
 }

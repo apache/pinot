@@ -42,7 +42,7 @@ public class TDigestTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(TDigestTest.class);
     private static final int compressionFactor = 100;
     private static final HashMap<Byte, QuantileTDigestAggregationFunction> functionMap = new HashMap<Byte, QuantileTDigestAggregationFunction>();
-    private static final HashMap<Byte, QuantileAccurateAggregationFunction> accurateFunctionMap = new HashMap<Byte, QuantileAccurateAggregationFunction>();
+    private static final HashMap<Byte, QuantileAggregationFunction> accurateFunctionMap = new HashMap<Byte, QuantileAggregationFunction>();
 
     public static int[] _docIdsArray;
     public static IntArray _docIds;
@@ -56,13 +56,13 @@ public class TDigestTest {
     private static final int DUPLICATION_PER_ITEM = 10;
 
     static {
-        functionMap.put((byte) 50, new Quantile50());
-        functionMap.put((byte) 90, new Quantile90());
-        functionMap.put((byte) 95, new Quantile95());
+        functionMap.put((byte) 50, new Percentileest50());
+        functionMap.put((byte) 90, new Percentileest90());
+        functionMap.put((byte) 95, new Percentileest95());
 
-        accurateFunctionMap.put((byte) 50, new QuantileAccurateAggregationFunction((byte) 50));
-        accurateFunctionMap.put((byte) 90, new QuantileAccurateAggregationFunction((byte) 90));
-        accurateFunctionMap.put((byte) 95, new QuantileAccurateAggregationFunction((byte) 95));
+        accurateFunctionMap.put((byte) 50, new QuantileAggregationFunction((byte) 50));
+        accurateFunctionMap.put((byte) 90, new QuantileAggregationFunction((byte) 90));
+        accurateFunctionMap.put((byte) 95, new QuantileAggregationFunction((byte) 95));
     }
 
     @BeforeClass

@@ -58,14 +58,14 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("distinctcount", DistinctCountAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcounthll", DistinctCountHLLAggregationFunction.class);
     // quantiles
-    keyToFunctionWithDictionary.put("quantile50", Quantile50.class);
-    keyToFunctionWithDictionary.put("quantile90", Quantile90.class);
-    keyToFunctionWithDictionary.put("quantile95", Quantile95.class);
-    keyToFunctionWithDictionary.put("Quantile99", Quantile99.class);
-    keyToFunctionWithDictionary.put("quantileacc50", QuantileAccurate50.class);
-    keyToFunctionWithDictionary.put("quantileacc90", QuantileAccurate90.class);
-    keyToFunctionWithDictionary.put("quantileacc95", QuantileAccurate95.class);
-    keyToFunctionWithDictionary.put("quantileacc99", QuantileAccurate99.class);
+    keyToFunctionWithDictionary.put("percentileest50", Percentileest50.class);
+    keyToFunctionWithDictionary.put("percentileest90", Percentileest90.class);
+    keyToFunctionWithDictionary.put("percentileest95", Percentileest95.class);
+    keyToFunctionWithDictionary.put("percentileest99", Percentileest99.class);
+    keyToFunctionWithDictionary.put("percentile50", Percentile50.class);
+    keyToFunctionWithDictionary.put("percentile90", Percentile90.class);
+    keyToFunctionWithDictionary.put("percentile95", Percentile95.class);
+    keyToFunctionWithDictionary.put("percentile99", Percentile99.class);
   }
 
   static {

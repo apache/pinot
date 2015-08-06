@@ -302,7 +302,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testQuantileNoGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"quantileacc50", "quantile50"},
+            new String[]{"percentile50", "percentileest50"},
             new String[]{"AirTime"/* int */, "ArrTime"/* int */},
             null,
             0.05);
@@ -311,7 +311,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testQuantileGroupByQuery() throws Exception {
     testApproximationQuery(
-            new String[]{"quantileacc50", "quantile50"},
+            new String[]{"percentile50", "percentileest50"},
             new String[]{"AirTime"/* int */, "ArrTime"/* int */},
             "Carrier",
             0.05);
