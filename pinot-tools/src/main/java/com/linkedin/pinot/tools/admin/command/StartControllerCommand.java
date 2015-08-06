@@ -43,7 +43,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = "/tmp/PinotController";
+  private String _dataDir = TMP_DIR + "PinotController";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -147,7 +147,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
     starter.start();
 
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminController.pid");
+    savePID(TMP_DIR + ".pinotAdminController.pid");
     return true;
   }
 
@@ -155,16 +155,16 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   ControllerConf readConfigFromFile(String configFileName) throws ConfigurationException {
     ControllerConf conf = null;
 
-    if (configFileName != null) {
-      File configFile = new File(_configFileName);
-
-      if (configFile.exists()) {
-        conf = new ControllerConf(configFile);
-      } else {
-        return null;
-      }
+    if (configFileName == null) {
+      return null;
     }
 
+    File configFile = new File(_configFileName);
+    if (!configFile.exists()) {
+      return null;
+    }
+
+    conf = new ControllerConf(configFile);
     return (validateConfig(conf)) ? conf : null;
   }
 

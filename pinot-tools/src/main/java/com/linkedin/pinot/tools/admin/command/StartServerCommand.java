@@ -42,11 +42,11 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
-  private String _dataDir = "/tmp/pinotServerData";
+  private String _dataDir = TMP_DIR  + "pinotServerData";
 
   @Option(name = "-segmentDir", required = false, metaVar = "<string>",
       usage = "Path to directory containing segments.")
-  private String _segmentDir = "/tmp/pinotSegments";
+  private String _segmentDir = TMP_DIR + "pinotSegments";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;

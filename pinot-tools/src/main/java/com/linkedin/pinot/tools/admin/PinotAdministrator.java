@@ -23,6 +23,8 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.SubCommand;
 import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
@@ -47,6 +49,7 @@ import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
  *
  */
 public class PinotAdministrator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
 
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
@@ -96,8 +99,8 @@ public class PinotAdministrator {
   }
 
   public void printUsage() {
-    System.out.println("Usage: pinot-admin.sh <subCommand>");
-    System.out.println("Valid subCommands are:");
+    LOGGER.info("Usage: pinot-admin.sh <subCommand>");
+    LOGGER.info("Valid subCommands are:");
 
     Class<PinotAdministrator> obj = PinotAdministrator.class;
 
@@ -111,12 +114,13 @@ public class PinotAdministrator {
 
           try {
             command = (Command) subCommandClass.newInstance();
-            System.out.println("\t" + subCommand.name() + "\t<" + command.description() + ">");
+            LOGGER.info("\t" + subCommand.name() + "\t<" + command.description() + ">");
           } catch (Exception e) {
-            System.out.println("Internal Error: Error instantiating class.");
+            LOGGER.info("Internal Error: Error instantiating class.");
           }
         }
       }
     }
+    LOGGER.info("For other crud operations, please refer to ${ControllerAddress}/help.");
   }
 }

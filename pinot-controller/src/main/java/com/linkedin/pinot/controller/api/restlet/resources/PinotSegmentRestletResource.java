@@ -158,7 +158,7 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
    * @throws JSONException
    */
   @HttpVerb("get")
-  @Summary("Toggle the state of the specified segment.")
+  @Summary("Set the state for a segment to one of {enable|disable|drop}")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/", "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
   private Representation toggleSegmentState(@Parameter(name = "tableName", in = "path",

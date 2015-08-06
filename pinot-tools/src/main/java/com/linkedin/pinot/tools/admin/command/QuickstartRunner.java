@@ -32,6 +32,7 @@ public class QuickstartRunner {
   private final static String _controllerPort = "9000";
   private final static String _controllerAddress = "http://localhost:9000";
   private final static String _segmentName = "baseballStats";
+  private final static String TMP_DIR = System.getProperty("java.io.dir") + File.separator;
 
   private final static int _zkPort = 2181;
   private final static int _brokerPort = 8099;
@@ -79,7 +80,7 @@ public class QuickstartRunner {
   void StartServer() throws Exception {
     StartServerCommand serverStarter = new StartServerCommand();
     serverStarter.setClusterName(_clusterName).setZkAddress(_zkAddress).setPort(_serverPort)
-        .setDataDir("/tmp/PinotServerData").setSegmentDir("/tmp/PinotServerSegment");
+        .setDataDir(TMP_DIR + "PinotServerData").setSegmentDir(TMP_DIR + "PinotServerSegment");
     serverStarter.execute();
   }
 
@@ -91,9 +92,9 @@ public class QuickstartRunner {
   }
 
   public void clean() throws Exception {
-    File controllerDir = new File("/tmp/PinotController");
-    File serverDir1 = new File("/tmp/PinotServer/test");
-    File serverDir2 = new File("/tmp/PinotServer/test/8003/index");
+    File controllerDir = new File(TMP_DIR + "PinotController");
+    File serverDir1 = new File(TMP_DIR + "PinotServer/test");
+    File serverDir2 = new File(TMP_DIR + "PinotServer/test/8003/index");
     FileUtils.deleteDirectory(controllerDir);
     FileUtils.deleteDirectory(serverDir1);
     FileUtils.deleteDirectory(serverDir2);

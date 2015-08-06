@@ -229,7 +229,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
   }
 
   @HttpVerb("get")
-  @Summary("Gets information about a tenant")
+  @Summary("Set the state of a tenant to one of {enable|disable|drop}")
   @Tags({ "tenant" })
   @Paths({ "/tenants/{tenantName}", "/tenants/{tenantName}/" })
   private StringRepresentation toggleTenantState(
