@@ -1,13 +1,21 @@
 <script src="/assets/js/thirdeye.dimension.heatmap.js"></script>
 
-<div class="heat-map-icons">
-  <span id="dimension-heat-map-help">
-      <a href="#dimension-help-modal" data-uk-modal><i class="uk-icon-button uk-icon-question"></i></a>
-  </span>
-  <span class="dimension-heat-map-filter">
-      <input id="dimension-heat-map-filter" type="checkbox" checked>
-      <label for="dimension-heat-map-filter"><i id="heat-map-filter-icon" class="uk-icon-button uk-icon-filter data-uk-tooltip" title="Only show elements with 0.5% or greater volume change"></i></label>
-  </span>
+<div class="uk-button-group heat-map-buttons">
+
+        <button class="uk-button dimension-heat-map-filter-btn data-uk-tooltip" title="Only show elements with 0.5% or greater volume change">
+             <input id="dimension-heat-map-filter" class="dimension-heat-map-filter" type="checkbox" checked>
+                 <label class="dimension-heat-map-filter-label" for="dimension-heat-map-filter" >
+                 <i id="heat-map-filter-icon" class="uk-icon-filter"></i>
+             </label>
+        </button>
+
+
+        <button class="uk-button dimension-heat-map-help-btn">
+              <a href="#dimension-help-modal" class="dimension-heat-map-help-link" data-uk-modal>
+                  <i class="uk-icon-question"></i>
+              </a>
+        </button>
+
 </div>
 
 <div id="dimension-help-modal" class="uk-modal">
