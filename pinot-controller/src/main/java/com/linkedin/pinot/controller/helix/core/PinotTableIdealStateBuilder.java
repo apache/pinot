@@ -82,7 +82,6 @@ public class PinotTableIdealStateBuilder {
       final int replicas = numCopies;
       uAutoModeISBuilder.setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
               .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
-
       final IdealState idealState = uAutoModeISBuilder.build();
       idealState.setRebalancerClassName(UAutoRebalancer.class.getName());
     return idealState;
@@ -287,7 +286,7 @@ public class PinotTableIdealStateBuilder {
       final List<String> selectedInstances =
           segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas,
               serverTenant);
-        logger.info("addNewOfflineSegmentToIdealStateFor:"+selectedInstances.toString());
+//        logger.info("addNewOfflineSegmentToIdealStateFor:"+selectedInstances.toString());
       for (final String instance : selectedInstances) {
         currentIdealState.setPartitionState(segmentName, instance, ONLINE);
       }

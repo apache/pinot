@@ -42,8 +42,8 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
 
     @Override
     public ResourceAssignment computeBestPossiblePartitionState(ClusterDataCache cache, IdealState idealState, Resource resource, CurrentStateOutput currentStateOutput) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Processing resource:" + resource.getResourceName());
+        if (LOG.isInfoEnabled()) {
+            LOG.info("Processing resource:" + resource.getResourceName());
         }
         String stateModelDefName = idealState.getStateModelDefRef();
         StateModelDefinition stateModelDef = cache.getStateModelDef(stateModelDefName);
@@ -73,24 +73,19 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
 
     @Override
     public IdealState computeNewIdealState(String resourceName, IdealState currentIdealState, CurrentStateOutput currentStateOutput, ClusterDataCache clusterData) {
-        LOG.info("current idealstate :" + currentIdealState.toString());
-        LOG.info("current state output :" + currentStateOutput.toString());
-        LOG.info("cluster datecache : " + clusterData.toString());
+        LOG.info("######resourceName :"+resourceName);
+        LOG.info("######current idealstate :" + currentIdealState.toString());
+        LOG.info("#######current state output :" + currentStateOutput.toString());
+        LOG.info("#########cluster datecache : " + clusterData.toString());
 
-        Map<String,String> tmpSimple = currentIdealState.getRecord().getSimpleFields();
         List<String> partitions = new ArrayList<String>(currentIdealState.getPartitionSet());
         String stateModelName = currentIdealState.getStateModelDefRef();
         StateModelDefinition stateModelDef = clusterData.getStateModelDef(stateModelName);
         Map<String, LiveInstance> liveInstance = clusterData.getLiveInstances();
-        for (String instanceName : liveInstance.keySet()){
-            if (instanceName.startsWith("Broker_"))
-                liveInstance.remove(instanceName);
-        }
         String replicas = currentIdealState.getReplicas();
-        LOG.info("Partitions:" + partitions.toString() + ";live Instance:" + liveInstance + ";statemodeldef:" + stateModelDef.toString() + ";Replicas:" + replicas);
+        LOG.info("######Partitions:" + partitions.toString() + ";live Instance:" + liveInstance + ";statemodeldef:" + stateModelDef.toString() + ";Replicas:" + replicas);
         LinkedHashMap<String, Integer> stateCountMap = new LinkedHashMap<String, Integer>();
         stateCountMap = stateCount(stateModelDef, liveInstance.size(), Integer.parseInt(replicas));
-        LOG.info("StateCountMap:" + stateCountMap.toString());
         List<String> liveNodes = new ArrayList<String>(liveInstance.keySet());
         List<String> allNodes = new ArrayList<String>(clusterData.getInstanceConfigMap().keySet());
         Map<String, Map<String, String>> currentMapping =
@@ -133,22 +128,6 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
         Collections.sort(allNodes);
         Collections.sort(liveNodes);
 
-        List<String> liveServers = new ArrayList<String>();
-        List<String> allServers = new ArrayList<String>();
-
-        for (String tmp:liveNodes){
-            if(tmp.startsWith("Server"))
-                liveServers.add(tmp);
-        }
-        for (String tmp:allNodes){
-            if(tmp.startsWith("Server"))
-                allServers.add(tmp);
-        }
-
-         LOG.info("live servers"+liveServers.toString());
-         LOG.info("all servers"+allServers.toString());
-
-
         int maxPartition = currentIdealState.getMaxPartitionsPerInstance();
 
         if (LOG.isInfoEnabled()) {
@@ -158,24 +137,64 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
             LOG.info("allNodes: " + allNodes);
             LOG.info("maxPartition: " + maxPartition);
         }
-        AutoRebalanceStrategy.ReplicaPlacementScheme placementScheme = new AutoRebalanceStrategy.DefaultPlacementScheme();
-        placementScheme.init(_manager);
-        _algorithm =
-                new AutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition,
-                        placementScheme);
-        ZNRecord newMapping =
-                _algorithm.computePartitionAssignment(liveServers, currentMapping, allServers);
+
+        ZNRecord newMapping = null;
+        List<String> liveServers = new ArrayList<String>();
+        List<String> allServers = new ArrayList<String>();
+        List<String> liveBrokers = new ArrayList<String>();
+        List<String> allBrokers = new ArrayList<String>();
+
+        for (String tmp:liveNodes){
+            if (tmp.startsWith("Broker_")){
+                liveBrokers.add(tmp);
+            }else{
+                liveServers.add(tmp);
+            }
+        }
+        for (String tmp:allNodes){
+            if (tmp.startsWith("Broker_")){
+                allBrokers.add(tmp);
+            }else{
+                allServers.add(tmp);
+            }
+        }
+
+        if (resourceName.equals("brokerResource")){
+            newMapping = calculateNewMapping(resourceName,partitions,stateCountMap,maxPartition,liveBrokers,currentMapping,allBrokers);
+        } else{
+            newMapping = calculateNewMapping(resourceName,partitions,stateCountMap,maxPartition,liveServers,currentMapping,allServers);
+        }
+
+//        AutoRebalanceStrategy.ReplicaPlacementScheme placementScheme = new AutoRebalanceStrategy.DefaultPlacementScheme();
+//        placementScheme.init(_manager);
+//        _algorithm =
+//                new AutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition,
+//                        placementScheme);
+//        ZNRecord newMapping =
+//                _algorithm.computePartitionAssignment(liveNodes, currentMapping, allNodes);
 
         if (LOG.isInfoEnabled()) {
             LOG.info("newMapping: " + newMapping);
         }
 
         IdealState newIdealState = new IdealState(resourceName);
-        newIdealState.getRecord().setSimpleFields(tmpSimple);
+        newIdealState.getRecord().setSimpleFields(currentIdealState.getRecord().getSimpleFields());
         newIdealState.getRecord().setMapFields(newMapping.getMapFields());
         newIdealState.getRecord().setListFields(newMapping.getListFields());
-        LOG.info("new ideal state:"+newIdealState.toString());
+        LOG.info("#########new ideal state:"+newIdealState.toString());
         return newIdealState;
+    }
+
+    public  ZNRecord calculateNewMapping(String resourceName,List<String> partitions,LinkedHashMap<String, Integer> stateCountMap,int maxPartition,
+                                         List<String> liveNodes,Map<String, Map<String, String>> currentMapping,List<String> allNodes) {
+        AutoRebalanceStrategy.ReplicaPlacementScheme placementScheme = new AutoRebalanceStrategy.DefaultPlacementScheme();
+        placementScheme.init(_manager);
+        _algorithm =
+                new AutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition,
+                        placementScheme);
+        ZNRecord newMapping =
+                _algorithm.computePartitionAssignment(liveNodes, currentMapping, allNodes);
+        return newMapping;
     }
 
     public static LinkedHashMap<String, Integer> stateCount(StateModelDefinition stateModelDef,
