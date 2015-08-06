@@ -23,11 +23,11 @@ import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
-import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreator, Closeable {
+public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator, Closeable {
 
   private final File forwardIndexFile;
   private final FieldSpec spec;
@@ -45,15 +45,10 @@ public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreato
   }
 
   @Override
-  public void index(int docId, Object e) {
-    final Object[] entryArr = ((Object[]) e);
-    Arrays.sort(entryArr);
+  public void index(int docId, int[] dictionaryIndices) {
+    final int[] entries = Arrays.copyOf(dictionaryIndices, dictionaryIndices.length);
+    Arrays.sort(entries);
 
-    final int[] entries = new int[entryArr.length];
-
-    for (int i = 0; i < entryArr.length; i++) {
-      entries[i] = ((Integer) entryArr[i]).intValue();
-    }
     mVWriter.setIntArray(docId, entries);
   }
 

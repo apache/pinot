@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-import java.io.IOException;
 
-
-public interface ForwardIndexCreator {
-  void close() throws IOException;
+public interface MultiValueForwardIndexCreator extends ForwardIndexCreator {
+  void index(int docId, int[] dictionaryIndices);
 }

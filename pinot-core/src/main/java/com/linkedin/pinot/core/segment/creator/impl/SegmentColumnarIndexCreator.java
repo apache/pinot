@@ -52,6 +52,8 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -155,16 +157,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final String column : dictionaryCreatorMap.keySet()) {
 
       Object columnValueToIndex = row.getValue(column);
-      Object dictionaryIndex;
-      if (dictionaryCache.get(column).containsKey(columnValueToIndex)) {
-        dictionaryIndex = dictionaryCache.get(column).get(columnValueToIndex);
+      if (schema.getFieldSpecFor(column).isSingleValueField()) {
+        int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
+        ((SingleValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
       } else {
-        dictionaryIndex = dictionaryCreatorMap.get(column).indexOf(columnValueToIndex);
-        dictionaryCache.get(column).put(columnValueToIndex, dictionaryIndex);
-      }
-      forwardIndexCreatorMap.get(column).index(docIdCounter, dictionaryIndex);
-      if (config.createInvertedIndexEnabled()) {
-        invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+        int[] dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
+        ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
       }
     }
     docIdCounter++;
