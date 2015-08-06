@@ -104,6 +104,8 @@
 
 .metric-table-time {
     white-space: nowrap;
+    cursor: pointer;
+    text-decoration: underline;
 }
 
 .metric-table-group-1 {
