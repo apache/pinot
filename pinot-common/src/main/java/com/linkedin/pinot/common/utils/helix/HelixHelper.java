@@ -87,14 +87,11 @@ public class HelixHelper {
 
   public static Set<String> getAllInstancesForResource(IdealState state) {
     final Set<String> instances = new HashSet<String>();
-    IdealState.RebalanceMode rebalanceMode = state.getRebalanceMode();
-    state.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
     for (final String partition : state.getPartitionSet()) {
       for (final String instance : state.getInstanceSet(partition)) {
         instances.add(instance);
       }
     }
-    state.setRebalanceMode(rebalanceMode);
     return instances;
   }
 
