@@ -31,10 +31,10 @@ public class ReportEmailSender {
   private List<Table> tables;
   private ScheduleSpec scheduleSpec;
   private ReportConfig reportConfig;
-  private List<AnomalyReportTable> anomalyReportTables;
+  private Map<String, AnomalyReportTable> anomalyReportTables;
   private String templatePath;
 
-  public ReportEmailSender(List<Table> tables, ScheduleSpec scheduleSpec, ReportConfig reportConfig, List<AnomalyReportTable> anomalyReportTables, String templatePath) {
+  public ReportEmailSender(List<Table> tables, ScheduleSpec scheduleSpec, ReportConfig reportConfig, Map<String, AnomalyReportTable> anomalyReportTables, String templatePath) {
     this.tables = tables;
     this.scheduleSpec = scheduleSpec;
     this.reportConfig = reportConfig;
@@ -73,7 +73,10 @@ public class ReportEmailSender {
         emailReportMessage.addRecipient(Message.RecipientType.TO,
                          new InternetAddress(emailIdTo, scheduleSpec.getNameTo()));
       }
-      emailReportMessage.setSubject(reportConfig.getName());
+      emailReportMessage.setSubject(ReportConstants.REPORT_SUBJECT_PREFIX +
+          " " + reportConfig.getCollection().toUpperCase() +
+          " (" + reportConfig.getEndTimeString() +
+          ") " + reportConfig.getName());
       emailReportMessage.setContent(emailOutput.toString(), "text/html");
       LOGGER.info("Sending email from {} to {}  ",
           scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo());
