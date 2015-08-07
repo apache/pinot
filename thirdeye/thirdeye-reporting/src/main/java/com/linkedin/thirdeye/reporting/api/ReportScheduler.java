@@ -69,16 +69,12 @@ public class ReportScheduler {
               .withDescription(entry.getKey())
               .usingJobData(newJobDataMap)
               .build();
-          /*Trigger trigger = TriggerBuilder.newTrigger()
+          Trigger trigger = TriggerBuilder.newTrigger()
               .withDescription(entry.getKey())
               .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron()))
-              .build();*/
+              .build();
 
-          Trigger trigger = TriggerBuilder.newTrigger()
-          .withDescription(entry.getKey())
-          .startNow()
-          .withSchedule(SimpleScheduleBuilder.simpleSchedule().withRepeatCount(0))
-          .build();
+
           LOGGER.info("Scheduling job {} with trigger {}", job.getDescription(), entry.getValue().getCron());
           quartzScheduler.scheduleJob(job, trigger);
         }
