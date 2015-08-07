@@ -168,7 +168,7 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
   }
 
   @HttpVerb("get")
-  @Summary("Set the state of a table to one of {enable|disable|drop}")
+  @Summary("Enable, disable or drop a table")
   @Tags({ "table" })
   @Paths({ "/tables/{tableName}", "/table/{tableName}/" })
   private StringRepresentation setTablestate(
