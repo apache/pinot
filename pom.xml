@@ -88,6 +88,7 @@
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
     <kafka.version>0.8.2.0</kafka.version>
+    <helix.version>0.6.5</helix.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms10G -Xmx10G</argLine>
   </properties>
@@ -358,7 +359,7 @@
       <dependency>
         <groupId>org.apache.helix</groupId>
         <artifactId>helix-core</artifactId>
-        <version>0.6.5</version>
+        <version>${helix.version}</version>
       </dependency>
       <dependency>
         <groupId>log4j</groupId>
@@ -454,6 +455,11 @@
         <groupId>org.webjars</groupId>
         <artifactId>swagger-ui</artifactId>
         <version>2.1.8-M1</version>
+      </dependency>
+      <dependency>
+        <groupId>com.clearspring.analytics</groupId>
+        <artifactId>stream</artifactId>
+        <version>2.7.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
