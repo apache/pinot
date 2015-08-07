@@ -100,7 +100,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     }
 
     @Override
-    public StateModel createNewStateModel(String partitionName) {
+    public StateModel createNewStateModel(String resource,String partitionName) {
         final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel =
                 new SegmentOnlineOfflineStateModel(HELIX_CLUSTER_NAME, INSTANCE_ID);
         return SegmentOnlineOfflineStateModel;
@@ -119,7 +119,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
         @Transition(from = "OFFLINE", to = "ONLINE")
         public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-            LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+            LOGGER.info("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
             final CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
             try {
                 switch (tableType) {

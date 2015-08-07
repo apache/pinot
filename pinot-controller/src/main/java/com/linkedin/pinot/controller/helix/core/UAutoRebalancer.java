@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.controller.rebalancer.Rebalancer;
@@ -22,7 +23,6 @@ import org.apache.helix.controller.rebalancer.internal.MappingCalculator;
 import org.apache.helix.controller.rebalancer.util.ConstraintBasedAssignment;
 import org.apache.helix.controller.stages.ClusterDataCache;
 import org.apache.helix.controller.stages.CurrentStateOutput;
-import org.apache.helix.controller.strategy.AutoRebalanceStrategy;
 import org.apache.helix.model.*;
 import org.apache.log4j.Logger;
 
@@ -36,7 +36,7 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
 
 
     private HelixManager _manager;
-    private AutoRebalanceStrategy _algorithm;
+    private UAutoRebalanceStrategy _algorithm;
 
     private static final Logger LOG = Logger.getLogger(UAutoRebalancer.class);
 
@@ -83,7 +83,7 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
         StateModelDefinition stateModelDef = clusterData.getStateModelDef(stateModelName);
         Map<String, LiveInstance> liveInstance = clusterData.getLiveInstances();
         String replicas = currentIdealState.getReplicas();
-        LOG.info("######Partitions:" + partitions.toString() + ";live Instance:" + liveInstance + ";statemodeldef:" + stateModelDef.toString() + ";Replicas:" + replicas);
+        LOG.info("######Partitions:" + partitions.toString() + ";live Instance:" + liveInstance + ";Replicas:" + replicas);
         LinkedHashMap<String, Integer> stateCountMap = new LinkedHashMap<String, Integer>();
         stateCountMap = stateCount(stateModelDef, liveInstance.size(), Integer.parseInt(replicas));
         List<String> liveNodes = new ArrayList<String>(liveInstance.keySet());
@@ -176,7 +176,10 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
         if (LOG.isInfoEnabled()) {
             LOG.info("newMapping: " + newMapping);
         }
-
+        if (isTheSameMapping(currentIdealState.getRecord().getMapFields(),newMapping.getMapFields())){
+            LOG.info("The same mapping return currentIdealState");
+            return currentIdealState;
+        }
         IdealState newIdealState = new IdealState(resourceName);
         newIdealState.getRecord().setSimpleFields(currentIdealState.getRecord().getSimpleFields());
         newIdealState.getRecord().setMapFields(newMapping.getMapFields());
@@ -185,12 +188,30 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
         return newIdealState;
     }
 
+    public static boolean isTheSameMapping(Map oldMapping,Map nMapping){
+        if (oldMapping.size()!=nMapping.size())return false;
+        Map<String, Object> total = new HashedMap(oldMapping);
+        total.putAll(nMapping);
+        if (total.size()!=oldMapping.size()) return false;
+        Set<Boolean> result = new HashSet<Boolean>();
+        for (Object oKey: oldMapping.keySet()){
+            Object oValue = oldMapping.get(oKey);
+            if (oValue instanceof String){
+                result.add(oValue.equals(nMapping.get(oValue)));
+            }else if (oValue instanceof Map){
+                result.add(isTheSameMapping((Map)oValue,(Map)nMapping.get(oKey)));
+            }
+        }
+        if (result.size()!=1) return false;
+        return true;
+    }
+
     public  ZNRecord calculateNewMapping(String resourceName,List<String> partitions,LinkedHashMap<String, Integer> stateCountMap,int maxPartition,
                                          List<String> liveNodes,Map<String, Map<String, String>> currentMapping,List<String> allNodes) {
-        AutoRebalanceStrategy.ReplicaPlacementScheme placementScheme = new AutoRebalanceStrategy.DefaultPlacementScheme();
+        UAutoRebalanceStrategy.ReplicaPlacementScheme placementScheme = new UAutoRebalanceStrategy.DefaultPlacementScheme();
         placementScheme.init(_manager);
         _algorithm =
-                new AutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition,
+                new UAutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition,
                         placementScheme);
         ZNRecord newMapping =
                 _algorithm.computePartitionAssignment(liveNodes, currentMapping, allNodes);
