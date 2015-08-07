@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -23,7 +28,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
-
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -34,13 +38,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
-
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class AvroRecordReader implements RecordReader {
@@ -102,8 +99,8 @@ public class AvroRecordReader implements RecordReader {
         value = transformAvroArrayToObjectArray((Array) value, spec);
       }
 
-      if (value == null && spec.isSingleValueField()) {
-        value = getDefaultNullValue(spec);
+      if (value == null) {
+        value = spec.getDefaultNullValue();
       }
 
       _fieldMap.put(field.name(), value);
@@ -113,22 +110,13 @@ public class AvroRecordReader implements RecordReader {
   }
 
   public static Object getDefaultNullValue(FieldSpec spec) {
-    switch (spec.getDataType()) {
-      case INT:
-        return Dictionary.DEFAULT_NULL_INT_VALUE;
-      case FLOAT:
-        return Dictionary.DEFAULT_NULL_FLOAT_VALUE;
-      case DOUBLE:
-        return Dictionary.DEFAULT_NULL_DOUBLE_VALUE;
-      case LONG:
-        return Dictionary.DEFAULT_NULL_LONG_VALUE;
-      case STRING:
-      case BOOLEAN:
-        return Dictionary.DEFAULT_NULL_STRING_VALUE;
-      default:
-        break;
+    Object defaultNullValue = null;
+    try {
+      defaultNullValue = spec.getDefaultNullValue();
+    } catch (UnsupportedOperationException e) {
+      // Ignore the exception, and return null to keep the semantics of the call
     }
-    return null;
+    return defaultNullValue;
   }
 
   @Override
