@@ -74,7 +74,6 @@ public class ReportScheduler {
               .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron()))
               .build();
 
-
           LOGGER.info("Scheduling job {} with trigger {}", job.getDescription(), entry.getValue().getCron());
           quartzScheduler.scheduleJob(job, trigger);
         }

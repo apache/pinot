@@ -147,7 +147,7 @@ public class ReportGenerator implements Job{
         }
 
         calculateSummaryRow(metricTableRows, tableSpec);
-        tableReportRows = getGroupBy(metricTableRows);
+        tableReportRows = getGroupBy(metricTableRows, tableSpec.getMetrics());
 
         if (scheduleSpec.isFindAnomalies() && reportConfig.getDbconfig() != null) {
           if (anomalyReportTables == null ) {
@@ -196,11 +196,12 @@ public class ReportGenerator implements Job{
   }
 
 
-  private List<TableReportRow> getGroupBy(Map<String, List<ReportRow>> metricTableRows) {
+  private List<TableReportRow> getGroupBy(Map<String, List<ReportRow>> metricTableRows, List<String> metrics) {
     //List<GroupBy> groupBy = new ArrayList<GroupBy>();
     List<TableReportRow> tableReportRows = new ArrayList<TableReportRow>();
-    for (Entry<String, List<ReportRow>> entry : metricTableRows.entrySet()) {
-      for (ReportRow row : entry.getValue()) {
+    for (String metric : metrics) {
+      List<ReportRow> rows = metricTableRows.get(metric);
+      for (ReportRow row : rows) {
         String startTime;
         if (row.getDimension().equals("Total")) {
           startTime = "Total";
@@ -215,8 +216,8 @@ public class ReportGenerator implements Job{
       break;
     }
 
-    for (Entry<String, List<ReportRow>> entry : metricTableRows.entrySet()) {
-      List<ReportRow> metricRows = entry.getValue();
+    for (String metric : metrics) {
+      List<ReportRow> metricRows = metricTableRows.get(metric);
 
       for (int i = 0; i < metricRows.size(); i++) {
         tableReportRows.get(i).getRows().add(metricRows.get(i));

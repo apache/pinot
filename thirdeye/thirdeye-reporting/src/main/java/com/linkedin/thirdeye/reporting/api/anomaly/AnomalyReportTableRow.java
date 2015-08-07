@@ -19,7 +19,7 @@ public class AnomalyReportTableRow {
   private Number anomalyScore;
   private Number anomalyVolume;
 
-  private static final DateFormat DATE_FORMAT =  new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+  private static final DateFormat DATE_FORMAT =  new SimpleDateFormat("YYYY-MM-dd h a");
 
   public AnomalyReportTableRow(DateTime timestamp, String dimensions, String description, boolean scoreIsPercent,
       Number anomalyScore, Number anomalyVolume) {

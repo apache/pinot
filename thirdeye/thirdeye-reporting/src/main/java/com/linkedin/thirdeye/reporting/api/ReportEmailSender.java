@@ -57,6 +57,7 @@ public class ReportEmailSender {
       rootMap.put(ReportConstants.REPORT_CONFIG_OBJECT, reportConfig);
       rootMap.put(ReportConstants.TABLES_OBJECT, tables);
       rootMap.put(ReportConstants.ANOMALY_TABLES_OBJECT, anomalyReportTables);
+      rootMap.put(ReportConstants.SCHEDULE_SPEC_OBJECT, scheduleSpec);
 
       Writer emailOutput = new StringWriter();
       emailReportTemplate.process(rootMap, emailOutput);
