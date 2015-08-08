@@ -44,13 +44,6 @@ public class AnomalyTable {
   private static final Joiner COMMA = Joiner.on(',');
   private static final Joiner AND = Joiner.on(" AND ");
 
-  private static final SimpleDateFormat DATE_FORMAT;
-
-  static {
-   DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-   DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-  }
-
   /**
    * @param dbConfig
    * @param collection
@@ -123,7 +116,7 @@ public class AnomalyTable {
         row.setFunctionName(rs.getString("function_name"));
         row.setFunctionDescription(rs.getString("function_description"));
         row.setCollection(rs.getString("collection"));
-        row.setTimeWindow(rs.getTimestamp("time_window").getTime());
+        row.setTimeWindow(rs.getLong("time_window"));
         row.setNonStarCount(rs.getInt("non_star_count"));
         row.setDimensions(rs.getString("dimensions"));
         row.setDimensionsContribution(rs.getDouble("dimensions_contribution"));
@@ -205,7 +198,7 @@ public class AnomalyTable {
       preparedStmt.setString(3, row.getFunctionDescription());
       preparedStmt.setString(4, row.getFunctionName());
       preparedStmt.setString(5, row.getCollection());
-      preparedStmt.setString(6, DATE_FORMAT.format(row.getTimeWindow()));
+      preparedStmt.setLong(6, row.getTimeWindow());
       preparedStmt.setInt(7, row.getNonStarCount());
       preparedStmt.setString(8, row.getDimensions());
       preparedStmt.setDouble(9, row.getDimensionsContribution());
@@ -287,8 +280,7 @@ public class AnomalyTable {
     }
 
     if (timeRange != null) {
-      whereClause.add("time_window BETWEEN '" + DATE_FORMAT.format(timeRange.getStart()) + "' AND '" +
-          DATE_FORMAT.format(timeRange.getEnd())+ "'");
+      whereClause.add("time_window BETWEEN '" + timeRange.getStart() + "' AND '" + timeRange.getEnd() + "'");
     }
 
     sb.append(AND.join(whereClause));
