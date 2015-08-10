@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.anomaly.api;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Set;
 
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;

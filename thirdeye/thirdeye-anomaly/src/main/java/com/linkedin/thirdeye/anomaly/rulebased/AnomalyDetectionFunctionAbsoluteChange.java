@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.function;
+package com.linkedin.thirdeye.anomaly.rulebased;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,20 +22,20 @@ import com.linkedin.thirdeye.api.TimeRange;
 /**
  *
  */
-public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunctionAbstractBase {
+public class AnomalyDetectionFunctionAbsoluteChange extends AnomalyDetectionFunctionAbstractBase {
 
   private TimeGranularity baselineTimePeriod;
   private String metricName;
-  private double percentDelta;
+  private double absoluteDelta;
 
   private DimensionKeyMatchTable<Double> deltaTable;
 
-  public AnomalyDetectionFunctionPercentChange(TimeGranularity baselineTimePeriod,
-      TimeGranularity aggregateTimeGranularity, String metricName, double percentDelta) {
+  public AnomalyDetectionFunctionAbsoluteChange(TimeGranularity baselineTimePeriod,
+      TimeGranularity aggregateTimeGranularity, String metricName, double absoluteDelta) {
     super(aggregateTimeGranularity);
     this.baselineTimePeriod = baselineTimePeriod;
     this.metricName = metricName;
-    this.percentDelta = percentDelta;
+    this.absoluteDelta = absoluteDelta;
   }
 
   @Override
@@ -46,13 +46,6 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
   @Override
   public TimeGranularity getTrainingWindowTimeGranularity() {
     return baselineTimePeriod;
-  }
-
-  @Override
-  public Set<String> getMetrics() {
-    Set<String> metrics = new HashSet<>();
-    metrics.add(metricName);
-    return metrics;
   }
 
   @Override
@@ -79,29 +72,22 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
       if (series.getTimeWindowSet().contains(oldTime)) {
         double oldValue = series.get(oldTime, metricName).doubleValue();
         double newValue = series.get(timeWindow, metricName).doubleValue();
-        double percentChange;
-        if (oldValue > 0) {
-          percentChange = 100.0 * (newValue - oldValue) / oldValue;
-        } else {
-          percentChange = 0.0;
-        }
         double absoluteChange = newValue - oldValue;
 
         ResultProperties properties = new ResultProperties();
         properties.setProperty("oldValue", "" + oldValue);
         properties.setProperty("newValue", "" + newValue);
         properties.setProperty("usingThreshold", "" + threshold);
-        properties.setProperty("absoluteChange", "" + absoluteChange);
 
         boolean isAnomaly;
         // percent delta determines the direction of the rule
-        if (percentDelta < 0) {
-            isAnomaly = percentChange <= threshold;
+        if (absoluteDelta < 0) {
+            isAnomaly = absoluteChange <= threshold;
         } else {
-            isAnomaly = percentChange >= threshold;
+            isAnomaly = absoluteChange >= threshold;
         }
 
-        results.add(new AnomalyResult(isAnomaly, timeWindow, percentChange, absoluteChange, properties));
+        results.add(new AnomalyResult(isAnomaly, timeWindow, absoluteChange, absoluteChange, properties));
         pointsEvaluated++;
       }
     }
@@ -113,8 +99,15 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
     return results;
   }
 
+  @Override
+  public Set<String> getMetrics() {
+    Set<String> metrics = new HashSet<>();
+    metrics.add(metricName);
+    return metrics;
+  }
+
   public String toString() {
-    return String.format("%s change in %s exceeds %.2f%%", baselineTimePeriod.toString(), metricName, percentDelta);
+    return String.format("%s change in %s exceeds %.2f%%", baselineTimePeriod.toString(), metricName, absoluteDelta);
   }
 
   public AnomalyDetectionFunction setDeltaTable(DimensionKeyMatchTable<Double> deltaTable) {
@@ -133,8 +126,7 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
         return threshold;
       }
     }
-    return percentDelta;
+    return absoluteDelta;
   }
-
 
 }

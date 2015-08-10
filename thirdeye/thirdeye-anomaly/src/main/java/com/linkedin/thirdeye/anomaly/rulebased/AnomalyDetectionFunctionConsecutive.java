@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.function;
+package com.linkedin.thirdeye.anomaly.rulebased;
 
 import java.util.ArrayList;
 import java.util.HashMap;
