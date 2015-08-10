@@ -104,8 +104,8 @@ public class PinotHelixResourceManager {
   private long _externalViewOnlineToOfflineTimeout;
   private boolean _isSingleTenantCluster = true;
 
-  PinotHelixAdmin _pinotHelixAdmin;
   private HelixDataAccessor _helixDataAccessor;
+  Builder _keyBuilder;
 
   private static final Map<String, SegmentAssignmentStrategy> SEGMENT_ASSIGNMENT_STRATEGY_MAP =
       new HashMap<String, SegmentAssignmentStrategy>();
@@ -142,9 +142,9 @@ public class PinotHelixResourceManager {
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
+    _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
     _externalViewOnlineToOfflineTimeout = 10000L;
-    _pinotHelixAdmin = new PinotHelixAdmin(_helixZkURL, _helixClusterName);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
 
@@ -383,7 +383,7 @@ public class PinotHelixResourceManager {
 
   private PinotResourceManagerResponse scaleUpBroker(Tenant tenant, PinotResourceManagerResponse res,
       String brokerTenantTag, List<String> instancesInClusterWithTag) {
-    List<String> unTaggedInstanceList = _pinotHelixAdmin.getOnlineUnTaggedBrokerInstanceList();
+    List<String> unTaggedInstanceList = getOnlineUnTaggedBrokerInstanceList();
     int numberOfInstancesToAdd = tenant.getNumberOfInstances() - instancesInClusterWithTag.size();
     if (unTaggedInstanceList.size() < numberOfInstancesToAdd) {
       res.status = ResponseStatus.failure;
@@ -475,7 +475,7 @@ public class PinotHelixResourceManager {
       String realtimeServerTag, List<String> taggedRealtimeServers, String offlineServerTag,
       List<String> taggedOfflineServers, Set<String> allServingServers) {
     int incInstances = serverTenant.getNumberOfInstances() - allServingServers.size();
-    List<String> unTaggedInstanceList = _pinotHelixAdmin.getOnlineUnTaggedServerInstanceList();
+    List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
     if (unTaggedInstanceList.size() < incInstances) {
       res.status = ResponseStatus.failure;
       res.message =
@@ -612,8 +612,7 @@ public class PinotHelixResourceManager {
     Set<String> tenantSet = new HashSet<String>();
     List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
     for (String instanceName : instancesInCluster) {
-      Builder keyBuilder = _helixDataAccessor.keyBuilder();
-      InstanceConfig config = _helixDataAccessor.getProperty(keyBuilder.instanceConfig(instanceName));
+      InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
         if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
             || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)) {
@@ -631,8 +630,7 @@ public class PinotHelixResourceManager {
     Set<String> tenantSet = new HashSet<String>();
     List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
     for (String instanceName : instancesInCluster) {
-      Builder keyBuilder = _helixDataAccessor.keyBuilder();
-      InstanceConfig config = _helixDataAccessor.getProperty(keyBuilder.instanceConfig(instanceName));
+      InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
         if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
             || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)) {
@@ -647,15 +645,14 @@ public class PinotHelixResourceManager {
   }
 
   private List<String> getTagsForInstance(String instanceName) {
-    Builder keyBuilder = _helixDataAccessor.keyBuilder();
-    InstanceConfig config = _helixDataAccessor.getProperty(keyBuilder.instanceConfig(instanceName));
+    InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
     return config.getTags();
   }
 
   public PinotResourceManagerResponse createServerTenant(Tenant serverTenant) {
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     int numberOfInstances = serverTenant.getNumberOfInstances();
-    List<String> unTaggedInstanceList = _pinotHelixAdmin.getOnlineUnTaggedServerInstanceList();
+    List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
     if (unTaggedInstanceList.size() < numberOfInstances) {
       res.status = ResponseStatus.failure;
       res.message =
@@ -705,7 +702,7 @@ public class PinotHelixResourceManager {
 
   public PinotResourceManagerResponse createBrokerTenant(Tenant brokerTenant) {
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
-    List<String> unTaggedInstanceList = _pinotHelixAdmin.getOnlineUnTaggedBrokerInstanceList();
+    List<String> unTaggedInstanceList = getOnlineUnTaggedBrokerInstanceList();
     int numberOfInstances = brokerTenant.getNumberOfInstances();
     if (unTaggedInstanceList.size() < numberOfInstances) {
       res.status = ResponseStatus.failure;
@@ -1219,7 +1216,7 @@ public class PinotHelixResourceManager {
     final String segmentName = segmentZKMetadata.getSegmentName();
 
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    PropertyKey idealStatePropertyKey = helixDataAccessor.keyBuilder().idealStates(tableName);
+    PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableName);
 
     // Set all partitions to offline to unload them from the servers
     boolean updateSuccessful;
@@ -1332,7 +1329,7 @@ public class PinotHelixResourceManager {
     String status = (enable) ? "ONLINE" : "OFFLINE";
 
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    PropertyKey idealStatePropertyKey = helixDataAccessor.keyBuilder().idealStates(tableName);
+    PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableName);
 
     boolean updateSuccessful;
     long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
@@ -1453,12 +1450,11 @@ public class PinotHelixResourceManager {
     }
 
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    Builder keyBuilder = helixDataAccessor.keyBuilder();
-    LiveInstance liveInstance = helixDataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
+    LiveInstance liveInstance = helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName));
 
     if (liveInstance != null) {
       PropertyKey currentStatesKey =
-          _helixDataAccessor.keyBuilder().currentStates(instanceName, liveInstance.getSessionId());
+          _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
       List<CurrentState> currentStates = _helixDataAccessor.getChildValues(currentStatesKey);
 
       if (currentStates != null) {
@@ -1504,7 +1500,7 @@ public class PinotHelixResourceManager {
 
     while (System.currentTimeMillis() < deadline) {
       toggleSucceed = true;
-      PropertyKey liveInstanceKey = _helixDataAccessor.keyBuilder().liveInstance(instanceName);
+      PropertyKey liveInstanceKey = _keyBuilder.liveInstance(instanceName);
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
       if (liveInstance == null) {
         if (toggle) {
@@ -1514,7 +1510,7 @@ public class PinotHelixResourceManager {
         }
       }
       PropertyKey instanceCurrentStatesKey =
-          _helixDataAccessor.keyBuilder().currentStates(instanceName, liveInstance.getSessionId());
+          _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
       List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
       if (instanceCurrentStates == null) {
         return PinotResourceManagerResponse.SUCCESS_RESPONSE;
@@ -1548,12 +1544,36 @@ public class PinotHelixResourceManager {
    */
   public boolean instanceExists(String instanceName) {
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    Builder keyBuilder = helixDataAccessor.keyBuilder();
-    InstanceConfig config = helixDataAccessor.getProperty(keyBuilder.instanceConfig(instanceName));
+    InstanceConfig config = helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
     return (config != null);
   }
 
   public boolean isSingleTenantCluster() {
     return _isSingleTenantCluster;
+  }
+
+  /**
+   * Computes the broker nodes that are untagged and free to be used.
+   * @return List of online untagged broker instances.
+   */
+  public List<String> getOnlineUnTaggedBrokerInstanceList() {
+
+    final List<String> instanceList =
+            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    final List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
+    instanceList.retainAll(liveInstances);
+    return instanceList;
+  }
+
+  /**
+   * Computes the server nodes that are untagged and free to be used.
+   * @return List of untagged online server instances.
+   */
+  public List<String> getOnlineUnTaggedServerInstanceList() {
+    final List<String> instanceList =
+            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+    final List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
+    instanceList.retainAll(liveInstances);
+    return instanceList;
   }
 }
