@@ -29,7 +29,6 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +39,6 @@ public class SegmentDictionaryCreator implements Closeable {
   private final Object[] sortedList;
   private final FieldSpec spec;
   private final File dictionaryFile;
-  private FixedByteWidthRowColDataFileReader dataReader;
 
   private Int2IntOpenHashMap intValueToIndexMap;
   private Long2IntOpenHashMap longValueToIndexMap;
@@ -63,7 +61,6 @@ public class SegmentDictionaryCreator implements Closeable {
 
   @Override
   public void close() throws IOException {
-    dataReader.close();
   }
 
   public void build() throws Exception {
@@ -79,10 +76,6 @@ public class SegmentDictionaryCreator implements Closeable {
           intValueToIndexMap.put(entry, i);
         }
         intDictionaryWrite.close();
-
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
         break;
       case FLOAT:
         final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
@@ -95,9 +88,6 @@ public class SegmentDictionaryCreator implements Closeable {
           floatValueToIndexMap.put(entry, i);
         }
         floatDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         break;
       case LONG:
         final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
@@ -110,9 +100,6 @@ public class SegmentDictionaryCreator implements Closeable {
           longValueToIndexMap.put(entry, i);
         }
         longDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         break;
       case DOUBLE:
         final FixedByteWidthRowColDataFileWriter doubleDictionaryWrite =
@@ -125,9 +112,6 @@ public class SegmentDictionaryCreator implements Closeable {
           doubleValueToIndexMap.put(entry, i);
         }
         doubleDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         break;
       case STRING:
       case BOOLEAN:
@@ -165,9 +149,6 @@ public class SegmentDictionaryCreator implements Closeable {
           stringValueToIndexMap.put(revised[i], i);
         }
         stringDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                new int[] { stringColumnMaxLength });
         break;
       default:
         break;
