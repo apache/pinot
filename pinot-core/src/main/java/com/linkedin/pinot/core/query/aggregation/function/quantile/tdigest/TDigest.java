@@ -40,10 +40,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The special characteristics of this algorithm are:
  * a) smaller summaries than Q-digest
  * b) works on doubles as well as integers.
- * c) provides part per million accuracy for extreme quantiles and typically <1000 ppm accuracy for middle quantiles
+ * c) provides part per million accuracy for extreme quantiles and typically &lt;1000 ppm accuracy for middle quantiles
  * d) fast
  * e) simple
- * f) test coverage > 90%
+ * f) test coverage &gt;90%
  * g) easy to adapt for use with map-reduce
  *
  */
@@ -273,7 +273,7 @@ public class TDigest implements Serializable {
 
     /**
      * @param q The quantile desired.  Can be in the range [0,1].
-     * @return The minimum value x such that we think that the proportion of samples is <= x is q.
+     * @return The minimum value x such that we think that the proportion of samples is &lt;= x is q.
      */
     public double quantile(double q) {
         GroupTree values = summary;
