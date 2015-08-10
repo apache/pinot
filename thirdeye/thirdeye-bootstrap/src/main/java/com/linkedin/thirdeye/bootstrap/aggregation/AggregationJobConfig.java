@@ -103,7 +103,7 @@ public class AggregationJobConfig {
       }
     }
     catch (Exception e) {
-      throw new IllegalStateException("Error reading starTreeConfig " + config.encode());
+      throw new IllegalStateException("The config must contain dimensions and metrics : " + config.encode(), e);
     }
     return new AggregationJobConfig(dimensionNames,
                                     metricNames,
