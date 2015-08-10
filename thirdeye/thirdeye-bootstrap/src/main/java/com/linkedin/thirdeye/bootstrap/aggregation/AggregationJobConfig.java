@@ -103,7 +103,13 @@ public class AggregationJobConfig {
       }
     }
     catch (Exception e) {
-      throw new IllegalStateException("The config must contain dimensions and metrics : " + config.encode(), e);
+      if (config.getMetrics() == null) {
+        throw new IllegalStateException("Metrics missing from config : " + config.encode(), e);
+      } else if (config.getDimensions() == null) {
+        throw new IllegalStateException("Dimensions missing from config : " + config.encode(), e);
+      } else {
+        throw new IllegalStateException("Error reading config : " + config.encode(), e);
+      }
     }
     return new AggregationJobConfig(dimensionNames,
                                     metricNames,
