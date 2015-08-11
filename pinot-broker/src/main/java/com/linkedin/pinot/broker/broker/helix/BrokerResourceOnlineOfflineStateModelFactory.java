@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
-import java.util.List;
-
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
@@ -30,9 +31,7 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import java.util.List;
 
 
 /**
@@ -57,7 +56,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
   }
 
   @Override
-  public StateModel createNewStateModel(String resourceName) {
+  public StateModel createNewStateModel(String resourceName,String partition) {
     return new BrokerResourceOnlineOfflineStateModel();
   }
 
