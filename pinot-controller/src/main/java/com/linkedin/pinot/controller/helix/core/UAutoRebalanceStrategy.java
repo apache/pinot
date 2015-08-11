@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.helix.core;
 
 import org.apache.helix.HelixManager;
@@ -6,24 +21,6 @@ import org.apache.log4j.Logger;
 
 import java.util.*;
 
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
 
 public class UAutoRebalanceStrategy {
 
@@ -101,7 +98,6 @@ public class UAutoRebalanceStrategy {
 
         // compute the preferred mapping if all nodes were up
         _preferredAssignment = computePreferredPlacement(allNodes);
-
         // logger.info("preferred mapping:"+ preferredAssignment);
         // from current mapping derive the ones in preferred location
         // this will update the nodes with their current fill status
@@ -733,10 +729,36 @@ public class UAutoRebalanceStrategy {
                                 % nodeNames.size();
             } else {
                 // in all other cases, assigning a replica at a time for each partition is reasonable
-                index = (partitionId + replicaId) % nodeNames.size();
+                    index = (partitionId + replicaId) % nodeNames.size();
             }
             return nodeNames.get(index);
         }
     }
+//
+//    public static void main(String[] args) {
+//         List<String> partitions = new ArrayList<String>();
+//        partitions.add("flights_0");
+//        partitions.add("flights_1");
+//
+//        LinkedHashMap<String,Integer> stateCountMap = new LinkedHashMap<String, Integer>();
+//        stateCountMap.put("ONLINE",1);
+//
+//        UAutoRebalanceStrategy uAutoRebalanceStrategy = new UAutoRebalanceStrategy("flights_OFFLINE",partitions,stateCountMap,1,new DefaultPlacementScheme());
+//
+//        List<String> liveNodes = new ArrayList<String>();
+//        liveNodes.add("Server_192.168.11.204_8094");
+//
+//        List<String> allNodes = new ArrayList<String>(liveNodes);
+//
+//        Map<String,Map<String,String>> currentHashMap = new HashMap<String, Map<String, String>>();
+//        Map<String,String> partMap = new HashMap<String, String>();
+//        partMap.put("Server_192.168.11.204_8094","ONLINE");
+//        currentHashMap.put("flights_0",partMap);
+//
+//        ZNRecord znRecord = uAutoRebalanceStrategy.computePartitionAssignment(liveNodes, currentHashMap, allNodes);
+//
+//        System.out.println(znRecord.getMapFields());
+//
+//    }
 }
 

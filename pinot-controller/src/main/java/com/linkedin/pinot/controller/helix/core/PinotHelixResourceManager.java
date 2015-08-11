@@ -1048,17 +1048,14 @@ public class PinotHelixResourceManager {
                 offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
                 offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
                 ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-                LOGGER.info("Added segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
-//                LOGGER.info("segment data is:"+segmentMetadata.toString());
+//                LOGGER.info("Added segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
                 AbstractTableConfig offlineTableConfig =
                         ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getTableName());
-                LOGGER.info("above is zk problem");
                 //fixme
                 final IdealState idealState =
                         PinotTableIdealStateBuilder.addNewOfflineSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
                                 _helixClusterName, getPropertyStore(), ControllerTenantNameBuilder
                                         .getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig().getServer()));
-                LOGGER.info("above is ideal state");
                 _helixAdmin.setResourceIdealState(_helixClusterName,
                         TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()), idealState);
                 LOGGER.info("##########IDEALSTATE is:"+idealState.toString());

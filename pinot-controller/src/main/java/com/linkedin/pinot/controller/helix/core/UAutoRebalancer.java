@@ -73,17 +73,17 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
 
     @Override
     public IdealState computeNewIdealState(String resourceName, IdealState currentIdealState, CurrentStateOutput currentStateOutput, ClusterDataCache clusterData) {
-        LOG.info("######resourceName :"+resourceName);
-        LOG.info("######current idealstate :" + currentIdealState.toString());
-        LOG.info("#######current state output :" + currentStateOutput.toString());
-        LOG.info("#########cluster datecache : " + clusterData.toString());
+//        LOG.info("######resourceName :"+resourceName);
+//        LOG.info("######current idealstate :" + currentIdealState.toString());
+//        LOG.info("#######current state output :" + currentStateOutput.toString());
+//        LOG.info("#########cluster datecache : " + clusterData.toString());
 
         List<String> partitions = new ArrayList<String>(currentIdealState.getPartitionSet());
         String stateModelName = currentIdealState.getStateModelDefRef();
         StateModelDefinition stateModelDef = clusterData.getStateModelDef(stateModelName);
         Map<String, LiveInstance> liveInstance = clusterData.getLiveInstances();
         String replicas = currentIdealState.getReplicas();
-        LOG.info("######Partitions:" + partitions.toString() + ";live Instance:" + liveInstance + ";Replicas:" + replicas);
+//        LOG.info("######Partitions:" + partitions.toString() + ";live Instance:" + liveInstance + ";Replicas:" + replicas);
         LinkedHashMap<String, Integer> stateCountMap = new LinkedHashMap<String, Integer>();
         stateCountMap = stateCount(stateModelDef, liveInstance.size(), Integer.parseInt(replicas));
         List<String> liveNodes = new ArrayList<String>(liveInstance.keySet());
@@ -185,6 +185,7 @@ public class UAutoRebalancer implements Rebalancer, MappingCalculator {
         newIdealState.getRecord().setMapFields(newMapping.getMapFields());
         newIdealState.getRecord().setListFields(newMapping.getListFields());
         LOG.info("#########new ideal state:"+newIdealState.toString());
+
         return newIdealState;
     }
 
