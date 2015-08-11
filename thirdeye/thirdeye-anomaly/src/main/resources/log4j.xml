@@ -10,11 +10,4 @@
         <priority value="info"/>
         <appender-ref ref="ConsoleAppender"/>
     </root>
-    <logger name="org.apache.commons.httpclient">
-        <level value="fatal"/>
-    </logger>
-
-    <logger name="org.apache.httpclient.wire">
-        <level value="fatal"/>
-    </logger>
 </log4j:configuration>
