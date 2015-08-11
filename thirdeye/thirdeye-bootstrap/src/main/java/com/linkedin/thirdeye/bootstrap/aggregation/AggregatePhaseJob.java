@@ -282,7 +282,7 @@ public class AggregatePhaseJob extends Configured {
     job.waitForCompletion(true);
 
     Counter counter = job.getCounters().findCounter(AggregationCounter.NUMBER_OF_RECORDS);
-    System.out.println(counter.getDisplayName() + " : " + counter.getValue());
+    LOGGER.info(counter.getDisplayName() + " : " + counter.getValue());
     if (counter.getValue() == 0) {
       throw new IllegalStateException("No input records in " + inputPathDir);
     }
