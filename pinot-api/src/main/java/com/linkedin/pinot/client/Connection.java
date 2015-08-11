@@ -77,38 +77,7 @@ public class Connection {
   public Future<ResultSetGroup> executeAsync(String statement) throws PinotClientException {
     final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(pickRandomBroker(), statement);
 
-    return new Future<ResultSetGroup>() {
-      @Override
-      public boolean cancel(boolean mayInterruptIfRunning) {
-        return responseFuture.cancel(mayInterruptIfRunning);
-      }
-
-      @Override
-      public boolean isCancelled() {
-        return responseFuture.isCancelled();
-      }
-
-      @Override
-      public boolean isDone() {
-        return responseFuture.isDone();
-      }
-
-      @Override
-      public ResultSetGroup get() throws InterruptedException, ExecutionException {
-        try {
-          return get(1000L, TimeUnit.DAYS);
-        } catch (TimeoutException e) {
-          throw new ExecutionException(e);
-        }
-      }
-
-      @Override
-      public ResultSetGroup get(long timeout, TimeUnit unit)
-          throws InterruptedException, ExecutionException, TimeoutException {
-        BrokerResponse response = responseFuture.get(timeout, unit);
-        return new ResultSetGroup(response);
-      }
-    };
+    return new ResultSetGroupFuture(responseFuture);
   }
 
   private String pickRandomBroker() {
@@ -122,5 +91,44 @@ public class Connection {
    */
   List<String> getBrokerList() {
     return _brokerList;
+  }
+
+  private static class ResultSetGroupFuture implements Future<ResultSetGroup> {
+    private final Future<BrokerResponse> _responseFuture;
+
+    public ResultSetGroupFuture(Future<BrokerResponse> responseFuture) {
+      _responseFuture = responseFuture;
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      return _responseFuture.cancel(mayInterruptIfRunning);
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return _responseFuture.isCancelled();
+    }
+
+    @Override
+    public boolean isDone() {
+      return _responseFuture.isDone();
+    }
+
+    @Override
+    public ResultSetGroup get() throws InterruptedException, ExecutionException {
+      try {
+        return get(1000L, TimeUnit.DAYS);
+      } catch (TimeoutException e) {
+        throw new ExecutionException(e);
+      }
+    }
+
+    @Override
+    public ResultSetGroup get(long timeout, TimeUnit unit)
+        throws InterruptedException, ExecutionException, TimeoutException {
+      BrokerResponse response = _responseFuture.get(timeout, unit);
+      return new ResultSetGroup(response);
+    }
   }
 }

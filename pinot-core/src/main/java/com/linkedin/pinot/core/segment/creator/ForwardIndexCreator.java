@@ -19,9 +19,5 @@ import java.io.IOException;
 
 
 public interface ForwardIndexCreator {
-
-  public abstract void index(int docId, Object e);
-
-  public abstract void close() throws IOException;
-
+  void close() throws IOException;
 }

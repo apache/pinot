@@ -12,6 +12,8 @@ public class ThirdEyeReportingConfiguration extends Configuration {
   private String reportConfigPath; // directory where all report-config.yml files are saved
   @NotNull
   private String dashboardUri;
+  @NotNull
+  private String reportEmailTemplatePath;
 
   @JsonProperty
   public String getServerUri() {
@@ -38,5 +40,14 @@ public class ThirdEyeReportingConfiguration extends Configuration {
 
   public void setReportConfigPath(String reportConfigPath) {
     this.reportConfigPath = reportConfigPath;
+  }
+
+  @JsonProperty
+  public String getReportEmailTemplatePath() {
+    return reportEmailTemplatePath;
+  }
+
+  public void setReportEmailTemplatePath(String reportEmailTemplatePath) {
+    this.reportEmailTemplatePath = reportEmailTemplatePath;
   }
 }

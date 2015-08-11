@@ -27,11 +27,13 @@ public class ReportScheduler {
 
   private Scheduler quartzScheduler = null;
   private File reportConfigFolder;
+  private String reportEmailTemplatePath;
   private String serverUri;
   private String dashboardUri;
 
-  public ReportScheduler(File reportConfigFolder, String serverUri, String dashboardUri) {
+  public ReportScheduler(File reportConfigFolder, String reportEmailTemplatePath, String serverUri, String dashboardUri) {
     this.reportConfigFolder = reportConfigFolder;
+    this.reportEmailTemplatePath = reportEmailTemplatePath;
     this.serverUri = serverUri;
     this.dashboardUri = dashboardUri;
   }
@@ -53,26 +55,26 @@ public class ReportScheduler {
       for (File reportConfigFile : reportConfigFiles) {
         ReportConfig reportConfig = ReportConfig.decode(new FileInputStream(reportConfigFile));
         LOGGER.info("Config {}", reportConfig.encode());
+        LOGGER.info("Job data: ( reportConfigFile:{}, serverUri:{}, dashboardUri:{}, templatePath:{}",
+            reportConfigFile, serverUri, dashboardUri, reportEmailTemplatePath);
 
         JobDataMap newJobDataMap = new JobDataMap();
         newJobDataMap.put(ReportConstants.CONFIG_FILE_KEY, reportConfigFile.getPath());
         newJobDataMap.put(ReportConstants.SERVER_URI_KEY, serverUri);
         newJobDataMap.put(ReportConstants.DASHBOARD_URI_KEY, dashboardUri);
+        newJobDataMap.put(ReportConstants.TEMPLATE_PATH_KEY, reportEmailTemplatePath);
 
         for (Entry<String, ScheduleSpec> entry :reportConfig.getSchedules().entrySet()) {
           JobDetail job = JobBuilder.newJob(ReportGenerator.class)
               .withDescription(entry.getKey())
               .usingJobData(newJobDataMap)
               .build();
-          /*Trigger trigger = TriggerBuilder.newTrigger()
-              .withDescription(entry.getKey())
-              .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron()))
-              .build();*/
           Trigger trigger = TriggerBuilder.newTrigger()
               .withDescription(entry.getKey())
-              .startNow()
-              .withSchedule(SimpleScheduleBuilder.simpleSchedule().withRepeatCount(0))
+              .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron()))
               .build();
+
+          LOGGER.info("Scheduling job {} with trigger {}", job.getDescription(), entry.getValue().getCron());
           quartzScheduler.scheduleJob(job, trigger);
         }
       }

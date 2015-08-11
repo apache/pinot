@@ -115,7 +115,7 @@ public class RealtimeQuickStart {
     printStatus(color.GREEN, "***************************************************");
 
     printStatus(color.GREEN,
-        "you can always go to http://localhost:9000/query/index.html to play around in the query console");
+        "you can always go to http://localhost:9000/query/ to play around in the query console");
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override

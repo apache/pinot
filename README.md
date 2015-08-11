@@ -107,7 +107,7 @@ select playerName,runs,homeRuns from baseballStats order by yearID limit 10
 
 ### Step 3: Pinot Data Explorer
 
-There are 3 ways to [interact](https://github.com/linkedin/pinot/wiki/Pinot-Client-API) with Pinot - simple web interface, REST api and java client. Open your browser and go to http://localhost:9000/query/index.html and run any of the queries provided above. See [Pinot Query Syntax](https://github.com/linkedin/pinot/wiki/Pinot-Query-Language-Examples) for more info. 
+There are 3 ways to [interact](https://github.com/linkedin/pinot/wiki/Pinot-Client-API) with Pinot - simple web interface, REST api and java client. Open your browser and go to http://localhost:9000/query/ and run any of the queries provided above. See [Pinot Query Syntax](https://github.com/linkedin/pinot/wiki/Pinot-Query-Language-Examples) for more info.
 
 *** 
 ## Realtime quick start

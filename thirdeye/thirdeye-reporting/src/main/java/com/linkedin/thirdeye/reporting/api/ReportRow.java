@@ -22,7 +22,7 @@ public class ReportRow {
   private Number current;
   private String ratio;
 
-  private static DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+  private static DateFormat DATE_FORMAT = new SimpleDateFormat("HH a");
 
   public ReportRow(DateTime currentStart, DateTime currentEnd, DateTime baselineStart, DateTime baselineEnd,
       DimensionKey dimensionKey, String dimension, String metric, Number baseline, Number current) {

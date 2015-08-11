@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
+import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -24,21 +29,30 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
-import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class SegmentDictionaryCreator implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
   private final Object[] sortedList;
   private final FieldSpec spec;
   private final File dictionaryFile;
-  private FixedByteWidthRowColDataFileReader dataReader;
-  private ByteBufferBinarySearchUtil searchableByteBuffer;
+
+  private Int2IntOpenHashMap intValueToIndexMap;
+  private Long2IntOpenHashMap longValueToIndexMap;
+  private Float2IntOpenHashMap floatValueToIndexMap;
+  private Double2IntOpenHashMap doubleValueToIndexMap;
+  private Object2IntOpenHashMap<String> stringValueToIndexMap;
+
   private int stringColumnMaxLength = 0;
 
   public SegmentDictionaryCreator(boolean hasNulls, Object[] sortedList, FieldSpec spec, File indexDir)
       throws IOException {
+    LOGGER.info(
+        "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}",
+        spec.getName(), hasNulls, sortedList.length, spec.getDataType(), spec.isSingleValueField());
     this.sortedList = sortedList;
     this.spec = spec;
     dictionaryFile = new File(indexDir, spec.getName() + ".dict");
@@ -47,7 +61,6 @@ public class SegmentDictionaryCreator implements Closeable {
 
   @Override
   public void close() throws IOException {
-    dataReader.close();
   }
 
   public void build() throws Exception {
@@ -56,54 +69,49 @@ public class SegmentDictionaryCreator implements Closeable {
         final FixedByteWidthRowColDataFileWriter intDictionaryWrite =
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
+        intValueToIndexMap = new Int2IntOpenHashMap(sortedList.length);
         for (int i = 0; i < sortedList.length; i++) {
           final int entry = ((Number) sortedList[i]).intValue();
           intDictionaryWrite.setInt(i, 0, entry);
+          intValueToIndexMap.put(entry, i);
         }
         intDictionaryWrite.close();
-
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
         break;
       case FLOAT:
         final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
+        floatValueToIndexMap = new Float2IntOpenHashMap(sortedList.length);
         for (int i = 0; i < sortedList.length; i++) {
           final float entry = ((Number) sortedList[i]).floatValue();
           floatDictionaryWrite.setFloat(i, 0, entry);
+          floatValueToIndexMap.put(entry, i);
         }
         floatDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         break;
       case LONG:
         final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
+        longValueToIndexMap = new Long2IntOpenHashMap(sortedList.length);
         for (int i = 0; i < sortedList.length; i++) {
           final long entry = ((Number) sortedList[i]).longValue();
           longDictionaryWrite.setLong(i, 0, entry);
+          longValueToIndexMap.put(entry, i);
         }
         longDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         break;
       case DOUBLE:
         final FixedByteWidthRowColDataFileWriter doubleDictionaryWrite =
             new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
                 V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
+        doubleValueToIndexMap = new Double2IntOpenHashMap(sortedList.length);
         for (int i = 0; i < sortedList.length; i++) {
           final double entry = ((Number) sortedList[i]).doubleValue();
           doubleDictionaryWrite.setDouble(i, 0, entry);
+          doubleValueToIndexMap.put(entry, i);
         }
         doubleDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         break;
       case STRING:
       case BOOLEAN:
@@ -129,51 +137,38 @@ public class SegmentDictionaryCreator implements Closeable {
           for (int j = 0; j < padding; j++) {
             bld.append(V1Constants.Str.STRING_PAD_CHAR);
           }
-          revised[i] = bld.toString();
+          String entry = bld.toString();
+          revised[i] = entry;
           assert (revised[i].getBytes(Charset.forName("UTF-8")).length == stringColumnMaxLength);
         }
         Arrays.sort(revised);
 
+        stringValueToIndexMap = new Object2IntOpenHashMap<>(sortedList.length);
         for (int i = 0; i < revised.length; i++) {
           stringDictionaryWrite.setString(i, 0, revised[i]);
+          stringValueToIndexMap.put(revised[i], i);
         }
         stringDictionaryWrite.close();
-        dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1,
-                new int[] { stringColumnMaxLength });
         break;
       default:
         break;
     }
-    searchableByteBuffer = new ByteBufferBinarySearchUtil(dataReader);
   }
 
   public int getStringColumnMaxLength() {
     return stringColumnMaxLength;
   }
 
-  public Object indexOf(Object e) {
-    if (spec.isSingleValueField()) {
-      return indexOfSV(e);
-    } else {
-      return indexOfMV(e);
-    }
-  }
-
-  private Integer indexOfSV(Object e) {
+  public int indexOfSV(Object e) {
     switch (spec.getDataType()) {
       case INT:
-        final int intValue = ((Integer) e).intValue();
-        return new Integer(searchableByteBuffer.binarySearch(0, intValue));
+        return intValueToIndexMap.get(e);
       case FLOAT:
-        final float floatValue = ((Float) e).floatValue();
-        return new Integer(searchableByteBuffer.binarySearch(0, floatValue));
+        return floatValueToIndexMap.get(e);
       case DOUBLE:
-        final double doubleValue = ((Double) e).doubleValue();
-        return new Integer(searchableByteBuffer.binarySearch(0, doubleValue));
+        return doubleValueToIndexMap.get(e);
       case LONG:
-        final long longValue = ((Long) e).longValue();
-        return new Integer(searchableByteBuffer.binarySearch(0, longValue));
+        return longValueToIndexMap.get(e);
       case STRING:
       case BOOLEAN:
         final StringBuilder bld = new StringBuilder();
@@ -181,54 +176,54 @@ public class SegmentDictionaryCreator implements Closeable {
         for (int i = 0; i < (stringColumnMaxLength - ((String) e).getBytes(Charset.forName("UTF-8")).length); i++) {
           bld.append(V1Constants.Str.STRING_PAD_CHAR);
         }
-        return new Integer(searchableByteBuffer.binarySearch(0, bld.toString()));
+        return stringValueToIndexMap.get(bld.toString());
       default:
-        break;
+        throw new UnsupportedOperationException("Unsupported data type : " + spec.getDataType() +
+            " for column : " + spec.getName());
     }
-
-    throw new UnsupportedOperationException("unsupported data type : " + spec.getDataType() + " : " + " for column : "
-        + spec.getName());
   }
 
-  private Integer[] indexOfMV(Object e) {
+  public int[] indexOfMV(Object e) {
 
     final Object[] multiValues = (Object[]) e;
-    final Integer[] ret = new Integer[multiValues.length];
+    final int[] ret = new int[multiValues.length];
 
     switch (spec.getDataType()) {
       case INT:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Integer) multiValues[i]).intValue());
+          ret[i] = intValueToIndexMap.get(multiValues[i]);
         }
         break;
       case FLOAT:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Float) multiValues[i]).floatValue());
+          ret[i] = floatValueToIndexMap.get(multiValues[i]);
         }
         break;
       case LONG:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Long) multiValues[i]).longValue());
+          ret[i] = longValueToIndexMap.get(multiValues[i]);
         }
         break;
       case DOUBLE:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Double) multiValues[i]).doubleValue());
+          ret[i] = doubleValueToIndexMap.get(multiValues[i]);
         }
         break;
       case STRING:
       case BOOLEAN:
         for (int i = 0; i < multiValues.length; i++) {
           final StringBuilder bld = new StringBuilder();
-          bld.append(multiValues[i].toString());
-          for (int j = 0; j < (stringColumnMaxLength - ((String) multiValues[i]).getBytes(Charset.forName("UTF-8")).length); j++) {
+          String value = multiValues[i].toString();
+          bld.append(value);
+          for (int j = 0; j < (stringColumnMaxLength - value.getBytes(Charset.forName("UTF-8")).length); j++) {
             bld.append(V1Constants.Str.STRING_PAD_CHAR);
           }
-          ret[i] = searchableByteBuffer.binarySearch(0, bld.toString());
+          ret[i] = stringValueToIndexMap.get(bld.toString());
         }
         break;
       default:
-        break;
+        throw new UnsupportedOperationException("Unsupported data type : " + spec.getDataType() +
+            " for multivalue column : " + spec.getName());
     }
 
     return ret;

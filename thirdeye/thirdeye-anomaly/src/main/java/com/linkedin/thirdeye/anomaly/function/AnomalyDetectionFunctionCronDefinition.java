@@ -61,9 +61,10 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval) {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,
+      List<AnomalyResult> anomalyHistory) {
     List<AnomalyResult> timeFilteredResults = new ArrayList<AnomalyResult>();
-    List<AnomalyResult> intermediateResults = childFunc.analyze(dimensionKey, series, timeInterval);
+    List<AnomalyResult> intermediateResults = childFunc.analyze(dimensionKey, series, timeInterval, anomalyHistory);
 
     // remove results that do not match the cron expression
     for (AnomalyResult intermediateResult : intermediateResults) {
@@ -72,7 +73,6 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
       Date dateEvalTz = resultDtEvalTz.toDate();
       if (cronExpression.isSatisfiedBy(dateEvalTz)) {
         timeFilteredResults.add(intermediateResult);
-        LOGGER.info("cron definition satisfied : {} - {} - {}", resultDtUTC, resultDtEvalTz, dateEvalTz);
       }
     }
     return timeFilteredResults;

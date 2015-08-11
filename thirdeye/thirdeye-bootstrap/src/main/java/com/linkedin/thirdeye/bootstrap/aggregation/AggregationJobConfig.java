@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -71,27 +72,43 @@ public class AggregationJobConfig {
     return thresholdFuncParams;
   }
 
-  public static AggregationJobConfig fromStarTreeConfig(StarTreeConfig config) {
-    List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
-    List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
-      metricNames.add(spec.getName());
-      metricTypes.add(spec.getType());
-    }
+  public static AggregationJobConfig fromStarTreeConfig(StarTreeConfig config) throws IOException {
+    List<String> metricNames = null;
+    List<MetricType> metricTypes = null;
+    List<String> dimensionNames = null;
+    Map<String, String> rollupFunctionConfig  = null;
 
-    List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
-      dimensionNames.add(dimensionSpec.getName());
-    }
-
-    Map<String, String> rollupFunctionConfig = new HashMap<String, String>();
-    if (config.getRollup().getFunctionConfig() != null)
-    {
-      for (Map.Entry<Object, Object> entry : config.getRollup().getFunctionConfig().entrySet())
+    try {
+      metricNames = new ArrayList<String>(config.getMetrics().size());
+      metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
+      for (MetricSpec spec : config.getMetrics())
       {
-        rollupFunctionConfig.put((String) entry.getKey(), (String) entry.getValue());
+        metricNames.add(spec.getName());
+        metricTypes.add(spec.getType());
+      }
+
+      dimensionNames = new ArrayList<String>(config.getDimensions().size());
+      for (DimensionSpec dimensionSpec : config.getDimensions())
+      {
+        dimensionNames.add(dimensionSpec.getName());
+      }
+
+      rollupFunctionConfig = new HashMap<String, String>();
+      if (config.getRollup().getFunctionConfig() != null)
+      {
+        for (Map.Entry<Object, Object> entry : config.getRollup().getFunctionConfig().entrySet())
+        {
+          rollupFunctionConfig.put((String) entry.getKey(), (String) entry.getValue());
+        }
+      }
+    }
+    catch (Exception e) {
+      if (config.getMetrics() == null) {
+        throw new IllegalStateException("Metrics missing from config : " + config.encode(), e);
+      } else if (config.getDimensions() == null) {
+        throw new IllegalStateException("Dimensions missing from config : " + config.encode(), e);
+      } else {
+        throw new IllegalStateException("Error reading config : " + config.encode(), e);
       }
     }
     return new AggregationJobConfig(dimensionNames,

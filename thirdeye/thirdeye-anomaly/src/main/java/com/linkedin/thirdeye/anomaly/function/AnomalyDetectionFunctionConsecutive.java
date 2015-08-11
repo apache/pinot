@@ -60,14 +60,16 @@ public class AnomalyDetectionFunctionConsecutive extends AnomalyDetectionFunctio
    * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.api.DimensionKey, com.linkedin.thirdeye.api.MetricTimeSeries)
    */
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval) {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,
+      List<AnomalyResult> anomalyHistory) {
     // consecutive requires the nested function to produce some extra results
     long newTimeIntervalStart = timeInterval.getStart() - (
         length * TimeGranularityUtils.toMillis(childFunc.getAggregationTimeGranularity()));
     TimeRange timeIntervalExtended = new TimeRange(newTimeIntervalStart, timeInterval.getEnd());
 
     List<AnomalyResult> consecutiveResults = new ArrayList<AnomalyResult>(series.getTimeWindowSet().size());
-    List<AnomalyResult> intermediateResults = childFunc.analyze(dimensionKey, series, timeIntervalExtended);
+    List<AnomalyResult> intermediateResults = childFunc.analyze(dimensionKey, series, timeIntervalExtended,
+        anomalyHistory);
     HashMap<Long, AnomalyResult> mappedResults = new HashMap<>();
     for (AnomalyResult ar : intermediateResults) {
       mappedResults.put(ar.getTimeWindow(), ar);

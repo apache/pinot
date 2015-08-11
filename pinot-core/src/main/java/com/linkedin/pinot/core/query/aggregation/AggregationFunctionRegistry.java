@@ -30,9 +30,10 @@ import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationNoDictionaryFunction;
+import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Aggregation function registry, that is used to register aggregation functions with the nicknames, so that it can be easily referred
@@ -55,6 +56,16 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("sum", SumAggregationFunction.class);
     keyToFunctionWithDictionary.put("avg", AvgAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcount", DistinctCountAggregationFunction.class);
+    keyToFunctionWithDictionary.put("distinctcounthll", DistinctCountHLLAggregationFunction.class);
+    // quantiles
+    keyToFunctionWithDictionary.put("percentileest50", Percentileest50.class);
+    keyToFunctionWithDictionary.put("percentileest90", Percentileest90.class);
+    keyToFunctionWithDictionary.put("percentileest95", Percentileest95.class);
+    keyToFunctionWithDictionary.put("percentileest99", Percentileest99.class);
+    keyToFunctionWithDictionary.put("percentile50", Percentile50.class);
+    keyToFunctionWithDictionary.put("percentile90", Percentile90.class);
+    keyToFunctionWithDictionary.put("percentile95", Percentile95.class);
+    keyToFunctionWithDictionary.put("percentile99", Percentile99.class);
   }
 
   static {

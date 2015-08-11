@@ -8,15 +8,15 @@ public class FunctionDidNotEvaluateException extends RuntimeException {
   /** */
   private static final long serialVersionUID = 3530065990026973342L;
 
-  private final String reason;
-
-  public FunctionDidNotEvaluateException(String reason) {
-    super();
-    this.reason = reason;
+  public FunctionDidNotEvaluateException(String cause) {
+    super(cause);
   }
 
-  @Override
-  public String toString() {
-    return "FunctionDidNotEvaluateException [reason=" + reason + "]";
+  public FunctionDidNotEvaluateException(Throwable cause) {
+    super(cause);
+  }
+
+  public FunctionDidNotEvaluateException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

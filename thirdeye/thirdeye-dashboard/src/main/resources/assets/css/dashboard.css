@@ -104,6 +104,8 @@
 
 .metric-table-time {
     white-space: nowrap;
+    cursor: pointer;
+    text-decoration: underline;
 }
 
 .metric-table-group-1 {
@@ -158,15 +160,66 @@
     clear: both;
 }
 
+.dimension-heat-map-filter-label{
+    position: relative;
+    left: -25px;
+    top: -1px;
+    padding: 4px 26px 7px 30px;
+    -webkit-border-radius: 4px 0px 0px 4px;
+    -moz-border-radius:  4px 0px 0px 4px;
+    border-radius: 4px 0px 0px 4px;
+}
+
+#dimension-heat-map-filter:checked + label{
+    background-color: #b9b9b9;
+    border:1px solid #777;
+}
+
+.heat-map-buttons{
+    float: right;
+}
+
+.heat-map-buttons i,
+.heat-map-buttons i:hover{
+    border: transparent;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.dimension-heat-map-filter-btn,
+.dimension-heat-map-help-btn{
+   width: 68px;
+}
+
+.dimension-heat-map-help-link{
+    color: #444;
+    position: relative;
+    left: -13px;
+    padding: 6px 30px 6px 30px;
+    -webkit-border-radius: 0px 4px 4px 0px;
+    -moz-border-radius: 0px 4px 4px 0px;
+    border-radius: 0px 4px 4px 0px;
+}
+
+.dimension-heat-map-help-link:hover{
+    color: #222;
+}
+
+
+.dimension-heat-map-filter{
+    width:1px; height:1px;
+}
+
 #dimension-view-heat-map-rendered table {
     border-collapse: collapse;
 }
 
-#dimension-heat-map-help {
-    float: right;
+
+#dimension-heat-map-container td{
+    border: 1px solid #ddd;
 }
 
-.cell-up, .cell-down {
+.cell-up, .cell-down{
     float: right;
 }
 

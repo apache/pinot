@@ -22,11 +22,11 @@ import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
-import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class SingleValueUnsortedForwardIndexCreator implements Closeable, ForwardIndexCreator {
+public class SingleValueUnsortedForwardIndexCreator implements Closeable, SingleValueForwardIndexCreator {
 
   private final File forwardIndexFile;
   private final FieldSpec spec;
@@ -55,20 +55,11 @@ public class SingleValueUnsortedForwardIndexCreator implements Closeable, Forwar
     return ret;
   }
 
-  /**
-   * {@inheritDoc}
-   * @see com.linkedin.pinot.core.segment.creator.ForwardIndexCreator#index(int, Object)
-   */
   @Override
-  public void index(int docId, Object e) {
-    final int entry = ((Integer) e).intValue();
-    sVWriter.setInt(docId, 0, entry);
+  public void index(int docId, int dictionaryIndex) {
+    sVWriter.setInt(docId, 0, dictionaryIndex);
   }
 
-  /**
-   * {@inheritDoc}
-   * @see com.linkedin.pinot.core.segment.creator.ForwardIndexCreator#close()
-   */
   @Override
   public void close() {
     sVWriter.close();

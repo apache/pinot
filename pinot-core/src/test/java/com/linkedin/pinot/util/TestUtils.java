@@ -18,9 +18,17 @@ package com.linkedin.pinot.util;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.HashMap;
+
 import org.apache.commons.io.FileUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -49,5 +57,63 @@ public class TestUtils {
       System.out.println("Not extracting plain file " + resourceUrl);
       return resourceUrl.getFile();
     }
+  }
+
+  /**
+   * assert estimation in error range
+   * @param estimate
+   * @param actual
+   */
+  public static void assertApproximation(double estimate, double actual, double precision) {
+    int threshold = 1000;
+    if (Math.abs(estimate) < threshold && Math.abs(actual) < threshold) {
+      double error = Math.abs(actual - estimate + 0.0);
+      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in difference): " + error);
+      LOGGER.info("small value comparison ignored!");
+      //Assert.assertEquals(error < 3, true);
+    } else {
+      double error = Math.abs(actual - estimate + 0.0) / actual;
+      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in rate): " + error);
+      Assert.assertEquals(error < precision, true);
+    }
+  }
+
+  /*
+  public static void assertQuantileApproximation(double estimate, double actual, double precision, byte quantile) {
+    assertApproximation(estimate, (actual+0.0)*(quantile+0.0)/100, precision);
+  }*/
+
+  public static void assertJSONArrayApproximation(JSONArray jsonArrayEstimate, JSONArray jsonArrayActual, double precision) {
+    LOGGER.info("====== assertJSONArrayApproximation ======");
+    try {
+      HashMap<String, Double> mapEstimate = genMapFromJSONArray(jsonArrayEstimate);
+      HashMap<String, Double> mapActual = genMapFromJSONArray(jsonArrayActual);
+
+      // estimation should not affect number of groups formed
+      Assert.assertEquals(mapEstimate.keySet().size(), mapActual.keySet().size());
+      LOGGER.info("estimate: " + mapEstimate.keySet());
+      LOGGER.info("actual: " + mapActual.keySet());
+      int cnt = 0;
+      for (String key: mapEstimate.keySet()) {
+        // Not strictly enforced, since in quantile, top 100 groups from accurate maybe not be top 100 from estimate
+        // Assert.assertEquals(mapActual.keySet().contains(key), true);
+        if (mapActual.keySet().contains(key)) {
+          assertApproximation(mapEstimate.get(key), mapActual.get(key), precision);
+          cnt += 1;
+        }
+      }
+      LOGGER.info("group overlap rate: " + (cnt+0.0)/mapEstimate.keySet().size());
+    } catch (JSONException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private static HashMap<String, Double> genMapFromJSONArray(JSONArray array) throws JSONException {
+    HashMap<String, Double> map = new HashMap<String, Double>();
+    for (int i = 0; i < array.length(); ++i) {
+      map.put(array.getJSONObject(i).getJSONArray("group").getString(0),
+              array.getJSONObject(i).getDouble("value"));
+    }
+    return map;
   }
 }

@@ -33,26 +33,27 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
-import com.linkedin.thirdeye.anomaly.reporting.AnomalyReportGenerator;
-import com.linkedin.thirdeye.anomaly.reporting.AnomalyReportTable;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGenerator;
+import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
 
 public class ReportGenerator implements Job{
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportGenerator.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("#.#");
+  private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("#");
 
   private String collection;
   private String serverUri;
   private String dashboardUri;
   private ReportConfig reportConfig;
+  private String templatePath;
   private StarTreeConfig starTreeConfig;
 
   @Override
@@ -62,6 +63,7 @@ public class ReportGenerator implements Job{
     try {
       File reportConfigFile = new File(context.getJobDetail().getJobDataMap().get(ReportConstants.CONFIG_FILE_KEY).toString());
       reportConfig = ReportConfig.decode(new FileInputStream(reportConfigFile));
+      templatePath = context.getJobDetail().getJobDataMap().getString(ReportConstants.TEMPLATE_PATH_KEY).toString();
       collection = reportConfig.getCollection();
       serverUri = context.getJobDetail().getJobDataMap().get(ReportConstants.SERVER_URI_KEY).toString();
       dashboardUri = context.getJobDetail().getJobDataMap().getString(ReportConstants.DASHBOARD_URI_KEY.toString());
@@ -74,8 +76,10 @@ public class ReportGenerator implements Job{
       TimeUnit lagUnit = scheduleSpec.getLagUnit();
 
       List<Table> tables = new ArrayList<Table>();
-      List<AnomalyReportTable> anomalyReportTables = new ArrayList<AnomalyReportTable>();
+      Map<String, AnomalyReportTable> anomalyReportTables = null;
       for (TableSpec tableSpec : reportConfig.getTables()) {
+
+        LOGGER.info("Collecting data for table {}", tableSpec);
 
         int baselineSize = tableSpec.getBaselineSize();
         TimeUnit baselineUnit = tableSpec.getBaselineUnit();
@@ -88,7 +92,14 @@ public class ReportGenerator implements Job{
         DateTime baselineStartHour = baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(
             scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(), scheduleSpec.getAggregationUnit()));
         reportConfig.setStartTime(currentStartHour);
+        reportConfig.setStartTimeString(ReportConstants.DATE_TIME_FORMATTER.print(currentStartHour) + " " + ReportConstants.TIMEZONE);
         reportConfig.setEndTime(currentEndHour);
+        reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(currentEndHour) + " " + ReportConstants.TIMEZONE);
+
+        URL thirdeyeUri = getThirdeyeURL(tableSpec, scheduleSpec,
+            baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit)),
+            currentEndHour.minus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit)));
+        LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
 
         Map<String, String> dimensionValues = new HashMap<String, String>();
         if (tableSpec.getGroupBy() != null) {
@@ -99,10 +110,11 @@ public class ReportGenerator implements Job{
         }
 
         Map<String, List<ReportRow>> metricTableRows = new HashMap<>();
-        List<GroupBy> groupBy = null;
+        List<TableReportRow> tableReportRows = new ArrayList<>();
         for (int i = 0; i < scheduleSpec.getReportWindow(); i++) {
           currentEndHour = currentStartHour.plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
           baselineEndHour = baselineStartHour.plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
+
 
           for (String metric : tableSpec.getMetrics()) {
 
@@ -135,23 +147,27 @@ public class ReportGenerator implements Job{
         }
 
         calculateSummaryRow(metricTableRows, tableSpec);
-        groupBy = getGroupBy(metricTableRows);
+        tableReportRows = getGroupBy(metricTableRows, tableSpec.getMetrics());
 
-        if (scheduleSpec.isFindAnomalies()) {
-          anomalyReportTables.addAll(getAnomalies(tableSpec));
+        if (scheduleSpec.isFindAnomalies() && reportConfig.getDbconfig() != null) {
+          if (anomalyReportTables == null ) {
+            anomalyReportTables = new HashMap<String, AnomalyReportTable>();
+          }
+          LOGGER.info("Finding anomalies...");
+          anomalyReportTables.putAll(getAnomalies(tableSpec));
         }
 
-        URL thirdeyeUri = getThirdeyeURL(tableSpec, scheduleSpec);
-        Table table = new Table(metricTableRows, tableSpec, groupBy, thirdeyeUri);
+        Table table = new Table(tableReportRows, tableSpec, thirdeyeUri);
         tables.add(table);
       }
 
       if (reportConfig.getAliases() != null) {
-        alias(tables);
+        alias(tables, anomalyReportTables);
       }
 
 
-      ReportEmailSender reportEmailSender = new ReportEmailSender(tables, scheduleSpec, reportConfig, anomalyReportTables);
+      ReportEmailSender reportEmailSender = new ReportEmailSender(tables, scheduleSpec,
+          reportConfig, anomalyReportTables, templatePath);
       reportEmailSender.emailReport();
 
     } catch (IOException e) {
@@ -160,39 +176,55 @@ public class ReportGenerator implements Job{
   }
 
 
-  private URL getThirdeyeURL(TableSpec tableSpec, ScheduleSpec scheduleSpec) throws MalformedURLException {
-    ThirdeyeUri thirdeyeUri = new ThirdeyeUri(dashboardUri, collection, scheduleSpec.getAggregationSize(), scheduleSpec.getAggregationUnit(), tableSpec.getMetrics(), reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis());
+  private URL getThirdeyeURL(TableSpec tableSpec, ScheduleSpec scheduleSpec, DateTime start, DateTime end) throws MalformedURLException {
+    ThirdeyeUri thirdeyeUri = new ThirdeyeUri(dashboardUri, collection, scheduleSpec, tableSpec, start.getMillis(), end.getMillis());
     return thirdeyeUri.getThirdeyeUri();
   }
 
 
-  private List<AnomalyReportTable> getAnomalies(TableSpec tableSpec) throws IOException {
-    List<AnomalyReportTable> anomalyTables = new ArrayList<AnomalyReportTable>();
+  private Map<String, AnomalyReportTable> getAnomalies(TableSpec tableSpec) throws IOException {
+    DBSpec dbSpec = reportConfig.getDbconfig();
+    Map<String, AnomalyReportTable> anomalyTables = new HashMap<String, AnomalyReportTable>();
     for (String metric : tableSpec.getMetrics()) {
-      AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig("jhong-ld1/thirdeye", "rule", "anomaly", "alert", "", false);
+      AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig(dbSpec.getUrl(), dbSpec.getFunctionTableName(), dbSpec.getAnomalyTableName(),
+          dbSpec.getUser(), dbSpec.getPassword(), dbSpec.isUseConnectionPool());
       AnomalyReportGenerator anomalyReportGenerator = new AnomalyReportGenerator(dbConfig);
-      anomalyTables.add(anomalyReportGenerator.getAnomalyTable(collection, metric, reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20));
+      anomalyTables.put(metric, anomalyReportGenerator.getAnomalyTable(collection, metric, reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20));
     }
 
     return anomalyTables;
   }
 
 
-  private List<GroupBy> getGroupBy(Map<String, List<ReportRow>> metricTableRows) {
-    List<GroupBy> groupBy = new ArrayList<GroupBy>();
-    for (Entry<String, List<ReportRow>> entry : metricTableRows.entrySet()) {
-      for (ReportRow row : entry.getValue()) {
+  private List<TableReportRow> getGroupBy(Map<String, List<ReportRow>> metricTableRows, List<String> metrics) {
+    //List<GroupBy> groupBy = new ArrayList<GroupBy>();
+    List<TableReportRow> tableReportRows = new ArrayList<TableReportRow>();
+    for (String metric : metrics) {
+      List<ReportRow> rows = metricTableRows.get(metric);
+      for (ReportRow row : rows) {
         String startTime;
         if (row.getDimension().equals("Total")) {
           startTime = "Total";
         } else {
-          startTime = ReportConstants.DATE_TIME_FORMATTER.print(row.getCurrentStart());
+          startTime = ReportConstants.HOUR_FORMATTER.print(row.getCurrentStart()).toLowerCase();
         }
-        groupBy.add(new GroupBy(startTime, row.getDimension()));
+        //groupBy.add(new GroupBy(startTime, row.getDimension()));
+        TableReportRow tableReportRow = new TableReportRow();
+        tableReportRow.setGroupByDimensions(new GroupBy(startTime, row.getDimension()));
+        tableReportRows.add(tableReportRow);
       }
       break;
     }
-    return groupBy;
+
+    for (String metric : metrics) {
+      List<ReportRow> metricRows = metricTableRows.get(metric);
+
+      for (int i = 0; i < metricRows.size(); i++) {
+        tableReportRows.get(i).getRows().add(metricRows.get(i));
+      }
+
+    }
+    return tableReportRows;
   }
 
 
@@ -205,6 +237,9 @@ public class ReportGenerator implements Job{
     for (Entry<String, List<ReportRow>> entry : metricTableRows.entrySet()) {
       List<ReportRow> tableRows = entry.getValue();
       String metric = entry.getKey();
+      if (tableRows.size() == 0) {
+        throw new IllegalStateException("No rows found for metric " + metric);
+      }
       MetricTimeSeries currentSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics()));
       MetricTimeSeries baselineSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics()));
 
@@ -223,45 +258,50 @@ public class ReportGenerator implements Job{
   }
 
 
-  private void alias(List<Table> tables) {
+  private void alias(List<Table> tables, Map<String, AnomalyReportTable> anomalyReportTables) {
 
     AliasSpec aliasSpec = reportConfig.getAliases();
+    Map<String, String> metricMap = aliasSpec.getMetric();
+    Map<String, String> dimensionMap = aliasSpec.getDimension();
+    Map<String, Map<String, String>> dimensionValuesMap = aliasSpec.getDimensionValues();
 
     for (Table table : tables) {
 
-      // Alias metric
-      if (aliasSpec.getMetric() != null) {
-        for (Entry<String, String> metricAlias : aliasSpec.getMetric().entrySet()) {
-          if (table.getMetricReportRows().get(metricAlias.getKey()) != null) {
-            List<ReportRow> reportRows = table.getMetricReportRows().remove(metricAlias.getKey());
-            table.getMetricReportRows().put(metricAlias.getValue(), reportRows);
+      // alias dimension values
+      String groupByDimension = table.getTableSpec().getGroupBy();
+      if (groupByDimension != null && dimensionValuesMap != null && dimensionValuesMap.containsKey(groupByDimension)) {
+        Map<String, String> dimensionValues = dimensionValuesMap.get(groupByDimension);
+        for (TableReportRow tableReportRow : table.getTableReportRows()) {
+          GroupBy groupBy = tableReportRow.getGroupByDimensions();
+          if (dimensionValues.containsKey(groupBy.getDimension())) {
+            groupBy.setDimension(dimensionValues.get(groupBy.getDimension()));
           }
         }
       }
 
-      // alias groupBy if it exists
-      String groupBy = table.tableSpec.getGroupBy();
-      if (groupBy != null) {
-
-        // alias includeDimensions
-        List<String> groupByValues = table.tableSpec.getFilter() == null ? null : table.tableSpec.getFilter().getIncludeDimensions();
-        Map<String, String> groupByValuesAlias = aliasSpec.getDimensionValues() == null ? null : aliasSpec.getDimensionValues().get(groupBy);
-
-        if (groupByValues != null && groupByValuesAlias != null) {
-          for (GroupBy group : table.getGroupBy()) {
-            if (groupByValuesAlias.get(group.getDimension()) != null) {
-              group.setDimension(groupByValuesAlias.get(group.getDimension()));
+      // alias metrics
+      if (metricMap != null) {
+        for (TableReportRow tableReportRow : table.getTableReportRows()) {
+          for (ReportRow reportRow : tableReportRow.getRows()) {
+            if (metricMap.containsKey(reportRow.getMetric())) {
+              reportRow.setMetric(metricMap.get(reportRow.getMetric()));
             }
           }
         }
-
-        // alias groupBy
-        Map<String, String> dimensionAlias = aliasSpec.getDimension();
-        if (dimensionAlias != null && dimensionAlias.get(groupBy) != null) {
-          table.tableSpec.setGroupBy(dimensionAlias.get(groupBy));
-        }
       }
 
+      // alias groupby dimension
+      if (dimensionMap != null && dimensionMap.containsKey(table.getTableSpec().getGroupBy())) {
+         table.getTableSpec().setGroupBy(dimensionMap.get(table.getTableSpec().getGroupBy()));
+      }
+    }
+
+    if (anomalyReportTables != null && metricMap != null) {
+      for (Entry<String, String> entry : metricMap.entrySet()) {
+        if (anomalyReportTables.containsKey(entry.getKey())) {
+          anomalyReportTables.put(entry.getValue(), anomalyReportTables.remove(entry.getKey()));
+        }
+      }
     }
   }
 

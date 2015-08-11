@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS %s(
   function_name VARCHAR(255) NOT NULL,
   function_description VARCHAR(1024) NOT NULL,
   collection VARCHAR(255) NOT NULL,
-  time_window DATETIME NOT NULL,
+  time_window BIGINT NOT NULL,
   non_star_count INT NOT NULL,
   dimensions VARCHAR(800) NOT NULL,
   dimensions_contribution DOUBLE NOT NULL,

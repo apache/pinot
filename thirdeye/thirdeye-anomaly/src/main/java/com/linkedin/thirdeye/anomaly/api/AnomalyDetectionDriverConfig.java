@@ -37,6 +37,9 @@ public class AnomalyDetectionDriverConfig {
   /** Set of dimensions that the driver should not attempt to group by. */
   private Set<String> neverExplore;
 
+  /** Prune exploration based on feedback to reduce computation costs and raising redundant anomalies */
+  private boolean pruneExplortaionUsingFeedback = true;
+
   @JsonProperty
   public String getCollectionName() {
     return collectionName;
@@ -75,6 +78,11 @@ public class AnomalyDetectionDriverConfig {
   @JsonProperty
   public int getMaxExplorationDepth() {
     return maxExplorationDepth;
+  }
+
+  @JsonProperty
+  public boolean isPruneExplortaionUsingFeedback() {
+    return pruneExplortaionUsingFeedback;
   }
 
   /**

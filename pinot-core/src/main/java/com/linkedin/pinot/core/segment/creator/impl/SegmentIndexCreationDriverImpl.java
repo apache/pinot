@@ -116,6 +116,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
     buildIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
+    LOGGER.info("Collected stats for {} documents", totalDocs);
 
     // Initialize the index creation using the per-column statistics information
     indexCreator.init(config, indexCreationInfoMap, dataSchema, totalDocs, tempIndexDir);

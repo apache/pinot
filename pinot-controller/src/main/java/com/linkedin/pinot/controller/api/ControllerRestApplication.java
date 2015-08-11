@@ -135,6 +135,7 @@ public class ControllerRestApplication extends Application {
 
     final Directory webdir = new Directory(getContext(), CONSOLE_WEBAPP_ROOT_PATH);
     webdir.setDeeplyAccessible(true);
+    webdir.setIndexName("index.html");
     router.attach("/query", webdir);
 
     final Directory swaggerUiDir = new Directory(getContext(), getClass().getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.1.8-M1").toString());

@@ -43,11 +43,10 @@ public class PinotTableIndexingConfigs extends PinotRestletResourceBase {
       return new StringRepresentation("tableName is not present");
     }
 
-    AbstractTableConfig config = null;
     try {
-      return updateIndexingConfig(tableName, entity, config);
+      return updateIndexingConfig(tableName, entity);
     } catch (final Exception e) {
-      LOGGER.error("errpr updating indexing configs for table {}", config.getTableName(), e);
+      LOGGER.error("Error updating indexing configs for table {}", tableName, e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
@@ -61,10 +60,10 @@ public class PinotTableIndexingConfigs extends PinotRestletResourceBase {
   private Representation updateIndexingConfig(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the indexing configuration", required = true)
       String tableName,
-      Representation entity, AbstractTableConfig config)
+      Representation entity)
       throws Exception {
-    config = AbstractTableConfig.init(entity.getText());
-    _pinotHelixResourceManager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType()),
+    AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
+    _pinotHelixResourceManager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType().toUpperCase()),
         config.getIndexingConfig());
     return new StringRepresentation("done");
   }

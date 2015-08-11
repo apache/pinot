@@ -43,12 +43,10 @@ public class PinotTableSegmentConfigs extends PinotRestletResourceBase {
       return new StringRepresentation("tableName is not present");
     }
 
-    AbstractTableConfig config = null;
-
     try {
-      return updateSegmentConfig(tableName, entity, config);
+      return updateSegmentConfig(tableName, entity);
     } catch (final Exception e) {
-      LOGGER.error("errpr updating segments configs for table {}", config.getTableName(), e);
+      LOGGER.error("Error updating segments configs for table {}", tableName, e);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
 
@@ -62,11 +60,11 @@ public class PinotTableSegmentConfigs extends PinotRestletResourceBase {
   })
   private Representation updateSegmentConfig(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the segment configuration", required = true)
-      String tableName, Representation entity, AbstractTableConfig config)
+      String tableName, Representation entity)
       throws Exception {
-    config = AbstractTableConfig.init(entity.getText());
+    AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
     _pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(config.getTableName(),
-        TableType.valueOf(config.getTableType()), config.getValidationConfig());
+        TableType.valueOf(config.getTableType().toUpperCase()), config.getValidationConfig());
     return new StringRepresentation("done");
   }
 }

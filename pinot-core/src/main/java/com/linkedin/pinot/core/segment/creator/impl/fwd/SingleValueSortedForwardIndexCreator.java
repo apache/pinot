@@ -21,11 +21,11 @@ import java.io.IOException;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
-import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator, Closeable {
+public class SingleValueSortedForwardIndexCreator implements SingleValueForwardIndexCreator, Closeable {
   private FixedByteWidthRowColDataFileWriter indexWriter;
   private int[] mins;
   private int[] maxs;
@@ -66,9 +66,8 @@ public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator
   }
 
   @Override
-  public void index(int docId, Object e) {
-    int dictionaryId = ((Integer) e).intValue();
-    add(dictionaryId, docId);
+  public void index(int docId, int dictionaryIndex) {
+    add(dictionaryIndex, docId);
   }
 
   @Override

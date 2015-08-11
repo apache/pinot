@@ -40,10 +40,10 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
   private int _zkPort=2181;
 
   @Option(name="-dataDir", required=false, metaVar="<string>", usage="Directory for zookeper data.")
-  private String _dataDir = "/tmp/PinotAdmin/zkData";
+  private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
 
   @Option(name="-logDir", required=false, metaVar="<string>", usage="Directory for zookeeper logs.")
-  private String _logDir = "/tmp/PinotAdmin/zkLog";
+  private String _logDir = TMP_DIR + "PinotAdmin/zkLog";
 
   @Option(name="-tickTime", required=false, metaVar="<int>", usage="Tick time for zookeeper.")
   private int _tickTime = 30000;

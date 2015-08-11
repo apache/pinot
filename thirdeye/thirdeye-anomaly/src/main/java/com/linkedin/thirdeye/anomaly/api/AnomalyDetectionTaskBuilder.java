@@ -71,9 +71,13 @@ public class AnomalyDetectionTaskBuilder {
         AnomalyResultHandler resultHandler = new AnomalyResultHandlerDatabase(dbConfig);
         resultHandler.init(starTreeConfig, new HandlerProperties());
 
+        // make the function history interface
+        AnomalyDetectionFunctionHistory functionHistory = new AnomalyDetectionFunctionHistory(starTreeConfig, dbConfig,
+            functionTableRow.getFunctionId());
+
         // make the task
-        AnomalyDetectionTask task = new AnomalyDetectionTask(starTreeConfig, collectionDriverConfig, taskInfo,
-            function, resultHandler);
+        AnomalyDetectionTask task = new AnomalyDetectionTaskImpl(starTreeConfig, collectionDriverConfig, taskInfo,
+            function, resultHandler, functionHistory);
 
         tasks.add(task);
       } catch (Exception e) {

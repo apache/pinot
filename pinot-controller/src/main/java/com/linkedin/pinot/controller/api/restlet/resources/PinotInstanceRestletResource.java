@@ -155,7 +155,7 @@ public class PinotInstanceRestletResource extends PinotRestletResourceBase {
    * @throws JSONException
    */
   @HttpVerb("get")
-  @Summary("Toggles an instance's state")
+  @Summary("Enable, disable or drop an instance")
   @Tags({ "instance" })
   @Paths({ "/instances/{instanceName}", "/instances/{instanceName}/" })
   private StringRepresentation toggleInstanceState(@Parameter(name = "instanceName", in = "path",

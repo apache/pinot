@@ -40,7 +40,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
-  private String _dataDir = "/tmp/PinotController";
+  private String _dataDir = TMP_DIR + "PinotController";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -121,7 +121,54 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
     starter.start();
 
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminController.pid");
+    savePID(TMP_DIR + ".pinotAdminController.pid");
+    return true;
+  }
+
+  @Override
+  ControllerConf readConfigFromFile(String configFileName) throws ConfigurationException {
+    ControllerConf conf = null;
+
+    if (configFileName == null) {
+      return null;
+    }
+
+    File configFile = new File(_configFileName);
+    if (!configFile.exists()) {
+      return null;
+    }
+
+    conf = new ControllerConf(configFile);
+    return (validateConfig(conf)) ? conf : null;
+  }
+
+  private boolean validateConfig(ControllerConf conf) {
+    if (conf == null) {
+      LOGGER.error("Error: Null conf object.");
+      return false;
+    }
+
+    if (conf.getControllerHost() == null) {
+      LOGGER.error("Error: missing hostname, please specify 'controller.host' property in config file.");
+      return false;
+    }
+
+    if (conf.getControllerPort() == null) {
+      LOGGER.error("Error: missing controller port, please specify 'controller.port' property in config file.");
+      return false;
+    }
+
+    if (conf.getZkStr() == null) {
+      LOGGER.error("Error: missing Zookeeper address, please specify 'controller.zk.str' property in config file.");
+      return false;
+    }
+
+    if (conf.getHelixClusterName() == null) {
+      LOGGER
+          .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
+      return false;
+    }
+
     return true;
   }
 }

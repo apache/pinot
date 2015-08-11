@@ -168,15 +168,15 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
   }
 
   @HttpVerb("get")
-  @Summary("Toggles the state of a table.")
+  @Summary("Enable, disable or drop a table")
   @Tags({ "table" })
   @Paths({ "/tables/{tableName}", "/table/{tableName}/" })
   private StringRepresentation setTablestate(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to toggle its state",
           required = true) String tableName,
-      @Parameter(name = "type", in = "query", description = "Type of table, Offline or Realtime", required = true) String type,
+      @Parameter(name = "type", in = "query", description = "Type of table, Offline or Realtime", required = false) String type,
       @Parameter(name = "state", in = "query", description = "The desired table state, either enable or disable",
-          required = false) String state) throws JSONException {
+          required = true) String state) throws JSONException {
 
     JSONArray ret = new JSONArray();
     boolean tableExists = false;

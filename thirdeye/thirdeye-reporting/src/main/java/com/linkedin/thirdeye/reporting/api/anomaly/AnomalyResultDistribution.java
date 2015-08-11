@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.reporting;
+package com.linkedin.thirdeye.reporting.api.anomaly;
 
 import org.apache.commons.math3.util.Pair;
 
