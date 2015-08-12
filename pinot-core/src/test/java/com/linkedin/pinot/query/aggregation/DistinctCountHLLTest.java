@@ -178,9 +178,6 @@ public class DistinctCountHLLTest {
         // Test aggregate
 
         // Test combine
-        StringBuilder sb1 = new StringBuilder();
-        StringBuilder sb2 = new StringBuilder();
-        StringBuilder sb3 = new StringBuilder();
         // Make combine list number fixed to 10, each list has large number of elements
         int maxSize = 100000; // 10000000
         for (int i = 1; i <= maxSize; i += maxSize/17) {
@@ -193,13 +190,9 @@ public class DistinctCountHLLTest {
             long t3 = System.nanoTime();
             long estimate = ((HyperLogLog) (combinedResult.get(0))).cardinality();
             long precise = arr.getPreciseCardinality();
-            TestUtils.assertApproximation(estimate, precise, 0.1);
             println(i + ", " + "" + (t2 - t1) + "" + ", " + (t3 - t2) + ", " + getErrorString(precise, estimate));
-            sb1.append(estimate + ", ");
-            sb2.append(precise + ", ");
+            TestUtils.assertApproximation(estimate, precise, 0.1);
         }
-        // println("Error: " + sb3.toString());
-        // assertEquals(sb1.toString(), sb2.toString());  // assert actual equals (nearly impossible!)
 
         // Test reduce
         /*for (int i = 1; i <= _sizeOfCombineList; ++i) {
@@ -241,10 +234,10 @@ public class DistinctCountHLLTest {
             long estimate = ((HyperLogLog) (hllCombinedResult.get(0))).cardinality();
             long precise = arr.getPreciseCardinality();
 
-            TestUtils.assertApproximation(estimate, precise, 0.15);
-            assertEquals(((IntOpenHashSet) (setCombinedResult.get(0))).size(), precise);
             println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
                     + estimate + ", " + precise + ", " + getErrorString(precise, estimate));
+            TestUtils.assertApproximation(estimate, precise, 0.15);
+            assertEquals(((IntOpenHashSet) (setCombinedResult.get(0))).size(), precise);
         }
     }
 
@@ -304,7 +297,11 @@ public class DistinctCountHLLTest {
     }
 
     private String getErrorString(long precise, long estimate) {
-        return Math.abs(precise - estimate + 0.0) /precise*100 + "%";
+        if (precise != 0) {
+            return Math.abs((precise - estimate + 0.0) / precise) * 100 + "%";
+        } else {
+            return "precise: " + precise + " estimate: " + estimate;
+        }
     }
 
     private int getSerializedSize(Serializable ser) {

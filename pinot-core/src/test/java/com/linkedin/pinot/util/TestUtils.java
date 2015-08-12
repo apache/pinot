@@ -23,7 +23,6 @@ import java.util.HashMap;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -37,6 +36,7 @@ import static org.testng.Assert.assertEquals;
  */
 public class TestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
+  private static final int testThreshold = 1000;
 
   public static String getFileFromResourceUrl(URL resourceUrl) {
     System.out.println(resourceUrl);
@@ -65,16 +65,21 @@ public class TestUtils {
    * @param actual
    */
   public static void assertApproximation(double estimate, double actual, double precision) {
-    int threshold = 1000;
-    if (Math.abs(estimate) < threshold && Math.abs(actual) < threshold) {
-      double error = Math.abs(actual - estimate + 0.0);
-      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in difference): " + error);
+    estimate = Math.abs(estimate);
+    actual = Math.abs(actual);
+
+    if (estimate < testThreshold && actual < testThreshold) {
+      double errorDiff = Math.abs(actual - estimate);
+      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in difference): " + errorDiff);
       LOGGER.info("small value comparison ignored!");
       //Assert.assertEquals(error < 3, true);
     } else {
-      double error = Math.abs(actual - estimate + 0.0) / actual;
-      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in rate): " + error);
-      Assert.assertEquals(error < precision, true);
+      double errorRate = 1;
+      if (actual > 0) {
+        errorRate = Math.abs((actual - estimate) / actual);
+      }
+      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in rate): " + errorRate);
+      Assert.assertEquals(errorRate < precision, true);
     }
   }
 

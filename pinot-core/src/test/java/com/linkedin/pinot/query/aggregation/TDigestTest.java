@@ -216,8 +216,8 @@ public class TDigestTest {
                 List<Serializable> combinedResult2 = aggregationAccurateFunction.combine(aggregationResults2, CombineLevel.SEGMENT);
                 double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
 
-                TestUtils.assertApproximation(estimate, actual, threshold);
                 println(i + ", " + "" + (t2 - t1) + "" + ", " + (t3 - t2) + ", " + getErrorString(actual, estimate));
+                TestUtils.assertApproximation(estimate, actual, threshold);
             }
         }
     }
@@ -257,9 +257,9 @@ public class TDigestTest {
                 double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
                 long t4 = System.nanoTime();
 
+                println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
+                        + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
                 TestUtils.assertApproximation(estimate, actual, threshold);
-                // println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
-                //        + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
             }
         }
     }
@@ -362,7 +362,11 @@ public class TDigestTest {
     }
 
     private String getErrorString(double precise, double estimate) {
-        return Math.abs(precise - estimate + 0.0) /precise*100 + "%";
+        if (precise != 0) {
+            return Math.abs((precise - estimate + 0.0) / precise) * 100 + "%";
+        } else {
+            return "precise: " + precise + " estimate: " + estimate;
+        }
     }
 
     private int getSerializedSize(Serializable ser) {
