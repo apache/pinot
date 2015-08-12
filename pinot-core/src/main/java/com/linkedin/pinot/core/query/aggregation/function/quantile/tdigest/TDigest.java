@@ -67,7 +67,7 @@ public class TDigest implements Serializable {
      *                    accuracy.
      */
     public TDigest(double compression) {
-        this(compression, new Random());
+        this(compression, new Random(1000L));
     }
 
     public TDigest(double compression, Random random) {

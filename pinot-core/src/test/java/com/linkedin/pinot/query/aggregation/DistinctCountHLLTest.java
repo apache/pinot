@@ -73,7 +73,9 @@ public class DistinctCountHLLTest {
     }
 
     public static class RandomNumberArray {
-        private static Random _rnd = new Random(System.currentTimeMillis());
+        // For test purpose, we fix the random seeds.
+        // It should also work for arbitrary seeds like System.currentTimeMillis()
+        private static Random _rnd = new Random(0L);
 
         private final Integer[] arr;
         private final HashSet<Integer> set = new HashSet<Integer>();
@@ -100,7 +102,7 @@ public class DistinctCountHLLTest {
             // add to set
             set.addAll(lst);
             // shuffle
-            Collections.shuffle(lst);
+            Collections.shuffle(lst, new Random(10L));
             // toIntArray
             arr = lst.toArray(new Integer[0]);
             if (arr.length != size) {

@@ -82,7 +82,9 @@ public class TDigestTest {
     }
 
     public static class RandomNumberArray {
-        private static Random _rnd = new Random(System.currentTimeMillis());
+        // For test purpose, we fix the random seeds.
+        // It should also work for arbitrary seeds like System.currentTimeMillis()
+        private static Random _rnd = new Random(0L);
 
         private final Integer[] arr;
         private final HashSet<Integer> set = new HashSet<Integer>();
@@ -109,7 +111,7 @@ public class TDigestTest {
             // add to set
             set.addAll(lst);
             // shuffle
-            Collections.shuffle(lst);
+            Collections.shuffle(lst, new Random(10L));
             // toIntArray
             arr = lst.toArray(new Integer[0]);
             if (arr.length != size) {
@@ -256,8 +258,8 @@ public class TDigestTest {
                 long t4 = System.nanoTime();
 
                 TestUtils.assertApproximation(estimate, actual, threshold);
-                println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
-                        + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
+                // println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
+                //        + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
             }
         }
     }
