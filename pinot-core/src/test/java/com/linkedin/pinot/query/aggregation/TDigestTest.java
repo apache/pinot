@@ -50,6 +50,8 @@ public class TDigestTest {
     public static String _columnName = "met";
     public static AggregationInfo _paramsInfo;
 
+    private static final double threshold = 0.1;  // Precision threshold, can be set to smaller value.
+
     /**
      * This does not mean too much sense here, but we fix it to a small number.
      */
@@ -164,7 +166,7 @@ public class TDigestTest {
                 List<Serializable> combinedResult2 = aggregationAccurateFunction.combine(aggregationResults2, CombineLevel.SEGMENT);
                 double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
 
-                TestUtils.assertApproximation(estimate, actual, 0.05);
+                TestUtils.assertApproximation(estimate, actual, threshold);
                 sb1.append((int)estimate + ", ");
                 sb2.append(i + ", ");
             }
@@ -176,7 +178,7 @@ public class TDigestTest {
               List<Serializable> combinedResults2 = getDoubleArrayListResultValues(i);
               double estimate = (Double) aggregationFunction.reduce(combinedResults);
               double actual = (Double) aggregationAccurateFunction.reduce(combinedResults2);
-              TestUtils.assertApproximation(estimate, actual, 0.05);
+              TestUtils.assertApproximation(estimate, actual, threshold);
             }
         }
     }
@@ -212,7 +214,7 @@ public class TDigestTest {
                 List<Serializable> combinedResult2 = aggregationAccurateFunction.combine(aggregationResults2, CombineLevel.SEGMENT);
                 double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
 
-                TestUtils.assertApproximation(estimate, actual, 0.05);
+                TestUtils.assertApproximation(estimate, actual, threshold);
                 println(i + ", " + "" + (t2 - t1) + "" + ", " + (t3 - t2) + ", " + getErrorString(actual, estimate));
             }
         }
@@ -253,7 +255,7 @@ public class TDigestTest {
                 double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
                 long t4 = System.nanoTime();
 
-                TestUtils.assertApproximation(estimate, actual, 0.05);
+                TestUtils.assertApproximation(estimate, actual, threshold);
                 println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
                         + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
             }

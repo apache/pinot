@@ -198,7 +198,7 @@ public class QueriesSentinelTest {
       aggCalls.add(new TestSimpleAggreationQuery("select percentileest50(column" + i + ") from testTable limit 0", 0.0));
     }
 
-    runApproximationQueries(aggCalls, 0.05);
+    runApproximationQueries(aggCalls, 0.1);
   }
 
   @Test
@@ -213,7 +213,7 @@ public class QueriesSentinelTest {
       groupByCalls.add(new TestGroupByAggreationQuery("select percentileest50(column1) from testTable group by column" + i + " top " + top + " limit 0", null));
     }
 
-    runApproximationQueries(groupByCalls, 0.05);
+    runApproximationQueries(groupByCalls, 0.1);
   }
 
   @Test

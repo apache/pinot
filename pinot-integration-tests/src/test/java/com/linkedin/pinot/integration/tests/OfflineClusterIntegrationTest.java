@@ -305,7 +305,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
             new String[]{"percentile50", "percentileest50"},
             new String[]{"AirTime"/* int */, "ArrTime"/* int */},
             null,
-            0.05);
+            0.1);
   }
 
   @Test
@@ -314,7 +314,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
             new String[]{"percentile50", "percentileest50"},
             new String[]{"AirTime"/* int */, "ArrTime"/* int */},
             "Carrier",
-            0.05);
+            0.1);
   }
 
 
