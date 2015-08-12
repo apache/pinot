@@ -252,12 +252,10 @@ public class DashboardResource {
         String timeUnit = metricFunction.split("_")[2];
         int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
 
-        long INTRA_PERIOD;
-        if (timeUnit.startsWith(TimeUnit.HOURS.toString())) {
-          INTRA_PERIOD = INTRA_DAY_PERIOD;
-        } else if (aggregationWindow == 1) {
+        long INTRA_PERIOD = INTRA_DAY_PERIOD;
+        if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
           INTRA_PERIOD = INTRA_WEEK_PERIOD;
-        } else {
+        } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())){
           INTRA_PERIOD = INTRA_MONTH_PERIOD;
         }
 
