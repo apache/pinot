@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
+import javax.validation.constraints.NotNull;
+
 import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,16 +17,22 @@ public class ReportConfig {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
+  @NotNull
   private String name;
+  @NotNull
   private String collection;
+  @NotNull
   private List<TableSpec> tables;
   private AliasSpec aliases;
   private DateTime endTime;
   private DateTime startTime;
   private String startTimeString;
   private String endTimeString;
+
   private Map<String, ScheduleSpec> schedules;
   private DBSpec dbconfig;
+  @NotNull
+  private String timezone;
 
 
   public ReportConfig() {
@@ -102,6 +110,14 @@ public class ReportConfig {
 
   public List<TableSpec> getTables() {
     return tables;
+  }
+
+  public String getTimezone() {
+    return timezone;
+  }
+
+  public void setTimezone(String timezone) {
+    this.timezone = timezone;
   }
 
 

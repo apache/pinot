@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.time.DateUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -48,6 +49,8 @@ public class ReportGenerator implements Job{
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportGenerator.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("#");
+  private static int DEFAULT_AGGREGATION_GRANULARITY = 1;
+  private static TimeUnit DEFAULT_AGGREGATION_UNIT = TimeUnit.HOURS;
 
   private String collection;
   private String serverUri;
@@ -91,14 +94,14 @@ public class ReportGenerator implements Job{
             scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(), scheduleSpec.getAggregationUnit()));
         DateTime baselineStartHour = baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(
             scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(), scheduleSpec.getAggregationUnit()));
-        reportConfig.setStartTime(currentStartHour);
-        reportConfig.setStartTimeString(ReportConstants.DATE_TIME_FORMATTER.print(currentStartHour) + " " + ReportConstants.TIMEZONE);
-        reportConfig.setEndTime(currentEndHour);
-        reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(currentEndHour) + " " + ReportConstants.TIMEZONE);
+        reportConfig.setStartTime(currentStartHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
+        reportConfig.setStartTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getStartTime()) + " " + reportConfig.getTimezone());
+        reportConfig.setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
+        reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()) + " " + reportConfig.getTimezone());
 
         URL thirdeyeUri = getThirdeyeURL(tableSpec, scheduleSpec,
-            baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit)),
-            currentEndHour.minus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit)));
+            baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)),
+            currentEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)));
         LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
 
         Map<String, String> dimensionValues = new HashMap<String, String>();
@@ -189,7 +192,8 @@ public class ReportGenerator implements Job{
       AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig(dbSpec.getUrl(), dbSpec.getFunctionTableName(), dbSpec.getAnomalyTableName(),
           dbSpec.getUser(), dbSpec.getPassword(), dbSpec.isUseConnectionPool());
       AnomalyReportGenerator anomalyReportGenerator = new AnomalyReportGenerator(dbConfig);
-      anomalyTables.put(metric, anomalyReportGenerator.getAnomalyTable(collection, metric, reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20));
+      anomalyTables.put(metric, anomalyReportGenerator.getAnomalyTable(collection, metric,
+          reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20, reportConfig.getTimezone()));
     }
 
     return anomalyTables;
@@ -197,7 +201,6 @@ public class ReportGenerator implements Job{
 
 
   private List<TableReportRow> getGroupBy(Map<String, List<ReportRow>> metricTableRows, List<String> metrics) {
-    //List<GroupBy> groupBy = new ArrayList<GroupBy>();
     List<TableReportRow> tableReportRows = new ArrayList<TableReportRow>();
     for (String metric : metrics) {
       List<ReportRow> rows = metricTableRows.get(metric);
@@ -206,9 +209,8 @@ public class ReportGenerator implements Job{
         if (row.getDimension().equals("Total")) {
           startTime = "Total";
         } else {
-          startTime = ReportConstants.HOUR_FORMATTER.print(row.getCurrentStart()).toLowerCase();
+          startTime = ReportConstants.HOUR_FORMATTER.print(row.getCurrentStart().withZone(DateTimeZone.forID(reportConfig.getTimezone()))).toLowerCase();
         }
-        //groupBy.add(new GroupBy(startTime, row.getDimension()));
         TableReportRow tableReportRow = new TableReportRow();
         tableReportRow.setGroupByDimensions(new GroupBy(startTime, row.getDimension()));
         tableReportRows.add(tableReportRow);

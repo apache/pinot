@@ -44,21 +44,22 @@ public class AnomalyReportGenerator {
    *  AnomalyReportTable with default settings and ranking
    * @throws IOException
    */
-  public AnomalyReportTable getAnomalyTable(String collection, String metric, long startTime, long endTime, int topK)
+  public AnomalyReportTable getAnomalyTable(String collection, String metric, long startTime, long endTime, int topK, String timezone)
       throws IOException {
     List<AnomalyTableRow> anomalyTableRows = getAnomalyRowsHelper(dbConfig, collection, metric, startTime, endTime);
-    return getAnomalyTable(anomalyTableRows, topK);
+    return getAnomalyTable(anomalyTableRows, topK, timezone);
   }
 
   /**
    * @param anomalyTableRows
    *  These should all have the same collection
    * @param topK
+   * @param timezone
    * @return
    *  AnomalyReportTable based on list of AnomalyTableRows provided
    * @throws IOException
    */
-  public AnomalyReportTable getAnomalyTable(List<AnomalyTableRow> anomalyTableRows, int topK) throws IOException {
+  public AnomalyReportTable getAnomalyTable(List<AnomalyTableRow> anomalyTableRows, int topK, String timezone) throws IOException {
     List<AnomalyReportTableRow> reportTableRows = new ArrayList<AnomalyReportTableRow>(topK);
 
     // the order in which dimensions are to be displayed
@@ -78,7 +79,7 @@ public class AnomalyReportGenerator {
         dimensionValues[dimensionSchema.indexOf(e.getKey())] = e.getValue();
       }
 
-      DateTime timestamp = new DateTime(row.getTimeWindow(), DateTimeZone.UTC).toDateTime(DateTimeZone.getDefault());
+      DateTime timestamp = new DateTime(row.getTimeWindow()).withZone(DateTimeZone.forID(timezone));
       AnomalyReportTableRow reportTableRow = new AnomalyReportTableRow(
           timestamp,
           new DimensionKey(dimensionValues).toString(),
@@ -155,7 +156,7 @@ public class AnomalyReportGenerator {
     AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig("localhost/thirdeye", "rule", "anomaly", "alert", "",
         false);
     AnomalyReportGenerator rg = new AnomalyReportGenerator(dbConfig);
-    System.out.println(rg.getAnomalyTable("ads", "cost", 0, 2000000000000L, 20));
+    System.out.println(rg.getAnomalyTable("ads", "cost", 0, 2000000000000L, 20, "Pacific/US"));
   }
 }
 

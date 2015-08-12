@@ -19,13 +19,13 @@ public class AnomalyReportTableRow {
   private Number anomalyScore;
   private Number anomalyVolume;
 
-  private static final DateFormat DATE_FORMAT =  new SimpleDateFormat("YYYY-MM-dd h a");
+  private static final DateFormat DATE_FORMAT =  new SimpleDateFormat("yyyy-MM-dd h a");
 
   public AnomalyReportTableRow(DateTime timestamp, String dimensions, String description, boolean scoreIsPercent,
       Number anomalyScore, Number anomalyVolume) {
     super();
     this.timestamp = timestamp;
-    this.date = DATE_FORMAT.format(timestamp.toDate());
+    this.date = DATE_FORMAT.format(timestamp.toDate()).toLowerCase();
     this.dimensions = dimensions;
     this.description = description;
     this.scoreIsPercent = scoreIsPercent;
@@ -47,7 +47,7 @@ public class AnomalyReportTableRow {
 
   public void setTimestamp(DateTime timestamp) {
     this.timestamp = timestamp;
-    this.date = DATE_FORMAT.format(timestamp.toDate());
+    this.date = DATE_FORMAT.format(timestamp.toDate()).toLowerCase();
   }
 
   public String getDimensions() {
