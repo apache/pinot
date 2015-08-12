@@ -92,5 +92,5 @@ thirdeye.schema <- function(host, port, collection) {
   # Do query
   res <- stream_in(url(uri))
 
-  return res
+  return(res)
 }
