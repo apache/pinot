@@ -36,6 +36,7 @@ import org.apache.hadoop.mapred.Merger;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Job.JobState;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.security.AccessControlException;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
@@ -1019,11 +1020,30 @@ public class ThirdEyeJob {
         {
           missingInputs = new ArrayList<String>();
           for (String input : inputs) {
-            if (!fileSystem.exists(new Path(input)) || fileSystem.exists(new Path(input, TEMPORARY_FOLDER))) {
+
+            LOGGER.info("Checking path {}", input);
+
+            if (!fileSystem.exists(new Path(input)) ) {
               missingInputs.add(input);
               LOGGER.info("Missing input {}", input);
             }
+            else {
+              try {
+                fileSystem.getFileStatus(new Path(input));
+
+                if (fileSystem.exists(new Path(input, TEMPORARY_FOLDER))) {
+                  missingInputs.add(input);
+                  LOGGER.info("Data generation in progress");
+                } else {
+                  LOGGER.info("Path available {}", input);
+                }
+              } catch (AccessControlException e) {
+                missingInputs.add(input);
+                LOGGER.info("No access to path {}", input);
+              }
+            }
           }
+
           if (missingInputs.size() == 0) {
             LOGGER.info("All paths available");
             break;
