@@ -5,6 +5,11 @@
         <#include "common/style.ftl">
 
         <style>
+        body {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
         .not-available {
             background-color: #ffd700;
         }
@@ -117,6 +122,18 @@
                       <div class="time-series-container"></div>
                       <div class="time-series-data">${componentView.second.jsonString}</div>
                   </div>
+
+                  <#if componentView.first.dimensions??>
+                      <h3>Dimensions</h3>
+                      <table>
+                      <#list componentView.first.dimensions?keys as dimension>
+                        <tr>
+                          <th>${dimension}</th>
+                          <td>${componentView.first.flattenedDimensions[dimension]}</td>
+                        </tr>
+                      </#list>
+                      </table>
+                  </#if>
             <#else>
                 <p>No component type ${componentView.first.type}</p>
             </#if>

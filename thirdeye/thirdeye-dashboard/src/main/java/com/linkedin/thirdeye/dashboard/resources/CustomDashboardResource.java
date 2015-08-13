@@ -261,7 +261,7 @@ public class CustomDashboardResource {
 
     for (Map.Entry<String, Map<String, Number[]>> entry : result.getData().entrySet()) {
       // Dimension value
-      String dimensionValue = "ALL";
+      String dimensionValue = "";
       if (groupByIdx >= 0) {
         List<String> values = objectMapper.readValue(entry.getKey(), LIST_REF);
         dimensionValue = values.get(groupByIdx);
@@ -287,7 +287,9 @@ public class CustomDashboardResource {
         return (int) (aggregates.get(o2) - aggregates.get(o1)); // reverse
       }
     });
-    chosenValues = chosenValues.subList(0, 5);
+    if (chosenValues.size() > 5) {
+      chosenValues = chosenValues.subList(0, 5);
+    }
 
     // Get times
     List<Long> times = new ArrayList<>();
