@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -68,26 +69,27 @@ public class AnomalyTable {
       List<String> orderBy,
       long startTimeWindow,
       long endTimeWindow) throws SQLException {
-    return selectRows(dbConfig, collection, null, functionName, functionDescription, metrics, topLevelOnly,
+    return selectRows(dbConfig, collection, null, functionName, functionDescription, null, metrics, topLevelOnly,
         orderBy, new TimeRange(startTimeWindow, endTimeWindow));
   }
 
   public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, int functionId, TimeRange timeRange)
       throws SQLException {
     List<String> orderBy = Arrays.asList(new String[]{"time_window"});
-    return selectRows(dbConfig, null, functionId, null, null, null, false, orderBy, null);
+    return selectRows(dbConfig, null, functionId, null, null, null, null, false, orderBy, null);
   }
 
   public static List<AnomalyTableRow> selectRows(
       AnomalyDatabaseConfig dbConfig,
-        String collection,
-        Integer functionId,
-        String functionName,
-        String functionDescription,
-        Set<String> metrics,
-        boolean topLevelOnly,
-        List<String> orderBy,
-        TimeRange timeRange) throws SQLException {
+      String collection,
+      Integer functionId,
+      String functionName,
+      String functionDescription,
+      Map<String, String> dimensions,
+      Set<String> metrics,
+      boolean topLevelOnly,
+      List<String> orderBy,
+      TimeRange timeRange) throws SQLException {
 
     Connection conn = null;
     Statement stmt = null;
@@ -112,7 +114,7 @@ public class AnomalyTable {
         row.setCollection(rs.getString("collection"));
         row.setTimeWindow(rs.getLong("time_window"));
         row.setNonStarCount(rs.getInt("non_star_count"));
-        row.setDimensions(rs.getString("dimensions"));
+        row.setDimensions(deserializeDimensions(rs.getString("dimensions")));
         row.setDimensionsContribution(rs.getDouble("dimensions_contribution"));
         row.setMetrics(deserializeMetrics(rs.getString("metrics")));
         row.setAnomalyScore(rs.getDouble("anomaly_score"));
@@ -128,15 +130,23 @@ public class AnomalyTable {
 
         row.setProperties(properties);
 
+        // filter on dimensions
+        if (dimensions != null) {
+          if (row.getDimensions() == null || row.getDimensions().size() != dimensions.size()
+              || !row.compareDimensions(dimensions)) {
+            continue;
+          }
+        }
+
         // filter on metrics
         if (metrics != null) {
-          if (row.getMetrics() != null && row.getMetrics().size() == metrics.size()
-            && metrics.containsAll(row.getMetrics())) {
-            results.add(row);
+          if (row.getMetrics() == null || row.getMetrics().size() != metrics.size()
+              || !metrics.containsAll(row.getMetrics())) {
+            continue;
           }
-        } else {
-          results.add(row);
         }
+
+        results.add(row);
       }
 
       return results;
@@ -194,7 +204,7 @@ public class AnomalyTable {
       preparedStmt.setString(5, row.getCollection());
       preparedStmt.setLong(6, row.getTimeWindow());
       preparedStmt.setInt(7, row.getNonStarCount());
-      preparedStmt.setString(8, row.getDimensions());
+      preparedStmt.setString(8, serializeDimensions(row.getDimensions()));
       preparedStmt.setDouble(9, row.getDimensionsContribution());
       preparedStmt.setString(10, serializeMetrics(row.getMetrics()));
       preparedStmt.setDouble(11, row.getAnomalyScore());
@@ -297,6 +307,19 @@ public class AnomalyTable {
     return String.format(formatString, tableName);
   }
 
+  private static Map<String, String> deserializeDimensions(String dimensionsString) {
+    ObjectReader reader = OBJECT_MAPPER.reader(Map.class);
+    try {
+      return reader.readValue(dimensionsString);
+    } catch (IOException e) {
+      return null;
+    }
+  }
+
+  private static String serializeDimensions(Map<String, String> dimensionsMap) throws JsonProcessingException {
+    return OBJECT_MAPPER.writeValueAsString(dimensionsMap);
+  }
+
   private static Set<String> deserializeMetrics(String metricsString) {
     ObjectReader reader = OBJECT_MAPPER.reader(Set.class);
     try {
@@ -307,6 +330,6 @@ public class AnomalyTable {
   }
 
   private static String serializeMetrics(Set<String> metrics) throws JsonProcessingException {
-    return OBJECT_MAPPER.writer().writeValueAsString(metrics);
+    return OBJECT_MAPPER.writeValueAsString(metrics);
   }
 }

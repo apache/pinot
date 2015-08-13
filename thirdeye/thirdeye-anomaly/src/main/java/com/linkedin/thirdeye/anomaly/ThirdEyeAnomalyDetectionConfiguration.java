@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly;
 
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -19,26 +18,48 @@ public class ThirdEyeAnomalyDetectionConfiguration {
     RuleBased, Generic,
   }
 
-  /** The time range (start, end) to run anomaly detection on. */
-  private TimeRange explicitTimeRange;
-
   /** The mode determining how to interpret the anomaly database function specifications. */
   private Mode mode;
 
-  /** The interval at which anomaly detection tasks are scheduled to run. */
-  private TimeGranularity detectionInterval;
+  /** The name of the collection */
+  private String collectionName;
 
-  /** An additional delay to running detection to account for data arrival at the third eye server */
-  private TimeGranularity detectionLag;
+  /** The server hosting data */
+  private String thirdEyeServerHost;
+
+  /** The port to request data from the server */
+  private short thirdEyeServerPort;
 
   /** The configuration for the anomaly database including: url, function table, anomaly table, user credentials */
   private AnomalyDatabaseConfig anomalyDatabaseConfig;
 
   /** List of anomaly detection driver configurations pertaining to each collection */
-  private List<AnomalyDetectionDriverConfig> collectionDriverConfigurations;
+  private AnomalyDetectionDriverConfig driverConfig;
 
   /** Maximum amount of time to wait for tasks in a batch to finish */
   private TimeGranularity maxWaitToCompletion = new TimeGranularity(1, TimeUnit.HOURS);
+
+  /**
+   * Only run this functionId. This should only be used for testing purposes. The is_active column should be used
+   * to control which functions are run in production.
+   */
+  private Integer functionIdToEvaluate = null;
+
+  /*
+   * The following settings are only used when the anomaly detection service is running as a standalone process.
+   */
+
+  /**
+   * The time range (start, end) to run anomaly detection on.
+   * This option only makes sense in a standalone mode!
+   */
+  private TimeRange explicitTimeRange;
+
+  /**
+   * The interval at which anomaly detection tasks are scheduled to run.
+   * This option only makes sense in a standalone mode and when not running with an explicit time range!
+   */
+  private TimeGranularity detectionInterval;
 
   @JsonProperty
   public TimeRange getExplicitTimeRange() {
@@ -59,21 +80,22 @@ public class ThirdEyeAnomalyDetectionConfiguration {
   }
 
   @JsonProperty
+  public short getThirdEyeServerPort() {
+    return thirdEyeServerPort;
+  }
+
+  @JsonProperty
+  public String getThirdEyeServerHost() {
+    return thirdEyeServerHost;
+  }
+
+  @JsonProperty
   public TimeGranularity getDetectionInterval() {
     return detectionInterval;
   }
 
   public void setDetectionInterval(TimeGranularity detectionInterval) {
     this.detectionInterval = detectionInterval;
-  }
-
-  @JsonProperty
-  public TimeGranularity getDetectionLag() {
-    return detectionLag;
-  }
-
-  public void setDetectionLag(TimeGranularity detectionLag) {
-    this.detectionLag = detectionLag;
   }
 
   @JsonProperty
@@ -86,15 +108,6 @@ public class ThirdEyeAnomalyDetectionConfiguration {
   }
 
   @JsonProperty
-  public List<AnomalyDetectionDriverConfig> getCollectionDriverConfigurations() {
-    return collectionDriverConfigurations;
-  }
-
-  public void setCollectionDriverConfigurations(List<AnomalyDetectionDriverConfig> collections) {
-    this.collectionDriverConfigurations = collections;
-  }
-
-  @JsonProperty
   public TimeGranularity getMaxWaitToCompletion() {
     return maxWaitToCompletion;
   }
@@ -102,4 +115,32 @@ public class ThirdEyeAnomalyDetectionConfiguration {
   public void setMaxWaitToCompletion(TimeGranularity maxWaitToCompletion) {
     this.maxWaitToCompletion = maxWaitToCompletion;
   }
+
+  @JsonProperty
+  public AnomalyDetectionDriverConfig getDriverConfig() {
+    return driverConfig;
+  }
+
+  public void setDriverConfig(AnomalyDetectionDriverConfig driverConfig) {
+    this.driverConfig = driverConfig;
+  }
+
+  @JsonProperty
+  public String getCollectionName() {
+    return collectionName;
+  }
+
+  public void setCollectionName(String collectionName) {
+    this.collectionName = collectionName;
+  }
+
+  @JsonProperty
+  public Integer getFunctionIdToEvaluate() {
+    return functionIdToEvaluate;
+  }
+
+  public void setFunctionIdToEvaluate(Integer functionIdToEvaluate) {
+    this.functionIdToEvaluate = functionIdToEvaluate;
+  }
+
 }

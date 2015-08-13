@@ -6,12 +6,12 @@ import org.jblas.DoubleMatrix;
 
 public class StateSpaceModel {
   // The matrices describing a state space model.
-  private DoubleMatrix state_transition_matrix_;
-  private DoubleMatrix observation_matrix_;
-  private DoubleMatrix transition_covariance_matrix_;
-  private DoubleMatrix observation_covariance_matrix_;
-  private DoubleMatrix initial_state_mean_;
-  private DoubleMatrix initial_state_covariance_;
+  private DoubleMatrix state_transition_matrix_ref_;
+  private DoubleMatrix observation_matrix_ref_;
+  private DoubleMatrix transition_covariance_matrix_ref_;
+  private DoubleMatrix observation_covariance_matrix_ref_;
+  private DoubleMatrix initial_state_mean_ref_;
+  private DoubleMatrix initial_state_covariance_ref_;
 
   // Dimensions.
   private int dimension_of_states_;
@@ -19,7 +19,7 @@ public class StateSpaceModel {
   private int number_of_observations_;
 
   // Observations.
-  private DoubleMatrix[] observations_;
+  private DoubleMatrix[] observations_ref_;
   private DoubleMatrix[] estimated_state_means_;
   private DoubleMatrix[] estimated_state_covariances_;
   private DoubleMatrix[] predicted_observation_means_;
@@ -44,7 +44,7 @@ public class StateSpaceModel {
       DoubleMatrix[] observations) {
     dimension_of_states_ = observation_matrix.getColumns();
     dimension_of_observations_ = observation_matrix.getRows();
-    observation_matrix_ = observation_matrix.dup();
+    observation_matrix_ref_ = observation_matrix;
 
     if (!state_transition_matrix.isSquare() ||
         state_transition_matrix.getRows() != dimension_of_states_) {
@@ -53,7 +53,7 @@ public class StateSpaceModel {
           dimension_of_states_,
           dimension_of_states_);
     }
-    state_transition_matrix_ = state_transition_matrix.dup();
+    state_transition_matrix_ref_ = state_transition_matrix;
 
 
     if (!transition_covariance_matrix.isSquare() ||
@@ -63,7 +63,7 @@ public class StateSpaceModel {
           dimension_of_states_,
           dimension_of_states_);
     }
-    transition_covariance_matrix_ = transition_covariance_matrix.dup();
+    transition_covariance_matrix_ref_ = transition_covariance_matrix;
 
     if (!observation_covariance_matrix.isSquare() ||
         observation_covariance_matrix.getRows() != dimension_of_observations_) {
@@ -72,7 +72,7 @@ public class StateSpaceModel {
           dimension_of_observations_,
           dimension_of_observations_);
     }
-    observation_covariance_matrix_ = observation_covariance_matrix.dup();
+    observation_covariance_matrix_ref_ = observation_covariance_matrix;
 
     if (initial_state_mean.getRows() != dimension_of_states_ ||
         initial_state_mean.getColumns() != 1) {
@@ -81,7 +81,7 @@ public class StateSpaceModel {
           dimension_of_states_,
           1);
     }
-    initial_state_mean_ = initial_state_mean.dup();
+    initial_state_mean_ref_ = initial_state_mean;
 
 
     if (!initial_state_covariance.isSquare() ||
@@ -91,11 +91,11 @@ public class StateSpaceModel {
           dimension_of_states_,
           dimension_of_states_);
     }
-    initial_state_covariance_ = initial_state_covariance.dup();
+    initial_state_covariance_ref_ = initial_state_covariance;
 
     number_of_observations_ = observations.length;
 
-    observations_ = observations.clone();
+    observations_ref_ = observations;
 
     estimated_state_means_ = new DoubleMatrix[number_of_observations_];
     estimated_state_covariances_ = new DoubleMatrix[number_of_observations_];
@@ -117,17 +117,17 @@ public class StateSpaceModel {
       DoubleMatrix previous_state_mean = estimated_state_means_[estimated_state_means_.length-1];
       DoubleMatrix previous_state_covariance = estimated_state_covariances_[estimated_state_covariances_.length-1];
       for (int ii=0; ii<steps_ahead; ii++) {
-        DoubleMatrix a = state_transition_matrix_.mmul(previous_state_mean);
-        DoubleMatrix R = state_transition_matrix_
+        DoubleMatrix a = state_transition_matrix_ref_.mmul(previous_state_mean);
+        DoubleMatrix R = state_transition_matrix_ref_
             .mmul(previous_state_covariance)
-            .mmul(state_transition_matrix_.transpose())
-            .addi(transition_covariance_matrix_);
+            .mmul(state_transition_matrix_ref_.transpose())
+            .addi(transition_covariance_matrix_ref_);
         // One-step-ahead observation prediction.
-        predicted_means_[ii] = observation_matrix_.mmul(a);
-        predicted_variances_[ii] = observation_matrix_
+        predicted_means_[ii] = observation_matrix_ref_.mmul(a);
+        predicted_variances_[ii] = observation_matrix_ref_
             .mmul(R)
-            .mmul(observation_matrix_.transpose())
-            .addi(observation_covariance_matrix_);
+            .mmul(observation_matrix_ref_.transpose())
+            .addi(observation_covariance_matrix_ref_);
         previous_state_mean = a;
         previous_state_covariance = R;
       }
@@ -140,53 +140,54 @@ public class StateSpaceModel {
   }
 
   private void UpdateFilteredStates() {
+    DoubleMatrix state_transition_matrix_T = state_transition_matrix_ref_.transpose();
+    DoubleMatrix observation_matrix_T = observation_matrix_ref_.transpose();
+
     for (int ii = 0; ii < number_of_observations_; ii++) {
       DoubleMatrix previous_state_mean =
-          (ii == 0) ? initial_state_mean_ : estimated_state_means_[ii - 1];
+          (ii == 0) ? initial_state_mean_ref_ : estimated_state_means_[ii - 1];
       DoubleMatrix previous_state_covariance =
-          (ii == 0) ? initial_state_covariance_ : estimated_state_covariances_[ii - 1];
+          (ii == 0) ? initial_state_covariance_ref_ : estimated_state_covariances_[ii - 1];
 
       // One-step-ahead state prediction. (i)
-      DoubleMatrix a = state_transition_matrix_.mmul(previous_state_mean);
-      DoubleMatrix R = state_transition_matrix_
+      DoubleMatrix a = state_transition_matrix_ref_.mmul(previous_state_mean);
+      DoubleMatrix R = state_transition_matrix_ref_
           .mmul(previous_state_covariance)
-          .mmul(state_transition_matrix_.transpose())
-          .addi(transition_covariance_matrix_);
+          .mmul(state_transition_matrix_T)
+          .addi(transition_covariance_matrix_ref_);
       // One-step-ahead observation prediction(ii)
-      predicted_observation_means_[ii] = observation_matrix_.mmul(a);
+      predicted_observation_means_[ii] = observation_matrix_ref_.mmul(a);
 
-      predicted_observation_covariances_[ii] = observation_matrix_
+      predicted_observation_covariances_[ii] = observation_matrix_ref_
           .mmul(R)
-          .mmul(observation_matrix_.transpose())
-          .addi(observation_covariance_matrix_);
+          .mmul(observation_matrix_T)
+          .addi(observation_covariance_matrix_ref_);
 
       //if current observation is null:
-      if (observations_[ii] == null) {
+      if (observations_ref_[ii] == null) {
         estimated_state_means_[ii] = a;
         estimated_state_covariances_[ii] = R;
       } else {
         DoubleMatrix inv_predicted_observation_covariances = InverseMatrix.inverse(
-            predicted_observation_covariances_[ii], 0);
-
+            predicted_observation_covariances_[ii]);
+        DoubleMatrix R_obs_mat_T_inv_pred_obs_cov = R
+            .mmul(observation_matrix_T)
+            .mmuli(inv_predicted_observation_covariances);
         // forward filtering states.(iii)
-        estimated_state_means_[ii] = R
-            .mmul(observation_matrix_.transpose())
-            .mmuli(inv_predicted_observation_covariances)
-            .mmul(observations_[ii].sub(predicted_observation_means_[ii]))
+        estimated_state_means_[ii] = R_obs_mat_T_inv_pred_obs_cov
+            .mmul(observations_ref_[ii].sub(predicted_observation_means_[ii]))
             .addi(a);
 
         estimated_state_covariances_[ii] = R
-            .sub(R
-                .mmul(observation_matrix_.transpose())
-                .mmuli(inv_predicted_observation_covariances)
-                .mmul(observation_matrix_)
+            .sub(R_obs_mat_T_inv_pred_obs_cov
+                .mmul(observation_matrix_ref_)
                 .mmuli(R)
                 );
-        estimated_means_[ii] = observation_matrix_.mmul(estimated_state_means_[ii]);
-        estimated_covariances_[ii] = observation_matrix_
+        estimated_means_[ii] = observation_matrix_ref_.mmul(estimated_state_means_[ii]);
+        estimated_covariances_[ii] = observation_matrix_ref_
             .mmul(estimated_state_covariances_[ii])
-            .mmul(observation_matrix_.transpose())
-            .addi(observation_covariance_matrix_);
+            .mmul(observation_matrix_T)
+            .addi(observation_covariance_matrix_ref_);
       }
     }
   }
@@ -194,7 +195,7 @@ public class StateSpaceModel {
   private void CalculateLogLikelihood() {
     sum_log_likelihood_ = 0;
     for (int ii = 0; ii < number_of_observations_; ii++) {
-      if (observations_[ii] == null) {
+      if (observations_ref_[ii] == null) {
         continue;
       }
       //System.out.println(ii);
@@ -202,17 +203,17 @@ public class StateSpaceModel {
       MultivariateNormalDistribution dist = new MultivariateNormalDistribution(
           predicted_observation_means_[ii].getColumn(0).toArray(),
           predicted_observation_covariances_[ii].toArray2());
-      sum_log_likelihood_ += Math.log(dist.density(observations_[ii].getColumn(0).toArray()));
+      sum_log_likelihood_ += Math.log(dist.density(observations_ref_[ii].getColumn(0).toArray()));
     }
   }
 
   // Getters
   public DoubleMatrix GetStateNoiseMatrix() {
-    return transition_covariance_matrix_.dup();
+    return transition_covariance_matrix_ref_.dup();
   }
 
   public DoubleMatrix GetObservationNoiseMatrix() {
-    return observation_covariance_matrix_.dup();
+    return observation_covariance_matrix_ref_.dup();
   }
 
   public DoubleMatrix[] GetEstimatedStateMeans() {
@@ -248,7 +249,7 @@ public class StateSpaceModel {
   }
 
   public DoubleMatrix[] GetTrainingSequence() {
-    return observations_.clone();
+    return observations_ref_.clone();
   }
 
   public double GetLogLikeliHood() {

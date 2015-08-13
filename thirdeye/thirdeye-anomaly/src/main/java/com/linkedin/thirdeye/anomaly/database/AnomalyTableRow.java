@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.database;
 
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import com.linkedin.thirdeye.anomaly.api.ResultProperties;
@@ -33,8 +35,8 @@ public class AnomalyTableRow {
   /** The number of dimensions that are non '*' */
   int nonStarCount;
 
-  /** The dimension key that produced this anomaly as a json string */
-  String dimensions;
+  /** The dimension key that produced this anomaly as map, serializable to json */
+  Map<String, String> dimensions;
 
   /** The estimated proportion that the dimension key contributes to the metric total */
   double dimensionsContribution;
@@ -115,11 +117,11 @@ public class AnomalyTableRow {
     this.nonStarCount = nonStarCount;
   }
 
-  public String getDimensions() {
+  public Map<String, String> getDimensions() {
     return dimensions;
   }
 
-  public void setDimensions(String dimensions) {
+  public void setDimensions(Map<String, String> dimensions) {
     this.dimensions = dimensions;
   }
 
@@ -161,5 +163,22 @@ public class AnomalyTableRow {
 
   public void setDimensionsContribution(double dimensionsContribution) {
     this.dimensionsContribution = dimensionsContribution;
+  }
+
+  /**
+   * @param dimensions
+   * @return
+   *  Whether the dimension keys are the same
+   */
+  public boolean compareDimensions(Map<String, String> dimensions) {
+    if (this.dimensions == null || dimensions == null || this.dimensions.size() != dimensions.size()) {
+      return false;
+    }
+    for (Entry<String, String> entry : dimensions.entrySet()) {
+      if (!entry.getValue().equals(dimensions.get(entry.getKey()))) {
+        return false;
+      }
+    }
+    return true;
   }
 }

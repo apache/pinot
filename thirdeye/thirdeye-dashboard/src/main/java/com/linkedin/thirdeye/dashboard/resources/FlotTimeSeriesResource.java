@@ -1,11 +1,16 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
+import com.linkedin.thirdeye.anomaly.database.AnomalyTable;
+import com.linkedin.thirdeye.anomaly.database.AnomalyTableRow;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.FlotTimeSeries;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.*;
+
 import org.joda.time.DateTime;
 
 import javax.ws.rs.GET;
@@ -16,6 +21,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,18 +31,25 @@ import java.util.concurrent.Future;
 @Produces(MediaType.APPLICATION_JSON)
 public class FlotTimeSeriesResource {
   private static final String BASELINE_LABEL_PREFIX = "BASELINE_";
+  private static final String ANOMALY_LABEL_PREFIX = "ANOMALY_";
   private final String serverUri;
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
   private final ConfigCache configCache;
+  private final AnomalyDatabaseConfig anomalyDatabase;
+  private final boolean displayAnomalies;
 
-  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache, ObjectMapper objectMapper, ConfigCache configCache) {
+  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache, ObjectMapper objectMapper,
+      ConfigCache configCache, AnomalyDatabaseConfig anomalyDatabase) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
     this.configCache = configCache;
+    this.anomalyDatabase = anomalyDatabase;
+
+    displayAnomalies = anomalyDatabase != null;
   }
 
   @GET
@@ -58,7 +71,15 @@ public class FlotTimeSeriesResource {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, uriInfo.getQueryParameters(), reverseDimensionGroups);
     QueryResult queryResult = queryCache.getQueryResult(serverUri, sql).checkEmpty();
-    return FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
+
+    List<FlotTimeSeries> allSeries = FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
+    if (displayAnomalies) {
+      List<AnomalyTableRow> anomalies = AnomalyTable.selectRows(anomalyDatabase, collection, null, null, null, null,
+          null, false, null, new TimeRange(baselineMillis, currentMillis));
+      allSeries.addAll(FlotTimeSeries.anomaliesFromQueryResult(schema, objectMapper, queryResult, ANOMALY_LABEL_PREFIX,
+          anomalies));
+    }
+    return allSeries;
   }
 
   @GET
@@ -96,11 +117,28 @@ public class FlotTimeSeriesResource {
     Future<QueryResult> currentResult
         = queryCache.getQueryResultAsync(serverUri, currentSeriesSql);
 
+    // Query for anomalies
+    List<AnomalyTableRow> anomalies = null;
+    if (displayAnomalies) {
+      anomalies = AnomalyTable.selectRows(anomalyDatabase, collection, null, null, null, null, null, false, null,
+          new TimeRange(currentMillis - windowMillis, currentMillis));
+    }
+
     // Generate series
     List<FlotTimeSeries> baselineSeries
         = FlotTimeSeries.fromQueryResult(schema, objectMapper, baselineResult.get().checkEmpty(), BASELINE_LABEL_PREFIX);
+
+    QueryResult currentQueryResult = currentResult.get().checkEmpty();
     List<FlotTimeSeries> currentSeries
-        = FlotTimeSeries.fromQueryResult(schema, objectMapper, currentResult.get().checkEmpty());
+        = FlotTimeSeries.fromQueryResult(schema, objectMapper, currentQueryResult);
+
+    List<FlotTimeSeries> anomalySeries;
+    if (displayAnomalies) {
+      anomalySeries = FlotTimeSeries.anomaliesFromQueryResult(schema, objectMapper, currentQueryResult,
+          ANOMALY_LABEL_PREFIX, anomalies);
+    } else {
+      anomalySeries = new ArrayList<>(0);
+    }
 
     // Shift all baseline results up by window size
     long offsetMillis = currentMillis - baselineMillis;
@@ -111,9 +149,11 @@ public class FlotTimeSeriesResource {
     }
 
     // Combine
-    List<FlotTimeSeries> combinedSeries = new ArrayList<>(baselineSeries.size() + currentSeries.size());
-    combinedSeries.addAll(baselineSeries);
+    List<FlotTimeSeries> combinedSeries = new ArrayList<>(baselineSeries.size() + currentSeries.size()
+        + anomalySeries.size());
     combinedSeries.addAll(currentSeries);
+    combinedSeries.addAll(baselineSeries);
+    combinedSeries.addAll(anomalySeries);
     return combinedSeries;
   }
 }

@@ -7,23 +7,29 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.exception.FunctionDidNotEvaluateException;
-import com.linkedin.thirdeye.anomaly.util.DimensionKeyUtils;
+import com.linkedin.thirdeye.anomaly.util.DimensionSpecUtils;
 import com.linkedin.thirdeye.anomaly.util.ThirdEyeRequestUtils;
 import com.linkedin.thirdeye.anomaly.util.TimeGranularityUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
@@ -33,11 +39,17 @@ import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
-
 /**
  *
  */
 public class AnomalyDetectionTask implements Runnable {
+
+  /**
+   * Shared thread pool for evaluating anomalies
+   */
+  private static final ExecutorService SHARED_EXECUTORS = Executors.newFixedThreadPool(
+      Runtime.getRuntime().availableProcessors(),
+      new ThreadFactoryBuilder().setDaemon(true).build());
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionTask.class);
 
@@ -45,7 +57,7 @@ public class AnomalyDetectionTask implements Runnable {
   private final String dimensionKeyContributionMetric;
 
   private final StarTreeConfig starTreeConfig;
-  private final AnomalyDetectionDriverConfig collectionDriverConfig;
+  private final AnomalyDetectionDriverConfig driverConfig;
   private final AnomalyDetectionTaskInfo taskInfo;
   private final AnomalyDetectionFunction function;
   private final AnomalyResultHandler handler;
@@ -61,7 +73,7 @@ public class AnomalyDetectionTask implements Runnable {
   /**
    * @param starTreeConfig
    *  Configuration for the star-tree
-   * @param collectionDriverConfig
+   * @param driverConfig
    *  Configuration for the driver
    * @param taskInfo
    *  Information identifying the task
@@ -74,14 +86,14 @@ public class AnomalyDetectionTask implements Runnable {
    * @param thirdEyeClient
    *  The client to use to request data
    */
-  public AnomalyDetectionTask(StarTreeConfig starTreeConfig, AnomalyDetectionDriverConfig collectionDriverConfig,
+  public AnomalyDetectionTask(StarTreeConfig starTreeConfig, AnomalyDetectionDriverConfig driverConfig,
       AnomalyDetectionTaskInfo taskInfo, AnomalyDetectionFunction function, AnomalyResultHandler handler,
       AnomalyDetectionFunctionHistory functionHistory, ThirdEyeClient thirdEyeClient)
   {
     this.function = function;
     this.handler = handler;
     this.starTreeConfig = starTreeConfig;
-    this.collectionDriverConfig = collectionDriverConfig;
+    this.driverConfig = driverConfig;
     this.taskInfo = taskInfo;
     this.functionHistory = functionHistory;
     this.thirdEyeClient = thirdEyeClient;
@@ -89,8 +101,8 @@ public class AnomalyDetectionTask implements Runnable {
     /*
      * Use the metric specified in the config
      */
-    if (collectionDriverConfig.getContributionEstimateMetric() != null) {
-      dimensionKeyContributionMetric = collectionDriverConfig.getContributionEstimateMetric();
+    if (driverConfig.getContributionEstimateMetric() != null) {
+      dimensionKeyContributionMetric = driverConfig.getContributionEstimateMetric();
     } else {
       /*
        * Use the first metric in the collection if no metric is specified.
@@ -99,7 +111,7 @@ public class AnomalyDetectionTask implements Runnable {
       dimensionKeyContributionMetric = starTreeConfig.getMetrics().get(0).getName();
     }
 
-    metricsRequiredByTask = getMetricsRequiredByTask(starTreeConfig, collectionDriverConfig, function);
+    metricsRequiredByTask = getMetricsRequiredByTask(starTreeConfig, driverConfig, function);
 
     queryTimeRange = computeQueryTimeRange(taskInfo, function);
 
@@ -112,16 +124,35 @@ public class AnomalyDetectionTask implements Runnable {
    */
   @Override
   public void run() {
-    try {
-      // start exploring from top level
-      searchAndRun(new HashMap<String, String>(), null, new AnomalyTimeSeries(), 1.0);
-    } catch (Exception e) {
-      LOGGER.error("did not complete {}", taskInfo, e);
+    LOGGER.info("start executing AnomalyDetetcionTask : {}", taskInfo);
+    final LinkedBlockingQueue<Future<?>> futures = new LinkedBlockingQueue<Future<?>>();
+
+    futures.add(SHARED_EXECUTORS.submit(getRunnableSearchAndRun(futures, null, 1.0, new HashMap<String, String>())));
+
+    // wait for everything to finish
+    while (!futures.isEmpty()) {
+      try {
+        futures.poll().get();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      } catch (ExecutionException e) {
+        e.printStackTrace();
+      }
     }
+    LOGGER.info("done executing AnomalyDetetcionTask : {}", taskInfo);
   }
 
-  private void searchAndRun(Map<String, String> dimensionValues, String groupByDimension, AnomalyTimeSeries anomalies,
-      double proportionMultiplier) throws Exception
+
+  /**
+   * @param dimensionValues
+   * @param groupByDimension
+   * @param proportionMultiplier
+   * @param futures
+   *  Before returning, any additional tasks will have been added top this list of futures
+   * @throws Exception
+   */
+  private void searchAndRun(Map<String, String> dimensionValues, String groupByDimension, double proportionMultiplier,
+      final LinkedBlockingQueue<Future<?>> futures) throws Exception
   {
     // Base case : driver chooses to stop exploring
     boolean shouldContinueExploring = true;
@@ -153,7 +184,7 @@ public class AnomalyDetectionTask implements Runnable {
        */
       if (dimensionKeyContributionMap != null) {
         double proportion = dimensionKeyContributionMap.get(dimensionKey) * proportionMultiplier;
-        if (proportion <= collectionDriverConfig.getContributionMinProportion()) {
+        if (proportion <= driverConfig.getContributionMinProportion()) {
           LOGGER.info("skipping series {} - proportion ({}) below threshold", dimensionKey,
               String.format("%.4f", proportion));
           continue;
@@ -176,7 +207,7 @@ public class AnomalyDetectionTask implements Runnable {
       }
 
       // publish anomalies to database
-      handleAnomalyResults(anomalies, dimensionKey, dimensionKeyContributionMap.get(dimensionKey), anomalyResults);
+      handleAnomalyResults(dimensionKey, dimensionKeyContributionMap.get(dimensionKey), anomalyResults);
 
       /*
        * Update dimensions evaluated.
@@ -199,7 +230,7 @@ public class AnomalyDetectionTask implements Runnable {
     if (groupByDimension != null) {
       currentExplorationDepth++;
     }
-    if (currentExplorationDepth >= collectionDriverConfig.getMaxExplorationDepth()) {
+    if (currentExplorationDepth >= driverConfig.getMaxExplorationDepth()) {
       shouldContinueExploring = false;
     }
 
@@ -208,9 +239,20 @@ public class AnomalyDetectionTask implements Runnable {
      */
 
     if (shouldContinueExploring) {
+      /*
+       * Wait for exploration further down the cube to finish.
+       */
+      List<Runnable> runnables = new LinkedList<>();
+
+      Set<String> dimensionsExplored = new HashSet<>(dimensionValues.keySet());
+      if (groupByDimension != null) {
+        dimensionsExplored.add(groupByDimension);
+      }
+      Set<String> nextGroupByCandidates = getDimensionKeysToGroupBy(dimensionsExplored);
+
       for (DimensionKey dimensionKey : dimensionKeysEvaluated) {
         // do not continue exploring this dimension key
-        if (collectionDriverConfig.isPruneExplortaionUsingFeedback()
+        if (driverConfig.isPruneExplortaionUsingFeedback()
             && dimensionKeysWithAnomalies.contains(dimensionKey)) {
           LOGGER.info("pruned computation due to anomaly in enclosing series");
           continue;
@@ -224,23 +266,54 @@ public class AnomalyDetectionTask implements Runnable {
         }
 
         // dive into the next group by
-        for (String nextGroupByDimension : getDimensionKeysToGroupBy(dimensionValues)) {
+        for (final String nextGroupByDimension : nextGroupByCandidates) {
           LOGGER.info("grouping by '{}'", nextGroupByDimension);
-          searchAndRun(dimensionValues, nextGroupByDimension, anomalies,
-              proportionMultiplier * dimensionKeyContributionMap.get(dimensionKey));
+          final double nextProportionMultiplier = proportionMultiplier * dimensionKeyContributionMap.get(dimensionKey);
+          final HashMap<String, String> nextDimensionValues = new HashMap<>(dimensionValues);
+          runnables.add(
+              getRunnableSearchAndRun(futures, nextGroupByDimension, nextProportionMultiplier, nextDimensionValues));
         }
       }
 
-      // backtrack
-      if (groupByDimension != null) {
-        dimensionValues.remove(groupByDimension);
+      // run on next time series
+      for (Runnable runnable : runnables) {
+        futures.add(SHARED_EXECUTORS.submit(runnable));
       }
     }
   }
 
   /**
+   * @param seriesCounter
+   * @param nextGroupByDimension
+   * @param nextProportionMultiplier
+   * @param nextDimensionValues
+   * @return
+   */
+  private Runnable getRunnableSearchAndRun(
+      final LinkedBlockingQueue<Future<?>> futures,
+      final String nextGroupByDimension,
+      final double nextProportionMultiplier,
+      final HashMap<String, String> nextDimensionValues)
+  {
+    return new Runnable() {
+      @Override
+      public void run() {
+        try {
+          searchAndRun(
+              nextDimensionValues,
+              nextGroupByDimension,
+              nextProportionMultiplier,
+              futures);
+        } catch (Exception e) {
+          LOGGER.error("encountered exception in {}", taskInfo, e);
+        }
+      }
+    };
+  }
+
+  /**
    * @param starTreeConfig
-   * @param collectionDriverConfig
+   * @param driverConfig
    * @param function
    * @return
    *  A list of metrics needed by the task to complete
@@ -291,16 +364,35 @@ public class AnomalyDetectionTask implements Runnable {
    * @return
    *  Returns the list dimension names to be explored
    */
-  private Set<String> getDimensionKeysToGroupBy(Map<String, String> dimensionValues) {
-    Set<String> dimensions = new HashSet<>();
-    for (DimensionSpec dimensionSpec : starTreeConfig.getDimensions()) {
-      String dimension = dimensionSpec.getName();
-      if (dimensionValues.containsKey(dimension) || collectionDriverConfig.isNeverExploreDimension(dimension)) {
-        continue;
-      }
-      dimensions.add(dimension);
+  private Set<String> getDimensionKeysToGroupBy(Set<String> dimensionsExplored) {
+    Set<String> dimensionsToGroupBy = new HashSet<>();
+    List<String> dimensions = driverConfig.getDimensionPrecedence();
+    if (dimensions == null) {
+      LOGGER.warn("no dimension precedence given, applying default order in star-tree. This may be highly inefficient.");
+      dimensions = DimensionSpecUtils.getDimensionNames(starTreeConfig.getDimensions());
     }
-    return dimensions;
+
+    /*
+     * By exploring the dimensions in a strict ordering, we prevent running anomaly detection on the same set of
+     * dimensionValues twice.
+     */
+    int firstUnexploredDimensionIndex = 0;
+
+    for (int i = 0; i < dimensions.size(); i++) {
+      if (dimensionsExplored.contains(dimensions.get(i))) {
+        firstUnexploredDimensionIndex = i + 1;
+      }
+    }
+
+    for (int i = firstUnexploredDimensionIndex; i < dimensions.size(); i++) {
+      String dimensionName = dimensions.get(i);
+      if (dimensionsExplored.contains(dimensionName)) {
+        // this should not happen, because we already maxed over already fixed dimensions
+        throw new IllegalStateException();
+      }
+      dimensionsToGroupBy.add(dimensionName);
+    }
+    return dimensionsToGroupBy;
   }
 
   /**
@@ -310,7 +402,7 @@ public class AnomalyDetectionTask implements Runnable {
    */
   private Map<DimensionKey, MetricTimeSeries> getDataset(Map<String, String> fixedDimensionValues,
       String groupByDimension) throws Exception {
-    ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(collectionDriverConfig.getCollectionName(),
+    ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(starTreeConfig.getCollection(),
         groupByDimension, fixedDimensionValues, metricsRequiredByTask, function.getAggregationTimeGranularity(),
         queryTimeRange);
     return thirdEyeClient.execute(request);
@@ -342,8 +434,6 @@ public class AnomalyDetectionTask implements Runnable {
   }
 
   /**
-   * @param anomalies
-   *  Any existing anomalies that have been raised in this run
    * @param dimensionKeyContribution
    *  The estimated contribution of the dimension key
    * @param dimensionKey
@@ -351,7 +441,7 @@ public class AnomalyDetectionTask implements Runnable {
    * @param anomalyResults
    *  List of anomaly results for current detection interval
    */
-  private void handleAnomalyResults(AnomalyTimeSeries anomalies, DimensionKey dimensionKey,
+  private void handleAnomalyResults(DimensionKey dimensionKey,
       double dimensionKeyContribution, List<AnomalyResult> anomalyResults)
   {
     Set<String> metrics = function.getMetrics();
@@ -370,15 +460,6 @@ public class AnomalyDetectionTask implements Runnable {
         continue;
       }
 
-      /*
-       * Decide whether to suppress on this anomaly or not
-       */
-      if (shouldSupressAnomalyResult(anomalies, dimensionKey, anomalyResult)) {
-        continue;
-      } else {
-        anomalies.put(anomalyResult.getTimeWindow(), dimensionKey);
-      }
-
       // handle the anomaly result
       try {
         handler.handle(taskInfo, dimensionKey, dimensionKeyContribution, metrics, anomalyResult);
@@ -386,65 +467,6 @@ public class AnomalyDetectionTask implements Runnable {
         LOGGER.error("failed to handle AnomalyResult from {}", dimensionKey);
       }
     }
-  }
-
-
-  /**
-   * @param primaryAnomalies
-   * @param dimensionKey
-   * @param anomalyResult
-   * @return
-   *  Whether the anomaly should be suppressed.
-   */
-  private boolean shouldSupressAnomalyResult(AnomalyTimeSeries anomalies, DimensionKey dimensionKey,
-      AnomalyResult anomalyResult) {
-    long anomalyTimeWindow = anomalyResult.getTimeWindow();
-
-    /*
-     * Suppress reporting of the anomaly if an anomaly was already reported for a series that contains the current
-     * series.
-     */
-    if (collectionDriverConfig.isSuppressSecondaryAnomalies()) {
-      boolean isSecondaryAnomaly = false;
-      if (anomalies.getTimeWindowSet().contains(anomalyTimeWindow)) {
-        for (DimensionKey anomalousDimensionKey : anomalies.getDimensionKeySet(anomalyTimeWindow)) {
-          if (DimensionKeyUtils.isContainedWithin(anomalousDimensionKey, dimensionKey)) {
-            isSecondaryAnomaly = true;
-            break;
-          }
-        }
-      }
-      return isSecondaryAnomaly;
-    }
-
-    return false;
-  }
-
-  /**
-   * Data structure for storing anomalies by timeWindow.
-   */
-  private class AnomalyTimeSeries {
-
-    Map<Long, Set<DimensionKey>> timeWindowToAnomalies = new HashMap<>();
-
-    public void put(long timeWindow, DimensionKey dimensionKey) {;
-      if (timeWindowToAnomalies.containsKey(timeWindow)) {
-        timeWindowToAnomalies.get(timeWindow).add(dimensionKey);
-      } else {
-        Set<DimensionKey> anomalousDimensionsAtTimeWindow = new HashSet<>();
-        anomalousDimensionsAtTimeWindow.add(dimensionKey);
-        timeWindowToAnomalies.put(timeWindow, anomalousDimensionsAtTimeWindow);
-      }
-    }
-
-    public Set<Long> getTimeWindowSet() {
-      return timeWindowToAnomalies.keySet();
-    }
-
-    public Set<DimensionKey> getDimensionKeySet(long timeWindow) {
-      return timeWindowToAnomalies.get(timeWindow);
-    }
-
   }
 
   /**
@@ -501,4 +523,5 @@ public class AnomalyDetectionTask implements Runnable {
     }
     return new TimeRange(start, end);
   }
+
 }

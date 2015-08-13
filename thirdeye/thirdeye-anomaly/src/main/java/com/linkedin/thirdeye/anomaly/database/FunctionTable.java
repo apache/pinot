@@ -31,8 +31,8 @@ public class FunctionTable {
    * @throws IOException
    * @throws SQLException
    */
-  public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig,
-      Class<T> rowClass) throws InstantiationException, IllegalAccessException, IOException, SQLException {
+  public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig, Class<T> rowClass,
+      String collection) throws InstantiationException, IllegalAccessException, IOException, SQLException {
 
     List<T> functionTableRows = new LinkedList<>();
 
@@ -42,7 +42,7 @@ public class FunctionTable {
     try {
       conn = dbConfig.getConnection();
       stmt = conn.createStatement();
-      rs = stmt.executeQuery(buildFunctionTableSelectStmt(dbConfig));
+      rs = stmt.executeQuery(buildFunctionTableSelectStmt(dbConfig, collection));
 
       while (rs.next()) {
         T row = rowClass.newInstance();
@@ -53,7 +53,7 @@ public class FunctionTable {
       return functionTableRows;
 
     } catch (SQLException e) {
-      LOGGER.error("load rule sql exception", e);
+      LOGGER.error("load function sql exception", e);
       throw e;
     } finally {
       try {
@@ -77,9 +77,10 @@ public class FunctionTable {
    * @return
    * @throws IOException
    */
-  private static String buildFunctionTableSelectStmt(AnomalyDatabaseConfig dbConfig) throws IOException {
+  private static String buildFunctionTableSelectStmt(AnomalyDatabaseConfig dbConfig, String collection)
+      throws IOException {
     String formatString = ResourceUtils.getResourceAsString("database/function/select-function-table-template.sql");
-    return String.format(formatString, dbConfig.getFunctionTableName());
+    return String.format(formatString, dbConfig.getFunctionTableName(), collection);
   }
 
 }

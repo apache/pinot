@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.api;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -8,8 +7,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
@@ -26,8 +23,6 @@ import com.linkedin.thirdeye.api.TimeRange;
 public class AnomalyDetectionFunctionHistory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionFunctionHistory.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private AnomalyDatabaseConfig dbConfig;
   private StarTreeConfig starTreeConfig;
@@ -59,14 +54,10 @@ public class AnomalyDetectionFunctionHistory {
     try {
       List<AnomalyTableRow> anomalyTableRows = AnomalyTable.selectRows(dbConfig, functionId, queryTimeRange);
       for (AnomalyTableRow anomalyTableRow : anomalyTableRows) {
-        try {
-          DimensionKey dimensionKey = dimensionKeyFromJson(starTreeConfig.getDimensions(),
-              anomalyTableRow.getDimensions());
-          functionHistory.put(dimensionKey, new AnomalyResult(true, anomalyTableRow.getTimeWindow(),
-              anomalyTableRow.getAnomalyScore(), anomalyTableRow.getAnomalyVolume(), anomalyTableRow.getProperties()));
-        } catch (IOException e) {
-          LOGGER.warn("malformed dimension key json string", e);
-        }
+        DimensionKey dimensionKey = dimensionKeyFromMap(starTreeConfig.getDimensions(),
+            anomalyTableRow.getDimensions());
+        functionHistory.put(dimensionKey, new AnomalyResult(true, anomalyTableRow.getTimeWindow(),
+            anomalyTableRow.getAnomalyScore(), anomalyTableRow.getAnomalyVolume(), anomalyTableRow.getProperties()));
       }
     } catch (SQLException e) {
       LOGGER.error("could not select anomaly history", e);
@@ -82,22 +73,14 @@ public class AnomalyDetectionFunctionHistory {
     return functionHistory.get(dimensionKey);
   }
 
-  /**
-   * @param dimensions
-   * @return
-   * @throws IOException
-   */
-  private static DimensionKey dimensionKeyFromJson(List<DimensionSpec> dimensionSpecs, String dimensionsString)
-      throws IOException {
-    ObjectReader reader = OBJECT_MAPPER.reader(Map.class);
-    Map<String, String> dimensionsMap = reader.readValue(dimensionsString);
+  private static DimensionKey dimensionKeyFromMap(List<DimensionSpec> dimensionSpecs, Map<String,
+      String> dimensionsMap) {
     String[] dimensionValues = new String[dimensionSpecs.size()];
     int idx = 0;
     for (DimensionSpec dimensionSpec : dimensionSpecs) {
       dimensionValues[idx] = dimensionsMap.get(dimensionSpec.getName());
       idx++;
     }
-
     return new DimensionKey(dimensionValues);
   }
 

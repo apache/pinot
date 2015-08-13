@@ -1,34 +1,17 @@
 package com.linkedin.thirdeye.anomaly.lib.fanomaly;
 
-
 import java.util.Arrays;
-import java.util.Map;
 import java.util.Set;
 
 import org.jblas.DoubleMatrix;
 
+/**
+ *
+ */
+public class DataUtils {
 
-public abstract class AnomalyDetector {
-  public long trainStart;
-  public long trainEnd;
-  public int stepsAhead;
-  public long timeGranularity;
-  public Set<Long> omitTimestamps;
-
-  public AnomalyDetector(long trainStartInput, long trainEndInput, int stepsAheadInput, long timeGranularityInput,
-      Set<Long> omitTimestampsInput) {
-    trainStart = trainStartInput;
-    trainEnd = trainEndInput;
-    stepsAhead = stepsAheadInput;
-    timeGranularity = timeGranularityInput;
-    omitTimestamps = omitTimestampsInput;
-  }
-
-  // utility function
-  public abstract Map<Long, FanomalyDataPoint> DetectAnomaly(double[] inputTimeSeries, long[] inputTimeStamps,
-      long offset) throws Exception;
-
-  protected DoubleMatrix[] RemoveTimeStamps(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps) {
+  public static DoubleMatrix[] removeTimeStamps(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps,
+      Set<Long> omitTimestamps) {
     if (omitTimestamps.size() > 0) {
       for (int i = 0; i < inputTimeSeries.length; i++) {
         if (omitTimestamps.contains(inputTimeStamps[i])) {
@@ -39,7 +22,8 @@ public abstract class AnomalyDetector {
     return inputTimeSeries;
   }
 
-  protected DoubleMatrix[] getPredictionData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps) throws Exception {
+  public static DoubleMatrix[] getPredictionData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, long trainEnd,
+      int stepsAhead) throws Exception {
     int startPredictionIndex = -1;
     for (int i = 0; i < inputTimeStamps.length; i++) {
       if (inputTimeStamps[i] > trainEnd) {
@@ -54,12 +38,12 @@ public abstract class AnomalyDetector {
       if (endPredictionIndex > inputTimeStamps.length) {
         endPredictionIndex = inputTimeStamps.length;
       }
-      return  Arrays.copyOfRange(inputTimeSeries, startPredictionIndex, endPredictionIndex);
+      return Arrays.copyOfRange(inputTimeSeries, startPredictionIndex, endPredictionIndex);
     }
   }
 
-  // todo getTrainingTimeStamps
-  protected DoubleMatrix[] getTrainingData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps) throws Exception {
+  public static DoubleMatrix[] getTrainingData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, long trainStart,
+      long trainEnd) throws Exception {
     // clean data
     // sanity check
     if (inputTimeSeries.length != inputTimeStamps.length) {
@@ -98,5 +82,37 @@ public abstract class AnomalyDetector {
     // get subarray
     return Arrays.copyOfRange(inputTimeSeries, startIndex, endIndex);
   }
-}
 
+  public static double estimateTrainingMean(DoubleMatrix[] processTrainingTimeSeries, int seasonal) {
+    return estimateTrainingRawMoment(processTrainingTimeSeries, seasonal, 1);
+  }
+
+  public static double estimateTrainingRawMoment(DoubleMatrix[] processTrainingTimeSeries, int seasonal, int degree) {
+    double estimate = 0;
+    double count = 0;
+    for (int ii = 0; ii < seasonal + 1; ii++)
+    {
+      if (processTrainingTimeSeries[ii] != null)
+      {
+        count++;
+        estimate += Math.pow(processTrainingTimeSeries[ii].get(0, 0), degree);
+      }
+    }
+    return estimate / count;
+  }
+
+  public static double estimateTrainingVariance(DoubleMatrix[] processTrainingTimeSeries, int seasonal) {
+    double estimateMean = estimateTrainingMean(processTrainingTimeSeries, seasonal);
+    double estimateVariance = 0;
+    double count = 0;
+    for (int ii = 0; ii < seasonal + 1; ii++)
+    {
+      if (processTrainingTimeSeries[ii] != null)
+      {
+        count++;
+        estimateVariance += Math.pow(processTrainingTimeSeries[ii].get(0, 0) - estimateMean, 2);
+      }
+    }
+    return  estimateVariance / count;
+  }
+}

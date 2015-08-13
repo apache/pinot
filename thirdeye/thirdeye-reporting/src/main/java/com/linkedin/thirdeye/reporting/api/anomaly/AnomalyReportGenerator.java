@@ -67,8 +67,7 @@ public class AnomalyReportGenerator {
 
     // create rows for top k results
     for (AnomalyTableRow row : anomalyTableRows) {
-      ObjectReader reader = OBJECT_MAPPER.reader(Map.class);
-      Map<String, String> dimensions = reader.readValue(row.getDimensions());
+      Map<String, String> dimensions = row.getDimensions();
       if (dimensionSchema == null) {
         dimensionSchema = new ArrayList<>(dimensions.keySet());
         Collections.sort(dimensionSchema);

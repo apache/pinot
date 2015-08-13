@@ -72,7 +72,8 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
         dataCache,
         queryCache,
         environment.getObjectMapper(),
-        configCache));
+        configCache,
+        config.getAnomalyDatabaseConfig()));
 
     environment.jersey().register(new MetadataResource(config.getServerUri(), dataCache));
 

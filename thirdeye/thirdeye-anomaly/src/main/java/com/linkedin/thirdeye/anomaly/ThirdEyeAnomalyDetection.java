@@ -1,30 +1,39 @@
 package com.linkedin.thirdeye.anomaly;
 
 import java.io.File;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory;
+import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionTask;
-import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionTaskBuilder;
+import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionTaskInfo;
+import com.linkedin.thirdeye.anomaly.api.AnomalyResultHandler;
+import com.linkedin.thirdeye.anomaly.api.HandlerProperties;
+import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.database.FunctionTable;
+import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
 import com.linkedin.thirdeye.anomaly.generic.GenericFunctionFactory;
+import com.linkedin.thirdeye.anomaly.handler.AnomalyResultHandlerDatabase;
 import com.linkedin.thirdeye.anomaly.rulebased.RuleBasedFunctionFactory;
-import com.linkedin.thirdeye.anomaly.util.ThirdEyeMultiClient;
+import com.linkedin.thirdeye.anomaly.util.ServerUtils;
 import com.linkedin.thirdeye.anomaly.util.TimeGranularityUtils;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.FlowControlledDefaultThirdeyeClient;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 
 
 /**
@@ -32,21 +41,40 @@ import com.linkedin.thirdeye.api.TimeRange;
  */
 public class ThirdEyeAnomalyDetection implements Callable<Void> {
 
+  private static final int DEFAULT_CACHE_EXPIRATION_MINUTES = 5;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeAnomalyDetection.class);
 
   private final ThirdEyeAnomalyDetectionConfiguration config;
+
   private final TimeRange timeRange;
 
-  public ThirdEyeAnomalyDetection(ThirdEyeAnomalyDetectionConfiguration config, TimeRange timeRange) {
+  /**
+   * @param config
+   *  Overall application config
+   * @param timeRange
+   *  Time range to run anomaly detection
+   */
+  public ThirdEyeAnomalyDetection(ThirdEyeAnomalyDetectionConfiguration config,
+      TimeRange timeRange)
+  {
     this.config = config;
     this.timeRange = timeRange;
   }
 
+  /**
+   * {@inheritDoc}
+   * @see java.util.concurrent.Callable#call()
+   */
   public Void call() throws Exception
   {
-    List<AnomalyDetectionDriverConfig> collectionDriverConfigurations = config.getCollectionDriverConfigurations();
-    AnomalyDatabaseConfig anomalyDatabase = config.getAnomalyDatabaseConfig();
-    ThirdEyeMultiClient thirdEyeMultiClient = new ThirdEyeMultiClient(collectionDriverConfigurations);
+    DefaultThirdEyeClientConfig thirdEyeClientConfig = new DefaultThirdEyeClientConfig();
+    thirdEyeClientConfig.setExpirationTime(DEFAULT_CACHE_EXPIRATION_MINUTES);
+    thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
+    thirdEyeClientConfig.setExpireAfterAccess(false);
+
+    ThirdEyeClient thirdEyeClient = new FlowControlledDefaultThirdeyeClient(config.getThirdEyeServerHost(),
+        config.getThirdEyeServerPort(), thirdEyeClientConfig, 1);
 
     AnomalyDetectionFunctionFactory functionFactory;
     switch (config.getMode()) {
@@ -67,8 +95,7 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
       }
     }
 
-    List<AnomalyDetectionTask> tasks = new AnomalyDetectionTaskBuilder(collectionDriverConfigurations, anomalyDatabase,
-        thirdEyeMultiClient).buildTasks(timeRange, functionFactory);
+    List<AnomalyDetectionTask> tasks = buildTasks(thirdEyeClient, timeRange, functionFactory);
 
     ExecutorService taskExecutors = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
@@ -80,10 +107,67 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     taskExecutors.awaitTermination(config.getMaxWaitToCompletion().getSize(),
         config.getMaxWaitToCompletion().getUnit());
 
-    // close all the clients
-    thirdEyeMultiClient.close();
-
+    thirdEyeClient.close();
     return null;
+  }
+
+  /**
+   * @param thirdEyeClient
+   * @param timeRange
+   * @param functionFactory
+   * @return
+   *  A list of tasks to run
+   * @throws Exception
+   */
+  public List<AnomalyDetectionTask> buildTasks(ThirdEyeClient thirdEyeClient, TimeRange timeRange,
+      AnomalyDetectionFunctionFactory functionFactory) throws Exception {
+
+    List<AnomalyDetectionTask> tasks = new LinkedList<AnomalyDetectionTask>();
+
+    AnomalyDetectionDriverConfig driverConfig = config.getDriverConfig();
+
+    List<? extends FunctionTableRow> rows = FunctionTable.selectRows(config.getAnomalyDatabaseConfig(),
+        functionFactory.getFunctionRowClass(), config.getCollectionName());
+
+    // load star tree
+    StarTreeConfig starTreeConfig = ServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
+        config.getThirdEyeServerPort(), config.getCollectionName());
+
+    for (FunctionTableRow functionTableRow : rows) {
+      // for testing purposes
+      if (config.getFunctionIdToEvaluate() != null &&
+          config.getFunctionIdToEvaluate() != functionTableRow.getFunctionId()) {
+        continue;
+      }
+
+      try {
+        // load the function
+        AnomalyDetectionFunction function = functionFactory.getFunction(starTreeConfig,
+            config.getAnomalyDatabaseConfig(), functionTableRow);
+
+        // create task info
+        AnomalyDetectionTaskInfo taskInfo = new AnomalyDetectionTaskInfo(functionTableRow.getFunctionName(),
+            functionTableRow.getFunctionId(), functionTableRow.getFunctionDescription(), timeRange);
+
+        // make a handler
+        AnomalyResultHandler resultHandler = new AnomalyResultHandlerDatabase(config.getAnomalyDatabaseConfig());
+        resultHandler.init(starTreeConfig, new HandlerProperties());
+
+        // make the function history interface
+        AnomalyDetectionFunctionHistory functionHistory = new AnomalyDetectionFunctionHistory(starTreeConfig,
+            config.getAnomalyDatabaseConfig(), functionTableRow.getFunctionId());
+
+        // make the task
+        AnomalyDetectionTask task = new AnomalyDetectionTask(starTreeConfig, driverConfig, taskInfo,
+            function, resultHandler, functionHistory, thirdEyeClient);
+
+        tasks.add(task);
+      } catch (Exception e) {
+        LOGGER.error("could not create function for function_id={}", functionTableRow.getFunctionId(), e);
+      }
+    }
+
+    return tasks;
   }
 
   /**
@@ -99,56 +183,60 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     if (config.getExplicitTimeRange() != null) {
       runWithExplicitTimeRange(config);
     } else {
-      runWithScheduler(config);
+      runWithPolling(config);
     }
   }
 
+  /** the maximum rate at which to poll */
+  private static long MILLIS_BEWEEEN_POLLS = TimeUnit.MINUTES.toMillis(5);
+
   /**
-   * Standalone mode where anomaly detection is run at scheduled intervals
+   * Standalone mode where the service polls the third-eye server for data
+   * @throws Exception
    */
-  private static void runWithScheduler(final ThirdEyeAnomalyDetectionConfiguration config) {
-    ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
+  private static void runWithPolling(final ThirdEyeAnomalyDetectionConfiguration config) throws Exception {
+    long detectionIntervalInMillis = TimeGranularityUtils.toMillis(config.getDetectionInterval());
 
-    final int detectionIntervalInMillis = (int) TimeGranularityUtils.toMillis(config.getDetectionInterval());
-    final int detectionLagInMillis = (int) TimeGranularityUtils.toMillis(config.getDetectionLag());
+    long latestTimeDataAvailable = ServerUtils.getLatestTime(config.getThirdEyeServerHost(),
+        config.getThirdEyeServerPort(), config.getCollectionName());
+    long prevTime = TimeGranularityUtils.truncateBy(latestTimeDataAvailable, config.getDetectionInterval());
 
-    long appStartTime = DateTime.now(DateTimeZone.UTC).getMillis();
-    long firstExecution = TimeGranularityUtils.truncateBy(DateTime.now(DateTimeZone.UTC).getMillis(),
-        config.getDetectionInterval()) + detectionLagInMillis;
-    while (firstExecution - detectionIntervalInMillis > appStartTime) {
-      firstExecution -= detectionIntervalInMillis;
-    }
+    while (true)
+    {
+      latestTimeDataAvailable = ServerUtils.getLatestTime(config.getThirdEyeServerHost(),
+          config.getThirdEyeServerPort(), config.getCollectionName());
 
-    long initialDelay = firstExecution - DateTime.now(DateTimeZone.UTC).getMillis();
-
-    scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-
-      @Override
-      public void run() {
-        long currentTime = DateTime.now(DateTimeZone.UTC).getMillis();
-        currentTime -= detectionLagInMillis;
-
-        currentTime = TimeGranularityUtils.truncateBy(currentTime, config.getDetectionInterval());
-
-        /*
-         * Compute the start and end times for the current batch
-         */
-        long taskEndTime = currentTime;
-        long taskStartTime = currentTime - detectionIntervalInMillis;
-
-        LOGGER.info("begin processing for {} to {}", taskStartTime, taskEndTime);
-
-        try {
-          new ThirdEyeAnomalyDetection(config, new TimeRange(taskStartTime, taskEndTime)).call();
-        } catch (Exception e) {
-          LOGGER.error("uncaught exception", e);
-        }
+      long nextTime = prevTime;
+      while (nextTime + detectionIntervalInMillis <= latestTimeDataAvailable) {
+        nextTime += detectionIntervalInMillis;
       }
 
-    }, initialDelay, detectionIntervalInMillis, TimeUnit.MILLISECONDS);
+      if (nextTime != prevTime) {;
+        LOGGER.info("begin processing for {} to {}", prevTime, nextTime);
+        final TimeRange taskTimeRange = new TimeRange(prevTime, nextTime);
 
-    LOGGER.info("scheduling tasks to run every {}", config.getDetectionInterval());
-    LOGGER.info("first execution at {}", new DateTime(firstExecution, DateTimeZone.UTC));
+        new Thread(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              new ThirdEyeAnomalyDetection(config, taskTimeRange).call();
+            } catch (Exception e) {
+              LOGGER.error("uncaught exception", e);
+            }
+          }
+        }).start();
+
+        prevTime = nextTime;
+
+        // got some data, now sleep for longer
+        Thread.sleep(detectionIntervalInMillis - MILLIS_BEWEEEN_POLLS);
+      } else {
+        LOGGER.info("no new data available, polling again at {} for {}",
+            DateTime.now().plusMillis((int) MILLIS_BEWEEEN_POLLS), new DateTime(prevTime + detectionIntervalInMillis));
+        Thread.sleep(MILLIS_BEWEEEN_POLLS);
+      }
+    }
+
   }
 
   /**

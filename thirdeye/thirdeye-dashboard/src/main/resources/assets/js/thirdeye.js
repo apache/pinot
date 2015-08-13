@@ -327,6 +327,8 @@ function renderTimeSeries(container, tooltip, options) {
                 var label = datum.label
                 if (label.indexOf('BASELINE_') >= 0) {
                     label = label.substring('BASELINE_'.length)
+                } else if (label.indexOf('ANOMALY_') >= 0) {
+                    label = label.substring('ANOMALY_'.length)
                 }
                 label = label.substring(0, label.indexOf(' '))
                 if (!groups[label]) {
@@ -389,11 +391,24 @@ function plotOne(container, tooltip, options, data) {
         data = options.filter(data)
     }
 
+    // make anomalies display as points instead of lines
+    var dataToPlot = []
+    for (var i = 0; i < data.length; i++) {
+        if (data[i].label.indexOf("ANOMALY_") >= 0) {
+            data[i].lines = { show: false }
+            data[i].points = {
+                show: true,
+                radius: 5,
+            }
+            data[i].color = "red"
+        }
+    }
+
     container.plot(data, {
         legend: {
             show: options.legend == null ? true : options.legend,
-            position: "se",
-            container: options.legendContainer
+                position: "se",
+                container: options.legendContainer
         },
         grid: {
             clickable: true,
@@ -411,7 +426,20 @@ function plotOne(container, tooltip, options, data) {
         if (item) {
             var dateString = moment.utc(item.datapoint[0]).tz(jstz().timezone_name).format()
             var value = item.datapoint[1]
-            tooltip.html(item.series.label + " = " + value + " @ " + dateString)
+            if (item.series.label.indexOf("ANOMALY_") >= 0) {
+                var metric =  item.series.label.substring('ANOMALY_'.length, item.series.label.indexOf(' '))
+                tooltip.html(metric + " = " + value + " @ " + dateString + "<hr>"
+                    + item.series.annotations[item.datapoint[0]].join("<hr>"))
+                    .css({
+                         top: item.pageY + 5,
+                         right: $(window).width() - item.pageX,
+                         'background-color': 'white',
+                         border: '1px solid red',
+                         'z-index': 1000
+                    })
+                    .fadeIn(100)
+            } else {
+                tooltip.html(item.series.label + " = " + value + " @ " + dateString)
                    .css({
                         top: item.pageY + 5,
                         right: $(window).width() - item.pageX,
@@ -420,6 +448,7 @@ function plotOne(container, tooltip, options, data) {
                         'z-index': 1000
                    })
                    .fadeIn(100)
+            }
         } else {
             tooltip.hide()
         }

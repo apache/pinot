@@ -19,6 +19,7 @@ public class StateSpaceUnivariateObj implements UnivariateFunction {
   private int dimension_of_observations_;
   // Observations.
   private DoubleMatrix[] observations_;
+
   public StateSpaceUnivariateObj(
       DoubleMatrix state_transition_matrix,
       DoubleMatrix observation_matrix,
@@ -50,7 +51,7 @@ public class StateSpaceUnivariateObj implements UnivariateFunction {
         initial_state_covariance_,
         observations_);
     double ll = model.GetLogLikeliHood();
-    LOGGER.info("log likelihood : {}", state_noise);
+    LOGGER.info("log likelihood : {}, state noise : {}", ll, state_noise);
     return ll;
   }
 

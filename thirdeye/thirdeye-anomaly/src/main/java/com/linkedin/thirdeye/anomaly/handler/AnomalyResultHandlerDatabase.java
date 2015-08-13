@@ -62,7 +62,7 @@ public class AnomalyResultHandlerDatabase implements AnomalyResultHandler {
     row.setCollection(starTreeConfig.getCollection());
     row.setTimeWindow(result.getTimeWindow());
     row.setNonStarCount(dimensionKey.getDimensionValues().length - DimensionKeyUtils.getStarCount(dimensionKey));
-    row.setDimensions(DimensionKeyUtils.toJsonString(starTreeConfig.getDimensions(), dimensionKey));
+    row.setDimensions(DimensionKeyUtils.toMap(starTreeConfig.getDimensions(), dimensionKey));
     row.setDimensionsContribution(dimensionKeyContribution);
     row.setMetrics(metrics);
     row.setAnomalyScore(result.getAnomalyScore());

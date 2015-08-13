@@ -40,17 +40,15 @@ public class DimensionKeyUtils {
    * @param dimensions
    * @param dimensionKey
    * @return
-   *  A JSON string of the dimension key
-   * @throws JsonProcessingException
+   *  A map of the dimension key
    */
-  public static String toJsonString(List<DimensionSpec> dimensions, DimensionKey dimensionKey)
-      throws JsonProcessingException {
+  public static Map<String, String>  toMap(List<DimensionSpec> dimensions, DimensionKey dimensionKey) {
     Map<String, String> dimensionMap = new TreeMap<>();
     String[] dimensionValues = dimensionKey.getDimensionValues();
     for (int i = 0; i < dimensions.size(); i++) {
       dimensionMap.put(dimensions.get(i).getName(), dimensionValues[i]);
     }
-    return OBJECT_MAPPER.writer().writeValueAsString(dimensionMap);
+    return dimensionMap;
   }
 
   /**

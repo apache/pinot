@@ -135,7 +135,12 @@ public class AnomalyDatabaseConfig {
 
         SharedPoolDataSource tds = new SharedPoolDataSource();
         tds.setConnectionPoolDataSource(cpds);
-        tds.setMaxTotal(50);
+        tds.setMaxTotal(10);
+        tds.setValidationQuery("select 1 as dbcp_connection_test;");
+        tds.setDefaultTestOnBorrow(true);
+        tds.setDefaultTestOnReturn(true);
+        tds.setDefaultTestOnCreate(true);
+        tds.setDefaultTestWhileIdle(true);
 
         dataSource = tds;
       }
