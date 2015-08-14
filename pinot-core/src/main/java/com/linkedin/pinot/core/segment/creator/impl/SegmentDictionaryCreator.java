@@ -172,8 +172,9 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         final StringBuilder bld = new StringBuilder();
-        bld.append(e.toString());
-        for (int i = 0; i < (stringColumnMaxLength - ((String) e).getBytes(Charset.forName("UTF-8")).length); i++) {
+        String value = e.toString();
+        bld.append(value);
+        for (int i = 0; i < (stringColumnMaxLength - value.getBytes(Charset.forName("UTF-8")).length); i++) {
           bld.append(V1Constants.Str.STRING_PAD_CHAR);
         }
         return stringValueToIndexMap.get(bld.toString());
