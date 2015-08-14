@@ -119,7 +119,7 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
   @HttpVerb("get")
   @Summary("Lists segment metadata for a given table")
   @Tags({ "segment", "table" })
-  @Paths({ "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
+  @Paths({ "/tables/{tableName}/segments/metadata", "/tables/{tableName}/segments/metadata/" })
   private Representation getAllSegmentsMetadataForTable(
       @Parameter(name = "tableName", in = "path",
           description = "The name of the table for which to list segment metadata", required = true) String tableName,
@@ -158,12 +158,12 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
    * @throws JSONException
    */
   @HttpVerb("get")
-  @Summary("Enable, disable or drop a segment")
+  @Summary("Enable, disable or drop specified or all segments")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/", "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
   private Representation toggleSegmentState(@Parameter(name = "tableName", in = "path",
       description = "The name of the table to which segment belongs", required = true) String tableName, @Parameter(
-      name = "segmentName", in = "path", description = "Segment to toggle", required = true) String segmentName,
+      name = "segmentName", in = "path", description = "Segment to enable, disable or drop", required = false) String segmentName,
       @Parameter(name = "state", in = "query", description = "state to set for segment {enable|disable|drop}",
           required = true) String state, @Parameter(name = "type", in = "query",
           description = "Type of table {offline|realtime}", required = false) String tableType)
@@ -233,7 +233,7 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
   @HttpVerb("get")
   @Summary("Gets segment metadata for a given segment")
   @Tags({ "segment", "table" })
-  @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/" })
+  @Paths({ "/tables/{tableName}/segments/{segmentName}/metadata", "/tables/{tableName}/segments/{segmentName}/metadata/" })
   private Representation getSegmentMetadataForTable(
       @Parameter(name = "tableName", in = "path",
           description = "The name of the table for which to list segment metadata", required = true) String tableName,
