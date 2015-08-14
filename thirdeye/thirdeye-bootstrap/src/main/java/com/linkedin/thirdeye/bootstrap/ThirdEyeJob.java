@@ -1039,7 +1039,7 @@ public class ThirdEyeJob {
                 }
               } catch (AccessControlException e) {
                 missingInputs.add(input);
-                LOGGER.info("No access to path {}", input);
+                LOGGER.warn("No access to path {}", input, e);
               }
             }
           }
