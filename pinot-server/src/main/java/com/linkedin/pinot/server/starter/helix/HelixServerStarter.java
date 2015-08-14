@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.Utils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -131,6 +132,8 @@ public class HelixServerStarter {
   }
 
   private void startServerInstance(Configuration moreConfigurations) throws Exception {
+    Utils.logVersions();
+
     _serverConf = getInstanceServerConfig(moreConfigurations);
     if (_serverInstance == null) {
       LOGGER.info("Trying to create a new ServerInstance!");

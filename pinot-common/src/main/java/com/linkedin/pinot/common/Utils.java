@@ -15,10 +15,20 @@
  */
 package com.linkedin.pinot.common;
 
+import java.io.IOException;
+import java.net.JarURLConnection;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.net.URLConnection;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.jar.Attributes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Utils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+
   /**
    * Rethrows an exception, even if it is not in the method signature.
    *
@@ -69,5 +79,44 @@ public class Utils {
     }
 
     return builder.toString();
+  }
+
+  /**
+   * Write the version of Pinot components to the log at info level.
+   */
+  public static void logVersions() {
+    // Find the first URLClassLoader, walking up the chain of parent classloaders if necessary
+    ClassLoader classLoader = Utils.class.getClassLoader();
+    while (classLoader != null && !(classLoader instanceof URLClassLoader)) {
+      classLoader = classLoader.getParent();
+    }
+
+    if (classLoader instanceof URLClassLoader) {
+      URLClassLoader urlClassLoader = (URLClassLoader) classLoader;
+      URL[] urls = urlClassLoader.getURLs();
+      for (URL url : urls) {
+        try {
+          // Convert the URL to the JAR into a JAR URL: eg. jar:http://www.foo.com/bar/baz.jar!/ in order to load it
+          URL jarUrl = new URL("jar", "", url + "!/");
+          URLConnection connection = jarUrl.openConnection();
+          if (connection instanceof JarURLConnection) {
+            JarURLConnection jarURLConnection = (JarURLConnection) connection;
+
+            // Read JAR attributes and log the Implementation-Title and Implementation-Version manifestvalues for pinot
+            // components
+            Attributes attributes = jarURLConnection.getMainAttributes();
+            if (attributes != null) {
+              String implementationTitle = attributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE);
+              String implementationVersion = attributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION);
+              if (implementationTitle != null && implementationTitle.contains("pinot")) {
+                LOGGER.info("Using {} {}", implementationTitle, implementationVersion);
+              }
+            }
+          }
+        } catch (IOException e) {
+          // Ignored
+        }
+      }
+    }
   }
 }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -74,6 +75,8 @@ public class SegmentCreationJob extends Configured {
     _outputDir = _properties.getProperty(PATH_TO_OUTPUT);
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
+
+    Utils.logVersions();
 
     LOGGER.info("*********************************************************************");
     LOGGER.info("path.to.input: {}", _inputSegmentDir);

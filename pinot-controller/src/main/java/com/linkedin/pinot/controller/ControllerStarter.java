@@ -68,6 +68,8 @@ public class ControllerStarter {
   }
 
   public void start() {
+    Utils.logVersions();
+
     component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
     component.getClients().add(Protocol.FILE);
     component.getClients().add(Protocol.JAR);

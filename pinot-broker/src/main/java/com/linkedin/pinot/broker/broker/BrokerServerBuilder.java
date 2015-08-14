@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker;
 
+import com.linkedin.pinot.common.Utils;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -206,6 +207,8 @@ public class BrokerServerBuilder {
   }
 
   public void start() throws Exception {
+    Utils.logVersions();
+
     LOGGER.info("Network starting !!");
     if (_state.get() != State.INIT) {
       LOGGER.warn("Network already initialized. Skipping !!");
