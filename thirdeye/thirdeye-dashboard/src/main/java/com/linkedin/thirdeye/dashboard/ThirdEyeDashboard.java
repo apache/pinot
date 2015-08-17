@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard;
 
 import com.linkedin.thirdeye.dashboard.resources.*;
 import com.linkedin.thirdeye.dashboard.task.ClearCachesTask;
+import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import io.dropwizard.Application;
@@ -38,15 +39,23 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
 
     ExecutorService queryExecutor = environment.lifecycle().executorService("query_executor").build();
 
+    ConfigCache configCache = new ConfigCache();
     DataCache dataCache = new DataCache(httpClient, environment.getObjectMapper());
-
     QueryCache queryCache = new QueryCache(httpClient, environment.getObjectMapper(), queryExecutor);
 
     CustomDashboardResource customDashboardResource = null;
     if (config.getCustomDashboardRoot() != null) {
       File customDashboardDir = new File(config.getCustomDashboardRoot());
-      customDashboardResource = new CustomDashboardResource(customDashboardDir, config.getServerUri(), queryCache, dataCache);
+      configCache.setCustomDashboardRoot(customDashboardDir);
+      customDashboardResource = new CustomDashboardResource(customDashboardDir, config.getServerUri(), queryCache, dataCache, configCache);
       environment.jersey().register(customDashboardResource);
+    }
+
+    if (config.getCollectionConfigRoot() != null) {
+      File collectionConfigDir = new File(config.getCollectionConfigRoot());
+      configCache.setCollectionConfigRoot(collectionConfigDir);
+      CollectionConfigResource collectionConfigResource = new CollectionConfigResource(collectionConfigDir, configCache);
+      environment.jersey().register(collectionConfigResource);
     }
 
     environment.jersey().register(new DashboardResource(
@@ -55,17 +64,19 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
         config.getFeedbackEmailAddress(),
         queryCache,
         environment.getObjectMapper(),
-        customDashboardResource));
+        customDashboardResource,
+        configCache));
 
     environment.jersey().register(new FlotTimeSeriesResource(
         config.getServerUri(),
         dataCache,
         queryCache,
-        environment.getObjectMapper()));
+        environment.getObjectMapper(),
+        configCache));
 
     environment.jersey().register(new MetadataResource(config.getServerUri(), dataCache));
 
-    environment.admin().addTask(new ClearCachesTask(dataCache, queryCache));
+    environment.admin().addTask(new ClearCachesTask(dataCache, queryCache, configCache));
   }
 
   public static void main(String[] args) throws Exception {

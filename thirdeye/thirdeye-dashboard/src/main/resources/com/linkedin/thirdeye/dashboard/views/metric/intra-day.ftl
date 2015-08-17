@@ -17,7 +17,40 @@
         <#assign dimensions = metricTable.dimensionValues>
         <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
         <#include "../common/dimension-header.ftl">
-        <table class="uk-table uk-table-striped">
+
+        <div id="intra-day-buttons">
+          <button class="uk-button uk-modal-close" data-uk-modal="{target:'#intra-day-config'}">
+            <i class="uk-icon-cog"></i>
+          </button>
+        </div>
+
+        <div id="intra-day-config" class="uk-modal">
+          <div class="uk-modal-dialog">
+            <form class="uk-form">
+              <fieldset>
+                  <legend>Order</legend>
+                  <div class="uk-form-row">
+                    <ul id="intra-day-table-order" class="uk-sortable uk-grid uk-grid-small uk-grid-width-1-1" data-uk-sortable>
+                      <#list (metricView.view.metricNames)!metricNames as metricName>
+                        <li class="uk-grid-margin">
+                          <div class="uk-panel uk-panel-box">
+                            ${(metricView.view.metricAliases!metricAliases)[metricName]!metricName}
+                          </div>
+                        </li>
+                      </#list>
+                    </ul>
+                  </div>
+              </fieldset>
+            </form>
+
+            <div class="uk-modal-footer uk-text-right">
+              <button id="intra-day-update" class="uk-button uk-button-primary uk-modal-close">Update</button>
+            </div>
+            
+          </div>
+        </div>
+
+        <table id="intra-day-table" class="uk-table uk-table-striped">
             <thead>
                 <tr>
                     <th></th>

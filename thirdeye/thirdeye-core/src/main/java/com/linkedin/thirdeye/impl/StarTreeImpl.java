@@ -267,14 +267,14 @@ public class StarTreeImpl implements StarTree {
 
   @Override
   public Set<String> getDimensionValues(String dimensionName,
-      Map<String, String> fixedDimensions) {
+      Map<String, Collection<String>> fixedDimensions) {
     Set<String> collector = new HashSet<String>();
     getDimensionValues(root, dimensionName, fixedDimensions, collector);
     return collector;
   }
 
   public void getDimensionValues(StarTreeNode node, String dimensionName,
-      Map<String, String> fixedDimensions, Set<String> collector) {
+      Map<String, Collection<String>> fixedDimensions, Set<String> collector) {
     if (node.isLeaf()) {
       Set<String> dimensionValues = node.getRecordStore().getDimensionValues(
           dimensionName);
@@ -310,16 +310,16 @@ public class StarTreeImpl implements StarTree {
    * </p>
    */
   private boolean shouldTraverse(StarTreeNode child,
-      Map<String, String> fixedDimensions) {
+      Map<String, Collection<String>> fixedDimensions) {
     if (fixedDimensions == null) {
       return true;
     }
 
-    String fixedValue = fixedDimensions.get(child.getDimensionName());
+    Collection<String> fixedValue = fixedDimensions.get(child.getDimensionName());
 
-    return fixedValue == null || fixedValue.equals(StarTreeConstants.ALL)
-        || fixedValue.equals(StarTreeConstants.STAR)
-        || fixedValue.equals(child.getDimensionValue());
+    return fixedValue == null || fixedValue.contains(StarTreeConstants.ALL)
+        || fixedValue.contains(StarTreeConstants.STAR)
+        || fixedValue.contains(child.getDimensionValue());
   }
 
   @Override

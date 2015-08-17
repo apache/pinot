@@ -27,7 +27,7 @@ public class TestSqlUtils {
     dimensionValues.putSingle("A", "A1");
     dimensionValues.putSingle("B", "B1");
     dimensionValues.putSingle("C", "!");
-    String dimensionWhereClause = SqlUtils.getDimensionWhereClause(dimensionValues);
+    String dimensionWhereClause = SqlUtils.getDimensionWhereClause(dimensionValues, null);
     Assert.assertEquals(dimensionWhereClause, "A = 'A1' AND B = 'B1'");
   }
 

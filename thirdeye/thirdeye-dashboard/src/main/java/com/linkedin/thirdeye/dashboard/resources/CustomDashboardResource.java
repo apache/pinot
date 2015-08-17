@@ -8,13 +8,11 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardSpec;
 import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardComponentSpec;
-import com.linkedin.thirdeye.dashboard.util.DataCache;
-import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.util.UriUtils;
+import com.linkedin.thirdeye.dashboard.util.*;
 import com.linkedin.thirdeye.dashboard.views.CustomDashboardView;
 import com.linkedin.thirdeye.dashboard.views.CustomFunnelTabularView;
 import com.linkedin.thirdeye.dashboard.views.CustomTimeSeriesView;
@@ -43,32 +41,20 @@ public class CustomDashboardResource {
   private final String serverUri;
   private final QueryCache queryCache;
   private final DataCache dataCache;
-  private final ObjectMapper yamlObjectMapper;
+  private final ConfigCache configCache;
   private final ObjectMapper objectMapper;
-  private final LoadingCache<CacheKey, CustomDashboardSpec> cache;
 
   public CustomDashboardResource(File customDashboardRoot,
                                  String serverUri,
                                  QueryCache queryCache,
-                                 DataCache dataCache) {
+                                 DataCache dataCache,
+                                 ConfigCache configCache) {
     this.customDashboardRoot = customDashboardRoot;
     this.serverUri = serverUri;
     this.queryCache = queryCache;
     this.dataCache = dataCache;
-    this.yamlObjectMapper = new ObjectMapper(new YAMLFactory());
+    this.configCache = configCache;
     this.objectMapper = new ObjectMapper();
-    this.cache = CacheBuilder.newBuilder()
-        .expireAfterWrite(5, TimeUnit.MINUTES)
-        .build(new CustomDashboardSpecLoader());
-  }
-
-  private class CustomDashboardSpecLoader extends CacheLoader<CacheKey, CustomDashboardSpec> {
-    @Override
-    public CustomDashboardSpec load(CacheKey key) throws Exception {
-      File collectionDir = new File(customDashboardRoot, key.getCollection());
-      File configFile = new File(collectionDir, key.getName());
-      return yamlObjectMapper.readValue(configFile, CustomDashboardSpec.class);
-    }
   }
 
   public List<String> getCustomDashboardNames(String collection) {
@@ -167,7 +153,7 @@ public class CustomDashboardResource {
 
     try {
       FileUtils.forceDelete(configFile);
-      cache.invalidate(name);
+      configCache.invalidateCustomDashboardSpec(collection, name);
       LOG.info("Deleted custom dashboard {} for collection {}", name, collection);
       return Response.noContent().build();
     } catch (Exception e) {
@@ -185,7 +171,7 @@ public class CustomDashboardResource {
       @PathParam("year") Integer year,
       @PathParam("month") Integer month,
       @PathParam("day") Integer day) throws Exception {
-    CustomDashboardSpec spec = cache.get(new CacheKey(collection, name));
+    CustomDashboardSpec spec = configCache.getCustomDashboardSpec(collection, name);
 
     // Get funnel views
     List<Pair<CustomDashboardComponentSpec, View>> views = new ArrayList<>();
@@ -242,7 +228,12 @@ public class CustomDashboardResource {
     }
 
     // Query
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
+    Map<String, Map<String, List<String>>> dimensionGroups = null;
+    DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+    if (dimensionGroupSpec != null) {
+      dimensionGroups = dimensionGroupSpec.getReverseMapping();
+    }
+    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, dimensionGroups);
     QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
     // Get index of group by so we can extract values for labels
@@ -329,9 +320,18 @@ public class CustomDashboardResource {
     DateTime baselineEnd = currentEnd.minusWeeks(1);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
+    // Dimension groups
+    Map<String, Map<String, List<String>>> dimensionGroups = null;
+    DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+    if (dimensionGroupSpec != null) {
+      dimensionGroups = dimensionGroupSpec.getReverseMapping();
+    }
+
     // SQL
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, queryParams);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, queryParams);
+    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, queryParams, dimensionGroups);
+    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, queryParams, dimensionGroups);
+    LOG.info("Generated SQL: {}", baselineSql);
+    LOG.info("Generated SQL: {}", currentSql);
 
     // Query
     Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);

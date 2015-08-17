@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
@@ -36,19 +37,22 @@ public class DashboardResource {
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
   private final CustomDashboardResource customDashboardResource;
+  private final ConfigCache configCache;
 
   public DashboardResource(String serverUri,
                            DataCache dataCache,
                            String feedbackEmailAddress,
                            QueryCache queryCache,
                            ObjectMapper objectMapper,
-                           CustomDashboardResource customDashboardResource) {
+                           CustomDashboardResource customDashboardResource,
+                           ConfigCache configCache) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
     this.customDashboardResource = customDashboardResource;
     this.feedbackEmailAddress = feedbackEmailAddress;
+    this.configCache = configCache;
   }
 
   @GET
@@ -259,7 +263,14 @@ public class DashboardResource {
           INTRA_PERIOD = INTRA_MONTH_PERIOD;
         }
 
-        String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_PERIOD), new DateTime(currentMillis), dimensionValues);
+        // Dimension groups
+        Map<String, Map<String, List<String>>> dimensionGroups = null;
+        DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+        if (dimensionGroupSpec != null) {
+          dimensionGroups = dimensionGroupSpec.getReverseMapping();
+        }
+
+        String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_PERIOD), new DateTime(currentMillis), dimensionValues, dimensionGroups);
         LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
         QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
@@ -293,6 +304,13 @@ public class DashboardResource {
     DateTime current = new DateTime(currentMillis);
     MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
 
+    // Dimension groups
+    Map<String, Map<String, List<String>>> reverseDimensionGroups = null;
+    DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+    if (dimensionGroupSpec != null) {
+      reverseDimensionGroups = dimensionGroupSpec.getReverseMapping();
+    }
+
     // Dimension view
     Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
     switch (dimensionViewType) {
@@ -302,7 +320,7 @@ public class DashboardResource {
           if (!dimensionValues.containsKey(dimension)) {
             // Generate SQL (n.b. will query /flot resource async)
             dimensionValues.put(dimension, Arrays.asList("!"));
-            String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
+            String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, reverseDimensionGroups);
             LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
             dimensionValues.remove(dimension);
 
@@ -311,11 +329,12 @@ public class DashboardResource {
         }
         return new DimensionViewMultiTimeSeries(multiTimeSeriesDimensions);
       case HEAT_MAP:
+      case TABULAR:
         for (String dimension : schema.getDimensions()) {
           if (!dimensionValues.containsKey(dimension)) {
             // Generate SQL
             dimensionValues.put(dimension, Arrays.asList("!"));
-            String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
+            String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, reverseDimensionGroups);
             LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
             dimensionValues.remove(dimension);
 
@@ -323,12 +342,27 @@ public class DashboardResource {
             resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
           }
         }
+
+        // Get the possible dimension groups
+        Map<String, Map<String, String>> dimensionGroups = null;
+        Map<String, Map<Pattern, String>> dimensionRegex = null;
+        DimensionGroupSpec groupSpec = configCache.getDimensionGroupSpec(collection);
+        if (groupSpec != null) {
+          dimensionGroups = groupSpec.getMapping();
+          dimensionRegex = groupSpec.getRegexMapping();
+        }
+
         // Wait for all queries
         Map<String, QueryResult> results = new HashMap<>(resultFutures.size());
         for (Map.Entry<String, Future<QueryResult>> entry : resultFutures.entrySet()) {
           results.put(entry.getKey(), entry.getValue().get());
         }
-        return new DimensionViewHeatMap(schema, objectMapper, results);
+
+        if (DimensionViewType.HEAT_MAP.equals(dimensionViewType)) {
+          return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups, dimensionRegex);
+        } else if (DimensionViewType.TABULAR.equals(dimensionViewType)) {
+          return new DimensionViewTabular(schema, objectMapper, results, dimensionGroups, dimensionRegex);
+        }
       default:
         throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }

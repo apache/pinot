@@ -10,6 +10,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
@@ -22,14 +23,15 @@ public class SqlUtils {
                               DateTime start,
                               DateTime end,
                               Map<String, String> dimensionValues) {
-    return getSql(metricFunction, collection, start, end, toMultivaluedMap(dimensionValues));
+    return getSql(metricFunction, collection, start, end, toMultivaluedMap(dimensionValues), null);
   }
 
   public static String getSql(String metricFunction,
                               String collection,
                               DateTime start,
                               DateTime end,
-                              MultivaluedMap<String, String> dimensionValues) {
+                              MultivaluedMap<String, String> dimensionValues,
+                              Map<String, Map<String, List<String>>> dimensionGroups) {
     StringBuilder sb = new StringBuilder();
 
     sb.append("SELECT ")
@@ -39,7 +41,7 @@ public class SqlUtils {
         .append(" WHERE ")
         .append(getBetweenClause(start, end));
 
-    String dimensionWhereClause = getDimensionWhereClause(dimensionValues);
+    String dimensionWhereClause = getDimensionWhereClause(dimensionValues, dimensionGroups);
     if (dimensionWhereClause != null) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
@@ -56,7 +58,8 @@ public class SqlUtils {
     return String.format("time BETWEEN '%s' AND '%s'", getDateString(start), getDateString(end));
   }
 
-  public static String getDimensionWhereClause(MultivaluedMap<String, String> dimensionValues) {
+  public static String getDimensionWhereClause(MultivaluedMap<String, String> dimensionValues,
+                                               Map<String, Map<String, List<String>>> dimensionGroups) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, List<String>> entry : dimensionValues.entrySet()) {
       if (entry.getValue().size() == 1 && "!".equals(entry.getValue().get(0))) {
@@ -64,8 +67,22 @@ public class SqlUtils {
         continue;
       }
 
+      // TODO: Alias values to groups
+      List<String> values = entry.getValue();
+      if (dimensionGroups != null) {
+        values = new ArrayList<>();
+        Map<String, List<String>> groups = dimensionGroups.get(entry.getKey());
+        for (String value : entry.getValue()) {
+          if (groups != null && groups.containsKey(value)) {
+            values.addAll(groups.get(value));
+          } else {
+            values.add(value);
+          }
+        }
+      }
+
       List<String> equals = new ArrayList<>(entry.getValue().size());
-      for (String value : entry.getValue()) {
+      for (String value : values) {
         equals.add(EQUALS.join(entry.getKey(), String.format("'%s'", value)));
       }
 

@@ -15,6 +15,8 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
 
   private String customDashboardRoot; // directory where all {dashboard}.yml files are saved
 
+  private String collectionConfigRoot; // directory where all collection configs are defined
+
   @Valid
   @NotNull
   @JsonProperty
@@ -42,5 +44,13 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
 
   public void setCustomDashboardRoot(String customDashboardRoot) {
     this.customDashboardRoot = customDashboardRoot;
+  }
+
+  public String getCollectionConfigRoot() {
+    return collectionConfigRoot;
+  }
+
+  public void setCollectionConfigRoot(String collectionConfigRoot) {
+    this.collectionConfigRoot = collectionConfigRoot;
   }
 }

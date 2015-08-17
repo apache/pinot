@@ -42,7 +42,7 @@ public interface StarTree
    * @return
    *  A set of every observed value for a dimension in the tree
    */
-  Set<String> getDimensionValues(String dimensionName, Map<String, String> fixedDimensions);
+  Set<String> getDimensionValues(String dimensionName, Map<String, Collection<String>> fixedDimensions);
 
   /**
    * @return

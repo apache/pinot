@@ -147,6 +147,16 @@
     clear: both;
 }
 
+#intra-day-buttons {
+  clear: both;
+  float: right;
+  margin-bottom: 20px;
+}
+
+#intra-day-update-area {
+  margin-top: 20px;
+}
+
 /* Dimension */
 
 #dimension-heat-map-area,

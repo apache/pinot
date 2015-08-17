@@ -2,12 +2,10 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.FlotTimeSeries;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import com.linkedin.thirdeye.dashboard.util.DataCache;
-import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.util.UriUtils;
+import com.linkedin.thirdeye.dashboard.util.*;
 import org.joda.time.DateTime;
 
 import javax.ws.rs.GET;
@@ -31,12 +29,14 @@ public class FlotTimeSeriesResource {
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
+  private final ConfigCache configCache;
 
-  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache, ObjectMapper objectMapper) {
+  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache, ObjectMapper objectMapper, ConfigCache configCache) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
+    this.configCache = configCache;
   }
 
   @GET
@@ -49,8 +49,14 @@ public class FlotTimeSeriesResource {
       @Context UriInfo uriInfo) throws Exception {
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
+    // Dimension groups
+    Map<String, Map<String, List<String>>> reverseDimensionGroups = null;
+    DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+    if (dimensionGroupSpec != null) {
+      reverseDimensionGroups = dimensionGroupSpec.getReverseMapping();
+    }
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, uriInfo.getQueryParameters());
+    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, uriInfo.getQueryParameters(), reverseDimensionGroups);
     QueryResult queryResult = queryCache.getQueryResult(serverUri, sql).checkEmpty();
     return FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
   }
@@ -71,11 +77,18 @@ public class FlotTimeSeriesResource {
     MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
+    // Dimension groups
+    Map<String, Map<String, List<String>>> reverseDimensionGroups = null;
+    DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+    if (dimensionGroupSpec != null) {
+      reverseDimensionGroups = dimensionGroupSpec.getReverseMapping();
+    }
+
     // Generate SQL
     String baselineSeriesSql
-        = SqlUtils.getSql(metricFunction, collection, baselineRangeStart, baselineRangeEnd, dimensionValues);
+        = SqlUtils.getSql(metricFunction, collection, baselineRangeStart, baselineRangeEnd, dimensionValues, reverseDimensionGroups);
     String currentSeriesSql
-        = SqlUtils.getSql(metricFunction, collection, currentRangeStart, currentRangeEnd, dimensionValues);
+        = SqlUtils.getSql(metricFunction, collection, currentRangeStart, currentRangeEnd, dimensionValues, reverseDimensionGroups);
 
     // Query (async)
     Future<QueryResult> baselineResult

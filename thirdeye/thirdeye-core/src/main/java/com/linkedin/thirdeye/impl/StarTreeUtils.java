@@ -84,11 +84,12 @@ public class StarTreeUtils {
       List<StarTreeQuery> expandedQueries = new ArrayList<StarTreeQuery>();
       for (StarTreeQuery query : queries)
       {
-        Map<String, String> dimensionValues = new HashMap<String, String>(dimensionSpecs.size());
+        Map<String, Collection<String>> dimensionValues = new HashMap<String, Collection<String>>(dimensionSpecs.size());
 
         for (int i = 0; i < dimensionSpecs.size(); i++)
         {
-          dimensionValues.put(dimensionSpecs.get(i).getName(), query.getDimensionKey().getDimensionValues()[i]);
+          dimensionValues.put(dimensionSpecs.get(i).getName(),
+              Collections.singletonList(query.getDimensionKey().getDimensionValues()[i]));
         }
 
         Set<String> values = starTree.getDimensionValues(dimensionName, dimensionValues);

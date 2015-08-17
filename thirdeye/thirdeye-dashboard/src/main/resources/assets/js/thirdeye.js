@@ -667,3 +667,76 @@ function getTimeZone() {
     }
     return tz
 }
+
+function updateTableOrder(tableContainer, orderContainer) {
+  // Get column headers
+  var currentOrder = $.map(tableContainer.find("thead tr").first().find("th"), function(elt) { 
+    return $.trim(elt.innerHTML) 
+  }).slice(1) // for time column
+
+  // Get columns
+  var columns = {}
+  for (var i = 0; i < currentOrder.length; i++) {
+    columns[currentOrder[i]] = []
+  }
+  var tableRows = tableContainer.find("tbody tr")
+  for (var i = 0; i < tableRows.size(); i++) {
+    var tableCols = $(tableRows[i]).find("td")
+    for (var j = 0; j < currentOrder.length; j++) {
+      var colIdx = 1 + j * 3 // n.b. first column time
+      //columns[j].push({
+      columns[currentOrder[j]].push({
+        current: tableCols[colIdx].innerHTML,
+        baseline: tableCols[colIdx + 1].innerHTML,
+        ratio: tableCols[colIdx + 2].innerHTML
+      })
+    }
+  }
+
+  // Get the desired ordering of metric columns
+  var nextOrder = $.map(orderContainer.find("li div"), function(elt) { 
+    return $.trim(elt.innerHTML)
+  })
+
+  // Re-write the column headers
+  tableContainer.find("thead tr").first().find("th").each(function(i, elt) {
+    if (i > 0) { // first is time column
+      var metricIndex = i - 1
+      var currentMetric = currentOrder[metricIndex]
+      var nextMetric = nextOrder[metricIndex]
+      $(elt).html(nextMetric)
+    }
+  })
+
+  // Re-write the columns
+  for (var i = 0; i < tableRows.size(); i++) {
+    var tableCols = $(tableRows[i]).find("td")
+    for (var j = 0; j < currentOrder.length; j++) {
+      var nextMetric = nextOrder[j]
+      var column = columns[nextMetric]
+
+      // This is relative to the table itself
+      var colIdx = 1 + j * 3;
+      $(tableCols[colIdx]).html(column[i].current)
+      $(tableCols[colIdx + 1]).html(column[i].baseline)
+      $(tableCols[colIdx + 2]).html(column[i].ratio)
+
+      // Set the right class for the value
+      var ratio = parseFloat(column[i].ratio)
+      var ratioCell = $(tableCols[colIdx + 2])
+      ratioCell.removeClass('metric-table-down-cell metric-table-same-cell')
+      if (ratio < 0) {
+        ratioCell.addClass('metric-table-down-cell')
+      } else if (ratio == 0) {
+        ratioCell.addClass('metric-table-same-cell')
+      }
+    }
+  }
+
+  // Set hash parameter
+  var hashParams = parseHashParameters(window.location.hash)
+  $.each(nextOrder, function(i, elt) {
+    hashParams['intraDayOrder_' + i] = elt
+  })
+  window.location.hash = encodeHashParameters(hashParams)
+}

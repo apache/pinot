@@ -2,11 +2,9 @@ package com.linkedin.thirdeye.dashboard.views;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-import com.linkedin.thirdeye.dashboard.api.HeatMap;
-import com.linkedin.thirdeye.dashboard.api.HeatMapCell;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.api.*;
 import com.linkedin.thirdeye.dashboard.util.SnapshotUtils;
+import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import io.dropwizard.views.View;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -14,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class DimensionViewHeatMap extends View {
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionViewHeatMap.class);
@@ -21,13 +20,19 @@ public class DimensionViewHeatMap extends View {
   private final CollectionSchema schema;
   private final ObjectMapper objectMapper;
   private final List<HeatMap> heatMaps;
+  private final Map<String, Map<String, String>> dimensionGroupMap;
+  private final Map<String, Map<Pattern, String>> dimensionRegexMap;
 
   public DimensionViewHeatMap(CollectionSchema schema,
                               ObjectMapper objectMapper,
-                              Map<String, QueryResult> queryResults) throws Exception {
+                              Map<String, QueryResult> queryResults,
+                              Map<String, Map<String, String>> dimensionGroupMap,
+                              Map<String, Map<Pattern, String>> dimensionRegexMap) throws Exception {
     super("dimension/heat-map.ftl");
     this.schema = schema;
     this.objectMapper = objectMapper;
+    this.dimensionGroupMap = dimensionGroupMap;
+    this.dimensionRegexMap = dimensionRegexMap;
     this.heatMaps = new ArrayList<>();
 
     for (Map.Entry<String, QueryResult> entry : queryResults.entrySet()) {
@@ -95,8 +100,12 @@ public class DimensionViewHeatMap extends View {
       allCurrentStats.put(metric, new DescriptiveStatistics());
     }
 
-    for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
-      List<String> combination = objectMapper.readValue(entry.getKey(), LIST_TYPE_REFERENCE);
+    // Aggregate w.r.t. dimension groups
+    Map<List<String>, Map<String, Number[]>> processedResult = ViewUtils.processDimensionGroups(
+        queryResult, objectMapper, dimensionGroupMap, dimensionRegexMap, dimension);
+
+    for (Map.Entry<List<String>, Map<String, Number[]>> entry : processedResult.entrySet()) {
+      List<String> combination = entry.getKey();
       String value = combination.get(dimensionIdx);
 
       // Find min / max times (for current / baseline)

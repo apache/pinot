@@ -34,13 +34,14 @@ $(document).ready(function() {
             }
 
             var vd = (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
+            var br = (cell.stats['baseline_ratio'] * 100).toFixed(2)
             var cd = (cell.stats['contribution_difference'] * 100).toFixed(2) + '%'
 
             var cellContent = value + '<br/>' + vd
             if (cell.stats['contribution_difference'] > 0) {
-                cellContent += ' <span class="cell-down">(&#916;' + cd + ')</span>'
+              cellContent += ' <span class="cell-up">' + br + '% (+' + cd + ')</span>'
             } else {
-                cellContent += ' <span class="cell-up">(&#916;' + cd + ')</span>'
+              cellContent += ' <span class="cell-down">' + br + '% (' + cd + ')</span>'
             }
 
             return cellContent

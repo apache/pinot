@@ -51,6 +51,8 @@
                         <#include "dimension/heat-map.ftl">
                     <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
                         <#include "dimension/multi-time-series.ftl">
+                    <#elseif (dimensionView.type == "TABULAR")>
+                        <#include "dimension/tabular.ftl">
                     <#else>
                         <div class="uk-alert uk-alert-danger">
                             <p>

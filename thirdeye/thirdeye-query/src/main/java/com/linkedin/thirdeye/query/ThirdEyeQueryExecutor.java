@@ -174,16 +174,7 @@ public class ThirdEyeQueryExecutor {
           dimensionSetFutures.add(executorService.submit(new Callable<Set<String>>() {
             @Override
             public Set<String> call() throws Exception {
-              // TODO: Support multiple values per dimension
-              Multimap<String, String> values = query.getDimensionValues();
-              Map<String, String> singleValues = new HashMap<>(values.size());
-              for (Map.Entry<String, String> entry : query.getDimensionValues().entries()) {
-                if (singleValues.containsKey(entry.getKey())) {
-                  throw new IllegalArgumentException("Multiple values currently not supported: " + values);
-                }
-                singleValues.put(entry.getKey(), entry.getValue());
-              }
-              return starTree.getDimensionValues(groupByColumn, singleValues);
+              return starTree.getDimensionValues(groupByColumn, query.getDimensionValues().asMap());
             }
           }));
         }
