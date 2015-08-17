@@ -83,20 +83,21 @@ public class ViewUtils {
 
       Map<String, Number[]> existing = processedResult.get(combination);
       if (existing == null) {
-        processedResult.put(combination, entry.getValue());
-      } else {
-        for (Map.Entry<String, Number[]> point : entry.getValue().entrySet()) {
-          Number[] existingValues = existing.get(point.getKey());
-          if (existingValues == null) {
-            existingValues = new Number[point.getValue().length];
-            Arrays.fill(existingValues, 0);
-            existing.put(point.getKey(), existingValues);
-          }
+        existing = new HashMap<>();
+        processedResult.put(combination, existing);
+      }
 
-          Number[] incrementValues = point.getValue();
-          for (int i = 0; i < existingValues.length; i++) {
-            existingValues[i] = existingValues[i].doubleValue() + incrementValues[i].doubleValue();
-          }
+      for (Map.Entry<String, Number[]> point : entry.getValue().entrySet()) {
+        Number[] values = existing.get(point.getKey());
+        if (values == null) {
+          values = new Number[point.getValue().length];
+          Arrays.fill(values, 0);
+          existing.put(point.getKey(), values);
+        }
+
+        Number[] increment = point.getValue();
+        for (int i = 0; i < values.length; i++) {
+          values[i] = values[i].doubleValue() + increment[i].doubleValue();
         }
       }
     }
