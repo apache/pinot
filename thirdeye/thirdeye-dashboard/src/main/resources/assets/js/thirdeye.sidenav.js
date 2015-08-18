@@ -2,8 +2,10 @@ $(document).ready(function() {
     var path = parsePath(window.location.pathname)
 
     // Derived metrics
-    $("#sidenav-derived-metrics-add").click(function(event) {
-        event.preventDefault()
+    var addDerivedMetric = function(event) {
+        if (event) {
+            event.preventDefault()
+        }
 
         var derivedMetrics = [
             { type: "RATIO", numArgs: 2 }
@@ -41,7 +43,8 @@ $(document).ready(function() {
 
         var inputs = $("<div></div>")
         controls.append(inputs)
-        select.change(function() {
+
+        var selectChange = function() {
             inputs.empty()
             var selected = select.find(':selected')
             var idx = $(selected).attr('idx')
@@ -67,10 +70,13 @@ $(document).ready(function() {
 
                 inputs.append(metricSelect)
             }
-        })
+        }
 
-        select.trigger('change')
-    })
+        select.change(selectChange)
+        selectChange()
+    }
+
+    $("#sidenav-derived-metrics-add").click(addDerivedMetric)
 
     // Moving average toggle
     $("#sidenav-moving-average").change(function() {
@@ -81,7 +87,6 @@ $(document).ready(function() {
             $("#sidenav-moving-average-controls").hide()
         }
     })
-
 
     // Generate Timezone drop down
     var timezones = moment.tz.names()
@@ -147,13 +152,12 @@ $(document).ready(function() {
 
       // Add derived metrics
       $.each(derivedMetrics, function(i, derivedMetric) {
-        $("#sidenav-derived-metrics-add").trigger('click')
+        addDerivedMetric() // appends a new element to list
         var metricElements = $("#sidenav-derived-metrics-list .uk-form-row")
         var metricElement = $(metricElements[metricElements.length - 1])
         metricElement.find(".derived-metric-type").val(derivedMetric.name)
         $.each(derivedMetric.args, function(j, arg) {
-            var input = $("#" + derivedMetric.name + "-arg" + j)
-            input.val(arg)
+            metricElement.find('#' + derivedMetric.name + '-arg' + j).val(arg)
         })
       })
     }
