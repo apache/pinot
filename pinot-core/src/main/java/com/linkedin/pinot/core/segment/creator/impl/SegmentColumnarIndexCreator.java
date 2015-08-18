@@ -208,7 +208,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
     }
     if (config.containsKey(SEGMENT_END_TIME)) {
-      properties.setProperty(SEGMENT_END_TIME, config.getStartTime());
+      properties.setProperty(SEGMENT_END_TIME, config.getEndTime());
     }
     if (config.containsKey(TIME_UNIT)) {
       properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
