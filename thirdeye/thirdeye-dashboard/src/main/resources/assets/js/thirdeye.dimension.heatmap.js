@@ -12,7 +12,8 @@ $(document).ready(function() {
     var options = {
         filter: function(cell) {
             if (filterToggle.attr('state') === 'on') {
-                return  Math.abs(cell.stats['volume_difference']) > 0.005 // only show those w/ 0.5% or greater change
+                // Only show cells which make up 1% or more of the dimension
+                return cell.stats['baseline_ratio'] > 0.01 || cell.stats['current_ratio'] > 0.01
             } else {
                 return true;
             }
