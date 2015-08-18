@@ -30,10 +30,12 @@ public class TestThirdEyeMovingAverageFunction {
     }
 
     MetricTimeSeries derived = new ThirdEyeMovingAverageFunction(
-        ImmutableList.of("L"), new TimeGranularity(7, TimeUnit.HOURS)).apply(config, query, timeSeries);
+        new TimeGranularity(7, TimeUnit.HOURS)).apply(config, query, timeSeries);
 
     Assert.assertEquals(derived.getTimeWindowSet().size(), 14);
-    Assert.assertEquals(derived.getSchema().getNames().size(), 1);
+    Assert.assertEquals(derived.getSchema().getNames().size(), 2);
+
+    System.out.println(derived);
 
     for (Long time : derived.getTimeWindowSet()) {
       Assert.assertEquals(derived.get(time, "L").doubleValue(), 1.0, 0.001);

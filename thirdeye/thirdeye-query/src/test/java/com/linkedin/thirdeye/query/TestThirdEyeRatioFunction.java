@@ -28,9 +28,15 @@ public class TestThirdEyeRatioFunction {
   @Test
   public void testValid_simple() {
     MetricTimeSeries derived = new ThirdEyeRatioFunction(ImmutableList.of("L", "D")).apply(config, null, timeSeries);
-    Assert.assertEquals(derived.getSchema().getNumMetrics(), 1);
+    Assert.assertEquals(derived.getSchema().getNumMetrics(), 3); // contains originals
     for (int i = 0; i < 16; i++) {
       Assert.assertEquals(derived.get(i, "RATIO(L,D)").doubleValue(), 0.25);
     }
+  }
+
+  @Test
+  public void testToString() {
+    ThirdEyeFunction function = new ThirdEyeRatioFunction(ImmutableList.of("N", "D"));
+    Assert.assertEquals(function.toString(), "RATIO(N,D)");
   }
 }

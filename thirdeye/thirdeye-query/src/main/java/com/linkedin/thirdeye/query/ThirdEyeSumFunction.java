@@ -1,15 +1,22 @@
 package com.linkedin.thirdeye.query;
 
+import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 import java.util.List;
 
 public class ThirdEyeSumFunction implements ThirdEyeFunction {
+  private static final Joiner JOINER = Joiner.on(",");
   private final List<String> metricNames;
 
   public ThirdEyeSumFunction(List<String> metricNames) {
     this.metricNames = metricNames;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("SUM(%s)", JOINER.join(metricNames));
   }
 
   @Override

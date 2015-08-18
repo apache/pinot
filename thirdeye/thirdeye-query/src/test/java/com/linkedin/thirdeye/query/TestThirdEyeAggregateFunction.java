@@ -31,7 +31,7 @@ public class TestThirdEyeAggregateFunction {
   @Test
   public void testValid_simple() {
     MetricTimeSeries derived = new ThirdEyeAggregateFunction(
-        ImmutableList.of("L", "D"), new TimeGranularity(4, TimeUnit.HOURS)).apply(config, query, timeSeries);
+        new TimeGranularity(4, TimeUnit.HOURS)).apply(config, query, timeSeries);
     Assert.assertEquals(derived.getTimeWindowSet().size(), 4);
 
     for (long i = 0; i < 16; i += 4) {

@@ -107,7 +107,7 @@ public class TestThirdEyeQueryParser {
     Assert.assertEquals(query.getCollection(), "collection");
     Assert.assertEquals(query.getStart(), start);
     Assert.assertEquals(query.getEnd(), end);
-    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("m1", "m2"));
+    Assert.assertTrue(query.getMetricNames().isEmpty());
     Assert.assertTrue(query.getDimensionValues().isEmpty());
     Assert.assertEquals(query.getFunctions().size(), 1);
     Assert.assertEquals(query.getFunctions().get(0).getClass(), ThirdEyeAggregateFunction.class);
@@ -136,6 +136,18 @@ public class TestThirdEyeQueryParser {
     Assert.assertTrue(query.getDimensionValues().isEmpty());
     Assert.assertTrue(query.getFunctions().isEmpty());
     Assert.assertEquals(query.getGroupByColumns(), ImmutableList.of("root.m1"));
+  }
+
+  @Test
+  public void testValid_ratiosAndRaw() throws Exception {
+    query = parse("SELECT m1, m2, RATIO(m2, m3) FROM collection WHERE time BETWEEN '2015-01-07' AND '2015-01-08'");
+    Assert.assertEquals(query.getCollection(), "collection");
+    Assert.assertEquals(query.getStart(), start);
+    Assert.assertEquals(query.getEnd(), end);
+    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("m1", "m2"));
+    Assert.assertTrue(query.getDimensionValues().isEmpty());
+    Assert.assertTrue(query.getFunctions().isEmpty());
+    Assert.assertEquals(query.getDerivedMetrics().size(), 1);
   }
 
   // Negative

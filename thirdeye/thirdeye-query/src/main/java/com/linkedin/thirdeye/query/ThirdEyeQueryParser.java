@@ -131,12 +131,12 @@ public class ThirdEyeQueryParser implements
       terminalState.push(TerminalState.FUNCTION_MOVING_AVERAGE);
       function.getParameters().accept(this);
       TimeGranularity window = parseTimeGranularity(function.getName());
-      query.addFunction(new ThirdEyeMovingAverageFunction(functionMetrics, window));
+      query.addFunction(new ThirdEyeMovingAverageFunction(window));
     } else if (function.getName().startsWith("AGGREGATE_")) {
       terminalState.push(TerminalState.FUNCTION_AGGREGATE);
       function.getParameters().accept(this);
       TimeGranularity window = parseTimeGranularity(function.getName());
-      query.addFunction(new ThirdEyeAggregateFunction(functionMetrics, window));
+      query.addFunction(new ThirdEyeAggregateFunction(window));
     } else if ("SUM".equals(function.getName())) {
       terminalState.push(TerminalState.FUNCTION_SUM);
       function.getParameters().accept(this);
@@ -339,9 +339,9 @@ public class ThirdEyeQueryParser implements
         return;
       case FUNCTION_MOVING_AVERAGE:
       case FUNCTION_AGGREGATE:
+        query.addMetricName(column.getColumnName());
       case FUNCTION_SUM:
       case FUNCTION_RATIO:
-        query.addMetricName(column.getColumnName());
         functionMetrics.add(column.getColumnName());
         return;
     }
@@ -484,17 +484,5 @@ public class ThirdEyeQueryParser implements
   private static TimeGranularity parseTimeGranularity(String functionName) {
     String[] tokens = functionName.split("_");
     return new TimeGranularity(Integer.valueOf(tokens[tokens.length - 2]), TimeUnit.valueOf(tokens[tokens.length - 1]));
-  }
-
-  public static void main(String[] args) throws Exception {
-    StarTreeConfig config = StarTreeConfig.decode(new FileInputStream("/Users/gbrandt/thirdeye-data/thirdeye-server/ads/config.yml"));
-//    String sql = "SELECT * FROM abook WHERE tenMinutesSinceEpoch BETWEEN 1234 AND 5678";
-//    String sql = "SELECT adImpressionCount FROM abook WHERE tenMinutesSinceEpoch BETWEEN 1234 AND 5678 AND channelId = '1' AND fabric = 'ELA-4'";
-//    String sql = "SELECT adImpressionCount FROM abook WHERE channelId = '1' " +
-//        "AND tenMinutesSinceEpoch BETWEEN 1234 AND 5678 GROUP BY fabric";
-//    String sql = "SELECT MOVING_AVERAGE(adImpressionCount, adClickCount, 7) FROM abook WHERE tenMinutesSinceEpoch BETWEEN 1234 AND 5678";
-    String sql = "SELECT SUM(adImpressionCount, adClickCount) FROM ads WHERE time BETWEEN '2015-01-07' AND '2015-01-08'";
-    ThirdEyeQuery query = new ThirdEyeQueryParser(sql).getQuery();
-    System.out.println(query);
   }
 }

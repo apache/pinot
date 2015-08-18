@@ -7,11 +7,9 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import java.util.*;
 
 public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
-  private final List<String> metricNames;
   private final TimeGranularity window;
 
-  public ThirdEyeAggregateFunction(List<String> metricNames, TimeGranularity window) {
-    this.metricNames = metricNames;
+  public ThirdEyeAggregateFunction(TimeGranularity window) {
     this.window = window;
   }
 
@@ -21,8 +19,7 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
 
   @Override
   public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
-    Set<String> metricNames = new HashSet<>(query.getMetricNames());
-    MetricTimeSeries aggregate = ThirdEyeFunctionUtils.copyBlankSeriesSame(new ArrayList<String>(metricNames), timeSeries.getSchema());
+    MetricTimeSeries aggregate = ThirdEyeFunctionUtils.copyBlankSeriesSame(timeSeries.getSchema().getNames(), timeSeries.getSchema());
 
     if (timeSeries.getTimeWindowSet().isEmpty()) {
       return aggregate;
@@ -43,7 +40,7 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
     for (long i = minTime; i < maxTime; i += collectionWindow) {
       long alignedTime = (i / collectionWindow) * collectionWindow;
       for (long j = i; j < i + collectionWindow; j++) {
-        for (String metricName : metricNames) {
+        for (String metricName : timeSeries.getSchema().getNames()) {
           Number metricValue = timeSeries.get(j, metricName);
           if (metricValue != null) {
             aggregate.increment(alignedTime, metricName, metricValue);

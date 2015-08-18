@@ -6,11 +6,9 @@ import com.linkedin.thirdeye.impl.NumberUtils;
 import java.util.*;
 
 public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
-  private final List<String> metricNames;
   private final TimeGranularity window;
 
-  public ThirdEyeMovingAverageFunction(List<String> metricNames, TimeGranularity window) {
-    this.metricNames = metricNames;
+  public ThirdEyeMovingAverageFunction(TimeGranularity window) {
     this.window = window;
 
     if (window.getSize() < 1) {
@@ -24,10 +22,11 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
 
   @Override
   public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
-    List<MetricType> metricTypes = new ArrayList<>(metricNames.size());
-    for (String metricName : metricNames) {
+    List<MetricType> metricTypes = new ArrayList<>();
+    for (String metricName : timeSeries.getSchema().getNames()) {
       metricTypes.add(MetricType.DOUBLE);
     }
+    List<String> metricNames = timeSeries.getSchema().getNames();
     MetricTimeSeries movingAverage = new MetricTimeSeries(new MetricSchema(metricNames, metricTypes));
 
     if (timeSeries.getTimeWindowSet().isEmpty()) {

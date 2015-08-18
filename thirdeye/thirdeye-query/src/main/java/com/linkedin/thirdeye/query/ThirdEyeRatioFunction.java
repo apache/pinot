@@ -27,76 +27,34 @@ public class ThirdEyeRatioFunction implements ThirdEyeFunction {
   }
 
   @Override
+  public String toString() {
+    return String.format("RATIO(%s,%s)", numerator, denominator);
+  }
+
+  @Override
   public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
-    MetricSchema oldSchema = timeSeries.getSchema();
-    List<String> metricNames = new ArrayList<>(oldSchema.getNumMetrics() - 1);
-    List<MetricType> metricTypes = new ArrayList<>(oldSchema.getNumMetrics() - 1);
+    List<String> metricNames = new ArrayList<>(timeSeries.getSchema().getNames());
+    List<MetricType> metricTypes = new ArrayList<>(timeSeries.getSchema().getTypes());
 
-    // Determine to keep numerator or denominator
-    Map<String, Integer> nameCounts = new HashMap<>();
-    if (query != null) {
-      for (String name : query.getMetricNames()) {
-        Integer count = nameCounts.get(name);
-        if (count == null) {
-          count = 0;
-        }
-        nameCounts.put(name, count + 1);
-      }
-    }
-
-    boolean keepNumerator = nameCounts.get(numerator) != null && nameCounts.get(numerator) > 1;
-    boolean keepDenominator = nameCounts.get(denominator) != null && nameCounts.get(denominator) > 1;
-
-    // Keep all other original metrics
-    MetricType denominatorType = null;
-    for (int i = 0; i < oldSchema.getNumMetrics(); i++) {
-      String name = oldSchema.getMetricName(i);
-      if (!name.equals(numerator) && !name.equals(denominator)) {
-        metricNames.add(name);
-        metricTypes.add(oldSchema.getMetricType(i));
-      }
-
-      if (name.equals(denominator)) {
-        denominatorType = oldSchema.getMetricType(name);
-      }
-    }
-
-    // Add numerator / denominator if necessary
-    if (keepNumerator) {
-      metricNames.add(numerator);
-      metricTypes.add(oldSchema.getMetricType(numerator));
-    }
-    if (keepDenominator) {
-      metricNames.add(denominator);
-      metricTypes.add(oldSchema.getMetricType(denominator));
-    }
-
-    // Add the ratio metric
-    String ratioName = String.format("RATIO(%s,%s)", numerator, denominator);
+    // The ratio
+    String ratioName = toString();
     metricNames.add(ratioName);
     metricTypes.add(MetricType.DOUBLE);
 
+    // New schema
     MetricSchema newSchema = new MetricSchema(metricNames, metricTypes);
     MetricTimeSeries newTimeSeries = new MetricTimeSeries(newSchema);
 
     // Compute
     for (Long time : timeSeries.getTimeWindowSet()) {
       // Copy all non-involved metrics
-      for (int i = 0; i < oldSchema.getNumMetrics(); i++) {
-        String name = oldSchema.getMetricName(i);
-        if (!name.equals(numerator) && !name.equals(denominator)) {
-          newTimeSeries.increment(time, name, timeSeries.get(time, name));
+      MetricType denominatorType = null;
+      for (int i = 0; i < timeSeries.getSchema().getNumMetrics(); i++) {
+        String name = timeSeries.getSchema().getMetricName(i);
+        newTimeSeries.increment(time, name, timeSeries.get(time, name));
+        if (name.equals(denominator)) {
+          denominatorType = timeSeries.getSchema().getMetricType(i);
         }
-      }
-
-      // Numerator
-      if (keepNumerator) {
-        newTimeSeries.increment(time, numerator, timeSeries.get(time, numerator));
-      }
-
-      // Denominator
-      if (keepDenominator) {
-        newTimeSeries.increment(time, denominator, timeSeries.get(time, denominator));
       }
 
       // Compute ratio
