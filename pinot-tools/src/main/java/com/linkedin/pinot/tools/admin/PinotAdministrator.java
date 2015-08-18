@@ -90,7 +90,7 @@ public class PinotAdministrator {
       }
 
     } catch (Exception e) {
-      System.err.println(e.getMessage());
+      LOGGER.error("Exception Caught: ", e);
     }
   }
 

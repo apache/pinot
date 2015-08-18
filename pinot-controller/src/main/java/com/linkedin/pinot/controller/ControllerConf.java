@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller;
 
 import java.io.File;
+import java.util.ArrayList;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -101,7 +102,17 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getZkStr() {
-    return (String) getProperty(ZK_STR);
+    Object zkAddressObj = getProperty(ZK_STR);
+
+    // The set method converted comma separated string into ArrayList, so need to convert back to String here.
+    if (zkAddressObj instanceof ArrayList) {
+      return String.join(",", (ArrayList) zkAddressObj);
+    } else if (zkAddressObj instanceof String) {
+      return (String) zkAddressObj;
+    } else {
+      throw new RuntimeException("Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got "
+              + zkAddressObj.getClass().getName());
+    }
   }
 
   @Override

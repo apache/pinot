@@ -87,8 +87,11 @@ public class HelixServerStarter {
 
     pinotHelixProperties.addProperty("pinot.server.instance.id", _instanceId);
     startServerInstance(pinotHelixProperties);
+
+    // Replace all white-spaces from list of zkServers.
+    String zkServers = zkServer.replaceAll("\\s+", "");
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkServer);
+        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkServers);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);

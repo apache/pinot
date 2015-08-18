@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,8 @@ import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
 public class HelixBrokerStarter {
 
   private static final String TABLES_KEY = "tables";
+  private static final String PROPERTY_STORE = "PROPERTYSTORE";
+
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final Configuration _pinotHelixProperties;
@@ -80,12 +83,12 @@ public class HelixBrokerStarter {
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
     final String brokerId =
         _pinotHelixProperties.getString(
-            "instanceId",
-            CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE
-                + NetUtil.getHostAddress()
-                + "_"
-                + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
-                    CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
+                "instanceId",
+                CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE
+                        + NetUtil.getHostAddress()
+                        + "_"
+                        + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
+                        CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
     RoutingTableBuilder defaultOfflineRoutingTableBuilder =
@@ -94,8 +97,12 @@ public class HelixBrokerStarter {
         getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY));
     Map<String, RoutingTableBuilder> tableToRoutingTableBuilderMap =
         getTableToRoutingTableBuilderMap(_pinotHelixProperties.subset(ROUTING_TABLE_BUILDER_KEY));
+
+    // Remove all white-spaces from the list of zkServers (if any).
+    String zkServers = zkServer.replaceAll("\\s+", "");
+
     ZkClient zkClient =
-        new ZkClient(StringUtil.join("/", StringUtils.chomp(zkServer, "/"), helixClusterName, "PROPERTYSTORE"),
+        new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
     _helixExternalViewBasedRouting =
@@ -105,7 +112,7 @@ public class HelixBrokerStarter {
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
+        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =
         new BrokerResourceOnlineOfflineStateModelFactory(_helixManager, _helixExternalViewBasedRouting);
@@ -189,6 +196,16 @@ public class HelixBrokerStarter {
       }
     });
     return brokerServerBuilder;
+  }
+
+  private String getZkAddressForBroker(String zkServers, String helixClusterName) {
+    List tokens = new ArrayList<String>();
+
+    for (String token : zkServers.split(",")) {
+      tokens.add(StringUtil.join("/", StringUtils.chomp(token, "/"), helixClusterName, PROPERTY_STORE));
+    }
+
+    return StringUtils.join(tokens, ",");
   }
 
   public HelixExternalViewBasedRouting getHelixExternalViewBasedRouting() {
