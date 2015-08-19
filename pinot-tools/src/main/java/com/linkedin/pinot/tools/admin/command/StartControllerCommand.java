@@ -15,14 +15,17 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
+import java.io.File;
+
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerStarter;
 
 
 /**
@@ -47,6 +50,11 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
+
+  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
+          usage = "Controller Starter config file",
+          forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
+  private String _configFileName;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
           usage = "Print this message.")
@@ -77,6 +85,11 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     return this;
   }
 
+  public StartControllerCommand setConfigFileName(String configFileName) {
+    _configFileName = configFileName;
+    return this;
+  }
+
   @Override
   public String getName() {
     return "StartController";
@@ -84,8 +97,12 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public String toString() {
-    return ("StartControllerCommand -clusterName " + _clusterName + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+    if (_configFileName != null) {
+      return ("StartController -configFileName " + _configFileName);
+    } else {
+      return ("StartController -clusterName " + _clusterName + " -controllerHost " + _controllerHost
+              + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+    }
   }
 
   @Override
@@ -100,21 +117,30 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public boolean execute() throws Exception {
-    final ControllerConf conf = new ControllerConf();
-
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
-    conf.setControllerHost(_controllerHost);
-    conf.setControllerPort(_controllerPort);
-    conf.setDataDir(_dataDir);
-    conf.setZkStr(_zkAddress);
 
-    conf.setHelixClusterName(_clusterName);
-    conf.setControllerVipHost(_controllerHost);
+    ControllerConf conf = readConfigFromFile(_configFileName);
+    if (conf == null) {
+      if (_configFileName != null) {
+        LOGGER.error("Error: Unable to find file {}.", _configFileName);
+        return false;
+      }
 
-    conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-    conf.setValidationControllerFrequencyInSeconds(3600);
+      conf = new ControllerConf();
+
+      conf.setControllerHost(_controllerHost);
+      conf.setControllerPort(_controllerPort);
+      conf.setDataDir(_dataDir);
+      conf.setZkStr(_zkAddress);
+
+      conf.setHelixClusterName(_clusterName);
+      conf.setControllerVipHost(_controllerHost);
+
+      conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
+      conf.setValidationControllerFrequencyInSeconds(3600);
+    }
 
     LOGGER.info("Executing command: " + toString());
     final ControllerStarter starter = new ControllerStarter(conf);
@@ -165,7 +191,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
     if (conf.getHelixClusterName() == null) {
       LOGGER
-          .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
+              .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
       return false;
     }
 

@@ -467,7 +467,9 @@
                     <configuration>
                         <source>1.8</source>
                         <target>1.8</target>
+                        <!--
                         <executable>/opt/java/jdk1.8.0_51/bin/javac</executable>
+                        -->
                     </configuration>
                 </plugin>
                 <plugin>
