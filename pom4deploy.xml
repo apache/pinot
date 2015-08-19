@@ -477,6 +477,10 @@
                     <artifactId>appassembler-maven-plugin</artifactId>
                     <version>1.1.1</version>
                     <configuration>
+                        <property>
+                            <name>JAVA_HOME</name>
+                            <value>/opt/java/jdk1.8.0_60</value>
+                        </property>
                         <binFileExtensions>
                             <unix>.sh</unix>
                         </binFileExtensions>
