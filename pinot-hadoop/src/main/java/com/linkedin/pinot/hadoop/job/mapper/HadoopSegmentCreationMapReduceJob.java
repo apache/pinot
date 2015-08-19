@@ -15,9 +15,13 @@
  */
 package com.linkedin.pinot.hadoop.job.mapper;
 
-import java.io.File;
-import java.io.IOException;
-
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,15 +33,9 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.stringtemplate.v4.compiler.STParser.list_return;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import java.io.File;
+import java.io.IOException;
 
 
 public class HadoopSegmentCreationMapReduceJob {
@@ -52,6 +50,7 @@ public class HadoopSegmentCreationMapReduceJob {
 
     private Path _currentHdfsWorkDir;
     private String _currentDiskWorkDir;
+    private String _postfix;
 
     // Temporary HDFS path for local machine
     private String _localHdfsSegmentTarPath;
@@ -80,7 +79,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("Current DISK working dir : {}", new File(_currentDiskWorkDir).getAbsolutePath());
       LOGGER.info("*********************************************************************");
       _properties = context.getConfiguration();
-
+      _postfix = _properties.get("segment.name.postfix");
       _outputPath = _properties.get("path.to.output");
       _tableName = _properties.get("segment.table.name");
       if (_outputPath == null || _tableName == null) {
@@ -135,10 +134,13 @@ public class HadoopSegmentCreationMapReduceJob {
       } catch (Exception e) {
         LOGGER.error("Got exceptions during creating segments!", e);
       }
-
-      context.write(new LongWritable(Long.parseLong(lineSplits[2])),
-          new Text(FileSystem.get(new Configuration()).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
-      LOGGER.info("finished the job successfully");
+      if(FileSystem.get(new Configuration()).exists(new Path(_localHdfsSegmentTarPath + "/"))) {
+        context.write(new LongWritable(Long.parseLong(lineSplits[2])),
+                new Text(FileSystem.get(new Configuration()).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+        LOGGER.info("finished the job successfully");
+      }else{
+        LOGGER.error("Can't find compressed segment on hdfs!");
+      }
     }
 
     private String createSegment(String dataFilePath, Schema schema, String seqId) throws Exception {
@@ -160,7 +162,11 @@ public class HadoopSegmentCreationMapReduceJob {
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setInputFileFormat(fileFormat);
-      segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+      if (null != _postfix) {
+        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
+      } else {
+        segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+      }
       segmentGeneratorConfig.setRecordeReaderConfig(getReaderConfig(fileFormat));
 
       segmentGeneratorConfig.setIndexOutputDir(_localDiskSegmentDirectory);

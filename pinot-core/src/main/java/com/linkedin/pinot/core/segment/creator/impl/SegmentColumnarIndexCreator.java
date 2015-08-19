@@ -85,8 +85,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, int totalDocs, File outDir)
-      throws Exception {
+                   Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, int totalDocs, File outDir)
+          throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
@@ -112,7 +112,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
       if (info.isCreateDictionary()) {
         dictionaryCreatorMap.put(spec.getName(),
-            new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec, file));
+                new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec, file));
       } else {
         throw new RuntimeException("Creation of indices without dictionaries is not implemented!");
       }
@@ -126,28 +126,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
         if (indexCreationInfo.isSorted()) {
           forwardIndexCreatorMap.put(column,
-              new SingleValueSortedForwardIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length,
-                  schema.getFieldSpecFor(column)));
+                  new SingleValueSortedForwardIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length,
+                          schema.getFieldSpecFor(column)));
         } else {
           forwardIndexCreatorMap.put(
-              column,
-              new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
-                  .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
-                  indexCreationInfo.hasNulls()));
+                  column,
+                  new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
+                          .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                          indexCreationInfo.hasNulls()));
         }
       } else {
         forwardIndexCreatorMap.put(
-            column,
-            new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
-                .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
-                indexCreationInfo.hasNulls()));
+                column,
+                new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
+                        .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                        indexCreationInfo.hasNulls()));
       }
 
       if (config.createInvertedIndexEnabled()) {
         invertedIndexCreatorMap.put(
-            column,
-            new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
-                .getFieldSpecFor(column)));
+                column,
+                new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
+                        .getFieldSpecFor(column)));
       }
     }
   }
@@ -187,7 +187,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   void writeMetadata() throws ConfigurationException {
     final PropertiesConfiguration properties =
-        new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+            new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     properties.setProperty(SEGMENT_NAME, segmentName);
     properties.setProperty(TABLE_NAME, config.getTableName());
@@ -220,40 +220,40 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     for (final String column : indexCreationInfoMap.keySet()) {
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, CARDINALITY),
-          String.valueOf(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length));
+              String.valueOf(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length));
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATA_TYPE),
-          schema.getFieldSpecFor(column).getDataType().toString());
+              schema.getFieldSpecFor(column).getDataType().toString());
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT), String
-          .valueOf(SingleValueUnsortedForwardIndexCreator.getNumOfBits(indexCreationInfoMap.get(column)
-              .getSortedUniqueElementsArray().length)));
+              .valueOf(SingleValueUnsortedForwardIndexCreator.getNumOfBits(indexCreationInfoMap.get(column)
+                      .getSortedUniqueElementsArray().length)));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
-          String.valueOf(dictionaryCreatorMap.get(column).getStringColumnMaxLength()));
+              String.valueOf(dictionaryCreatorMap.get(column).getStringColumnMaxLength()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, COLUMN_TYPE),
-          String.valueOf(schema.getFieldSpecFor(column).getFieldType().toString()));
+              String.valueOf(schema.getFieldSpecFor(column).getFieldType().toString()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SORTED),
-          String.valueOf(indexCreationInfoMap.get(column).isSorted()));
+              String.valueOf(indexCreationInfoMap.get(column).isSorted()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_NULL_VALUE),
-          String.valueOf(indexCreationInfoMap.get(column).hasNulls()));
+              String.valueOf(indexCreationInfoMap.get(column).hasNulls()));
       properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
-          String.valueOf(indexCreationInfoMap.get(column).isCreateDictionary()));
+              V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
+              String.valueOf(indexCreationInfoMap.get(column).isCreateDictionary()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
-          String.valueOf(true));
+              String.valueOf(true));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
-          String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
+              String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
-          String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
+              String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
-          String.valueOf(indexCreationInfoMap.get(column).getTotalNumberOfEntries()));
+              String.valueOf(indexCreationInfoMap.get(column).getTotalNumberOfEntries()));
 
     }
 

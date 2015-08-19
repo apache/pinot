@@ -15,26 +15,20 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
-import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.google.common.base.Joiner;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
+import org.apache.commons.lang.StringUtils;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang.StringUtils;
-
-import com.google.common.base.Joiner;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
-
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
 
 /**
@@ -155,7 +149,7 @@ public class SegmentGeneratorConfig {
 
   public TimeUnit getTimeUnitForSegment() {
     if (properties.containsKey(MetadataKeys.Segment.TIME_UNIT)) {
-      return TimeUtils.timeUnitFromString(properties.get(TIME_UNIT).toString());
+      return TimeUnit.valueOf(properties.get(MetadataKeys.Segment.TIME_UNIT).toString());
     } else {
       if (schema.getTimeFieldSpec() != null) {
         if (schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {

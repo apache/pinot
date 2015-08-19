@@ -73,7 +73,45 @@
       <version>1.5</version>
     </dependency>
   </dependencies>
-  <build>
+<!--
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>appassembler-maven-plugin</artifactId>
+                <version>1.1.1</version>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>assemble</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <configurationDirectory>conf</configurationDirectory>
+                    <configurationSourceDirectory>src/main/config</configurationSourceDirectory>
+                    <copyConfigurationDirectory>true</copyConfigurationDirectory>
+                    <includeConfigurationDirectoryInClasspath>true</includeConfigurationDirectoryInClasspath>
+                    <repositoryLayout>flat</repositoryLayout>
+                    <repositoryName>lib</repositoryName>
+                    <binFileExtensions>
+                        <unix>.sh</unix>
+                    </binFileExtensions>
+                    <assembleDirectory>C:\xxx-RELEASE</assembleDirectory>
+                    <programs>
+                        <program>
+                            <mainClass>xxx.xxx.Main</mainClass>
+                            <name>start</name>
+                        </program>
+                    </programs>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+-->
+    <build>
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -102,11 +140,13 @@
           <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
           <copyConfigurationDirectory>false</copyConfigurationDirectory>
           <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
-          <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
+          <includeConfigurationDirectoryInClasspath>true</includeConfigurationDirectoryInClasspath>
           <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
           <!-- Extra JVM arguments that will be included in the bin scripts -->
-          <extraJvmArguments>-Xms1G -Xmx1G -Dlog4j.configuration=conf/quickstart-log4j.properties</extraJvmArguments>
+          <extraJvmArguments>-Xms32G -Xmx32G -Dlog4j.configuration=conf/quickstart-log4j.properties</extraJvmArguments>
           <!-- Generate bin scripts for windows and unix pr default -->
+
+          <!--<assembleDirectory>${project.build.directory}/sbin</assembleDirectory>-->
           <platforms>
             <platform>unix</platform>
           </platforms>

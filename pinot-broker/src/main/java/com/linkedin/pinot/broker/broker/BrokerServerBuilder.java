@@ -69,7 +69,7 @@ public class BrokerServerBuilder {
   private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.time.out";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
-  private static final long DEFAULT_BROKER_TIME_OUT = 10 * 1000L;
+  private static final long DEFAULT_BROKER_TIME_OUT = 10 * 10 * 1000L;
 
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;

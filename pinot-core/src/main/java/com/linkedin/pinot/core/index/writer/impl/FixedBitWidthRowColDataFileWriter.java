@@ -15,20 +15,15 @@
  */
 package com.linkedin.pinot.core.index.writer.impl;
 
-import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.utils.MmapUtils;
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import com.linkedin.pinot.core.util.CustomBitSet;
+import org.apache.commons.io.IOUtils;
+
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-
-import com.linkedin.pinot.core.util.CustomBitSet;
-import org.apache.commons.io.IOUtils;
 
 
 /**
@@ -53,28 +48,33 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private int bytesRequired;
 
   public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
-      int[] columnSizesInBits) throws Exception {
+                                           int[] columnSizesInBits) throws Exception {
     init(file, rows, cols, columnSizesInBits);
     createBuffer(file);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
+  /**
+   * forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits }, new boolean[] { hasNulls })
+   * @param cols 1
+   * @param columnSizesInBits 是一个空数组，长度是列的势
+   * */
   public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
-      int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
+                                           int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);
     createBuffer(file);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
   public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
-      int cols, int[] columnSizesInBits) throws Exception {
+                                           int cols, int[] columnSizesInBits) throws Exception {
     init(file, rows, cols, columnSizesInBits);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
   public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
-      int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
-      throws Exception {
+                                           int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
+          throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
@@ -86,7 +86,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   }
 
   private void init(File file, int rows, int cols, int[] columnSizesInBits,
-      boolean[] signed) {
+                    boolean[] signed) {
     this.file = file;
     this.colSizesInBits = new int[cols];
     this.columnOffsetsInBits = new int[cols];
@@ -110,16 +110,15 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
       this.rowSizeInBits += colSize;
       this.colSizesInBits[i] = colSize;
     }
-    long totalSizeInBits = ((long) rowSizeInBits) * rows;
-    // jfim: We keep the number of bytes required as an int, as Java Buffers cannot be larger than 2GB
-    this.bytesRequired = Ints.checkedCast((totalSizeInBits + 7) / 8);
+    int totalSizeInBits = rowSizeInBits * rows;
+    this.bytesRequired = (totalSizeInBits + 7) / 8;
   }
 
   private void createBuffer(File file) throws FileNotFoundException,
-      IOException {
+          IOException {
     raf = new RandomAccessFile(file, "rw");
     byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        bytesRequired);
+            bytesRequired);
     byteBuffer.position(0);
     for (int i = 0; i < bytesRequired; i++) {
       byteBuffer.put((byte) 0);
@@ -133,12 +132,16 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   /**
    *
    * @param row
-   * @param col
+   * @param col 通常情况等于0
    * @param val
    */
   public void setInt(int row, int col, int val) {
     assert val >= minValues[col]  && val <= maxValues[col];
-    long bitOffset = ((long) rowSizeInBits) * row + columnOffsetsInBits[col];
+    // rowSizeInBits = 1
+    // columnOffsetsInBits[0]=0
+    // bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
+    //=> bitOffset =  row
+    int bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
     val = val + offsets[col];
     for (int bitPos = colSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
       if ((val & (1 << bitPos)) != 0) {

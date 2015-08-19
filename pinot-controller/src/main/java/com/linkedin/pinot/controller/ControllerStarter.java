@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller;
 
 import java.io.File;
 
+import com.linkedin.pinot.monitor.util.RuntimeMonitor;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
@@ -72,6 +73,7 @@ public class ControllerStarter {
     component.getClients().add(Protocol.FILE);
     component.getClients().add(Protocol.JAR);
     component.getClients().add(Protocol.WAR);
+    RuntimeMonitor rm=RuntimeMonitor.getRuntimeMonitor("controller");
 
     final Context applicationContext = component.getContext().createChildContext();
 

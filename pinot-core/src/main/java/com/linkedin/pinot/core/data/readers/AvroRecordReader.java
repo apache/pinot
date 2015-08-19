@@ -38,9 +38,12 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AvroRecordReader implements RecordReader {
+  private static final Logger _logger = LoggerFactory.getLogger(AvroRecordReader.class);
   private static final String COMMA = ",";
 
   private String _fileName = null;
@@ -135,6 +138,7 @@ public class AvroRecordReader implements RecordReader {
 
   private void updateSchema(Schema schema) {
     for (final FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      _logger.info("fieldSpec=" + fieldSpec.toString());
       fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(fieldSpec.getName())));
       fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(fieldSpec.getName())));
       schema.addSchema(fieldSpec.getName(), fieldSpec);

@@ -65,7 +65,8 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener, Inst
   }
 
   private void refresh() {
-    LOGGER.info("HelixBrokerRoutingTable.onExternalViewChange");
+    // FIXME: Comment this line for debug friendly
+    //LOGGER.info("HelixBrokerRoutingTable.onExternalViewChange");
 
     PropertyKey externalViews = keyBuilder.externalViews();
     HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();

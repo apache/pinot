@@ -39,7 +39,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   private String _controllerHost;
 
   @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+          usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
@@ -52,12 +52,12 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   private String _clusterName = "PinotCluster";
 
   @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
-      usage = "Controller Starter config file",
-      forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
+          usage = "Controller Starter config file",
+          forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
   private String _configFileName;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+          usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -101,7 +101,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
       return ("StartController -configFileName " + _configFileName);
     } else {
       return ("StartController -clusterName " + _clusterName + " -controllerHost " + _controllerHost
-          + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+              + " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
     }
   }
 
@@ -191,7 +191,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
     if (conf.getHelixClusterName() == null) {
       LOGGER
-          .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
+              .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
       return false;
     }
 
