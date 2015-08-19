@@ -9,6 +9,11 @@ $(document).ready(function() {
         filterToggle.attr('state', hash['filterState'])
     }
 
+    var currentMode = hash['heatMapMode']
+    if (!currentMode) {
+      currentMode = 'self'
+    }
+
     var options = {
         filter: function(cell) {
             if (filterToggle.attr('state') === 'on') {
@@ -34,15 +39,20 @@ $(document).ready(function() {
                 value = 'OTHER'
             }
 
-            var vd = (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
-            var br = (cell.stats['baseline_ratio'] * 100).toFixed(2)
-            var cd = (cell.stats['contribution_difference'] * 100).toFixed(2) + '%'
+            var cellContent = value + '<br/>'
 
-            var cellContent = value + '<br/>' + vd
-            if (cell.stats['contribution_difference'] > 0) {
-              cellContent += ' <span class="cell-up">' + br + '% (+' + cd + ')</span>'
-            } else {
-              cellContent += ' <span class="cell-down">' + br + '% (' + cd + ')</span>'
+            if (currentMode === 'self') {
+              var currentValue = cell.stats['current_value']
+              var baselineValue = cell.stats['baseline_value']
+              var selfRatio = (currentValue - baselineValue) / baselineValue
+              cellContent += (selfRatio * 100).toFixed(2) + '%'
+            } else if (currentMode === 'others') {
+              var baselineRatio = (cell.stats['baseline_ratio'] * 100).toFixed(2) + '%'
+              var contributionDifference = (cell.stats['contribution_difference'] * 100).toFixed(2) + '%'
+              cellContent += baselineRatio + ' (' + contributionDifference + ')'
+            } else if (currentMode === 'all') {
+              var volumeDifference = (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
+              cellContent += volumeDifference
             }
 
             return cellContent
@@ -52,7 +62,18 @@ $(document).ready(function() {
                 return '#ffffff'
             }
 
-            if (cell.stats['volume_difference'] >= 0) {
+            var testStatistic = null
+            if (currentMode === 'self') {
+              var currentValue = cell.stats['current_value']
+              var baselineValue = cell.stats['baseline_value']
+              testStatistic = (currentValue - baselineValue) / baselineValue
+            } else if (currentMode === 'others') {
+              testStatistic = cell.stats['contribution_difference']
+            } else if (currentMode === 'all') {
+              testStatistic = cell.stats['volume_difference']
+            }
+
+            if (testStatistic >= 0) {
                 return 'rgba(136, 138, 252, ' + cell.stats['baseline_cdf_value'].toFixed(3) + ')'
             } else {
                 return 'rgba(252, 136, 138, ' + cell.stats['baseline_cdf_value'].toFixed(3) + ')'
@@ -74,5 +95,22 @@ $(document).ready(function() {
         renderHeatMap(data, container, options)
     })
 
-    renderHeatMap(data, container, options)
+    $(".dimension-heat-map-mode").click(function() {
+      currentMode = $(this).attr('mode')
+      console.log('Switching to heat map mode ' + currentMode)
+
+      // Set in URI
+      var hash = parseHashParameters(window.location.hash)
+      hash['heatMapMode'] = currentMode
+      window.location.hash = encodeHashParameters(hash)
+
+      // Display correct explanation
+      $("#dimension-heat-map-explanation div").hide()
+      $("#dimension-heat-map-explanation-" + currentMode).show()
+
+      // Re-render heat map
+      renderHeatMap(data, container, options)
+    })
+
+    $("#dimension-heat-map-mode-" + currentMode).trigger('click')
 })

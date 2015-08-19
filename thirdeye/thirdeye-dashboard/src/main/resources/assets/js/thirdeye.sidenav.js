@@ -253,6 +253,11 @@ $(document).ready(function() {
         // Timezone
         var timezone = $("#sidenav-timezone").val()
 
+        // Aggregate
+        var aggregateSize = parseInt($("#sidenav-aggregate-size").val())
+        var aggregateUnit = $("#sidenav-aggregate-unit").val()
+        var aggregateMillis = toMillis(aggregateSize, aggregateUnit)
+
         // Baseline
         var baselineSize = parseInt($("#sidenav-baseline-size").val())
         var baselineUnit = parseInt($("#sidenav-baseline-unit").val())
@@ -262,11 +267,6 @@ $(document).ready(function() {
         var baseline = moment(current.valueOf() - (baselineSize * baselineUnit))
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
-
-        // Aggregate
-        var aggregateSize = parseInt($("#sidenav-aggregate-size").val())
-        var aggregateUnit = $("#sidenav-aggregate-unit").val()
-        var aggregateMillis = toMillis(aggregateSize, aggregateUnit)
 
         // Metric function
         var metricFunction = metrics.join(",")

@@ -1,7 +1,7 @@
 <nav class="uk-navbar">
     <ul class="view-links uk-navbar-nav">
         <li><a type="METRIC" view="INTRA_DAY" class="uk-navbar-nav-subtitle">Intra-day<div>Metric</div></a></li>
-        <li><a type="METRIC" view="FUNNEL" class="uk-navbar-nav-subtitle">Funnel<div>Metric</div></a></li>
+        <#--<li><a type="METRIC" view="FUNNEL" class="uk-navbar-nav-subtitle">Funnel<div>Metric</div></a></li>-->
         <li><a type="METRIC" view="TIME_SERIES_OVERLAY" class="uk-navbar-nav-subtitle">Overlay<div>Metric</div></a></li>
         <li><a type="METRIC" view="TIME_SERIES_FULL" class="uk-navbar-nav-subtitle">Series<div>Metric</div></a></li>
     </ul>

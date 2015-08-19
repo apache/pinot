@@ -187,6 +187,7 @@
 
 .heat-map-buttons{
     float: right;
+    padding-left: 20px;
 }
 
 .heat-map-buttons i,
@@ -231,6 +232,20 @@
 
 .cell-up, .cell-down{
     float: right;
+}
+
+#dimension-heat-map-explanation {
+  clear: both;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+#dimension-heat-map-explanation div {
+  display: none;
+}
+
+#dimension-heat-map-explanation em {
+  color: #ccc;
 }
 
 /* Both */
