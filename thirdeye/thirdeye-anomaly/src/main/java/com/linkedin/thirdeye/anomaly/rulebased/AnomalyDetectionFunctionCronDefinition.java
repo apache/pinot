@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.function;
+package com.linkedin.thirdeye.anomaly.rulebased;
 
 import java.text.ParseException;
 import java.util.ArrayList;

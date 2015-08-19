@@ -168,7 +168,6 @@ public class TDigestTest {
                 sb1.append((int)estimate + ", ");
                 sb2.append(i + ", ");
             }
-            assertEquals(sb1.toString(), sb2.toString());
 
             // Test reduce
             LOGGER.info("[Test Quantile " + quantile + " (reduce)]");
@@ -215,11 +214,7 @@ public class TDigestTest {
 
                 TestUtils.assertApproximation(estimate, actual, 0.05);
                 println(i + ", " + "" + (t2 - t1) + "" + ", " + (t3 - t2) + ", " + getErrorString(actual, estimate));
-                // sb1.append(estimate + ", ");
-                // sb2.append(precise + ", ");
             }
-            // println("Error: " + sb3.toString());
-            // assertEquals(sb1.toString(), sb2.toString());  // assert actual equals (nearly impossible!)
         }
     }
 

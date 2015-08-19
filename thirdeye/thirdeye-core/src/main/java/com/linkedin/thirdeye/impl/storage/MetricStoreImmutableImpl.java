@@ -1,13 +1,7 @@
 package com.linkedin.thirdeye.impl.storage;
 
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.impl.NumberUtils;
-
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -19,8 +13,21 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.impl.NumberUtils;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
+
 public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListener
 {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MetricStoreImmutableImpl.class);
+
   private static final TimeRange EMPTY_TIME_RANGE = new TimeRange(-1L, -1L);
 
   private final StarTreeConfig config;
@@ -31,7 +38,11 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   private final AtomicReference<TimeRange> maxTime;
   private ConcurrentMap<TimeRange, Integer> timeRangeCount;
 
-  public MetricStoreImmutableImpl(StarTreeConfig config, ConcurrentMap<TimeRange, List<ByteBuffer>> buffers)
+  private int sizePerEntry;
+  private boolean useBinarySearch = false;;
+
+  public MetricStoreImmutableImpl(StarTreeConfig config,
+      ConcurrentMap<TimeRange, List<ByteBuffer>> buffers)
   {
     this.config = config;
     this.buffers = buffers;
@@ -45,6 +56,8 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
       minTime.set(Collections.min(buffers.keySet()));
       maxTime.set(Collections.max(buffers.keySet()));
     }
+    // bytes required to store one time value (long and all the metrics)
+    sizePerEntry = (Long.SIZE / 8 + metricSchema.getRowSizeInBytes());
   }
 
   @Override
@@ -60,49 +73,108 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   @Override
-  public MetricTimeSeries getTimeSeries(Collection<Integer> logicalOffsets, TimeRange timeRange)
+  public MetricTimeSeries getTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange)
   {
     MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
     Set<Long> times = getTimes(timeRange);
-
+    Collections.sort(logicalOffsets);
     for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet())
     {
       TimeRange bufferTimeRange = entry.getKey();
-
-      int rowSize = bufferTimeRange.totalBuckets() * (Long.SIZE / 8 + metricSchema.getRowSizeInBytes());
-
-      for (ByteBuffer originalBuffer : entry.getValue())
+      if (bufferTimeRange.getStart() >= 0
+          && (timeRange == null || !bufferTimeRange.isDisjoint(timeRange)))
       {
-        ByteBuffer buffer = originalBuffer.duplicate();
-
-        if (bufferTimeRange.getStart() >= 0 && (timeRange == null || !bufferTimeRange.isDisjoint(timeRange)))
+        for (ByteBuffer originalBuffer : entry.getValue())
         {
-          for (Integer logicalOffset : logicalOffsets)
-          {
-            buffer.mark();
-            buffer.position(logicalOffset * rowSize);
-
-            for (int i = 0; i < bufferTimeRange.totalBuckets(); i++)
-            {
-              Long time = buffer.getLong();
-
-              for (MetricSpec metricSpec : config.getMetrics())
-              {
-                Number value = NumberUtils.readFromBuffer(buffer, metricSpec.getType());
-
-                if (times.contains(time))
-                {
-                  timeSeries.increment(time, metricSpec.getName(), value);
-                }
-              }
-            }
-          }
+          ByteBuffer buffer = originalBuffer.duplicate();
+          computeAggregateTimeSeries(logicalOffsets, timeRange, timeSeries, times, buffer);
         }
       }
     }
 
     return timeSeries;
+  }
+
+  private void computeAggregateTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange,
+      MetricTimeSeries timeSeries, Set<Long> times, ByteBuffer buffer)
+  {
+    buffer.rewind();
+    for (Integer logicalOffset : logicalOffsets)
+    {
+      buffer.position(logicalOffset * (4 + 4));
+      int startOffset = buffer.getInt();
+      int length = buffer.getInt();
+      if (length == 0)
+      {
+        continue;
+      }
+      buffer.position(startOffset);
+      long minTime = buffer.getLong();
+      int middle = 0;
+      long timeRangeStartValue = timeRange.getStart();
+      if (useBinarySearch)
+      {
+        middle = findStartIndex(buffer, startOffset, length, minTime, timeRangeStartValue);
+      }
+      if (middle == -1)
+      {
+        continue;
+      }
+      for (int i = middle; i < length; i++)
+      {
+        buffer.position(startOffset + (i * sizePerEntry));
+        Long time = buffer.getLong();
+        if (times.contains(time))
+        {
+          for (MetricSpec metricSpec : config.getMetrics())
+          {
+            Number value = NumberUtils.readFromBuffer(buffer, metricSpec.getType());
+            timeSeries.increment(time, metricSpec.getName(), value);
+          }
+        }
+        // since the times in buffer are sorted, if the time is greater the end of TimeRange
+        // break
+        if (time >= timeRange.getEnd())
+        {
+          break;
+        }
+      }
+    }
+  }
+
+  private int findStartIndex(ByteBuffer buffer, int startOffset, int length, long minTime,
+      long timeRangeStartValue)
+  {
+    int middle = -1;
+    if (minTime >= timeRangeStartValue)
+    {
+      middle = 0;
+    } else
+    {
+      // do a binary search to find the start Index
+      int low = 0;
+      int high = length - 1;
+      boolean found = false;
+      while (low <= high)
+      {
+        middle = (low + high) / 2;
+        buffer.position(startOffset + (middle * sizePerEntry));
+        final long midValue = buffer.getLong();
+        if (timeRangeStartValue > midValue)
+        {
+          low = middle + 1;
+        } else if (timeRangeStartValue < midValue)
+        {
+          high = middle - 1;
+        } else
+        {
+          found = true;
+          break;
+        }
+      }
+    }
+    return middle;
   }
 
   @Override
@@ -118,7 +190,8 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   @Override
-  public Map<TimeRange, Integer> getTimeRangeCount() {
+  public Map<TimeRange, Integer> getTimeRangeCount()
+  {
 
     for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet())
     {
@@ -156,8 +229,7 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
         times.add(i);
       }
       return times;
-    }
-    else
+    } else
     {
       Set<Long> times = new HashSet<Long>();
       for (long i = getMinTime(); i <= getMaxTime(); i++)
@@ -167,6 +239,5 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
       return times;
     }
   }
-
 
 }

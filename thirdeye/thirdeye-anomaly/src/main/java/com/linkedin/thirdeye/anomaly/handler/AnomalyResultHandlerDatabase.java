@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.anomaly.handler;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;

@@ -12,9 +12,10 @@ import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.database.FunctionTable;
 import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
 import com.linkedin.thirdeye.anomaly.handler.AnomalyResultHandlerDatabase;
-import com.linkedin.thirdeye.anomaly.server.ThirdEyeServerQueryUtils;
+import com.linkedin.thirdeye.anomaly.util.ThirdEyeMultiClient;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 
 /**
  * Loads rules from the function table in the anomaly database.
@@ -24,13 +25,15 @@ public class AnomalyDetectionTaskBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionTaskBuilder.class);
 
   private final List<AnomalyDetectionDriverConfig> collectionDrivers;
+  private final ThirdEyeMultiClient thirdEyeMultiClient;
   private final AnomalyDatabaseConfig dbConfig;
 
   public AnomalyDetectionTaskBuilder(List<AnomalyDetectionDriverConfig> collectionDrivers,
-      AnomalyDatabaseConfig dbConfig) {
+      AnomalyDatabaseConfig dbConfig, ThirdEyeMultiClient thirdEyeMultiClient) {
     super();
     this.collectionDrivers = collectionDrivers;
     this.dbConfig = dbConfig;
+    this.thirdEyeMultiClient = thirdEyeMultiClient;
   }
 
   /**
@@ -53,12 +56,17 @@ public class AnomalyDetectionTaskBuilder {
 
     for (FunctionTableRow functionTableRow : rows) {
       try {
+        String collectionName = functionTableRow.getCollectionName();
+
         // find the collection
         AnomalyDetectionDriverConfig collectionDriverConfig = AnomalyDetectionDriverConfig.find(collectionDrivers,
-            functionTableRow.getCollectionName());
+            collectionName);
 
         // load star tree
-        StarTreeConfig starTreeConfig = ThirdEyeServerQueryUtils.getStarTreeConfig(collectionDriverConfig);
+        StarTreeConfig starTreeConfig = thirdEyeMultiClient.getStarTreeConfig(collectionName);
+
+        // get the shared client
+        ThirdEyeClient sharedThirdEyeClient = thirdEyeMultiClient.getClient(collectionName);
 
         // load the function
         AnomalyDetectionFunction function = functionFactory.getFunction(starTreeConfig, dbConfig, functionTableRow);
@@ -76,8 +84,8 @@ public class AnomalyDetectionTaskBuilder {
             functionTableRow.getFunctionId());
 
         // make the task
-        AnomalyDetectionTask task = new AnomalyDetectionTaskImpl(starTreeConfig, collectionDriverConfig, taskInfo,
-            function, resultHandler, functionHistory);
+        AnomalyDetectionTask task = new AnomalyDetectionTask(starTreeConfig, collectionDriverConfig, taskInfo,
+            function, resultHandler, functionHistory, sharedThirdEyeClient);
 
         tasks.add(task);
       } catch (Exception e) {

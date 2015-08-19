@@ -365,7 +365,7 @@ public class DataUpdateManager {
             }
 
             DimensionDictionary dictionary = new DimensionDictionary(node.getRecordStore().getForwardIndex());
-            FixedBufferUtil.createLeafBufferFiles(leafBufferDir, node.getId().toString(), starTree.getConfig(), records, dictionary);
+            VariableSizeBufferUtil.createLeafBufferFiles(leafBufferDir, node.getId().toString(), starTree.getConfig(), records, dictionary);
           } catch (Exception e) {
             LOGGER.error("Error creating leaf buffer files for {}", node.getId(), e);
           }
@@ -382,7 +382,7 @@ public class DataUpdateManager {
 
       // Combine those into the segment buffers
       LOGGER.info("Combining data files into {}", segmentBufferDir);
-      FixedBufferUtil.combineDataFiles(treeStream, leafBufferDir, segmentBufferDir);
+      VariableSizeBufferUtil.combineDataFiles(treeStream, leafBufferDir, segmentBufferDir);
 
       // Create index metadata
       File metadataFile = new File(segmentBufferDir, StarTreeConstants.METADATA_FILE_NAME);
@@ -397,7 +397,7 @@ public class DataUpdateManager {
       IndexMetadata metadata =
           new IndexMetadata(minDataTime.get(), maxDataTime.get(), minDataTimeMillis, maxDataTimeMillis,
               startTime, endTime, minTime.getMillis(), maxTime.getMillis(),
-              schedule, aggregationGranularity.toString(), bucketSize);
+              schedule, aggregationGranularity.toString(), bucketSize, IndexFormat.VARIABLE_SIZE);
       OutputStream metadataStream = new FileOutputStream(metadataFile);
       metadata.toProperties().store(metadataStream, "This segment was created via DataUpdateManager#persistTree");
       metadataStream.close();

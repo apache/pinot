@@ -6,13 +6,16 @@ import com.linkedin.thirdeye.dashboard.api.*;
 import com.linkedin.thirdeye.dashboard.util.*;
 import com.linkedin.thirdeye.dashboard.views.*;
 import com.sun.jersey.api.NotFoundException;
+
 import io.dropwizard.views.View;
+
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
+
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.Future;
@@ -23,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 public class DashboardResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
   private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
+  private static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+  private static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
   private final String serverUri;
@@ -213,7 +218,7 @@ public class DashboardResource {
           new DateTime(baselineMillis),
           new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType), 
+          new DimensionView(dimensionView, dimensionViewType),
           earliestDataTime,
           latestDataTime,
           customDashboardNames,
@@ -244,15 +249,26 @@ public class DashboardResource {
     // Metric view
     switch (metricViewType) {
       case INTRA_DAY:
-        String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_DAY_PERIOD), new DateTime(currentMillis), dimensionValues);
+        String timeUnit = metricFunction.split("_")[2];
+        int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
+
+        long INTRA_PERIOD = INTRA_DAY_PERIOD;
+        if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
+          INTRA_PERIOD = INTRA_WEEK_PERIOD;
+        } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())){
+          INTRA_PERIOD = INTRA_MONTH_PERIOD;
+        }
+
+        String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_PERIOD), new DateTime(currentMillis), dimensionValues);
         LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
         QueryResult result = queryCache.getQueryResult(serverUri, sql);
+
         return new MetricViewTabular(
             schema,
             objectMapper,
             result,
             currentMillis - baselineMillis,
-            INTRA_DAY_PERIOD);
+            INTRA_PERIOD);
       case TIME_SERIES_FULL:
       case TIME_SERIES_OVERLAY:
       case FUNNEL:
@@ -317,4 +333,6 @@ public class DashboardResource {
         throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }
   }
+
+
 }

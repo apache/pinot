@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
@@ -13,6 +14,7 @@ import com.linkedin.thirdeye.api.TimeRange;
  */
 public class ThirdEyeAnomalyDetectionConfiguration {
 
+  /** Built in modes of operation that determine how function definitions in the anomaly database are interpreted */
   public enum Mode {
     RuleBased, Generic,
   }
@@ -34,6 +36,9 @@ public class ThirdEyeAnomalyDetectionConfiguration {
 
   /** List of anomaly detection driver configurations pertaining to each collection */
   private List<AnomalyDetectionDriverConfig> collectionDriverConfigurations;
+
+  /** Maximum amount of time to wait for tasks in a batch to finish */
+  private TimeGranularity maxWaitToCompletion = new TimeGranularity(1, TimeUnit.HOURS);
 
   @JsonProperty
   public TimeRange getExplicitTimeRange() {
@@ -87,5 +92,14 @@ public class ThirdEyeAnomalyDetectionConfiguration {
 
   public void setCollectionDriverConfigurations(List<AnomalyDetectionDriverConfig> collections) {
     this.collectionDriverConfigurations = collections;
+  }
+
+  @JsonProperty
+  public TimeGranularity getMaxWaitToCompletion() {
+    return maxWaitToCompletion;
+  }
+
+  public void setMaxWaitToCompletion(TimeGranularity maxWaitToCompletion) {
+    this.maxWaitToCompletion = maxWaitToCompletion;
   }
 }

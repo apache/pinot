@@ -115,7 +115,6 @@ public class StarTreeImpl implements StarTree {
     if (node == null) {
       throw new IllegalArgumentException("No star tree node for query " + query);
     }
-
     return node.getRecordStore().getTimeSeries(query);
   }
 

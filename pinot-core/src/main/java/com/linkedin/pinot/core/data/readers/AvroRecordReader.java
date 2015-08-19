@@ -95,15 +95,19 @@ public class AvroRecordReader implements RecordReader {
         continue;
       }
       Object value = rawRecord.get(field.name());
-      if (value instanceof Utf8) {
-        value = ((Utf8) value).toString();
-      }
-      if (value instanceof Array) {
-        value = transformAvroArrayToObjectArray((Array) value, spec);
-      }
-
       if (value == null) {
-        value = spec.getDefaultNullValue();
+        if (spec.isSingleValueField()) {
+          value = spec.getDefaultNullValue();
+        } else {
+          value = transformAvroArrayToObjectArray((Array) value, spec);
+        }
+      } else {
+        if (value instanceof Utf8) {
+          value = ((Utf8) value).toString();
+        }
+        if (value instanceof Array) {
+          value = transformAvroArrayToObjectArray((Array) value, spec);
+        }
       }
 
       _fieldMap.put(field.name(), value);

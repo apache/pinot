@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -30,6 +31,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -141,6 +144,7 @@ public class AggregatePhaseJob extends Configured {
       baos.write(serializedMetrics);
 
       context.write(new BytesWritable(serializedKey), new BytesWritable(serializedMetrics));
+      context.getCounter(AggregationCounter.NUMBER_OF_RECORDS).increment(1);
     }
 
     @Override
@@ -277,6 +281,12 @@ public class AggregatePhaseJob extends Configured {
 
     job.waitForCompletion(true);
 
+    Counter counter = job.getCounters().findCounter(AggregationCounter.NUMBER_OF_RECORDS);
+    LOGGER.info(counter.getDisplayName() + " : " + counter.getValue());
+    if (counter.getValue() == 0) {
+      throw new IllegalStateException("No input records in " + inputPathDir);
+    }
+
     return job;
   }
 
@@ -305,6 +315,10 @@ public class AggregatePhaseJob extends Configured {
 
     AggregatePhaseJob job = new AggregatePhaseJob("aggregate_avro_job", props);
     job.run();
+  }
+
+  public static enum AggregationCounter{
+    NUMBER_OF_RECORDS
   }
 
 }

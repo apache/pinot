@@ -68,7 +68,7 @@ public class ReportsResource implements Managed {
         return name.endsWith(ReportConstants.YAML_FILE_SUFFIX);
       }
     });
-    if (reportConfigFiles.length == 0) {
+    if (reportConfigFiles == null || reportConfigFiles.length == 0) {
       throw new NotFoundException("No report config files at rootDir " + reportConfigPath);
     }
     return Arrays.asList(reportConfigFiles);

@@ -3,7 +3,10 @@ package com.linkedin.thirdeye.impl.storage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -144,7 +147,22 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       this.rootDir = rootDir;
       this.isInit = true;
       this.starTreeConfig = starTreeConfig;
+      
+      InputStream indexMetadataFile = new FileInputStream(new File(rootDir, StarTreeConstants.METADATA_FILE_NAME));
+      Properties indexMetadataProps = new Properties();
+      indexMetadataProps.load(indexMetadataFile);
+      indexMetadataFile.close();
+      
+      indexMetadata = IndexMetadata.fromProperties(indexMetadataProps);
 
+      //check if the data needs to be converted
+      if(indexMetadata.getIndexFormat().equals(IndexFormat.FIXED_SIZE)){
+        LOGGER.info("START: Converting data from Fixed format to  Variable format at {}", rootDir);
+        FixedToVariableFormatConvertor convertor = new FixedToVariableFormatConvertor(rootDir);
+        convertor.convert();
+        
+        LOGGER.info("DONE: Converted data from Fixed format to  Variable format at {}", rootDir);
+      }
       if (recordStoreConfig != null) {
         Object metricStoreMutableProp = recordStoreConfig.get(PROP_METRIC_STORE_MUTABLE);
 
@@ -397,6 +415,8 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       return file.getName().endsWith(StarTreeConstants.INDEX_FILE_SUFFIX);
     }
   };
+
+  private IndexMetadata indexMetadata;
 
   private static class FileDescriptor {
     private final UUID id;

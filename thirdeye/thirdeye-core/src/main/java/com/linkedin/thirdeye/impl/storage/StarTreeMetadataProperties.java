@@ -24,5 +24,8 @@ public class StarTreeMetadataProperties {
   public static String AGGREGATION_GRANULARITY = "aggregation.granularity";
   // Bucket unit of the collection data : 1, 10
   public static String BUCKET_SIZE = "bucket.size";
+  //Data storage format, FIXED or VARIABLE SIZE
+  public static final String INDEX_FORMAT = "index.format";
+
 
 }

@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import com.linkedin.thirdeye.impl.storage.FixedToVariableFormatConvertor;
+
 public class ToolsLauncher
 {
   private static List<ToolSpec> TOOLS = new ArrayList<ToolSpec>();
@@ -18,6 +20,8 @@ public class ToolsLauncher
     TOOLS.add(new ToolSpec(KafkaLoadTool.class, "Loads an Avro data file into Kafka"));
     TOOLS.add(new ToolSpec(BufferViewer.class, "Views the contents of a leaf buffer"));
     TOOLS.add(new ToolSpec(StandAloneKafkaConsumer.class, "Consumes data from Kafka and writes into server dir"));
+    TOOLS.add(new ToolSpec(FixedToVariableFormatConvertor.class, "Converts data from Fixed format to Variable Size"));
+
   }
 
   public static void main(String[] args) throws Exception

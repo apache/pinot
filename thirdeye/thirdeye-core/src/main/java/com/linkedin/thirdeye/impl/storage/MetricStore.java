@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeRange;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -32,7 +33,7 @@ public interface MetricStore
    * @return
    *  The aggregate time series for all dimension ids (logicalOffsets)
    */
-  MetricTimeSeries getTimeSeries(Collection<Integer> logicalOffsets, TimeRange timeRange);
+  MetricTimeSeries getTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange);
 
   /**
    * @return

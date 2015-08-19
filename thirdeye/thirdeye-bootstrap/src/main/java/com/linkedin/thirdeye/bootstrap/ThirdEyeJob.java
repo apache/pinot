@@ -36,6 +36,7 @@ import org.apache.hadoop.mapred.Merger;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Job.JobState;
 import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.security.AccessControlException;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
@@ -64,6 +65,7 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
+import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 /**
@@ -687,7 +689,7 @@ public class ThirdEyeJob {
     IndexMetadata mergedIndexMetadata = new IndexMetadata
         (min, max, minMillis, maxMillis,
             startTime, endTime, startTimeMillis, endTimeMillis,
-            schedule, aggregationGranularity, bucketSize);
+            schedule, aggregationGranularity, bucketSize, IndexFormat.VARIABLE_SIZE);
 
     return mergedIndexMetadata;
   }
@@ -1018,11 +1020,30 @@ public class ThirdEyeJob {
         {
           missingInputs = new ArrayList<String>();
           for (String input : inputs) {
-            if (!fileSystem.exists(new Path(input)) || fileSystem.exists(new Path(input, TEMPORARY_FOLDER))) {
+
+            LOGGER.info("Checking path {}", input);
+
+            if (!fileSystem.exists(new Path(input)) ) {
               missingInputs.add(input);
               LOGGER.info("Missing input {}", input);
             }
+            else {
+              try {
+                fileSystem.getFileStatus(new Path(input));
+
+                if (fileSystem.exists(new Path(input, TEMPORARY_FOLDER))) {
+                  missingInputs.add(input);
+                  LOGGER.info("Data generation in progress");
+                } else {
+                  LOGGER.info("Path available {}", input);
+                }
+              } catch (AccessControlException e) {
+                missingInputs.add(input);
+                LOGGER.warn("No access to path {}", input, e);
+              }
+            }
           }
+
           if (missingInputs.size() == 0) {
             LOGGER.info("All paths available");
             break;

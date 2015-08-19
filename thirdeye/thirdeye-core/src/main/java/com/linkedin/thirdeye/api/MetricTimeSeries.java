@@ -86,6 +86,7 @@ public class MetricTimeSeries {
     Number ret = 0;
 
     if (buffer != null) {
+      buffer = buffer.duplicate();
       MetricType metricType = schema.getMetricType(name);
       buffer.position(schema.getOffset(name));
       switch (metricType) {

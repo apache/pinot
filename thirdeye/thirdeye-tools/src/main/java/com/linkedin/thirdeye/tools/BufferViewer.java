@@ -185,7 +185,7 @@ public class BufferViewer
     for (DimensionKey dimensionKey : dimensionStore.getDimensionKeys())
     {
       MetricTimeSeries timeSeries
-          = metricStore.getTimeSeries(dimensionStore.findMatchingKeys(dimensionKey).values(), null);
+          = metricStore.getTimeSeries(new ArrayList(dimensionStore.findMatchingKeys(dimensionKey).values()), null);
 
       List<Long> times = new ArrayList<Long>(timeSeries.getTimeWindowSet());
       Collections.sort(times);

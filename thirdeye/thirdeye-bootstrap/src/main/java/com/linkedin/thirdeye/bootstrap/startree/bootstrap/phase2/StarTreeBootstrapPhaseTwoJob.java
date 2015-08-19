@@ -10,7 +10,8 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.bootstrap.ThirdEyeJobConstants;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
-import com.linkedin.thirdeye.impl.storage.FixedBufferUtil;
+import com.linkedin.thirdeye.impl.storage.IndexFormat;
+import com.linkedin.thirdeye.impl.storage.VariableSizeBufferUtil;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import com.linkedin.thirdeye.bootstrap.util.DFSUtil;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
@@ -324,7 +325,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       }
 
       // Write dimension / metric buffers
-      FixedBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId, starTreeConfig,
+      VariableSizeBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId, starTreeConfig,
           records, dictionary);
 
       // Create metadata object
@@ -336,7 +337,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
       indexMetadata = new IndexMetadata
           (minDataTime, maxDataTime, minDataTimeMillis, maxDataTimeMillis,
-              config.getAggregationGranularity(), config.getBucketSize());
+              config.getAggregationGranularity(), config.getBucketSize(), IndexFormat.VARIABLE_SIZE);
 
       LOGGER.info("END: processing {}", nodeId);
     }
@@ -358,7 +359,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         LOGGER.info(f.getAbsolutePath());
       }
       // Combine
-      FixedBufferUtil.combineDataFiles(dfs.open(pathToTree), new File(localTmpDataDir), new File(
+      VariableSizeBufferUtil.combineDataFiles(dfs.open(pathToTree), new File(localTmpDataDir), new File(
           localOutputDataDir));
       Collection<File> listFilesAfterCombine =
           FileUtils.listFiles(new File(localOutputDataDir), null, true);
@@ -375,7 +376,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
       // add metadata
       if (indexMetadata != null) {
-        FixedBufferUtil.writeMetadataBootstrap(indexMetadata, new File(localOutputDataDir));
+        VariableSizeBufferUtil.writeMetadataBootstrap(indexMetadata, new File(localOutputDataDir));
         builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.METADATA_FILE_NAME));
       }
 

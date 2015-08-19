@@ -11,6 +11,9 @@ import com.google.common.base.Joiner;
 
 public class ThirdeyeUri {
 
+  public final String DEFAULT_AGGREGATION_GRANULARITY = "1";
+  public final String DEFAULT_AGGREGATION_UNIT = "HOURS";
+
   private String dashboardUri;
   private String collection;
   private long startTime;
@@ -34,7 +37,7 @@ public class ThirdeyeUri {
     thirdeyeUri.add(dashboardUri);
     thirdeyeUri.add("dashboard");
     thirdeyeUri.add(collection);
-    String metricFunction = "AGGREGATE_"+scheduleSpec.getAggregationSize()+"_"+scheduleSpec.getAggregationUnit();
+    String metricFunction = "AGGREGATE_"+DEFAULT_AGGREGATION_GRANULARITY+"_"+DEFAULT_AGGREGATION_UNIT;
     thirdeyeUri.add(metricFunction+"("+Joiner.on(',').join(tableSpec.getMetrics())+")");
 
     if (scheduleSpec.getAggregationSize() == 1 && scheduleSpec.getAggregationUnit() == TimeUnit.HOURS) {

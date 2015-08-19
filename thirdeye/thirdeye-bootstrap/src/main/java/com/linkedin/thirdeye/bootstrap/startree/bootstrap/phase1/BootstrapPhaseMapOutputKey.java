@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
 
 /**
@@ -23,11 +24,13 @@ public class BootstrapPhaseMapOutputKey {
    */
   byte[] md5;
 
+  int hashCode ;
 
-  public BootstrapPhaseMapOutputKey(UUID nodeId, byte[] md5) {
+  public BootstrapPhaseMapOutputKey(UUID nodeId, byte[] md5) throws IOException {
     super();
     this.nodeId = nodeId;
     this.md5 = md5;
+    this.hashCode = Arrays.hashCode(toBytes());
   }
 
 
@@ -40,6 +43,16 @@ public class BootstrapPhaseMapOutputKey {
     return md5;
   }
 
+  @Override
+  public int hashCode() {
+    return hashCode;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    BootstrapPhaseMapOutputKey that = (BootstrapPhaseMapOutputKey) obj;
+    return Arrays.equals(this.md5, that.md5) && this.nodeId.equals(that.nodeId);
+  }
 
   public byte[] toBytes() throws IOException{
     ByteArrayOutputStream baos = new ByteArrayOutputStream();

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.function;
+package com.linkedin.thirdeye.anomaly.rulebased;
 
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
