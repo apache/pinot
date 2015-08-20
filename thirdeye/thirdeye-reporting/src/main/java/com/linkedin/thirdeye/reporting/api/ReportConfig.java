@@ -33,10 +33,23 @@ public class ReportConfig {
   private DBSpec dbconfig;
   @NotNull
   private String timezone;
+  private String dashboardUri;
 
 
   public ReportConfig() {
 
+  }
+
+
+
+  public String getDashboardUri() {
+    return dashboardUri;
+  }
+
+
+
+  public void setDashboardUri(String dashboardUri) {
+    this.dashboardUri = dashboardUri;
   }
 
 

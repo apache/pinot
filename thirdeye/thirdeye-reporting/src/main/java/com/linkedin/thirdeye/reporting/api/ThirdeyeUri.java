@@ -1,16 +1,11 @@
 package com.linkedin.thirdeye.reporting.api;
 
-import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 
@@ -18,7 +13,6 @@ public class ThirdeyeUri {
 
   public final String DEFAULT_AGGREGATION_GRANULARITY = "1";
   public final String DEFAULT_AGGREGATION_UNIT = "HOURS";
-  private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyeUri.class);
 
   private String dashboardUri;
   private String collection;
@@ -40,13 +34,6 @@ public class ThirdeyeUri {
   public URL getThirdeyeUri() throws MalformedURLException {
 
     List<String> thirdeyeUri = new ArrayList<String>();
-    InetAddress address = null;
-    try {
-      address = InetAddress.getLocalHost();
-    } catch (UnknownHostException e) {
-     LOGGER.warn(e.toString());
-    }
-    dashboardUri = dashboardUri.replace("localhost", address.getHostName());
     thirdeyeUri.add(dashboardUri);
     thirdeyeUri.add("dashboard");
     thirdeyeUri.add(collection);

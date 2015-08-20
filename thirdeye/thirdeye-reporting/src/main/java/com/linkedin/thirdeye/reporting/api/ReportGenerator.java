@@ -182,7 +182,7 @@ public class ReportGenerator implements Job{
 
 
   private URL getThirdeyeURL(TableSpec tableSpec, ScheduleSpec scheduleSpec, DateTime start, DateTime end) throws MalformedURLException {
-    ThirdeyeUri thirdeyeUri = new ThirdeyeUri(dashboardUri, collection, scheduleSpec, tableSpec, start.getMillis(), end.getMillis());
+    ThirdeyeUri thirdeyeUri = new ThirdeyeUri(reportConfig.getDashboardUri(), collection, scheduleSpec, tableSpec, start.getMillis(), end.getMillis());
     return thirdeyeUri.getThirdeyeUri();
   }
 
