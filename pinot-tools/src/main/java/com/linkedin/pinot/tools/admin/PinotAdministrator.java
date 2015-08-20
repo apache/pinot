@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.admin;
 
 import java.lang.reflect.Field;
 
+import com.linkedin.pinot.tools.admin.command.*;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -25,23 +26,6 @@ import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
-import com.linkedin.pinot.tools.admin.command.AddTableCommand;
-import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
-import com.linkedin.pinot.tools.admin.command.Command;
-import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
-import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
-import com.linkedin.pinot.tools.admin.command.GenerateDataCommand;
-import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
-import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
-import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
-import com.linkedin.pinot.tools.admin.command.StartServerCommand;
-import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
-import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
-import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
-import com.linkedin.pinot.tools.admin.command.StartKafkaCommand;
-import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 
 
 /**
@@ -69,6 +53,7 @@ public class PinotAdministrator {
       @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
       @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
       @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
+      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class)
   })
   Command _subCommand;
   // @formatter:on
