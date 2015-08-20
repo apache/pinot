@@ -99,6 +99,7 @@ public class ReportGenerator implements Job{
         reportConfig.setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
         reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()));
 
+
         URL thirdeyeUri = getThirdeyeURL(tableSpec, scheduleSpec,
             baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)),
             currentEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)));
@@ -177,6 +178,7 @@ public class ReportGenerator implements Job{
       LOGGER.error(e.toString());
     }
   }
+
 
 
   private URL getThirdeyeURL(TableSpec tableSpec, ScheduleSpec scheduleSpec, DateTime start, DateTime end) throws MalformedURLException {
@@ -375,9 +377,14 @@ e.printStackTrace();
     }
 
     // get metric position
-    int metricPosition = queryResult.getMetrics().indexOf(metric);
-
+    int metricPosition = 0;
     MetricSchema schema = MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics());
+    for (int i = 0; i < starTreeConfig.getMetrics().size(); i ++) {
+      if (metric.equals(starTreeConfig.getMetrics().get(i).getName())) {
+        metricPosition = i;
+        break;
+      }
+    }
 
     for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
       DimensionKey dimensionKey = createDimensionKey(entry.getKey());
@@ -385,7 +392,8 @@ e.printStackTrace();
       MetricTimeSeries series = new MetricTimeSeries(schema);
       for (Entry<String, Number[]> dataEntry : data.entrySet()) {
         if (!String.valueOf(endTime.getMillis()).equals(dataEntry.getKey())) {
-          series.set(Long.valueOf(dataEntry.getKey()), metric, dataEntry.getValue()[metricPosition]);
+          int position = queryResult.getMetrics().indexOf(metric);
+          series.set(Long.valueOf(dataEntry.getKey()), metric, dataEntry.getValue()[position]);
         }
       }
       Number[] seriesSums = series.getMetricSums();
@@ -423,5 +431,7 @@ e.printStackTrace();
     URL url = new URL(serverUri + "/collections/" + collection);
     return OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), StarTreeConfig.class);
   }
+
+
 
 }
