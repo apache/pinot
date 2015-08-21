@@ -1,0 +1,37 @@
+{
+  "type" : "record",
+  "name" : "TestRecord",
+  "fields" : [ {
+    "name" : "timeColumn",
+    "type" : [ "null", "long" ],
+    "doc" : "field representing time"
+  }, {
+    "name" : "dimension1",
+    "type" : [ "null", "string" ],
+    "doc" : "dimension1 field"
+  }, {
+    "name" : "dimension2",
+    "type" : [ "null", "string" ],
+    "doc" : "dimension2 field"
+  }, {
+    "name" : "dimension3",
+    "type" : [ "null", "string" ],
+    "doc" : "dimension3 field"
+  }, {
+    "name" : "dimension4",
+    "type" : [ "null", "string" ],
+    "doc" : "dimension4 field"
+  }, {
+    "name" : "metric1",
+    "type" : [ "null", "long" ],
+    "doc" : "metric1 field"
+  }, {
+    "name" : "metric2",
+    "type" : [ "null", "long" ],
+    "doc" : "metric2 field"
+  }, {
+    "name" : "metric3",
+    "type" : [ "null", "long" ],
+    "doc" : "metric3 field"
+  } ]
+}

@@ -1,0 +1,41 @@
+collection: integrationTest
+
+dimensions:
+ - name: dimension1
+ - name: dimension2
+ - name: dimension3
+ - name: dimension4
+
+metrics:
+ - name: metric1
+   type: LONG
+ - name: metric2
+   type: LONG
+ - name: metric3
+   type: LONG
+
+time:
+  columnName: timeColumn
+  input:
+    size: 1
+    unit: HOURS
+  bucket:
+    size: 1
+    unit: HOURS
+  retention:
+    size: 31
+    unit: DAYS
+
+rollup:
+  functionClass: com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction
+  functionConfig:
+    metricName: "metric1"
+    threshold: "50"
+  order:
+    - dimension1
+    - dimension2
+    - dimension3
+    - dimension4
+
+split:
+  threshold: 100
