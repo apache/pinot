@@ -153,7 +153,7 @@ public class ThirdEyeJob {
   private static final String DATA_FOLDER_JOINER = "_";
   private static final String TEMPORARY_FOLDER = "_temporary";
 
-  private enum FlowSpec {
+  protected enum FlowSpec {
     DIMENSION_INDEX,
     METRIC_INDEX
   }
@@ -732,8 +732,8 @@ public class ThirdEyeJob {
     return Joiner.on(INPUT_PATHS_JOINER).join(filteredInputs);
   }
 
-  private void serverPackage(String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws Exception {
-    FileSystem fileSystem = FileSystem.get(new Configuration());
+
+  public void serverPackage(FileSystem fileSystem, String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws Exception {
 
     // Get config file to package
     Path configPath =
@@ -800,15 +800,14 @@ public class ThirdEyeJob {
     }
   }
 
-  private void serverUpload(String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws Exception {
+
+  public void serverUpload(FileSystem fileSystem, String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime) throws Exception {
     String thirdEyeServerUri =
         inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName());
     if (thirdEyeServerUri == null) {
       throw new IllegalArgumentException("Must provide "
           + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName() + " in properties");
     }
-
-    FileSystem fileSystem = FileSystem.get(new Configuration());
 
     // Push config (may 409 but that's okay)
     Path configPath =
@@ -852,7 +851,7 @@ public class ThirdEyeJob {
             StarTreeConstants.DATE_TIME_FORMATTER.print(minTime),
             StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime)));
 
-    FsShell shell = new FsShell(new Configuration());
+    FsShell shell = new FsShell(fileSystem.getConf());
     LOGGER.info("Changing permission of {} to {}", dimensionIndexDir, thirdeyeFolderPermission);
     shell.run(new String[]{"-chmod","-R",thirdeyeFolderPermission, dimensionIndexDir});
     LOGGER.info("Changing permission of {} to {}", metricIndexDir, thirdeyeFolderPermission);
@@ -968,6 +967,7 @@ public class ThirdEyeJob {
     String maxTimeProp = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MAX.getName());
     String timePathProp =
         inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_PATH.getName());
+    FileSystem fileSystem = FileSystem.get(new Configuration());
 
     if (minTimeProp != null && maxTimeProp != null) // user provided, override
     {
@@ -975,7 +975,6 @@ public class ThirdEyeJob {
       maxTime = ISODateTimeFormat.dateTimeParser().parseDateTime(maxTimeProp);
     } else if (timePathProp != null) // use path managed by preparation jobs
     {
-      FileSystem fileSystem = FileSystem.get(new Configuration());
       InputStream inputStream = fileSystem.open(new Path(timePathProp));
 
       Properties timePathProps = new Properties();
@@ -995,9 +994,9 @@ public class ThirdEyeJob {
     }
 
     if (PhaseSpec.SERVER_PACKAGE.equals(phaseSpec)) {
-      serverPackage(root, collection, flowSpec, minTime, maxTime);
+      serverPackage(fileSystem, root, collection, flowSpec, minTime, maxTime);
     } else if (PhaseSpec.SERVER_UPLOAD.equals(phaseSpec)) {
-      serverUpload(root, collection, flowSpec, minTime, maxTime);
+      serverUpload(fileSystem, root, collection, flowSpec, minTime, maxTime);
     } else if (PhaseSpec.WAIT.equals(phaseSpec)) {
 
       // Check if we need to poll for any input paths
@@ -1006,7 +1005,6 @@ public class ThirdEyeJob {
 
       if (pollEnable) {
 
-        FileSystem fileSystem = FileSystem.get(new Configuration());
 
         long elapsedTime = 0;
         long pollStart = (new DateTime()).getMillis();
@@ -1078,7 +1076,6 @@ public class ThirdEyeJob {
 
         LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoDate.getMillis(), dimensionIndexDir, metricIndexDir);
 
-        FileSystem fileSystem = FileSystem.get(new Configuration());
 
         // list folders in dimensionDir starting with data_
         FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexDir, new PathFilter() {

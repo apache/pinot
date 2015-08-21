@@ -43,13 +43,13 @@ public class DataGeneratorTool {
     config.starTreeConfig = StarTreeConfig.decode(new FileInputStream(commandLine.getArgs()[0]));
     config.schemaFile = new File(commandLine.getArgs()[1]);
     config.outputDataDirectory = new File(commandLine.getArgs()[2]);
-    config.setOptions();
 
     DataGeneratorTool dataGenTool = new DataGeneratorTool();
     dataGenTool.generateData(config);
   }
 
   public void generateData(DataGeneratorConfig config) throws Exception {
+    config.setOptions();
     writer = new DataGeneratorWriter(config);
     writer.init();
     writer.generate();

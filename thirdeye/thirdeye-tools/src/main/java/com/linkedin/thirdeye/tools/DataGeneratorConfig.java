@@ -76,4 +76,71 @@ public class DataGeneratorConfig {
     numRecordsPerFile = numRecords / numFiles;
   }
 
+  public String getMinTime() {
+    return minTime;
+  }
+
+  public void setMinTime(String minTime) {
+    this.minTime = minTime;
+  }
+
+  public String getMaxTime() {
+    return maxTime;
+  }
+
+  public void setMaxTime(String maxTime) {
+    this.maxTime = maxTime;
+  }
+
+  public String getCardinality() {
+    return cardinality;
+  }
+
+  public void setCardinality(String cardinality) {
+    this.cardinality = cardinality;
+  }
+
+  public long getNumRecords() {
+    return numRecords;
+  }
+
+  public void setNumRecords(long numRecords) {
+    this.numRecords = numRecords;
+  }
+
+  public int getNumFiles() {
+    return numFiles;
+  }
+
+  public void setNumFiles(int numFiles) {
+    this.numFiles = numFiles;
+  }
+
+  public StarTreeConfig getStarTreeConfig() {
+    return starTreeConfig;
+  }
+
+  public void setStarTreeConfig(StarTreeConfig starTreeConfig) {
+    this.starTreeConfig = starTreeConfig;
+  }
+
+  public File getSchemaFile() {
+    return schemaFile;
+  }
+
+  public void setSchemaFile(File schemaFile) {
+    this.schemaFile = schemaFile;
+  }
+
+  public File getOutputDataDirectory() {
+    return outputDataDirectory;
+  }
+
+  public void setOutputDataDirectory(File outputDataDirectory) {
+    this.outputDataDirectory = outputDataDirectory;
+  }
+
+
+
+
 }
