@@ -1,4 +1,4 @@
-INSERT IGNORE INTO %s(
+INSERT IGNORE INTO `%s`(
   function_table,
   function_id,
   function_description,

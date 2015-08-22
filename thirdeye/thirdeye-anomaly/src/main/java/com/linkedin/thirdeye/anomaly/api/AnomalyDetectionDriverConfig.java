@@ -68,4 +68,23 @@ public class AnomalyDetectionDriverConfig {
     this.dimensionPrecedence = explorationPrecedence;
   }
 
+  public void setCollectionName(String collectionName) {
+    this.collectionName = collectionName;
+  }
+
+  public void setContributionEstimateMetric(String contributionEstimateMetric) {
+    this.contributionEstimateMetric = contributionEstimateMetric;
+  }
+
+  public void setContributionMinProportion(double contributionMinProportion) {
+    this.contributionMinProportion = contributionMinProportion;
+  }
+
+  public void setMaxExplorationDepth(int maxExplorationDepth) {
+    this.maxExplorationDepth = maxExplorationDepth;
+  }
+
+  public void setPruneExplortaionUsingFeedback(boolean pruneExplortaionUsingFeedback) {
+    this.pruneExplortaionUsingFeedback = pruneExplortaionUsingFeedback;
+  }
 }

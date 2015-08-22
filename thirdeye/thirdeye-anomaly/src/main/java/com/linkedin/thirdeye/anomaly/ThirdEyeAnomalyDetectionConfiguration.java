@@ -84,9 +84,17 @@ public class ThirdEyeAnomalyDetectionConfiguration {
     return thirdEyeServerPort;
   }
 
+  public void setThirdEyeServerPort(short thirdEyeServerPort) {
+    this.thirdEyeServerPort = thirdEyeServerPort;
+  }
+
   @JsonProperty
   public String getThirdEyeServerHost() {
     return thirdEyeServerHost;
+  }
+
+  public void setThirdEyeServerHost(String thirdEyeServerHost) {
+    this.thirdEyeServerHost = thirdEyeServerHost;
   }
 
   @JsonProperty

@@ -10,11 +10,14 @@ import javax.sql.DataSource;
 import org.apache.commons.dbcp2.cpdsadapter.DriverAdapterCPDS;
 import org.apache.commons.dbcp2.datasources.SharedPoolDataSource;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Configuration for anomaly database. It is mapped in from the configuration file.
  */
+@JsonIgnoreProperties({"dataSource"})
 public class AnomalyDatabaseConfig {
 
   /** The database url */
@@ -103,16 +106,19 @@ public class AnomalyDatabaseConfig {
     this.useConnectionPool = useConnectionPool;
   }
 
+  @JsonIgnore
   private static final String JDBC_MYSQL_PREFIX = "jdbc:mysql://";
 
   /**
    * @return
    *  the jdbc prefix for creating a connection
    */
+  @JsonIgnore
   public String getPrefix() {
     return JDBC_MYSQL_PREFIX;
   }
 
+  @JsonIgnore
   private DataSource dataSource;
 
   /**
@@ -120,6 +126,7 @@ public class AnomalyDatabaseConfig {
    *  A database connection from the pool.
    * @throws SQLException
    */
+  @JsonIgnore
   public Connection getConnection() throws SQLException {
     if (useConnectionPool) {
       if (dataSource == null) {
@@ -164,7 +171,8 @@ public class AnomalyDatabaseConfig {
     try {
       conn = getConnection();
       stmt = conn.createStatement();
-      success = stmt.execute(sql);
+      stmt.execute(sql);
+      success = true;
     } catch (SQLException e) {
       e.printStackTrace();
     } finally {

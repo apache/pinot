@@ -179,7 +179,7 @@ public class AnomalyTable {
    * @throws IOException
    */
   public static void createTable(AnomalyDatabaseConfig dbConfig) throws IOException {
-    dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName(), dbConfig.getFunctionTableName()));
+    dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName()));
   }
 
   /**
@@ -297,9 +297,9 @@ public class AnomalyTable {
     return sb.toString();
   }
 
-  private static String buildAnomalyTableCreateStmt(String anomalyTableName, String ruleTableName) throws IOException {
+  private static String buildAnomalyTableCreateStmt(String anomalyTableName) throws IOException {
     String formatString = ResourceUtils.getResourceAsString("database/anomaly/create-anomaly-table-template.sql");
-    return String.format(formatString, anomalyTableName, ruleTableName);
+    return String.format(formatString, anomalyTableName);
   }
 
   private static String buildAnomlayTableInsertStmt(String tableName) throws IOException {

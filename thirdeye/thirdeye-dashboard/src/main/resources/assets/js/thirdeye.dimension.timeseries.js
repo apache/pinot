@@ -34,6 +34,14 @@ $(document).ready(function() {
         mode: hash['dimensionTimeSeriesMode'] ? hash['dimensionTimeSeriesMode'] : 'same',
         legend: true,
         filter: function(data) {
+            // Don't show anomaly series in this view
+            var i = data.length
+            while (i--) {
+              if (data[i].label.indexOf("ANOMALY_") >= 0) {
+                data.splice(i, 1)
+              }
+            }
+
             // Pick the top 4 according to baseline value
             data.sort(function(a, b) {
                 if (!b.data[0] && !a.data[0]) {

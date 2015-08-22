@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.builtin;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -172,19 +173,30 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
   public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval,
       List<AnomalyResult> anomalyHistory) {
 
+    long trainStartInput = Collections.min(series.getTimeWindowSet());
+    long trainEndInput = Collections.max(series.getTimeWindowSet());
+    long bucketMillis = bucketUnit.toMillis(bucketSize);
+
     /*
      * Convert data input to arrays
      */
-    int numObservations = series.getTimeWindowSet().size();
+    int numObservations = (int) (1 + ((trainEndInput - trainStartInput) / bucketMillis));
     double[] observations = new double[numObservations];
     long[] timestamps = new long[numObservations];
 
-    int observationIndex = 0;
-    TreeSet<Long> sortedTimestamps = new TreeSet<Long>(series.getTimeWindowSet()); // sort it
-    for (long observationTimeStamp : sortedTimestamps) {
-      observations[observationIndex] = series.get(observationTimeStamp, metric).doubleValue();
-      timestamps[observationIndex] = observationTimeStamp;
-      observationIndex++;
+    for (int i = 0; i < numObservations; i++) {
+      long timeWindow = trainStartInput + (i * bucketMillis);
+      timestamps[i] = timeWindow;
+      if (series.getTimeWindowSet().contains(timeWindow)) {
+        observations[i] = series.get(timeWindow, metric).doubleValue();
+      } else {
+        observations[i] = 0.0;
+      }
+    }
+
+    if (numObservations != series.getTimeWindowSet().size()) {
+      LOGGER.warn("looks like there are holes in the data: expected {} timestamps, actual {}", numObservations,
+          series.getTimeWindowSet().size());
     }
     /*
      * Done converting data input
@@ -197,9 +209,6 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
     for (AnomalyResult ar : anomalyHistory) {
       omitTimestamps.add(ar.getTimeWindow());
     }
-
-    long trainStartInput = sortedTimestamps.first();
-    long trainEndInput = sortedTimestamps.last();
 
     StateSpaceAnomalyDetector stateSpaceDetector = new StateSpaceAnomalyDetector(
         trainStartInput,

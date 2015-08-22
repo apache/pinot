@@ -177,6 +177,19 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
    * @throws Exception
    */
   public static void main(String[] args) throws Exception {
+    // help information
+    if (args.length != 1 || args[0].equalsIgnoreCase("--help")) {
+      System.out.println("usage: java -jar <this_jar> <your_config.yml>");
+      System.out.println("usage (for setup walkthrough): java -jar <this_jar> --setup");
+      return;
+    }
+
+    // help the user configure anomaly detection
+    if (args[0].equals("--setup")) {
+      new ThirdEyeAnomalyDetectionSetup().setup();
+      return;
+    }
+
     ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
     ThirdEyeAnomalyDetectionConfiguration config = mapper.readValue(new File(args[0]),
         ThirdEyeAnomalyDetectionConfiguration.class);
@@ -227,14 +240,12 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
         }).start();
 
         prevTime = nextTime;
-
-        // got some data, now sleep for longer
-        Thread.sleep(detectionIntervalInMillis - MILLIS_BEWEEEN_POLLS);
       } else {
         LOGGER.info("no new data available, polling again at {} for {}",
             DateTime.now().plusMillis((int) MILLIS_BEWEEEN_POLLS), new DateTime(prevTime + detectionIntervalInMillis));
-        Thread.sleep(MILLIS_BEWEEEN_POLLS);
       }
+
+      Thread.sleep(MILLIS_BEWEEEN_POLLS);
     }
 
   }
