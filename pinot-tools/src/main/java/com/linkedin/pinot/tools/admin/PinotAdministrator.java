@@ -19,6 +19,7 @@ import java.lang.reflect.Field;
 
 import com.linkedin.pinot.tools.admin.command.*;
 import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.SubCommand;
@@ -74,8 +75,10 @@ public class PinotAdministrator {
         _subCommand.execute();
       }
 
-    } catch (Exception e) {
+    } catch (CmdLineException e) {
       LOGGER.error("Error: {}", e.getMessage());
+    } catch (Exception e) {
+      LOGGER.error("Exception caught: ", e);
     }
   }
 
