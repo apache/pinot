@@ -23,6 +23,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,8 +37,13 @@ import java.util.concurrent.TimeUnit;
 public class AvroSchemaToPinotSchema extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
 
-  @Option(name = "-avroSchemaFileName", required = true, metaVar = "<string>", usage = "Path to avro schema file.")
+  @Option(name = "-avroSchemaFileName", required = false, forbids = {"-avroDataFileName"},
+      metaVar = "<String>", usage = "Path to avro schema file.")
   String _avroSchemaFileName;
+
+  @Option(name = "-avroDataFileName", required = false, forbids = {"-avroSchemaFileName"},
+      metaVar = "<String>", usage = "Path to avro schema file.")
+  String _avroDataFileName;
 
   @Option(name = "-pinotSchemaFileName", required = true, metaVar = "<string>", usage = "Path to pinot schema file.")
   String _pinotSchemaFileName;
@@ -60,8 +66,20 @@ public class AvroSchemaToPinotSchema extends AbstractBaseCommand implements Comm
 
   @Override
   public boolean execute() throws Exception {
-    Schema schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(_avroSchemaFileName, buildFieldTypesMap(), _timeUnit);
+    Schema schema = null;
+
+    if (_avroSchemaFileName != null) {
+      schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(_avroSchemaFileName, buildFieldTypesMap(), _timeUnit);
+    } else if (_avroDataFileName != null) {
+      schema = AvroUtils.extractSchemaFromAvro(new File(_avroDataFileName));
+    } else {
+      LOGGER.error("Error: Missing required argument, please specify either -avroSchemaFileName, or -avroDataFileName");
+      return false;
+    }
+
+
     if (schema == null) {
+      LOGGER.error("Error: Could not read avro schema from file.");
       return false;
     }
 

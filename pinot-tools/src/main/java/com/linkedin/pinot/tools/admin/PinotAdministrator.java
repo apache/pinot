@@ -75,7 +75,7 @@ public class PinotAdministrator {
       }
 
     } catch (Exception e) {
-      LOGGER.error("Exception Caught: ", e);
+      LOGGER.error("Error: {}", e.getMessage());
     }
   }
 
