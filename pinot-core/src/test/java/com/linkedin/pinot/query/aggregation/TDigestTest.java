@@ -24,6 +24,7 @@ import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -69,6 +70,7 @@ public class TDigestTest {
 
     @BeforeClass
     public static void setup() {
+        TDigest.TEST_ENABLED = true;
         _docIdsArray = new int[_sizeOfDocIdArray];
         for (int i = 0; i < _sizeOfDocIdArray; ++i) {
             _docIdsArray[i] = i;
@@ -79,6 +81,11 @@ public class TDigestTest {
         _paramsInfo = new AggregationInfo();
         _paramsInfo.setAggregationType("");
         _paramsInfo.setAggregationParams(params);
+    }
+
+    @AfterClass
+    public static void tearDown() {
+        TDigest.TEST_ENABLED = false;
     }
 
     public static class RandomNumberArray {

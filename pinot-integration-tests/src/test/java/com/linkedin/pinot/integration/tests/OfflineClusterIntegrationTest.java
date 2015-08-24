@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.core.query.aggregation.function.quantile.tdigest.TDigest;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
@@ -189,6 +190,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
         Assert.fail("Segments were not completely loaded within two minutes");
       }
     }
+
+    // Set test flag for TDigest to use fixed random seeds
+    TDigest.TEST_ENABLED = true;
   }
 
   @Override
@@ -371,6 +375,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
       // Swallow ZK Exceptions.
     }
     FileUtils.deleteDirectory(_tmpDir);
+    TDigest.TEST_ENABLED = false;
   }
 
   @Override

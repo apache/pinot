@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function.quantile.tdigest;
 
-import com.clearspring.analytics.stream.cardinality.ICardinality;
-import com.clearspring.analytics.stream.cardinality.RegisterSet;
 import com.clearspring.analytics.util.*;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +46,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  */
 public class TDigest implements Serializable {
+    // using fixed random seeds in tests
+    public static boolean TEST_ENABLED = false;
+
     // original class
     private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(TDigest.class);
 
@@ -67,12 +68,12 @@ public class TDigest implements Serializable {
      *                    accuracy.
      */
     public TDigest(double compression) {
-        this(compression, new Random(1000L));
+       this(compression, new Random());
     }
 
     public TDigest(double compression, Random random) {
         this.compression = compression;
-        gen = random;
+        this.gen = TEST_ENABLED ? new Random(1000L): random;
     }
 
     /**
@@ -550,6 +551,18 @@ public class TDigest implements Serializable {
         @Override
         public int hashCode() {
             return id;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Group group = (Group) o;
+
+            if (Double.compare(group.centroid, centroid) != 0) return false;
+            if (count != group.count) return false;
+            return id == group.id;
         }
 
         @Override
