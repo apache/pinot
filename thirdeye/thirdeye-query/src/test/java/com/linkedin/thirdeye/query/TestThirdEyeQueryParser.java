@@ -150,6 +150,18 @@ public class TestThirdEyeQueryParser {
     Assert.assertEquals(query.getDerivedMetrics().size(), 1);
   }
 
+  @Test
+  public void testValid_quotedMetrics() throws Exception {
+    query = parse("SELECT 'm1', 'm2', RATIO('m2', 'm3') FROM collection WHERE time BETWEEN '2015-01-07' AND '2015-01-08'");
+    Assert.assertEquals(query.getCollection(), "collection");
+    Assert.assertEquals(query.getStart(), start);
+    Assert.assertEquals(query.getEnd(), end);
+    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("m1", "m2"));
+    Assert.assertTrue(query.getDimensionValues().isEmpty());
+    Assert.assertTrue(query.getFunctions().isEmpty());
+    Assert.assertEquals(query.getDerivedMetrics().size(), 1);
+  }
+
   // Negative
 
   @Test(expectedExceptions = IllegalStateException.class)

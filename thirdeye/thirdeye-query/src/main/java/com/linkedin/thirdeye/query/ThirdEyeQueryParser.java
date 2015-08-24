@@ -214,6 +214,14 @@ public class ThirdEyeQueryParser implements
       case GROUP_BY:
         query.addGroupByColumn(stringValue.getValue());
         return;
+      case FUNCTION_AGGREGATE:
+      case FUNCTION_MOVING_AVERAGE:
+        query.addMetricName(stringValue.getValue());
+        return;
+      case FUNCTION_SUM:
+      case FUNCTION_RATIO:
+        functionMetrics.add(stringValue.getValue());
+        return;
     }
     throw new IllegalStateException("Invalid SQL: " + sql);
   }

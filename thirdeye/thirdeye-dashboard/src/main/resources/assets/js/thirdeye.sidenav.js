@@ -214,7 +214,7 @@ $(document).ready(function() {
         $(".sidenav-metric").each(function(i, checkbox) {
             var checkboxObj = $(checkbox)
             if (checkboxObj.is(':checked')) {
-                metrics.push(checkboxObj.val())
+                metrics.push("'" + checkboxObj.val() + "'")
             }
         })
 
@@ -223,7 +223,7 @@ $(document).ready(function() {
             var type = $(row).find(".derived-metric-type").find(":selected").val()
             var args = []
             $(row).find(".derived-metric-arg").each(function(j, arg) {
-                args.push($(arg).find(":selected").val())
+                args.push("'" + $(arg).find(":selected").val() + "'")
             })
             metrics.push(type + '(' + args.join(',') + ')')
         })
