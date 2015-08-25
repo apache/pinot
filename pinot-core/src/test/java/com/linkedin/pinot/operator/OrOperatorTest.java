@@ -124,7 +124,7 @@ public class OrOperatorTest {
 
     orOperator.open();
     BaseFilterBlock block;
-    while ((block = orOperator.nextBlock()) != null) {
+    while ((block = orOperator.getNextBlock()) != null) {
       final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
       final BlockDocIdIterator iterator = blockDocIdSet.iterator();
       int docId;

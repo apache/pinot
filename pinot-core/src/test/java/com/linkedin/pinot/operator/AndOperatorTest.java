@@ -46,7 +46,7 @@ public class AndOperatorTest {
 
     andOperator.open();
     BaseFilterBlock block;
-    while ((block = andOperator.nextBlock()) != null) {
+    while ((block = andOperator.getNextBlock()) != null) {
       final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
       final BlockDocIdIterator iterator = blockDocIdSet.iterator();
       int docId;
@@ -72,7 +72,7 @@ public class AndOperatorTest {
 
     andOperator.open();
     BaseFilterBlock block;
-    while ((block = andOperator.nextBlock()) != null) {
+    while ((block = andOperator.getNextBlock()) != null) {
       final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
       final BlockDocIdIterator iterator = blockDocIdSet.iterator();
       int docId;
@@ -102,7 +102,7 @@ public class AndOperatorTest {
 
     andOperator.open();
     BaseFilterBlock block;
-    while ((block = andOperator.nextBlock()) != null) {
+    while ((block = andOperator.getNextBlock()) != null) {
       final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
       final BlockDocIdIterator iterator = blockDocIdSet.iterator();
       int docId;
@@ -132,7 +132,7 @@ public class AndOperatorTest {
 
     andOperator.open();
     BaseFilterBlock block;
-    while ((block = andOperator.nextBlock()) != null) {
+    while ((block = andOperator.getNextBlock()) != null) {
       final BlockDocIdSet blockDocIdSet = block.getBlockDocIdSet();
       final BlockDocIdIterator iterator = blockDocIdSet.iterator();
       int docId;

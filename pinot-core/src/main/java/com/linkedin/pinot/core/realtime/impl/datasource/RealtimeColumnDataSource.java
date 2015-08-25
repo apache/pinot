@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
-public class RealtimeColumnDataSource implements DataSource {
+public class RealtimeColumnDataSource extends DataSource {
 
   private static final int REALTIME_DICTIONARY_INIT_ID = 1;
   private Predicate predicate;
@@ -88,16 +88,21 @@ public class RealtimeColumnDataSource implements DataSource {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     return getBlock();
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     if (BlockId.getId() == 0) {
       blockReturned = false;
     }
     return getBlock();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "RealtimeColumnDataSource";
   }
 
   @Override

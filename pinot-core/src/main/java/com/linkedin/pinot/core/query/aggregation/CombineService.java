@@ -55,8 +55,7 @@ public class CombineService {
     mergedBlock.setTotalDocs(mergedBlock.getTotalDocs() + blockToMerge.getTotalDocs());
     // Debug mode enable : Combine SegmentStatistics and TraceInfo
     if (brokerRequest.isEnableTrace()) {
-      mergedBlock.getSegmentStatistics().addAll(blockToMerge.getSegmentStatistics());
-      mergedBlock.getTraceInfo().putAll(blockToMerge.getTraceInfo());
+      // mergedBlock.getSegmentStatistics().addAll(blockToMerge.getSegmentStatistics());
     }
     // Combine Exceptions
     mergedBlock.setExceptionsList(combineExceptions(mergedBlock.getExceptions(), blockToMerge.getExceptions()));

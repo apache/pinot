@@ -41,7 +41,7 @@ import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
  *
  */
 
-public class ColumnDataSourceImpl implements DataSource {
+public class ColumnDataSourceImpl extends DataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnDataSourceImpl.class);
 
   private final ColumnIndexContainer indexContainer;
@@ -60,7 +60,7 @@ public class ColumnDataSourceImpl implements DataSource {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     blockNextCallCount++;
     if (blockNextCallCount <= 1) {
       return nextBlock(new BlockId(0));
@@ -69,7 +69,7 @@ public class ColumnDataSourceImpl implements DataSource {
   }
 
   @Override
-  public Block nextBlock(BlockId blockId) {
+  public Block getNextBlock(BlockId blockId) {
     Block b = null;
 
     if (indexContainer.getColumnMetadata().isSingleValue()) {
@@ -90,6 +90,11 @@ public class ColumnDataSourceImpl implements DataSource {
     }
 
     return b;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "ColumnDataSourceImpl";
   }
 
   @Override

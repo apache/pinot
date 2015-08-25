@@ -52,12 +52,17 @@ public class DataSourceUtils {
       }
 
       @Override
-      public Block nextBlock(BlockId BlockId) {
+      public Block getNextBlock(BlockId BlockId) {
         return new SingleValueBlock(dictionary, values);
       }
 
       @Override
-      public Block nextBlock() {
+      public String getOperatorName() {
+        return "DataSourceUtils_DataSource";
+      }
+
+      @Override
+      public Block getNextBlock() {
         if (blockCounter == 0) {
           return nextBlock(new BlockId(0));
         }

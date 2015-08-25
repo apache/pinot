@@ -53,7 +53,6 @@ public class IntermediateResultsBlock implements Block {
   private List<ResponseStatistics> _segmentStatistics;
   private long _timeUsedMs;
   private long _totalDocs;
-  private Map<String, String> _traceInfo;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
   private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
@@ -232,10 +231,6 @@ public class IntermediateResultsBlock implements Block {
     return _totalDocs;
   }
 
-  public Map<String, String> getTraceInfo() {
-    return _traceInfo;
-  }
-
   public void setExceptionsList(List<ProcessingException> processingExceptions) {
     _processingExceptions = processingExceptions;
   }
@@ -258,10 +253,6 @@ public class IntermediateResultsBlock implements Block {
 
   public void setTotalDocs(long totalDocs) {
     _totalDocs = totalDocs;
-  }
-
-  public void setTraceInfo(Map<String, String> traceInfo) {
-    _traceInfo = traceInfo;
   }
 
   public void setAggregationFunctions(List<AggregationFunction> aggregationFunctions) {
