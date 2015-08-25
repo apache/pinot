@@ -136,7 +136,7 @@ $(document).ready(function() {
       var derivedMetrics = []
       $.each(metricFunctionObj.args, function(i, arg) {
         if (typeof(arg) === 'string') {
-            primitiveMetrics.push(arg)
+            primitiveMetrics.push(arg.replace(/'/g, ""))
         } else {
             derivedMetrics.push(arg)
         }
@@ -157,7 +157,7 @@ $(document).ready(function() {
         var metricElement = $(metricElements[metricElements.length - 1])
         metricElement.find(".derived-metric-type").val(derivedMetric.name)
         $.each(derivedMetric.args, function(j, arg) {
-            metricElement.find('#' + derivedMetric.name + '-arg' + j).val(arg)
+            metricElement.find('#' + derivedMetric.name + '-arg' + j).val(arg.replace(/'/g, ""))
         })
       })
     }
