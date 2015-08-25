@@ -239,7 +239,7 @@ public class QueriesSentinelTest {
       LOGGER.info("Result from avro is : " + aggCall.result);
       try {
         Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
-            aggCall.result);
+                aggCall.result);
       } catch (AssertionError e) {
         System.out.println(aggCall.pql);
         System.out.println("from broker : "
@@ -270,7 +270,7 @@ public class QueriesSentinelTest {
 
       try {
         assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
-            groupBy.groupResults);
+                groupBy.groupResults);
       } catch (AssertionError e) {
         System.out.println(groupBy.pql);
         System.out.println("from broker : "
@@ -417,5 +417,24 @@ public class QueriesSentinelTest {
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getInt("value"), 14);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 14);
+  }
+
+  @Test
+  public void testTrace() throws RecognitionException, Exception {
+    String query = "select count(*) from testTable where column1='186154188'";
+    LOGGER.info("running  : " + query);
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    brokerRequest.setEnableTrace(true); //
+    InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
+    instanceRequest.setEnableTrace(true); // TODO: add trace settings consistency
+    instanceRequest.setSearchSegments(new ArrayList<String>());
+    instanceRequest.getSearchSegments().add(segmentName);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    instanceResponseMap.clear();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+    LOGGER.info("TraceInfo is " + brokerResponse.getTraceInfo()); //
   }
 }
