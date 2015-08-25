@@ -19,6 +19,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import com.linkedin.pinot.core.operator.BaseOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
  *
  *
  */
-public class MSelectionOnlyOperator implements Operator {
+public class MSelectionOnlyOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOnlyOperator.class);
 
   private final IndexSegment _indexSegment;
@@ -72,10 +73,9 @@ public class MSelectionOnlyOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
 
     final long startTime = System.currentTimeMillis();
-
     long numDocsScanned = 0;
     ProjectionBlock projectionBlock = null;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
@@ -101,14 +101,18 @@ public class MSelectionOnlyOperator implements Operator {
     resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
     final long endTime = System.currentTimeMillis();
     resultBlock.setTimeUsedMs(endTime - startTime);
-    LOGGER.debug("Time spent in MSelectionOnlyOperator:" + (endTime - startTime));
     return resultBlock;
 
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MSelectionOnlyOperator";
   }
 
   @Override

@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
@@ -38,7 +39,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  *
  *
  */
-public class MAggregationOperator implements Operator {
+public class MAggregationOperator extends BaseOperator {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfoList;
@@ -66,7 +67,7 @@ public class MAggregationOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     List<Serializable> aggregationResults = new ArrayList<Serializable>();
     for (int i = 0; i < _aggregationFunctionOperatorList.size(); ++i) {
       aggregationResults.add(AggregationFunctionFactory.get(_aggregationInfoList.get(i), true).getDefaultValue());
@@ -97,8 +98,13 @@ public class MAggregationOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MAggregationOperator";
   }
 
   @Override

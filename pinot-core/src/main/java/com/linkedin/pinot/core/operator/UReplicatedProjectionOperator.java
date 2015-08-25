@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.common.Operator;
  *
  *
  */
-public class UReplicatedProjectionOperator implements Operator {
+public class UReplicatedProjectionOperator extends BaseOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UReplicatedProjectionOperator.class);
 
@@ -53,13 +53,18 @@ public class UReplicatedProjectionOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     return _projectionOperator.getCurrentBlock();
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException("Not supported in MProjectionOperator!");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "UReplicatedProjectionOperator";
   }
 
   public MProjectionOperator getProjectionOperator() {

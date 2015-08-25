@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
@@ -35,7 +36,7 @@ import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFuncti
  *
  *
  */
-public abstract class AggregationFunctionGroupByOperator implements Operator {
+public abstract class AggregationFunctionGroupByOperator extends BaseOperator {
 
   protected final AggregationFunction _aggregationFunction;
   protected final Operator _projectionOperator;
@@ -87,10 +88,10 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
   }
 
   @Override
-  public abstract Block nextBlock();
+  public abstract Block getNextBlock();
 
   @Override
-  public abstract Block nextBlock(BlockId BlockId);
+  public abstract Block getNextBlock(BlockId BlockId);
 
   @Override
   public boolean close() {

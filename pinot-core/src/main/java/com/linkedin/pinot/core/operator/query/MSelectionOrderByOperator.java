@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.linkedin.pinot.core.operator.BaseOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
  *
  *
  */
-public class MSelectionOrderByOperator implements Operator {
+public class MSelectionOrderByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOrderByOperator.class);
 
   private final IndexSegment _indexSegment;
@@ -87,7 +88,7 @@ public class MSelectionOrderByOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
 
     final long startTime = System.currentTimeMillis();
 
@@ -112,7 +113,6 @@ public class MSelectionOrderByOperator implements Operator {
       resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
       final long endTime = System.currentTimeMillis();
       resultBlock.setTimeUsedMs(endTime - startTime);
-      LOGGER.info("Time spent in MSelectionOperator:" + (endTime - startTime));
       return resultBlock;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while processing selection operator", e);
@@ -133,8 +133,13 @@ public class MSelectionOrderByOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MSelectionOrderByOperator";
   }
 
   @Override

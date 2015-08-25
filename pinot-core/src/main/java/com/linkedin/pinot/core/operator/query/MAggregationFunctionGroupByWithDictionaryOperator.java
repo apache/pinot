@@ -88,7 +88,7 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     final ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block == null) {
       return null;
@@ -166,9 +166,14 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException(
         "Method: nextBlock(BlockId BlockId) is Not Supported in MAggregationFunctionGroupByOperator");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MAggregationFunctionGroupByWithDictionaryOperator";
   }
 
   @Override

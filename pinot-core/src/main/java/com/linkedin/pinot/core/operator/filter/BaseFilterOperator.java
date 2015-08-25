@@ -20,13 +20,14 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.BaseOperator;
 
 
 /**
  * Base Operator for all filter operators. ResultBlock is initialized in the planning phase
  *
  */
-public abstract class BaseFilterOperator implements Operator {
+public abstract class BaseFilterOperator extends BaseOperator {
 
   private FilterResultBlock resultBlock;
   private Predicate predicate;
@@ -49,18 +50,23 @@ public abstract class BaseFilterOperator implements Operator {
   }
 
   @Override
-  public final BaseFilterBlock nextBlock() {
-    return nextBlock(new BlockId(0));
+  public final BaseFilterBlock getNextBlock() {
+    return getNextBlock(new BlockId(0));
   }
 
   @Override
-  public final BaseFilterBlock nextBlock(BlockId blockId) {
+  public final BaseFilterBlock getNextBlock(BlockId blockId) {
     if (nextBlockCallCounter > 0) {
       return null;
     }
     Block nextBlock = nextFilterBlock(new BlockId(0));
     nextBlockCallCounter = nextBlockCallCounter + 1;
     return (BaseFilterBlock) nextBlock;
+  }
+
+  @Override
+  public final String getOperatorName() {
+    return "BaseFilterOperator";
   }
 
   public abstract BaseFilterBlock nextFilterBlock(BlockId blockId);

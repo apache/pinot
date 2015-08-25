@@ -75,7 +75,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     final ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block == null) {
       return null;
@@ -166,9 +166,14 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException(
         "Method: nextBlock(BlockId BlockId) is Not Supported in MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator";
   }
 
   @Override

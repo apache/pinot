@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 
@@ -31,7 +32,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  *
  *
  */
-public class BAggregationFunctionOperator implements Operator {
+public class BAggregationFunctionOperator extends BaseOperator {
 
   private final AggregationFunction _aggregationFunction;
   private final Block[] _blocks;
@@ -66,7 +67,7 @@ public class BAggregationFunctionOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _blocks.length; ++i) {
@@ -78,9 +79,14 @@ public class BAggregationFunctionOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException(
         "Method: nextBlock(BlockId BlockId) is Not Supported in UAggregationFunctionOperator");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "BAggregationFunctionOperator";
   }
 
   public AggregationFunction getAggregationFunction() {

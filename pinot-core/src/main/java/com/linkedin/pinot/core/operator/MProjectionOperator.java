@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.common.Operator;
  *
  *
  */
-public class MProjectionOperator implements Operator {
+public class MProjectionOperator extends BaseOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MProjectionOperator.class);
 
@@ -64,20 +64,22 @@ public class MProjectionOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
-    long start = System.currentTimeMillis();
+  public Block getNextBlock() {
     _currentBlock = new ProjectionBlock(_docIdSetOperator, _columnToDataSourceMap);
     if (_currentBlock.getDocIdSetBlock() == null) {
       return null;
     }
-    long end = System.currentTimeMillis();
-    LOGGER.info("Time taken in MProjectionOperator: " + (end - start));
     return _currentBlock;
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException("Not supported in MProjectionOperator!");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MProjectionOperator";
   }
 
   public ProjectionBlock getCurrentBlock() {

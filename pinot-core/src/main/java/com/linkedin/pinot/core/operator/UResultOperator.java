@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.common.Operator;
  *
  *
  */
-public class UResultOperator implements Operator {
+public class UResultOperator extends BaseOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UResultOperator.class);
 
@@ -47,17 +47,19 @@ public class UResultOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
-    long start = System.currentTimeMillis();
+  public Block getNextBlock() {
     InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(_operator.nextBlock());
-    long end = System.currentTimeMillis();
-    LOGGER.debug("Time spent in UResultOperator:" + (end - start));
     return instanceResponseBlock;
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "UResultOperator";
   }
 
   @Override

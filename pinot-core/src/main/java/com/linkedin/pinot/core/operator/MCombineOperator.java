@@ -26,7 +26,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.helix.manager.zk.ZKHelixManager;
+import com.linkedin.pinot.core.trace.TraceCallable;
+import com.linkedin.pinot.core.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,15 +52,17 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
  *  2. Parallelism Parameters:
  *      ExecutorService;
  *  3. All the Inner-Segment Operators:
- *      For now only three types:
- *          USelectionOperator, UAggregationOperator
- *          and UAggregationAndSelectionOperator
+ *      For now only four types:
+ *          {@link MSelectionOnlyOperator}
+ *          {@link MSelectionOrderByOperator}
+ *          {@link MAggregationOperator}
+ *          {@link MAggregationGroupByOperator}
  *      Number of Operators is based on the pruned segments:
  *          one segment to one Operator.
  *
  *
  */
-public class MCombineOperator implements Operator {
+public class MCombineOperator extends BaseOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineOperator.class);
 
@@ -105,7 +108,7 @@ public class MCombineOperator implements Operator {
 
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     final long startTime = System.currentTimeMillis();
     if (_isParallel) {
       final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
@@ -121,9 +124,9 @@ public class MCombineOperator implements Operator {
       final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<Block>(operatorGroups.size());
       // Submit operators.
       for (final List<Operator> operatorGroup : operatorGroups) {
-        _executorService.submit(new Runnable() {
+        _executorService.submit(new TraceRunnable() {
           @Override
-          public void run() {
+          public void runJob() {
             IntermediateResultsBlock mergedBlock = null;
             try {
               for (Operator operator : operatorGroup) {
@@ -149,9 +152,9 @@ public class MCombineOperator implements Operator {
 
       // Submit merger job:
       Future<IntermediateResultsBlock> mergedBlockFuture =
-          _executorService.submit(new Callable<IntermediateResultsBlock>() {
+          _executorService.submit(new TraceCallable<IntermediateResultsBlock>() {
             @Override
-            public IntermediateResultsBlock call() throws Exception {
+            public IntermediateResultsBlock callJob() throws Exception {
               int mergedBlocksNumber = 0;
               IntermediateResultsBlock mergedBlock = null;
               while ((queryEndTime > System.currentTimeMillis()) && (mergedBlocksNumber < operatorGroups.size())) {
@@ -245,8 +248,6 @@ public class MCombineOperator implements Operator {
         && (_brokerRequest.getGroupBy().getColumnsSize() > 0)) {
       trimToSize(_brokerRequest, _mergedBlock);
     }
-    long end = System.currentTimeMillis();
-    LOGGER.info("Time spent in MCombineOperator:" + (end - startTime));
 
     return _mergedBlock;
   }
@@ -259,8 +260,13 @@ public class MCombineOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "MCombineOperator";
   }
 
   @Override

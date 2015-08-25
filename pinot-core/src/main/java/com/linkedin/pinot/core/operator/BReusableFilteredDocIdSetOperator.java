@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.common.Operator;
  *
  *
  */
-public class BReusableFilteredDocIdSetOperator implements Operator {
+public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
   private final Operator _filterOperators;
   private final int _docSize;
@@ -58,7 +58,7 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  public Block getNextBlock() {
     if (_currentDoc == Constants.EOF) {
       return null;
     }
@@ -99,8 +99,13 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block getNextBlock(BlockId BlockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return "BReusableFilteredDocIdSetOperator";
   }
 
   public Block getCurrentBlock() {
