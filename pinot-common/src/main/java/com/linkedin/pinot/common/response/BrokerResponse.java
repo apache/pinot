@@ -248,7 +248,7 @@ public class BrokerResponse {
     retJsonObject.put("exceptions", new JSONArray(_exceptions));
     JSONObject traceInfo = new JSONObject();
     for (String key : _traceInfo.keySet()) {
-      traceInfo.put(key, traceInfo.get(key));
+      traceInfo.put(key, _traceInfo.get(key));
     }
     retJsonObject.put("traceInfo", traceInfo);
     return retJsonObject;

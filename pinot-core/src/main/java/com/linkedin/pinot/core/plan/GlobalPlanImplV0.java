@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
  *
  */
 public class GlobalPlanImplV0 extends Plan {
-  private static final Logger LOGGER = LoggerFactory.getLogger(UResultOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GlobalPlanImplV0.class);
 
   private InstanceResponsePlanNode _rootNode;
   private DataTable _instanceResponseDataTable;
