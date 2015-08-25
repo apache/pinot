@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.core.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,9 +71,9 @@ public class CombinePlanNode implements PlanNode {
       final CountDownLatch latch = new CountDownLatch(_planNodeList.size());
       final ConcurrentLinkedQueue<Operator> queue = new ConcurrentLinkedQueue<Operator>();
       for (final PlanNode planNode : _planNodeList) {
-        _executorService.execute(new Runnable() {
+        _executorService.execute(new TraceRunnable() {
           @Override
-          public void run() {
+          public void runJob() {
             try {
               Operator operator = planNode.run();
               queue.add(operator);

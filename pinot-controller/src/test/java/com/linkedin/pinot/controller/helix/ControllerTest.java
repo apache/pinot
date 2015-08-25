@@ -25,6 +25,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
+import com.linkedin.pinot.core.trace.TraceContext;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -45,6 +46,7 @@ import com.linkedin.pinot.controller.ControllerStarter;
  *
  */
 public abstract class ControllerTest {
+  private static final boolean isTraceEnabled = true;
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
   protected String BROKER_BASE_API_URL = "http://localhost:18099";
@@ -58,6 +60,7 @@ public abstract class ControllerTest {
   public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
+    json.put("trace", isTraceEnabled);
 
     final long start = System.currentTimeMillis();
     final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();

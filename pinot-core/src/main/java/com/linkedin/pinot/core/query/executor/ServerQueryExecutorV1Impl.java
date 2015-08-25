@@ -16,12 +16,12 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.core.trace.TraceContext;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
@@ -49,7 +49,6 @@ import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.Timer;
-
 
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
@@ -103,6 +102,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable instanceResponse;
     long start = System.currentTimeMillis();
     try {
+      TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.info("Incoming query is : {}", brokerRequest);
       long startPruningTime = System.nanoTime();
@@ -139,6 +139,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), instanceResponse.toString());
       instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
+      instanceResponse.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return instanceResponse;
     } catch (Exception e) {
       _serverMetrics.addMeteredValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
@@ -156,6 +157,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
             .returnSegmentReaders(instanceRequest.getSearchSegments());
       }
+      TraceContext.unregister(instanceRequest);
     }
   }
 
