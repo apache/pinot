@@ -164,7 +164,8 @@ $(document).ready(function() {
 
     // Load existing date / time
     if (path.currentMillis) {
-        var currentDateTime = moment(parseInt(path.currentMillis))
+        var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
+        var currentDateTime = moment(parseInt(path.currentMillis - aggregateMillis))
         var dateString = currentDateTime.format("YYYY-MM-DD")
         var timeString = currentDateTime.format("HH:mm")
         $("#sidenav-date").val(dateString)
@@ -281,6 +282,8 @@ $(document).ready(function() {
         // Aggregate
         metricFunction = "AGGREGATE_" + aggregateSize + "_" + aggregateUnit + "(" + metricFunction + ")"
 
+        // Set current +1 aggregate window, as backend is exclusive end
+        currentMillisUTC += aggregateMillis
 
         // Path
         var path = parsePath(window.location.pathname)

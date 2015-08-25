@@ -103,7 +103,7 @@ public class MetricViewTabular extends View {
         if (timeIndex < 0) {
           continue;
         }
-        long baseline = times.get(timeIndex);
+        long baseline = times.get(timeIndex - 1);
 
         windowFilled += (current - next);
 
