@@ -283,7 +283,9 @@ public class ThirdEyeQueryExecutor {
       IndexMetadata indexMetadata = treeMetadataMap.get(treeId);
       TimeRange treeTimeRange =
           new TimeRange(indexMetadata.getMinDataTimeMillis(), indexMetadata.getMaxDataTimeMillis());
-      if (!queryTimeRange.isDisjoint(treeTimeRange)) {
+      TimeRange wallClockRange =
+          new TimeRange(indexMetadata.getStartTimeMillis(), indexMetadata.getEndTimeMillis());
+      if ((!queryTimeRange.isDisjoint(treeTimeRange) || !queryTimeRange.isDisjoint(wallClockRange)) && !treeIds.contains(treeId)) {
         treeIds.add(treeId);
       }
     }
