@@ -29,9 +29,9 @@ public abstract class TraceRunnable implements Runnable {
   private static final Logger LOGGER = LoggerFactory.getLogger(TraceRunnable.class);
 
   private final InstanceRequest request;
-  private final TraceContext.Trace parent;
+  private final Trace parent;
 
-  private TraceRunnable(InstanceRequest request, TraceContext.Trace parent) {
+  private TraceRunnable(InstanceRequest request, Trace parent) {
     if (request == null) {
       LOGGER.warn("Passing null requestId to TraceRunnable, maybe forget to register the requestId in current thread.");
     }

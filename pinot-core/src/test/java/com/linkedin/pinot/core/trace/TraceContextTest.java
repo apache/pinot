@@ -34,6 +34,7 @@ import java.util.concurrent.*;
  */
 public class TraceContextTest {
 
+  private static final String SEP = "_";
   private static final Logger LOGGER = LoggerFactory.getLogger(TraceContextTest.class);
 
   static final int JOBS_PER_REQUEST = 100;
@@ -119,7 +120,7 @@ public class TraceContextTest {
         @Override
         public void runJob() {
           String tid = Thread.currentThread().getId() + "";
-          TraceContext.log(tid, request.getRequestId() + ": " + taskId);
+          TraceContext.log(tid, request.getRequestId() + SEP + taskId);
         }
       });
     }
@@ -215,14 +216,14 @@ public class TraceContextTest {
 
     // verify trace info
     for (long rqId = 0; rqId < numberOfRequests; rqId++) {
-      ConcurrentLinkedDeque<TraceContext.Trace> traceQueue = TraceContext.getAllTraceInfoMap().get(rqId);
+      ConcurrentLinkedDeque<Trace> traceQueue = TraceContext.getAllTraceInfoMap().get(rqId);
       assertEquals(traceQueue.size(), jobsPerRequest + 1);
       Set<Integer> jobIdSet = new HashSet<Integer>();
-      for (TraceContext.Trace trace: traceQueue) {
+      for (Trace trace: traceQueue) {
         // one trace is used for request handler, it has no info recorded
         if (trace.getValue().size() > 0) {
           Object obj = trace.getValue().get(0); // we have recorded one entry per job in tests
-          String[] tmp = ((String) obj).split(":");
+          String[] tmp = ((String) obj).split(SEP);
           long reqId = Long.parseLong(tmp[0].trim());
           assertEquals(rqId, reqId);
           int jobId = Integer.parseInt(tmp[1].trim());

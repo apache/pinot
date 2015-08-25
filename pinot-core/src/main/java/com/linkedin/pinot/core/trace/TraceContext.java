@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.trace;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
@@ -41,72 +39,6 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class TraceContext {
-  /**
-   * Trace maintains all trace logs for a specific Runnable or Callable job.
-   *
-   * It is not thread-safe, so should be protected by a ThreadLocal.
-   */
-  protected static class Trace {
-    private List<String> _key = new ArrayList<String>();
-    private List<Object> _value = new ArrayList<Object>();
-    private Long _threadId;
-    protected final Trace _parent;
-    protected final List<Trace> _children = new ArrayList<Trace>();
-
-    public Trace(Long threadId, Trace parent) {
-      _threadId = threadId;
-      _parent = parent;
-    }
-
-    public void log(String key, Object value) {
-      _key.add(key);
-      _value.add(value);
-    }
-
-    public List<Object> getValue() {
-      return _value;
-    }
-
-    public List<String> getKey() {
-      return _key;
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder();
-      sb.append("{");
-      for (int i = 0; i < _key.size(); i++) {
-        if (i > 0) {
-          sb.append(", ");
-        }
-        // sb.append("\"");
-        sb.append(_key.get(i));
-        // sb.append("\"");
-        sb.append(": ");
-        // sb.append("\"");
-        sb.append(_value.get(i));
-        // sb.append("\"");
-      }
-      sb.append("}");
-      return sb.toString();
-    }
-
-    public String getTraceTree(StringBuilder sb, int level) {
-      // a tree-style trace graph
-      for (int i = 0; i < level; i++) {
-        sb.append("--> ");
-      }
-      sb.append("[TID: " + _threadId + "] ");
-      sb.append(toString());
-      sb.append("\n");
-
-      for (Trace child: _children) {
-        child.getTraceTree(sb, level+1);
-      }
-
-      return sb.toString();
-    }
-  }
 
   /**
    * Only for tests

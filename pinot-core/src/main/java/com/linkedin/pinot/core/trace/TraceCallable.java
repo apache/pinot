@@ -31,9 +31,9 @@ public abstract class TraceCallable<V> implements Callable<V> {
   private static final Logger LOGGER = LoggerFactory.getLogger(TraceCallable.class);
 
   private final InstanceRequest request;
-  private final TraceContext.Trace parent;
+  private final Trace parent;
 
-  public TraceCallable(InstanceRequest request, TraceContext.Trace parent) {
+  public TraceCallable(InstanceRequest request, Trace parent) {
     if (request == null) {
       LOGGER.warn("Passing null requestId to TraceRunnable, maybe forget to register the request in current thread.");
     }

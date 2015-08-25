@@ -8,11 +8,11 @@ public class TraceUtils {
      * Builds the full tree and returns the root (which has to have a
      * null parent).
      */
-    private static TraceContext.Trace linkToTree(Iterable<TraceContext.Trace> nodes) {
-        TraceContext.Trace root = null;
+    private static Trace linkToTree(Iterable<Trace> nodes) {
+        Trace root = null;
 
-        for (TraceContext.Trace node : nodes) {
-            final TraceContext.Trace parent = node._parent;
+        for (Trace node : nodes) {
+            final Trace parent = node._parent;
 
             // try to detect the root node
             if (parent == null) {
@@ -32,18 +32,18 @@ public class TraceUtils {
      * @param deque
      * @return
      */
-    public static String getTraceTree(ConcurrentLinkedDeque<TraceContext.Trace> deque) {
+    public static String getTraceTree(ConcurrentLinkedDeque<Trace> deque) {
         StringBuilder sb = new StringBuilder();
         sb.append("\n");
         linkToTree(deque).getTraceTree(sb, 0);
         return sb.toString();
     }
 
-    public static String getTraceString(ConcurrentLinkedDeque<TraceContext.Trace> deque) {
+    public static String getTraceString(ConcurrentLinkedDeque<Trace> deque) {
         StringBuilder sb = new StringBuilder();
         sb.append("[");
         int cnt = 0;
-        for (TraceContext.Trace trace: deque) {
+        for (Trace trace: deque) {
             if (cnt > 0) {
                 sb.append(", ");
             }
