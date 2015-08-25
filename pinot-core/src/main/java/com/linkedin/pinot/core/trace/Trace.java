@@ -55,13 +55,13 @@ public class Trace {
       if (i > 0) {
         sb.append(", ");
       }
-      // sb.append("\"");
+      sb.append("\"");
       sb.append(_key.get(i));
-      // sb.append("\"");
+      sb.append("\"");
       sb.append(": ");
-      // sb.append("\"");
+      sb.append("\"");
       sb.append(_value.get(i));
-      // sb.append("\"");
+      sb.append("\"");
     }
     sb.append("}");
     sb.append("}");

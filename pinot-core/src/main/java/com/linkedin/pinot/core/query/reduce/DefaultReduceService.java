@@ -82,11 +82,11 @@ public class DefaultReduceService implements ReduceService {
       reduceOnExceptions(brokerResponse.getExceptions(), serverInstance, instanceResponse.getExceptions());
 
       // debug mode enable : reduceOnTraceInfo
-      if (brokerRequest.isEnableTrace()) {
+      /*if (brokerRequest.isEnableTrace()) {
         reduceOnSegmentStatistics(brokerResponse.getSegmentStatistics(), serverInstance,
             instanceResponse.getSegmentStatistics());
         reduceOnTraceInfos(brokerResponse.getTraceInfo(), serverInstance, instanceResponse.getTraceInfo());
-      }
+      }*/
       // reduceOnNumDocsScanned
       brokerResponse.setNumDocsScanned(brokerResponse.getNumDocsScanned() + instanceResponse.getNumDocsScanned());
       // reduceOnTotalDocs
@@ -97,15 +97,7 @@ public class DefaultReduceService implements ReduceService {
     return brokerResponse;
   }
 
-  private void reduceOnTraceInfos(Map<String, String> brokerTraceInfo, ServerInstance serverInstance,
-      Map<String, String> traceInfoToAdd) {
-    for (String key : traceInfoToAdd.keySet()) {
-      brokerTraceInfo.put(serverInstance.getHostname() + " : " + key, traceInfoToAdd.get(key));
-    }
-  }
-
   /**
-   * TODO: just a temporary work around
    * @param brokerTraceInfo
    * @param serverInstance
    * @param traceInfoToAdd
