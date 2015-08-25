@@ -7,8 +7,8 @@ import java.util.Set;
 
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.ResultProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.exception.FunctionDidNotEvaluateException;
 import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.anomaly.util.DimensionKeyMatchTable;

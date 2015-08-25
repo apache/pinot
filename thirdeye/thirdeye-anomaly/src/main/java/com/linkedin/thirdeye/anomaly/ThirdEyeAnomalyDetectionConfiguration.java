@@ -15,7 +15,7 @@ public class ThirdEyeAnomalyDetectionConfiguration {
 
   /** Built in modes of operation that determine how function definitions in the anomaly database are interpreted */
   public enum Mode {
-    RuleBased, Generic,
+    RULEBASED, GENERIC,
   }
 
   /** The mode determining how to interpret the anomaly database function specifications. */

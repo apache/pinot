@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.anomaly.rulebased;
 import java.util.Set;
 
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;

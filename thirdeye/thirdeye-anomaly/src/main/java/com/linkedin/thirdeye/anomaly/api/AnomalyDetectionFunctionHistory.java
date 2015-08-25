@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.database.AnomalyTable;
 import com.linkedin.thirdeye.anomaly.database.AnomalyTableRow;
 import com.linkedin.thirdeye.api.DimensionKey;

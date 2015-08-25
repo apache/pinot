@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory;
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.database.DeltaTable;
 import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
 import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
@@ -97,7 +97,7 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
     }
 
     /*
-     * RuleBased anomaly detection does not use init()
+     * RULEBASED anomaly detection does not use init()
      */
     func.init(starTreeConfig, new FunctionProperties());
 

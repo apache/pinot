@@ -17,11 +17,11 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistory;
-import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionTask;
-import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.api.AnomalyResultHandler;
 import com.linkedin.thirdeye.anomaly.api.HandlerProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.task.LocalDriverAnomalyDetectionTask;
+import com.linkedin.thirdeye.anomaly.api.task.AnomalyDetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.database.FunctionTable;
 import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
 import com.linkedin.thirdeye.anomaly.generic.GenericFunctionFactory;
@@ -78,12 +78,12 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
 
     AnomalyDetectionFunctionFactory functionFactory;
     switch (config.getMode()) {
-      case RuleBased:
+      case RULEBASED:
       {
         functionFactory = new RuleBasedFunctionFactory();
         break;
       }
-      case Generic:
+      case GENERIC:
       {
         functionFactory = new GenericFunctionFactory();
         break;
@@ -95,11 +95,11 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
       }
     }
 
-    List<AnomalyDetectionTask> tasks = buildTasks(thirdEyeClient, timeRange, functionFactory);
+    List<LocalDriverAnomalyDetectionTask> tasks = buildTasks(thirdEyeClient, timeRange, functionFactory);
 
     ExecutorService taskExecutors = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-    for (AnomalyDetectionTask task : tasks) {
+    for (LocalDriverAnomalyDetectionTask task : tasks) {
       taskExecutors.execute(task);
     }
 
@@ -119,10 +119,10 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
    *  A list of tasks to run
    * @throws Exception
    */
-  public List<AnomalyDetectionTask> buildTasks(ThirdEyeClient thirdEyeClient, TimeRange timeRange,
+  public List<LocalDriverAnomalyDetectionTask> buildTasks(ThirdEyeClient thirdEyeClient, TimeRange timeRange,
       AnomalyDetectionFunctionFactory functionFactory) throws Exception {
 
-    List<AnomalyDetectionTask> tasks = new LinkedList<AnomalyDetectionTask>();
+    List<LocalDriverAnomalyDetectionTask> tasks = new LinkedList<LocalDriverAnomalyDetectionTask>();
 
     AnomalyDetectionDriverConfig driverConfig = config.getDriverConfig();
 
@@ -158,7 +158,7 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
             config.getAnomalyDatabaseConfig(), functionTableRow.getFunctionId());
 
         // make the task
-        AnomalyDetectionTask task = new AnomalyDetectionTask(starTreeConfig, driverConfig, taskInfo,
+        LocalDriverAnomalyDetectionTask task = new LocalDriverAnomalyDetectionTask(starTreeConfig, driverConfig, taskInfo,
             function, resultHandler, functionHistory, thirdEyeClient);
 
         tasks.add(task);

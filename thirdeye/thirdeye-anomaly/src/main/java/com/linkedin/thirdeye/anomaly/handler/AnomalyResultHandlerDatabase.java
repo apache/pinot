@@ -7,10 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
-import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.api.AnomalyResultHandler;
 import com.linkedin.thirdeye.anomaly.api.HandlerProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.task.AnomalyDetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.database.AnomalyTable;
 import com.linkedin.thirdeye.anomaly.database.AnomalyTableRow;
 import com.linkedin.thirdeye.anomaly.util.DimensionKeyUtils;

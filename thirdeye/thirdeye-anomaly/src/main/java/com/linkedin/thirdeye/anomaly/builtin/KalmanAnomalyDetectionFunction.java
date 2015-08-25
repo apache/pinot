@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.util.LRUMap;
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.ResultProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.exception.FunctionDidNotEvaluateException;
 import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.anomaly.lib.fanomaly.FanomalyDataPoint;
@@ -96,7 +96,7 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
   /**
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#init(com.linkedin.thirdeye.anomaly.api.external.StarTreeConfig, com.linkedin.thirdeye.anomaly.api.FunctionProperties)
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#init(com.linkedin.thirdeye.anomaly.api.function.StarTreeConfig, com.linkedin.thirdeye.anomaly.api.FunctionProperties)
    */
   @Override
   public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException {
@@ -138,7 +138,7 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
   /**
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#getTrainingWindowTimeGranularity()
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getTrainingWindowTimeGranularity()
    */
   @Override
   public TimeGranularity getTrainingWindowTimeGranularity() {
@@ -147,7 +147,7 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
   /**
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#getAggregationTimeGranularity()
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getAggregationTimeGranularity()
    */
   @Override
   public TimeGranularity getAggregationTimeGranularity() {
@@ -156,7 +156,7 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
   /**
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#getMetrics()
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getMetrics()
    */
   @Override
   public Set<String> getMetrics() {
@@ -167,7 +167,7 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
   /**
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.anomaly.api.external.DimensionKey, com.linkedin.thirdeye.anomaly.api.external.MetricTimeSeries, com.linkedin.thirdeye.anomaly.api.external.TimeRange, java.util.List)
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.anomaly.api.function.DimensionKey, com.linkedin.thirdeye.anomaly.api.function.MetricTimeSeries, com.linkedin.thirdeye.anomaly.api.function.TimeRange, java.util.List)
    */
   @Override
   public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval,

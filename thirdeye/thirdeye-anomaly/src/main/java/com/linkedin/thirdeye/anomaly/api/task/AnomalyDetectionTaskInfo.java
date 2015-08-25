@@ -1,9 +1,9 @@
-package com.linkedin.thirdeye.anomaly.api;
+package com.linkedin.thirdeye.anomaly.api.task;
 
 import com.linkedin.thirdeye.api.TimeRange;
 
 /**
- * This class is used to identify the function and inputs to AnomalyDetectionTask
+ * This class is used to identify the function and inputs to LocalDriverAnomalyDetectionTask
  */
 public class AnomalyDetectionTaskInfo {
 

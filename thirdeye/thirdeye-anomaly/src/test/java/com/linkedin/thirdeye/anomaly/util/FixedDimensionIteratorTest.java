@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class FixedDimensionIteratorTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedDimensionIteratorTest.class);
@@ -57,5 +59,25 @@ public class FixedDimensionIteratorTest {
     Map<String, List<String>> fixedDimensions = new HashMap<>();
     FixedDimensionIterator it = new FixedDimensionIterator(fixedDimensions);
     Assert.assertFalse(it.hasNext());
+  }
+
+  @Test
+  public void stressTest() throws Exception {
+    int numEntries = 5;
+    List<String> bigList = new ArrayList<>(numEntries);
+    for (int i = 0; i < numEntries; i++) {
+      bigList.add("VALUE " + i);
+    }
+
+    Map<String, List<String>> fixedDimensions = new HashMap<>();
+    for (int i = 0; i < 6; i++) {
+      fixedDimensions.put("DIMENSION " + i, new ArrayList<>(bigList));
+    }
+
+    ObjectMapper mapper = new ObjectMapper();
+    FixedDimensionIterator it = new FixedDimensionIterator(fixedDimensions);
+    while (it.hasNext()) {
+      LOGGER.info(mapper.writeValueAsString(it.next()));
+    }
   }
 }

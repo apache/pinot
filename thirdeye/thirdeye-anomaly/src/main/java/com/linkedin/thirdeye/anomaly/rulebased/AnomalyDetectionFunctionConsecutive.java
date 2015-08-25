@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.anomaly.util.TimeGranularityUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
@@ -39,7 +39,7 @@ public class AnomalyDetectionFunctionConsecutive extends AnomalyDetectionFunctio
    * Adds length times aggregate granularity time to the child's minimum window time granularity.
    *
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#getTrainingWindowTimeGranularity()
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getTrainingWindowTimeGranularity()
    */
   @Override
   public TimeGranularity getTrainingWindowTimeGranularity() {
@@ -57,7 +57,7 @@ public class AnomalyDetectionFunctionConsecutive extends AnomalyDetectionFunctio
    * anomaly result in the window.
    *
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.api.DimensionKey, com.linkedin.thirdeye.api.MetricTimeSeries)
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.api.DimensionKey, com.linkedin.thirdeye.api.MetricTimeSeries)
    */
   @Override
   public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,

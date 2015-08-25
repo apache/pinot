@@ -3,7 +3,8 @@ package com.linkedin.thirdeye.anomaly.api;
 import java.io.IOException;
 import java.util.Set;
 
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.api.task.AnomalyDetectionTaskInfo;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 

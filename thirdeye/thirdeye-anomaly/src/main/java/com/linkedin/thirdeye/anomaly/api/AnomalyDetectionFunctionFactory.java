@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.api;
 
-import com.linkedin.thirdeye.anomaly.api.external.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
 import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.api.StarTreeConfig;

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.api.external;
+package com.linkedin.thirdeye.anomaly.api.function;
 
 import java.util.concurrent.TimeUnit;
 
