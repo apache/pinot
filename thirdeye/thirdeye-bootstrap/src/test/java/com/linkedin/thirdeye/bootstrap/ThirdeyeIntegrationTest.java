@@ -92,8 +92,9 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConst
 import static com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.*;
+
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 
 
 
@@ -243,7 +244,7 @@ public class ThirdeyeIntegrationTest {
      String sql = "SELECT metric1 FROM " + COLLECTION + " WHERE time BETWEEN '" +getDateString(MIN_TIME)+ "' AND '" + getDateString(MAX_TIME) +"'";
      URL url = new URL(THIRDEYE_SERVER + "/query/" + URLEncoder.encode(sql, "UTF-8"));
      ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-     QueryResult queryResult =  OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), QueryResult.class);
+     ThirdEyeRawResponse queryResult =  OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), ThirdEyeRawResponse.class);
      for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
        for (Entry<String, Number[]> metricEntry : entry.getValue().entrySet()) {
          metric1SumActual += metricEntry.getValue()[0].longValue();

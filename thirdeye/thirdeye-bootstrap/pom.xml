@@ -134,7 +134,7 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.thirdeye</groupId>
-      <artifactId>thirdeye-dashboard</artifactId>
+      <artifactId>thirdeye-client</artifactId>
       <version>1.0-SNAPSHOT</version>
        <scope>test</scope>
     </dependency>
