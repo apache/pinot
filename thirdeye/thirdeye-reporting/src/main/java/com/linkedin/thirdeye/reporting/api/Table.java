@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.reporting.api;
 
 import java.net.URL;
 import java.util.List;
-import java.util.Map;
 
 public class Table {
   TableSpec tableSpec;

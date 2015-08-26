@@ -2,8 +2,6 @@ package com.linkedin.thirdeye.reporting.api;
 
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 public class ScheduleSpec {
 
   private String cron;

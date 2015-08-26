@@ -11,7 +11,6 @@ import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 
 public class ReportConfig {
 

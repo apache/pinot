@@ -38,8 +38,8 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
+import com.linkedin.thirdeye.client.util.SqlUtils;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGenerator;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
@@ -125,8 +125,8 @@ public class ReportGenerator implements Job{
             String currentSql = SqlUtils.getSql(metric, collection, currentStartHour, currentEndHour, dimensionValues);
             String baselineSql = SqlUtils.getSql(metric, collection, baselineStartHour, baselineEndHour, dimensionValues);
 
-            QueryResult currentQueryResult = getReport(currentSql);
-            QueryResult baselineQueryResult = getReport(baselineSql);
+            ThirdEyeRawResponse currentQueryResult = getReport(currentSql);
+            ThirdEyeRawResponse baselineQueryResult = getReport(baselineSql);
 
             Map<DimensionKey, Number> currentReportOutput = applyFilters(currentQueryResult, tableSpec, metric, currentStartHour, currentEndHour);
             Map<DimensionKey, Number> baselineReportOutput = applyFilters(baselineQueryResult, tableSpec, metric, baselineStartHour, baselineEndHour);
@@ -339,7 +339,7 @@ e.printStackTrace();
   }
 
 
-  private Map<DimensionKey, Number> applyFilters(QueryResult queryResult, TableSpec tableSpec, String metric, DateTime startTime, DateTime endTime) {
+  private Map<DimensionKey, Number> applyFilters(ThirdEyeRawResponse queryResult, TableSpec tableSpec, String metric, DateTime startTime, DateTime endTime) {
 
     Map<DimensionKey, Number> reportOutput = new HashMap<DimensionKey, Number>();
 
@@ -420,10 +420,10 @@ e.printStackTrace();
 
 
 
-  private QueryResult getReport(String sql) throws IOException {
+  private ThirdEyeRawResponse getReport(String sql) throws IOException {
 
     URL url = new URL(serverUri + "/query/" + URLEncoder.encode(sql, "UTF-8"));
-    return OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), QueryResult.class);
+    return OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), ThirdEyeRawResponse.class);
   }
 
   private StarTreeConfig getStarTreeConfig() throws JsonParseException, JsonMappingException, UnsupportedEncodingException, IOException {
