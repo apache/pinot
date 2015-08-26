@@ -14,7 +14,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.hadoop.io.AvroSerialization;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.math.random.RandomDataImpl;
+import org.apache.commons.math3.random.RandomDataGenerator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -222,7 +222,7 @@ public class TestStarTreeBootstrapPhase1
       MetricSchema schema = new MetricSchema(names, types);
       MetricTimeSeries series = new MetricTimeSeries(schema);
       long timeStamp = TimeUnit.HOURS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      RandomDataImpl rand = new RandomDataImpl();
+      RandomDataGenerator rand = new RandomDataGenerator();
       for(int i = 0;i<names.size();i++){
         series.set(timeStamp, names.get(i), rand.nextInt(0, 100));
       }

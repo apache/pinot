@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.bootstrap;
 import static org.junit.Assert.assertTrue;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -14,10 +15,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URISyntaxException;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -34,8 +43,6 @@ import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -43,10 +50,18 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.ThirdEyeApplication;
 import com.linkedin.thirdeye.tools.DataGeneratorConfig;
 import com.linkedin.thirdeye.tools.DataGeneratorTool;
+import com.linkedin.thirdeye.util.DropWizardApplicationRunner;
 
 import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileReader;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 
@@ -76,10 +91,11 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeCons
 import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.*;
-
-import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants;
-
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.*;
+import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants;
+import com.linkedin.thirdeye.dashboard.api.QueryResult;
+
+
 
 public class ThirdeyeIntegrationTest {
 
@@ -105,7 +121,6 @@ public class ThirdeyeIntegrationTest {
   private static final String CONFIG_FILE = "config.yml";
   private static final String SCHEMA_FILE = "schema.avsc";
   private static final String PROPERTIES_FILE = "integrationTest.properties";
-  private static final String THIRDEYE_ADMIN_PORT = "15994";
 
   private static Path inputFilePath;
   private static Path configFilePath;
@@ -177,7 +192,7 @@ public class ThirdeyeIntegrationTest {
   }
 
 
-  @Test
+ @Test
   public void testEndToEndIntegration() throws Exception {
 
     LOGGER.info("End to end integration testing starting");
@@ -212,23 +227,59 @@ public class ThirdeyeIntegrationTest {
     // ServerPackage
     testServerPackage();
 
-    // Delete collection from server
-    deleteExistingServer();
-
-    // ServerUpload
-    testServerUpload();
+    // Start and test server
+    testCreateServer();
 
     LOGGER.info("End to end integration testing completed");
 }
 
 
+   private void checkData() throws IOException {
+
+     long metric1SumActual = 0;
+     long metric1SumExpected = 0;
+
+     // calculate metric1 from /query
+     String sql = "SELECT metric1 FROM " + COLLECTION + " WHERE time BETWEEN '" +getDateString(MIN_TIME)+ "' AND '" + getDateString(MAX_TIME) +"'";
+     URL url = new URL(THIRDEYE_SERVER + "/query/" + URLEncoder.encode(sql, "UTF-8"));
+     ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+     QueryResult queryResult =  OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), QueryResult.class);
+     for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
+       for (Entry<String, Number[]> metricEntry : entry.getValue().entrySet()) {
+         metric1SumActual += metricEntry.getValue()[0].longValue();
+       }
+     }
+
+     // calculate metric1 from input files
+     File schemaFile = new File(getClass().getClassLoader().getResource("integrationTest/"+SCHEMA_FILE).getFile());
+     Schema schema = new Schema.Parser().parse(schemaFile);
+     GenericRecord record = new GenericData.Record(schema);
+     File avroDataInput = new File(rootDir, COLLECTION);
+     avroDataInput = new File(avroDataInput, INPUT_DIR);
+
+     for (File avroFile : avroDataInput.listFiles()) {
+       DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
+       DataFileReader<GenericRecord> dataFileReader = new DataFileReader<>(avroFile, datumReader);
+
+       while (dataFileReader.hasNext()) {
+         record = dataFileReader.next();
+         long metric1 = (long) record.get("metric1");
+         metric1SumExpected += metric1;
+       }
+     }
+     assertTrue("Data mismatch between input files and server", metric1SumActual == metric1SumExpected);
+   }
+
+
   private void testServerUpload() throws Exception {
+
     LOGGER.info("Starting server_upload job");
 
+    // server_upload
     new ThirdEyeJob("server_upload", properties).serverUpload(fs, ROOT, COLLECTION, FlowSpec.METRIC_INDEX, MIN_TIME, MAX_TIME);
 
     // restore
-    String uri = THIRDEYE_SERVER.replaceAll(":[0-9][0-9]*", ":"+THIRDEYE_ADMIN_PORT) +  "/tasks/restore?collection=" + COLLECTION;
+    String uri = "http://localhost:8081/tasks/restore?collection=" + COLLECTION;
     CloseableHttpClient httpClient = HttpClientBuilder.create().build();
     HttpPost postRequest = new HttpPost(uri);
     HttpResponse response = httpClient.execute(postRequest);
@@ -246,20 +297,59 @@ public class ThirdeyeIntegrationTest {
     LOGGER.info("server_upload job completed");
   }
 
-  private void deleteExistingServer() throws ClientProtocolException, IOException, URISyntaxException {
-    LOGGER.info("Deleting existing collection before upload");
+  private void testCreateServer() throws Exception
+  {
 
-    String uri = THIRDEYE_SERVER + "/collections/" + COLLECTION;
-    CloseableHttpClient httpClient = HttpClientBuilder.create().build();
-    HttpDelete deleteRequest = new HttpDelete(uri);
-    HttpResponse response = httpClient.execute(deleteRequest);
+    // start server
+    File ROOT_DIR = new File(rootDir, "thirdeye-server");
+    int REQUEST_TIMEOUT_MILLIS = 10000;
+    ThirdEyeApplication.Config config = new ThirdEyeApplication.Config();
+    config.setRootDir(ROOT_DIR.getAbsolutePath());
 
-    LOGGER.info("Delete existing server status : "+response.getStatusLine().getStatusCode());
+    DropWizardApplicationRunner.DropWizardServer<ThirdEyeApplication.Config> server
+            = DropWizardApplicationRunner.createServer(config, ThirdEyeApplication.class);
+
+    assertTrue(server.getMetricRegistry() != null);
+
+    server.start();
+
+    // Try to contact it
+    long startTime = System.currentTimeMillis();
+    boolean success = false;
+    while (System.currentTimeMillis() - startTime < REQUEST_TIMEOUT_MILLIS)
+    {
+      try
+      {
+        HttpURLConnection conn = (HttpURLConnection) URI.create("http://localhost:8080/admin").toURL().openConnection();
+        byte[] res = IOUtils.toByteArray(conn.getInputStream());
+        if (Arrays.equals(res, "GOOD".getBytes()))
+        {
+          success = true;
+          break;
+        }
+      }
+      catch (Exception e)
+      {
+        // Re-try
+      }
+    }
+    assertTrue(success);
+
+    // server upload
+    testServerUpload();
+
+    // test data integrity
+    checkData();
+
+    // stop server
+    server.stop();
   }
 
   private void testServerPackage() throws Exception {
+
     LOGGER.info("Starting server_package job");
 
+    // server_package
     new ThirdEyeJob("server_package", properties).serverPackage(fs, ROOT, COLLECTION, FlowSpec.METRIC_INDEX, MIN_TIME, MAX_TIME);
     assertTrue("failed to create data.tar.gz in server_package", fs.exists(new Path(serverPackageOutput, "data.tar.gz")));
 
@@ -548,6 +638,7 @@ public class ThirdeyeIntegrationTest {
   }
 
   private void testRollupPhase1() throws ClassNotFoundException, IOException, InterruptedException {
+
     LOGGER.info("Starting rollup_phase1 job");
 
     // Rollup phase 1
@@ -604,6 +695,7 @@ public class ThirdeyeIntegrationTest {
   }
 
   private void testAggregation() throws IOException, ClassNotFoundException, InterruptedException {
+
     LOGGER.info("Starting aggregation job");
 
     // Aggregation
@@ -729,5 +821,8 @@ public class ThirdeyeIntegrationTest {
     serverPackageOutput = metricIndexDir;
   }
 
+  public static String getDateString(DateTime dateTime) {
+    return ISODateTimeFormat.dateTimeNoMillis().print(dateTime.toDateTime(DateTimeZone.UTC));
+  }
 
 }
