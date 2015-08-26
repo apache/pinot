@@ -85,13 +85,13 @@ public class ControllerTenantNameBuilder {
 
   public static String getExternalTenantName(String tenantName) {
     if (tenantName.endsWith(ServerType.REALTIME.toString())) {
-      return tenantName.substring(0, tenantName.length() - ServerType.REALTIME.toString().length() + 1);
+      return tenantName.substring(0, tenantName.length() - (ServerType.REALTIME.toString().length() + 1));
     }
     if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
-      return tenantName.substring(0, tenantName.length() - ServerType.OFFLINE.toString().length() + 1);
+      return tenantName.substring(0, tenantName.length() - (ServerType.OFFLINE.toString().length() + 1));
     }
     if (tenantName.endsWith(TenantRole.BROKER.toString())) {
-      return tenantName.substring(0, tenantName.length() - TenantRole.BROKER.toString().length() + 1);
+      return tenantName.substring(0, tenantName.length() - (TenantRole.BROKER.toString().length() + 1));
     }
     return tenantName;
   }
