@@ -36,6 +36,7 @@ public class ZKMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataProvider.class);
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
   private static String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
+  private static String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
@@ -63,6 +64,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
+  }
+
+  public static String constructPropertyStorePathForSchema(String schemaName) {
+    return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
