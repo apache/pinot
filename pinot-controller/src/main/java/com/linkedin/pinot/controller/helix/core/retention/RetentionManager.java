@@ -110,7 +110,7 @@ public class RetentionManager {
         LOGGER.info("Not leader of the controller, sleep!");
       }
     } catch (Exception e) {
-      LOGGER.error("Got error in deletion thread: " + e);
+      LOGGER.error("Caught exception while running retention", e);
     }
   }
 
@@ -121,7 +121,7 @@ public class RetentionManager {
         RetentionStrategy deletionStrategy;
         deletionStrategy = _tableDeletionStrategy.get(tableName);
         if (deletionStrategy == null) {
-          LOGGER.info("No Retention strategy found for segment: " + segmentZKMetadata.getSegmentName());
+          LOGGER.info("No Retention strategy found for segment: {}", segmentZKMetadata.getSegmentName());
           continue;
         }
         if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
@@ -130,7 +130,7 @@ public class RetentionManager {
           }
         }
         if (deletionStrategy.isPurgeable(segmentZKMetadata)) {
-          LOGGER.info("Trying to delete segment: " + segmentZKMetadata.getSegmentName());
+          LOGGER.info("Trying to delete segment: {}", segmentZKMetadata.getSegmentName());
           _pinotHelixResourceManager.deleteSegment(tableName, segmentZKMetadata.getSegmentName());
         }
       }
@@ -173,7 +173,7 @@ public class RetentionManager {
       return tableToDeletionStrategyMap;
     }
     if (offlineTableConfig.getValidationConfig().getSegmentPushType().equalsIgnoreCase("REFRESH")) {
-      LOGGER.info("Table: " + offlineTableName + " is a fresh only table.");
+      LOGGER.info("Table: {} is a refresh only table.", offlineTableName);
       return tableToDeletionStrategyMap;
     }
     try {
@@ -181,7 +181,7 @@ public class RetentionManager {
           offlineTableConfig.getValidationConfig().getRetentionTimeValue());
       tableToDeletionStrategyMap.put(offlineTableName, timeRetentionStrategy);
     } catch (Exception e) {
-      LOGGER.error("Error creating TimeRetentionStrategy for table: " + offlineTableName + ", Exception: " + e);
+      LOGGER.error("Error creating TimeRetentionStrategy for table: {}", offlineTableName, e);
     }
     return tableToDeletionStrategyMap;
   }
@@ -201,7 +201,7 @@ public class RetentionManager {
           realtimeTableConfig.getValidationConfig().getRetentionTimeValue());
       tableToDeletionStrategyMap.put(realtimeTableName, timeRetentionStrategy);
     } catch (Exception e) {
-      LOGGER.error("Error creating TimeRetentionStrategy for table: " + realtimeTableName + ", Exception: " + e);
+      LOGGER.error("Error creating TimeRetentionStrategy for table {}", realtimeTableName, e);
     }
     return tableToDeletionStrategyMap;
   }
