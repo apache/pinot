@@ -20,20 +20,17 @@ public class STLDecompositionUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(STLDecompositionUtils.class);
 
-  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
   /**
    * @param timestamps
+   *  This should be a sorted array of timestamps with no gaps
    * @param series
+   *  The raw series values
    * @param seasonality
+   *  The seasonality in number of buckets
    * @return
    *  The timeseries with seasonality removed
    */
   public static double[] removeSeasonality(long[] timestamps, double[] series, int seasonality) {
-    if (seasonality != 168) {
-      throw new IllegalArgumentException("only 168 seasonality is supported");
-    }
-
     int numDataPoints = timestamps.length;
     if (numDataPoints != series.length) {
       throw new IllegalArgumentException("time series lengths do not match");
@@ -43,41 +40,46 @@ public class STLDecompositionUtils {
       throw new IllegalArgumentException("seasonality cannot be negative");
     }
 
-    double[] result = new double[numDataPoints];
-
     Process process = null;
     BufferedReader stdout = null;
     BufferedWriter stdin = null;
+
     try {
       ProcessBuilder processBuilder = new ProcessBuilder(
           "Rscript",
-          STLDecompositionUtils.class.getClassLoader().getResource("r/stl-wrapper.R").getPath());
+          STLDecompositionUtils.class.getClassLoader().getResource("r/stl-wrapper.R").getPath(),
+          "" + seasonality);
       processBuilder.redirectErrorStream(true);
       process = processBuilder.start();
 
+      // the Rscript's stdout
       stdout = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+      // the Rscript's stdin
       stdin = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 
-      stdin.write("\"Bucket\",\"Median\"\n");
+      stdin.write("\"Bucket\",\"Series\"\n");
       for (int i = 0; i < numDataPoints; i++) {
-        stdin.write(DATE_FORMAT.format(new Date(timestamps[i])) + "," + series[i] + "\n");
+        stdin.write(timestamps[i] + "," + series[i] + "\n");
       }
       stdin.close();
 
+      // wait for Rscript to finish
       process.waitFor();
 
-      String headers = stdout.readLine();
+      // read the result line by line
+      double[] result = new double[numDataPoints];
+
       for (int i = 0; i < numDataPoints; i++){
         String line = stdout.readLine();
-        result[i] = Double.valueOf(line.split(",")[1]);
+        result[i] = Double.valueOf(line);
       }
+
+      return result;
     } catch (Exception e) {
       LOGGER.info("exception trying to run stl", e);
       return null;
     } finally {
-      if (process != null) {
-        process.destroyForcibly();
-      }
       if (stdin != null) {
         try {
           stdin.close();
@@ -92,9 +94,10 @@ public class STLDecompositionUtils {
           e1.printStackTrace();
         }
       }
+      if (process != null) {
+        process.destroyForcibly();
+      }
     }
-
-    return result;
   }
 
 //  public static void main(String[] args) throws IOException {
