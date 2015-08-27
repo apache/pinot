@@ -205,15 +205,16 @@ public class AggregatePhaseJob extends Configured {
     }
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
-      FSDataOutputStream dimensionStatsOutputStream =
-          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
-      dimensionStatsOutputStream.close();
-
-      FSDataOutputStream outputStream =
-          fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-      outputStream.write(aggregationStats.toString().getBytes());
-      outputStream.close();
+      // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks are used (gbrandt, 2015-08-27)
+//      FSDataOutputStream dimensionStatsOutputStream =
+//          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+//      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
+//      dimensionStatsOutputStream.close();
+//
+//      FSDataOutputStream outputStream =
+//          fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+//      outputStream.write(aggregationStats.toString().getBytes());
+//      outputStream.close();
     }
   }
 

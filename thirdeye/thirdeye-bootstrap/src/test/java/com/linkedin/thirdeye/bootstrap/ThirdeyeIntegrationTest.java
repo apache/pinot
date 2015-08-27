@@ -737,22 +737,23 @@ public class ThirdeyeIntegrationTest {
 
     // tests
     assertTrue("aggregation job failed", job.isSuccessful());
-    assertTrue("Dimension stats folder not created", fs.exists(dimensionStatsPath));
-    FileStatus[] dimensionStatus = fs.listStatus(dimensionStatsPath, new PathFilter() {
-      @Override
-      public boolean accept(Path path) {
-        return path.getName().endsWith(".stat");
-      }
-    });
-    assertTrue("Dimension stats not generated", dimensionStatus.length != 0);
-    assertTrue("Aggregation ouput folder not created", fs.exists(aggregationOutputPath));
-    FileStatus[] aggregationStatus = fs.listStatus(aggregationOutputPath, new PathFilter() {
-      @Override
-      public boolean accept(Path path) {
-        return path.getName().startsWith("part");
-      }
-    });
-    assertTrue("Aggregation results not generated", aggregationStatus.length != 0);
+    // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks are used (gbrandt, 2015-08-27)
+//    assertTrue("Dimension stats folder not created", fs.exists(dimensionStatsPath));
+//    FileStatus[] dimensionStatus = fs.listStatus(dimensionStatsPath, new PathFilter() {
+//      @Override
+//      public boolean accept(Path path) {
+//        return path.getName().endsWith(".stat");
+//      }
+//    });
+//    assertTrue("Dimension stats not generated", dimensionStatus.length != 0);
+//    assertTrue("Aggregation ouput folder not created", fs.exists(aggregationOutputPath));
+//    FileStatus[] aggregationStatus = fs.listStatus(aggregationOutputPath, new PathFilter() {
+//      @Override
+//      public boolean accept(Path path) {
+//        return path.getName().startsWith("part");
+//      }
+//    });
+//    assertTrue("Aggregation results not generated", aggregationStatus.length != 0);
 
     LOGGER.info("aggregation job completed");
   }
