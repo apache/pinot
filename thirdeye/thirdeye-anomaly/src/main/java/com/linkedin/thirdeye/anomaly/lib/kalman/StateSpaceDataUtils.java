@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.lib.fanomaly;
+package com.linkedin.thirdeye.anomaly.lib.kalman;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -8,10 +8,14 @@ import org.jblas.DoubleMatrix;
 /**
  *
  */
-public class DataUtils {
+public class StateSpaceDataUtils {
 
-  public static DoubleMatrix[] removeTimeStamps(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps,
-      Set<Long> omitTimestamps) {
+  /**
+   * @return
+   *  The intput time series with timestamps nulled out.
+   */
+  public static void removeTimeStamps(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, Set<Long> omitTimestamps)
+  {
     if (omitTimestamps.size() > 0) {
       for (int i = 0; i < inputTimeSeries.length; i++) {
         if (omitTimestamps.contains(inputTimeStamps[i])) {
@@ -19,9 +23,12 @@ public class DataUtils {
         }
       }
     }
-    return inputTimeSeries;
   }
 
+  /**
+   * @return
+   *  The range of data for which to make predictions.
+   */
   public static DoubleMatrix[] getPredictionData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, long trainEnd,
       int stepsAhead) throws Exception {
     int startPredictionIndex = -1;
@@ -42,6 +49,11 @@ public class DataUtils {
     }
   }
 
+
+  /**
+   * @return
+   *  The range of data between train start and train end
+   */
   public static DoubleMatrix[] getTrainingData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, long trainStart,
       long trainEnd) throws Exception {
     // clean data
@@ -87,6 +99,13 @@ public class DataUtils {
     return estimateTrainingRawMoment(processTrainingTimeSeries, seasonal, 1);
   }
 
+  /**
+   * @param processTrainingTimeSeries
+   * @param seasonal
+   * @param degree
+   * @return
+   *  The raw moment of one season of training data.
+   */
   public static double estimateTrainingRawMoment(DoubleMatrix[] processTrainingTimeSeries, int seasonal, int degree) {
     double estimate = 0;
     double count = 0;
@@ -101,6 +120,12 @@ public class DataUtils {
     return estimate / count;
   }
 
+  /**
+   * @param processTrainingTimeSeries
+   * @param seasonal
+   * @return
+   *  The variance of one season of training data
+   */
   public static double estimateTrainingVariance(DoubleMatrix[] processTrainingTimeSeries, int seasonal) {
     double estimateMean = estimateTrainingMean(processTrainingTimeSeries, seasonal);
     double estimateVariance = 0;

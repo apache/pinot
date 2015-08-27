@@ -15,7 +15,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 /**
  *
  */
-public class ServerUtils {
+public class ThirdEyeServerUtils {
 
   private static final ObjectMapper OBJECT_MAPPER;
 

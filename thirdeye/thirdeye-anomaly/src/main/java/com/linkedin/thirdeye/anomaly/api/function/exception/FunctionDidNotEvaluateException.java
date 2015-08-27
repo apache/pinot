@@ -1,7 +1,8 @@
-package com.linkedin.thirdeye.anomaly.exception;
+package com.linkedin.thirdeye.anomaly.api.function.exception;
 
 /**
- *
+ * Exception thrown by AnomalyDetectionFunction at runtime.
+ * For example, the training data has too many anomalies, is incomplete, etc.
  */
 public class FunctionDidNotEvaluateException extends RuntimeException {
 

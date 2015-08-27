@@ -6,7 +6,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeRange;
 
 /**
  *
@@ -45,31 +44,6 @@ public class ThirdEyeAnomalyDetectionConfiguration {
    */
   private Integer functionIdToEvaluate = null;
 
-  /*
-   * The following settings are only used when the anomaly detection service is running as a standalone process.
-   */
-
-  /**
-   * The time range (start, end) to run anomaly detection on.
-   * This option only makes sense in a standalone mode!
-   */
-  private TimeRange explicitTimeRange;
-
-  /**
-   * The interval at which anomaly detection tasks are scheduled to run.
-   * This option only makes sense in a standalone mode and when not running with an explicit time range!
-   */
-  private TimeGranularity detectionInterval;
-
-  @JsonProperty
-  public TimeRange getExplicitTimeRange() {
-    return explicitTimeRange;
-  }
-
-  public void setExplicitTimeRange(TimeRange explicitTimeRange) {
-    this.explicitTimeRange = explicitTimeRange;
-  }
-
   @JsonProperty
   public Mode getMode() {
     return mode;
@@ -95,15 +69,6 @@ public class ThirdEyeAnomalyDetectionConfiguration {
 
   public void setThirdEyeServerHost(String thirdEyeServerHost) {
     this.thirdEyeServerHost = thirdEyeServerHost;
-  }
-
-  @JsonProperty
-  public TimeGranularity getDetectionInterval() {
-    return detectionInterval;
-  }
-
-  public void setDetectionInterval(TimeGranularity detectionInterval) {
-    this.detectionInterval = detectionInterval;
   }
 
   @JsonProperty

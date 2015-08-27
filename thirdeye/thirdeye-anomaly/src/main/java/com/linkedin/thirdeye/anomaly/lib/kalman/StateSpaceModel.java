@@ -1,8 +1,9 @@
-package com.linkedin.thirdeye.anomaly.lib.fanomaly;
+package com.linkedin.thirdeye.anomaly.lib.kalman;
 
 import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import org.apache.commons.math3.linear.MatrixDimensionMismatchException;
 import org.jblas.DoubleMatrix;
+import org.jblas.Solve;
 
 public class StateSpaceModel {
   // The matrices describing a state space model.
@@ -105,11 +106,11 @@ public class StateSpaceModel {
     estimated_means_ = new DoubleMatrix[number_of_observations_];
     estimated_covariances_ = new DoubleMatrix[number_of_observations_];
 
-    UpdateFilteredStates();
-    CalculateLogLikelihood();
+    updateFilteredStates();
+    calculateLogLikelihood();
   }
 
-  public void CalculatePrediction(int steps_ahead) {
+  public void calculatePrediction(int steps_ahead) {
     if (steps_ahead > 0) {
       predicted_means_ = new DoubleMatrix[steps_ahead];
       predicted_variances_ = new DoubleMatrix[steps_ahead];
@@ -139,7 +140,7 @@ public class StateSpaceModel {
 
   }
 
-  private void UpdateFilteredStates() {
+  private void updateFilteredStates() {
     DoubleMatrix state_transition_matrix_T = state_transition_matrix_ref_.transpose();
     DoubleMatrix observation_matrix_T = observation_matrix_ref_.transpose();
 
@@ -168,8 +169,7 @@ public class StateSpaceModel {
         estimated_state_means_[ii] = a;
         estimated_state_covariances_[ii] = R;
       } else {
-        DoubleMatrix inv_predicted_observation_covariances = InverseMatrix.inverse(
-            predicted_observation_covariances_[ii]);
+        DoubleMatrix inv_predicted_observation_covariances = Solve.pinv(predicted_observation_covariances_[ii]);
         DoubleMatrix R_obs_mat_T_inv_pred_obs_cov = R
             .mmul(observation_matrix_T)
             .mmuli(inv_predicted_observation_covariances);
@@ -192,7 +192,7 @@ public class StateSpaceModel {
     }
   }
 
-  private void CalculateLogLikelihood() {
+  private void calculateLogLikelihood() {
     sum_log_likelihood_ = 0;
     for (int ii = 0; ii < number_of_observations_; ii++) {
       if (observations_ref_[ii] == null) {
@@ -208,51 +208,51 @@ public class StateSpaceModel {
   }
 
   // Getters
-  public DoubleMatrix GetStateNoiseMatrix() {
+  public DoubleMatrix getStateNoiseMatrix() {
     return transition_covariance_matrix_ref_.dup();
   }
 
-  public DoubleMatrix GetObservationNoiseMatrix() {
+  public DoubleMatrix getObservationNoiseMatrix() {
     return observation_covariance_matrix_ref_.dup();
   }
 
-  public DoubleMatrix[] GetEstimatedStateMeans() {
+  public DoubleMatrix[] getEstimatedStateMeans() {
     return estimated_state_means_.clone();
   }
 
-  public DoubleMatrix[] GetEstimatedMeans() {
+  public DoubleMatrix[] getEstimatedMeans() {
     return estimated_means_.clone();
   }
 
-  public DoubleMatrix[] GetEstimatedCovariances() {
+  public DoubleMatrix[] getEstimatedCovariances() {
     return estimated_covariances_.clone();
   }
 
-  public DoubleMatrix[] GetEstimatedStateCovariances() {
+  public DoubleMatrix[] getEstimatedStateCovariances() {
     return estimated_state_covariances_.clone();
   }
 
-  public DoubleMatrix[] GetPredictedObservationMeans() {
+  public DoubleMatrix[] getPredictedObservationMeans() {
     return predicted_observation_means_.clone();
   }
 
-  public DoubleMatrix[] GetPredictedObservationCovariance() {
+  public DoubleMatrix[] getPredictedObservationCovariance() {
     return predicted_observation_covariances_.clone();
   }
 
-  public DoubleMatrix[] GetPredictedMeans() {
+  public DoubleMatrix[] getPredictedMeans() {
     return predicted_means_.clone();
   }
 
-  public DoubleMatrix[] GetPredictedCovariance() {
+  public DoubleMatrix[] getPredictedCovariance() {
     return predicted_variances_.clone();
   }
 
-  public DoubleMatrix[] GetTrainingSequence() {
+  public DoubleMatrix[] getTrainingSequence() {
     return observations_ref_.clone();
   }
 
-  public double GetLogLikeliHood() {
+  public double getLogLikeliHood() {
     return sum_log_likelihood_;
   }
 }

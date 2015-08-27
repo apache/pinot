@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
-import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
+import com.linkedin.thirdeye.anomaly.api.function.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;

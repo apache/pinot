@@ -1,9 +1,12 @@
 package com.linkedin.thirdeye.anomaly.util;
 
-import org.joda.time.DateTime;
-
 import java.io.File;
 
+import org.joda.time.DateTime;
+
+/**
+ * A copy of dashboard's segment descriptor used locally to avoid circular dependencies
+ */
 public class SegmentDescriptor {
   private File file;
   private DateTime startWallTime;
@@ -13,11 +16,12 @@ public class SegmentDescriptor {
 
   public SegmentDescriptor() {}
 
-  public SegmentDescriptor(File file,
-                           DateTime startWallTime,
-                           DateTime endWallTime,
-                           DateTime startDataTime,
-                           DateTime endDataTime) {
+  public SegmentDescriptor(
+      File file,
+      DateTime startWallTime,
+      DateTime endWallTime,
+      DateTime startDataTime,
+      DateTime endDataTime) {
     this.file = file;
     this.startWallTime = startWallTime;
     this.endWallTime = endWallTime;

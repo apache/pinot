@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.math3.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,10 +19,11 @@ import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.ResultProperties;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
-import com.linkedin.thirdeye.anomaly.exception.FunctionDidNotEvaluateException;
-import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
-import com.linkedin.thirdeye.anomaly.lib.fanomaly.FanomalyDataPoint;
-import com.linkedin.thirdeye.anomaly.lib.fanomaly.StateSpaceAnomalyDetector;
+import com.linkedin.thirdeye.anomaly.api.function.exception.FunctionDidNotEvaluateException;
+import com.linkedin.thirdeye.anomaly.api.function.exception.IllegalFunctionException;
+import com.linkedin.thirdeye.anomaly.lib.kalman.StateSpaceAnomalyDetector;
+import com.linkedin.thirdeye.anomaly.lib.kalman.StateSpaceDataPoint;
+import com.linkedin.thirdeye.anomaly.lib.util.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -36,7 +38,7 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
   private static final Logger LOGGER = LoggerFactory.getLogger(KalmanAnomalyDetectionFunction.class);
 
   private static final String PROP_DEFAULT_SEASONAL = "0";
-  private static final String PROP_DEFAULT_KNOB = "1000";
+  private static final String PROP_DEFAULT_KNOB = "10000";
   private static final String PROP_DEFAULT_ORDER = "1";
   private static final String PROP_DEFAULT_P_VALUE_THRESHOLD = "0.05";
 
@@ -177,35 +179,16 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
     long trainEndInput = Collections.max(series.getTimeWindowSet());
     long bucketMillis = bucketUnit.toMillis(bucketSize);
 
-    /*
-     * Convert data input to arrays
-     */
-    int numObservations = (int) (1 + ((trainEndInput - trainStartInput) / bucketMillis));
-    double[] observations = new double[numObservations];
-    long[] timestamps = new long[numObservations];
-
-    for (int i = 0; i < numObservations; i++) {
-      long timeWindow = trainStartInput + (i * bucketMillis);
-      timestamps[i] = timeWindow;
-      if (series.getTimeWindowSet().contains(timeWindow)) {
-        observations[i] = series.get(timeWindow, metric).doubleValue();
-      } else {
-        observations[i] = 0.0;
-      }
-    }
-
-    if (numObservations != series.getTimeWindowSet().size()) {
-      LOGGER.warn("looks like there are holes in the data: expected {} timestamps, actual {}", numObservations,
-          series.getTimeWindowSet().size());
-    }
-    /*
-     * Done converting data input
-     */
-
-    /*
-     * Configure omit timestamps
-     */
+    // data to leave out from training
     Set<Long> omitTimestamps = new HashSet<Long>();
+
+    // convert the data to arrays
+    Pair<long[], double[]> arraysFromSeries = MetricTimeSeriesUtils.toArray(series, metric, bucketMillis,
+        omitTimestamps, 0.0);
+    long[] timestamps = arraysFromSeries.getFirst();
+    double[] observations = arraysFromSeries.getSecond();
+
+    // omit previously detected anomalies from training
     for (AnomalyResult ar : anomalyHistory) {
       omitTimestamps.add(ar.getTimeWindow());
     }
@@ -229,12 +212,12 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
       stateSpaceDetector.setInitialEstimatedStateNoise(initialEstimatedStateNoise);
     }
 
-    Map<Long, FanomalyDataPoint> fAnomalyDataPoints;
+    Map<Long, StateSpaceDataPoint> resultsByTimeWindow;
     try {
-      LOGGER.info("detecting anomalies using fanomaly");
+      LOGGER.info("detecting anomalies using kalman filter");
       long offset = TimeUnit.MILLISECONDS.convert(bucketSize, bucketUnit);
       long startTime = System.nanoTime();
-      fAnomalyDataPoints = stateSpaceDetector.DetectAnomaly(observations, timestamps, offset);
+      resultsByTimeWindow = stateSpaceDetector.detectAnomalies(observations, timestamps, offset);
       LOGGER.info("algorithm took {} seconds", TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
 
       // cached state
@@ -246,9 +229,9 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
     // translate FanomalyDataPoints to AnomalyResults (sort them to make the anomaly ids in the db easier to look at)
     List<AnomalyResult> anomalyResults = new LinkedList<AnomalyResult>();
-    for (long timeWindow : new TreeSet<>(fAnomalyDataPoints.keySet()))
+    for (long timeWindow : new TreeSet<>(resultsByTimeWindow.keySet()))
     {
-      FanomalyDataPoint fAnomalyDataPoint = fAnomalyDataPoints.get(timeWindow);
+      StateSpaceDataPoint fAnomalyDataPoint = resultsByTimeWindow.get(timeWindow);
 
       if (fAnomalyDataPoint.pValue < pValueThreshold)
       {

@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
-import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
+import com.linkedin.thirdeye.anomaly.api.function.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;

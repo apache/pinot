@@ -1,15 +1,15 @@
-package com.linkedin.thirdeye.anomaly.util;
+package com.linkedin.thirdeye.anomaly.lib.util;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 
 
 /**
@@ -100,26 +100,26 @@ public class STLDecompositionUtils {
     }
   }
 
-//  public static void main(String[] args) throws IOException {
-//    String[] lines = ResourceUtils.getResourceAsString("timeseries.csv").split("\n");
-//    int numData = lines.length;
-//    long[] timestamps = new long[numData];
-//    double[] series = new double[numData];
-//    for (int i = 0; i < numData; i++) {
-//      timestamps[i] = i;
-//      String value = lines[i].split(",")[1];
-//      if (value.equals("NA")) {
-//        series[i] = 0;
-//      } else {
-//        series[i] = Double.valueOf(value);
-//      }
-//    }
-//
-//    double[] result = removeSeasonality(timestamps, series, 168);
-//
-//    for (int i = 0; i < result.length; i++) {
-//      System.out.println(result[i]);
-//    }
-//  }
+  public static void main(String[] args) throws IOException {
+    String[] lines = ResourceUtils.getResourceAsString("timeseries.csv").split("\n");
+    int numData = lines.length;
+    long[] timestamps = new long[numData];
+    double[] series = new double[numData];
+    for (int i = 0; i < numData; i++) {
+      timestamps[i] = i;
+      String value = lines[i].split(",")[1];
+      if (value.equals("NA")) {
+        series[i] = 0;
+      } else {
+        series[i] = Double.valueOf(value);
+      }
+    }
+
+    double[] result = removeSeasonality(timestamps, series, 168);
+
+    for (int i = 0; i < result.length; i++) {
+      System.out.println(result[i]);
+    }
+  }
 
 }

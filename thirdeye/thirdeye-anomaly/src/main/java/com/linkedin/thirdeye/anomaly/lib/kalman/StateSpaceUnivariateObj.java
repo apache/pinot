@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.lib.fanomaly;
+package com.linkedin.thirdeye.anomaly.lib.kalman;
 
 
 import org.apache.commons.math3.analysis.UnivariateFunction;
@@ -50,7 +50,7 @@ public class StateSpaceUnivariateObj implements UnivariateFunction {
         initial_state_mean_,
         initial_state_covariance_,
         observations_);
-    double ll = model.GetLogLikeliHood();
+    double ll = model.getLogLikeliHood();
     LOGGER.info("log likelihood : {}, state noise : {}", ll, state_noise);
     return ll;
   }

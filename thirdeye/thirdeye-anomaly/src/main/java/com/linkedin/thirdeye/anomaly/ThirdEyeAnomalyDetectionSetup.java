@@ -3,13 +3,9 @@ package com.linkedin.thirdeye.anomaly;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,11 +18,8 @@ import com.linkedin.thirdeye.anomaly.database.AnomalyTable;
 import com.linkedin.thirdeye.anomaly.util.DimensionSpecUtils;
 import com.linkedin.thirdeye.anomaly.util.MetricSpecUtils;
 import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
-import com.linkedin.thirdeye.anomaly.util.ServerUtils;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.anomaly.util.ThirdEyeServerUtils;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
  * This class does everything required to get started with thirdeye-anomaly, creating config files and populating the
@@ -47,7 +40,7 @@ public class ThirdEyeAnomalyDetectionSetup {
     ThirdEyeAnomalyDetectionConfiguration topLevelConfig = getTopLevelConfig(userInput);
 
     // get the star tree config (for sanity checking + automated config)
-    StarTreeConfig starTreeConfig = ServerUtils.getStarTreeConfig(topLevelConfig.getThirdEyeServerHost(),
+    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(topLevelConfig.getThirdEyeServerHost(),
         topLevelConfig.getThirdEyeServerPort(), topLevelConfig.getCollectionName());
 
     topLevelConfig.setAnomalyDatabaseConfig(getDatabaseConfig(userInput));
@@ -204,6 +197,8 @@ public class ThirdEyeAnomalyDetectionSetup {
         config.getAnomalyDatabaseConfig().runSQL(sql);
       }
     }
+
+    // TODO load scan statistics algorithm
   }
 
   /**
@@ -222,7 +217,6 @@ public class ThirdEyeAnomalyDetectionSetup {
     baseConfig.setCollectionName(collection);
     baseConfig.setThirdEyeServerHost(host);
     baseConfig.setThirdEyeServerPort(port);
-    baseConfig.setDetectionInterval(new TimeGranularity(1, TimeUnit.HOURS));
     return baseConfig;
   }
 

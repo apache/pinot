@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
-import com.linkedin.thirdeye.anomaly.exception.IllegalFunctionException;
+import com.linkedin.thirdeye.anomaly.api.function.exception.IllegalFunctionException;
 import com.linkedin.thirdeye.anomaly.util.TimeGranularityUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;

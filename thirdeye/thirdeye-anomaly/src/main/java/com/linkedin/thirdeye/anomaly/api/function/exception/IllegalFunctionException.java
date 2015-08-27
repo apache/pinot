@@ -1,7 +1,8 @@
-package com.linkedin.thirdeye.anomaly.exception;
+package com.linkedin.thirdeye.anomaly.api.function.exception;
 
 /**
- *
+ * Exception thrown when an AnomalyDetectionFunction is given illegal configuration.
+ * For example, if the training data interval is negative.
  */
 public class IllegalFunctionException extends Exception {
 

@@ -7,8 +7,6 @@ import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
 
@@ -18,8 +16,6 @@ import com.linkedin.thirdeye.api.DimensionSpec;
 public class DimensionKeyUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionKeyUtils.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /**
    * @param dimensionKey

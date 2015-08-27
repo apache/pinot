@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistory;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
-import com.linkedin.thirdeye.anomaly.exception.FunctionDidNotEvaluateException;
+import com.linkedin.thirdeye.anomaly.api.function.exception.FunctionDidNotEvaluateException;
 import com.linkedin.thirdeye.anomaly.util.MetricSpecUtils;
 import com.linkedin.thirdeye.anomaly.util.ThirdEyeRequestUtils;
 import com.linkedin.thirdeye.anomaly.util.TimeGranularityUtils;
