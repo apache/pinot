@@ -88,6 +88,11 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       return null;
     }
     List<ServerToSegmentSetMap> serverToSegmentSetMaps = _brokerRoutingTable.get(tableName);
+
+    // This map can be potentially empty, for example for realtime table with no segments.
+    if (serverToSegmentSetMaps.isEmpty()) {
+      return Collections.emptyMap();
+    }
     return serverToSegmentSetMaps.get(_random.nextInt(serverToSegmentSetMaps.size())).getRouting();
   }
 
