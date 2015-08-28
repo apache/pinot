@@ -1,11 +1,7 @@
 package com.linkedin.thirdeye.reporting.api;
 
-import java.io.Serializable;
-import java.sql.Timestamp;
-
-public class TimeRange implements Comparable<TimeRange>, Serializable
+public class TimeRange
 {
-  private static final long serialVersionUID = -403250971215465050L;
 
   private Long start;
   private Long end;
@@ -31,49 +27,6 @@ public class TimeRange implements Comparable<TimeRange>, Serializable
   public Long getEnd()
   {
     return end;
-  }
-
-  public boolean contains(Long time)
-  {
-    return time >= start && time <= end;
-  }
-
-  public boolean contains(TimeRange timeRange)
-  {
-    return start <= timeRange.getStart() && end >= timeRange.getEnd();
-  }
-
-  public boolean isDisjoint(TimeRange timeRange)
-  {
-    return end < timeRange.getStart() || start > timeRange.getEnd();
-  }
-
-  public int totalBuckets()
-  {
-    return (int) (end - start + 1);
-  }
-
-  @Override
-  public boolean equals(Object o)
-  {
-    if (!(o instanceof TimeRange))
-    {
-      return false;
-    }
-    TimeRange tr = (TimeRange) o;
-    return start.equals(tr.getStart()) && end.equals(tr.getEnd());
-  }
-
-  @Override
-  public int hashCode()
-  {
-    return (int) (start + 13 * end);
-  }
-
-  @Override
-  public int compareTo(TimeRange timeRange)
-  {
-    return (int) (start - timeRange.getStart());
   }
 
   @Override
