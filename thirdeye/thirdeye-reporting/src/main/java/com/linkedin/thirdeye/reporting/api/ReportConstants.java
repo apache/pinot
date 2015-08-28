@@ -24,6 +24,7 @@ public final class ReportConstants {
 
   public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd h a z");
   public static final DateTimeFormatter HOUR_FORMATTER = DateTimeFormat.forPattern("h a");
+  public static final DateTimeFormatter DATA_DIR_DATE_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HH0000");
 
   public static String REPORT_SUBJECT_PREFIX = "Thirdeye Reports";
 

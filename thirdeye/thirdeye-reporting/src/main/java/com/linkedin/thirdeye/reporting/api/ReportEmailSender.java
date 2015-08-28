@@ -18,6 +18,7 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
 import freemarker.cache.FileTemplateLoader;
@@ -87,6 +88,53 @@ public class ReportEmailSender {
     } catch (Exception e) {
      e.printStackTrace();
     }
+  }
+
+  public static void sendErrorReport(List<TimeRange> missingSegments, ScheduleSpec scheduleSpec, ReportConfig reportConfig) {
+    StringBuilder sb = new StringBuilder("Data segments missing : ");
+    sb.append(System.getProperty("line.separator"));
+    for (TimeRange tr : missingSegments) {
+      sb.append(ReportConstants.DATE_TIME_FORMATTER.print(tr.getStart()));
+      sb.append(" - ");
+      sb.append(ReportConstants.DATE_TIME_FORMATTER.print(tr.getEnd()));
+      sb.append(System.getProperty("line.separator"));
+    }
+
+    String subject = ReportConstants.REPORT_SUBJECT_PREFIX +
+    " (Data Segments Missing)" +
+    " " + reportConfig.getCollection().toUpperCase() +
+    " (" + reportConfig.getEndTimeString() +
+    ") " + reportConfig.getName();
+
+    sendErrorReport(subject, sb.toString(), scheduleSpec, reportConfig);
+  }
+
+  public static void sendErrorReport(String subject, String message, ScheduleSpec scheduleSpec, ReportConfig reportConfig) {
+    try {
+
+      Properties props = new Properties();
+      props.setProperty(ReportConstants.MAIL_SMTP_HOST_KEY, ReportConstants.MAIL_SMTP_HOST_VALUE);
+      Session session = Session.getDefaultInstance(props, null);
+
+      Message emailReportMessage = new MimeMessage(session);
+      for (String emailIdFrom : scheduleSpec.getEmailFrom().split(",")) {
+        emailReportMessage.setFrom(new InternetAddress(emailIdFrom, scheduleSpec.getNameFrom()));
+      }
+      for (String emailIdTo : scheduleSpec.getErrorEmailTo().split(",")) {
+        emailReportMessage.addRecipient(Message.RecipientType.TO,
+                         new InternetAddress(emailIdTo, scheduleSpec.getNameTo()));
+      }
+      emailReportMessage.setSubject(subject);
+      emailReportMessage.setContent(message, "text/html");
+      LOGGER.info("Sending error email from {} to {}  ",
+          scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo());
+
+      Transport.send(emailReportMessage);
+
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    throw new IllegalStateException("Data Segments missing");
   }
 
 }

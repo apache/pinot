@@ -38,10 +38,12 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 import com.linkedin.thirdeye.client.util.SqlUtils;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGenerator;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
+import com.linkedin.thirdeye.reporting.util.SegmentDescriptorUtils;
 
 
 public class ReportGenerator implements Job{
@@ -99,6 +101,11 @@ public class ReportGenerator implements Job{
         reportConfig.setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
         reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()));
 
+        List<TimeRange> missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection,
+            currentStartHour, currentEndHour, baselineStartHour, baselineEndHour);
+        if (missingSegments !=null && missingSegments.size() != 0) {
+          ReportEmailSender.sendErrorReport(missingSegments, scheduleSpec, reportConfig);
+        }
 
         URL thirdeyeUri = getThirdeyeURL(tableSpec, scheduleSpec,
             baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)),
@@ -178,7 +185,6 @@ public class ReportGenerator implements Job{
       LOGGER.error(e.toString());
     }
   }
-
 
 
   private URL getThirdeyeURL(TableSpec tableSpec, ScheduleSpec scheduleSpec, DateTime start, DateTime end) throws MalformedURLException {
@@ -431,7 +437,5 @@ e.printStackTrace();
     URL url = new URL(serverUri + "/collections/" + collection);
     return OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), StarTreeConfig.class);
   }
-
-
 
 }

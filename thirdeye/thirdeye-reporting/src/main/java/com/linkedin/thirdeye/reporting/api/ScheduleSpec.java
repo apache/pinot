@@ -16,6 +16,7 @@ public class ScheduleSpec {
   private String nameFrom;
   private boolean findAnomalies;
   private String emailTemplate;
+  private String errorEmailTo;
 
   public ScheduleSpec() {
 
@@ -33,6 +34,16 @@ public class ScheduleSpec {
     this.emailFrom = emailFrom;
     this.findAnomalies = findAnomalies;
     this.emailTemplate = emailTemplate;
+  }
+
+
+
+  public String getErrorEmailTo() {
+    return errorEmailTo;
+  }
+
+  public void setErrorEmailTo(String errorEmailTo) {
+    this.errorEmailTo = errorEmailTo;
   }
 
   public String getEmailTemplate() {
