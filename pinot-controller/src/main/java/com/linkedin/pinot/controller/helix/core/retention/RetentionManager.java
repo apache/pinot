@@ -172,6 +172,12 @@ public class RetentionManager {
       LOGGER.error("Error getting offline table config from property store!", e);
       return tableToDeletionStrategyMap;
     }
+
+    if (offlineTableConfig == null) {
+      LOGGER.info("Table config null for table: {}, treating it as refresh only table.", offlineTableName);
+      return tableToDeletionStrategyMap;
+    }
+    
     if (offlineTableConfig.getValidationConfig().getSegmentPushType().equalsIgnoreCase("REFRESH")) {
       LOGGER.info("Table: {} is a refresh only table.", offlineTableName);
       return tableToDeletionStrategyMap;
