@@ -108,6 +108,17 @@
   <br>
 </#list>
 
+<#if missingSegments?has_content>
+<table cellspacing="0" cellpadding="0" style="border-left:1.0pt solid;border-top:1.0pt solid;border-right:1.0pt solid;border-bottom:1.0pt solid;border-left-color:#ffffff;border-top-color:#ffffff;border-right-color:#ffffff;border-bottom-color:#ffffff">
+    <tbody>
+      <tr><td style="color:windowtext;font-size:10.0pt;font-weight:400;font-style:normal;text-decoration:none;font-family:Arial;text-align:general;vertical-align:bottom;border:none;font-size:8.0pt;text-align:right;vertical-align:middle;border-left:.5pt solid #c0c0c0;border-top:none;border-right:none;border-bottom:.5pt solid #c0c0c0;padding-left:1.0pt;padding-right:1.0pt;padding-top:1.0pt;padding-bottom:1.0pt">*The following data segments are missing from the thirdeye-server</td></tr>
+      <#list missingSegments as segment>
+        <tr><td style="color:windowtext;font-size:10.0pt;font-weight:400;font-style:normal;text-decoration:none;font-family:Arial;text-align:general;vertical-align:bottom;border:none;font-size:8.0pt;text-align:left;vertical-align:middle;border-left:.5pt solid #c0c0c0;border-top:none;border-right:none;border-bottom:.5pt solid #c0c0c0;padding-left:1.0pt;padding-right:1.0pt;padding-top:1.0pt;padding-bottom:1.0pt">${segment}</td></tr>
+      </#list>
+    </tbody>
+</table>
+</#if>
+
 <#if (anomalyTables)??>
 <br>
 <table cellpadding="0" cellspacing="0">

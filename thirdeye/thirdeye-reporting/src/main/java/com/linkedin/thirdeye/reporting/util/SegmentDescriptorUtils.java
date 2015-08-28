@@ -18,7 +18,7 @@ import org.joda.time.DateTime;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.reporting.api.TimeRange;
 import com.linkedin.thirdeye.reporting.api.SegmentDescriptor;
 
 public class SegmentDescriptorUtils {

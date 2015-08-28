@@ -18,7 +18,7 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
-import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.reporting.api.TimeRange;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
 import freemarker.cache.FileTemplateLoader;
@@ -33,13 +33,15 @@ public class ReportEmailSender {
   private ScheduleSpec scheduleSpec;
   private ReportConfig reportConfig;
   private Map<String, AnomalyReportTable> anomalyReportTables;
+  private List<TimeRange> missingSegments;
   private String templatePath;
 
-  public ReportEmailSender(List<Table> tables, ScheduleSpec scheduleSpec, ReportConfig reportConfig, Map<String, AnomalyReportTable> anomalyReportTables, String templatePath) {
+  public ReportEmailSender(List<Table> tables, ScheduleSpec scheduleSpec, ReportConfig reportConfig, Map<String, AnomalyReportTable> anomalyReportTables, List<TimeRange> missingSegments, String templatePath) {
     this.tables = tables;
     this.scheduleSpec = scheduleSpec;
     this.reportConfig = reportConfig;
     this.anomalyReportTables = anomalyReportTables;
+    this.missingSegments = missingSegments;
     this.templatePath = templatePath;
   }
 
@@ -58,6 +60,7 @@ public class ReportEmailSender {
       rootMap.put(ReportConstants.REPORT_CONFIG_OBJECT, reportConfig);
       rootMap.put(ReportConstants.TABLES_OBJECT, tables);
       rootMap.put(ReportConstants.ANOMALY_TABLES_OBJECT, anomalyReportTables);
+      rootMap.put(ReportConstants.MISSING_SEGMENTS_OBJECT, missingSegments);
       rootMap.put(ReportConstants.SCHEDULE_SPEC_OBJECT, scheduleSpec);
 
       Writer emailOutput = new StringWriter();
@@ -134,7 +137,6 @@ public class ReportEmailSender {
     } catch (Exception e) {
       e.printStackTrace();
     }
-    throw new IllegalStateException("Data Segments missing");
   }
 
 }

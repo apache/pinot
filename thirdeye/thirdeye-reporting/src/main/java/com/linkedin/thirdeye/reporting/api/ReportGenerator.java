@@ -38,7 +38,7 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.reporting.api.TimeRange;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 import com.linkedin.thirdeye.client.util.SqlUtils;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGenerator;
@@ -82,6 +82,7 @@ public class ReportGenerator implements Job{
 
       List<Table> tables = new ArrayList<Table>();
       Map<String, AnomalyReportTable> anomalyReportTables = null;
+      List<TimeRange> missingSegments = null;
       for (TableSpec tableSpec : reportConfig.getTables()) {
 
         LOGGER.info("Collecting data for table {}", tableSpec);
@@ -101,7 +102,7 @@ public class ReportGenerator implements Job{
         reportConfig.setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
         reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()));
 
-        List<TimeRange> missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection,
+        missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection,
             currentStartHour, currentEndHour, baselineStartHour, baselineEndHour);
         if (missingSegments !=null && missingSegments.size() != 0) {
           ReportEmailSender.sendErrorReport(missingSegments, scheduleSpec, reportConfig);
@@ -178,7 +179,7 @@ public class ReportGenerator implements Job{
 
 
       ReportEmailSender reportEmailSender = new ReportEmailSender(tables, scheduleSpec,
-          reportConfig, anomalyReportTables, templatePath);
+          reportConfig, anomalyReportTables, missingSegments, templatePath);
       reportEmailSender.emailReport();
 
     } catch (IOException e) {

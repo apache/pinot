@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.reporting.api;
 
 import org.joda.time.DateTime;
 
+import com.linkedin.thirdeye.api.StarTreeConstants;
+
 import java.io.File;
 
 public class SegmentDescriptor{
@@ -33,13 +35,13 @@ public class SegmentDescriptor{
 
   public DateTime getStartWallTime() {
     String[] tokens = file.getName().split("_");
-    return ReportConstants.DATA_DIR_DATE_FORMATTER.parseDateTime(tokens[2]);
+    return StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[2]);
 
   }
 
   public DateTime getEndWallTime() {
     String[] tokens = file.getName().split("_");
-    return ReportConstants.DATA_DIR_DATE_FORMATTER.parseDateTime(tokens[3]);
+    return StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]);
   }
 
   public DateTime getStartDataTime() {
@@ -52,8 +54,8 @@ public class SegmentDescriptor{
 
   public boolean includesTime(long time) {
     String[] tokens = file.getName().split("_");
-    long wallStartTime = ReportConstants.DATA_DIR_DATE_FORMATTER.parseDateTime(tokens[2]).getMillis();
-    long wallEndTime = ReportConstants.DATA_DIR_DATE_FORMATTER.parseDateTime(tokens[3]).getMillis();
+    long wallStartTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[2]).getMillis();
+    long wallEndTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]).getMillis();
     if (time >= wallStartTime && time < wallEndTime) {
       return true;
     }
