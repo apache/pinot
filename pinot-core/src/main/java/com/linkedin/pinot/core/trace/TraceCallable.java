@@ -35,7 +35,7 @@ public abstract class TraceCallable<V> implements Callable<V> {
 
   public TraceCallable(InstanceRequest request, Trace parent) {
     if (request == null) {
-      LOGGER.warn("Passing null requestId to TraceRunnable, maybe forget to register the request in current thread.");
+      LOGGER.warn("Passing null request to TraceRunnable, maybe forget to register the request in current thread.");
     }
     this.request = request;
     this.parent = parent;
@@ -50,11 +50,11 @@ public abstract class TraceCallable<V> implements Callable<V> {
 
   @Override
   public V call() throws Exception {
-    TraceContext.registerThreadToRequest(request, parent);
+    if (request != null) TraceContext.registerThreadToRequest(request, parent);
     try {
       return callJob();
     } finally {
-      TraceContext.unregisterThreadFromRequest();
+      if (request != null) TraceContext.unregisterThreadFromRequest();
     }
   }
 

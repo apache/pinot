@@ -33,7 +33,7 @@ public abstract class TraceRunnable implements Runnable {
 
   private TraceRunnable(InstanceRequest request, Trace parent) {
     if (request == null) {
-      LOGGER.warn("Passing null requestId to TraceRunnable, maybe forget to register the requestId in current thread.");
+      LOGGER.warn("Passing null request to TraceRunnable, maybe forget to register the request in current thread.");
     }
     this.request = request;
     this.parent = parent;
@@ -48,11 +48,11 @@ public abstract class TraceRunnable implements Runnable {
 
   @Override
   public void run() {
-    TraceContext.registerThreadToRequest(request, parent);
+    if (request != null) TraceContext.registerThreadToRequest(request, parent);
     try {
       runJob();
     } finally {
-      TraceContext.unregisterThreadFromRequest();
+      if (request != null) TraceContext.unregisterThreadFromRequest();
     }
   }
 
