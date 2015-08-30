@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ResponseStatistics;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -37,6 +38,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
 
 /**
@@ -78,6 +80,9 @@ public class IntermediateResultsBlock implements Block {
     if (_processingExceptions == null) {
       _processingExceptions = new ArrayList<ProcessingException>();
     }
+    ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
+    exception.setMessage(ExceptionUtils.getStackTrace(e));
+    _processingExceptions.add(exception);
   }
 
   public IntermediateResultsBlock() {
