@@ -17,12 +17,18 @@ package com.linkedin.pinot.core.query.aggregation.function.quantile;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 
-import java.io.Serializable;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-public class QuantileUtil {
+import static com.google.common.base.Preconditions.checkArgument;
+
+public class PercentileUtil {
+
+    public static double getValueOnPercentile(DoubleArrayList list, byte percentile) {
+        return getValueOnQuantile(list, (percentile+0.0)/100);
+    }
+
     /**
      * List will be sorted after passing to this function,
      * so a pre-sorting is not needed.
@@ -31,7 +37,9 @@ public class QuantileUtil {
      * @param quantile
      * @return
      */
-    public static Double getValueOnQuantile(List list, byte quantile) {
+    public static double getValueOnQuantile(DoubleArrayList list, double quantile) {
+        checkArgument(quantile >= 0 && quantile <= 1, "quantile must be in range [0, 1]");
+
         Collections.sort(list, new Comparator<Double>() {
             @Override
             public int compare(Double o1, Double o2) {
@@ -39,7 +47,7 @@ public class QuantileUtil {
             }
         });
 
-        int index = (int) ((list.size()*quantile+0.0)/100);
-        return (Double) list.get(index);
+        int index = (int) (list.size()*quantile);
+        return list.get(index);
     }
 }

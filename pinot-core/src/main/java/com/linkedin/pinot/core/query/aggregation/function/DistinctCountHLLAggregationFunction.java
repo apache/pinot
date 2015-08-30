@@ -215,6 +215,6 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Override
   public Serializable getDefaultValue() {
-    return new HyperLogLog(_bitSize);
+    return new HyperLogLog(DEFAULT_BIT_SIZE);
   }
 }

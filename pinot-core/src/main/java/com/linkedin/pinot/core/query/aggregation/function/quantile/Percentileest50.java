@@ -16,11 +16,12 @@
 package com.linkedin.pinot.core.query.aggregation.function.quantile;
 
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionRegistry;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.DigestAggregationFunction;
 
 /**
  * register function in {@link AggregationFunctionRegistry}
  */
-public class Percentileest50 extends QuantileTDigestAggregationFunction {
+public class Percentileest50 extends DigestAggregationFunction {
     public Percentileest50() {
         super((byte) 50);
     }

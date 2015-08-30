@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function.quantile;
 
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.DigestAggregationFunction;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -35,20 +36,19 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * Accurate Quantile function, it is used for ground truth.
- * However, it should never be used in production since in reduce step,
- * it will sort a large list which incurs significant overhead.
- *
+ * Accurate Percentile function, it is used for ground truth.
+ * It will sort a large list which incurs significant overhead when data is large.
+ * Use digest estimation {@link DigestAggregationFunction} instead.
  */
-public class QuantileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileAggregationFunction.class);
+public class PercentileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PercentileAggregationFunction.class);
   public static final int DEFAULT_COMPRESSION_FACTOR = 100;
 
   private String _columnName;
-  private byte _quantile; // 0-100
+  private byte _percentile; // 0-100
 
-  public QuantileAggregationFunction(byte quantile) {
-    _quantile = quantile;
+  public PercentileAggregationFunction(byte percentile) {
+    _percentile = percentile;
   }
 
   @Override
@@ -146,7 +146,7 @@ public class QuantileAggregationFunction implements AggregationFunction<DoubleAr
       list.addAll(aggregationResult);
     }
 
-    return QuantileUtil.getValueOnQuantile(list, _quantile);
+    return PercentileUtil.getValueOnPercentile(list, _percentile);
   }
 
   @Override
@@ -167,7 +167,7 @@ public class QuantileAggregationFunction implements AggregationFunction<DoubleAr
 
   @Override
   public String getFunctionName() {
-    return "quantileAccurate" + _quantile + "_" + _columnName;
+    return "percentile" + _percentile + "_" + _columnName;
   }
 
   @Override

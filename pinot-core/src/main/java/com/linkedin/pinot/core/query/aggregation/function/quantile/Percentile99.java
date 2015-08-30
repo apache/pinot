@@ -20,7 +20,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionRegistry;
 /**
  * register function in {@link AggregationFunctionRegistry}
  */
-public class Percentile99 extends QuantileAggregationFunction {
+public class Percentile99 extends PercentileAggregationFunction {
     public Percentile99() {
         super((byte) 99);
     }

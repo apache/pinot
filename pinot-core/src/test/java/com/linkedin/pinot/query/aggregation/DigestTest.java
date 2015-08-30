@@ -19,12 +19,12 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.*;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.tdigest.TDigest;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.DigestAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -35,15 +35,15 @@ import static org.testng.Assert.assertEquals;
 
 /**
  *
- * Tests for TDigest quantile estimation, the routine is similar to {@link SimpleAggregationFunctionsTest}
+ * Tests for QuantileDigest quantile estimation, the routine is similar to {@link SimpleAggregationFunctionsTest}
  *
  *
  */
-public class TDigestTest {
-    private static final Logger LOGGER = LoggerFactory.getLogger(TDigestTest.class);
-    private static final int compressionFactor = 100;
-    private static final HashMap<Byte, QuantileTDigestAggregationFunction> functionMap = new HashMap<Byte, QuantileTDigestAggregationFunction>();
-    private static final HashMap<Byte, QuantileAggregationFunction> accurateFunctionMap = new HashMap<Byte, QuantileAggregationFunction>();
+public class DigestTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DigestTest.class);
+    private static final double maxError = 0.05;
+    private static final HashMap<Byte, DigestAggregationFunction> functionMap = new HashMap<Byte, DigestAggregationFunction>();
+    private static final HashMap<Byte, PercentileAggregationFunction> accurateFunctionMap = new HashMap<Byte, PercentileAggregationFunction>();
 
     public static int[] _docIdsArray;
     public static IntArray _docIds;
@@ -51,7 +51,7 @@ public class TDigestTest {
     public static String _columnName = "met";
     public static AggregationInfo _paramsInfo;
 
-    private static final double threshold = 0.1;  // Precision threshold, can be set to smaller value.
+    private static final double threshold = maxError + 0.01;  // Precision threshold, can be set to smaller value.
 
     /**
      * This does not mean too much sense here, but we fix it to a small number.
@@ -63,14 +63,13 @@ public class TDigestTest {
         functionMap.put((byte) 90, new Percentileest90());
         functionMap.put((byte) 95, new Percentileest95());
 
-        accurateFunctionMap.put((byte) 50, new QuantileAggregationFunction((byte) 50));
-        accurateFunctionMap.put((byte) 90, new QuantileAggregationFunction((byte) 90));
-        accurateFunctionMap.put((byte) 95, new QuantileAggregationFunction((byte) 95));
+        accurateFunctionMap.put((byte) 50, new PercentileAggregationFunction((byte) 50));
+        accurateFunctionMap.put((byte) 90, new PercentileAggregationFunction((byte) 90));
+        accurateFunctionMap.put((byte) 95, new PercentileAggregationFunction((byte) 95));
     }
 
     @BeforeClass
     public static void setup() {
-        TDigest.TEST_ENABLED = true;
         _docIdsArray = new int[_sizeOfDocIdArray];
         for (int i = 0; i < _sizeOfDocIdArray; ++i) {
             _docIdsArray[i] = i;
@@ -81,11 +80,6 @@ public class TDigestTest {
         _paramsInfo = new AggregationInfo();
         _paramsInfo.setAggregationType("");
         _paramsInfo.setAggregationParams(params);
-    }
-
-    @AfterClass
-    public static void tearDown() {
-        TDigest.TEST_ENABLED = false;
     }
 
     public static class RandomNumberArray {
@@ -130,15 +124,15 @@ public class TDigestTest {
             return arr.length;
         }
 
-        public void offerAllNumberTo(TDigest tDigest) {
-            offerNumberInRangeTo(tDigest, 0, arr.length);
+        public void offerAllNumberTo(QuantileDigest digest) {
+            offerNumberInRangeTo(digest, 0, arr.length);
         }
 
         public void offerAllNumberTo(DoubleArrayList list) {
             offerNumberInRangeTo(list, 0, arr.length);
         }
 
-        public void offerNumberInRangeTo(TDigest tDigest, int start, int end) {
+        public void offerNumberInRangeTo(QuantileDigest tDigest, int start, int end) {
             end = Math.min(end, arr.length);
             for (int i = start; i < end; i++) {
                 tDigest.offer(arr[i]);
@@ -155,10 +149,10 @@ public class TDigestTest {
 
     @Test
     public void testCombineReduce() {
-        for (Byte quantile: functionMap.keySet()) {
-            LOGGER.info("[Test Quantile " + quantile + " (combine)]");
-            AggregationFunction aggregationFunction = functionMap.get(quantile);
-            AggregationFunction aggregationAccurateFunction = accurateFunctionMap.get(quantile);
+        for (Byte percentile: functionMap.keySet()) {
+            LOGGER.info("[Test Percentile " + percentile + " (combine)]");
+            AggregationFunction aggregationFunction = functionMap.get(percentile);
+            AggregationFunction aggregationAccurateFunction = accurateFunctionMap.get(percentile);
             aggregationFunction.init(_paramsInfo);
             aggregationAccurateFunction.init(_paramsInfo);
 
@@ -167,13 +161,13 @@ public class TDigestTest {
             StringBuilder sb1 = new StringBuilder();
             StringBuilder sb2 = new StringBuilder();
             for (int i = 1; i <= _sizeOfCombineList; ++i) {
-                List<Serializable> aggregationResults = getTDigestResultValues(i);
+                List<Serializable> aggregationResults = getQuantileDigestResultValues(i);
                 List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
-                double estimate = ((TDigest) (combinedResult.get(0))).getQuantile(quantile);
+                long estimate = ((QuantileDigest) (combinedResult.get(0))).getQuantile(((double)percentile)/100);
 
                 List<Serializable> aggregationResults2 = getDoubleArrayListResultValues(i);
                 List<Serializable> combinedResult2 = aggregationAccurateFunction.combine(aggregationResults2, CombineLevel.SEGMENT);
-                double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
+                long actual = (long) PercentileUtil.getValueOnPercentile((DoubleArrayList) combinedResult2.get(0), percentile);
 
                 TestUtils.assertApproximation(estimate, actual, threshold);
                 sb1.append((int)estimate + ", ");
@@ -181,12 +175,12 @@ public class TDigestTest {
             }
 
             // Test reduce
-            LOGGER.info("[Test Quantile " + quantile + " (reduce)]");
+            LOGGER.info("[Test Percentile " + percentile + " (reduce)]");
             for (int i = 1; i <= _sizeOfCombineList; ++i) {
-              List<Serializable> combinedResults = getTDigestResultValues(i);
+              List<Serializable> combinedResults = getQuantileDigestResultValues(i);
               List<Serializable> combinedResults2 = getDoubleArrayListResultValues(i);
-              double estimate = (Double) aggregationFunction.reduce(combinedResults);
-              double actual = (Double) aggregationAccurateFunction.reduce(combinedResults2);
+              long estimate = (long) aggregationFunction.reduce(combinedResults);
+              double actual = (double) aggregationAccurateFunction.reduce(combinedResults2);
               TestUtils.assertApproximation(estimate, actual, threshold);
             }
         }
@@ -194,10 +188,10 @@ public class TDigestTest {
 
     @Test
     public void testLargeCombineList() {
-        for (Byte quantile: functionMap.keySet()) {
-            LOGGER.info("[Test Quantile " + quantile + "]");
-            AggregationFunction aggregationFunction = functionMap.get(quantile);
-            AggregationFunction aggregationAccurateFunction = accurateFunctionMap.get(quantile);
+        for (Byte percentile: functionMap.keySet()) {
+            LOGGER.info("[Test Percentile " + percentile + "]");
+            AggregationFunction aggregationFunction = functionMap.get(percentile);
+            AggregationFunction aggregationAccurateFunction = accurateFunctionMap.get(percentile);
             aggregationFunction.init(_paramsInfo);
             aggregationAccurateFunction.init(_paramsInfo);
 
@@ -212,16 +206,15 @@ public class TDigestTest {
                 if (i == 1) continue;
                 RandomNumberArray arr = new RandomNumberArray(i * 10, 1);
                 long t1 = System.nanoTime();
-                List<Serializable> aggregationResults = getTDigestResultValues(arr, 10, i);
+                List<Serializable> aggregationResults = getQuantileDigestResultValues(arr, 10, i);
                 long t2 = System.nanoTime();
                 List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
                 long t3 = System.nanoTime();
-                double estimate = ((TDigest) (combinedResult.get(0))).getQuantile(quantile);
-
+                long estimate = ((QuantileDigest) (combinedResult.get(0))).getQuantile(((double)percentile)/100);
 
                 List<Serializable> aggregationResults2 = getDoubleArrayListResultValues(arr, 10, i);
                 List<Serializable> combinedResult2 = aggregationAccurateFunction.combine(aggregationResults2, CombineLevel.SEGMENT);
-                double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
+                long actual = (long) PercentileUtil.getValueOnPercentile((DoubleArrayList) combinedResult2.get(0), percentile);
 
                 println(i + ", " + "" + (t2 - t1) + "" + ", " + (t3 - t2) + ", " + getErrorString(actual, estimate));
                 TestUtils.assertApproximation(estimate, actual, threshold);
@@ -234,14 +227,14 @@ public class TDigestTest {
         final int numOfItemsPerList = 100;
         final int numOfListCombined = 1000;
 
-        for (Byte quantile: functionMap.keySet()) {
-            LOGGER.info("[Test Quantile " + quantile + "]");
-            AggregationFunction aggregationFunction = functionMap.get(quantile);
-            AggregationFunction aggregationAccurateFunction = accurateFunctionMap.get(quantile);
+        for (Byte percentile: functionMap.keySet()) {
+            LOGGER.info("[Test Percentile " + percentile + "]");
+            AggregationFunction aggregationFunction = functionMap.get(percentile);
+            AggregationFunction aggregationAccurateFunction = accurateFunctionMap.get(percentile);
             aggregationFunction.init(_paramsInfo);
             aggregationAccurateFunction.init(_paramsInfo);
 
-            println("#list_combined, TDigest_time(nano), DoubleArrayList_time(nano), time_ratio, estimate, precise, error");
+            println("#list_combined, QuantileDigest_time(nano), DoubleArrayList_time(nano), time_ratio, estimate, precise, error");
 
             // Test combine
             StringBuilder sb1 = new StringBuilder();
@@ -252,16 +245,16 @@ public class TDigestTest {
                 }
                 RandomNumberArray arr = new RandomNumberArray(i * numOfItemsPerList, DUPLICATION_PER_ITEM);
 
-                List<Serializable> aggregationResults = getTDigestResultValues(arr, i, numOfItemsPerList);
+                List<Serializable> aggregationResults = getQuantileDigestResultValues(arr, i, numOfItemsPerList);
                 long t1 = System.nanoTime();
                 List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
-                double estimate = ((TDigest) (combinedResult.get(0))).getQuantile(quantile);
+                long estimate = ((QuantileDigest) (combinedResult.get(0))).getQuantile(((double)percentile)/100);
                 long t2 = System.nanoTime();
 
                 List<Serializable> aggregationResults2 = getDoubleArrayListResultValues(arr, i, numOfItemsPerList);
                 long t3 = System.nanoTime();
                 List<Serializable> combinedResult2 = aggregationAccurateFunction.combine(aggregationResults2, CombineLevel.SEGMENT);
-                double actual = (Double) QuantileUtil.getValueOnQuantile((DoubleArrayList) combinedResult2.get(0), quantile);
+                long actual = (long) PercentileUtil.getValueOnPercentile((DoubleArrayList) combinedResult2.get(0), percentile);
                 long t4 = System.nanoTime();
 
                 println(i + ", " + (t2 - t1) + ", " + (t4 - t3) + ", " + (t2 - t1 + 0.0) / (t4 - t3 + 0.0) + ", "
@@ -275,22 +268,22 @@ public class TDigestTest {
     public void testInsertionTime() {
         int numOfItems = 1000000;
 
-        for (Byte quantile: functionMap.keySet()) {
-            LOGGER.info("[Test Quantile " + quantile + "]");
-            println("#items_inserted, TDigest_time(nano), DoubleArrayList_time(nano), time_ratio, estimate, precise, error");
+        for (Byte percentile: functionMap.keySet()) {
+            LOGGER.info("[Test Percentile " + percentile + "]");
+            println("#items_inserted, QuantileDigest_time(nano), DoubleArrayList_time(nano), time_ratio, estimate, precise, error");
             for (int i = 0; i < numOfItems; i += numOfItems / 17) {
                 if (i == 0) {
                     continue;
                 }
                 RandomNumberArray arr = new RandomNumberArray(i, DUPLICATION_PER_ITEM);
-                TDigest digest = new TDigest(compressionFactor);
+                QuantileDigest digest = new QuantileDigest(maxError);
                 DoubleArrayList list = new DoubleArrayList();
                 long t1 = System.nanoTime();
                 arr.offerAllNumberTo(digest);
-                double estimate = digest.getQuantile(quantile);
+                long estimate = digest.getQuantile(((double)percentile)/100);
                 long t2 = System.nanoTime();
                 arr.offerAllNumberTo(list);
-                double actual = QuantileUtil.getValueOnQuantile(list, quantile);
+                long actual = (long) PercentileUtil.getValueOnPercentile(list, percentile);
                 long t3 = System.nanoTime();
 
                 println(i + ", " + "" + (t2 - t1) + ", " + (t3 - t2) + ", " + (t2 - t1 + 0.0) / (t3 - t2 + 0.0) + ", "
@@ -305,23 +298,23 @@ public class TDigestTest {
     public void testMemoryConsumption() {
         int numOfItems = 1000000;
 
-        for (Byte quantile: functionMap.keySet()) {
-            LOGGER.info("[Test Quantile " + quantile + "]");
-            println("#items_inserted, TDigest_ser_size, DoubleArrayList_ser_size, ser_size_ratio, estimate, precise, error");
+        for (Byte percentile: functionMap.keySet()) {
+            LOGGER.info("[Test Percentile " + percentile + "]");
+            println("#items_inserted, QuantileDigest_ser_size, DoubleArrayList_ser_size, ser_size_ratio, estimate, precise, error");
             for (int i = 0; i < numOfItems; i += numOfItems / 17) {
                 if (i == 0) {
                     continue;
                 }
                 RandomNumberArray arr = new RandomNumberArray(i, DUPLICATION_PER_ITEM);
-                TDigest digest = new TDigest(compressionFactor);
+                QuantileDigest digest = new QuantileDigest(maxError);
                 DoubleArrayList list = new DoubleArrayList();
                 arr.offerAllNumberTo(digest);
                 arr.offerAllNumberTo(list);
                 int digestSize = getSerializedSize(digest);
                 int listSize = getSerializedSize(list);
 
-                double estimate = digest.getQuantile(quantile);
-                double actual = QuantileUtil.getValueOnQuantile(list, quantile);
+                long estimate = digest.getQuantile(((double)percentile)/100);
+                long actual = (long) PercentileUtil.getValueOnPercentile(list, percentile);
 
                 println(i + ", " + digestSize + ", " + listSize + ", " + (digestSize + 0.0) / (listSize + 0.0) + ", "
                         + estimate + ", " + actual + ", " + getErrorString(actual, estimate));
@@ -335,24 +328,24 @@ public class TDigestTest {
     public void testSerialization() {
         int numOfItems = 10000;
 
-        for (Byte quantile: functionMap.keySet()) {
-            LOGGER.info("[Test Quantile " + quantile + "]");
+        for (Byte percentile: functionMap.keySet()) {
+            LOGGER.info("[Test Percentile " + percentile + "]");
             for (int i = 0; i < numOfItems; i += numOfItems / 17) {
                 if (i == 0) {
                     continue;
                 }
                 RandomNumberArray arr = new RandomNumberArray(i, DUPLICATION_PER_ITEM);
-                TDigest digest = new TDigest(compressionFactor);
+                QuantileDigest digest = new QuantileDigest(maxError);
                 DoubleArrayList list = new DoubleArrayList();
                 arr.offerAllNumberTo(digest);
                 arr.offerAllNumberTo(list);
                 // write and read
                 byte[] bytes = serialize(digest);
-                TDigest digest2 = deserialize(bytes);
+                QuantileDigest digest2 = deserialize(bytes);
 
-                double estimate = digest.getQuantile(quantile);
-                double estimate2 = digest2.getQuantile(quantile);
-                double actual = QuantileUtil.getValueOnQuantile(list, quantile);
+                long estimate = digest.getQuantile((percentile+0.0)/100);
+                long estimate2 = digest2.getQuantile((percentile+0.0)/100);
+                long actual = (long) PercentileUtil.getValueOnPercentile(list, percentile);
 
                 println("[Before Serialization Estimate]: " + estimate);
                 println("[After Serialization Estimate]: " + estimate2);
@@ -394,12 +387,12 @@ public class TDigestTest {
         return null;
     }
 
-    private TDigest deserialize(byte[] bytes) {
+    private QuantileDigest deserialize(byte[] bytes) {
         ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
         ObjectInputStream ois = null;
         try {
             ois = new ObjectInputStream(bais);
-            TDigest digest = (TDigest) ois.readObject();
+            QuantileDigest digest = (QuantileDigest) ois.readObject();
             ois.close();
             return digest;
         } catch (IOException e) {
@@ -411,10 +404,10 @@ public class TDigestTest {
     }
 
     // function set 1
-    private static List<Serializable> getTDigestResultValues(int numOfListCombined) {
+    private static List<Serializable> getQuantileDigestResultValues(int numOfListCombined) {
         List<Serializable> resultList = new ArrayList<Serializable>();
         for (int i = 0; i < numOfListCombined; ++i) {
-            TDigest digest = new TDigest(compressionFactor);
+            QuantileDigest digest = new QuantileDigest(maxError);
             digest.offer(i);
             resultList.add(digest);
         }
@@ -432,10 +425,10 @@ public class TDigestTest {
     }
 
     // function set 2
-    private static List<Serializable> getTDigestResultValues(RandomNumberArray arr, int numOfListCombined, int numOfItemsPerList) {
+    private static List<Serializable> getQuantileDigestResultValues(RandomNumberArray arr, int numOfListCombined, int numOfItemsPerList) {
         List<Serializable> resultList = new ArrayList<Serializable>();
         for (int i = 0; i < numOfListCombined; ++i) {
-            TDigest digest = new TDigest(compressionFactor);
+            QuantileDigest digest = new QuantileDigest(maxError);
             arr.offerNumberInRangeTo(digest, i*numOfItemsPerList, (i+1)*numOfItemsPerList);
             resultList.add(digest);
         }
@@ -453,8 +446,8 @@ public class TDigestTest {
     }
 
     // others
-    private QuantileTDigestAggregationFunction getQuantileAggregationFunction(byte quantile) {
-        QuantileTDigestAggregationFunction ret = functionMap.get(quantile);
+    private DigestAggregationFunction getQuantileAggregationFunction(byte quantile) {
+        DigestAggregationFunction ret = functionMap.get(quantile);
         if (ret != null) {
             return ret;
         }

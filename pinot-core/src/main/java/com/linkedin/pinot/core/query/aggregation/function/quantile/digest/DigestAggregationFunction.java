@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.function.quantile;
+package com.linkedin.pinot.core.query.aggregation.function.quantile.digest;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.tdigest.TDigest;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -35,39 +34,39 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * Quantile function implemented using TDigest estimation.
+ * Percentile(Quantile) function implemented using Digest estimation.
  *
  */
-public class QuantileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileTDigestAggregationFunction.class);
-  public static final int DEFAULT_COMPRESSION_FACTOR = 100;
+public class DigestAggregationFunction implements AggregationFunction<QuantileDigest, Long> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DigestAggregationFunction.class);
+  public static final double DEFAULT_MAX_ERROR = 0.05;
 
-  private String _tDigestColumnName;
-  private int _compressionFactor;
-  private byte _quantile; // 0-100
+  private String _digestColumnName;
+  private double _maxError;
+  private double _quantile; // 0.0-1.0
 
-  public QuantileTDigestAggregationFunction(byte quantile) {
-    this(quantile, DEFAULT_COMPRESSION_FACTOR);
+  public DigestAggregationFunction(byte percentile) {
+    this(percentile, DEFAULT_MAX_ERROR);
   }
 
-  public QuantileTDigestAggregationFunction(byte quantile, int compressionFactor) {
-    _quantile = quantile;
-    _compressionFactor = compressionFactor;
+  public DigestAggregationFunction(byte percentile, double maxError) {
+    _quantile = (percentile + 0.0) / 100;
+    _maxError = maxError;
   }
 
   @Override
   public void init(AggregationInfo aggregationInfo) {
-    _tDigestColumnName = aggregationInfo.getAggregationParams().get("column");
+    _digestColumnName = aggregationInfo.getAggregationParams().get("column");
   }
 
-  private void offerValueToTDigest(int docId, Block[] block, TDigest digest) {
+  private void offerValueToTDigest(int docId, Block[] block, QuantileDigest digest) {
     Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 
     if (blockValIterator.skipTo(docId)) {
       int dictionaryIndex = blockValIterator.nextIntVal();
       if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-        digest.offer(((Number) dictionaryReader.get(dictionaryIndex)).doubleValue());
+        digest.add(((Number) dictionaryReader.get(dictionaryIndex)).longValue());
       } else {
         // ignore this
         LOGGER.info("ignore NULL_VALUE_INDEX");
@@ -76,14 +75,14 @@ public class QuantileTDigestAggregationFunction implements AggregationFunction<T
   }
 
   @Override
-  public TDigest aggregate(Block docIdSetBlock, Block[] block) {
+  public QuantileDigest aggregate(Block docIdSetBlock, Block[] block) {
     DataType type = block[0].getMetadata().getDataType();
-    if (!type.isNumber()) {
-      throw new RuntimeException("Only number column can be used in quantile, get: " + type);
+    if (!type.isInteger()) {
+      throw new RuntimeException("Only integer(byte, short, int, long) type columns can be used in percentileest, get: " + type);
     }
 
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    TDigest ret = new TDigest(_compressionFactor);
+    QuantileDigest ret = new QuantileDigest(_maxError);
     int docId = 0;
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       offerValueToTDigest(docId, block, ret);
@@ -93,33 +92,33 @@ public class QuantileTDigestAggregationFunction implements AggregationFunction<T
   }
 
   @Override
-  public TDigest aggregate(TDigest mergedResult, int docId, Block[] block) {
+  public QuantileDigest aggregate(QuantileDigest mergedResult, int docId, Block[] block) {
     DataType type = block[0].getMetadata().getDataType();
-    if (!type.isNumber()) {
-      throw new RuntimeException("Only number column can be used in quantile, get: " + type);
+    if (!type.isInteger()) {
+      throw new RuntimeException("Only integer(byte, short, int, long) type columns can be used in percentileest, get: " + type);
     }
 
     if (mergedResult == null) {
-      mergedResult = new TDigest(_compressionFactor);
+      mergedResult = new QuantileDigest(_maxError);
     }
     offerValueToTDigest(docId, block, mergedResult);
     return mergedResult;
   }
 
   @Override
-  public List<TDigest> combine(List<TDigest> aggregationResultList, CombineLevel combineLevel) {
+  public List<QuantileDigest> combine(List<QuantileDigest> aggregationResultList, CombineLevel combineLevel) {
     if ((aggregationResultList == null) || aggregationResultList.isEmpty()) {
       return null;
     }
 
-    TDigest tDigestResult = TDigest.merge(aggregationResultList);
+    QuantileDigest digestResult = QuantileDigest.merge(aggregationResultList);
     aggregationResultList.clear();
-    aggregationResultList.add(tDigestResult);
+    aggregationResultList.add(digestResult);
     return aggregationResultList;
   }
 
   @Override
-  public TDigest combineTwoValues(TDigest aggregationResult0, TDigest aggregationResult1) {
+  public QuantileDigest combineTwoValues(QuantileDigest aggregationResult0, QuantileDigest aggregationResult1) {
     if (aggregationResult0 == null) {
       return aggregationResult1;
     }
@@ -127,22 +126,23 @@ public class QuantileTDigestAggregationFunction implements AggregationFunction<T
       return aggregationResult0;
     }
 
-    return TDigest.merge(aggregationResult0, aggregationResult1);
+    aggregationResult0.merge(aggregationResult1);
+    return aggregationResult0;
   }
 
   @Override
-  public Double reduce(List<TDigest> combinedResultList) {
+  public Long reduce(List<QuantileDigest> combinedResultList) {
     if ((combinedResultList == null) || combinedResultList.isEmpty()) {
-      return 0.0;
+      return 0L;
     }
 
-    TDigest merged = TDigest.merge(combinedResultList);
-    Double ret = merged.getQuantile(_quantile);
+    QuantileDigest merged = QuantileDigest.merge(combinedResultList);
+    Long ret = merged.getQuantile(_quantile);
     return ret;
   }
 
   @Override
-  public JSONObject render(Double finalAggregationResult) {
+  public JSONObject render(Long finalAggregationResult) {
     try {
       return new JSONObject().put("value", finalAggregationResult.toString());
     } catch (JSONException e) {
@@ -159,11 +159,11 @@ public class QuantileTDigestAggregationFunction implements AggregationFunction<T
 
   @Override
   public String getFunctionName() {
-    return "quantile" + _quantile + "_" + _tDigestColumnName;
+    return "percentileEst" + (int)(_quantile * 100) + "_" + _digestColumnName;
   }
 
   @Override
   public Serializable getDefaultValue() {
-    return new TDigest(_compressionFactor);
+    return new QuantileDigest(DEFAULT_MAX_ERROR);
   }
 }

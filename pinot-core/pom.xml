@@ -135,6 +135,10 @@
       <groupId>com.clearspring.analytics</groupId>
       <artifactId>stream</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.airlift</groupId>
+      <artifactId>stats</artifactId>
+    </dependency>
 
     <!-- Kafka -->
     <dependency>

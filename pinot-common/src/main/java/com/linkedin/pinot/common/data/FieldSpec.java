@@ -176,6 +176,10 @@ public abstract class FieldSpec {
       return (this == BYTE) || (this == SHORT) || (this == INT) || (this == LONG) || (this == FLOAT) || (this == DOUBLE);
     }
 
+    public boolean isInteger() {
+      return (this == BYTE) || (this == SHORT) || (this == INT) || (this == LONG);
+    }
+
     public boolean isSingleValue() {
       return this.ordinal() < BYTE_ARRAY.ordinal();
     }
