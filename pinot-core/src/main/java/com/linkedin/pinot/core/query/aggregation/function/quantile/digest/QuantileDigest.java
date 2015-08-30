@@ -20,7 +20,6 @@ import com.google.common.base.*;
 import com.google.common.base.Objects;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.AtomicDouble;
-import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.*;
@@ -35,7 +34,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 
 /**
- * Re-implement the {@link io.airlift.stats.QuantileDigest} with additional methods facilitating serialization.
+ * Re-implement io.airlift.stats.QuantileDigest with additional methods facilitating serialization.
  */
 @NotThreadSafe
 public class QuantileDigest implements Serializable {
@@ -64,8 +63,7 @@ public class QuantileDigest implements Serializable {
     private int nonZeroNodeCount = 0;
     private int compressions = 0;
 
-    private enum TraversalOrder
-    {
+    private enum TraversalOrder {
         FORWARD, REVERSE
     }
 
@@ -74,26 +72,23 @@ public class QuantileDigest implements Serializable {
      *
      * @param maxError the max error tolerance
      */
-    public QuantileDigest(double maxError)
-    {
+    public QuantileDigest(double maxError) {
         this(maxError, 0);
     }
 
     /**
-     *<p>Create a QuantileDigest with a maximum error guarantee of "maxError" and exponential decay
+     * <p>Create a QuantileDigest with a maximum error guarantee of "maxError" and exponential decay
      * with factor "alpha".</p>
      *
      * @param maxError the max error tolerance
-     * @param alpha the exponential decay factor
+     * @param alpha    the exponential decay factor
      */
-    public QuantileDigest(double maxError, double alpha)
-    {
+    public QuantileDigest(double maxError, double alpha) {
         this(maxError, alpha, Ticker.systemTicker(), true);
     }
 
     @VisibleForTesting
-    QuantileDigest(double maxError, double alpha, Ticker ticker, boolean compressAutomatically)
-    {
+    QuantileDigest(double maxError, double alpha, Ticker ticker, boolean compressAutomatically) {
         checkArgument(maxError >= 0 && maxError <= 1, "maxError must be in range [0, 1]");
         checkArgument(alpha >= 0 && alpha < 1, "alpha must be in range [0, 1)");
 
@@ -105,32 +100,27 @@ public class QuantileDigest implements Serializable {
         landmarkInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
     }
 
-    public QuantileDigest(QuantileDigest quantileDigest)
-    {
+    public QuantileDigest(QuantileDigest quantileDigest) {
         this(quantileDigest.getMaxError(), quantileDigest.getAlpha());
         merge(quantileDigest);
     }
 
-    public double getMaxError()
-    {
+    public double getMaxError() {
         return maxError;
     }
 
-    public double getAlpha()
-    {
+    public double getAlpha() {
         return alpha;
     }
 
-    public void add(long value)
-    {
+    public void add(long value) {
         add(value, 1);
     }
 
     /**
      * Adds a value to this digest. The value must be {@code >= 0}
      */
-    public void add(long value, long count)
-    {
+    public void add(long value, long count) {
         checkArgument(count > 0, "count must be > 0");
 
         long nowInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
@@ -139,8 +129,7 @@ public class QuantileDigest implements Serializable {
         if (nowInSeconds - landmarkInSeconds >= RESCALE_THRESHOLD_SECONDS) {
             rescale(nowInSeconds);
             compress(); // need to compress to get rid of nodes that may have decayed to ~ 0
-        }
-        else if (nonZeroNodeCount > MAX_SIZE_FACTOR * maxExpectedNodeCount && compressAutomatically) {
+        } else if (nonZeroNodeCount > MAX_SIZE_FACTOR * maxExpectedNodeCount && compressAutomatically) {
             // The size (number of non-zero nodes) of the digest is at most 3 * compression factor
             // If we're over MAX_SIZE_FACTOR of the expected size, compress
             // Note: we don't compress as soon as we go over expectedNodeCount to avoid unnecessarily
@@ -156,8 +145,7 @@ public class QuantileDigest implements Serializable {
         insert(longToBits(value), weight);
     }
 
-    public void merge(QuantileDigest other)
-    {
+    public void merge(QuantileDigest other) {
         rescaleToCommonLandmark(this, other);
 
         // 2. merge other into this (don't modify other)
@@ -174,8 +162,7 @@ public class QuantileDigest implements Serializable {
      * Gets the values at the specified quantiles +/- maxError. The list of quantiles must be sorted
      * in increasing order, and each value must be in the range [0, 1]
      */
-    public List<Long> getQuantiles(List<Double> quantiles)
-    {
+    public List<Long> getQuantiles(List<Double> quantiles) {
         checkArgument(Ordering.natural().isOrdered(quantiles), "quantiles must be sorted in increasing order");
         for (double quantile : quantiles) {
             checkArgument(quantile >= 0 && quantile <= 1, "quantile must be between [0,1]");
@@ -184,12 +171,10 @@ public class QuantileDigest implements Serializable {
         final ImmutableList.Builder<Long> builder = ImmutableList.builder();
         final PeekingIterator<Double> iterator = Iterators.peekingIterator(quantiles.iterator());
 
-        postOrderTraversal(root, new Callback()
-        {
+        postOrderTraversal(root, new Callback() {
             private double sum = 0;
 
-            public boolean process(Node node)
-            {
+            public boolean process(Node node) {
                 sum += node.weightedCount;
 
                 while (iterator.hasNext() && sum > iterator.peek() * weightedCount) {
@@ -219,16 +204,14 @@ public class QuantileDigest implements Serializable {
     /**
      * Gets the value at the specified quantile +/- maxError. The quantile must be in the range [0, 1]
      */
-    public long getQuantile(double quantile)
-    {
+    public long getQuantile(double quantile) {
         return getQuantiles(ImmutableList.of(quantile)).get(0);
     }
 
     /**
      * Number (decayed) of elements added to this quantile digest
      */
-    public double getCount()
-    {
+    public double getCount() {
         return weightedCount / weight(TimeUnit.NANOSECONDS.toSeconds(ticker.read()));
     }
 
@@ -240,8 +223,7 @@ public class QuantileDigest implements Serializable {
     * The approximate count in each bucket is guaranteed to be within 2 * totalCount * maxError of
     * the real count.
     */
-    public List<Bucket> getHistogram(List<Long> bucketUpperBounds)
-    {
+    public List<Bucket> getHistogram(List<Long> bucketUpperBounds) {
         checkArgument(Ordering.natural().isOrdered(bucketUpperBounds), "buckets must be sorted in increasing order");
 
         final ImmutableList.Builder<Bucket> builder = ImmutableList.builder();
@@ -255,10 +237,8 @@ public class QuantileDigest implements Serializable {
 
         final double normalizationFactor = weight(TimeUnit.NANOSECONDS.toSeconds(ticker.read()));
 
-        postOrderTraversal(root, new Callback()
-        {
-            public boolean process(Node node)
-            {
+        postOrderTraversal(root, new Callback() {
+            public boolean process(Node node) {
 
                 while (iterator.hasNext() && iterator.peek() <= node.getUpperBound()) {
                     double bucketCount = sum.get() - lastSum.get();
@@ -289,13 +269,10 @@ public class QuantileDigest implements Serializable {
         return builder.build();
     }
 
-    public long getMin()
-    {
+    public long getMin() {
         final AtomicLong chosen = new AtomicLong(min);
-        postOrderTraversal(root, new Callback()
-        {
-            public boolean process(Node node)
-            {
+        postOrderTraversal(root, new Callback() {
+            public boolean process(Node node) {
                 if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
                     chosen.set(node.getLowerBound());
                     return false;
@@ -307,13 +284,10 @@ public class QuantileDigest implements Serializable {
         return Math.max(min, chosen.get());
     }
 
-    public long getMax()
-    {
+    public long getMax() {
         final AtomicLong chosen = new AtomicLong(max);
-        postOrderTraversal(root, new Callback()
-        {
-            public boolean process(Node node)
-            {
+        postOrderTraversal(root, new Callback() {
+            public boolean process(Node node) {
                 if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
                     chosen.set(node.getUpperBound());
                     return false;
@@ -325,13 +299,7 @@ public class QuantileDigest implements Serializable {
         return Math.min(max, chosen.get());
     }
 
-    public int estimatedInMemorySizeInBytes()
-    {
-        return SizeOf.QUANTILE_DIGEST + totalNodeCount * SizeOf.NODE;
-    }
-
-    public int estimatedSerializedSizeInBytes()
-    {
+    public int estimatedSerializedSizeInBytes() {
         int estimatedNodeSize = SizeOf.BYTE + // flags
                 SizeOf.BYTE + // level
                 SizeOf.LONG + // value
@@ -346,8 +314,7 @@ public class QuantileDigest implements Serializable {
                 totalNodeCount * estimatedNodeSize;
     }
 
-    public void serialize(final DataOutput output)
-    {
+    public void serialize(final DataOutput output) {
         try {
             output.writeDouble(maxError);
             output.writeDouble(alpha);
@@ -356,29 +323,24 @@ public class QuantileDigest implements Serializable {
             output.writeLong(max);
             output.writeInt(totalNodeCount);
 
-            postOrderTraversal(root, new Callback()
-            {
+            postOrderTraversal(root, new Callback() {
                 @Override
-                public boolean process(Node node)
-                {
+                public boolean process(Node node) {
                     try {
                         serializeNode(output, node);
-                    }
-                    catch (IOException e) {
+                    } catch (IOException e) {
                         Throwables.propagate(e);
                     }
                     return true;
                 }
             });
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Throwables.propagate(e);
         }
     }
 
     private void serializeNode(DataOutput output, Node node)
-            throws IOException
-    {
+            throws IOException {
         int flags = 0;
         if (node.left != null) {
             flags |= Flags.HAS_LEFT;
@@ -393,8 +355,7 @@ public class QuantileDigest implements Serializable {
         output.writeDouble(node.weightedCount);
     }
 
-    public static QuantileDigest deserialize(DataInput input)
-    {
+    public static QuantileDigest deserialize(DataInput input) {
         try {
             double maxError = input.readDouble();
             double alpha = input.readDouble();
@@ -434,15 +395,13 @@ public class QuantileDigest implements Serializable {
             }
 
             return result;
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw Throwables.propagate(e);
         }
     }
 
     private static Node deserializeNode(DataInput input)
-            throws IOException
-    {
+            throws IOException {
         int level = input.readUnsignedByte();
         long value = input.readLong();
         double weight = input.readDouble();
@@ -451,34 +410,28 @@ public class QuantileDigest implements Serializable {
     }
 
     @VisibleForTesting
-    int getTotalNodeCount()
-    {
+    int getTotalNodeCount() {
         return totalNodeCount;
     }
 
     @VisibleForTesting
-    int getNonZeroNodeCount()
-    {
+    int getNonZeroNodeCount() {
         return nonZeroNodeCount;
     }
 
     @VisibleForTesting
-    int getCompressions()
-    {
+    int getCompressions() {
         return compressions;
     }
 
     @VisibleForTesting
-    void compress()
-    {
+    void compress() {
         ++compressions;
 
         final int compressionFactor = calculateCompressionFactor();
 
-        postOrderTraversal(root, new Callback()
-        {
-            public boolean process(Node node)
-            {
+        postOrderTraversal(root, new Callback() {
+            public boolean process(Node node) {
                 if (node.isLeaf()) {
                     return true;
                 }
@@ -525,23 +478,19 @@ public class QuantileDigest implements Serializable {
         }
     }
 
-    private double weight(long timestamp)
-    {
+    private double weight(long timestamp) {
         return Math.exp(alpha * (timestamp - landmarkInSeconds));
     }
 
-    private void rescale(long newLandmarkInSeconds)
-    {
+    private void rescale(long newLandmarkInSeconds) {
         // rescale the weights based on a new landmark to avoid numerical overflow issues
 
         final double factor = Math.exp(-alpha * (newLandmarkInSeconds - landmarkInSeconds));
 
         weightedCount *= factor;
 
-        postOrderTraversal(root, new Callback()
-        {
-            public boolean process(Node node)
-            {
+        postOrderTraversal(root, new Callback() {
+            public boolean process(Node node) {
                 double oldWeight = node.weightedCount;
 
                 node.weightedCount *= factor;
@@ -557,8 +506,7 @@ public class QuantileDigest implements Serializable {
         landmarkInSeconds = newLandmarkInSeconds;
     }
 
-    private int calculateCompressionFactor()
-    {
+    private int calculateCompressionFactor() {
         if (root == null) {
             return 1;
         }
@@ -566,8 +514,7 @@ public class QuantileDigest implements Serializable {
         return Math.max((int) ((root.level + 1) / maxError), 1);
     }
 
-    private void insert(long bits, double weight)
-    {
+    private void insert(long bits, double weight) {
         long lastBranch = 0;
         Node parent = null;
         Node current = root;
@@ -576,14 +523,12 @@ public class QuantileDigest implements Serializable {
             if (current == null) {
                 setChild(parent, lastBranch, createLeaf(bits, weight));
                 return;
-            }
-            else if (!inSameSubtree(bits, current.bits, current.level)) {
+            } else if (!inSameSubtree(bits, current.bits, current.level)) {
                 // if bits and node.bits are not in the same branch given node's level,
                 // insert a parent above them at the point at which branches diverge
                 setChild(parent, lastBranch, makeSiblings(current, createLeaf(bits, weight)));
                 return;
-            }
-            else if (current.level == 0 && current.bits == bits) {
+            } else if (current.level == 0 && current.bits == bits) {
                 // found the node
 
                 double oldWeight = current.weightedCount;
@@ -607,28 +552,23 @@ public class QuantileDigest implements Serializable {
 
             if (branch == 0) {
                 current = current.left;
-            }
-            else {
+            } else {
                 current = current.right;
             }
         }
     }
 
-    private void setChild(Node parent, long branch, Node child)
-    {
+    private void setChild(Node parent, long branch, Node child) {
         if (parent == null) {
             root = child;
-        }
-        else if (branch == 0) {
+        } else if (branch == 0) {
             parent.left = child;
-        }
-        else {
+        } else {
             parent.right = child;
         }
     }
 
-    private Node makeSiblings(Node node, Node sibling)
-    {
+    private Node makeSiblings(Node node, Node sibling) {
         int parentLevel = MAX_BITS - Long.numberOfLeadingZeros(node.bits ^ sibling.bits);
 
         Node parent = createNode(node.bits, parentLevel, 0);
@@ -638,8 +578,7 @@ public class QuantileDigest implements Serializable {
         if (branch == 0) {
             parent.left = sibling;
             parent.right = node;
-        }
-        else {
+        } else {
             parent.left = node;
             parent.right = sibling;
         }
@@ -647,13 +586,11 @@ public class QuantileDigest implements Serializable {
         return parent;
     }
 
-    private Node createLeaf(long bits, double weight)
-    {
+    private Node createLeaf(long bits, double weight) {
         return createNode(bits, 0, weight);
     }
 
-    private Node createNode(long bits, int level, double weight)
-    {
+    private Node createNode(long bits, int level, double weight) {
         weightedCount += weight;
         ++totalNodeCount;
         if (weight >= ZERO_WEIGHT_THRESHOLD) {
@@ -662,37 +599,30 @@ public class QuantileDigest implements Serializable {
         return new Node(bits, level, weight);
     }
 
-    private Node merge(Node node, Node other)
-    {
+    private Node merge(Node node, Node other) {
         if (node == null) {
             return copyRecursive(other);
-        }
-        else if (other == null) {
+        } else if (other == null) {
             return node;
-        }
-        else if (!inSameSubtree(node.bits, other.bits, Math.max(node.level, other.level))) {
+        } else if (!inSameSubtree(node.bits, other.bits, Math.max(node.level, other.level))) {
             return makeSiblings(node, copyRecursive(other));
-        }
-        else if (node.level > other.level) {
+        } else if (node.level > other.level) {
             long branch = other.bits & node.getBranchMask();
 
             if (branch == 0) {
                 node.left = merge(node.left, other);
-            }
-            else {
+            } else {
                 node.right = merge(node.right, other);
             }
             return node;
-        }
-        else if (node.level < other.level) {
+        } else if (node.level < other.level) {
             Node result = createNode(other.bits, other.level, other.weightedCount);
 
             long branch = node.bits & other.getBranchMask();
             if (branch == 0) {
                 result.left = merge(node, other.left);
                 result.right = copyRecursive(other.right);
-            }
-            else {
+            } else {
                 result.left = copyRecursive(other.left);
                 result.right = merge(node, other.right);
             }
@@ -715,13 +645,11 @@ public class QuantileDigest implements Serializable {
         return node;
     }
 
-    private static boolean inSameSubtree(long bitsA, long bitsB, int level)
-    {
+    private static boolean inSameSubtree(long bitsA, long bitsB, int level) {
         return level == MAX_BITS || (bitsA >>> level) == (bitsB >>> level);
     }
 
-    private Node copyRecursive(Node node)
-    {
+    private Node copyRecursive(Node node) {
         Node result = null;
 
         if (node != null) {
@@ -737,8 +665,7 @@ public class QuantileDigest implements Serializable {
      * Remove the node if possible or set its count to 0 if it has children and
      * it needs to be kept around
      */
-    private Node tryRemove(Node node)
-    {
+    private Node tryRemove(Node node) {
         if (node == null) {
             return null;
         }
@@ -752,12 +679,10 @@ public class QuantileDigest implements Serializable {
         Node result = null;
         if (node.isLeaf()) {
             --totalNodeCount;
-        }
-        else if (node.hasSingleChild()) {
+        } else if (node.hasSingleChild()) {
             result = node.getSingleChild();
             --totalNodeCount;
-        }
-        else {
+        } else {
             node.weightedCount = 0;
             result = node;
         }
@@ -765,14 +690,12 @@ public class QuantileDigest implements Serializable {
         return result;
     }
 
-    private boolean postOrderTraversal(Node node, Callback callback)
-    {
+    private boolean postOrderTraversal(Node node, Callback callback) {
         return postOrderTraversal(node, callback, TraversalOrder.FORWARD);
     }
 
     // returns true if traversal should continue
-    private boolean postOrderTraversal(Node node, Callback callback, TraversalOrder order)
-    {
+    private boolean postOrderTraversal(Node node, Callback callback, TraversalOrder order) {
         if (node == null) {
             return false;
         }
@@ -783,8 +706,7 @@ public class QuantileDigest implements Serializable {
         if (order == TraversalOrder.FORWARD) {
             first = node.left;
             second = node.right;
-        }
-        else {
+        } else {
             first = node.right;
             second = node.left;
         }
@@ -803,13 +725,11 @@ public class QuantileDigest implements Serializable {
     /**
      * Computes the maximum error of the current digest
      */
-    public double getConfidenceFactor()
-    {
+    public double getConfidenceFactor() {
         return computeMaxPathWeight(root) * 1.0 / weightedCount;
     }
 
-    public boolean equivalent(QuantileDigest other)
-    {
+    public boolean equivalent(QuantileDigest other) {
         rescaleToCommonLandmark(this, other);
 
         return (totalNodeCount == other.totalNodeCount &&
@@ -820,8 +740,7 @@ public class QuantileDigest implements Serializable {
                 Objects.equal(root, other.root));
     }
 
-    private void rescaleToCommonLandmark(QuantileDigest one, QuantileDigest two)
-    {
+    private void rescaleToCommonLandmark(QuantileDigest one, QuantileDigest two) {
         long nowInSeconds = TimeUnit.NANOSECONDS.toSeconds(ticker.read());
 
         // 1. rescale this and other to common landmark
@@ -844,8 +763,7 @@ public class QuantileDigest implements Serializable {
      * Computes the max "weight" of any path starting at node and ending at a leaf in the
      * hypothetical complete tree. The weight is the sum of counts in the ancestors of a given node
      */
-    private double computeMaxPathWeight(Node node)
-    {
+    private double computeMaxPathWeight(Node node) {
         if (node == null || node.level == 0) {
             return 0;
         }
@@ -857,8 +775,7 @@ public class QuantileDigest implements Serializable {
     }
 
     @VisibleForTesting
-    void validate()
-    {
+    void validate() {
         final AtomicDouble sumOfWeights = new AtomicDouble();
         final AtomicInteger actualNodeCount = new AtomicInteger();
         final AtomicInteger actualNonZeroNodeCount = new AtomicInteger();
@@ -866,11 +783,9 @@ public class QuantileDigest implements Serializable {
         if (root != null) {
             validateStructure(root);
 
-            postOrderTraversal(root, new Callback()
-            {
+            postOrderTraversal(root, new Callback() {
                 @Override
-                public boolean process(Node node)
-                {
+                public boolean process(Node node) {
                     sumOfWeights.addAndGet(node.weightedCount);
                     actualNodeCount.incrementAndGet();
 
@@ -896,8 +811,7 @@ public class QuantileDigest implements Serializable {
                 actualNonZeroNodeCount.get(), nonZeroNodeCount);
     }
 
-    private void validateStructure(Node node)
-    {
+    private void validateStructure(Node node) {
         checkState(node.level >= 0);
 
         if (node.left != null) {
@@ -911,8 +825,7 @@ public class QuantileDigest implements Serializable {
         }
     }
 
-    private void validateBranchStructure(Node parent, Node child, Node otherChild, boolean isLeft)
-    {
+    private void validateBranchStructure(Node parent, Node child, Node otherChild, boolean isLeft) {
         checkState(child.level < parent.level, "Child level (%s) should be smaller than parent level (%s)", child.level, parent.level);
 
         long branch = child.bits & (1L << (parent.level - 1));
@@ -923,29 +836,24 @@ public class QuantileDigest implements Serializable {
                 "Found a linear chain of zero-weight nodes");
     }
 
-    public String toGraphviz()
-    {
+    public String toGraphviz() {
         StringBuilder builder = new StringBuilder();
 
         builder.append("digraph QuantileDigest {\n")
                 .append("\tgraph [ordering=\"out\"];");
 
         final List<Node> nodes = new ArrayList<>();
-        postOrderTraversal(root, new Callback()
-        {
+        postOrderTraversal(root, new Callback() {
             @Override
-            public boolean process(Node node)
-            {
+            public boolean process(Node node) {
                 nodes.add(node);
                 return true;
             }
         });
 
-        Multimap<Integer, Node> nodesByLevel = Multimaps.index(nodes, new Function<Node, Integer>()
-        {
+        Multimap<Integer, Node> nodesByLevel = Multimaps.index(nodes, new Function<Node, Integer>() {
             @Override
-            public Integer apply(Node input)
-            {
+            public Integer apply(Node input) {
                 return input.level;
             }
         });
@@ -982,51 +890,43 @@ public class QuantileDigest implements Serializable {
         return builder.toString();
     }
 
-    private static String idFor(Node node)
-    {
+    private static String idFor(Node node) {
         return String.format("node_%x_%x", node.bits, node.level);
     }
 
     /**
      * Convert a java long (two's complement representation) to a 64-bit lexicographically-sortable binary
      */
-    private static long longToBits(long value)
-    {
+    private static long longToBits(long value) {
         return value ^ 0x8000_0000_0000_0000L;
     }
 
     /**
-     *  Convert a 64-bit lexicographically-sortable binary to a java long (two's complement representation)
+     * Convert a 64-bit lexicographically-sortable binary to a java long (two's complement representation)
      */
-    private static long bitsToLong(long bits)
-    {
+    private static long bitsToLong(long bits) {
         return bits ^ 0x8000_0000_0000_0000L;
     }
 
-    public static class Bucket
-    {
+    public static class Bucket {
         private double count;
         private double mean;
 
-        public Bucket(double count, double mean)
-        {
+        public Bucket(double count, double mean) {
             this.count = count;
             this.mean = mean;
         }
 
-        public double getCount()
-        {
+        public double getCount() {
             return count;
         }
 
-        public double getMean()
-        {
+        public double getMean() {
             return mean;
         }
 
         @Override
-        public boolean equals(Object o)
-        {
+        public boolean equals(Object o) {
             if (this == o) {
                 return true;
             }
@@ -1047,8 +947,7 @@ public class QuantileDigest implements Serializable {
         }
 
         @Override
-        public int hashCode()
-        {
+        public int hashCode() {
             int result;
             long temp;
             temp = count != +0.0d ? Double.doubleToLongBits(count) : 0L;
@@ -1058,45 +957,38 @@ public class QuantileDigest implements Serializable {
             return result;
         }
 
-        public String toString()
-        {
+        public String toString() {
             return String.format("[count: %f, mean: %f]", count, mean);
         }
     }
 
-    private static class Node
-    {
+    private static class Node {
         private double weightedCount;
         private int level;
         private long bits;
         private Node left;
         private Node right;
 
-        private Node(long bits, int level, double weightedCount)
-        {
+        private Node(long bits, int level, double weightedCount) {
             this.bits = bits;
             this.level = level;
             this.weightedCount = weightedCount;
         }
 
-        public boolean isLeaf()
-        {
+        public boolean isLeaf() {
             return left == null && right == null;
         }
 
-        public boolean hasSingleChild()
-        {
+        public boolean hasSingleChild() {
             return left == null && right != null || left != null && right == null;
         }
 
-        public Node getSingleChild()
-        {
+        public Node getSingleChild() {
             checkState(hasSingleChild(), "Node does not have a single child");
             return firstNonNull(left, right);
         }
 
-        public long getUpperBound()
-        {
+        public long getUpperBound() {
             // set all lsb below level to 1 (we're looking for the highest value of the range covered by this node)
             long mask = 0;
 
@@ -1106,13 +998,11 @@ public class QuantileDigest implements Serializable {
             return bitsToLong(bits | mask);
         }
 
-        public long getBranchMask()
-        {
+        public long getBranchMask() {
             return (1L << (level - 1));
         }
 
-        public long getLowerBound()
-        {
+        public long getLowerBound() {
             // set all lsb below level to 0 (we're looking for the lowest value of the range covered by this node)
             long mask = 0;
 
@@ -1123,25 +1013,21 @@ public class QuantileDigest implements Serializable {
             return bitsToLong(bits & (~mask));
         }
 
-        public long getMiddle()
-        {
+        public long getMiddle() {
             return getLowerBound() + (getUpperBound() - getLowerBound()) / 2;
         }
 
-        public String toString()
-        {
+        public String toString() {
             return format("%s (level = %d, count = %s, left = %s, right = %s)", bits, level, weightedCount, left != null, right != null);
         }
 
         @Override
-        public int hashCode()
-        {
+        public int hashCode() {
             return Objects.hashCode(weightedCount, level, bits, left, right);
         }
 
         @Override
-        public boolean equals(Object obj)
-        {
+        public boolean equals(Object obj) {
             if (this == obj) {
                 return true;
             }
@@ -1157,8 +1043,7 @@ public class QuantileDigest implements Serializable {
         }
     }
 
-    private static interface Callback
-    {
+    private static interface Callback {
         /**
          * @param node the node to process
          * @return true if processing should continue
@@ -1166,20 +1051,16 @@ public class QuantileDigest implements Serializable {
         boolean process(Node node);
     }
 
-    private static class SizeOf
-    {
+    private static class SizeOf {
         public static final int BYTE = 1;
         public static final int INTEGER = 4;
         public static final int LONG = 8;
 
         public static final int DOUBLE = 8;
 
-        public static final int QUANTILE_DIGEST = ClassLayout.parseClass(QuantileDigest.class).instanceSize();
-        public static final int NODE = ClassLayout.parseClass(Node.class).instanceSize();
     }
 
-    private static class Flags
-    {
+    private static class Flags {
         public static final int HAS_LEFT = 1 << 0;
         public static final int HAS_RIGHT = 1 << 1;
     }
@@ -1223,7 +1104,7 @@ public class QuantileDigest implements Serializable {
      * HyperLogLog objects without having to expose a public
      * constructor, public write/read methods, or pretend final
      * fields aren't final.
-     *
+     * <p>
      * In short, Externalizable allows you to skip some of the more
      * verbose meta-data default Serializable gets you, but still
      * includes the class name. In that sense, there is some cost

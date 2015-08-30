@@ -35,7 +35,7 @@ import static org.testng.Assert.assertEquals;
 
 /**
  *
- * Tests for QuantileDigest quantile estimation, the routine is similar to {@link SimpleAggregationFunctionsTest}
+ * Tests for {@link QuantileDigest} estimation, the routine is similar to {@link SimpleAggregationFunctionsTest}
  *
  *
  */
