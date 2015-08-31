@@ -93,7 +93,7 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
-    boolean isTraceEnabled = true;
+    boolean isTraceEnabled = false;
 //    try {
 //      isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
 //    } catch (Exception e) {

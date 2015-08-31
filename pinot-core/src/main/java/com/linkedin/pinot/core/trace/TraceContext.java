@@ -139,7 +139,7 @@ public class TraceContext {
   private static void logInfo(CONSTANT info, InstanceRequest request) {
     long requestId = (request == null) ? -1 : request.getRequestId();
     Long tid = Thread.currentThread().getId();
-    LOGGER.info("[TID: {}] {} in Request: {}", tid, info, requestId);
+    LOGGER.debug("[TID: {}] {} in Request: {}", tid, info, requestId);
     if (TEST_ENABLED) {
       tidToTestInfoMap.putIfAbsent(tid, new ConcurrentLinkedDeque<Info>());
       tidToTestInfoMap.get(tid).offerLast(new Info(info, requestId));
