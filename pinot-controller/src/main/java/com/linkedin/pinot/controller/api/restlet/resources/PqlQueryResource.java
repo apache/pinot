@@ -59,7 +59,10 @@ public class PqlQueryResource extends PinotRestletResourceBase {
 
   @Override
   public Representation get() {
+    LOGGER.info("Running query: " + getQuery());
     final String pqlString = getQuery().getValues("pql");
+    final String traceEnabled = getQuery().getValues("trace");
+
     LOGGER.info("*** found pql : " + pqlString);
     JSONObject compiledJSON;
 
@@ -101,7 +104,8 @@ public class PqlQueryResource extends PinotRestletResourceBase {
     }
 
 
-    final String resp = sendPQLRaw("http://" + config.getHostName().split("_")[1] + ":" + config.getPort() + "/query", pqlString);
+    String url = "http://" + config.getHostName().split("_")[1] + ":" + config.getPort() + "/query";
+    final String resp = sendPQLRaw(url, pqlString, traceEnabled );
 
     return new StringRepresentation(resp);
   }
@@ -184,10 +188,10 @@ public class PqlQueryResource extends PinotRestletResourceBase {
     }
   }
 
-  public String sendPQLRaw(String url, String pqlRequest) {
+  public String sendPQLRaw(String url, String pqlRequest, String traceEnabled) {
     try {
       final long startTime = System.currentTimeMillis();
-      final JSONObject bqlJson = new JSONObject().put("pql", pqlRequest);
+      final JSONObject bqlJson = new JSONObject().put("pql", pqlRequest).put("trace", traceEnabled);
 
       final String pinotResultString = sendPostRaw(url, bqlJson.toString(), null);
 

@@ -46,8 +46,8 @@ $(document).ready(function() {
   $("#execute-query").click(function() {
     // execute query and draw the results
     var query = EDITOR.getValue().trim();
-    
-    HELPERS.executeQuery(query, function(data) {
+    var traceEnabled = document.getElementById('trace-enabled').checked;
+    HELPERS.executeQuery(query, traceEnabled, function(data) {
       RESULTS.setValue(js_beautify(data, JS_BEAUTIFY_SETTINGS));
     })
   });
@@ -96,8 +96,8 @@ var HELPERS = {
     var query = EDITOR.getValue().trim();
   },
 
-  executeQuery: function(query, callback) {
-    var url = "/pql?pql=" + query;
+  executeQuery: function(query, traceEnabled, callback) {
+    var url = "/pql?pql=" + query +"&trace=" + traceEnabled;
     $.ajax({
       type: 'GET',
       url: url,

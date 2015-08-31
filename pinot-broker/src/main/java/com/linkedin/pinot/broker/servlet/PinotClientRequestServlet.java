@@ -94,11 +94,18 @@ public class PinotClientRequestServlet extends HttpServlet {
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
     boolean isTraceEnabled = false;
-//    try {
-//      isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
-//    } catch (Exception e) {
-//      // ignore
-//    }
+
+    if(request.has("trace")){
+      try {
+        isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
+        LOGGER.info("Trace is set to: "+ isTraceEnabled);
+      } catch (Exception e) {
+        LOGGER.warn("Invalid trace value: {}", request.getString("trace"), e);
+      }
+    } else {
+      LOGGER.warn("Request does not contain a key called \"trace\", so trace is disabled.");
+    }
+
     final long startTime = System.nanoTime();
     final BrokerRequest brokerRequest;
     try {
@@ -116,17 +123,17 @@ public class PinotClientRequestServlet extends HttpServlet {
 
     final long requestCompilationTime = System.nanoTime() - startTime;
     brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION,
-        requestCompilationTime);
+            requestCompilationTime);
 
     final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION,
-        new Callable<BrokerResponse>() {
-          @Override
-          public BrokerResponse call()
-              throws Exception {
-            final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
-            return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
-          }
-        });
+            new Callable<BrokerResponse>() {
+              @Override
+              public BrokerResponse call()
+                      throws Exception {
+                final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
+                return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
+              }
+            });
 
     LOGGER.info("Broker Response : " + resp);
     return resp;
