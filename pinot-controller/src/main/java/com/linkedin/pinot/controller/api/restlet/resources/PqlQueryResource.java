@@ -191,7 +191,10 @@ public class PqlQueryResource extends PinotRestletResourceBase {
   public String sendPQLRaw(String url, String pqlRequest, String traceEnabled) {
     try {
       final long startTime = System.currentTimeMillis();
-      final JSONObject bqlJson = new JSONObject().put("pql", pqlRequest).put("trace", traceEnabled);
+      final JSONObject bqlJson = new JSONObject().put("pql", pqlRequest);
+      if (traceEnabled != null && !traceEnabled.isEmpty()) {
+        bqlJson.put("trace", traceEnabled);
+      }
 
       final String pinotResultString = sendPostRaw(url, bqlJson.toString(), null);
 

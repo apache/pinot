@@ -93,17 +93,18 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
+    LOGGER.info("Broker received Query String is: " + pql);
     boolean isTraceEnabled = false;
 
-    if(request.has("trace")){
+    if (request.has("trace")) {
       try {
         isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
-        LOGGER.info("Trace is set to: "+ isTraceEnabled);
+        LOGGER.info("Trace is set to: " + isTraceEnabled);
       } catch (Exception e) {
         LOGGER.warn("Invalid trace value: {}", request.getString("trace"), e);
       }
     } else {
-      LOGGER.warn("Request does not contain a key called \"trace\", so trace is disabled.");
+      // ignore, trace is disabled by default
     }
 
     final long startTime = System.nanoTime();
@@ -135,7 +136,7 @@ public class PinotClientRequestServlet extends HttpServlet {
               }
             });
 
-    LOGGER.info("Broker Response : " + resp);
+    LOGGER.info("Broker Response : {}", resp);
     return resp;
   }
 
