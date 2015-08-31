@@ -1,218 +1,264 @@
 package com.linkedin.thirdeye.anomaly.lib.scanstatistics;
-import java.util.HashSet;
-import java.lang.Integer;
-import org.apache.commons.math3.stat.descriptive.rank.Percentile;
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.apache.commons.math3.util.Pair;
 
-import com.linkedin.thirdeye.anomaly.lib.scanstatistics.MaxInterval;
-import java.util.Random;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.math3.distribution.NormalDistribution;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Range;
+import com.linkedin.thirdeye.anomaly.api.function.exception.FunctionDidNotEvaluateException;
+import com.linkedin.thirdeye.anomaly.lib.util.STLDecompositionUtils;
+import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 
 /**
- * Created with IntelliJ IDEA.
- * User: jjchen
- * Date: 8/25/15
- * Time: 9:42 PM
- * To change this template use File | Settings | File Templates.
+ * Online scan statistics implementation.
  */
 public class ScanStatistics {
-	public int _numSimulation;
-	public int _minWindowLength;
-	public int _minIncrement;
-	public double _pValue;
-	public Pattern _pattern;
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScanStatistics.class);
+
+	private final int _numSimulation;
+	private final int _minWindowLength;
+	private final int _maxWindowLength;
+	private final int _minIncrement;
+	private final double _pValue;
+	private final Pattern _pattern;
+
+	/**
+	 * The direction of the hypothesis test
+	 */
 	public enum Pattern {
-	    UP, DOWN,NOTEQUAL,
+	  UP, DOWN, NOTEQUAL,
 	}
 
-	public ScanStatistics(int numSimulation, int minWindowLength, double pValue, Pattern pattern, int minIncrement)  {
+	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
+	    int minIncrement)  {
 		_numSimulation = numSimulation;
 		_minWindowLength = minWindowLength;
+		_maxWindowLength = maxWindowLength;
 		_minIncrement = minIncrement;
 		_pValue = pValue;
 		_pattern = pattern;
-
 	}
-	/**
-	 * Generate all possible scan windows for the monitoring window.
-	 * @param start_index: the starting point of the monitoring window.
-	 * @param end_index: the end point of the monitoring window.
-	 * @return a set of scanning windows represented by (start point, end point).
-	 * (TODO): add_maxWindowLength
-	 */
 
-	public HashSet<Pair<Integer, Integer>> generateScanWindows(int start_index, int end_index) {
-		if (end_index - start_index < _minWindowLength) {
-			return null;
-		}
-		HashSet<Pair<Integer, Integer>> scanWindows = new HashSet<Pair<Integer, Integer>> ();
-		for (int idx = start_index;  idx < end_index-_minWindowLength; idx=idx+_minIncrement)  {
-			for (int idx2 = idx+_minWindowLength; idx2 < end_index; idx2=idx2+_minIncrement)  {
-				scanWindows.add(new Pair<Integer, Integer>(idx, idx2));
-			}
-		}
-		return scanWindows;
+	 /**
+   * This function finds the given interval in the monitoring window of which the maximum likelihood
+   * values above the simulated quantile.
+   *
+   * @param startScanIndex
+   *  Starting point of the monitoring window.
+   * @param data
+   *  A data array which contains training and monitoring.
+   * @return
+   *  An interval with starting point and ending point, or null if none surpass the threshold
+   */
+  public Range<Integer> getInterval(double[] trainingData, double[] monitoringData) {
 
-	}
+    OnlineNormalStatistics trainDataDs = new OnlineNormalStatistics(trainingData);
+    NormalDistribution trainDataNormal = new NormalDistribution(trainDataDs.getMean(),
+        Math.sqrt(trainDataDs.getPopulationVariance()));
+
+    ScanIntervalIterator scanWindowIterator = new ScanIntervalIterator(
+        0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
+    MaxInterval realDataInterval = generateMaxLikelihood(scanWindowIterator, trainingData, monitoringData, trainDataDs);
+    if (realDataInterval.getInterval() == null) {
+      throw new FunctionDidNotEvaluateException("no interval generated");
+    }
+
+    int numExceeded = 0;
+    int exceededCountThreshold = (int) (_pValue * _numSimulation);
+
+    // simulation buffer
+    double[] simulationBuffer = new double[monitoringData.length];
+    for (int ii = 0; ii < _numSimulation; ii++) {
+      LOGGER.info("started simulation {}", ii);
+      simulateInPlace(simulationBuffer, trainDataNormal);
+
+      ScanIntervalIterator simulationScanWindowIterator = new ScanIntervalIterator(
+          0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
+      MaxInterval simulationResult = generateMaxLikelihood(simulationScanWindowIterator, trainingData, simulationBuffer,
+          trainDataDs);
+
+      LOGGER.info("finished simulation {} : {}", ii, simulationResult.getMaxLikelihood());
+      if (simulationResult.getInterval() != null
+          && realDataInterval.getMaxLikelihood() < simulationResult.getMaxLikelihood())
+      {
+        numExceeded++;
+        if (numExceeded >= exceededCountThreshold) {
+          // early stopping condition
+          break;
+        }
+      }
+    }
+
+    LOGGER.info("real one: {} (percentile {})", realDataInterval.getMaxLikelihood(),
+        1 - (numExceeded / (double)_numSimulation));
+
+    if (numExceeded < exceededCountThreshold) {
+      return realDataInterval.getInterval();
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * @param simulationData
+   *  The array that will be modified in place.
+   * @param dist
+   *  Normal distribution from which values are drawn.
+   */
+  private void simulateInPlace(double[] simulationData, NormalDistribution dist) {
+    for (int i = 0; i < simulationData.length; i++) {
+      simulationData[i] = dist.sample();
+    }
+  }
+
 	/**
 	 * This function generates necessary statistics for a given period of a time series.
-	 * @param a_scanwindow: a pair of integers, the first/second one indicates the starting/ending of the scanning window.
-	 * @param data: the data sequence which contains the data in the training window and the data in monitoring window.
-	 * @param isIn: a boolean flag indicates the statistics is generated for the data inside/outside a_scanwindow. 
-	 * @return a descriptive statistics object.
+	 *
+	 * @param range
+	 *  The interval considered as 'in'
+	 * @param data
+	 * @param inDs
+	 *  The descriptive statistics to register 'in' values to
+	 * @param outDs
+	 *  The descriptive statistics to register 'out' values to
 	 */
-	public DescriptiveStatistics getTimeSeriesStats(Pair<Integer, Integer> a_scanwindow, double[] data, boolean isIn) {
-		int left_index = a_scanwindow.getKey();
-		int right_index = a_scanwindow.getValue();
-		if (left_index < 0 | right_index > data.length) {
-			return null;
-		}
-		if (isIn) {
-			double[] subTimeSeries = new double[right_index-left_index];
-			for (int ii=left_index; ii < right_index; ii++)   {
-				subTimeSeries[ii] = data[ii];
-			} 
-			DescriptiveStatistics inObj = new DescriptiveStatistics(subTimeSeries);
-			return inObj;          
-		} else {
-			int current_timeSeries_len = data.length - (right_index-left_index);
-			double[] subTimeSeries = new double[current_timeSeries_len];
-			for (int ii=0; ii < left_index; ii++)   {
-				subTimeSeries[ii] = data[ii];
-			}
-			for (int ii=right_index; ii<data.length; ii++) {
-				subTimeSeries[ii] = data[ii];
-			}    
-			DescriptiveStatistics outObj = new DescriptiveStatistics(subTimeSeries);
-			return outObj;
-		} 
+	private void getTimeSeriesStats(Range<Integer> range, double[] data, OnlineNormalStatistics inDs,
+	    OnlineNormalStatistics outDs) {
+	  // TODO should be able to leverage sliding windows to do this more efficiently
+	  for (int i = 0; i < data.length; i++) {
+	    if (range.contains(i)) {
+	      inDs.addValue(data[i]);
+	    } else {
+	      outDs.addValue(data[i]);
+	    }
+	  }
 	}
+
 	/**
-	 * This function finds the scanning window which has the maximum likelihood values defined by the 
-	 * scanning hypothesis. 
-	 * @param ScanWindowSet: a set of scanning windows.
-	 * @param data: a data vector contains training data and simulated data for monitoring window.
-	 * @return the interval which gives the maximum likelihood values.
+	 * This function finds the scanning window which has the maximum likelihood values defined by the
+	 * scanning hypothesis.
+	 *
+	 * @param scanWindowIterator
+	 *   Iterator from which to get scan windows.
+	 * @param trainingData
+	 * @param monitoringData
+	 * @param trainDataDs
+	 *   OnlineNormalStatistics for the train data
+	 * @return
+	 *   The interval which gives the maximum likelihood values.
 	 */
+	private MaxInterval generateMaxLikelihood(ScanIntervalIterator scanWindowIterator, double[] trainingData,
+	    double[] monitoringData, OnlineNormalStatistics trainDataDs)
+	{
+		double maxValue = Double.NEGATIVE_INFINITY;
+		Range<Integer> maxInterval = null;
 
-	public MaxInterval generateMaxLikelihood(HashSet<Pair<Integer, Integer>> ScanWindowSet, double[] data) {
-		if (ScanWindowSet == null)
-			return null;
-		double  maxValue = Double.NEGATIVE_INFINITY;
-		Pair<Integer, Integer>  maxInterval = null;
-		for (Pair<Integer, Integer> a_scanwindow : ScanWindowSet)  {
-			DescriptiveStatistics inObj =  getTimeSeriesStats(a_scanwindow, data, true);
-			DescriptiveStatistics outObj = getTimeSeriesStats(a_scanwindow, data, false);
-			if (inObj != null & outObj != null )  {
-				DescriptiveStatistics allObj = new DescriptiveStatistics(data);
-				double inMean = inObj.getMean();
-				double outMean = outObj.getMean();
-				double allMean = allObj.getMean();
-				double allVar = allObj.getVariance();
-				double sharedVar = 0;
-				int total_len = data.length;
-				for (int ii=0; ii < data.length; ii++){
-					if (ii >= a_scanwindow.getKey() & ii< a_scanwindow.getValue()) {
-						sharedVar +=  (data[ii] - inMean) * (data[ii] - inMean);
-					}  else {
-						sharedVar +=  (data[ii] - outMean) * (data[ii] - outMean);
-					}
-				}
-				sharedVar =  sharedVar / (double) total_len;
-				double currentValue = (double)total_len * Math.log(Math.sqrt(allVar)) - (double)total_len /2.0 - (double)total_len * Math.log(Math.sqrt(sharedVar));
-				for (int ii =0; ii<total_len; ii++) {
-					currentValue = (data[ii] - allMean) * (data[ii] - allMean) / (2.0 * allVar);
-				}
-				int pattern_indicator;
-				if (_pattern == Pattern.UP) {
-					pattern_indicator = (inMean > outMean) ? 1 : 0;
-				} else if (_pattern == Pattern.DOWN) {
-					pattern_indicator = (inMean < outMean) ? 1 : 0;
-				} else {
-					pattern_indicator =  (inMean != outMean) ? 1 : 0;
-				}
+		OnlineNormalStatistics dsAll = trainDataDs.copy();
+    for (double d : monitoringData) {
+      dsAll.addValue(d);
+    }
 
-				if (currentValue > maxValue & pattern_indicator == 1) {
-					maxValue = currentValue;
-					maxInterval = a_scanwindow;
-				}
+    double allVar = dsAll.getPopulationVariance();
+    double N = trainingData.length + monitoringData.length;
+
+    /* The first three terms are shared */
+    double sharedTerms = (dsAll.getSumSqDev() / (2 * allVar)) + (N * Math.log(Math.sqrt(allVar))) - (0.5 * N);
+
+		while(scanWindowIterator.hasNext())
+		{
+		  Range<Integer> currentScanWindow = scanWindowIterator.next();
+
+		  // initialize descriptive statistics
+		  OnlineNormalStatistics inDs = new OnlineNormalStatistics();
+	    OnlineNormalStatistics outDs = trainDataDs.copy();
+
+		  getTimeSeriesStats(currentScanWindow, monitoringData, inDs, outDs);
+
+			double inMean = inDs.getMean();
+			double outMean = outDs.getMean();
+
+			double sharedVar = (outDs.getSumSqDev() + inDs.getSumSqDev()) / N;
+			double currentValue = sharedTerms - (N * Math.log(Math.sqrt(sharedVar)));
+			boolean matchesPattern = false;
+			switch (_pattern)
+			{
+			  case UP: {
+			    matchesPattern = inMean > outMean;
+			    break;
+			  }
+			  case DOWN: {
+			    matchesPattern = inMean < outMean;
+			    break;
+			  }
+			  case NOTEQUAL: {
+			    matchesPattern = equalsDouble(inMean, outMean, 0.001); // TODO : this epsilon is arbitrary
+			    break;
+			  }
+			}
+
+			if (currentValue > maxValue && matchesPattern) {
+			  maxValue = currentValue;
+			  maxInterval = currentScanWindow;
 			}
 		}
+
 		MaxInterval maxDataInterval = new MaxInterval(maxValue, maxInterval);
 		return maxDataInterval;
 	}
-	/**
-	 * This version we include the online simulation version.  Each run will 
-	 * simulate and generate the threshold.
-	 * @param data: training data.
-	 * @param nrow: number of simulations.
-	 * @param ncol: length(training data) + length(monitoring data)
-	 * @return a double array which contains #nrow of rows. Each row, row[1:length(data)] is the training data,
-	 * row[length(data)+1: ncol] contains the simulated values based on Gaussian assumptions.
-	 */
-	public double[][] simulation(double[] data, int nrow, int ncol){
-		double[][] simulationMatrix = new double[nrow][ncol];
-		DescriptiveStatistics dataObj = new DescriptiveStatistics(data);
-		double data_mean = dataObj.getMean();
-		double data_var = dataObj.getVariance();
-		for (int row_idx = 0; row_idx < nrow; row_idx++) {
-			for (int col_idx=0; col_idx < ncol; col_idx++)  {
-				if (col_idx < data.length) {
-					simulationMatrix[row_idx][col_idx] = data[col_idx];
-				} else {
-					Random random_rv = new Random();
-					simulationMatrix[row_idx][col_idx] = data_mean + Math.sqrt(data_var) * random_rv.nextGaussian();
-				}
-			}
-		}
-		return simulationMatrix;
-	}
-	/**
-	 * This function generates the given quantile for an array.
-	 * @param an array of maxLikelihood values for different scanning windows.
-	 * @return a Percentile obj.
-	 */
-	public double computeQuantile(double[] maxLikelihoodArray) {
-		Percentile Percentile_obj = new Percentile();
-		Percentile_obj.setData(maxLikelihoodArray);
-		return Percentile_obj.evaluate(1 -_pValue);
-	}
-	/**
-	 * This function finds the given interval in the monitoring window of which the maximum likelihood 
-	 * values above the simulated quantile.
-	 * @param start_index: starting point of the monitoring window.
-	 * @param end_index: ending point of the monitoring window.
-	 * @param data: a data array which contains training and monitoring.
-	 * @return an interval with starting point and ending point.
-	 */
 
-	public Pair<Integer, Integer> getInterval(int start_index, int end_index, double[] data) {
-		// (TODO): AssertionError() check start_index < end_index
-		// (TODO): Assert length(data) > end_index
-		HashSet<Pair<Integer, Integer>> ScanWindowsSet =   generateScanWindows(start_index, end_index);
-		double[] training_data = new double[start_index];
-		for (int ii = 0; ii<start_index; ii++){
-			training_data[ii] = data[ii];
-		}
-
-		double[][] SimulationMatrix = simulation(training_data, _numSimulation, data.length);
-
-		double[] maxLikelihoodArray = new double[_numSimulation];
-
-		for  (int ii = 0; ii < _numSimulation; ii++) {
-
-			maxLikelihoodArray[ii] = generateMaxLikelihood(ScanWindowsSet, SimulationMatrix[ii])._maxLikelihood;
-		}
-		double threshold = computeQuantile(maxLikelihoodArray);
-
-		MaxInterval realDataInterval = generateMaxLikelihood(ScanWindowsSet, data);
-		if (realDataInterval._maxLikelihood > threshold) {
-			return realDataInterval._interval;
-		}  else {
-			return null;
-		}
+	private boolean equalsDouble(double d1, double d2, double epsilon) {
+	  return Math.abs(d1 - d2) < epsilon;
 	}
 
+	/**
+	 * Test on known anomalies
+	 *
+	 * @param args
+	 * @throws IOException
+	 */
+	public static void main(String[] args) throws IOException {
+    String[] lines = ResourceUtils.getResourceAsString("timeseries.csv").split("\n");
+    int numData = lines.length;
+    long[] timestamps = new long[numData];
+    double[] series = new double[numData];
+    for (int i = 0; i < numData; i++) {
+      timestamps[i] = i;
+      String value = lines[i].split(",")[1];
+      if (value.equals("NA")) {
+        series[i] = 0;
+      } else {
+        series[i] = Double.valueOf(value);
+      }
+    }
+
+    long start = System.currentTimeMillis();
+    double[] data = STLDecompositionUtils.removeSeasonality(timestamps, series, 168);
+
+    int split = 800;
+    double[] train = Arrays.copyOfRange(data, 0, split);
+    double[] monitor = Arrays.copyOfRange(data, split, data.length);
+
+    ScanStatistics scanStatistics = new ScanStatistics(
+        1000,
+        1,
+        100000,
+        0.05,
+        Pattern.DOWN,
+        1);
+
+    Range<Integer> anomaly = scanStatistics.getInterval(train, monitor);
+    Range<Integer> anomalyOffset = Range.closedOpen(anomaly.lowerEndpoint() + split, anomaly.upperEndpoint() + split);
+
+    System.out.println("N : " + data.length);
+    System.out.println("Split : " + split);
+    System.out.println("Anomaly : " + anomalyOffset);
+    System.out.println("Runtime: " + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start) + " seconds");
+	}
 }
 
 

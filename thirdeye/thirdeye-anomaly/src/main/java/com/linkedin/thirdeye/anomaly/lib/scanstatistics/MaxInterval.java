@@ -1,24 +1,25 @@
 package com.linkedin.thirdeye.anomaly.lib.scanstatistics;
 
-import org.apache.commons.math3.util.Pair;
+import com.google.common.collect.Range;
 
-
-/**
- * Created with IntelliJ IDEA.
- * User: jjchen
- * Date: 8/25/15
- * Time: 10:32 PM
- * To change this template use File | Settings | File Templates.
- */
 public class MaxInterval {
 
-        public double _maxLikelihood;
-        public Pair<Integer, Integer> _interval;
+  private final double _maxLikelihood;
 
-        public MaxInterval(double maxLikelihood, Pair<Integer, Integer> interval) {
-            _maxLikelihood = maxLikelihood;
-            _interval= interval;
-        }
+  private final Range<Integer> _interval;
+
+  public MaxInterval(double maxLikelihood, Range<Integer> interval) {
+    _maxLikelihood = maxLikelihood;
+    _interval = interval;
+  }
+
+  public Range<Integer> getInterval() {
+    return _interval;
+  }
+
+  public double getMaxLikelihood() {
+    return _maxLikelihood;
+  }
 
 }
 

@@ -31,7 +31,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
 
 /**
- * This class wraps around the fanomaly StateSpaceAnomalyDetector
+ * This class wraps around StateSpaceAnomalyDetector
  */
 public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction {
 

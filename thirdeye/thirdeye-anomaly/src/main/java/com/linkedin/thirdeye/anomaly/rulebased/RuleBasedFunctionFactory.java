@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.anomaly.rulebased;
 
-import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,12 +42,12 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
      * Begin: perform some basic rule validation
      */
     TimeGranularity aggregateGranularity = new TimeGranularity(ruleBasedFunctionTableRow.getAggregateSize(),
-        TimeUnit.valueOf(ruleBasedFunctionTableRow.getAggregateUnit()));
+        ruleBasedFunctionTableRow.getAggregateUnit());
     if (aggregateGranularity.getSize() <= 0) {
       throw new IllegalFunctionException("aggregate size must be positive");
     }
     TimeGranularity baselineGranularity = new TimeGranularity(ruleBasedFunctionTableRow.getBaselineSize(),
-        TimeUnit.valueOf(ruleBasedFunctionTableRow.getBaselineUnit()));
+        ruleBasedFunctionTableRow.getBaselineUnit());
     if (baselineGranularity.getSize() <= 0) {
       throw new IllegalFunctionException("baseline size must be positive");
     }
@@ -58,7 +56,8 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
      */
 
     DimensionKeyMatchTable<Double> deltaTable = null;
-    if (ruleBasedFunctionTableRow.getDeltaTableName() != null) {
+    if (ruleBasedFunctionTableRow.getDeltaTableName() != null
+        && ruleBasedFunctionTableRow.getDeltaTableName().length() > 0) {
       deltaTable = DeltaTable.load(dbconfig, starTreeConfig, ruleBasedFunctionTableRow.getDeltaTableName());
     }
 

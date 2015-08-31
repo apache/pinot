@@ -2,10 +2,16 @@ package com.linkedin.thirdeye.anomaly.lib.util;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +25,60 @@ import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 public class STLDecompositionUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(STLDecompositionUtils.class);
+
+  private static final String TMP_STL_WRAPPER_R_PATH;
+
+  static {
+    String outputPath = null;
+    try {
+      outputPath = "/tmp/" + md5(ResourceUtils.getResourceAsString("r/stl-wrapper.R") + "-stl-wrapper.R");
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    TMP_STL_WRAPPER_R_PATH = outputPath;
+
+    InputStream in = null;
+    OutputStream out = null;
+    try {
+      in = STLDecompositionUtils.class.getClassLoader().getResourceAsStream("r/stl-wrapper.R");
+      out = new FileOutputStream(TMP_STL_WRAPPER_R_PATH);
+      IOUtils.copy(in, out);
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      if (in != null) {
+        try {
+          in.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+      if (out != null) {
+        try {
+          out.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
+
+  private static String md5(String s) {
+    MessageDigest md = null;
+    try {
+      md = MessageDigest.getInstance("MD5");
+    } catch (NoSuchAlgorithmException e) {
+      LOGGER.error("no md5 available", e);
+    }
+    md.update(s.getBytes());
+    byte[] digest = md.digest();
+    StringBuffer sb = new StringBuffer();
+    for (byte b : digest) {
+      sb.append(String.format("%02x", b & 0xff));
+    }
+    return sb.toString();
+  }
+
 
   /**
    * @param timestamps
@@ -47,7 +107,7 @@ public class STLDecompositionUtils {
     try {
       ProcessBuilder processBuilder = new ProcessBuilder(
           "Rscript",
-          STLDecompositionUtils.class.getClassLoader().getResource("r/stl-wrapper.R").getPath(),
+          TMP_STL_WRAPPER_R_PATH,
           "" + seasonality);
       processBuilder.redirectErrorStream(true);
       process = processBuilder.start();
@@ -97,28 +157,6 @@ public class STLDecompositionUtils {
       if (process != null) {
         process.destroyForcibly();
       }
-    }
-  }
-
-  public static void main(String[] args) throws IOException {
-    String[] lines = ResourceUtils.getResourceAsString("timeseries.csv").split("\n");
-    int numData = lines.length;
-    long[] timestamps = new long[numData];
-    double[] series = new double[numData];
-    for (int i = 0; i < numData; i++) {
-      timestamps[i] = i;
-      String value = lines[i].split(",")[1];
-      if (value.equals("NA")) {
-        series[i] = 0;
-      } else {
-        series[i] = Double.valueOf(value);
-      }
-    }
-
-    double[] result = removeSeasonality(timestamps, series, 168);
-
-    for (int i = 0; i < result.length; i++) {
-      System.out.println(result[i]);
     }
   }
 

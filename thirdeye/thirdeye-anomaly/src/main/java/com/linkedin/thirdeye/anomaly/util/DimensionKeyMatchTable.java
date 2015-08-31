@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.util;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
@@ -53,6 +54,10 @@ public class DimensionKeyMatchTable<V> {
     } else {
       return null;
     }
+  }
+
+  public Set<DimensionKey> keySet() {
+    return valueMap.keySet();
   }
 
   public int size() {

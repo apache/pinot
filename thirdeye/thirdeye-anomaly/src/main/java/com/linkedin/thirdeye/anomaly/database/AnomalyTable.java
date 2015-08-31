@@ -177,6 +177,7 @@ public class AnomalyTable {
    *
    * @param dbConfig
    * @throws IOException
+   * @throws SQLException
    */
   public static void createTable(AnomalyDatabaseConfig dbConfig) throws IOException {
     dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName()));

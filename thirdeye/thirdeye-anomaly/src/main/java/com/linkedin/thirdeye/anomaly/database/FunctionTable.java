@@ -31,7 +31,7 @@ public class FunctionTable {
    * @throws IOException
    * @throws SQLException
    */
-  public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig, Class<T> rowClass,
+  public static <T extends FunctionTableRow> List<T> selectActiveRows(AnomalyDatabaseConfig dbConfig, Class<T> rowClass,
       String collection) throws InstantiationException, IllegalAccessException, IOException, SQLException {
 
     List<T> functionTableRows = new LinkedList<>();
@@ -42,7 +42,11 @@ public class FunctionTable {
     try {
       conn = dbConfig.getConnection();
       stmt = conn.createStatement();
-      rs = stmt.executeQuery(buildFunctionTableSelectStmt(dbConfig, collection));
+      String sql = String.format(
+          ResourceUtils.getResourceAsString("database/function/select-function-table-template-active.sql"),
+          dbConfig.getFunctionTableName(),
+          collection);
+      rs = stmt.executeQuery(sql);
 
       while (rs.next()) {
         T row = rowClass.newInstance();
@@ -72,15 +76,49 @@ public class FunctionTable {
     }
   }
 
-  /**
-   * @param dbConfig
-   * @return
-   * @throws IOException
-   */
-  private static String buildFunctionTableSelectStmt(AnomalyDatabaseConfig dbConfig, String collection)
-      throws IOException {
-    String formatString = ResourceUtils.getResourceAsString("database/function/select-function-table-template.sql");
-    return String.format(formatString, dbConfig.getFunctionTableName(), collection);
+  public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig, Class<T> rowClass,
+      String collection) throws InstantiationException, IllegalAccessException, IOException, SQLException {
+
+    List<T> functionTableRows = new LinkedList<>();
+
+    Connection conn = null;
+    Statement stmt = null;
+    ResultSet rs = null;
+    try {
+      conn = dbConfig.getConnection();
+      stmt = conn.createStatement();
+      String sql = String.format(
+          ResourceUtils.getResourceAsString("database/function/select-function-table-template.sql"),
+          dbConfig.getFunctionTableName(),
+          collection);
+      rs = stmt.executeQuery(sql);
+
+      while (rs.next()) {
+        T row = rowClass.newInstance();
+        row.init(rs);
+        functionTableRows.add(row);
+      }
+
+      return functionTableRows;
+
+    } catch (SQLException e) {
+      LOGGER.error("load function sql exception", e);
+      throw e;
+    } finally {
+      try {
+        if (conn != null) {
+          conn.close();
+        }
+        if (stmt != null) {
+          stmt.close();
+        }
+        if (rs != null) {
+          rs.close();
+        }
+      } catch (SQLException e) {
+        e.printStackTrace();
+      }
+    }
   }
 
 }

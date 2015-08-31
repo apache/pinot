@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
- *
+ * This class is configuration for thirdeye-anomaly detection and not for the management server.
  */
 public class ThirdEyeAnomalyDetectionConfiguration {
 

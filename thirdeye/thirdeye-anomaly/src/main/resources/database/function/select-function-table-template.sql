@@ -1,1 +1,1 @@
-SELECT * FROM `%s` WHERE collection='%s' AND is_active;
+SELECT * FROM `%s` WHERE collection='%s';

@@ -1,20 +1,25 @@
 package com.linkedin.thirdeye.anomaly.builtin;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.math3.util.Pair;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Range;
 import com.linkedin.thirdeye.anomaly.api.FunctionProperties;
+import com.linkedin.thirdeye.anomaly.api.ResultProperties;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.api.function.exception.IllegalFunctionException;
+import com.linkedin.thirdeye.anomaly.lib.scanstatistics.ScanStatistics;
+import com.linkedin.thirdeye.anomaly.lib.scanstatistics.ScanStatistics.Pattern;
 import com.linkedin.thirdeye.anomaly.lib.util.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.anomaly.lib.util.STLDecompositionUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
@@ -32,6 +37,10 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
 
   private static final String PROP_DEFAULT_SEASONAL = "168";
   private static final String PROP_DEFAULT_P_VALUE_THRESHOLD = "0.05";
+  private static final String PROP_DEFAULT_MIN_WINDOW_LEN = "1";
+  private static final String PROP_DEFAULT_NUM_SIMULATIONS = "1000";
+  private static final String PROP_DEFAULT_MIN_INCREMENT = "1";
+  private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + Integer.MAX_VALUE;
 
   private String metric;
   private double pValueThreshold;
@@ -43,6 +52,13 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private TimeUnit bucketUnit;
 
   private int seasonal;
+
+  private int numSimulation;
+  private int minWindowLength;
+  private int maxWindowLength;
+  private int minIncrement;
+
+  private Pattern pattern;
 
   /**
    * {@inheritDoc}
@@ -71,7 +87,12 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
 
     seasonal = Integer.parseInt(functionConfig.getProperty("seasonal", PROP_DEFAULT_SEASONAL));
 
-    // TODO add the remaining arguments
+    numSimulation = Integer.parseInt(functionConfig.getProperty("numSimulations", PROP_DEFAULT_NUM_SIMULATIONS));
+    minWindowLength = Integer.parseInt(functionConfig.getProperty("minWindowLength", PROP_DEFAULT_MIN_WINDOW_LEN));
+    maxWindowLength = Integer.parseInt(functionConfig.getProperty("maxWindowLength", PROP_DEFAULT_MAX_WINDOW_LEN));
+    minIncrement = Integer.parseInt(functionConfig.getProperty("minIncrement", PROP_DEFAULT_MIN_INCREMENT));
+
+    pattern = Pattern.valueOf(functionConfig.getProperty("pattern"));
   }
 
   /**
@@ -110,8 +131,6 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   @Override
   public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval,
       List<AnomalyResult> anomalyHistory) {
-    long startTimeStamp = Collections.min(series.getTimeWindowSet());
-    long endTimeStamp = Collections.max(series.getTimeWindowSet());
     long bucketMillis = bucketUnit.toMillis(bucketSize);
 
     // convert the data to arrays
@@ -119,18 +138,81 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
         null, Double.NaN);
     long[] timestamps = arraysFromSeries.getFirst();
     double[] observations = arraysFromSeries.getSecond();
-    removeHolesByAveragingNeighbors(observations);
+    removeMissingValuesByAveragingNeighbors(observations);
 
     // call stl library
     double[] observationsMinusSeasonality = STLDecompositionUtils.removeSeasonality(timestamps, observations, seasonal);
 
+    int effectiveMaxWindowLength = (int) (detectionInterval.totalBuckets() / bucketMillis);
+    effectiveMaxWindowLength = Math.min(effectiveMaxWindowLength, maxWindowLength);
+
+    // instantiate model
+    ScanStatistics scanStatistics = new ScanStatistics(
+        numSimulation,
+        minWindowLength,
+        effectiveMaxWindowLength,
+        pValueThreshold,
+        pattern,
+        minIncrement);
+
+    int numBucketsToScan = (int) ((detectionInterval.getEnd() - detectionInterval.getStart()) / bucketMillis);
+    int totalNumBuckets = observationsMinusSeasonality.length;
+    int numTrain = totalNumBuckets - numBucketsToScan;
+
+    // set of timestamps with anomalies
+    Set<Long> anomalousTimestamps = new HashSet<Long>();
+    for (AnomalyResult ar : anomalyHistory) {
+      anomalousTimestamps.add(ar.getTimeWindow());
+    }
+
+    // partition the data into train and monitoring
+    double[] trainingData = Arrays.copyOfRange(observationsMinusSeasonality, 0, numTrain);
+    long[] trainingTimestamps = Arrays.copyOfRange(timestamps, 0, numTrain);
+    double[] trainingDataWithOutAnomalies = removeAnomalies(trainingTimestamps, trainingData, anomalousTimestamps);
+    double[] monitoringData = Arrays.copyOfRange(observationsMinusSeasonality, numTrain,
+        observationsMinusSeasonality.length);
+    long[] monitoringTimestamps = Arrays.copyOfRange(timestamps, numTrain, observationsMinusSeasonality.length);
+
+    // get anomalous interval if any
+    LOGGER.info("detecting anomalies using scan statistics");
+    long startTime = System.nanoTime();
+    Range<Integer> anomalousInterval = scanStatistics.getInterval(trainingDataWithOutAnomalies, monitoringData);
+    LOGGER.info("scan statistics took {} seconds", TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
+
+    // convert interval result to points
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
-
-    /*
-     * TODO : do scan statistics here
-     */
-
+    if (anomalousInterval != null) {
+      for (int i = anomalousInterval.lowerEndpoint(); i < anomalousInterval.upperEndpoint(); i++) {
+        ResultProperties properties = new ResultProperties();
+        properties.setProperty("anomalyStart", new DateTime(
+            monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
+        properties.setProperty("anomalyEnd", new DateTime(
+            monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
+        anomalyResults.add(new AnomalyResult(true, timestamps[i], pValueThreshold, observations[i], properties));
+      }
+    }
     return anomalyResults;
+  }
+
+  /**
+   * @param timestamps
+   * @param data
+   * @param anomalousTimestamps
+   * @return
+   *  The data with anomalies removed. Timestamps will no longer match this array.
+   */
+  private double[] removeAnomalies(long[] timestamps, double[] data, Set<Long> anomalousTimestamps) {
+    int collapsedIdx = 0;
+    double[] dataWithAnomaliesRemoved = new double[timestamps.length];
+    for (int i = 0; i < timestamps.length; i++) {
+      if (anomalousTimestamps.contains(timestamps[i])) {
+        continue;
+      } else {
+        dataWithAnomaliesRemoved[collapsedIdx] = data[i];
+        collapsedIdx++;
+      }
+    }
+    return Arrays.copyOf(dataWithAnomaliesRemoved, collapsedIdx);
   }
 
   /**
@@ -140,7 +222,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
    * Note, the first data point cannot be a hole by construction from the conversion of MetricTimeSeries with
    * (min, max) times.
    */
-  private void removeHolesByAveragingNeighbors(double[] arr) {
+  private void removeMissingValuesByAveragingNeighbors(double[] arr) {
     for (int i = 0; i < arr.length; i++) {
       if (Double.isNaN(arr[i])) {
         double sum = 0.0;

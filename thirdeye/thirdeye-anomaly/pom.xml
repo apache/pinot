@@ -15,34 +15,73 @@
 
   <properties>
       <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <dropwizard.version>0.7.1</dropwizard.version>
+      <jackson.version>2.4.3</jackson.version>
   </properties>
-
 
   <dependencies>
       <dependency>
-          <groupId>com.linkedin.thirdeye</groupId>
-          <artifactId>thirdeye-core</artifactId>
-          <version>1.0-SNAPSHOT</version>
+        <groupId>com.linkedin.thirdeye</groupId>
+        <artifactId>thirdeye-core</artifactId>
+        <version>1.0-SNAPSHOT</version>
       </dependency>
       <dependency>
-          <groupId>com.linkedin.thirdeye</groupId>
-          <artifactId>thirdeye-client</artifactId>
-          <version>1.0-SNAPSHOT</version>
+        <groupId>com.linkedin.thirdeye</groupId>
+        <artifactId>thirdeye-client</artifactId>
+        <version>1.0-SNAPSHOT</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-core</artifactId>
+        <version>${dropwizard.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>log4j-over-slf4j</artifactId>
+          </exclusion>
+            <exclusion>
+              <groupId>com.fasterxml.jackson</groupId>
+              <artifactId>jackson-core</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.fasterxml.jackson</groupId>
+              <artifactId>jackson-databind</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.slf4j</groupId>
+              <artifactId>slf4j-simple</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-assets</artifactId>
+        <version>${dropwizard.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-client</artifactId>
+        <version>${dropwizard.version}</version>
+      </dependency>
+      <dependency>
+      <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-views-freemarker</artifactId>
+        <version>${dropwizard.version}</version>
+      </dependency>
+      <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+          <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+          <version>${jackson.version}</version>
       </dependency>
       <dependency>
           <groupId>com.google.guava</groupId>
           <artifactId>guava</artifactId>
           <version>18.0</version>
-      </dependency>
-      <dependency>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>httpclient</artifactId>
-          <version>4.5</version>
-      </dependency>
-      <dependency>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>fluent-hc</artifactId>
-          <version>4.5</version>
       </dependency>
       <dependency>
           <groupId>org.slf4j</groupId>
