@@ -1089,7 +1089,7 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public void addSegment(final SegmentMetadata segmentMetadata, String downloadUrl) {
+  public PinotResourceManagerResponse addSegment(final SegmentMetadata segmentMetadata, String downloadUrl) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       if (!matchTableName(segmentMetadata)) {
@@ -1137,7 +1137,11 @@ public class PinotHelixResourceManager {
       }
     } catch (final Exception e) {
       LOGGER.error("Caught exception while adding segment", e);
+      res.status = ResponseStatus.failure;
+      res.message = e.getMessage();
     }
+
+    return res;
   }
 
   /**

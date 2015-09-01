@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.resource.Put;
 import org.slf4j.Logger;
@@ -38,7 +39,8 @@ public class PinotTableTenantConfigs extends PinotRestletResourceBase {
     try {
       return updateTenantConfig("dummy");
     } catch (Exception e) {
-      LOGGER.error("errpr updating medata configs for table {}", entity, e);
+      LOGGER.error("Caught exception while updating tenant config " , e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }

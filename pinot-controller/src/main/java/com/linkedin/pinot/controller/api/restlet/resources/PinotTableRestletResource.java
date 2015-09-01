@@ -11,6 +11,7 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Delete;
@@ -57,11 +58,13 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
         addTable(config);
       } catch (Exception e) {
         LOGGER.error("Caught exception while adding table", e);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
         return new StringRepresentation("Failed: " + e.getMessage());
       }
       return new StringRepresentation("Success");
     } catch (Exception e) {
       LOGGER.error("error reading/serializing requestJSON", e);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation("Failed: " + e.getMessage());
     }
   }
@@ -101,6 +104,8 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
     final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
     if (tableType != null && !isValidTableType(tableType)) {
+      LOGGER.error(INVALID_TABLE_TYPE_ERROR);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation(INVALID_TABLE_TYPE_ERROR);
     }
 
@@ -108,7 +113,8 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
       try {
         return getAllTables();
       } catch (Exception e) {
-        LOGGER.error("Error processing table list", e);
+        LOGGER.error("Caught exception while fetching table ", e);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     }
@@ -118,10 +124,13 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
       } else if (isValidState(state)) {
         return setTablestate(tableName, tableType, state);
       } else {
+        LOGGER.error(INVALID_STATE_ERROR);
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         return new StringRepresentation(INVALID_STATE_ERROR);
       }
     } catch (Exception e) {
-      LOGGER.error("Error processing get table config", e);
+      LOGGER.error("Caught exception while fetching table ", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
@@ -222,6 +231,8 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
       return _pinotHelixResourceManager.dropTable(tableName);
     } else {
+      LOGGER.error(INVALID_STATE_ERROR);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new PinotResourceManagerResponse(INVALID_STATE_ERROR, false);
     }
   }
@@ -233,8 +244,11 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
 
     final String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
     final String type = getReference().getQueryAsForm().getValues(TABLE_TYPE);
-    if (deleteTable(tableName, type)) {
-      return new StringRepresentation("Error: Unable to find table " + tableName);
+    if (!deleteTable(tableName, type)) {
+      String error = new String("Error: Table " + tableName + " not found.");
+      LOGGER.error(error);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation(error);
     }
     return presentation;
   }
@@ -247,7 +261,9 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
       description = "The name of the table to delete", required = true) String tableName, @Parameter(name = "type",
       in = "query", description = "The type of table to delete, either offline or realtime") String type) {
     if (tableName == null) {
-      return true;
+      LOGGER.error("Error: Table name null.");
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return false;
     }
     if (type == null || type.equalsIgnoreCase(TableType.OFFLINE.name())) {
       _pinotHelixResourceManager.deleteOfflineTable(tableName);
@@ -255,6 +271,6 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
     if (type == null || type.equalsIgnoreCase(TableType.REALTIME.name())) {
       _pinotHelixResourceManager.deleteRealtimeTable(tableName);
     }
-    return false;
+    return true;
   }
 }

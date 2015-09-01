@@ -92,11 +92,15 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
       final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
       if (tableType != null && !isValidTableType(tableType)) {
+        LOGGER.error(INVALID_TABLE_TYPE_ERROR);
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         return new StringRepresentation(INVALID_TABLE_TYPE_ERROR);
       }
 
       if (state != null) {
         if (!isValidState(state)) {
+          LOGGER.error(INVALID_STATE_ERROR);
+          setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
           return new StringRepresentation(INVALID_STATE_ERROR);
         } else {
           return toggleSegmentState(tableName, segmentName, state, tableType);
@@ -269,7 +273,10 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
   private StringRepresentation getSegmentMetaData(String tableName, String segmentName, TableType tableType)
       throws JSONException {
     if (!ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), tableName, segmentName)) {
-      return new StringRepresentation("Error: segment " + segmentName + " not found.");
+      String error = new String("Error: segment " + segmentName + " not found.");
+      LOGGER.error(error);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation(error);
     }
 
     JSONArray ret = new JSONArray();

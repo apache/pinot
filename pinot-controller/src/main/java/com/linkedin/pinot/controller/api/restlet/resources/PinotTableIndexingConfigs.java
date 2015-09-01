@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Put;
@@ -40,13 +41,17 @@ public class PinotTableIndexingConfigs extends PinotRestletResourceBase {
   public Representation put(Representation entity) {
     final String tableName = (String) getRequest().getAttributes().get("tableName");
     if (tableName == null) {
-      return new StringRepresentation("tableName is not present");
+      String error = new String("Error: Table " + tableName + " not found.");
+      LOGGER.error(error);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation(error);
     }
 
     try {
       return updateIndexingConfig(tableName, entity);
     } catch (final Exception e) {
-      LOGGER.error("Error updating indexing configs for table {}", tableName, e);
+      LOGGER.error("Caught exception while updating indexing configs for table {}", tableName, e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }

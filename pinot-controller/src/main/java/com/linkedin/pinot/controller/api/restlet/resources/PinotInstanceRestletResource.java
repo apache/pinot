@@ -106,6 +106,8 @@ public class PinotInstanceRestletResource extends PinotRestletResourceBase {
       final String state = getReference().getQueryAsForm().getValues(STATE);
 
       if (!isValidState(state)) {
+        LOGGER.error(INVALID_STATE_ERROR);
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         return new StringRepresentation(INVALID_STATE_ERROR);
       }
 
@@ -173,8 +175,9 @@ public class PinotInstanceRestletResource extends PinotRestletResourceBase {
       return new StringRepresentation(_pinotHelixResourceManager.dropInstance(instanceName).toJSON().toString());
 
     } else {
-      return new StringRepresentation(
-          "Incorrect URI: must be of form: /instances/{instanceName}[?{state}={enable|disable|drop}]");
+      LOGGER.error(INVALID_INSTANCE_URI_ERROR);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation(INVALID_INSTANCE_URI_ERROR);
     }
   }
 }

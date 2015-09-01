@@ -6,6 +6,7 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
@@ -43,13 +44,17 @@ public class PinotTableInstances extends PinotRestletResourceBase {
     final String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
     final String type = getQueryValue(TABLE_TYPE);
     if (tableName == null) {
-      return new StringRepresentation("tableName is not present");
+      String error = new String("Error: Table " + tableName + " not found.");
+      LOGGER.error(error);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation(error);
     }
 
     try {
       return getTableInstances(tableName, type);
     } catch (Exception e) {
-      LOGGER.error("error processing fetch table request, ", e);
+      LOGGER.error("Caught exception fetching instances for table ", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
 

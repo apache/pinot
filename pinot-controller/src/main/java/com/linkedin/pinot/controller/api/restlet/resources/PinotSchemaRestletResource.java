@@ -61,6 +61,8 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
         return getAllSchemas();
       }
     } catch (Exception e) {
+      LOGGER.error("Caught exception while fetching schema ", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
@@ -100,6 +102,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation("{}");
     }
     LOGGER.info("schema string is : " + schema.getJSONSchema());

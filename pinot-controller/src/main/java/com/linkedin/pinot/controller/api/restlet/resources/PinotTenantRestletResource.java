@@ -93,7 +93,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
       presentation = createTenant(tenant);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while processing put request", e);
+      LOGGER.error("Caught exception while creating tenant ", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -133,7 +133,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
       presentation = updateTenant(tenant);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while processing put request", e);
+      LOGGER.error("Caught exception while updating tenant ", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -189,12 +189,15 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
         if (isValidState(state)) {
           presentation = toggleTenantState(tenantName, state, type);
         } else {
+          LOGGER.error(INVALID_STATE_ERROR);
+          setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
           return new StringRepresentation(INVALID_STATE_ERROR);
         }
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while processing get request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
+      LOGGER.error("Caught exception while fetching tenant ", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -257,6 +260,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
 
     if (StateType.DROP.name().equalsIgnoreCase(state)) {
       if (!allInstances.isEmpty()) {
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         return new StringRepresentation("Error: Tenant " + tenantName + " has live instances, cannot be dropped.");
       }
       _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
@@ -305,7 +309,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
       presentation = deleteTenant(tenantName, type);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while processing delete request", e);
+      LOGGER.error("Caught exception while deleting tenant ", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

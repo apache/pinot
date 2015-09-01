@@ -19,6 +19,7 @@ public class PinotRestletResourceBase extends ServerResource {
   protected static final String STATE = "state";
 
   protected final static String INVALID_STATE_ERROR = "Error: Invalid state, must be one of {enable|disable|drop}'.";
+  protected final static String INVALID_INSTANCE_URI_ERROR = "Incorrect URI: must be of form: /instances/{instanceName}[?{state}={enable|disable|drop}]";
   protected final static String INVALID_TABLE_TYPE_ERROR =
       "Error: Invalid table type, must be one of {offline|realtime}'.";
 

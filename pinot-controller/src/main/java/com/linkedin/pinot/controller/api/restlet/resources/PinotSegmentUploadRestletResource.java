@@ -26,6 +26,7 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.restlet.data.MediaType;
 import org.restlet.data.Status;
 import org.restlet.ext.fileupload.RestletFileUpload;
@@ -121,6 +122,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     if (dataFile.exists()) {
       presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
     } else {
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       presentation = new StringRepresentation("Table or segment is not found!");
     }
     return presentation;
@@ -139,6 +141,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     Representation presentation;
     final JSONArray ret = new JSONArray();
     File tableDir = new File(baseDataDir, tableName);
+
     if (tableDir.exists()) {
       for (final File file : tableDir.listFiles()) {
         final String url =
@@ -146,7 +149,11 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
                 + tableName + "/" + file.getName();
         ret.put(url);
       }
+    } else {
+      LOGGER.error("Error: Table " + tableName + " not found.");
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
     }
+
     presentation = new StringRepresentation(ret.toString());
     return presentation;
   }
@@ -239,6 +246,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
           LOGGER.error("Caught exception in file upload", e);
+          setStatus(Status.SERVER_ERROR_INTERNAL);
         }
       }
       if ((dataFile != null) && dataFile.exists()) {
@@ -256,7 +264,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
       "/segments/"
   })
   private Representation uploadSegment(File indexDir, File dataFile)
-      throws ConfigurationException, IOException {
+      throws ConfigurationException, IOException, JSONException {
     final SegmentMetadata metadata = new SegmentMetadataImpl(indexDir);
     final File tableDir = new File(baseDataDir, metadata.getTableName());
     File segmentFile = new File(tableDir, dataFile.getName());
@@ -265,9 +273,11 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     }
     FileUtils.moveFile(dataFile, segmentFile);
 
-    _pinotHelixResourceManager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
-    setStatus(Status.SUCCESS_OK);
-    return new StringRepresentation("");
+    PinotResourceManagerResponse response =
+        _pinotHelixResourceManager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+
+    setStatus((response.isSuccessfull() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL));
+    return new StringRepresentation(response.toJSON().toString());
   }
 
   @Override
@@ -314,7 +324,10 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
       rep = new StringRepresentation(res.toString());
     }
     if (res == null) {
-      rep = new StringRepresentation("Cannot find the segment: " + segmentName + " in table: " + tableName);
+      String error = new String("Cannot find the segment: " + segmentName + " in table: " + tableName);
+      LOGGER.error(error);
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      rep = new StringRepresentation(error);
     }
     return rep;
   }

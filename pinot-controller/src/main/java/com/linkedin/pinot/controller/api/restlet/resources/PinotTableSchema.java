@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
@@ -60,7 +61,8 @@ public class PinotTableSchema extends PinotRestletResourceBase {
         return new StringRepresentation(_pinotHelixResourceManager.getSchema(config.getValidationConfig().getSchemaName()).getJSONSchema()
             .toString());
       } catch (Exception e) {
-        LOGGER.error("error fetching schema for a realtime table : {} ", tableName, e);
+        LOGGER.error("Caught exception while fetching schema for a realtime table : {} ", tableName, e);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     } else {
@@ -70,7 +72,8 @@ public class PinotTableSchema extends PinotRestletResourceBase {
         return new StringRepresentation(_pinotHelixResourceManager.getSchema(config.getValidationConfig().getSchemaName()).getJSONSchema()
             .toString());
       } catch (Exception e) {
-        LOGGER.error("error fetching schema for a offline table : {} ", tableName, e);
+        LOGGER.error("Caught exception while fetching schema for a offline table : {} ", tableName, e);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     }
