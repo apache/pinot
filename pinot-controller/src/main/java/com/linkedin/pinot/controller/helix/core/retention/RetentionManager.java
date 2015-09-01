@@ -173,7 +173,7 @@ public class RetentionManager {
       return tableToDeletionStrategyMap;
     }
 
-    if (offlineTableConfig == null) {
+    if (offlineTableConfig == null || offlineTableConfig.getValidationConfig() == null) {
       LOGGER.info("Table config null for table: {}, treating it as refresh only table.", offlineTableName);
       return tableToDeletionStrategyMap;
     }
