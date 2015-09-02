@@ -66,7 +66,7 @@ public class TestSchema {
 
     StarTreeIndexSpec indexSpec = new StarTreeIndexSpec();
     indexSpec.setSplitOrder(Arrays.asList("dim2", "dim1", "dim3"));
-    indexSpec.setMaxLeafRecords(100); // the known default
+    indexSpec.setMaxLeafRecords(10000); // the known default
 
     Assert.assertEquals(schema.getStarTreeIndexSpecs().get(0), indexSpec);
   }
