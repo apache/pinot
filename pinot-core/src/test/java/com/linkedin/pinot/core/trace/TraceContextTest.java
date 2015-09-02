@@ -95,6 +95,13 @@ public class TraceContextTest {
     countInfo.numberOfRequests.add(info1.requestId);
   }
 
+  private void putIfAbsent(Map<Long, Integer> map, Long key, Integer value) {
+    Integer v = map.get(key);
+    if (v == null) {
+      map.put(key, value);
+    }
+  }
+
   private void jobHandlerInvariants(ConcurrentLinkedDeque<TraceContext.Info> queue, CountInfo countInfo) {
     TraceContext.Info info1 = queue.pollFirst();
     TraceContext.Info info2 = queue.pollFirst();
@@ -105,11 +112,11 @@ public class TraceContextTest {
     assertEquals(info2.message, TraceContext.CONSTANT.START_NEW_TRACE);
     assertEquals(info3.message, TraceContext.CONSTANT.UNREGISTER_THREAD_FROM_REQUEST);
 
-    countInfo.numberOfJobsMap.putIfAbsent(info1.requestId, 0);
+    putIfAbsent(countInfo.numberOfJobsMap, info1.requestId, 0);
     countInfo.numberOfJobsMap.put(info1.requestId, countInfo.numberOfJobsMap.get(info1.requestId) + 1);
   }
 
-  private void singleRequestCall(ExecutorService jobService, InstanceRequest request, int jobsPerRequest) throws Exception {
+  private void singleRequestCall(ExecutorService jobService, final InstanceRequest request, int jobsPerRequest) throws Exception {
     TraceContext.register(request);
     Future[] tasks = new Future[jobsPerRequest];
 
@@ -141,8 +148,8 @@ public class TraceContextTest {
    * @param requestService
    * @throws Exception
    */
-  private void multipleRequestsCall(ExecutorService requestService, ExecutorService jobService,
-                                    int numberOfRequests, int jobsPerRequest) throws Exception {
+  private void multipleRequestsCall(ExecutorService requestService, final ExecutorService jobService,
+                                    int numberOfRequests, final int jobsPerRequest) throws Exception {
     // init requests
     List<InstanceRequest> requests = new ArrayList<InstanceRequest>();
     for (int j = 0; j < numberOfRequests; j++) {
@@ -154,7 +161,7 @@ public class TraceContextTest {
     // init tasks
     Future[] tasks = new Future[requests.size()];
     int i = 0;
-    for (InstanceRequest request: requests) {
+    for (final InstanceRequest request: requests) {
       tasks[i++] = requestService.submit(new Runnable() {
         @Override
         public void run() {
