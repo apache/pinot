@@ -49,7 +49,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
-  private String _clusterName = "PinotCluster";
+  private String _clusterName = DEFAULT_CLUSTER_NAME;
 
   @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
       usage = "Controller Starter config file",
@@ -112,7 +112,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
   @Override
   public String description() {
-    return "Star the Pinot Controller Process at the specified port.";
+    return "Start the Pinot Controller Process at the specified port.";
   }
 
   @Override
