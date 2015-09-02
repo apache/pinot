@@ -74,7 +74,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     this.numChunks = (numDocs + docsPerChunk - 1) / docsPerChunk;
     chunkOffsetHeaderSize = numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     bitsetSize = (totalNumValues + 7) / 8;
-    rawDataSize = (totalNumValues * columnSizeInBits + 7) / 8;
+    rawDataSize = Ints.checkedCast(((long) totalNumValues * columnSizeInBits + 7) / 8);
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     raf = new RandomAccessFile(file, "rw");
     this.isMmap = isMmap;
@@ -164,12 +164,12 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     return docsPerChunk;
   }
 
-  private int computeLength(int rowOffSetStart) {
-    int rowOffSetEnd = Ints.checkedCast(customBitSet.nextSetBitAfter(rowOffSetStart));
+  private int computeLength(long rowOffSetStart) {
+    long rowOffSetEnd = customBitSet.nextSetBitAfter(rowOffSetStart);
     if (rowOffSetEnd < 0) {
-      return totalNumValues - rowOffSetStart;
+      return (int) (totalNumValues - rowOffSetStart);
     }
-    return rowOffSetEnd - rowOffSetStart;
+    return (int) (rowOffSetEnd - rowOffSetStart);
   }
 
   private int computeStartOffset(int row) {
@@ -178,8 +178,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     if (row % docsPerChunk == 0) {
       return chunkIdOffset;
     }
-    long rowOffSetStart = customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
-    return Ints.checkedCast(rowOffSetStart);
+    return (int) customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
   }
 
   @Override
