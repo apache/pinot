@@ -3,13 +3,8 @@
 listen_port: 9001
 
 fabrics:
-  CORP-EAT1:
-    zk_host: zk-eat1-pinot.corp:12913
-    zk_root: /pinot-cluster/mpSprintDemoCluster
-    controller_url: http://eat1-app925.corp.linkedin.com:11984
 
-  # port forward these
-  PROD-ELA4:
+  local_test:
     zk_host: localhost:12914
     zk_root: /pinot-cluster/pinot
     controller_url: http://localhost:11985
