@@ -79,9 +79,8 @@ public class ReportEmailSender {
                          new InternetAddress(emailIdTo, scheduleSpec.getNameTo()));
       }
       emailReportMessage.setSubject(ReportConstants.REPORT_SUBJECT_PREFIX +
-          " " + reportConfig.getCollection().toUpperCase() +
-          " (" + reportConfig.getEndTimeString() +
-          ") " + reportConfig.getName());
+          " (" + reportConfig.getCollection().toUpperCase() + ") " +
+          reportConfig.getName());
       emailReportMessage.setContent(emailOutput.toString(), "text/html");
       LOGGER.info("Sending email from {} to {}  ",
           scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo());

@@ -50,7 +50,7 @@ public class ReportGenerator implements Job{
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportGenerator.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("#");
+  private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("0.00");
   private static int DEFAULT_AGGREGATION_GRANULARITY = 1;
   private static TimeUnit DEFAULT_AGGREGATION_UNIT = TimeUnit.HOURS;
 
@@ -338,7 +338,6 @@ try {
 } catch (Exception e) {
 e.printStackTrace();
 }
-
       row.setRatio(DOUBLE_FORMAT.format((row.getCurrent().doubleValue() - row.getBaseline().doubleValue()) / (row.getBaseline().doubleValue()) * 100));
       reportRows.add(row);
     }
