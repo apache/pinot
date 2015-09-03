@@ -184,7 +184,7 @@ public class RetentionManager {
       SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
 
       if (validationConfig.getSegmentPushType() == null || validationConfig.getSegmentPushType().isEmpty()) {
-        LOGGER.info("Segment push type for table {} is empty, skipping retention processing");
+        LOGGER.info("Segment push type for table {} is empty, skipping retention processing", offlineTableName);
         return tableToDeletionStrategyMap;
       }
 
@@ -192,6 +192,8 @@ public class RetentionManager {
         LOGGER.info("Table: {} is a refresh only table.", offlineTableName);
         return tableToDeletionStrategyMap;
       }
+
+      LOGGER.info("Building retention strategy for table {} with configuration {}", offlineTableName, validationConfig);
 
       TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(
           validationConfig.getRetentionTimeUnit(),

@@ -73,7 +73,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
-    LOGGER.debug("SegmentMetadata location: " + indexDir);
+    LOGGER.debug("SegmentMetadata location: {}", indexDir);
     if (indexDir.isDirectory()) {
       _metadataFile = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     } else {
@@ -87,7 +87,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     init();
     loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
     setTimeIntervalAndGranularity();
-    LOGGER.info("loaded metadata for " + indexDir.getName());
+    LOGGER.info("loaded metadata for {}", indexDir.getName());
   }
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
@@ -119,7 +119,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _allColumns = new HashSet<String>();
     _indexDir = null;
     _metadataFile = null;
-    LOGGER.info("loaded metadata successfully from ZK");
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata) {
@@ -413,7 +412,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         result.append(field.get(this));
       } catch (final IllegalAccessException ex) {
         if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn("Caught exception while trying to access field " + field, ex);
+          LOGGER.warn("Caught exception while trying to access field {}", field, ex);
         }
         result.append("ERROR");
       }
