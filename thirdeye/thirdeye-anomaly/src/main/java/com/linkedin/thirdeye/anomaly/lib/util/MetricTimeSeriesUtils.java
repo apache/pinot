@@ -28,6 +28,7 @@ public class MetricTimeSeriesUtils {
    * @param defaultValue
    *  The default value to use if the data is missing
    * @return
+   *  A pair containing the timestamps and values
    */
   public static Pair<long[], double[]> toArray(MetricTimeSeries series, String metric, long bucketWidthInMillis,
       Set<Long> missingTimeStamps, double defaultValue) {

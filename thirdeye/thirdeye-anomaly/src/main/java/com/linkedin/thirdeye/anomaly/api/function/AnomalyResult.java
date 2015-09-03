@@ -7,7 +7,7 @@ import com.linkedin.thirdeye.anomaly.api.ResultProperties;
 /**
  * Result of AnomalyDetectionFunction analyze
  */
-public final class AnomalyResult implements Comparable<AnomalyResult>
+public class AnomalyResult implements Comparable<AnomalyResult>
 {
   /** Whether this time window is anomalous */
   private final boolean isAnomaly;

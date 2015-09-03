@@ -36,7 +36,7 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 /**
  * This class represents a implementation of the anomaly detection driver where exploration is performed locally.
  */
-public class LocalDriverAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTask implements Runnable {
+public class LocalDriverAnomalyDetectionTask extends CallableAnomalyDetectionTask<Void> {
 
   /**
    * Shared thread pool for evaluating anomalies
@@ -102,7 +102,7 @@ public class LocalDriverAnomalyDetectionTask extends AbstractBaseAnomalyDetectio
    * Run anomaly detection
    */
   @Override
-  public void run() {
+  public Void call() {
     LOGGER.info("start executing AnomalyDetetcionTask : {}", getTaskInfo());
     final LinkedBlockingQueue<Future<?>> futures = new LinkedBlockingQueue<Future<?>>();
 
@@ -119,6 +119,7 @@ public class LocalDriverAnomalyDetectionTask extends AbstractBaseAnomalyDetectio
       }
     }
     LOGGER.info("done executing AnomalyDetetcionTask : {}", getTaskInfo());
+    return null;
   }
 
 

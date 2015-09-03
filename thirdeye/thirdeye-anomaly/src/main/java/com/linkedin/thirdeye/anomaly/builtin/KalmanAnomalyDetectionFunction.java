@@ -11,6 +11,7 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.math3.util.Pair;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,19 +232,20 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
     List<AnomalyResult> anomalyResults = new LinkedList<AnomalyResult>();
     for (long timeWindow : new TreeSet<>(resultsByTimeWindow.keySet()))
     {
-      StateSpaceDataPoint fAnomalyDataPoint = resultsByTimeWindow.get(timeWindow);
+      StateSpaceDataPoint stateSpaceDataPoint = resultsByTimeWindow.get(timeWindow);
 
-      if (fAnomalyDataPoint.pValue < pValueThreshold)
+      if (stateSpaceDataPoint.pValue < pValueThreshold)
       {
         // inserting non strings into properties messes with store method
         ResultProperties resultProperties = new ResultProperties();
-        resultProperties.put("actualValue", "" + fAnomalyDataPoint.actualValue);
-        resultProperties.put("predictedValue", "" + fAnomalyDataPoint.predictedValue);
-        resultProperties.put("stdError", "" + fAnomalyDataPoint.stdError);
-        resultProperties.put("pValue", "" + fAnomalyDataPoint.pValue);
-        resultProperties.put("predictedDate", "" + fAnomalyDataPoint.predictedDate);
+        resultProperties.put("actualValue", "" + stateSpaceDataPoint.actualValue);
+        resultProperties.put("predictedValue", "" + stateSpaceDataPoint.predictedValue);
+        resultProperties.put("stdError", "" + stateSpaceDataPoint.stdError);
+        resultProperties.put("pValue", "" + stateSpaceDataPoint.pValue);
+        resultProperties.put("predictedDate", "" + stateSpaceDataPoint.predictedDate);
+        resultProperties.setProperty("timestamp", new DateTime(timeWindow).toString());
         anomalyResults.add(new AnomalyResult(
-            true, timeWindow, fAnomalyDataPoint.pValue, fAnomalyDataPoint.actualValue, resultProperties));
+            true, timeWindow, stateSpaceDataPoint.pValue, stateSpaceDataPoint.actualValue, resultProperties));
       }
     }
 

@@ -19,10 +19,10 @@ th, td {
   <b>Table:</b> ${functionTable} <br>
   <b>Collection:</b> ${collection} <br>
   <br>
-    <a href="/add">Add a new function.</a>
+    <a href="/functions/add">Add a new function.</a>
   <br>
   <br>
-    <a href="/active?hideInactive=true">Show active functions only.</a>
+    <a href="/functions?hideInactive=true">Hide inactive.</a>
   <br>
   <br>
 </center>
@@ -41,10 +41,12 @@ th, td {
     <tr>
       <td>
         <#if (row.active)>
-          <a href="/deactivate/${row.functionId}">deactivate</a>
+          <a href="/functions/deactivate/${row.functionId}">deactivate</a>
         <#else>
-          <a href="/activate/${row.functionId}">activate</a>
+          <a href="/functions/activate/${row.functionId}">activate</a>
         </#if>
+        <br>
+        <a href="/functions/execute/${row.functionId}">execute</a>
       </td>
       <td>${row.functionId}</td>
       <td>${row.functionName}</td>

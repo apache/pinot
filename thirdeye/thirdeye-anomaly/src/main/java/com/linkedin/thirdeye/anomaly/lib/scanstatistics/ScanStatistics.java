@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.lib.scanstatistics;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.math3.distribution.NormalDistribution;
@@ -10,7 +11,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.anomaly.api.function.exception.FunctionDidNotEvaluateException;
-import com.linkedin.thirdeye.anomaly.lib.util.STLDecompositionUtils;
+import com.linkedin.thirdeye.anomaly.lib.util.STLDecomposition;
+import com.linkedin.thirdeye.anomaly.lib.util.STLDecomposition.STLResult;
 import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 
 /**
@@ -20,10 +22,13 @@ public class ScanStatistics {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanStatistics.class);
 
+  private static final Random RANDOM = new Random();
+
 	private final int _numSimulation;
 	private final int _minWindowLength;
 	private final int _maxWindowLength;
 	private final int _minIncrement;
+	private final boolean _bootstrap;
 	private final double _pValue;
 	private final Pattern _pattern;
 
@@ -35,13 +40,14 @@ public class ScanStatistics {
 	}
 
 	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
-	    int minIncrement)  {
+	    int minIncrement, boolean bootstrap)  {
 		_numSimulation = numSimulation;
 		_minWindowLength = minWindowLength;
 		_maxWindowLength = maxWindowLength;
 		_minIncrement = minIncrement;
 		_pValue = pValue;
 		_pattern = pattern;
+		_bootstrap = bootstrap;
 	}
 
 	 /**
@@ -75,7 +81,11 @@ public class ScanStatistics {
     double[] simulationBuffer = new double[monitoringData.length];
     for (int ii = 0; ii < _numSimulation; ii++) {
       LOGGER.info("started simulation {}", ii);
-      simulateInPlace(simulationBuffer, trainDataNormal);
+      if (_bootstrap) {
+        simulateBootstrapInPlace(simulationBuffer, trainingData);
+      } else {
+        simulateGaussuanInPlace(simulationBuffer, trainDataNormal);
+      }
 
       ScanIntervalIterator simulationScanWindowIterator = new ScanIntervalIterator(
           0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
@@ -110,9 +120,21 @@ public class ScanStatistics {
    * @param dist
    *  Normal distribution from which values are drawn.
    */
-  private void simulateInPlace(double[] simulationData, NormalDistribution dist) {
+  private void simulateGaussuanInPlace(double[] simulationData, NormalDistribution dist) {
     for (int i = 0; i < simulationData.length; i++) {
       simulationData[i] = dist.sample();
+    }
+  }
+
+  /**
+   * @param simulationData
+   *  The array that will be modified in place.
+   * @param trainData
+   *  Array from which samples are drawn.
+   */
+  private void simulateBootstrapInPlace(double[] simulationData, double[] trainData) {
+    for (int i = 0; i < simulationData.length; i++) {
+      simulationData[i] = trainData[RANDOM.nextInt(trainData.length)];
     }
   }
 
@@ -221,44 +243,67 @@ public class ScanStatistics {
 	 * @param args
 	 * @throws IOException
 	 */
-	public static void main(String[] args) throws IOException {
-    String[] lines = ResourceUtils.getResourceAsString("timeseries.csv").split("\n");
-    int numData = lines.length;
-    long[] timestamps = new long[numData];
-    double[] series = new double[numData];
-    for (int i = 0; i < numData; i++) {
-      timestamps[i] = i;
-      String value = lines[i].split(",")[1];
-      if (value.equals("NA")) {
-        series[i] = 0;
-      } else {
-        series[i] = Double.valueOf(value);
-      }
-    }
-
-    long start = System.currentTimeMillis();
-    double[] data = STLDecompositionUtils.removeSeasonality(timestamps, series, 168);
-
-    int split = 800;
-    double[] train = Arrays.copyOfRange(data, 0, split);
-    double[] monitor = Arrays.copyOfRange(data, split, data.length);
-
-    ScanStatistics scanStatistics = new ScanStatistics(
-        1000,
-        1,
-        100000,
-        0.05,
-        Pattern.DOWN,
-        1);
-
-    Range<Integer> anomaly = scanStatistics.getInterval(train, monitor);
-    Range<Integer> anomalyOffset = Range.closedOpen(anomaly.lowerEndpoint() + split, anomaly.upperEndpoint() + split);
-
-    System.out.println("N : " + data.length);
-    System.out.println("Split : " + split);
-    System.out.println("Anomaly : " + anomalyOffset);
-    System.out.println("Runtime: " + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start) + " seconds");
-	}
+//	public static void main(String[] args) throws IOException {
+//    String[] lines = ResourceUtils.getResourceAsString("timeseries.csv").split("\n");
+//    int numData = lines.length;
+//    long[] timestamps = new long[numData];
+//    double[] series = new double[numData];
+//    for (int i = 0; i < numData; i++) {
+//      timestamps[i] = i;
+//      String value = lines[i].split(",")[1];
+//      if (value.equals("NA")) {
+//        series[i] = 0;
+//      } else {
+//        series[i] = Double.valueOf(value);
+//      }
+//    }
+//
+//    long start = System.currentTimeMillis();
+//    double[] data = removeSeasonality(timestamps, series, 168);
+//
+//
+//    int split = 800;
+//    double[] train = Arrays.copyOfRange(data, 0, split);
+//    double[] monitor = Arrays.copyOfRange(data, split, data.length);
+//
+//    ScanStatistics scanStatistics = new ScanStatistics(
+//        1000,
+//        1,
+//        100000,
+//        0.05,
+//        Pattern.DOWN,
+//        1,
+//        false);
+//
+//    Range<Integer> anomaly = scanStatistics.getInterval(train, monitor);
+//    Range<Integer> anomalyOffset = Range.closedOpen(anomaly.lowerEndpoint() + split, anomaly.upperEndpoint() + split);
+//
+//    System.out.println("N : " + data.length);
+//    System.out.println("Split : " + split);
+//    System.out.println("Anomaly : " + anomalyOffset);
+//    System.out.println("Runtime: " + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - start) + " seconds");
+//	}
+//
+//	private static double[] removeSeasonality(long[] timestamps, double[] series, int seasonality) {
+//	  STLDecomposition.Config config = new STLDecomposition.Config();
+//    config.setNumberOfObservations(seasonality);
+//    config.setNumberOfInnerLoopPasses(2);
+//    config.setNumberOfRobustnessIterations(1);
+//    config.setLowPassFilterBandwidth(0.5);
+//    config.setTrendComponentBandwidth(0.5);
+//    config.setPeriodic(true);
+//    STLDecomposition stl = new STLDecomposition(config);
+//
+//    STLResult res = stl.decompose(timestamps, series);
+//
+//    double[] trend = res.getTrend();
+//    double[] remainder = res.getRemainder();
+//    double[] seasonalityRemoved = new double[trend.length];
+//    for (int i = 0; i < trend.length; i++) {
+//      seasonalityRemoved[i] = trend[i] + remainder[i];
+//    }
+//    return seasonalityRemoved;
+//	}
 }
 
 

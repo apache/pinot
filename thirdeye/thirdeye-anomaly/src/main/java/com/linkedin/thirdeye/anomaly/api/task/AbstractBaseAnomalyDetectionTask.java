@@ -41,7 +41,7 @@ public abstract class AbstractBaseAnomalyDetectionTask {
   private final ThirdEyeClient thirdEyeClient;
 
   /** the metric specs that the driver queries the third-eye server for */
-  private List<MetricSpec> metricsRequiredByTask;
+  private final List<String> metricsRequiredByTask;
 
   /** the time range of data that the driver needs to provide to the function */
   private final TimeRange queryTimeRange;
@@ -80,7 +80,7 @@ public abstract class AbstractBaseAnomalyDetectionTask {
     metricNames.addAll(function.getMetrics());
     metricNames.addAll(additionalMetricsRequiredByTask);
 
-    metricsRequiredByTask = getMetricSpecsRequiredByTask(starTreeConfig, metricNames);
+    metricsRequiredByTask = new ArrayList<>(metricNames);
 
     queryTimeRange = getTaskTimeSeriesRange(taskInfo, function);
 
@@ -209,27 +209,6 @@ public abstract class AbstractBaseAnomalyDetectionTask {
         it.remove();
       }
     }
-  }
-
-  /**
-   * @param starTreeConfig
-   * @param driverConfig
-   * @param function
-   * @param dimensionKeyContributionMetric
-   * @return
-   *  A list of metrics needed by the task to complete
-   */
-  private static List<MetricSpec> getMetricSpecsRequiredByTask(StarTreeConfig starTreeConfig,
-      Set<String> metricNames) {
-    List<MetricSpec> metrics = new ArrayList<MetricSpec>();
-    for (String metricName : metricNames) {
-      MetricSpec metricSpec = MetricSpecUtils.findMetricSpec(metricName, starTreeConfig.getMetrics());
-      if (metricSpec == null) { // not found, create it
-        metricSpec = new MetricSpec(metricName, MetricType.DOUBLE);
-      }
-      metrics.add(metricSpec);
-    }
-    return metrics;
   }
 
 }

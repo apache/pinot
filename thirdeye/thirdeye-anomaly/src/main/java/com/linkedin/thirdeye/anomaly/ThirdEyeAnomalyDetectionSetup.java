@@ -165,26 +165,7 @@ public class ThirdEyeAnomalyDetectionSetup {
     }
 
     if (promptForYN("Do you want to load the default (Kalman filter) algorithm?", userInput)) {
-      String metricsString = promptForInput(
-          "Metrics you want to analyze (delimited by ',', e.g., \"m1,m2,m3\").\n" +
-          "If empty, then all metrics will be monitored.", userInput);
-
-      List<String> validMetrics = MetricSpecUtils.getMetricNames(starTreeConfig.getMetrics());
-
-      List<String> metrics;
-      if (metricsString.equals("")) {
-        // add all metrics
-        metrics = validMetrics;
-      } else {
-        // add only selected metrics
-        metrics = Arrays.asList(metricsString.split(","));
-        for (String metric : metrics) {
-          if (!validMetrics.contains(metric)) {
-            System.err.println("'" + metric + "' is not a valid metric in " + starTreeConfig.getCollection());
-            System.exit(1);
-          }
-        }
-      }
+      List<String> metrics = getMetricsForFunction(userInput, starTreeConfig);
 
       printSectionTitle("inserting functions");
       for (String metric : metrics) {
@@ -198,7 +179,62 @@ public class ThirdEyeAnomalyDetectionSetup {
       }
     }
 
-    // TODO load scan statistics algorithm
+    if (promptForYN("Do you want to load the default (Scan statistics) algorithm?", userInput)) {
+      List<String> metrics = getMetricsForFunction(userInput, starTreeConfig);
+
+      printSectionTitle("inserting functions");
+      for (String metric : metrics) {
+        String sqlUp = String.format(ResourceUtils.getResourceAsString(
+            "database/generic/insert-scan-statistics-default.sql"),
+            config.getAnomalyDatabaseConfig().getFunctionTableName(),
+            "UP",
+            config.getCollectionName(),
+            metric.trim(),
+            "UP");
+        System.out.println(sqlUp);
+        config.getAnomalyDatabaseConfig().runSQL(sqlUp);
+
+        String sqlDown = String.format(ResourceUtils.getResourceAsString(
+            "database/generic/insert-scan-statistics-default.sql"),
+            config.getAnomalyDatabaseConfig().getFunctionTableName(),
+            "DOWN",
+            config.getCollectionName(),
+            metric.trim(),
+            "DOWN");
+        System.out.println(sqlDown);
+        config.getAnomalyDatabaseConfig().runSQL(sqlDown);
+      }
+    }
+  }
+
+  /**
+   * @param userInput
+   * @param starTreeConfig
+   * @return
+   *  Metrics to use for a function.
+   */
+  private List<String> getMetricsForFunction(Scanner userInput, StarTreeConfig starTreeConfig) {
+    String metricsString = promptForInput(
+        "Metrics you want to analyze (delimited by ',', e.g., \"m1,m2,m3\").\n" +
+        "If empty, then all metrics will be monitored.", userInput);
+
+    List<String> validMetrics = MetricSpecUtils.getMetricNames(starTreeConfig.getMetrics());
+
+    List<String> metrics;
+    if (metricsString.equals("")) {
+      // add all metrics
+      metrics = validMetrics;
+    } else {
+      // add only selected metrics
+      metrics = Arrays.asList(metricsString.split(","));
+      for (String metric : metrics) {
+        if (!validMetrics.contains(metric)) {
+          System.err.println("'" + metric + "' is not a valid metric in " + starTreeConfig.getCollection());
+          System.exit(1);
+        }
+      }
+    }
+    return metrics;
   }
 
   /**

@@ -236,15 +236,14 @@ public class AnomalyTable {
 
   /**
    * @param dbconfig
+   * @param functionId
    * @param functionName
    * @param functionDescription
    * @param collection
-   * @param metric
    * @param topLevelOnly
-   * @param startTimeWindow
-   * @param endTimeWidnow
+   * @param orderBy
+   * @param timeRange
    * @return
-   * @throws JsonProcessingException
    */
   private static String buildAnomalyTableSelectStatement(AnomalyDatabaseConfig dbconfig,
       Integer functionId,

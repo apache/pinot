@@ -23,10 +23,13 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistory;
+import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistoryImpl;
+import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistoryNoOp;
 import com.linkedin.thirdeye.anomaly.api.AnomalyResultHandler;
 import com.linkedin.thirdeye.anomaly.api.HandlerProperties;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.task.AnomalyDetectionTaskInfo;
+import com.linkedin.thirdeye.anomaly.api.task.CallableAnomalyDetectionTask;
 import com.linkedin.thirdeye.anomaly.api.task.LocalDriverAnomalyDetectionTask;
 import com.linkedin.thirdeye.anomaly.database.FunctionTable;
 import com.linkedin.thirdeye.anomaly.database.FunctionTableRow;
@@ -103,12 +106,12 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
       }
     }
 
-    List<LocalDriverAnomalyDetectionTask> tasks = buildTasks(thirdEyeClient, timeRange, functionFactory);
+    List<CallableAnomalyDetectionTask<Void>> tasks = buildTasks(thirdEyeClient, timeRange, functionFactory);
 
     ExecutorService taskExecutors = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-    for (LocalDriverAnomalyDetectionTask task : tasks) {
-      taskExecutors.execute(task);
+    for (CallableAnomalyDetectionTask<Void> task : tasks) {
+      taskExecutors.submit(task);
     }
 
     taskExecutors.shutdown();
@@ -127,10 +130,10 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
    *  A list of tasks to run
    * @throws Exception
    */
-  public List<LocalDriverAnomalyDetectionTask> buildTasks(ThirdEyeClient thirdEyeClient, TimeRange timeRange,
+  public List<CallableAnomalyDetectionTask<Void>> buildTasks(ThirdEyeClient thirdEyeClient, TimeRange timeRange,
       AnomalyDetectionFunctionFactory functionFactory) throws Exception {
 
-    List<LocalDriverAnomalyDetectionTask> tasks = new LinkedList<LocalDriverAnomalyDetectionTask>();
+    List<CallableAnomalyDetectionTask<Void>> tasks = new LinkedList<>();
 
     AnomalyDetectionDriverConfig driverConfig = config.getDriverConfig();
 
@@ -162,12 +165,17 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
         resultHandler.init(starTreeConfig, new HandlerProperties());
 
         // make the function history interface
-        AnomalyDetectionFunctionHistory functionHistory = new AnomalyDetectionFunctionHistory(starTreeConfig,
-            config.getAnomalyDatabaseConfig(), functionTableRow.getFunctionId());
+        AnomalyDetectionFunctionHistory functionHistory;
+        if (config.isProvideAnomalyHistory()) {
+          functionHistory = new AnomalyDetectionFunctionHistoryImpl(starTreeConfig, config.getAnomalyDatabaseConfig(),
+              functionTableRow.getFunctionId());
+        } else {
+          functionHistory = AnomalyDetectionFunctionHistoryNoOp.sharedInstance();
+        }
 
         // make the task
-        LocalDriverAnomalyDetectionTask task = new LocalDriverAnomalyDetectionTask(starTreeConfig, driverConfig, taskInfo,
-            function, resultHandler, functionHistory, thirdEyeClient);
+        CallableAnomalyDetectionTask<Void> task = new LocalDriverAnomalyDetectionTask(starTreeConfig, driverConfig,
+            taskInfo, function, resultHandler, functionHistory, thirdEyeClient);
 
         tasks.add(task);
       } catch (Exception e) {
@@ -201,7 +209,8 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     options.addOption(Option.builder("t")
         .argName("start end")
         .longOpt(OPT_TIME_RANGE)
-        .desc("Run anomaly detection on this time range in milliseconds.")
+        .desc("Run anomaly detection on this time range in milliseconds. If detection interval is also specified, "
+            + "the application will run in simulated streaming mode.")
         .hasArgs().numberOfArgs(2).build());
     options.addOption(Option.builder("d")
         .argName("size-unit")

@@ -21,7 +21,8 @@ import com.linkedin.thirdeye.anomaly.api.function.exception.IllegalFunctionExcep
 import com.linkedin.thirdeye.anomaly.lib.scanstatistics.ScanStatistics;
 import com.linkedin.thirdeye.anomaly.lib.scanstatistics.ScanStatistics.Pattern;
 import com.linkedin.thirdeye.anomaly.lib.util.MetricTimeSeriesUtils;
-import com.linkedin.thirdeye.anomaly.lib.util.STLDecompositionUtils;
+import com.linkedin.thirdeye.anomaly.lib.util.STLDecomposition;
+import com.linkedin.thirdeye.anomaly.lib.util.STLDecomposition.STLResult;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -41,6 +42,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private static final String PROP_DEFAULT_NUM_SIMULATIONS = "1000";
   private static final String PROP_DEFAULT_MIN_INCREMENT = "1";
   private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + Integer.MAX_VALUE;
+  private static final String PROP_DEFAULT_BOOTSTRAP = "true";
 
   private String metric;
   private double pValueThreshold;
@@ -59,6 +61,8 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private int minIncrement;
 
   private Pattern pattern;
+
+  private boolean bootstrap;
 
   /**
    * {@inheritDoc}
@@ -91,6 +95,8 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     minWindowLength = Integer.parseInt(functionConfig.getProperty("minWindowLength", PROP_DEFAULT_MIN_WINDOW_LEN));
     maxWindowLength = Integer.parseInt(functionConfig.getProperty("maxWindowLength", PROP_DEFAULT_MAX_WINDOW_LEN));
     minIncrement = Integer.parseInt(functionConfig.getProperty("minIncrement", PROP_DEFAULT_MIN_INCREMENT));
+
+    bootstrap = Boolean.parseBoolean(functionConfig.getProperty("bootstrap", PROP_DEFAULT_BOOTSTRAP));
 
     pattern = Pattern.valueOf(functionConfig.getProperty("pattern"));
   }
@@ -141,7 +147,8 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     removeMissingValuesByAveragingNeighbors(observations);
 
     // call stl library
-    double[] observationsMinusSeasonality = STLDecompositionUtils.removeSeasonality(timestamps, observations, seasonal);
+
+    double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal);
 
     int effectiveMaxWindowLength = (int) (detectionInterval.totalBuckets() / bucketMillis);
     effectiveMaxWindowLength = Math.min(effectiveMaxWindowLength, maxWindowLength);
@@ -153,7 +160,8 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
         effectiveMaxWindowLength,
         pValueThreshold,
         pattern,
-        minIncrement);
+        minIncrement,
+        bootstrap);
 
     int numBucketsToScan = (int) ((detectionInterval.getEnd() - detectionInterval.getStart()) / bucketMillis);
     int totalNumBuckets = observationsMinusSeasonality.length;
@@ -179,6 +187,8 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     Range<Integer> anomalousInterval = scanStatistics.getInterval(trainingDataWithOutAnomalies, monitoringData);
     LOGGER.info("scan statistics took {} seconds", TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
 
+    LOGGER.info("found interval : {}", anomalousInterval);
+
     // convert interval result to points
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
     if (anomalousInterval != null) {
@@ -188,7 +198,8 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
             monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
         properties.setProperty("anomalyEnd", new DateTime(
             monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
-        anomalyResults.add(new AnomalyResult(true, timestamps[i], pValueThreshold, observations[i], properties));
+        anomalyResults.add(new AnomalyResult(true, monitoringTimestamps[i], pValueThreshold, observations[i],
+            properties));
       }
     }
     return anomalyResults;
@@ -238,6 +249,33 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
         arr[i] = sum / count;
       }
     }
+  }
+
+  private double[] removeSeasonality(long[] timestamps, double[] series, int seasonality) {
+    STLDecomposition.Config config = new STLDecomposition.Config();
+    config.setNumberOfObservations(seasonality);
+    config.setNumberOfInnerLoopPasses(2);
+    config.setNumberOfRobustnessIterations(1);
+
+    /*
+     * There isn't a particularly good reason to use these exact values other than that the results closely match the
+     * stl R library results. It would appear than setting these anywhere between [0.5, 1.0} produces similar results.
+     */
+    config.setLowPassFilterBandwidth(0.5);
+    config.setTrendComponentBandwidth(0.5);
+
+    config.setPeriodic(true);
+    STLDecomposition stl = new STLDecomposition(config);
+
+    STLResult res = stl.decompose(timestamps, series);
+
+    double[] trend = res.getTrend();
+    double[] remainder = res.getRemainder();
+    double[] seasonalityRemoved = new double[trend.length];
+    for (int i = 0; i < trend.length; i++) {
+      seasonalityRemoved[i] = trend[i] + remainder[i];
+    }
+    return seasonalityRemoved;
   }
 
 }

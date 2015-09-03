@@ -44,6 +44,9 @@ public class ThirdEyeAnomalyDetectionConfiguration {
    */
   private Integer functionIdToEvaluate = null;
 
+  /** Provide functions with a list of anomalies they produced in the past. */
+  private boolean provideAnomalyHistory = true;
+
   @JsonProperty
   public Mode getMode() {
     return mode;
@@ -114,6 +117,15 @@ public class ThirdEyeAnomalyDetectionConfiguration {
 
   public void setFunctionIdToEvaluate(Integer functionIdToEvaluate) {
     this.functionIdToEvaluate = functionIdToEvaluate;
+  }
+
+  @JsonProperty
+  public boolean isProvideAnomalyHistory() {
+    return provideAnomalyHistory;
+  }
+
+  public void setProvideAnomalyHistory(boolean provideAnomalyHistory) {
+    this.provideAnomalyHistory = provideAnomalyHistory;
   }
 
 }
