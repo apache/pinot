@@ -30,15 +30,17 @@ import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class SegmentDictionaryCreator implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
-  private final Object[] sortedList;
+  private final Object sortedList;
   private final FieldSpec spec;
   private final File dictionaryFile;
+  private final int rowCount;
 
   private Int2IntOpenHashMap intValueToIndexMap;
   private Long2IntOpenHashMap longValueToIndexMap;
@@ -48,11 +50,12 @@ public class SegmentDictionaryCreator implements Closeable {
 
   private int stringColumnMaxLength = 0;
 
-  public SegmentDictionaryCreator(boolean hasNulls, Object[] sortedList, FieldSpec spec, File indexDir)
+  public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir)
       throws IOException {
+    rowCount = ArrayUtils.getLength(sortedList);
     LOGGER.info(
         "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}",
-        spec.getName(), hasNulls, sortedList.length, spec.getDataType(), spec.isSingleValueField());
+        spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField());
     this.sortedList = sortedList;
     this.spec = spec;
     dictionaryFile = new File(indexDir, spec.getName() + ".dict");
@@ -67,11 +70,12 @@ public class SegmentDictionaryCreator implements Closeable {
     switch (spec.getDataType()) {
       case INT:
         final FixedByteWidthRowColDataFileWriter intDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
-        intValueToIndexMap = new Int2IntOpenHashMap(sortedList.length);
-        for (int i = 0; i < sortedList.length; i++) {
-          final int entry = ((Number) sortedList[i]).intValue();
+        intValueToIndexMap = new Int2IntOpenHashMap(rowCount);
+        int[] sortedInts = (int[]) sortedList;
+        for (int i = 0; i < rowCount; i++) {
+          final int entry = sortedInts[i];
           intDictionaryWrite.setInt(i, 0, entry);
           intValueToIndexMap.put(entry, i);
         }
@@ -79,11 +83,12 @@ public class SegmentDictionaryCreator implements Closeable {
         break;
       case FLOAT:
         final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
-        floatValueToIndexMap = new Float2IntOpenHashMap(sortedList.length);
-        for (int i = 0; i < sortedList.length; i++) {
-          final float entry = ((Number) sortedList[i]).floatValue();
+        floatValueToIndexMap = new Float2IntOpenHashMap(rowCount);
+        float[] sortedFloats = (float[]) sortedList;
+        for (int i = 0; i < rowCount; i++) {
+          final float entry = sortedFloats[i];
           floatDictionaryWrite.setFloat(i, 0, entry);
           floatValueToIndexMap.put(entry, i);
         }
@@ -91,11 +96,12 @@ public class SegmentDictionaryCreator implements Closeable {
         break;
       case LONG:
         final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
-        longValueToIndexMap = new Long2IntOpenHashMap(sortedList.length);
-        for (int i = 0; i < sortedList.length; i++) {
-          final long entry = ((Number) sortedList[i]).longValue();
+        longValueToIndexMap = new Long2IntOpenHashMap(rowCount);
+        long[] sortedLongs = (long[]) sortedList;
+        for (int i = 0; i < rowCount; i++) {
+          final long entry = sortedLongs[i];
           longDictionaryWrite.setLong(i, 0, entry);
           longValueToIndexMap.put(entry, i);
         }
@@ -103,11 +109,12 @@ public class SegmentDictionaryCreator implements Closeable {
         break;
       case DOUBLE:
         final FixedByteWidthRowColDataFileWriter doubleDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
-        doubleValueToIndexMap = new Double2IntOpenHashMap(sortedList.length);
-        for (int i = 0; i < sortedList.length; i++) {
-          final double entry = ((Number) sortedList[i]).doubleValue();
+        doubleValueToIndexMap = new Double2IntOpenHashMap(rowCount);
+        double[] sortedDoubles = (double[]) sortedList;
+        for (int i = 0; i < rowCount; i++) {
+          final double entry = sortedDoubles[i];
           doubleDictionaryWrite.setDouble(i, 0, entry);
           doubleValueToIndexMap.put(entry, i);
         }
@@ -115,7 +122,8 @@ public class SegmentDictionaryCreator implements Closeable {
         break;
       case STRING:
       case BOOLEAN:
-        for (final Object e : sortedList) {
+        Object[] sortedObjects = (Object[]) sortedList;
+        for (final Object e : sortedObjects) {
           String val = e.toString();
           int length = val.getBytes(Charset.forName("UTF-8")).length;
           if (stringColumnMaxLength < length) {
@@ -124,12 +132,12 @@ public class SegmentDictionaryCreator implements Closeable {
         }
 
         final FixedByteWidthRowColDataFileWriter stringDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1,
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
                 new int[] { stringColumnMaxLength });
 
-        final String[] revised = new String[sortedList.length];
-        for (int i = 0; i < sortedList.length; i++) {
-          final String toWrite = sortedList[i].toString();
+        final String[] revised = new String[rowCount];
+        for (int i = 0; i < rowCount; i++) {
+          final String toWrite = sortedObjects[i].toString();
           final int padding = stringColumnMaxLength - toWrite.getBytes(Charset.forName("UTF-8")).length;
 
           final StringBuilder bld = new StringBuilder();
@@ -143,7 +151,7 @@ public class SegmentDictionaryCreator implements Closeable {
         }
         Arrays.sort(revised);
 
-        stringValueToIndexMap = new Object2IntOpenHashMap<>(sortedList.length);
+        stringValueToIndexMap = new Object2IntOpenHashMap<>(rowCount);
         for (int i = 0; i < revised.length; i++) {
           stringDictionaryWrite.setString(i, 0, revised[i]);
           stringValueToIndexMap.put(revised[i], i);
@@ -151,7 +159,7 @@ public class SegmentDictionaryCreator implements Closeable {
         stringDictionaryWrite.close();
         break;
       default:
-        break;
+        throw new RuntimeException("Unhandled type " + spec.getDataType());
     }
   }
 

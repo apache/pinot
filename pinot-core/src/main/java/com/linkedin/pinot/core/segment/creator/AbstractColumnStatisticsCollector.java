@@ -100,7 +100,7 @@ public abstract class AbstractColumnStatisticsCollector {
 
   public abstract Object getMaxValue() throws Exception;
 
-  public abstract Object[] getUniqueValuesSet() throws Exception;
+  public abstract Object getUniqueValuesSet() throws Exception;
 
   public abstract int getCardinality() throws Exception;
 

@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -31,14 +31,14 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   private Double min = null;
   private Double max = null;
-  private final Set<Double> doubleSet;
-  private Double[] sortedDoubleList;
+  private final DoubleSet doubleSet;
+  private double[] sortedDoubleList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public DoubleColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    doubleSet = new HashSet<Double>();
+    doubleSet = new DoubleOpenHashSet(1000);
   }
 
   @Override
@@ -75,7 +75,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public Object[] getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() throws Exception {
     if (sealed) {
       return sortedDoubleList;
     }
@@ -98,7 +98,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public void seal() {
     sealed = true;
-    sortedDoubleList = new Double[doubleSet.size()];
+    sortedDoubleList = new double[doubleSet.size()];
     doubleSet.toArray(sortedDoubleList);
 
     Arrays.sort(sortedDoubleList);

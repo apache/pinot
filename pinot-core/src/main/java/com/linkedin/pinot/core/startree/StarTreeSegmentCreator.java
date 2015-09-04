@@ -170,51 +170,48 @@ public class StarTreeSegmentCreator implements SegmentCreator {
     for (final String column : dictionaryCreatorMap.keySet()) {
       ColumnIndexCreationInfo indexCreationInfo = columnInfo.get(column);
 
-      Object[] uniqueValues = indexCreationInfo.getSortedUniqueElementsArray();
+      int uniqueValueCount = indexCreationInfo.getDistinctValueCount();
       if (schema.getMetricNames().contains(column)) {
         // Use the unique values including the new aggregate values
-        uniqueValues = uniqueMetricValues.get(column).toArray();
+        uniqueValueCount = uniqueMetricValues.get(column).toArray().length;
       }
 
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
         if (indexCreationInfo.isSorted()) {
           forwardIndexCreatorMap.put(column,
-              new SingleValueSortedForwardIndexCreator(outDir, uniqueValues.length, schema.getFieldSpecFor(column)));
+              new SingleValueSortedForwardIndexCreator(outDir, uniqueValueCount, schema.getFieldSpecFor(column)));
           aggregateForwardIndexCreatorMap.put(column,
-              new SingleValueSortedForwardIndexCreator(starTreeDir, uniqueValues.length, schema.getFieldSpecFor(column)));
+              new SingleValueSortedForwardIndexCreator(starTreeDir, uniqueValueCount, schema.getFieldSpecFor(column)));
         } else {
           forwardIndexCreatorMap.put(
               column,
               new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), outDir,
-                  uniqueValues.length, totalRawDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
+                  uniqueValueCount, totalRawDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
           aggregateForwardIndexCreatorMap.put(
               column,
-              new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), starTreeDir, indexCreationInfo
-                  .getSortedUniqueElementsArray().length, totalAggDocs, indexCreationInfo.getTotalNumberOfEntries(),
-                  indexCreationInfo.hasNulls()));
+              new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), starTreeDir, uniqueValueCount,
+                  totalAggDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
         }
       } else {
         forwardIndexCreatorMap.put(
             column,
             new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), outDir,
-                uniqueValues.length, totalRawDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                uniqueValueCount, totalRawDocs, indexCreationInfo.getTotalNumberOfEntries(),
                 indexCreationInfo.hasNulls()));
         aggregateForwardIndexCreatorMap.put(
             column,
             new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), starTreeDir,
-                uniqueValues.length, totalAggDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                uniqueValueCount, totalAggDocs, indexCreationInfo.getTotalNumberOfEntries(),
                 indexCreationInfo.hasNulls()));
       }
 
       if (config.createInvertedIndexEnabled()) {
         invertedIndexCreatorMap.put(
             column,
-            new BitmapInvertedIndexCreator(outDir, indexCreationInfo.getSortedUniqueElementsArray().length, schema
-                .getFieldSpecFor(column)));
+            new BitmapInvertedIndexCreator(outDir, uniqueValueCount, schema.getFieldSpecFor(column)));
         aggregateInvertedIndexCreatorMap.put(
             column,
-            new BitmapInvertedIndexCreator(starTreeDir, indexCreationInfo.getSortedUniqueElementsArray().length, schema
-                .getFieldSpecFor(column)));
+            new BitmapInvertedIndexCreator(starTreeDir, uniqueValueCount, schema.getFieldSpecFor(column)));
       }
     }
   }
@@ -383,9 +380,9 @@ public class StarTreeSegmentCreator implements SegmentCreator {
       Collections.sort(splitOrder, new Comparator<String>() {
         @Override
         public int compare(String o1, String o2) {
-          Object[] o1UniqueElements = columnInfo.get(o1).getSortedUniqueElementsArray();
-          Object[] o2UniqueElements = columnInfo.get(o2).getSortedUniqueElementsArray();
-          return o2UniqueElements.length - o1UniqueElements.length; // descending
+          int o1DistinctValueCount = columnInfo.get(o1).getDistinctValueCount();
+          int o2DistinctValueCount = columnInfo.get(o2).getDistinctValueCount();
+          return o2DistinctValueCount - o1DistinctValueCount; // descending
         }
       });
     } else {
@@ -566,14 +563,15 @@ public class StarTreeSegmentCreator implements SegmentCreator {
     }
 
     for (final String column : columnInfo.keySet()) {
+      final ColumnIndexCreationInfo columnIndexCreationInfo = columnInfo.get(column);
+      final int distinctValueCount = columnIndexCreationInfo.getDistinctValueCount();
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, CARDINALITY),
-          String.valueOf(columnInfo.get(column).getSortedUniqueElementsArray().length));
+          String.valueOf(distinctValueCount));
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATA_TYPE),
           schema.getFieldSpecFor(column).getDataType().toString());
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT), String
-          .valueOf(SingleValueUnsortedForwardIndexCreator.getNumOfBits(columnInfo.get(column)
-              .getSortedUniqueElementsArray().length)));
+          .valueOf(SingleValueUnsortedForwardIndexCreator.getNumOfBits(distinctValueCount)));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
           String.valueOf(dictionaryCreatorMap.get(column).getStringColumnMaxLength()));
@@ -582,13 +580,13 @@ public class StarTreeSegmentCreator implements SegmentCreator {
           String.valueOf(schema.getFieldSpecFor(column).getFieldType().toString()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SORTED),
-          String.valueOf(columnInfo.get(column).isSorted()));
+          String.valueOf(columnIndexCreationInfo.isSorted()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_NULL_VALUE),
-          String.valueOf(columnInfo.get(column).hasNulls()));
+          String.valueOf(columnIndexCreationInfo.hasNulls()));
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
-          String.valueOf(columnInfo.get(column).isCreateDictionary()));
+          String.valueOf(columnIndexCreationInfo.isCreateDictionary()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
           String.valueOf(true));
@@ -597,10 +595,10 @@ public class StarTreeSegmentCreator implements SegmentCreator {
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
-          String.valueOf(columnInfo.get(column).getMaxNumberOfMutiValueElements()));
+          String.valueOf(columnIndexCreationInfo.getMaxNumberOfMutiValueElements()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
-          String.valueOf(columnInfo.get(column).getTotalNumberOfEntries()));
+          String.valueOf(columnIndexCreationInfo.getTotalNumberOfEntries()));
 
     }
 

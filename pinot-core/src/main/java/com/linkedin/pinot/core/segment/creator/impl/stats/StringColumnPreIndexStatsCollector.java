@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -33,14 +33,14 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;
   private final int longestStringLength = 0;
-  private final Set<String> stringSet;
+  private final ObjectSet<String> stringSet;
   private String[] sortedStringList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public StringColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    stringSet = new HashSet<String>();
+    stringSet = new ObjectOpenHashSet<>(1000);
   }
 
   @Override

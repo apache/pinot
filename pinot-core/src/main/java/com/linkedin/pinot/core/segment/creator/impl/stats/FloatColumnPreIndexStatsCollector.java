@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -31,14 +31,14 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   private Float min = Float.MAX_VALUE;
   private Float max = Float.MIN_VALUE;
-  private final Set<Float> floatSet;
-  private Float[] sortedFloatList;
+  private final FloatSet floatSet;
+  private float[] sortedFloatList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public FloatColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    floatSet = new HashSet<Float>();
+    floatSet = new FloatOpenHashSet(1000);
   }
 
   @Override
@@ -76,7 +76,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   }
 
   @Override
-  public Object[] getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() throws Exception {
     if (sealed) {
       return sortedFloatList;
     }
@@ -99,7 +99,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public void seal() {
     sealed = true;
-    sortedFloatList = new Float[floatSet.size()];
+    sortedFloatList = new float[floatSet.size()];
     floatSet.toArray(sortedFloatList);
 
     Arrays.sort(sortedFloatList);

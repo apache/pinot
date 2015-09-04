@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -31,14 +31,14 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
   private Long min = null;
   private Long max = null;
-  private final Set<Long> longSet;
-  private Long[] sortedLongList;
+  private final LongSet longSet;
+  private long[] sortedLongList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
   public LongColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    longSet = new HashSet<Long>();
+    longSet = new LongOpenHashSet(1000);
   }
 
   @Override
@@ -78,7 +78,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   }
 
   @Override
-  public Object[] getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() throws Exception {
     if (sealed) {
       return sortedLongList;
     }
@@ -101,7 +101,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   @Override
   public void seal() {
     sealed = true;
-    sortedLongList = new Long[longSet.size()];
+    sortedLongList = new long[longSet.size()];
     longSet.toArray(sortedLongList);
 
     Arrays.sort(sortedLongList);

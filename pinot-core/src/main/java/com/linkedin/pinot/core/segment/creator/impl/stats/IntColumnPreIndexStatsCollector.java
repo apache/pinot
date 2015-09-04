@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
@@ -31,21 +31,21 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   private Integer min = null;
   private Integer max = null;
-  private final Set<Integer> intAVLTreeSet;
+  private final IntSet intSet;
   private boolean hasNull = false;
-  private Integer[] sortedIntList;
+  private int[] sortedIntList;
   private boolean sealed = false;
 
   public IntColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    intAVLTreeSet = new HashSet<Integer>();
+    intSet = new IntOpenHashSet(1000);
   }
 
   @Override
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
       for (Object e : (Object[]) entry) {
-        intAVLTreeSet.add(((Number) e).intValue());
+        intSet.add(((Number) e).intValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -56,7 +56,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
     int value = ((Number) entry).intValue();
     addressSorted(value);
-    intAVLTreeSet.add(value);
+    intSet.add(value);
   }
 
   @Override
@@ -76,7 +76,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   }
 
   @Override
-  public Object[] getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() throws Exception {
     if (sealed) {
       return sortedIntList;
     }
@@ -86,7 +86,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return intAVLTreeSet.size();
+      return intSet.size();
     }
     throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
   }
@@ -99,8 +99,8 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public void seal() {
     sealed = true;
-    sortedIntList = new Integer[intAVLTreeSet.size()];
-    intAVLTreeSet.toArray(sortedIntList);
+    sortedIntList = new int[intSet.size()];
+    intSet.toArray(sortedIntList);
 
     Arrays.sort(sortedIntList);
 
