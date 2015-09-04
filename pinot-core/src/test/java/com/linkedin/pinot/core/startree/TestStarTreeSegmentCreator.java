@@ -60,6 +60,7 @@ public class TestStarTreeSegmentCreator {
       FileUtils.forceDelete(avroFile);
     }
     avroFile.deleteOnExit();
+//    createSampleAvroData(avroFile, 25000000, 128);
 //    createSampleAvroData(avroFile, 10 * 1024 * 1024, 128);
     createSampleAvroData(avroFile, 1024, 128);
   }
@@ -71,7 +72,8 @@ public class TestStarTreeSegmentCreator {
     }
   }
 
-  @Test
+//  @Test(enabled = false)
+  @Test(enabled = true)
   public void testCreation() throws Exception {
     BasicConfigurator.configure();
 
@@ -83,7 +85,8 @@ public class TestStarTreeSegmentCreator {
 
     // Set the star tree index config
     StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
-    starTreeIndexSpec.setSplitExcludes(Arrays.asList("D1", "daysSinceEpoch"));
+//    starTreeIndexSpec.setSplitExcludes(Arrays.asList("D1", "daysSinceEpoch"));
+    starTreeIndexSpec.setSplitExcludes(Arrays.asList("daysSinceEpoch"));
     starTreeIndexSpec.setMaxLeafRecords(4);
     config.getSchema().setStarTreeIndexSpecs(ImmutableList.of(starTreeIndexSpec));
 
@@ -114,6 +117,9 @@ public class TestStarTreeSegmentCreator {
       record.put("D0", String.valueOf(i % 2));
       record.put("D1", String.valueOf(i % 4));
       record.put("D2", String.valueOf(i % 8));
+//      record.put("D0", String.valueOf(i % 16));
+//      record.put("D1", String.valueOf(i % 32));
+//      record.put("D2", String.valueOf(i % 128));
       record.put("daysSinceEpoch", (long) (i % numTimeBuckets));
       record.put("M0", 1L);
       record.put("M1", 1.0);

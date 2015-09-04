@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.startree;
 
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -25,11 +26,15 @@ import java.util.*;
 
 public class TestStarTreeBuilder {
   private List<Number> metrics;
+  private List<FieldSpec.DataType> dimensionTypes;
+  private List<FieldSpec.DataType> metricTypes;
 
   @BeforeClass
   public void beforeClass() {
     metrics = new ArrayList<Number>();
     metrics.add(1);
+    dimensionTypes = ImmutableList.of(FieldSpec.DataType.INT, FieldSpec.DataType.INT, FieldSpec.DataType.INT);
+    metricTypes = ImmutableList.of(FieldSpec.DataType.LONG);
   }
 
   @DataProvider
@@ -37,23 +42,22 @@ public class TestStarTreeBuilder {
     return new Object[][] {
         // Basic
         { createDefaultBuilder(ImmutableList.of(0, 1, 2), 4,
-            new LinkedListStarTreeTable(), new HashMapStarTreeDocumentIdMap()) },
+            new LinkedListStarTreeTable(dimensionTypes, metricTypes)) },
         // Reverse order
         { createDefaultBuilder(ImmutableList.of(2, 1, 0), 4,
-            new LinkedListStarTreeTable(), new HashMapStarTreeDocumentIdMap()) },
+            new LinkedListStarTreeTable(dimensionTypes, metricTypes)) },
         // A larger max leaf records
         { createDefaultBuilder(ImmutableList.of(2, 1, 0), 16,
-            new LinkedListStarTreeTable(), new HashMapStarTreeDocumentIdMap()) }
+            new LinkedListStarTreeTable(dimensionTypes, metricTypes)) }
     };
   }
 
   private StarTreeBuilder createDefaultBuilder(
       List<Integer> splitOrder,
       int maxLeafRecords,
-      StarTreeTable table,
-      StarTreeDocumentIdMap documentIdMap) {
+      StarTreeTable table) {
     StarTreeBuilder builder = new DefaultStarTreeBuilder();
-    builder.init(splitOrder, maxLeafRecords, table, documentIdMap);
+    builder.init(splitOrder, maxLeafRecords, table);
     List<List<Integer>> combinations = generateCombinations();
     for (List<Integer> combination : combinations) {
       builder.append(new StarTreeTableRow(combination, metrics));
@@ -120,7 +124,8 @@ public class TestStarTreeBuilder {
       List<List<Integer>> sortedValues = new ArrayList<List<Integer>>();
       Iterator<StarTreeTableRow> itr = subTable.getAllCombinations();
       while (itr.hasNext()) {
-        sortedValues.add(itr.next().getDimensions());
+        List<Integer> copy = new ArrayList<>(itr.next().getDimensions());
+        sortedValues.add(copy);
       }
       final List<Integer> pathDimensions = node.getPathDimensions();
       Collections.sort(sortedValues, new Comparator<List<Integer>>() {

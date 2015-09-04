@@ -16,10 +16,13 @@
 package com.linkedin.pinot.core.startree;
 
 import com.google.common.base.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class DefaultStarTreeBuilder implements StarTreeBuilder {
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultStarTreeBuilder.class);
   private List<Integer> splitOrder;
   private int maxLeafRecords;
   private StarTreeTable starTreeTable;
@@ -29,7 +32,6 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
   private boolean buildComplete;
   private int totalRawDocumentCount;
   private int totalAggDocumentCount;
-  private StarTreeDocumentIdMap documentIdMap;
 
   @Override
   public String toString() {
@@ -43,15 +45,13 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
   @Override
   public void init(List<Integer> splitOrder,
                    int maxLeafRecords,
-                   StarTreeTable starTreeTable,
-                   StarTreeDocumentIdMap documentIdMap) {
+                   StarTreeTable starTreeTable) {
     this.splitOrder = splitOrder;
     this.maxLeafRecords = maxLeafRecords;
     this.starTreeTable = starTreeTable;
     this.starTree = new StarTreeIndexNode();
     this.documentIdRanges = new HashMap<Integer, StarTreeTableRange>();
     this.adjustedDocumentIdRanges = new HashMap<Integer, StarTreeTableRange>();
-    this.documentIdMap = documentIdMap;
 
     // Root node is everything (i.e. raw segment)
     this.starTree.setDimensionName(StarTreeIndexNode.all());
@@ -76,9 +76,22 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
 
   @Override
   public void build() {
+    long startMillis;
+    long endMillis;
+
+    LOG.info("Beginning StarTree construction...");
+    startMillis = System.currentTimeMillis();
     constructStarTree(starTree, starTreeTable);
     numberNodes();
+    endMillis = System.currentTimeMillis();
+    LOG.info("StarTree construction complete, took {} ms", endMillis - startMillis);
+
+    LOG.info("Computing document ID ranges...");
+    startMillis = System.currentTimeMillis();
     computeDocumentIdRanges();
+    endMillis = System.currentTimeMillis();
+    LOG.info("Document ID range computation complete, took {} ms", endMillis - startMillis);
+
     buildComplete = true;
   }
 
@@ -130,14 +143,6 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
     return totalAggDocumentCount;
   }
 
-  @Override
-  public Integer getNextDocumentId(List<Integer> dimensions) {
-    if (!buildComplete) {
-      throw new IllegalStateException("Must call build first");
-    }
-    return documentIdMap.getNextDocumentId(dimensions);
-  }
-
   /**
    * Recursively constructs the StarTree, splitting nodes and adding leaf records.
    *
@@ -149,6 +154,9 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
    *  The number of records that were added at this level
    */
   private int constructStarTree(StarTreeIndexNode node, StarTreeTable table) {
+    long startMillis;
+    long endMillis;
+
     if (node.getLevel() >= splitOrder.size() || table.size() <= maxLeafRecords) {
       // Either can no longer split, or max record constraint has been met
       return 0;
@@ -156,6 +164,7 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
 
     // The next dimension on which to split
     Integer splitDimensionId = splitOrder.get(node.getLevel());
+    LOG.info("Splitting on dimension {} at level {} (table.size={})", splitDimensionId, node.getLevel(), table.size());
 
     // Compute the remaining unique combinations after removing split dimension
     int aggregateCombinations = 0;
@@ -167,20 +176,29 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
       table.append(row);
       aggregateCombinations++;
     }
+    LOG.info("Added {} aggregate combinations at {}", aggregateCombinations, node);
 
     // Sort the sub-table based on the current tree prefix
     // n.b. If a view of a larger table, it will be partially sorted,
     // so the first couple of dimension prefix comparisons will be no-ops.
     List<Integer> pathDimensions = node.getPathDimensions();
     pathDimensions.add(splitDimensionId);
+    LOG.info("Sorting sub-table at {} by dimensions {}", node, pathDimensions);
+    startMillis = System.currentTimeMillis();
     table.sort(pathDimensions);
+    endMillis = System.currentTimeMillis();
+    LOG.info("Sort of sub-table {} took {} ms", node, endMillis - startMillis);
 
     // Make this node a parent
     node.setChildDimensionName(splitDimensionId);
     node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
 
     // Compute the GROUP BY stats, including for ALL (i.e. "*") dimension value
+    LOG.info("Computing group by stats at {}", node);
+    startMillis = System.currentTimeMillis();
     StarTreeTableGroupByStats groupByStats = table.groupBy(splitDimensionId);
+    endMillis = System.currentTimeMillis();
+    LOG.info("Group by stats computation at {} took {} ms", node, endMillis - startMillis);
 
     int subTreeAggregateCombinations = 0;
     for (Integer valueId : groupByStats.getValues()) {
@@ -286,13 +304,6 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
         } else {
           matchingAdjustedStartDocumentId = currentRawDocumentId;
         }
-      }
-
-      // Record the document ID
-      if (currentPrefix.values().contains(StarTreeIndexNode.all())) {
-        documentIdMap.recordDocumentId(currentCombination.getDimensions(), currentAggDocumentId);
-      } else {
-        documentIdMap.recordDocumentId(currentCombination.getDimensions(), currentRawDocumentId);
       }
 
       // Move on to next document, also within agg / raw

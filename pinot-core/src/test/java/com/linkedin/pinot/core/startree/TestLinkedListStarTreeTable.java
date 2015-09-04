@@ -16,36 +16,71 @@
 package com.linkedin.pinot.core.startree;
 
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.util.*;
 
 public class TestLinkedListStarTreeTable {
   private List<Number> metrics;
+  private List<FieldSpec.DataType> dimensionTypes;
+  private List<FieldSpec.DataType> metricTypes;
 
   @BeforeClass
   public void beforeClass() {
     metrics = new ArrayList<Number>();
     metrics.add(1);
+    dimensionTypes = ImmutableList.of(FieldSpec.DataType.INT, FieldSpec.DataType.INT, FieldSpec.DataType.INT);
+    metricTypes = ImmutableList.of(FieldSpec.DataType.LONG);
   }
 
   @DataProvider
   public Object[][] uniqueCombinationExcludesDataProvider() {
     return new Object[][] {
-        { null },
-        { ImmutableList.of(1) },
-        { ImmutableList.of(0, 2) },
-        { ImmutableList.of(0, 1, 2) },
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), null },
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), ImmutableList.of(1) },
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), ImmutableList.of(0, 2) },
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), ImmutableList.of(0, 1, 2) },
+    };
+  }
+
+  @DataProvider
+  public Object[][] groupByDataProvider() {
+    return new Object[][] {
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), 0 },
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), 1 },
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes), 2 }
+    };
+  }
+
+  @DataProvider
+  public Object[][] viewTableDataProvider() {
+    String backingFileName = TestLinkedListStarTreeTable.class.getSimpleName() + ".mmap.view";
+    File backingFile = new File(System.getProperty("java.io.tmpdir"), backingFileName);
+    backingFile.deleteOnExit();
+    return new Object[][] {
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes) },
+        { new MmapLinkedListStarTreeTable(dimensionTypes, metricTypes, backingFile, 50 /* two resizes */) },
+    };
+  }
+
+  @DataProvider
+  public Object[][] aggregationTableDataProvider() {
+    String backingFileName = TestLinkedListStarTreeTable.class.getSimpleName() + ".mmap.aggregation";
+    File backingFile = new File(System.getProperty("java.io.tmpdir"), backingFileName);
+    backingFile.deleteOnExit();
+    return new Object[][] {
+        { new LinkedListStarTreeTable(dimensionTypes, metricTypes) },
+        { new MmapLinkedListStarTreeTable(dimensionTypes, metricTypes, backingFile, 50 /* two resizes */) },
     };
   }
 
   @Test(dataProvider = "uniqueCombinationExcludesDataProvider")
-  public void testGetUniqueCombinations(List<Integer> excludedDimensions) {
-    StarTreeTable table = new LinkedListStarTreeTable();
-
+  public void testGetUniqueCombinations(StarTreeTable table, List<Integer> excludedDimensions) {
     Set<List<Integer>> uniqueCombinations = new HashSet<List<Integer>>();
 
     for (List<Integer> combination : generateCombinations()) {
@@ -71,19 +106,8 @@ public class TestLinkedListStarTreeTable {
     Assert.assertEquals(actualCombinations, uniqueCombinations.size());
   }
 
-  @DataProvider
-  public Object[][] groupByDataProvider() {
-    return new Object[][] {
-        { 0 },
-        { 1 },
-        { 2 }
-    };
-  }
-
   @Test(dataProvider = "groupByDataProvider")
-  public void testGroupBy(int groupByDimension) {
-    StarTreeTable table = new LinkedListStarTreeTable();
-
+  public void testGroupBy(StarTreeTable table, int groupByDimension) {
     Map<Integer, Integer> rawCounts = new HashMap<Integer, Integer>();
     Map<Integer, Set<List<Integer>>> uniqueCombinations = new HashMap<Integer, Set<List<Integer>>>();
     for (List<Integer> combination : generateCombinations()) {
@@ -120,7 +144,7 @@ public class TestLinkedListStarTreeTable {
 
   @Test
   public void testGroupByWithSort() {
-    StarTreeTable table = new LinkedListStarTreeTable();
+    StarTreeTable table = new LinkedListStarTreeTable(dimensionTypes, metricTypes);
     for (List<Integer> combination : generateCombinations()) {
       table.append(new StarTreeTableRow(combination, metrics));
     }
@@ -141,9 +165,8 @@ public class TestLinkedListStarTreeTable {
     Assert.assertEquals(result.getMinRecordId(3), Integer.valueOf(96));
   }
 
-  @Test
-  public void testView() {
-    StarTreeTable table = new LinkedListStarTreeTable();
+  @Test(dataProvider = "viewTableDataProvider")
+  public void testView(StarTreeTable table) {
     for (List<Integer> combination : generateCombinations()) {
       table.append(new StarTreeTableRow(combination, metrics));
     }
@@ -185,9 +208,8 @@ public class TestLinkedListStarTreeTable {
     }
   }
 
-  @Test
-  public void testAggregation() {
-    StarTreeTable table = new LinkedListStarTreeTable();
+  @Test(dataProvider = "aggregationTableDataProvider")
+  public void testAggregation(StarTreeTable table) {
     for (List<Integer> combination : generateCombinations()) {
       table.append(new StarTreeTableRow(combination, metrics));
     }

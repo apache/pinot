@@ -29,10 +29,8 @@ public interface StarTreeBuilder {
    *  The maximum number of records that can exist at a leaf, if there are still split dimensions available.
    * @param table
    *  The temporary table to store dimensional data.
-   * @param documentIdMap
-   *  The document ID map.
    */
-  void init(List<Integer> splitOrder, int maxLeafRecords, StarTreeTable table, StarTreeDocumentIdMap documentIdMap);
+  void init(List<Integer> splitOrder, int maxLeafRecords, StarTreeTable table);
 
   /**
    * Adds a possibly non-unique dimension combination to the StarTree table.
@@ -88,11 +86,6 @@ public interface StarTreeBuilder {
    * Returns the maximum number of leaf records from init.
    */
   int getMaxLeafRecords();
-
-  /**
-   * Returns the possible document IDs that a dimension combination maps to.
-   */
-  Integer getNextDocumentId(List<Integer> dimensions);
 
   /**
    * Returns the split order from init.

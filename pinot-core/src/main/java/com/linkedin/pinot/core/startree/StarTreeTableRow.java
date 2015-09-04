@@ -15,15 +15,36 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public class StarTreeTableRow {
-  private final List<Integer> dimensions;
-  private final List<Number> metrics;
+  private List<Integer> dimensions;
+  private List<Number> metrics;
 
-  StarTreeTableRow(List<Integer> dimensions, List<Number> metrics) {
+  public StarTreeTableRow(int numDimensions, int numMetrics) {
+    this.dimensions = new ArrayList<>(numDimensions);
+    for (int i = 0; i < numDimensions; i++) {
+      this.dimensions.add(0);
+    }
+
+    this.metrics = new ArrayList<>(numMetrics);
+    for (int i = 0; i < numMetrics; i++) {
+      this.metrics.add(0);
+    }
+  }
+
+  public StarTreeTableRow(List<Integer> dimensions, List<Number> metrics) {
     this.dimensions = dimensions;
+    this.metrics = metrics;
+  }
+
+  public void setDimensions(List<Integer> dimensions) {
+    this.dimensions = dimensions;
+  }
+
+  public void setMetrics(List<Number> metrics) {
     this.metrics = metrics;
   }
 
@@ -33,6 +54,16 @@ public class StarTreeTableRow {
 
   public List<Number> getMetrics() {
     return metrics;
+  }
+
+  // Individual setters
+
+  public void setDimension(int idx, int dimension) {
+    this.dimensions.set(idx, dimension);
+  }
+
+  public void setMetric(int idx, Number metric) {
+    this.metrics.set(idx, metric);
   }
 
   @Override
