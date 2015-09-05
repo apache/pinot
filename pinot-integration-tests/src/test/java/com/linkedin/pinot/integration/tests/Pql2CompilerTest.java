@@ -18,13 +18,16 @@ package com.linkedin.pinot.integration.tests;
 import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileReader;
 import java.io.LineNumberReader;
 import java.util.Collections;
 import java.util.HashMap;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -99,16 +102,27 @@ public class Pql2CompilerTest {
   }
   
   @Test
-  public void testGeneratedQueries() {
-    File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
-    QueryGenerator qg = new QueryGenerator(Collections.singletonList(avroFile), "whatever", "whatever");
+  public void testGeneratedQueries() throws Exception {
+    final File tempDir = new File("/tmp/Pql2CompilerTest");
+    tempDir.mkdirs();
 
-    PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<>());
-    Pql2Compiler pql2Compiler = new Pql2Compiler();
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        OfflineClusterIntegrationTest.class.getClassLoader()
+            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), tempDir);
 
-    for (int i = 1; i <= 1000000; i++) {
-      String pql = qg.generateQuery().generatePql();
-      testQuery(pql1Compiler, pql2Compiler, pql);
+    try {
+      File avroFile = new File(tempDir, "On_Time_On_Time_Performance_2014_1.avro");
+      QueryGenerator qg = new QueryGenerator(Collections.singletonList(avroFile), "whatever", "whatever");
+
+      PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<>());
+      Pql2Compiler pql2Compiler = new Pql2Compiler();
+
+      for (int i = 1; i <= 1000000; i++) {
+        String pql = qg.generateQuery().generatePql();
+        testQuery(pql1Compiler, pql2Compiler, pql);
+      }
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
     }
   }
 
