@@ -195,9 +195,17 @@ public class RetentionManager {
 
       LOGGER.info("Building retention strategy for table {} with configuration {}", offlineTableName, validationConfig);
 
-      TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(
-          validationConfig.getRetentionTimeUnit(),
-          validationConfig.getRetentionTimeValue());
+      final String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+      final String retentionTimeValue = validationConfig.getRetentionTimeValue();
+
+      if (retentionTimeUnit == null || retentionTimeUnit.isEmpty() || retentionTimeValue == null || retentionTimeValue.isEmpty()) {
+        LOGGER.info("Table {} has an invalid retention period of {} {}, skipping", offlineTableName,
+            retentionTimeValue, retentionTimeUnit);
+        return tableToDeletionStrategyMap;
+      }
+
+      TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(retentionTimeUnit,
+          retentionTimeValue);
       tableToDeletionStrategyMap.put(offlineTableName, timeRetentionStrategy);
     } catch (Exception e) {
       LOGGER.error("Error creating TimeRetentionStrategy for table: {}", offlineTableName, e);
