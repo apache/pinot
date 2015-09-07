@@ -25,7 +25,7 @@ public class SegmentDescriptorUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDescriptorUtils.class);
 
-  public static List<TimeRange> checkSegments(String serverUri, String collection, DateTime currentStartHour, DateTime currentEndHour, DateTime baselineStartHour,
+  public static List<TimeRange> checkSegments(String serverUri, String collection, String timezone, DateTime currentStartHour, DateTime currentEndHour, DateTime baselineStartHour,
       DateTime baselineEndHour) throws JsonParseException, JsonMappingException, UnsupportedEncodingException, IOException {
 
     List<TimeRange> missingSegments = new ArrayList<TimeRange>();
@@ -48,18 +48,18 @@ public class SegmentDescriptorUtils {
       }
     });
     for (SegmentDescriptor segment : segmentDescriptors) {
-      LOGGER.info(segment.getStartWallTime().getMillis() + " " +segment.getEndWallTime().getMillis());
-      LOGGER.info("Segment : " + segment.getStartWallTime() + " " + segment.getEndWallTime() + " " + segment.getFile());
+      LOGGER.info(segment.getStartWallTime(timezone).getMillis() + " " +segment.getEndWallTime(timezone).getMillis());
+      LOGGER.info("Segment : " + segment.getStartWallTime(timezone) + " " + segment.getEndWallTime(timezone) + " " + segment.getFile());
     }
 
     // find missing ranges in current and baseline
-    missingSegments.addAll(getMissingSegments(segmentDescriptors, currentStartHour, currentEndHour));
-    missingSegments.addAll(getMissingSegments(segmentDescriptors, baselineStartHour, baselineEndHour));
+    missingSegments.addAll(getMissingSegments(segmentDescriptors, timezone, currentStartHour, currentEndHour));
+    missingSegments.addAll(getMissingSegments(segmentDescriptors, timezone, baselineStartHour, baselineEndHour));
     return missingSegments;
 
   }
 
-  private static List<TimeRange> getMissingSegments(List<SegmentDescriptor> segmentDescriptors, DateTime startDate, DateTime endDate) {
+  private static List<TimeRange> getMissingSegments(List<SegmentDescriptor> segmentDescriptors, String timezone, DateTime startDate, DateTime endDate) {
     List<TimeRange> missingRanges = new ArrayList<TimeRange>();
     long startHour = startDate.getMillis();
     long endHour = endDate.getMillis();
@@ -80,8 +80,8 @@ public class SegmentDescriptorUtils {
       Long currentEnd = null;
       long currentStart;
       while (start < segmentDescriptors.size()) {
-        currentStart = segmentDescriptors.get(start).getStartWallTime().getMillis();
-        currentEnd = segmentDescriptors.get(start).getEndWallTime().getMillis();
+        currentStart = segmentDescriptors.get(start).getStartWallTime(timezone).getMillis();
+        currentEnd = segmentDescriptors.get(start).getEndWallTime(timezone).getMillis();
         if (previousEnd != null && currentStart != previousEnd) {
           missingRanges.add(new TimeRange(previousEnd, currentStart));
         }

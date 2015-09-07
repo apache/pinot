@@ -102,7 +102,7 @@ public class ReportGenerator implements Job{
         reportConfig.setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
         reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()));
 
-        missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection,
+        missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection, reportConfig.getTimezone(),
             reportConfig.getStartTime(), reportConfig.getEndTime(),
             baselineStartHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())),
             baselineEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));

@@ -1,6 +1,10 @@
 package com.linkedin.thirdeye.reporting.api;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.base.BaseDateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 import com.linkedin.thirdeye.api.StarTreeConstants;
 
@@ -12,6 +16,7 @@ public class SegmentDescriptor{
   private DateTime endWallTime;
   private DateTime startDataTime;
   private DateTime endDataTime;
+
 
   public SegmentDescriptor() {
 
@@ -39,9 +44,20 @@ public class SegmentDescriptor{
 
   }
 
+
+  public BaseDateTime getStartWallTime(String timezone) {
+    String[] tokens = file.getName().split("_");
+    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[2]);
+  }
+
   public DateTime getEndWallTime() {
     String[] tokens = file.getName().split("_");
     return StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]);
+  }
+
+  public DateTime getEndWallTime(String timezone) {
+    String[] tokens = file.getName().split("_");
+    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[3]);
   }
 
   public DateTime getStartDataTime() {
@@ -61,5 +77,6 @@ public class SegmentDescriptor{
     }
     return false;
   }
+
 
 }
