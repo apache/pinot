@@ -48,6 +48,7 @@ public class SegmentDescriptorUtils {
       }
     });
     for (SegmentDescriptor segment : segmentDescriptors) {
+      LOGGER.info(segment.getStartWallTime().getMillis() + " " +segment.getEndWallTime().getMillis());
       LOGGER.info("Segment : " + segment.getStartWallTime() + " " + segment.getEndWallTime() + " " + segment.getFile());
     }
 
@@ -63,6 +64,7 @@ public class SegmentDescriptorUtils {
     long startHour = startDate.getMillis();
     long endHour = endDate.getMillis();
 
+    LOGGER.info(startHour + " " +endHour);
     LOGGER.info("Start : " + startDate + " End : " + endDate);
     int start = -1;
     for (int i = 0; i < segmentDescriptors.size(); i ++) {
