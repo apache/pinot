@@ -52,16 +52,18 @@ public class SegmentDescriptorUtils {
     }
 
     // find missing ranges in current and baseline
-    missingSegments.addAll(getMissingSegments(segmentDescriptors, currentStartHour.getMillis(), currentEndHour.getMillis()));
-    missingSegments.addAll(getMissingSegments(segmentDescriptors, baselineStartHour.getMillis(), baselineEndHour.getMillis()));
+    missingSegments.addAll(getMissingSegments(segmentDescriptors, currentStartHour, currentEndHour));
+    missingSegments.addAll(getMissingSegments(segmentDescriptors, baselineStartHour, baselineEndHour));
     return missingSegments;
 
   }
 
-  private static List<TimeRange> getMissingSegments(List<SegmentDescriptor> segmentDescriptors, long startHour, long endHour) {
+  private static List<TimeRange> getMissingSegments(List<SegmentDescriptor> segmentDescriptors, DateTime startDate, DateTime endDate) {
     List<TimeRange> missingRanges = new ArrayList<TimeRange>();
+    long startHour = startDate.getMillis();
+    long endHour = endDate.getMillis();
 
-    LOGGER.info("Start : " + startHour + " End : " + endHour);
+    LOGGER.info("Start : " + startDate + " End : " + endDate);
     int start = -1;
     for (int i = 0; i < segmentDescriptors.size(); i ++) {
       if (segmentDescriptors.get(i).includesTime(startHour)) {
