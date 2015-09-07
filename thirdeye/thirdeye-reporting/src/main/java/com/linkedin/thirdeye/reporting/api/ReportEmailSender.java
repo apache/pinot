@@ -7,9 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.StringWriter;
 import java.io.Writer;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 import javax.mail.Message;
@@ -19,7 +17,6 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
 import com.linkedin.thirdeye.reporting.api.TimeRange;
-import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
 import freemarker.cache.FileTemplateLoader;
 import freemarker.template.Configuration;
@@ -29,19 +26,11 @@ public class ReportEmailSender {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportEmailSender.class);
 
-  private List<Table> tables;
-  private ScheduleSpec scheduleSpec;
-  private ReportConfig reportConfig;
-  private Map<String, AnomalyReportTable> anomalyReportTables;
-  private List<TimeRange> missingSegments;
+  private ReportEmailObjects reportObjects;
   private String templatePath;
 
-  public ReportEmailSender(List<Table> tables, ScheduleSpec scheduleSpec, ReportConfig reportConfig, Map<String, AnomalyReportTable> anomalyReportTables, List<TimeRange> missingSegments, String templatePath) {
-    this.tables = tables;
-    this.scheduleSpec = scheduleSpec;
-    this.reportConfig = reportConfig;
-    this.anomalyReportTables = anomalyReportTables;
-    this.missingSegments = missingSegments;
+  public ReportEmailSender(ReportEmailObjects reportObjects, String templatePath) {
+    this.reportObjects = reportObjects;
     this.templatePath = templatePath;
   }
 
@@ -53,37 +42,29 @@ public class ReportEmailSender {
           new File(templatePath));
       Configuration emailConfiguration = new Configuration();
       emailConfiguration.setTemplateLoader(ftl);
-      Template emailReportTemplate = emailConfiguration.getTemplate(scheduleSpec.getEmailTemplate());
-
-      //TODO: Use POJO with accessors to the keys instead of Map<String, Object>
-      Map<String, Object> rootMap = new HashMap<String, Object>();
-      rootMap.put(ReportConstants.REPORT_CONFIG_OBJECT, reportConfig);
-      rootMap.put(ReportConstants.TABLES_OBJECT, tables);
-      rootMap.put(ReportConstants.ANOMALY_TABLES_OBJECT, anomalyReportTables);
-      rootMap.put(ReportConstants.MISSING_SEGMENTS_OBJECT, missingSegments);
-      rootMap.put(ReportConstants.SCHEDULE_SPEC_OBJECT, scheduleSpec);
+      Template emailReportTemplate = emailConfiguration.getTemplate(reportObjects.getScheduleSpec().getEmailTemplate());
 
       Writer emailOutput = new StringWriter();
-      emailReportTemplate.process(rootMap, emailOutput);
+      emailReportTemplate.process(reportObjects, emailOutput);
 
       Properties props = new Properties();
       props.setProperty(ReportConstants.MAIL_SMTP_HOST_KEY, ReportConstants.MAIL_SMTP_HOST_VALUE);
       Session session = Session.getDefaultInstance(props, null);
 
       Message emailReportMessage = new MimeMessage(session);
-      for (String emailIdFrom : scheduleSpec.getEmailFrom().split(",")) {
-        emailReportMessage.setFrom(new InternetAddress(emailIdFrom, scheduleSpec.getNameFrom()));
+      for (String emailIdFrom : reportObjects.getScheduleSpec().getEmailFrom().split(",")) {
+        emailReportMessage.setFrom(new InternetAddress(emailIdFrom, reportObjects.getScheduleSpec().getNameFrom()));
       }
-      for (String emailIdTo : scheduleSpec.getEmailTo().split(",")) {
+      for (String emailIdTo : reportObjects.getScheduleSpec().getEmailTo().split(",")) {
         emailReportMessage.addRecipient(Message.RecipientType.TO,
-                         new InternetAddress(emailIdTo, scheduleSpec.getNameTo()));
+                         new InternetAddress(emailIdTo, reportObjects.getScheduleSpec().getNameTo()));
       }
       emailReportMessage.setSubject(ReportConstants.REPORT_SUBJECT_PREFIX +
-          " (" + reportConfig.getCollection().toUpperCase() + ") " +
-          reportConfig.getName());
+          " (" + reportObjects.getReportConfig().getCollection().toUpperCase() + ") " +
+          reportObjects.getReportConfig().getName());
       emailReportMessage.setContent(emailOutput.toString(), "text/html");
       LOGGER.info("Sending email from {} to {}  ",
-          scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo());
+          reportObjects.getScheduleSpec().getEmailFrom(), reportObjects.getScheduleSpec().getEmailTo());
 
       Transport.send(emailReportMessage);
 
