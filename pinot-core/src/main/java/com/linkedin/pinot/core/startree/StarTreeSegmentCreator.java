@@ -21,6 +21,7 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 
 import com.google.common.base.Joiner;
 import com.linkedin.pinot.common.data.*;
+import com.linkedin.pinot.common.utils.PrimitiveArrayUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -516,7 +517,8 @@ public class StarTreeSegmentCreator implements SegmentCreator {
       Arrays.sort(valuesWithAggregates);
 
       // Reset dictionaries
-      dictionaryCreatorMap.put(column, new SegmentDictionaryCreator(info.hasNulls(), valuesWithAggregates, spec, outDir));
+      dictionaryCreatorMap.put(column, new SegmentDictionaryCreator(info.hasNulls(),
+          PrimitiveArrayUtils.toPrimitive(valuesWithAggregates), spec, outDir));
       dictionaryCreatorMap.get(column).build();
     }
   }
