@@ -1,17 +1,21 @@
 package com.linkedin.thirdeye.reporting.api;
 
+import org.joda.time.DateTimeZone;
+
 public class TimeRange
 {
 
   private Long start;
   private Long end;
+  private String timezone;
 
   public TimeRange() {}
 
-  public TimeRange(Long start, Long end)
+  public TimeRange(Long start, Long end, String timezone)
   {
     this.start = start;
     this.end = end;
+    this.timezone = timezone;
 
     if (start > end)
     {
@@ -32,6 +36,6 @@ public class TimeRange
   @Override
   public String toString()
   {
-    return "[" + ReportConstants.DATE_TIME_FORMATTER.print(start) + " - " + ReportConstants.DATE_TIME_FORMATTER.print(end) + "]";
+    return "[" + ReportConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).print(start) + " - " + ReportConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).print(end) + "]";
   }
 }

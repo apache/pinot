@@ -68,10 +68,10 @@ public class SegmentDescriptor{
     return endDataTime;
   }
 
-  public boolean includesTime(long time) {
+  public boolean includesTime(long time, String timezone) {
     String[] tokens = file.getName().split("_");
-    long wallStartTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[2]).getMillis();
-    long wallEndTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(tokens[3]).getMillis();
+    long wallStartTime = StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[2]).getMillis();
+    long wallEndTime = StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[3]).getMillis();
     if (time >= wallStartTime && time < wallEndTime) {
       return true;
     }

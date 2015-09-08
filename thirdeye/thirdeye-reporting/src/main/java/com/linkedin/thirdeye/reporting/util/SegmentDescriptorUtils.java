@@ -68,13 +68,15 @@ public class SegmentDescriptorUtils {
     LOGGER.info("Start : " + startDate + " End : " + endDate);
     int start = -1;
     for (int i = 0; i < segmentDescriptors.size(); i ++) {
-      if (segmentDescriptors.get(i).includesTime(startHour)) {
+      LOGGER.info("segment i : "+segmentDescriptors.get(i).getStartWallTime(timezone).getMillis()+ " " +segmentDescriptors.get(i).getEndWallTime(timezone).getMillis() + " starthour" +startHour );;
+      if (segmentDescriptors.get(i).includesTime(startHour, timezone)) {
         start = i;
         break;
       }
     }
     if (start == -1) {
-      missingRanges.add(new TimeRange(startHour, endHour));
+      missingRanges.add(new TimeRange(startHour, endHour, timezone));
+      LOGGER.info("Completely missing");
     } else {
       Long previousEnd = null;
       Long currentEnd = null;
@@ -82,18 +84,22 @@ public class SegmentDescriptorUtils {
       while (start < segmentDescriptors.size()) {
         currentStart = segmentDescriptors.get(start).getStartWallTime(timezone).getMillis();
         currentEnd = segmentDescriptors.get(start).getEndWallTime(timezone).getMillis();
+        LOGGER.info("previousend : "+previousEnd+" currrentstart : "+currentStart + " currentend : "+currentEnd);
         if (previousEnd != null && currentStart != previousEnd) {
-          missingRanges.add(new TimeRange(previousEnd, currentStart));
+          missingRanges.add(new TimeRange(previousEnd, currentStart, timezone));
+          LOGGER.info("Adding missing range : "+previousEnd +" "+currentStart);
         }
         previousEnd = currentEnd;
 
         if (endHour <= currentEnd) {
+          LOGGER.info("current end "+currentEnd+" exceeded endhour "+endHour);
           break;
         }
         start ++;
       }
       if (currentEnd < endHour) {
-        missingRanges.add(new TimeRange(currentEnd, endHour));
+        LOGGER.info("currentend is " + currentEnd + " endHour is "+endHour);
+        missingRanges.add(new TimeRange(currentEnd, endHour, timezone));
       }
     }
     return missingRanges;
