@@ -27,16 +27,13 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.codahale.metrics.health.HealthCheck.Result;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyDetectionConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyDetectionConfiguration.Mode;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory;
-import com.linkedin.thirdeye.anomaly.api.ResultProperties;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 import com.linkedin.thirdeye.anomaly.api.task.AnomalyDetectionTaskInfo;
-import com.linkedin.thirdeye.anomaly.api.task.CallableAnomalyDetectionTask;
 import com.linkedin.thirdeye.anomaly.api.task.FixedDimensionAnomalyDetectionTask;
 import com.linkedin.thirdeye.anomaly.database.DeltaTable;
 import com.linkedin.thirdeye.anomaly.database.FunctionTable;
@@ -54,12 +51,11 @@ import com.linkedin.thirdeye.anomaly.server.views.ExecuteFunctionResultView;
 import com.linkedin.thirdeye.anomaly.server.views.ExecuteFunctionView;
 import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 import com.linkedin.thirdeye.anomaly.util.ThirdEyeServerUtils;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
-import com.linkedin.thirdeye.client.FlowControlledDefaultThirdeyeClient;
+import com.linkedin.thirdeye.client.FlowControlledDefaultThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 
 @Path("/")
@@ -85,7 +81,7 @@ public class FunctionTableResource {
     thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
     thirdEyeClientConfig.setExpireAfterAccess(false);
 
-    thirdEyeClient = new FlowControlledDefaultThirdeyeClient(config.getThirdEyeServerHost(),
+    thirdEyeClient = new FlowControlledDefaultThirdEyeClient(config.getThirdEyeServerHost(),
         config.getThirdEyeServerPort(), thirdEyeClientConfig, 1);
   }
 

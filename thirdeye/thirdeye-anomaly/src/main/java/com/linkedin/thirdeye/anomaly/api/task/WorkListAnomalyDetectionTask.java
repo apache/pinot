@@ -1,17 +1,24 @@
 package com.linkedin.thirdeye.anomaly.api.task;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionHistory;
 import com.linkedin.thirdeye.anomaly.api.AnomalyResultHandler;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
+import com.linkedin.thirdeye.anomaly.driver.DimensionKeySeries;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -19,37 +26,51 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 
 /**
- * This implementation executes a work list of subtasks, which are pairs of a dimensionKey and a contribution estimate.
+ * This implementation executes a work list of dimensionKeySeries, which are pairs of a dimensionKey and a contribution estimate.
  */
-public class WorkListAnomalyDetectionTask extends CallableAnomalyDetectionTask<Void> {
+public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTask implements Runnable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(LocalDriverAnomalyDetectionTask.class);
+  /**
+   * Shared thread pool for evaluating anomalies
+   */
+  private static final ExecutorService SHARED_EXECUTORS = Executors.newFixedThreadPool(
+      Runtime.getRuntime().availableProcessors(), new ThreadFactoryBuilder().setDaemon(true).build());
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(WorkListAnomalyDetectionTask.class);
 
   private final AnomalyResultHandler handler;
-  private final List<SeriesSubtask> subtasks;
+  private final List<DimensionKeySeries> dimensionKeySeries;
 
   /**
    * @param starTreeConfig
+   *  Configuration for the star-tree
    * @param driverConfig
+   *  Configuration for the driver
    * @param taskInfo
+   *  Information identifying the task
    * @param function
+   *  Anomaly detection function to execute
    * @param handler
+   *  Handler for any anomaly results
    * @param functionHistory
+   *  A history of all anomaly results produced by this function
    * @param thirdEyeClient
+   *  The client to use to request data
+   * @param dimensionKeySeries
+   *  List of dimensionKey and meta-info pairs.
    */
   public WorkListAnomalyDetectionTask(
       StarTreeConfig starTreeConfig,
-      AnomalyDetectionDriverConfig driverConfig,
       AnomalyDetectionTaskInfo taskInfo,
       AnomalyDetectionFunction function,
       AnomalyResultHandler handler,
       AnomalyDetectionFunctionHistory functionHistory,
       ThirdEyeClient thirdEyeClient,
-      List<SeriesSubtask> subtasks)
+      List<DimensionKeySeries> dimensionKeySeries)
   {
-    super(starTreeConfig, taskInfo, function, functionHistory, thirdEyeClient, null);
+    super(starTreeConfig, taskInfo, function, functionHistory, thirdEyeClient);
     this.handler = handler;
-    this.subtasks = subtasks;
+    this.dimensionKeySeries = dimensionKeySeries;
   }
 
   /**
@@ -57,93 +78,36 @@ public class WorkListAnomalyDetectionTask extends CallableAnomalyDetectionTask<V
    * @see java.util.concurrent.Callable#call()
    */
   @Override
-  public Void call() throws Exception {
-    // explore phase
-//    List<SeriesSubtask> subtasks = explore(new HashMap<String, String>(), driverConfig.getDimensionPrecedence(), 0, 1.0);
+  public void run() {
+    LOGGER.info("begin executing AnomalyDetectionTask : {}", getTaskInfo());
+    List<Future<?>> futures = new LinkedList<>();
 
-    // run phase
-    for (SeriesSubtask subtask : subtasks) {
-      try {
-        runFunctionForSeries(subtask.getDimensionKey(), subtask.getContributionEstimate());
-      } catch (Exception e) {
-        LOGGER.error("problem failed to complete {} for {}", getTaskInfo(), subtask.getDimensionKey(), e);
+    for (final DimensionKeySeries dimensionKeySeries : dimensionKeySeries) {
+      futures.add(SHARED_EXECUTORS.submit(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            LOGGER.info("analyzing {}", dimensionKeySeries);
+            runFunctionForSeries(dimensionKeySeries.getDimensionKey(), dimensionKeySeries.getContributionEstimate());
+          } catch (Exception e) {
+            LOGGER.error("problem failed to complete {} for {}", getTaskInfo(), dimensionKeySeries, e);
+          }
+        }
+      }));
+    }
+
+    try {
+      for (Future<?> f : futures) {
+        f.get();
+      }
+    } catch (InterruptedException | ExecutionException e) {
+      for (Future<?> f : futures) {
+        f.cancel(false);
       }
     }
-    return null;
+
+    LOGGER.info("done executing AnomalyDetectionTask : {}", getTaskInfo());
   }
-
-  /**
-   * Class representing a series to run.
-   */
-  public class SeriesSubtask {
-
-    private final DimensionKey dimensionKey;
-    private final double contributionEstimate;
-
-    public SeriesSubtask(DimensionKey dimensionKey, double contributionEstimate) {
-      super();
-      this.dimensionKey = dimensionKey;
-      this.contributionEstimate = contributionEstimate;
-    }
-
-    public double getContributionEstimate() {
-      return contributionEstimate;
-    }
-
-    public DimensionKey getDimensionKey() {
-      return dimensionKey;
-    }
-
-  }
-
-  /**
-   * @return
-   *  List of subtasks to complete
-   * @throws Exception
-   */
-//  private List<SeriesSubtask> explore(Map<String, String> dimensionValues, List<String> dimensionNames,
-//      int groupByDimensionIndex, double proportionMultiplier) throws Exception {
-//    List<SeriesSubtask> subtasks = new ArrayList<SeriesSubtask>();
-//
-//    long taskTimeRangeStart = getTaskInfo().getTimeRange().getStart();
-//
-//    for (int i = groupByDimensionIndex; i < dimensionNames.size(); i++) {
-//      String groupByDimension = dimensionNames.get(i);
-//      ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(
-//          driverConfig.getCollectionName(),
-//          groupByDimension,
-//          dimensionValues,
-//          Collections.singletonList(driverConfig.getContributionEstimateMetric()),
-//          new TimeGranularity(1, TimeUnit.HOURS),
-//          new TimeRange(taskTimeRangeStart - TimeUnit.DAYS.toMillis(1), taskTimeRangeStart));
-//      Map<DimensionKey, MetricTimeSeries> dataset = thirdEyeClient.execute(request);
-//      Map<DimensionKey, Double> proportions = computeDatasetProportions(dataset,
-//          driverConfig.getContributionEstimateMetric());
-//
-//      for (DimensionKey dimensionKey : dataset.keySet()) {
-//        double scaledEstimateProportion = proportions.get(dimensionKey) * proportionMultiplier;
-//        if (scaledEstimateProportion < driverConfig.getContributionMinProportion()) {
-//          continue;
-//        }
-//
-//        BigInteger dimensionKeyHash = new BigInteger(dimensionKey.toMD5());
-//        if (dimensionKeyHash.mod(BigInteger.valueOf(getTaskInfo().getNumPartitions()))
-//            .equals(BigInteger.valueOf(getTaskInfo().getPartitionId()))) {
-//          subtasks.add(new SeriesSubtask(dimensionKey, scaledEstimateProportion));
-//        }
-//
-//        if (dimensionValues.size() + 1 < driverConfig.getMaxExplorationDepth()
-//          && scaledEstimateProportion > driverConfig.getContributionMinProportion()) {
-//          dimensionValues.put(groupByDimension, dimensionKey.getDimensionValue(getStarTreeConfig().getDimensions(),
-//              groupByDimension));
-//          subtasks.addAll(explore(dimensionValues, dimensionNames, i + 1, scaledEstimateProportion));
-//          dimensionValues.remove(groupByDimension);
-//        }
-//      }
-//
-//    }
-//    return subtasks;
-//  }
 
   /**
    * @param dimensionKey
@@ -172,27 +136,5 @@ public class WorkListAnomalyDetectionTask extends CallableAnomalyDetectionTask<V
       handler.handle(getTaskInfo(), dimensionKey, contributionProportion, getFunction().getMetrics(), anomaly);
     }
   }
-
-  /**
-   * @param dataset
-   * @param metricName
-   * @return
-   *  The proportion that each dimension key contributes to the metric for the timeseries.
-   */
-//  private Map<DimensionKey, Double> computeDatasetProportions(Map<DimensionKey, MetricTimeSeries> dataset,
-//      String metricName) {
-//    Map<DimensionKey, Double> result = new HashMap<>();
-//    double totalSum = 0;
-//    for (Entry<DimensionKey, MetricTimeSeries> entry : dataset.entrySet()) {
-//      int metricIndex = entry.getValue().getSchema().getNames().indexOf(metricName);
-//      double dkValue = entry.getValue().getMetricSums()[metricIndex].doubleValue();
-//      result.put(entry.getKey(), dkValue);
-//      totalSum += dkValue;
-//    }
-//    for (DimensionKey dk : dataset.keySet()) {
-//      result.put(dk, result.get(dk) / totalSum);
-//    }
-//    return result;
-//  }
 
 }

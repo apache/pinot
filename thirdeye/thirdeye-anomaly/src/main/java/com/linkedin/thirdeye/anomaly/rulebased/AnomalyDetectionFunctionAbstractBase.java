@@ -27,4 +27,9 @@ public abstract class AnomalyDetectionFunctionAbstractBase implements AnomalyDet
   public TimeGranularity getAggregationTimeGranularity() {
     return aggregateTimeGranularity;
   }
+
+  @Override
+  public TimeGranularity getMinimumMonitoringIntervalTimeGranularity() {
+    return null;
+  }
 }

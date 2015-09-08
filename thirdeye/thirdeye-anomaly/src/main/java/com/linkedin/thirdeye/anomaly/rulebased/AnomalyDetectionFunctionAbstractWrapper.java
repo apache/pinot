@@ -41,4 +41,8 @@ public abstract class AnomalyDetectionFunctionAbstractWrapper implements Anomaly
     return childFunc.getMetrics();
   }
 
+  @Override
+  public TimeGranularity getMinimumMonitoringIntervalTimeGranularity() {
+    return null;
+  }
 }

@@ -64,5 +64,7 @@ th, td {
   <input type="submit" value="Run">
 </form>
 
+<p>Please do not hit run more than once or refresh the page once you have pressed run.</p>
+
 </body>
 </html>

@@ -43,6 +43,12 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private static final String PROP_DEFAULT_MIN_INCREMENT = "1";
   private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + Integer.MAX_VALUE;
   private static final String PROP_DEFAULT_BOOTSTRAP = "true";
+  private static final String PROP_DEFAULT_STL_TREND_BANDWIDTH = "0.5";
+
+  private static final String PROP_DEFAULT_MONITORING_WINDOW_SIZE = "3";
+  private static final String PROP_DEFAULT_MONITORING_WINDOW_UNIT = "DAYS";
+
+  private static final String PROP_DEFAULT_ONLY_ALERT_BOUNDARIES = "false";
 
   private String metric;
   private double pValueThreshold;
@@ -53,7 +59,15 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private int bucketSize;
   private TimeUnit bucketUnit;
 
+  private int monitoringWindowSize;
+  private TimeUnit monitoringWindowUnit;
+
+  // TODO removing anomalies from the training set will not work with this set.
+  private boolean onlyAlertBoundaries;
+
   private int seasonal;
+
+  private double stlTrendBandwidth;
 
   private int numSimulation;
   private int minWindowLength;
@@ -88,6 +102,20 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     if (bucketSize < 0) {
       throw new IllegalFunctionException("bucketSize must be >= 0");
     }
+
+    monitoringWindowSize = Integer.parseInt(functionConfig.getProperty("monitoringWindowSize",
+        PROP_DEFAULT_MONITORING_WINDOW_SIZE));
+    monitoringWindowUnit = TimeUnit.valueOf(functionConfig.getProperty("monitoringWindowUnit",
+        PROP_DEFAULT_MONITORING_WINDOW_UNIT));
+    if (monitoringWindowSize < 0) {
+      throw new IllegalFunctionException("monitoringWindowSize must be >= 0");
+    }
+
+    onlyAlertBoundaries = Boolean.parseBoolean(functionConfig.getProperty("onlyAlertBoundaries",
+        PROP_DEFAULT_ONLY_ALERT_BOUNDARIES));
+
+    stlTrendBandwidth = Double.parseDouble(functionConfig.getProperty("stlTrendBandwidth",
+        PROP_DEFAULT_STL_TREND_BANDWIDTH));
 
     seasonal = Integer.parseInt(functionConfig.getProperty("seasonal", PROP_DEFAULT_SEASONAL));
 
@@ -132,10 +160,19 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
 
   /**
    * {@inheritDoc}
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getMinimumMonitoringIntervalTimeGranularity()
+   */
+  @Override
+  public TimeGranularity getMinimumMonitoringIntervalTimeGranularity() {
+    return new TimeGranularity(monitoringWindowSize, monitoringWindowUnit);
+  }
+
+  /**
+   * {@inheritDoc}
    * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.api.DimensionKey, com.linkedin.thirdeye.api.MetricTimeSeries, com.linkedin.thirdeye.api.TimeRange, java.util.List)
    */
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval,
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange monitoringWindow,
       List<AnomalyResult> anomalyHistory) {
     long bucketMillis = bucketUnit.toMillis(bucketSize);
 
@@ -150,7 +187,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
 
     double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal);
 
-    int effectiveMaxWindowLength = (int) (detectionInterval.totalBuckets() / bucketMillis);
+    int effectiveMaxWindowLength = (int) (monitoringWindow.totalBuckets() / bucketMillis);
     effectiveMaxWindowLength = Math.min(effectiveMaxWindowLength, maxWindowLength);
 
     // instantiate model
@@ -163,7 +200,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
         minIncrement,
         bootstrap);
 
-    int numBucketsToScan = (int) ((detectionInterval.getEnd() - detectionInterval.getStart()) / bucketMillis);
+    int numBucketsToScan = (int) ((monitoringWindow.getEnd() - monitoringWindow.getStart()) / bucketMillis);
     int totalNumBuckets = observationsMinusSeasonality.length;
     int numTrain = totalNumBuckets - numBucketsToScan;
 
@@ -192,16 +229,66 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     // convert interval result to points
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
     if (anomalousInterval != null) {
-      for (int i = anomalousInterval.lowerEndpoint(); i < anomalousInterval.upperEndpoint(); i++) {
-        ResultProperties properties = new ResultProperties();
-        properties.setProperty("anomalyStart", new DateTime(
-            monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
-        properties.setProperty("anomalyEnd", new DateTime(
-            monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
-        anomalyResults.add(new AnomalyResult(true, monitoringTimestamps[i], pValueThreshold, observations[i],
-            properties));
+      if (onlyAlertBoundaries) {
+        anomalyResults = getAnomalyResultsForBoundsOnly(monitoringData, monitoringTimestamps, anomalousInterval);
+      } else {
+        anomalyResults = getAnomalyResultsForAllPointsInInterval(monitoringData, monitoringTimestamps,
+            anomalousInterval);
       }
     }
+    return anomalyResults;
+  }
+
+  /**
+   * @param monitoringData
+   * @param monitoringTimestamps
+   * @param anomalousInterval
+   * @return
+   *  Anomaly results for each point in the interval.
+   */
+  private List<AnomalyResult> getAnomalyResultsForAllPointsInInterval(double[] monitoringData, long[] monitoringTimestamps,
+      Range<Integer> anomalousInterval) {
+    List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
+    for (int i = anomalousInterval.lowerEndpoint(); i < anomalousInterval.upperEndpoint(); i++) {
+      ResultProperties properties = new ResultProperties();
+      properties.setProperty("anomalyStart", new DateTime(
+          monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
+      properties.setProperty("anomalyEnd", new DateTime(
+          monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
+      anomalyResults.add(new AnomalyResult(true, monitoringTimestamps[i], pValueThreshold, monitoringData[i],
+          properties));
+    }
+    return anomalyResults;
+  }
+
+  /**
+   * @param monitoringData
+   * @param monitoringTimestamps
+   * @param anomalousInterval
+   * @return
+   *  Only anomaly results for the start and end of the interval.
+   */
+  private List<AnomalyResult> getAnomalyResultsForBoundsOnly(double[] monitoringData, long[] monitoringTimestamps,
+      Range<Integer> anomalousInterval) {
+    List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
+    ResultProperties startProperties = new ResultProperties();
+    startProperties.setProperty("anomalyStart", new DateTime(
+        monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
+    startProperties.setProperty("anomalyEnd", new DateTime(
+        monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
+    startProperties.setProperty("bound", "START");
+    anomalyResults.add(new AnomalyResult(true, monitoringTimestamps[anomalousInterval.lowerEndpoint()],
+        pValueThreshold, monitoringData[anomalousInterval.lowerEndpoint()], startProperties));
+
+    ResultProperties endProperties = new ResultProperties();
+    endProperties.setProperty("anomalyStart", new DateTime(
+        monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
+    endProperties.setProperty("anomalyEnd", new DateTime(
+        monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
+    endProperties.setProperty("bound", "END");
+    anomalyResults.add(new AnomalyResult(true, monitoringTimestamps[anomalousInterval.lowerEndpoint()],
+        pValueThreshold, monitoringData[anomalousInterval.lowerEndpoint()], endProperties));
+
     return anomalyResults;
   }
 
@@ -262,7 +349,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
      * stl R library results. It would appear than setting these anywhere between [0.5, 1.0} produces similar results.
      */
     config.setLowPassFilterBandwidth(0.5);
-    config.setTrendComponentBandwidth(0.5);
+    config.setTrendComponentBandwidth(stlTrendBandwidth); // default is 0.5
 
     config.setPeriodic(true);
     STLDecomposition stl = new STLDecomposition(config);

@@ -3,10 +3,7 @@ package com.linkedin.thirdeye.anomaly.lib.util;
 import java.util.ArrayList;
 
 import org.apache.commons.math3.analysis.interpolation.LoessInterpolator;
-import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-
-import com.mysql.fabric.xmlrpc.base.Array;
 
 /**
  * Implementation of STL: A Seasonal-Trend Decomposition Procedure based on Loess.
@@ -36,7 +33,7 @@ public class STLDecomposition {
    *
    * <p>
    *   Also, the Java Loess implementation accepts "bandwidth", the fraction of source points closest
-   *   to the current point, as opposed to integral values. 
+   *   to the current point, as opposed to integral values.
    * </p>
    */
   public STLDecomposition(Config config) {

@@ -19,6 +19,8 @@ public class ThirdEyeRequestUtils {
 
   private static final Joiner COMMA = Joiner.on(",");
 
+  public static final String NULL_GROUP_BY = null;
+
   /**
    * @param collection
    * @param dimensions
@@ -48,7 +50,7 @@ public class ThirdEyeRequestUtils {
       .setEndTime(end)
       .setMetricFunction(buildMetricFunction(aggregationGranularity, metricNames));
 
-    if (groupByDimension != null) {
+    if (groupByDimension != NULL_GROUP_BY) {
       request.setGroupBy(groupByDimension);
     }
 

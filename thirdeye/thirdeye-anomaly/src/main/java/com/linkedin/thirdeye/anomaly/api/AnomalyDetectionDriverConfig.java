@@ -1,16 +1,15 @@
 package com.linkedin.thirdeye.anomaly.api;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
  * This class represents configurations specific to a collection. It is mapped in from the configuration file.
  */
 public class AnomalyDetectionDriverConfig {
-
-  /** The name of the collection */
-  private String collectionName;
 
   /**
    * Metric with which to estimate the contribution of a dimension key, and also to apply the threshold for
@@ -30,12 +29,22 @@ public class AnomalyDetectionDriverConfig {
    */
   private List<String> dimensionPrecedence;
 
-  /** Prune exploration based on feedback to reduce computation costs and raising redundant anomalies */
+  /**
+   * Prune exploration based on feedback to reduce computation costs and raising redundant anomalies.
+   * TODO: This field is ignored.
+   */
   private boolean pruneExplortaionUsingFeedback = false;
 
+  /** The amount of time the driver should use to make decisions regarding exploration. */
+  private TimeGranularity driverTimeWindow = new TimeGranularity(7, TimeUnit.DAYS);
+
   @JsonProperty
-  public String getCollectionName() {
-    return collectionName;
+  public String getContributionEstimateMetric() {
+    return contributionEstimateMetric;
+  }
+
+  public void setContributionEstimateMetric(String contributionEstimateMetric) {
+    this.contributionEstimateMetric = contributionEstimateMetric;
   }
 
   @JsonProperty
@@ -43,9 +52,8 @@ public class AnomalyDetectionDriverConfig {
     return contributionMinProportion;
   }
 
-  @JsonProperty
-  public String getContributionEstimateMetric() {
-    return contributionEstimateMetric;
+  public void setContributionMinProportion(double contributionMinProportion) {
+    this.contributionMinProportion = contributionMinProportion;
   }
 
   @JsonProperty
@@ -53,9 +61,8 @@ public class AnomalyDetectionDriverConfig {
     return maxExplorationDepth;
   }
 
-  @JsonProperty
-  public boolean isPruneExplortaionUsingFeedback() {
-    return pruneExplortaionUsingFeedback;
+  public void setMaxExplorationDepth(int maxExplorationDepth) {
+    this.maxExplorationDepth = maxExplorationDepth;
   }
 
   @JsonProperty
@@ -63,28 +70,27 @@ public class AnomalyDetectionDriverConfig {
     return dimensionPrecedence;
   }
 
-  public void setDimensionPrecedence(List<String> explorationPrecedence) {
-    this.dimensionPrecedence = explorationPrecedence;
+  public void setDimensionPrecedence(List<String> dimensionPrecedence) {
+    this.dimensionPrecedence = dimensionPrecedence;
   }
 
-  public void setCollectionName(String collectionName) {
-    this.collectionName = collectionName;
-  }
-
-  public void setContributionEstimateMetric(String contributionEstimateMetric) {
-    this.contributionEstimateMetric = contributionEstimateMetric;
-  }
-
-  public void setContributionMinProportion(double contributionMinProportion) {
-    this.contributionMinProportion = contributionMinProportion;
-  }
-
-  public void setMaxExplorationDepth(int maxExplorationDepth) {
-    this.maxExplorationDepth = maxExplorationDepth;
+  @JsonProperty
+  public boolean isPruneExplortaionUsingFeedback() {
+    return pruneExplortaionUsingFeedback;
   }
 
   public void setPruneExplortaionUsingFeedback(boolean pruneExplortaionUsingFeedback) {
     this.pruneExplortaionUsingFeedback = pruneExplortaionUsingFeedback;
   }
+
+  @JsonProperty
+  public TimeGranularity getDriverTimeWindow() {
+    return driverTimeWindow;
+  }
+
+  public void setDriverTimeWindow(TimeGranularity driverTimeWindow) {
+    this.driverTimeWindow = driverTimeWindow;
+  }
+
 
 }

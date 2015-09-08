@@ -2,8 +2,6 @@ package com.linkedin.thirdeye.anomaly.server.api;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
 import com.linkedin.thirdeye.anomaly.api.function.AnomalyResult;
 

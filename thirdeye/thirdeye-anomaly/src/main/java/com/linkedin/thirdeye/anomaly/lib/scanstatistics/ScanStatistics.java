@@ -1,9 +1,6 @@
 package com.linkedin.thirdeye.anomaly.lib.scanstatistics;
 
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.slf4j.Logger;
@@ -11,9 +8,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.anomaly.api.function.exception.FunctionDidNotEvaluateException;
-import com.linkedin.thirdeye.anomaly.lib.util.STLDecomposition;
-import com.linkedin.thirdeye.anomaly.lib.util.STLDecomposition.STLResult;
-import com.linkedin.thirdeye.anomaly.util.ResourceUtils;
 
 /**
  * Online scan statistics implementation.

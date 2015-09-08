@@ -170,10 +170,19 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
   /**
    * {@inheritDoc}
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getMinimumMonitoringIntervalTimeGranularity()
+   */
+  @Override
+  public TimeGranularity getMinimumMonitoringIntervalTimeGranularity() {
+    return null;
+  }
+
+  /**
+   * {@inheritDoc}
    * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.anomaly.api.function.DimensionKey, com.linkedin.thirdeye.anomaly.api.function.MetricTimeSeries, com.linkedin.thirdeye.anomaly.api.function.TimeRange, java.util.List)
    */
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange detectionInterval,
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange monitoringWindow,
       List<AnomalyResult> anomalyHistory) {
 
     long trainStartInput = Collections.min(series.getTimeWindowSet());
@@ -251,4 +260,5 @@ public class KalmanAnomalyDetectionFunction implements AnomalyDetectionFunction 
 
     return anomalyResults;
   }
+
 }
