@@ -15,62 +15,48 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
-import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import org.apache.commons.lang.StringUtils;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang.StringUtils;
-
-import com.google.common.base.Joiner;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
-
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
-
 
 /**
  * Configuration properties used in the creation of index segments.
- *
- *
  */
 public class SegmentGeneratorConfig {
 
-  private static String SEGMENT_INDEX_VERSION = "segment.index.version";
-  private static String SEGMENT_TIME_COLUMN_NAME = "segment.time.column.name";
-
-  private static String SEGMENT_START_TIME = "segment.start.time";
-  private static String SEGMENT_END_TIME = "segment.end.time";
-  private static String SEGMENT_TIME_UNIT = "segment.time.unit";
-  private static String SEGMENT_CREATION_TIME = "segment.creation.time";
-  private static final String DATA_INPUT_FORMAT = "data.input.format";
-  private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
-  private static final String INDEX_OUTPUT_DIR = "index.output.dir";
-  private static String DATA_SCHEMA_PROJECTED_COLUMN = "data.schema.projected.column";
-  private static String DATA_SCHEMA = "data.schema";
-  private static String DELIMETER = "delimeter";
-  private static String FIELD_TYPE = "field.type";
-  private static final String IS_SINGLE_VALUED_FIELD = "isSingleValued";
-  private static final String FIELD_DATA_TYPE = "dataType";
-  private static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
-  private static final String SEGMENT_NAME = "segment.name";
-
-  private static String COMMA = ",";
-  private static String DOT = ".";
-
-  private Map<String, Object> properties;
+  private Map<String, String> properties;
   private Schema schema;
   private RecordReaderConfig recordReaderConfig;
 
+  /**
+   * For inverted Index : default
+   */
   private boolean createInvertedIndex = false;
+  private List<String> invertedIndexCreationColumns = new ArrayList<String>();
+
+  private String segmentNamePostfix = null;
+  private String segmentName = null;
+  private String tableName = null;
+  private String segmentTimeColumnName = null;
+  private TimeUnit segmentTimeUnit = null;
+  private String indexOutputDir = null;
+  private SegmentVersion segmentVersion = SegmentVersion.v1;
+  private String segmentCreationTime = null;
+  private String segmentStartTime = null;
+  private String segmentEndTime = null;
+  private FileFormat inputFileFormat = FileFormat.AVRO;
+  private File inputDataFilePath = null;
 
   /*
    *
@@ -79,55 +65,81 @@ public class SegmentGeneratorConfig {
    * */
 
   public SegmentGeneratorConfig(Schema schema) {
-    properties = new HashMap<String, Object>();
+    properties = new HashMap<String, String>();
     this.schema = schema;
   }
 
   public void setSegmentNamePostfix(String prefix) {
-    properties.put(SEGMENT_NAME_POSTFIX, prefix);
+    segmentNamePostfix = prefix;
   }
 
   public String getSegmentNamePostfix() {
-    if (properties.containsKey(SEGMENT_NAME_POSTFIX)) {
-      return properties.get(SEGMENT_NAME_POSTFIX).toString();
+    return segmentNamePostfix;
+  }
+
+  /**
+   *
+   * inverted index creation by default is set to false,
+   * it can be turned on, on a per column basis
+   */
+
+  @Deprecated
+  private void setCreateInvertedIndex(boolean create) {
+    createInvertedIndex = create;
+  }
+
+  public boolean isCreateInvertedIndexEnabled() {
+    return createInvertedIndex;
+  }
+
+  public void createInvertedIndexForColumn(String column) {
+    if (createInvertedIndex == false) {
+      createInvertedIndex = true;
     }
-    return null;
+    invertedIndexCreationColumns.add(column);
   }
 
-  public void setCreateInvertedIndex(boolean create) {
-    this.createInvertedIndex = create;
+  public void createInvertedIndexForAllColumns() {
+    if (schema == null) {
+      throw new RuntimeException(
+          "schema cannot be null, make sure that schema is property set before calling this method");
+    }
+    createInvertedIndex = true;
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
+      invertedIndexCreationColumns.add(spec.getName());
+    }
   }
 
-  public boolean createInvertedIndexEnabled() {
-    return this.createInvertedIndex;
+  public List<String> getInvertedIndexCreationColumns() {
+    return invertedIndexCreationColumns;
   }
 
   public void setSegmentName(String segmentName) {
-    properties.put(SEGMENT_NAME, segmentName);
-  }
-
-  public boolean containsKey(String key) {
-    return properties.containsKey(key);
+    this.segmentName = segmentName;
   }
 
   public String getSegmentName() {
-    if (properties.containsKey(SEGMENT_NAME)) {
-      return properties.get(SEGMENT_NAME).toString();
-    } else {
-      return null;
-    }
+    return segmentName;
   }
 
-  public String getString(String key) {
+  public void setCustomProperty(String key, String value) {
+    properties.put(key, value);
+  }
+
+  public boolean containsCustomPropertyWithKey(String key) {
+    return properties.containsKey(key);
+  }
+
+  public String getCustomProperty(String key) {
     return properties.get(key).toString();
   }
 
   public void setTableName(String resourceName) {
-    properties.put(MetadataKeys.Segment.TABLE_NAME, resourceName);
+    tableName = resourceName;
   }
 
   public String getTableName() {
-    return properties.get(MetadataKeys.Segment.TABLE_NAME).toString();
+    return tableName;
   }
 
   public String getDimensions() {
@@ -139,23 +151,23 @@ public class SegmentGeneratorConfig {
   }
 
   public void setTimeColumnName(String name) {
-    properties.put(SEGMENT_TIME_COLUMN_NAME, name);
+    segmentTimeColumnName = name;
   }
 
   public String getTimeColumnName() {
-    if (properties.containsKey(SEGMENT_TIME_COLUMN_NAME)) {
-      return properties.get(SEGMENT_TIME_COLUMN_NAME).toString();
+    if (segmentTimeColumnName != null) {
+      return segmentTimeColumnName;
     }
     return getQualifyingDimensions(FieldType.TIME);
   }
 
   public void setTimeUnitForSegment(TimeUnit timeUnit) {
-    properties.put(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+    segmentTimeUnit = timeUnit;
   }
 
   public TimeUnit getTimeUnitForSegment() {
-    if (properties.containsKey(MetadataKeys.Segment.TIME_UNIT)) {
-      return TimeUtils.timeUnitFromString(properties.get(TIME_UNIT).toString());
+    if (segmentTimeUnit != null) {
+      return segmentTimeUnit;
     } else {
       if (schema.getTimeFieldSpec() != null) {
         if (schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {
@@ -169,19 +181,8 @@ public class SegmentGeneratorConfig {
     }
   }
 
-  public void setCustom(String key, String value) {
-    Joiner j = Joiner.on(",");
-    properties.put(j.join(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
-  }
-
   public Map<String, String> getAllCustomKeyValuePair() {
-    final Map<String, String> customConfigs = new HashMap<String, String>();
-    for (String key : properties.keySet()) {
-      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX)) {
-        customConfigs.put(key, properties.get(key).toString());
-      }
-    }
-    return customConfigs;
+    return properties;
   }
 
   public void setRecordeReaderConfig(RecordReaderConfig readerConfig) {
@@ -203,67 +204,73 @@ public class SegmentGeneratorConfig {
   }
 
   public void setIndexOutputDir(String dir) {
-    properties.put(INDEX_OUTPUT_DIR, dir);
+    if (new File(dir).exists()) {
+
+    }
+    indexOutputDir = dir;
   }
 
   public String getIndexOutputDir() {
-    return properties.get(INDEX_OUTPUT_DIR).toString();
+    return indexOutputDir;
   }
 
   public void setSegmentVersion(SegmentVersion segmentVersion) {
-    properties.put(SEGMENT_INDEX_VERSION, segmentVersion.toString());
+    this.segmentVersion = segmentVersion;
   }
 
   public SegmentVersion getSegmentVersion() {
-    return SegmentVersion.valueOf(properties.get(SEGMENT_INDEX_VERSION).toString());
+    return segmentVersion;
   }
 
   public void setCreationTime(String creationTime) {
-    properties.put(SEGMENT_CREATION_TIME, creationTime);
+    segmentCreationTime = creationTime;
   }
 
   public String getCreationTime() {
-    return properties.get(SEGMENT_CREATION_TIME).toString();
+    return segmentCreationTime;
   }
 
   public void setStartTime(String startTime) {
-    properties.put(SEGMENT_START_TIME, startTime);
+    segmentStartTime = startTime;
   }
 
   public String getStartTime() {
-    return properties.get(SEGMENT_START_TIME).toString();
+    return segmentStartTime;
   }
 
   public void setEndTime(String endTime) {
-    properties.put(SEGMENT_END_TIME, endTime);
+    segmentEndTime = endTime;
   }
 
   public String getEndTime() {
-    return properties.get(SEGMENT_END_TIME).toString();
+    return segmentEndTime;
   }
 
   public void setTimeUnit(String timeUnit) {
-    properties.put(SEGMENT_TIME_UNIT, timeUnit);
+    segmentTimeUnit = TimeUnit.valueOf(timeUnit);
   }
 
   public String getTimeUnit() {
-    return properties.get(SEGMENT_TIME_UNIT).toString();
+    return segmentTimeUnit.toString();
   }
 
   public FileFormat getInputFileFormat() {
-    return FileFormat.valueOf(properties.get(DATA_INPUT_FORMAT).toString());
+    return inputFileFormat;
   }
 
   public void setInputFileFormat(FileFormat format) {
-    properties.put(DATA_INPUT_FORMAT, format.toString());
+    inputFileFormat = format;
   }
 
   public String getInputFilePath() {
-    return properties.get(DATA_INPUT_FILE_PATH).toString();
+    return inputDataFilePath.getAbsolutePath();
   }
 
   public void setInputFilePath(String path) {
-    properties.put(DATA_INPUT_FILE_PATH, path);
+    inputDataFilePath = new File(path);
+    if (!inputDataFilePath.exists()) {
+      throw new RuntimeException("input path needs to exist");
+    }
   }
 
   public List<String> getProjectedColumns() {
@@ -277,5 +284,4 @@ public class SegmentGeneratorConfig {
   public Schema getSchema() {
     return schema;
   }
-
 }

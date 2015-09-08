@@ -226,7 +226,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
                 indexCreationInfo.hasNulls()));
       }
 
-      if (config.createInvertedIndexEnabled()) {
+      if (config.isCreateInvertedIndexEnabled()) {
         invertedIndexCreatorMap.put(
             column,
             new BitmapInvertedIndexCreator(outDir, uniqueValueCount, schema.getFieldSpecFor(column)));
@@ -265,13 +265,13 @@ public class StarTreeSegmentCreator implements SegmentCreator {
           if (schema.getFieldSpecFor(column).isSingleValueField()) {
             int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
             ((SingleValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(nextMatchingDocumentId, dictionaryIndex);
-            if (config.createInvertedIndexEnabled()) {
+            if (config.isCreateInvertedIndexEnabled()) {
               invertedIndexCreatorMap.get(column).add(nextMatchingDocumentId, (Object) dictionaryIndex);
             }
           } else {
             int[] dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
             ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(nextMatchingDocumentId, dictionaryIndex);
-            if (config.createInvertedIndexEnabled()) {
+            if (config.isCreateInvertedIndexEnabled()) {
               invertedIndexCreatorMap.get(column).add(nextMatchingDocumentId, dictionaryIndex);
             }
           }
@@ -341,7 +341,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
                 .index(currentAggregateDocumentId, (int[]) dictionaryIndex);
           }
 
-          if (config.createInvertedIndexEnabled()) {
+          if (config.isCreateInvertedIndexEnabled()) {
             aggregateInvertedIndexCreatorMap.get(column).add(currentAggregateDocumentId, dictionaryIndex);
           }
         }
@@ -353,7 +353,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
 
     for (final String column : forwardIndexCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).close();
-      if (config.createInvertedIndexEnabled()) {
+      if (config.isCreateInvertedIndexEnabled()) {
         invertedIndexCreatorMap.get(column).seal();
       }
       dictionaryCreatorMap.get(column).close();
@@ -361,7 +361,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
 
     for (final String column : aggregateForwardIndexCreatorMap.keySet()) {
       aggregateForwardIndexCreatorMap.get(column).close();
-      if (config.createInvertedIndexEnabled()) {
+      if (config.isCreateInvertedIndexEnabled()) {
         aggregateInvertedIndexCreatorMap.get(column).seal();
       }
     }
@@ -575,13 +575,13 @@ public class StarTreeSegmentCreator implements SegmentCreator {
       properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
     }
 
-    if (config.containsKey(SEGMENT_START_TIME)) {
+    if (config.containsCustomPropertyWithKey(SEGMENT_START_TIME)) {
       properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
     }
-    if (config.containsKey(SEGMENT_END_TIME)) {
+    if (config.containsCustomPropertyWithKey(SEGMENT_END_TIME)) {
       properties.setProperty(SEGMENT_END_TIME, config.getStartTime());
     }
-    if (config.containsKey(TIME_UNIT)) {
+    if (config.containsCustomPropertyWithKey(TIME_UNIT)) {
       properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
     }
 

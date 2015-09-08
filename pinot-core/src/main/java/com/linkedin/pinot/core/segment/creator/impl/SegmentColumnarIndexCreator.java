@@ -143,13 +143,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 uniqueValueCount, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
                 indexCreationInfo.hasNulls()));
       }
+    }
 
-      if (config.createInvertedIndexEnabled()) {
-        invertedIndexCreatorMap.put(
-            column,
-            new BitmapInvertedIndexCreator(file, uniqueValueCount, schema
-                .getFieldSpecFor(column)));
-      }
+    for (String column : config.getInvertedIndexCreationColumns()) {
+      ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
+      int uniqueValueCount = indexCreationInfo.getDistinctValueCount();
+      invertedIndexCreatorMap.put(
+          column,
+          new BitmapInvertedIndexCreator(file, uniqueValueCount, schema
+              .getFieldSpecFor(column)));
     }
   }
 
@@ -161,9 +163,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
         int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
         ((SingleValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
+
+        // TODO : {refactor inverted index addition}
+        if (invertedIndexCreatorMap.containsKey(column)) {
+          invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+        }
       } else {
         int[] dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
         ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
+
+        // TODO : {refactor inverted index addition}
+        if (invertedIndexCreatorMap.containsKey(column)) {
+          invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+        }
       }
     }
     docIdCounter++;
@@ -178,7 +190,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void seal() throws ConfigurationException, IOException {
     for (final String column : forwardIndexCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).close();
-      if (config.createInvertedIndexEnabled()) {
+      if (config.isCreateInvertedIndexEnabled()) {
         invertedIndexCreatorMap.get(column).seal();
       }
       dictionaryCreatorMap.get(column).close();
@@ -205,13 +217,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
     }
 
-    if (config.containsKey(SEGMENT_START_TIME)) {
+    if (config.containsCustomPropertyWithKey(SEGMENT_START_TIME)) {
       properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
     }
-    if (config.containsKey(SEGMENT_END_TIME)) {
+    if (config.containsCustomPropertyWithKey(SEGMENT_END_TIME)) {
       properties.setProperty(SEGMENT_END_TIME, config.getEndTime());
     }
-    if (config.containsKey(TIME_UNIT)) {
+    if (config.containsCustomPropertyWithKey(TIME_UNIT)) {
       properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
     }
 
