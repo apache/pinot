@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
@@ -121,7 +122,10 @@ public class ThirdEyeAnomalyDetectionSetup {
     if (promptForYN("Create the function table?", userInput)) {
       String sql = String.format(ResourceUtils.getResourceAsString("database/rulebased/create-rule-table.sql"),
           config.getAnomalyDatabaseConfig().getFunctionTableName());
-      if (!config.getAnomalyDatabaseConfig().runSQL(sql)) {
+      try {
+        config.getAnomalyDatabaseConfig().runSQL(sql);
+      } catch (SQLException e) {
+        e.printStackTrace();
         if (!promptForYN("An error occured, do you wish to continue?", userInput)) {
           System.err.println("Abort...");
           System.exit(1);
@@ -149,7 +153,10 @@ public class ThirdEyeAnomalyDetectionSetup {
     if (promptForYN("Create the function table?", userInput)) {
       String sql = String.format(ResourceUtils.getResourceAsString("database/generic/create-function-table.sql"),
           config.getAnomalyDatabaseConfig().getFunctionTableName());
-      if (!config.getAnomalyDatabaseConfig().runSQL(sql)) {
+      try {
+        config.getAnomalyDatabaseConfig().runSQL(sql);
+      } catch (SQLException e) {
+        e.printStackTrace();
         if (!promptForYN("An error occured, do you wish to continue?", userInput)) {
           System.err.println("Abort...");
           System.exit(1);
@@ -175,7 +182,11 @@ public class ThirdEyeAnomalyDetectionSetup {
             config.getCollectionName(),
             metric.trim());
         System.out.println(sql);
-        config.getAnomalyDatabaseConfig().runSQL(sql);
+        try {
+          config.getAnomalyDatabaseConfig().runSQL(sql);
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
       }
     }
 
@@ -192,7 +203,11 @@ public class ThirdEyeAnomalyDetectionSetup {
             metric.trim(),
             "UP");
         System.out.println(sqlUp);
-        config.getAnomalyDatabaseConfig().runSQL(sqlUp);
+        try {
+          config.getAnomalyDatabaseConfig().runSQL(sqlUp);
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
 
         String sqlDown = String.format(ResourceUtils.getResourceAsString(
             "database/generic/insert-scan-statistics-default.sql"),
@@ -202,7 +217,11 @@ public class ThirdEyeAnomalyDetectionSetup {
             metric.trim(),
             "DOWN");
         System.out.println(sqlDown);
-        config.getAnomalyDatabaseConfig().runSQL(sqlDown);
+        try {
+          config.getAnomalyDatabaseConfig().runSQL(sqlDown);
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
       }
     }
   }

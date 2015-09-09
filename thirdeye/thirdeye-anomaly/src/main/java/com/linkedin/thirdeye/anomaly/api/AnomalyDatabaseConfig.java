@@ -161,20 +161,17 @@ public class AnomalyDatabaseConfig {
    * Executes the sql for convenience when no result set is needed.
    * @param sql
    *  Sql to execute.
-   * @return
-   *  Whether the sql executed successfully without exception.
+   * @throws SQLException
    */
-  public boolean runSQL(String sql) {
+  public void runSQL(String sql) throws SQLException {
     Connection conn = null;
     Statement stmt = null;
-    boolean success = false;
     try {
       conn = getConnection();
       stmt = conn.createStatement();
       stmt.execute(sql);
-      success = true;
     } catch (SQLException e) {
-      e.printStackTrace();
+      throw e;
     } finally {
       try {
         if (conn != null) {
@@ -187,7 +184,6 @@ public class AnomalyDatabaseConfig {
         e.printStackTrace();
       }
     }
-    return success;
   }
 
 }

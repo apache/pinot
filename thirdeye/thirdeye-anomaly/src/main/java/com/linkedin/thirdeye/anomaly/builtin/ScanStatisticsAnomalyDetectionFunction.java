@@ -41,7 +41,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private static final String PROP_DEFAULT_MIN_WINDOW_LEN = "1";
   private static final String PROP_DEFAULT_NUM_SIMULATIONS = "1000";
   private static final String PROP_DEFAULT_MIN_INCREMENT = "1";
-  private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + Integer.MAX_VALUE;
+  private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + TimeUnit.DAYS.toHours(7);
   private static final String PROP_DEFAULT_BOOTSTRAP = "true";
   private static final String PROP_DEFAULT_STL_TREND_BANDWIDTH = "0.5";
 
@@ -184,7 +184,6 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     removeMissingValuesByAveragingNeighbors(observations);
 
     // call stl library
-
     double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal);
 
     int effectiveMaxWindowLength = (int) (monitoringWindow.totalBuckets() / bucketMillis);
@@ -213,9 +212,12 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     // partition the data into train and monitoring
     double[] trainingData = Arrays.copyOfRange(observationsMinusSeasonality, 0, numTrain);
     long[] trainingTimestamps = Arrays.copyOfRange(timestamps, 0, numTrain);
+
     double[] trainingDataWithOutAnomalies = removeAnomalies(trainingTimestamps, trainingData, anomalousTimestamps);
+
     double[] monitoringData = Arrays.copyOfRange(observationsMinusSeasonality, numTrain,
         observationsMinusSeasonality.length);
+    double[] monitoringDataOrig = Arrays.copyOfRange(observations, numTrain, observations.length);
     long[] monitoringTimestamps = Arrays.copyOfRange(timestamps, numTrain, observationsMinusSeasonality.length);
 
     // get anomalous interval if any
@@ -230,9 +232,9 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
     if (anomalousInterval != null) {
       if (onlyAlertBoundaries) {
-        anomalyResults = getAnomalyResultsForBoundsOnly(monitoringData, monitoringTimestamps, anomalousInterval);
+        anomalyResults = getAnomalyResultsForBoundsOnly(monitoringDataOrig, monitoringTimestamps, anomalousInterval);
       } else {
-        anomalyResults = getAnomalyResultsForAllPointsInInterval(monitoringData, monitoringTimestamps,
+        anomalyResults = getAnomalyResultsForAllPointsInInterval(monitoringDataOrig, monitoringTimestamps,
             anomalousInterval);
       }
     }

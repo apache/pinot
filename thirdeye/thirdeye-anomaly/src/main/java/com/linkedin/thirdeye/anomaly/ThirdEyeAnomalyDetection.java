@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -145,6 +146,7 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
         config.getThirdEyeServerPort(), config.getCollectionName());
 
+    // explore the cube
     List<DimensionKeySeries> dimensionsToEvaluate = new AnomalyDetectionDriver(
         driverConfig, starTreeConfig, timeRange, thirdEyeClient).call();
 
@@ -213,7 +215,7 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
         .argName("start end")
         .longOpt(OPT_TIME_RANGE)
         .desc("Run anomaly detection on this time range in milliseconds. If detection interval is also specified, "
-            + "the application will run in simulated streaming mode.")
+            + "the application will run in simulated online mode.")
         .hasArgs().numberOfArgs(2).build());
     options.addOption(Option.builder("d")
         .argName("size-unit")
@@ -223,7 +225,7 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     options.addOption(Option.builder("p")
         .argName("minutes")
         .longOpt(OPT_POLLING_INTERVAL)
-        .desc("The frequency that thirdeye-anomaly should poll thirdeye-server for new segments.")
+        .desc("The frequency that thirdeye-anomaly should poll thirdeye-server for new segments. default: 5")
         .hasArg().build());
     options.addOption(Option.builder("s")
         .argName("server-config.yml")
@@ -233,14 +235,14 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     options.addOption("h", OPT_HELP, false, "");
 
     CommandLineParser parser = new DefaultParser();
-    CommandLine cmd = parser.parse(options, args);
+    final CommandLine cmd = parser.parse(options, args);
 
     /*
      * Help information
      */
     if (cmd.hasOption(OPT_HELP)) {
       HelpFormatter formatter = new HelpFormatter();
-      formatter.printHelp("java -jar <this_jar> [OPTIONS] <your_config>.yml", options);
+      formatter.printHelp("java -jar <this_jar> [OPTIONS] <config_1>.yml <config_2>.yml ...", options);
       return;
     }
 
@@ -253,48 +255,63 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     }
 
     /*
-     * For options below, a config file must be given
+     * For options below, at least one config file must be given
      */
+    ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+    List<ThirdEyeAnomalyDetectionConfiguration> configs = new LinkedList<ThirdEyeAnomalyDetectionConfiguration>();
+
     args = cmd.getArgs();
     if (args.length == 0) {
-      System.err.println("A anomaly-config.yml file is required. To create one, run with --setup.");
+      System.err.println("An anomaly-config.yml file is required. To create one, run with --setup.");
       return;
+    } else {
+      for (String fileName : args) {
+        configs.add(mapper.readValue(new File(fileName), ThirdEyeAnomalyDetectionConfiguration.class));
+      }
     }
-
-    ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-    ThirdEyeAnomalyDetectionConfiguration config = mapper.readValue(new File(args[0]),
-        ThirdEyeAnomalyDetectionConfiguration.class);
 
     /*
      * Run a server connecting to the database in the config to manage functions
      */
     if (cmd.hasOption(OPT_SERVER)) {
-      new AnomalyManagementServer(config).run(new String[]{"server", cmd.getOptionValue(OPT_SERVER)});
+      new AnomalyManagementServer(configs).run(new String[]{"server", cmd.getOptionValue(OPT_SERVER)});
       return;
     }
 
-    // get detection interval
-    String[] detectionIntervalArgs = cmd.getOptionValue(OPT_DETECTION_INTERVAL, "1-HOURS").split("-");
-    TimeGranularity detectionInterval = new TimeGranularity(Integer.valueOf(detectionIntervalArgs[0]),
-        TimeUnit.valueOf(detectionIntervalArgs[1]));
+    for (final ThirdEyeAnomalyDetectionConfiguration config : configs)
+    {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          // get detection interval
+          String[] detectionIntervalArgs = cmd.getOptionValue(OPT_DETECTION_INTERVAL, "1-HOURS").split("-");
+          TimeGranularity detectionInterval = new TimeGranularity(Integer.valueOf(detectionIntervalArgs[0]),
+              TimeUnit.valueOf(detectionIntervalArgs[1]));
 
-    /*
-     * Run anomaly detection
-     */
-    if (cmd.hasOption(OPT_TIME_RANGE)) {
-      // run with fixed time range
-      String[] timeRangeArgs = cmd.getOptionValues(OPT_TIME_RANGE);
-      TimeRange timeRange = new TimeRange(Long.valueOf(timeRangeArgs[0]), Long.valueOf(timeRangeArgs[1]));
-      if (cmd.hasOption(OPT_DETECTION_INTERVAL)) {
-        runWithOnlineSimulation(config, timeRange, detectionInterval);
-      } else {
-        runWithExplicitTimeRange(config, timeRange);
-      }
-    } else {
-      // get polling delay
-      long pollingMillis = TimeUnit.MINUTES.toMillis(Integer.valueOf(cmd.getOptionValue(OPT_POLLING_INTERVAL, "5")));
-
-      runWithPolling(config, detectionInterval, pollingMillis);
+          /*
+           * Run anomaly detection
+           */
+          if (cmd.hasOption(OPT_TIME_RANGE)) {
+            // run with fixed time range
+            String[] timeRangeArgs = cmd.getOptionValues(OPT_TIME_RANGE);
+            TimeRange timeRange = new TimeRange(Long.valueOf(timeRangeArgs[0]), Long.valueOf(timeRangeArgs[1]));
+            if (cmd.hasOption(OPT_DETECTION_INTERVAL)) {
+              runWithOnlineSimulation(config, timeRange, detectionInterval);
+            } else {
+              runWithExplicitTimeRange(config, timeRange);
+            }
+          } else {
+            // get polling delay
+            long pollingMillis = TimeUnit.MINUTES.toMillis(
+                Integer.valueOf(cmd.getOptionValue(OPT_POLLING_INTERVAL, "5")));
+            try {
+              runWithPolling(config, detectionInterval, pollingMillis);
+            } catch (Exception e) {
+              LOGGER.error("problem polling", e);
+            }
+          }
+        }
+      }).start();
     }
   }
 
@@ -314,36 +331,41 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
 
     while (true)
     {
-      latestTimeDataAvailable = ThirdEyeServerUtils.getLatestTime(config.getThirdEyeServerHost(),
-          config.getThirdEyeServerPort(), config.getCollectionName());
+      try {
+        latestTimeDataAvailable = ThirdEyeServerUtils.getLatestTime(config.getThirdEyeServerHost(),
+            config.getThirdEyeServerPort(), config.getCollectionName());
 
-      long nextTime = prevTime;
-      while (nextTime + detectionIntervalInMillis <= latestTimeDataAvailable) {
-        nextTime += detectionIntervalInMillis;
-      }
+        long nextTime = prevTime;
+        while (nextTime + detectionIntervalInMillis <= latestTimeDataAvailable) {
+          nextTime += detectionIntervalInMillis;
+        }
 
-      if (nextTime != prevTime) {;
-        LOGGER.info("begin processing for {} to {}", prevTime, nextTime);
-        final TimeRange taskTimeRange = new TimeRange(prevTime, nextTime);
+        if (nextTime != prevTime) {;
+          LOGGER.info("begin processing for {} to {}", prevTime, nextTime);
+          final TimeRange taskTimeRange = new TimeRange(prevTime, nextTime);
 
-        new Thread(new Runnable() {
-          @Override
-          public void run() {
-            try {
-              new ThirdEyeAnomalyDetection(config, taskTimeRange).call();
-            } catch (Exception e) {
-              LOGGER.error("uncaught exception", e);
+          new Thread(new Runnable() {
+            @Override
+            public void run() {
+              try {
+                new ThirdEyeAnomalyDetection(config, taskTimeRange).call();
+              } catch (Exception e) {
+                LOGGER.error("uncaught exception", e);
+              }
             }
-          }
-        }).start();
+          }).start();
 
-        prevTime = nextTime;
-      } else {
-        LOGGER.info("no new data available, polling again at {} for {}",
-            DateTime.now().plusMillis((int) pollingMillis), new DateTime(prevTime + detectionIntervalInMillis));
+          prevTime = nextTime;
+        } else {
+          LOGGER.info("no new data available, polling again at {} for {}",
+              DateTime.now().plusMillis((int) pollingMillis), new DateTime(prevTime + detectionIntervalInMillis));
+        }
+
+      } catch (IOException e) {
+        LOGGER.error("error in polling", e);
+      } finally {
+        Thread.sleep(pollingMillis);
       }
-
-      Thread.sleep(pollingMillis);
     }
 
   }
@@ -375,15 +397,18 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
     long startTimeWindow = applicationRunTimeWindow.getStart();
     long endTimeWindow = applicationRunTimeWindow.getEnd();
 
+    long detectionTimeWindowMillis = TimeGranularityUtils.toMillis(detectionInterval);
+
     long currTimeWindow = startTimeWindow;
     while (currTimeWindow < endTimeWindow) {
       LOGGER.info("begin processing for {} to {}", startTimeWindow, endTimeWindow);
       try {
-        new ThirdEyeAnomalyDetection(config, new TimeRange(currTimeWindow, endTimeWindow)).call();
+        new ThirdEyeAnomalyDetection(config,
+            new TimeRange(currTimeWindow, currTimeWindow + detectionTimeWindowMillis)).call();
       } catch (Exception e) {
         LOGGER.error("uncaught exception", e);
       }
-      currTimeWindow += TimeGranularityUtils.toMillis(detectionInterval);
+      currTimeWindow += detectionTimeWindowMillis;
     }
   }
 

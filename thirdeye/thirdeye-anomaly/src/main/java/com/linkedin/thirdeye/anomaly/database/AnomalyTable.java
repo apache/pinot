@@ -180,7 +180,11 @@ public class AnomalyTable {
    * @throws SQLException
    */
   public static void createTable(AnomalyDatabaseConfig dbConfig) throws IOException {
-    dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName()));
+    try {
+      dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName()));
+    } catch (SQLException e) {
+      // TODO Auto-generated catch block
+    }
   }
 
   /**

@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.server;
 
+import java.util.List;
+
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -13,10 +15,10 @@ import com.linkedin.thirdeye.anomaly.server.resources.FunctionTableResource;
  */
 public class AnomalyManagementServer extends Application<AnomalyManagementServerConfiguration> {
 
-  private final ThirdEyeAnomalyDetectionConfiguration anomalyDetectionConfig;
+  private final List<ThirdEyeAnomalyDetectionConfiguration> anomalyDetectionConfigs;
 
-  public AnomalyManagementServer(ThirdEyeAnomalyDetectionConfiguration anomalyDetectionConfig) {
-    this.anomalyDetectionConfig = anomalyDetectionConfig;
+  public AnomalyManagementServer(List<ThirdEyeAnomalyDetectionConfiguration> anomalyDetectionConfigs) {
+    this.anomalyDetectionConfigs = anomalyDetectionConfigs;
   }
 
   @Override
@@ -26,7 +28,7 @@ public class AnomalyManagementServer extends Application<AnomalyManagementServer
 
   @Override
   public void run(AnomalyManagementServerConfiguration config, Environment environment) throws Exception {
-    environment.jersey().register(new FunctionTableResource(anomalyDetectionConfig));
+    environment.jersey().register(new FunctionTableResource(anomalyDetectionConfigs));
   }
 
 }

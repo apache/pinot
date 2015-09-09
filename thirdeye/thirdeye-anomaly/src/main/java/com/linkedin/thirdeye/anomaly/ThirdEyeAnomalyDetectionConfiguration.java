@@ -8,7 +8,15 @@ import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
- * This class is configuration for thirdeye-anomaly detection and not for the management server.
+ * This class is configuration for thirdeye-anomaly detection.
+ *
+ * The purpose of this configuration is to:
+ *  - configure a single round of anomaly detection
+ *  - be generic to online and ad-hoc runs of anomaly detection
+ *
+ * This config does not handle:
+ *  - scheduling (detection interval)
+ *  - polling (how often to poll thirdeye-server)
  */
 public class ThirdEyeAnomalyDetectionConfiguration {
 

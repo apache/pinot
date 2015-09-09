@@ -19,10 +19,10 @@ th, td {
   <b>Table:</b> ${functionTable} <br>
   <b>Collection:</b> ${collection} <br>
   <br>
-    <a href="/functions/add">Add a new function.</a>
+    <a href="/${collection}/functions/add">Add a new function.</a>
   <br>
   <br>
-    <a href="/functions?hideInactive=true">Hide inactive.</a>
+    <a href="/${collection}/functions?hideInactive=true">Hide inactive.</a>
   <br>
   <br>
 </center>
@@ -45,12 +45,12 @@ th, td {
     <tr>
       <td>
         <#if (row.active)>
-          <a href="/functions/deactivate/${row.functionId}">deactivate</a>
+          <a href="/${collection}/functions/${row.functionId}?activate=false">deactivate</a>
         <#else>
-          <a href="/functions/activate/${row.functionId}">activate</a>
+          <a href="/${collection}/functions/${row.functionId}?activate=true">activate</a>
         </#if>
         <br>
-        <a href="/functions/execute/${row.functionId}">execute</a>
+        <a href="/${collection}/functions/execute/${row.functionId}">execute</a>
       </td>
       <td>${row.functionId}</td>
       <td>${row.functionName}</td>
@@ -63,7 +63,7 @@ th, td {
       <td>${row.cronDefinition!""}</td>
       <td>
         <#if row.deltaTableName??>
-          <a href="/rulebased/deltatable/${row.deltaTableName}">${row.deltaTableName}</a>
+          <a href="/${collection}/rulebased/deltatable/${row.deltaTableName}">${row.deltaTableName}</a>
         <#else>
           N/A
         </#if>

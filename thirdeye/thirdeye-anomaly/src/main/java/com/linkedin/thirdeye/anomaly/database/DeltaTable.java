@@ -59,7 +59,11 @@ public class DeltaTable {
 
     String sql = sb.toString();
     LOGGER.info("creating delta table if not exists - {}", deltaTableName);
-    dbConfig.runSQL(sql);
+    try {
+      dbConfig.runSQL(sql);
+    } catch (SQLException e) {
+      // TODO Auto-generated catch block
+    }
   }
 
   /**
