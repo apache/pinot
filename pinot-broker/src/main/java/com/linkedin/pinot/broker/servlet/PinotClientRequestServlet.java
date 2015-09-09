@@ -112,11 +112,11 @@ public class PinotClientRequestServlet extends HttpServlet {
     final long startTime = System.nanoTime();
     final BrokerRequest brokerRequest;
     try {
-      if (request.has("dialect") && "pql2".equals(request.getString("dialect"))) {
-        brokerRequest = pql2Compiler.compileToBrokerRequest(pql);
-      } else {
+      if (request.has("dialect") && "bql".equals(request.getString("dialect"))) {
         final JSONObject compiled = requestCompiler.compile(pql);
         brokerRequest = convertToBrokerRequest(compiled);
+      } else {
+        brokerRequest = pql2Compiler.compileToBrokerRequest(pql);
       }
       if (isTraceEnabled) brokerRequest.setEnableTrace(true);
     } catch (Exception e) {

@@ -64,6 +64,8 @@ public abstract class ControllerTest {
 
     if (usePql2Compiler) {
       json.put("dialect", "pql2");
+    } else {
+      json.put("dialect", "bql");
     }
 
     final long start = System.currentTimeMillis();
@@ -96,7 +98,7 @@ public abstract class ControllerTest {
   }
 
   public JSONObject postQuery(String query) throws Exception {
-    return postQuery(query, BROKER_BASE_API_URL, false);
+    return postQuery(query, BROKER_BASE_API_URL, true);
   }
 
   protected void startZk() {
