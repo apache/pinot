@@ -97,15 +97,6 @@ public class DefaultReduceService implements ReduceService {
     return brokerResponse;
   }
 
-  /**
-   * @param brokerTraceInfo
-   * @param serverInstance
-   * @param traceInfoToAdd
-   */
-  private void reduceOnTraceInfos(Map<String, String> brokerTraceInfo, ServerInstance serverInstance, String traceInfoToAdd) {
-    brokerTraceInfo.put(serverInstance.getHostname(), traceInfoToAdd);
-  }
-
   private void reduceOnSegmentStatistics(List<ResponseStatistics> brokerSegmentStatistics,
       ServerInstance serverInstance, List<ResponseStatistics> segmentStatisticsToAdd) {
     brokerSegmentStatistics.addAll(segmentStatisticsToAdd);
@@ -128,6 +119,13 @@ public class DefaultReduceService implements ReduceService {
       if (instanceResponse == null) {
         continue;
       }
+
+      // reduceOnTraceInfo (put it here so that trace info can show up even exception happens)
+      if (brokerRequest.isEnableTrace() && instanceResponse.getMetadata() != null) {
+        brokerResponse.getTraceInfo().put(serverInstance.getHostname(),
+                instanceResponse.getMetadata().get("traceInfo"));
+      }
+
       if (instanceResponse.getDataSchema() == null && instanceResponse.getMetadata() != null) {
         for (String key : instanceResponse.getMetadata().keySet()) {
           if (key.startsWith("Exception")) {
@@ -149,12 +147,6 @@ public class DefaultReduceService implements ReduceService {
               + Long.parseLong(instanceResponse.getMetadata().get(TOTAL_DOCS)));
       if (Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)) > brokerResponse.getTimeUsedMs()) {
         brokerResponse.setTimeUsedMs(Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)));
-      }
-      // debug mode enable : reduceOnTraceInfo
-      if (brokerRequest.isEnableTrace()) {
-        reduceOnTraceInfos(brokerResponse.getTraceInfo(),
-                serverInstance,
-                instanceResponse.getMetadata().get("traceInfo"));
       }
     }
     try {

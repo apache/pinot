@@ -146,11 +146,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.error(e.getMessage(), e);
       instanceResponse = new DataTable();
       instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      TraceContext.log("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
       long end = System.currentTimeMillis();
       LOGGER.info("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(), (end - start));
       LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), instanceResponse.toString());
       instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
+      instanceResponse.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return instanceResponse;
     } finally {
       if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
