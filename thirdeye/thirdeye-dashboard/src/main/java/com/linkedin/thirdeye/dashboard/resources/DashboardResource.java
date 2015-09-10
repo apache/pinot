@@ -107,7 +107,11 @@ public class DashboardResource {
       customDashboardNames = customDashboardResource.getCustomDashboardNames(collection);
     }
 
-    return new DashboardStartView(collection, schema, earliestDataTime, latestDataTime, customDashboardNames, funnelResource.getFunnelNamesFor(collection));
+    List<String> funnelNames = Collections.emptyList();
+    if(funnelResource !=null) { 
+      funnelNames = funnelResource.getFunnelNamesFor(collection);
+    }
+    return new DashboardStartView(collection, schema, earliestDataTime, latestDataTime, customDashboardNames, funnelNames);
   }
 
   @GET
@@ -215,15 +219,18 @@ public class DashboardResource {
     }
 
     // lets find if there are any funnels
-    List<FunnelHeatMapView> funnels = null;
-
+    List<FunnelHeatMapView> funnels = Collections.emptyList();
+    List<String> funnelNames = Collections.emptyList();
+    
     String selectedFunnels = uriInfo.getQueryParameters().getFirst("funnels");
-
-    if (selectedFunnels.length() > 0) {
+    
+    
+    if (funnelResource !=null && selectedFunnels !=null && selectedFunnels.length() > 0) {
       MultivaluedMap<String, String> filterMap = uriInfo.getQueryParameters();
       filterMap.remove("funnels");
       DateTime current = new DateTime(currentMillis);
       funnels = funnelResource.computeFunnelViews(collection, selectedFunnels, current, filterMap);
+      funnelNames = funnelResource.getFunnelNamesFor(collection);
     }
 
     try {
@@ -232,6 +239,7 @@ public class DashboardResource {
 
       View dimensionView = getDimensionView(
           collection, metricFunction, dimensionViewType, baselineMillis, currentMillis, uriInfo);
+
 
       return new DashboardView(
           collection,
@@ -244,7 +252,7 @@ public class DashboardResource {
           latestDataTime,
           customDashboardNames,
           feedbackEmailAddress,
-          funnelResource.getFunnelNamesFor(collection),
+          funnelNames,
           funnels);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {

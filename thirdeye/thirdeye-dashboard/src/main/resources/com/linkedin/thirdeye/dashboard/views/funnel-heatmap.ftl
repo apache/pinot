@@ -1,4 +1,5 @@
 
+<#if (funnelViews?size > 0)>
 <div id="collapser"><h2 style="color:#069;cursor:pointer">(-) Funnel(s)</h2></div>
 <div id="custom-funnels-container">
     <#list funnelViews as funnel>
@@ -64,3 +65,4 @@
         });
     });
     </script>
+</#if>    
