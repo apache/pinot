@@ -18,7 +18,9 @@ public class UriUtils {
             Response.Status.BAD_REQUEST);
       }
 
-      dimensionValues.put(entry.getKey(), entry.getValue().get(0));
+      if (!entry.getKey().equals("funnels")) {
+        dimensionValues.put(entry.getKey(), entry.getValue().get(0));
+      }
     }
 
     return dimensionValues;

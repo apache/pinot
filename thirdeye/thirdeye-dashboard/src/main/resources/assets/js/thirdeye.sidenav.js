@@ -1,6 +1,25 @@
 $(document).ready(function() {
     var path = parsePath(window.location.pathname)
 
+    var queryParams = getQueryParamValue(window.location.search);
+    console.log(queryParams);
+
+    if (queryParams.funnels) {
+        $(".sidenav-funnel").each(function(i, cell) {
+            var cellObj = $(cell);
+            var funnelName = cellObj.attr('value');
+            if (queryParams.funnels.indexOf(funnelName) >= 0) {
+                cellObj.prop( "checked", true );
+            }
+        });
+    } else {
+        $(".sidenav-funnel").each(function(i, cell) {
+            var cellObj = $(cell);
+            var funnelName = cellObj.attr('value');
+            cellObj.prop( "checked", true );
+        });
+    }
+
     // Derived metrics
     var addDerivedMetric = function(event) {
         if (event) {
@@ -216,7 +235,7 @@ $(document).ready(function() {
             if (checkboxObj.is(':checked')) {
                 metrics.push("'" + checkboxObj.val() + "'")
             }
-        })
+        });
 
         // Derived metric(s)
         $("#sidenav-derived-metrics-list").find(".uk-form-row").each(function(i, row) {
@@ -226,7 +245,16 @@ $(document).ready(function() {
                 args.push("'" + $(arg).find(":selected").val() + "'")
             })
             metrics.push(type + '(' + args.join(',') + ')')
-        })
+        });
+
+        // Funnels
+        var funnels = []
+        $(".sidenav-funnel").each(function(i, checkbox) {
+            var checkboxObj = $(checkbox)
+            if (checkboxObj.is(':checked')) {
+                funnels.push(checkboxObj.val());
+            }
+        });
 
         if (metrics.length == 0) {
             errorMessage.html("Must provide at least one metric")
@@ -289,12 +317,18 @@ $(document).ready(function() {
         path.dimensionViewType = path.dimensionViewType == null ? "HEAT_MAP" : path.dimensionViewType
         path.baselineMillis = baselineMillisUTC
         path.currentMillis = currentMillisUTC
+
         var dashboardPath = getDashboardPath(path)
         var params = {}
         if(timezone !== getLocalTimeZone().split(' ')[1]) {
             params.timezone = timezone.split('/').join('-')
         }
+
+        if (funnels.length > 0) {
+            dashboardPath = dashboardPath + "?funnels=" + funnels.join();
+        }
+
         errorAlert.hide()
         window.location = dashboardPath + encodeHashParameters(params)
-    })
+    });
 })

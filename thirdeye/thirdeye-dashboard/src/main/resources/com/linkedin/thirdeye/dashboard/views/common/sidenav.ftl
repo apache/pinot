@@ -39,6 +39,19 @@
                     </div>
                 </div>
 
+                <#if (funnelNames?size > 0)>
+                    <div class="uk-form-row">
+                        <label class="uk-form-label">Funnel(s)</label>
+                        <#list funnelNames as funnel>
+                            <label>
+                                <input class="sidenav-funnel" type="checkbox" value="${funnel}"/>
+                                ${funnel}
+                            </label>
+                            <br/>
+                        </#list>
+                    </div>
+                </#if>
+
                 <div class="uk-form-row">
                     <label class="uk-form-label">
                         Date / Time

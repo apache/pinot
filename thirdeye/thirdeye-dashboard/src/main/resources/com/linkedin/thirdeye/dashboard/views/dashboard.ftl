@@ -28,7 +28,12 @@
                     </button>
                 </div>
 
+                
                 <div id="dashboard-metric-view">
+                    <div id="dashboard-funnels-view">
+                        <#include "funnel-heatmap.ftl">
+                    </div>
+
                     <#-- Metric view-->
                     <#if (metricView.type == "INTRA_DAY")>
                         <#include "metric/intra-day.ftl">

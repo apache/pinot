@@ -17,6 +17,8 @@ public class DashboardView extends View {
   private final DateTime latestDataTime;
   private final List<String> customDashboardNames;
   private final String feedbackEmailAddress;
+  private final List<String> funnelNames;
+  private final List<FunnelHeatMapView> funnelViews;
 
   public DashboardView(String collection,
                        CollectionSchema collectionSchema,
@@ -27,7 +29,9 @@ public class DashboardView extends View {
                        DateTime earliestDataTime,
                        DateTime latestDataTime,
                        List<String> customDashboardNames,
-                       String feedbackEmailAddress) {
+                       String feedbackEmailAddress,
+                       List<String> allFunnelNames,
+                       List<FunnelHeatMapView> funnelViews) {
     super("dashboard.ftl");
     this.collection = collection;
     this.feedbackEmailAddress = feedbackEmailAddress;
@@ -39,6 +43,17 @@ public class DashboardView extends View {
     this.earliestDataTime = earliestDataTime;
     this.latestDataTime = latestDataTime;
     this.customDashboardNames = customDashboardNames;
+    this.funnelNames = allFunnelNames;
+    this.funnelViews = funnelViews;
+  }
+
+
+  public List<String> getFunnelNames() {
+    return funnelNames;
+  }
+
+  public List<FunnelHeatMapView> getFunnelViews() {
+    return funnelViews;
   }
 
   public String getCollection() {

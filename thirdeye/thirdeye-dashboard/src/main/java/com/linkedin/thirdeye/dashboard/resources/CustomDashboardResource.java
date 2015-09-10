@@ -400,7 +400,7 @@ public class CustomDashboardResource {
     return new CustomFunnelTabularView(metricList, filteredTable);
   }
 
-  private static Map<Long, Number[]> extractFunnelData(QueryResult queryResult) throws Exception {
+  static Map<Long, Number[]> extractFunnelData(QueryResult queryResult) throws Exception {
     Map<Long, Number[]> data = new HashMap<>();
 
     if (queryResult.getData().size() != 1) {
