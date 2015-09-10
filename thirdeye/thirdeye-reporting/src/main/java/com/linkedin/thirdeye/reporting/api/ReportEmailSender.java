@@ -26,10 +26,10 @@ public class ReportEmailSender {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportEmailSender.class);
 
-  private ReportEmailObjects reportObjects;
+  private ReportEmailDataModel reportObjects;
   private String templatePath;
 
-  public ReportEmailSender(ReportEmailObjects reportObjects, String templatePath) {
+  public ReportEmailSender(ReportEmailDataModel reportObjects, String templatePath) {
     this.reportObjects = reportObjects;
     this.templatePath = templatePath;
   }

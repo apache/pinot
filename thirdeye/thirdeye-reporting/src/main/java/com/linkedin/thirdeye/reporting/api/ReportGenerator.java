@@ -179,7 +179,7 @@ public class ReportGenerator implements Job{
         alias(tables, anomalyReportTables);
       }
 
-      ReportEmailObjects reportObjects = new ReportEmailObjects(reportConfig, tables, anomalyReportTables, missingSegments, scheduleSpec, new ReportEmailCssSpec());
+      ReportEmailDataModel reportObjects = new ReportEmailDataModel(reportConfig, tables, anomalyReportTables, missingSegments, scheduleSpec, new ReportEmailCssSpec());
       ReportEmailSender reportEmailSender = new ReportEmailSender(reportObjects, templatePath);
       reportEmailSender.emailReport();
 

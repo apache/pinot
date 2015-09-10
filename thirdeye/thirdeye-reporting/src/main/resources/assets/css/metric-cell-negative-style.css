@@ -1,0 +1,22 @@
+/* cell style for negative ratios */
+color:windowtext;
+font-size:10.0pt;
+font-weight:400;
+font-style:normal;
+text-decoration:none;
+font-family:Arial;
+text-align:general;
+vertical-align:bottom;
+border:none;
+font-size:8.0pt;
+color:#ff0000;
+text-align:right;
+vertical-align:middle;
+border-left:.5pt solid #c0c0c0;
+border-top:none;
+border-right:none;
+border-bottom:.5pt solid #c0c0c0;
+padding-left:1.0pt;
+padding-right:1.0pt;
+padding-top:1.0pt;
+padding-bottom:1.0pt;

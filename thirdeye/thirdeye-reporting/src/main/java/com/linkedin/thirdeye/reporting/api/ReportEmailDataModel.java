@@ -5,7 +5,7 @@ import java.util.Map;
 
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 
-public class ReportEmailObjects {
+public class ReportEmailDataModel {
 
   private ReportConfig reportConfig;
   private List<Table> tables;
@@ -14,7 +14,7 @@ public class ReportEmailObjects {
   private ScheduleSpec scheduleSpec;
   private ReportEmailCssSpec reportEmailCssSpec;
 
-  public ReportEmailObjects(ReportConfig reportConfig, List<Table> tables,
+  public ReportEmailDataModel(ReportConfig reportConfig, List<Table> tables,
       Map<String, AnomalyReportTable> anomalyReportTables, List<TimeRange> missingSegments, ScheduleSpec scheduleSpec, ReportEmailCssSpec reportEmailCssSpec) {
     this.reportConfig = reportConfig;
     this.tables = tables;
