@@ -1,6 +1,8 @@
 <script src="/assets/js/vendor/jquery.js"></script>
 <script src="/assets/js/vendor/jstz.js"></script>
 <script src="/assets/js/vendor/moment.js"></script>
+<script src="/assets/js/vendor/jquery.dataTables.min.js"></script>
+<script src="/assets/js/vendor/jquery.dataTables.columnFilter.js"></script>
 <script src="/assets/js/vendor/moment-timezone-with-data-2010-2020.js"></script>
 <script src="/assets/js/uikit/uikit.min.js"></script>
 <script src="/assets/js/uikit/core/dropdown.min.js"></script>

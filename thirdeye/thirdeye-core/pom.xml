@@ -22,7 +22,7 @@
       <dependency>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
-          <version>1.7.6</version>
+          <version>1.7.12</version>
       </dependency>
       <dependency>
           <groupId>org.apache.commons</groupId>

@@ -466,6 +466,7 @@ function plotOne(container, tooltip, options, data) {
 function extractHeatMapData(rawData) {
     var data = {}
 
+
     rawData.find('.dimension-view-heat-map').each(function(i, heatMap) {
         var heatMapObj = $(heatMap)
         var id = heatMapObj.attr('metric').split('.').join('-') + '-' + heatMapObj.attr('dimension').split('.').join('-')
@@ -504,7 +505,6 @@ function extractHeatMapData(rawData) {
             }
         })
     })
-
     return data
 }
 
@@ -619,6 +619,28 @@ function renderHeatMap(rawData, container, options) {
         })
     })
 }
+
+/**
+ * @param rawData The container with raw data
+ * @return an object with the raw data in an array as required by google treemap charts
+ */
+/*function extractTreeMapData(rawData){
+    var treeMapdata = {}
+
+
+    rawData.find('.dimension-view-heat-map').each(function(i, heatMap) {
+        var heatMapObj = $(heatMap)
+        var id = heatMapObj.attr('metric').split('.').join('-') + '-' + heatMapObj.attr('dimension').split('.').join('-')
+        data = []
+
+        data.push( [heatMapObj.attr('dimension-display'), heatMapObj.attr('metric-display'), 0,0])
+
+        //data.unshift([heatMapObj.attr('metric-display'),null,0,  0])
+        //data.unshift(['value', 'parent', 'current ratio (size)', 'delta (color)'])
+    })
+    return treeMapdata
+
+}*/
 
 /** @return A {"size": x, "unit": y} object that best describes @param millis */
 function describeMillis(millis) {

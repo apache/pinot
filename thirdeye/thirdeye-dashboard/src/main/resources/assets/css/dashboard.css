@@ -159,6 +159,201 @@
 
 /* Dimension */
 
+/* Dimension - Tabular */
+
+.dimension-heat-map-table-section{
+    padding:0 0 10px;
+    border: 1px solid #ccc;
+    margin-bottom:20px;
+}
+
+.dimension-heat-map-table-section td{
+    width: 100px;
+    text-align:center;
+}
+
+.dimension-heat-map-table-section th{
+    font-size: 9px;
+}
+
+.dimension-heat-map-container-title{
+    background-color: #f5f5f5;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    height: auto;
+    margin: 0 0 15px;
+    padding: 10px 0 2px 12px;
+    width: 100%;
+
+}
+.dimension-heat-map-container-title h2{
+    display: inline-block;
+    font-weight: 800;
+}
+
+.dimension-heat-map-container-title th{
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.title-stat{
+    font-size: 14px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.delta-ratio:after{
+    content: "%";
+}
+
+.dimension-tabular-column-toggle-buttons{
+    margin-bottom: 15px;
+    margin-left: 12px;
+}
+
+.number_range_filter{
+    width: 50px;
+}
+
+.dataTables_wrapper{
+    display: table;
+    width: 100%;
+}
+
+.dataTables_length,
+.dataTables_info{
+    padding-left: 12px;
+}
+
+.dataTables_filter{
+    padding-right: 12px;
+}
+.dimension-heat-map-table-section table{
+    white-space: normal;
+    table-layout:fixed;
+    width:100%
+}
+
+.filter-header th{
+    text-align: center;
+}
+
+.filter-header .filter-header-s{
+    width:60px;
+}
+
+.filter-header .filter-header-m{
+    max-width:90px;
+}
+
+.filter-header .filter-header-l{
+    width:110px;
+}
+
+.select_filter[rel="0"]{
+    width:90px;
+    font-size: 10px;
+}
+
+.filter_column input:not([value="Dimension Value"]){
+    display: block;
+    margin: auto;
+}
+
+input[value="Dimension Value"] {
+    position: relative;
+    top: 0;
+    left: -3px;
+    width: 80px;
+    font-size: 10px;
+}
+
+td[dimension-val]{
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.dimension-heat-map-table-section td:nth-child(7)::after,
+.dimension-heat-map-table-section td:nth-child(8)::after,
+.dimension-heat-map-table-section td:nth-child(9)::after,
+.dimension-heat-map-table-section td:nth-child(10)::after{
+    content: "%";
+}
+
+.datatable-empty-cell::after{
+    content: "-"
+}
+
+/* Dimension Tree Map */
+.treemap-area{
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    margin-top:20px;
+    margin-bottom:20px;
+    border: 1px solid #ddd;
+    padding: 0px
+}
+
+.dimension-treemap-toggle-buttons{
+    margin-left: 12px;
+    margin-bottom: 15px;
+}
+
+.treemap-display-tbl{
+    width: 100%;
+}
+
+#dimension-heat-map-wrapper .treemap-display-tbl-dim{
+    width: 30px;
+    white-space: nowrap;
+    height: 102px;
+}
+
+.treemap-rotate{
+    transform: translate(25px, 51px) rotate(315deg);
+    -webkit-transform: translate(25px, 51px) rotate(305deg);
+    width: 70px;
+}
+
+.treemap-rotate > div{
+    position: relative;
+    top: -50px;
+    left: 20px;
+    text-align: right;
+}
+
+.dimension-treemap{
+    width: 100%;
+    height:102px;
+    display:inline-block
+}
+
+.treemap-tooltip{
+    color: #000000;
+    outline: none;
+    text-decoration: none;
+    position: relative;
+    background: #9FDAEE;
+    border: 1px solid #2BB0D7;
+    padding: 0.5em 0.8em 0.8em 2em;
+    border-radius: 5px 5px;
+    -moz-border-radius: 5px;
+    -webkit-border-radius: 5px;
+    box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.1);
+    -webkit-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
+    -moz-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
+    font-family: Calibri, Tahoma, Geneva, sans-serif;
+}
+
+
+
+/* Dimension - Heat Map */
+
+.dimension-heat-map-heat-map-section{
+   border: 1px solid #ddd;
+   padding: 12px;
+}
+
+
 #dimension-heat-map-area,
 #dimension-time-series-area {
     clear: both;
@@ -248,8 +443,45 @@
   color: #ccc;
 }
 
-/* Both */
+
+
+/* Both: Metric and Dimension */
 
 .time-series-legend {
     overflow: hidden;
 }
+
+.up {
+  background-color:green;
+}
+
+.down {
+  background-color:red;
+}
+
+.red{
+    color: red;
+    font-weight: 800;
+}
+
+.blue{
+    color: blue;
+    font-weight: 800;
+}
+
+
+/* overwriting UIkit css */
+.uk-button.uk-active, .uk-button:active{
+    background-color: #ddd;
+    color: #444;
+    font-weight: 800;
+}
+
+
+
+
+
+
+
+
+
