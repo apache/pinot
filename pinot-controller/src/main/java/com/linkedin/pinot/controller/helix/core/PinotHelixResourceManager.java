@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
@@ -47,6 +48,7 @@ import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -231,33 +233,33 @@ public class PinotHelixResourceManager {
     HelixHelper.setStateForInstanceSet(allInstances, _helixClusterName, _helixAdmin, true);
   }
 
-  private boolean ifExternalViewChangeReflectedForState(String tableName, String segmentName, String targerStates,
-      long timeOutInMills) {
-    long timeOutTimeStamp = System.currentTimeMillis() + timeOutInMills;
-    boolean isSucess = true;
-    while (System.currentTimeMillis() < timeOutTimeStamp) {
+  private boolean ifExternalViewChangeReflectedForState(String tableName, String segmentName, String targetState,
+      long timeoutMillis) {
+    long externalViewChangeCompletedDeadline = System.currentTimeMillis() + timeoutMillis;
+
+    deadlineLoop:
+    while (System.currentTimeMillis() < externalViewChangeCompletedDeadline) {
       // Will try to read data every 2 seconds.
-      try {
-        Thread.sleep(2000);
-      } catch (InterruptedException e) {
-      }
-      isSucess = true;
+      Uninterruptibles.sleepUninterruptibly(2L, TimeUnit.SECONDS);
+
       ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
       Map<String, String> segmentStatsMap = externalView.getStateMap(segmentName);
       if (segmentStatsMap != null) {
         for (String instance : segmentStatsMap.keySet()) {
-          if (!segmentStatsMap.get(instance).equalsIgnoreCase(targerStates)) {
-            isSucess = false;
+          final String segmentState = segmentStatsMap.get(instance);
+          // jfim: Ignore segments in error state as part of checking if the external view change is reflected
+          if (!segmentState.equalsIgnoreCase(targetState) && !"ERROR".equalsIgnoreCase(segmentState)) {
+            continue deadlineLoop;
           }
         }
-      } else {
-        isSucess = false;
-      }
-      if (isSucess) {
-        break;
+
+        // All segments match with the expected external view state
+        return true;
       }
     }
-    return isSucess;
+
+    // Timed out
+    return false;
   }
 
   private boolean ifSegmentExisted(SegmentMetadata segmentMetadata) {
@@ -1261,7 +1263,9 @@ public class PinotHelixResourceManager {
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
     if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout)) {
-      LOGGER.error("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: " + segmentName);
+      LOGGER.error(
+          "External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
+          segmentName, _externalViewOnlineToOfflineTimeout);
       return false;
     }
 
