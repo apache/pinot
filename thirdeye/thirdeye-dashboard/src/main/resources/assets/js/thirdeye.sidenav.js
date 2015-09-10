@@ -19,7 +19,7 @@ $(document).ready(function() {
             cellObj.prop( "checked", true );
         });
     }
-
+    
     // Derived metrics
     var addDerivedMetric = function(event) {
         if (event) {

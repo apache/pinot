@@ -112,7 +112,7 @@ public class FunnelsDataProvider {
     DateTime baselineEnd = currentEnd.minusDays(7);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
-    String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(spec.getMetrics()) + ")";
+    String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()) + ")";
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
@@ -176,9 +176,9 @@ public class FunnelsDataProvider {
     // Filter (since query result set will contain primitive metrics for each derived one)
     List<Pair<Long, Number[]>> filteredTable = new ArrayList<>();
     for (Pair<Long, Number[]> pair : table) {
-      Number[] filtered = new Number[spec.getMetrics().size()];
-      for (int i = 0; i < spec.getMetrics().size(); i++) {
-        String metricName = spec.getMetrics().get(i);
+      Number[] filtered = new Number[spec.getActualMetricNames().size()];
+      for (int i = 0; i < spec.getActualMetricNames().size(); i++) {
+        String metricName = spec.getActualMetricNames().get(i);
         Integer metricIdx = metricNameToIndex.get(metricName);
         if (pair.getSecond() == null) {
           filtered[i] = 0;
@@ -195,7 +195,7 @@ public class FunnelsDataProvider {
       filteredTable.add(new Pair<>(pair.getFirst(), filtered));
     }
 
-    return new FunnelHeatMapView(spec.getName(), spec.getMetrics(), filteredTable);
+    return new FunnelHeatMapView(spec, filteredTable, currentEnd, baselineEnd);
   }
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out late}

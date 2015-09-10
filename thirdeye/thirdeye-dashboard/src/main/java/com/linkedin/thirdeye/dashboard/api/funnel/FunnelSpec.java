@@ -1,15 +1,17 @@
 package com.linkedin.thirdeye.dashboard.api.funnel;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 
 
 public class FunnelSpec {
 
   private String name;
   private String visulizationType;
-  private List<String> metrics;
+  private Map<String, String> aliasToMetricsMap;
 
   public String getName() {
     return name;
@@ -27,23 +29,22 @@ public class FunnelSpec {
     this.visulizationType = visulizationType;
   }
 
-  public List<String> getMetrics() {
-    return metrics;
+  public Map<String, String> getAliasToActualMetrics() {
+    return aliasToMetricsMap;
   }
 
-  public void setMetrics(List<String> metrics) {
-    this.metrics = metrics;
-  }
-
-  public String toString() {
-    String ret = null;
-
-    try {
-      ret = new ObjectMapper().writeValueAsString(this);
-    } catch (Exception e) {
-
+  public void setMetrics(LinkedList<String> metrics) {
+    aliasToMetricsMap = new LinkedHashMap<String, String>();
+    for (String metric : metrics) {
+      String alias = metric.split("=")[0];
+      String actual = metric.split("=")[1];
+      aliasToMetricsMap.put(alias, actual);
     }
+  }
 
+  public List<String> getActualMetricNames() {
+    List<String> ret = new ArrayList<String>();
+    ret.addAll(aliasToMetricsMap.values());
     return ret;
   }
 }
