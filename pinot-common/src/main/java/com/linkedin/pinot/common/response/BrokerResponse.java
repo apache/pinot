@@ -16,7 +16,7 @@
 package com.linkedin.pinot.common.response;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +61,7 @@ public class BrokerResponse {
     _aggregationResults = new ArrayList<JSONObject>();
     _segmentStatistics = new ArrayList<ResponseStatistics>();
     _exceptions = new ArrayList<ProcessingException>();
-    _traceInfo = new HashMap<String, String>();
+    _traceInfo = new LinkedHashMap<String, String>();
   }
 
   public long getTotalDocs() {
@@ -171,7 +171,7 @@ public class BrokerResponse {
 
   public void putToTraceInfo(String key, String val) {
     if (_traceInfo == null) {
-      _traceInfo = new HashMap<String, String>();
+      _traceInfo = new LinkedHashMap<String, String>();
     }
     _traceInfo.put(key, val);
   }
@@ -305,7 +305,7 @@ public class BrokerResponse {
 
     if (retJsonObject.has("traceInfo")) {
       JSONObject traceInfoObject = retJsonObject.getJSONObject("traceInfo");
-      Map<String, String> traceInfoMap = new HashMap<String, String>();
+      Map<String, String> traceInfoMap = new LinkedHashMap<String, String>();
 
       Iterator iterator = traceInfoObject.keys();
       while (iterator.hasNext()) {

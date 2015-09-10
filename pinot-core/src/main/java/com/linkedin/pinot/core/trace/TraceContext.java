@@ -76,7 +76,10 @@ public class TraceContext {
     REGISTER_THREAD_FAILURE,
 
     // trace log failure constants
-    REQUEST_FOR_THREAD_NOT_FOUND;
+    REQUEST_FOR_THREAD_NOT_FOUND,
+
+    // retrieve trace failure
+    RETRIEVE_TRACE_FAILURE;
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TraceContext.class);
@@ -134,16 +137,19 @@ public class TraceContext {
    * call this method to log info for this class, requestId -1 means requestId is invalid.
    *
    * @param info
-   * @param request
+   * @param requestId
    */
-  private static void logInfo(CONSTANT info, InstanceRequest request) {
-    long requestId = (request == null) ? -1 : request.getRequestId();
+  private static void logInfo(CONSTANT info, long requestId) {
     Long tid = Thread.currentThread().getId();
     LOGGER.debug("[TID: {}] {} in Request: {}", tid, info, requestId);
     if (TEST_ENABLED) {
       tidToTestInfoMap.putIfAbsent(tid, new ConcurrentLinkedDeque<Info>());
       tidToTestInfoMap.get(tid).offerLast(new Info(info, requestId));
     }
+  }
+
+  private static void logInfo(CONSTANT info, InstanceRequest request) {
+    logInfo(info, (request == null) ? -1 : request.getRequestId());
   }
 
   /**
@@ -262,16 +268,20 @@ public class TraceContext {
    * It is caller's responsibility to make sure all threads belong to requestId
    * finish their work before this method is called.
    *
-   * Eg. the caller could use a {@link CountDownLatch} to wait for all jobs finished.
+   * This method won't throw any exceptions, so feel free to use it safely.
    *
-   * TODO: modify this method to return serialized/compact results from ConcurrentLinkedDeque only.
+   * Eg. the caller could use a {@link CountDownLatch} to wait for all jobs finished.
    *
    * @param requestId
    * @return
    */
   public static String getTraceInfoOfRequestId(Long requestId) {
-    ConcurrentLinkedDeque<Trace> deque = allTraceInfoMap.get(requestId);
-    return (deque == null) ? "trace for " + requestId + " not found" : TraceUtils.getTraceString(deque);
+    try {
+      ConcurrentLinkedDeque<Trace> deque = allTraceInfoMap.get(requestId);
+      return (deque == null) ? "{ \"error\": \"trace for " + requestId + " not found\" }" : TraceUtils.getTraceString(deque);
+    } catch (Exception e) {
+      logInfo(CONSTANT.RETRIEVE_TRACE_FAILURE, requestId);
+      return "{ \"error\": \"retrieve trace for " + requestId + " failed\" }";
+    }
   }
-
 }
