@@ -91,7 +91,6 @@ $(document).ready(function() {
     function plotAllSeries() {
         $.each(containers, function(dimension, container) {
             var optionsCopy = $.extend(true, {}, options)
-            container.title.html(dimension)
             optionsCopy.dimension = dimension
             optionsCopy.legendContainer = container.legend
             renderTimeSeries(container.plot, container.tooltip, optionsCopy)

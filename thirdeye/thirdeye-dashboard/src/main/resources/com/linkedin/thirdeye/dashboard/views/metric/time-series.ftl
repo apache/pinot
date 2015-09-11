@@ -10,6 +10,7 @@
 <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
 <#include "../common/dimension-header.ftl">
 
+<div class="collapser"><h2>(-) Metric Time Series View</h2></div>
 <div id="metric-time-series-area">
     <div id="metric-time-series-placeholder"></div>
     <div id="metric-time-series-tooltip"></div>

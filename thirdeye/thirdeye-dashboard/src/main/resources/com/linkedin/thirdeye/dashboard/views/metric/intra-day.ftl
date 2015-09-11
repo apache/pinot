@@ -3,20 +3,21 @@
     <#include "../common/style.ftl">
     <#include "../common/script.ftl">
 </#if>
-
 <script src="/assets/js/thirdeye.metric.table.js"></script>
 
+<#list (metricView.view.metricTables)!metricTables as metricTable>
+    <#assign dimensions = metricTable.dimensionValues>
+    <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
+    <#include "../common/dimension-header.ftl">
+
+
+<div class="collapser"><h2>(-) Metric Intra-day View</h2></div>
 <div id="metric-table-area">
     <#if (((metricView.view.metricTables)!metricTables)?size == 0)>
         <div class="uk-alert uk-alert-warning">
             <p>No data available</p>
         </div>
     </#if>
-
-    <#list (metricView.view.metricTables)!metricTables as metricTable>
-        <#assign dimensions = metricTable.dimensionValues>
-        <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-        <#include "../common/dimension-header.ftl">
 
         <div id="intra-day-buttons">
           <button class="uk-button uk-modal-close" data-uk-modal="{target:'#intra-day-config'}">

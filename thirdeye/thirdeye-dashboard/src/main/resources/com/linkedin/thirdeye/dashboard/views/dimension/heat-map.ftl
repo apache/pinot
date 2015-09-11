@@ -1,213 +1,188 @@
 <script src="/assets/js/thirdeye.dimension.heatmap.js"></script>
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
 
-<div id="dimension-heat-map-wrapper">
+<div class="collapser"><h2>(-) Dimension Heat Map</h2></div>
+<div id="dimension-heat-map-area">
 
       <#list dimensionView.view.metricNames as metric>
-        <div id="dimension-tree-map-area" class="treemap-area">
-            <div class="dimension-heat-map-container-title">
-                <h2>${metric}</h2>
-                <table style="width:100%; table-layout:fixed;">
-                    <tr>
-                        <th> Baseline Date: </th>
-                        <th> Current Date: </th>
-                        <th> Baseline Total:</th>
-                        <th> Current Total:</th>
-                        <th> Delta Value:</th>
-                        <th> Delta (%):</th>
+      <div class="collapser"><h3>(-) ${metric} </h3></div>
+      <div class="metric-wrapper">
+          <div class="collapser"><h4>(-) ${metric} heat map</h4></div>
+          <div id="dimension-heat-map-tree-map-section" class="treemap-section">
+              <div class="dimension-heat-map-container-title">
+                  <h2>${metric}</h2>
+                  <table style="width:100%; table-layout:fixed;">
+                        <tr>
+                            <th> Baseline Date: </th>
+                            <th> Current Date: </th>
+                            <th> Baseline Total:</th>
+                            <th> Current Total:</th>
+                            <th> Delta Value:</th>
+                            <th> Delta (%):</th>
+                            </tr>
+                        <tr>
+                            <td class="title-stat baseline-date-time"></td>
+                            <td class="title-stat current-date-time"></td>
+                            <td class="title-stat baseline-total">${dimensionView.view.metricGlobalStats[metric]['baseline_total']}</td>
+                            <td class="title-stat current-total">${dimensionView.view.metricGlobalStats[metric]['current_total']}</td>
+                            <td class="title-stat delta-value">${dimensionView.view.metricGlobalStats[metric]['delta_absolute_change']}</td>
+                            <td class="title-stat delta-ratio">${dimensionView.view.metricGlobalStats[metric]['delta_percent_change']}</td>
                         </tr>
-                    <tr>
-                        <td class="title-stat baseline-date-time"></td>
-                        <td class="title-stat current-date-time"></td>
-                        <td class="title-stat baseline-total">${dimensionView.view.metricGlobalStats[metric]['baseline_total']}</td>
-                        <td class="title-stat current-total">${dimensionView.view.metricGlobalStats[metric]['current_total']}</td>
-                        <td class="title-stat delta-value">${dimensionView.view.metricGlobalStats[metric]['delta_absolute_change']}</td>
-                        <td class="title-stat delta-ratio">${dimensionView.view.metricGlobalStats[metric]['delta_percent_change']}</td>
-                    </tr>
-                </table>
-            </div>
-            <div class="uk-button-group dimension-treemap-toggle-buttons" data-uk-button-radio>
-                <button class="uk-button dimension-treemap-mode" id="treemap_contribution-total-change-percent" mode="0">
-                    <i class="uk-icon-eye-slash"></i> Percentage Change
-                </button>
-                <button class="uk-button dimension-treemap-mode" id="treemap_contribution-total-percent" mode="1">
-                    <i class="uk-icon-eye-slash"></i> Contribution Change (%)
-                </button>
-                <button class="uk-button dimension-treemap-mode" id="treemap_contribution-change-percent" mode="2">
-                    <i class="uk-icon-eye-slash"></i> Contribution to overall Change (%)
-                </button>
-            </div>
-
-	        <div id="metric_${metric?index}_treemap_0" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="0">
-                <table class="treemap-display-tbl">
-
-                <#list dimensionView.view.dimensionNames as dimension>
-                          <tr>
-                              <td class="treemap-display-tbl-dim"><div class="treemap-rotate"><div>${dimension}</div></div></td><td id="metric_${metric?index}_dim_${dimension?index}_treemap_0" class="dimension-treemap" rel="${dimension}" style="width: 100%; height:100px;display:inline-block" ></td>
-                          </tr>
-	        	</#list>
-                </table>
-
-	        </div>
-            <div id="metric_${metric?index}_treemap_1" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="1">
-                <table class="treemap-display-tbl">
-
-                <#list dimensionView.view.dimensionNames as dimension>
-                          <tr>
-                              <td class="treemap-display-tbl-dim"><div class="treemap-rotate"><div>${dimension}</div></div></td><td id="metric_${metric?index}_dim_${dimension?index}_treemap_1" class="dimension-treemap" rel="${dimension}" style="width: 100%; height:100px;display:inline-block" ></td>
-                          </tr>
-	        	</#list>
-                </table>
-
-	        </div>
-            <div id="metric_${metric?index}_treemap_2" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="2">
-                <table class="treemap-display-tbl">
-
-                <#list dimensionView.view.dimensionNames as dimension>
-                          <tr>
-                              <td class="treemap-display-tbl-dim"><div class="treemap-rotate"><div>${dimension}</div></div></td><td id="metric_${metric?index}_dim_${dimension?index}_treemap_2" class="dimension-treemap" rel="${dimension}" style="width: 100%; height:100px;display:inline-block" ></td>
-                          </tr>
-	        	</#list>
-                </table>
-	        </div>
-
-
-
-       </div>
-
-      <div class="dimension-heat-map-table-section">
-               <div id='div-tabularView-metric_${metric?index}' class="dimension-heat-map-container-title">
-                 <h2>${metric}</h2>
-                   <table style="width:100%; table-layout:fixed;">
-                       <tr>
-                           <th> Baseline Date: </th>
-                           <th> Current Date: </th>
-                           <th> Baseline Total:</th>
-                           <th> Current Total:</th>
-                           <th> Delta Value:</th>
-                           <th> Delta (%):</th>
-                       </tr>
-                       <tr>
-                           <td class="title-stat baseline-date-time"></td>
-                           <td class="title-stat current-date-time"></td>
-                           <td class="title-stat baseline-total">${dimensionView.view.metricGlobalStats[metric]['baseline_total']}</td>
-                           <td class="title-stat current-total">${dimensionView.view.metricGlobalStats[metric]['current_total']}</td>
-                           <td class="title-stat delta-value">${dimensionView.view.metricGlobalStats[metric]['delta_absolute_change']}</td>
-                           <td class="title-stat delta-ratio">${dimensionView.view.metricGlobalStats[metric]['delta_percent_change']}</td>
-                       </tr>
-                   </table>
-               </div>
-                <div class="uk-button-group dimension-tabular-column-toggle-buttons" data-uk-button-checkbox>
-                    <button class="uk-button toggle-vis" data-column="7" rel="contribution-total-change-percent">
-                        <i class="uk-icon-eye-slash"></i> Contribution to Total Change (%)
+                  </table>
+              </div>
+              <div class="uk-button-group dimension-treemap-toggle-buttons" data-uk-button-radio>
+                    <button class="uk-button dimension-treemap-mode" id="treemap_contribution-total-change-percent" mode="0">
+                        <i class="uk-icon-eye-slash"></i> Percentage Change
                     </button>
-                    <button class="uk-button toggle-vis" data-column="8" rel="contribution-total-percent">
-                        <i class="uk-icon-eye-slash"></i> Contribution to Total (%)
-                    </button>
-                    <button class="uk-button toggle-vis" data-column="9" rel="contribution-change-percent">
+                    <button class="uk-button dimension-treemap-mode" id="treemap_contribution-total-percent" mode="1">
                         <i class="uk-icon-eye-slash"></i> Contribution Change (%)
                     </button>
+                    <button class="uk-button dimension-treemap-mode" id="treemap_contribution-change-percent" mode="2">
+                        <i class="uk-icon-eye-slash"></i> Contribution to overall Change (%)
+                    </button>
+              </div>
+
+              <div id="metric_${metric?index}_treemap_0" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="0">
+                    <table class="treemap-display-tbl">
+
+                    <#list dimensionView.view.dimensionNames as dimension>
+                              <tr>
+                                  <td class="treemap-display-tbl-dim"><div class="treemap-rotate"><div>${dimension}</div></div></td><td id="metric_${metric?index}_dim_${dimension?index}_treemap_0" class="dimension-treemap" rel="${dimension}" style="width: 100%; height:100px;display:inline-block" ></td>
+                              </tr>
+                    </#list>
+                    </table>
+
                 </div>
+                <div id="metric_${metric?index}_treemap_1" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="1">
+                    <table class="treemap-display-tbl">
 
-               <table id='tabularView-metric_${metric?index}' class="display compact" cell-spacing="0" width="100%">
-                    <thead>
-                    <tr id="filter-header" class="filter-header">
-                        <th class="filter-header-m" rel="dimension">Dimension</th>
-                        <th id="rank" class="filter-header-s" rel="rank">Rank</th>
-                        <th           class="filter-header-m" rel="dimension-value">Dimension Value</th>
-                        <th           class="filter-header-s" rel="baseline">Baseline</th>
-                        <th           class="filter-header-s" rel="current">Current</th>
-                        <th           class="filter-header-s" rel="delta-val">Delta (Value)</th>
-                        <th           class="filter-header-s" rel="delta-ratio">Delta (%)</th>
-                        <th           class="filter-header-s" rel="contribution_to_total_change_val">Contribution to Total Change</th>
-                        <th           class="filter-header-s" rel="contribution_to_total_change_ratio">Contribution to Total (%)</th>
-                        <th           class="filter-header-s" rel="contribution_change_ratio">Contribution Change (%)</th>
-                    </tr>
-                    <tr>
-                        <th>Dimension</th>
-                        <th>Rank</th>
-                        <th>Dimension Value</th>
-                        <th>Baseline</th>
-                        <th>Current</th>
-                        <th>Delta (Value)</th>
-                        <th>Delta (%)</th>
-                        <th>Contribution to Total Change (%)</th>
-                        <th>Contribution to Total (%)</th>
-                        <th>Contribution Change (%)</th>
-                    </tr>
+                    <#list dimensionView.view.dimensionNames as dimension>
+                              <tr>
+                                  <td class="treemap-display-tbl-dim"><div class="treemap-rotate"><div>${dimension}</div></div></td><td id="metric_${metric?index}_dim_${dimension?index}_treemap_1" class="dimension-treemap" rel="${dimension}" style="width: 100%; height:100px;display:inline-block" ></td>
+                              </tr>
+                    </#list>
+                    </table>
 
-                    </thead>
+                </div>
+                <div id="metric_${metric?index}_treemap_2" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="2">
+                    <table class="treemap-display-tbl">
 
-                    <tbody>
-                        <#list dimensionView.view.heatMaps as heatMap>
-                            <#list heatMap.cells as cell>
-                            <#if (heatMap.metric == metric)>
-                            <tr role="row" class="${cell?item_cycle('even','odd')}">
-                                <td>${heatMap.dimension}</td>
-                                <td>${cell?index}</td>
-                                <#if (cell.value?html == "")>
-                                    <td dimension-val class="datatable-empty-cell"></td>
-                                <#else>
-                                    <td dimension-val>${cell.value?html}</td>
+                    <#list dimensionView.view.dimensionNames as dimension>
+                              <tr>
+                                  <td class="treemap-display-tbl-dim"><div class="treemap-rotate"><div>${dimension}</div></div></td><td id="metric_${metric?index}_dim_${dimension?index}_treemap_2" class="dimension-treemap" rel="${dimension}" style="width: 100%; height:100px;display:inline-block" ></td>
+                              </tr>
+                    </#list>
+                    </table>
+              </div>
+          </div>
+          <div class="collapser"><h4>(-) ${metric} heat map tabular view</h4></div>
+          <div class="dimension-heat-map-table-section">
+                   <div id='div-tabularView-metric_${metric?index}' class="dimension-heat-map-container-title">
+                     <h2>${metric}</h2>
+                       <table style="width:100%; table-layout:fixed;">
+                           <tr>
+                               <th> Baseline Date: </th>
+                               <th> Current Date: </th>
+                               <th> Baseline Total:</th>
+                               <th> Current Total:</th>
+                               <th> Delta Value:</th>
+                               <th> Delta (%):</th>
+                           </tr>
+                           <tr>
+                               <td class="title-stat baseline-date-time"></td>
+                               <td class="title-stat current-date-time"></td>
+                               <td class="title-stat baseline-total">${dimensionView.view.metricGlobalStats[metric]['baseline_total']}</td>
+                               <td class="title-stat current-total">${dimensionView.view.metricGlobalStats[metric]['current_total']}</td>
+                               <td class="title-stat delta-value">${dimensionView.view.metricGlobalStats[metric]['delta_absolute_change']}</td>
+                               <td class="title-stat delta-ratio">${dimensionView.view.metricGlobalStats[metric]['delta_percent_change']}</td>
+                           </tr>
+                       </table>
+                   </div>
+                    <div class="uk-button-group dimension-tabular-column-toggle-buttons" data-uk-button-checkbox>
+                        <button class="uk-button toggle-vis" data-column="7" rel="contribution-total-change-percent">
+                            <i class="uk-icon-eye-slash"></i> Contribution to Total Change (%)
+                        </button>
+                        <button class="uk-button toggle-vis" data-column="8" rel="contribution-total-percent">
+                            <i class="uk-icon-eye-slash"></i> Contribution to Total (%)
+                        </button>
+                        <button class="uk-button toggle-vis" data-column="9" rel="contribution-change-percent">
+                            <i class="uk-icon-eye-slash"></i> Contribution Change (%)
+                        </button>
+                    </div>
+
+                   <table id='tabularView-metric_${metric?index}' class="display compact" cell-spacing="0" width="100%">
+                        <thead>
+                        <tr id="filter-header" class="filter-header">
+                            <th class="filter-header-m" rel="dimension">Dimension</th>
+                            <th id="rank" class="filter-header-s" rel="rank">Rank</th>
+                            <th           class="filter-header-m" rel="dimension-value">Dimension Value</th>
+                            <th           class="filter-header-s" rel="baseline">Baseline</th>
+                            <th           class="filter-header-s" rel="current">Current</th>
+                            <th           class="filter-header-s" rel="delta-val">Delta (Value)</th>
+                            <th           class="filter-header-s" rel="delta-ratio">Delta (%)</th>
+                            <th           class="filter-header-s" rel="contribution_to_total_change_val">Contribution to Total Change</th>
+                            <th           class="filter-header-s" rel="contribution_to_total_change_ratio">Contribution to Total (%)</th>
+                            <th           class="filter-header-s" rel="contribution_change_ratio">Contribution Change (%)</th>
+                        </tr>
+                        <tr>
+                            <th>Dimension</th>
+                            <th>Rank</th>
+                            <th>Dimension Value</th>
+                            <th>Baseline</th>
+                            <th>Current</th>
+                            <th>Delta (Value)</th>
+                            <th>Delta (%)</th>
+                            <th>Contribution to Total Change (%)</th>
+                            <th>Contribution to Total (%)</th>
+                            <th>Contribution Change (%)</th>
+                        </tr>
+
+                        </thead>
+
+                        <tbody>
+                            <#list dimensionView.view.heatMaps as heatMap>
+                                <#list heatMap.cells as cell>
+                                <#if (heatMap.metric == metric)>
+                                <tr role="row" class="${cell?item_cycle('even','odd')}">
+                                    <td>${heatMap.dimension}</td>
+                                    <td>${cell?index}</td>
+                                    <#if (cell.value?html == "")>
+                                        <td dimension-val class="datatable-empty-cell"></td>
+                                    <#else>
+                                        <td dimension-val>${cell.value?html}</td>
+                                    </#if>
+                                    <td>${cell.statsMap['baseline_value']?string["0.##"]}</td>
+                                    <td>${cell.statsMap['current_value']?string["0.##"]}</td>
+                                    <td>${(cell.statsMap['current_value'] - cell.statsMap['baseline_value'])?string["0.##"]} </td>
+                                    <#if (cell.statsMap['baseline_value'] > 0)>
+                                      <td>${(cell.statsMap['current_value'] - cell.statsMap['baseline_value'])/(cell.statsMap['baseline_value']) * 100}</td>
+                                    <#else>
+                                      <td>0</td>
+                                    </#if>
+                                    <td> ${cell.statsMap['volume_difference'] * 100}</td>
+                                    <td> ${cell.statsMap['current_ratio'] * 100}</td>
+                                    <td> ${cell.statsMap['contribution_difference'] * 100}</td>
+                                </tr>
                                 </#if>
-                                <td>${cell.statsMap['baseline_value']?string["0.##"]}</td>
-                                <td>${cell.statsMap['current_value']?string["0.##"]}</td>
-                                <td>${(cell.statsMap['current_value'] - cell.statsMap['baseline_value'])?string["0.##"]} </td>
-                                <#if (cell.statsMap['baseline_value'] > 0)>
-                                  <td>${(cell.statsMap['current_value'] - cell.statsMap['baseline_value'])/(cell.statsMap['baseline_value']) * 100}</td>
-                                <#else>
-                                  <td>0</td>
-                                </#if>
-                                <td> ${cell.statsMap['volume_difference'] * 100}</td>
-                                <td> ${cell.statsMap['current_ratio'] * 100}</td>
-                                <td> ${cell.statsMap['contribution_difference'] * 100}</td>
-                            </tr>
-                            </#if>
+                                </#list>
                             </#list>
-                        </#list>
-                  </tbody>
-                  <tfoot>
-                 <!-- Display the total value of the columns
-                 <tr>
-                      <th>Total:</th>
-                      <th></th>
-                      <th></th>
-                      <th>
-
-                      <#list dimensionView.view.heatMaps as heatMap>
-                          <#if (heatMap.metric == metric)>
-                              ${heatMap.cells[0].statsMap['baseline_total']}
-                          </#if>
-                      </#list>
-                      </th>
-                      <th>
-                      <#list dimensionView.view.heatMaps as heatMap>
-                          <#if (heatMap.metric == metric)>
-                              ${heatMap.cells[0].statsMap['current_total']}
-                          </#if>
-                      </#list>
-                      </th>
-                      <th>
-                      </th>
-                      <th></th>
-                      <th></th>
-                      <th></th>
-                  </tr> -->
-
-                  <tr>
-                        <th>Dimension</th>
-                        <th>Rank</th>
-                        <th>Dimension Value</th>
-                        <th>Baseline</th>
-                        <th>Current</th>
-                        <th>Delta (Value)</th>
-                        <th>Delta (%)</th>
-                        <th>Contribution to Total Change (%)</th>
-                        <th>Contribution to Total (%)</th>
-                        <th>Contribution Change (%)</th>
-                    </tr>
-                  </tfoot>
-            </table>
+                      </tbody>
+                      <tfoot>
+                      <tr>
+                            <th>Dimension</th>
+                            <th>Rank</th>
+                            <th>Dimension Value</th>
+                            <th>Baseline</th>
+                            <th>Current</th>
+                            <th>Delta (Value)</th>
+                            <th>Delta (%)</th>
+                            <th>Contribution to Total Change (%)</th>
+                            <th>Contribution to Total (%)</th>
+                            <th>Contribution Change (%)</th>
+                        </tr>
+                      </tfoot>
+                </table>
+          </div>
       </div>
       </#list>
 </div>
@@ -265,7 +240,7 @@
       </p>
     </div>
 
-    <div id="dimension-heat-map-area">
+    <div id="dimension-heat-map-section-heat-map-area">
         <#if (dimensionView.view.heatMaps?size == 0)>
             <div class="uk-alert uk-alert-warning">
                 <p>No data available</p>
@@ -501,8 +476,12 @@
         }
     }
 
+
+
     google.load("visualization", "1", {packages:["treemap"]});
     google.setOnLoadCallback(Treemap.drawChart);
+
+
 
 
 

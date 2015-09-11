@@ -264,7 +264,7 @@ $(document).ready(function() {
 
         var currentMode = $(this).attr('mode')
 
-       var currentArea = $(this).closest(".treemap-area");
+       var currentArea = $(this).closest(".treemap-section");
        // var currentID = $(this).attr('id')
        // console.log("currentArea", currentArea)
        // var currentContainer = $(".treemap-container", currentArea)////

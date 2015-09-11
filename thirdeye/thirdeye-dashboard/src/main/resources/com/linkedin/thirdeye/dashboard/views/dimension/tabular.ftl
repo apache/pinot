@@ -1,5 +1,6 @@
 <script src="/assets/js/thirdeye.dimension.tabular.js"></script>
 
+<div class="collapser"><h2>(-) Dimension Tabular View</h2></div>
 <div id="dimension-table-area">
     <#if (((dimensionView.view.dimensionTables)!dimensionTables)?size == 0)>
         <div class="uk-alert uk-alert-warning">
@@ -8,7 +9,7 @@
     </#if>
 
     <#list dimensionView.view.dimensionTables as dimensionTable>
-        <h2>${dimensionTable.dimensionAlias!dimensionTable.dimensionName}</h2>
+        <div class="collapser"><h3>(-) ${dimensionTable.dimensionAlias!dimensionTable.dimensionName}</h3></div>
         <table class="uk-table uk-table-striped dimension-tabular-table">
           <thead>
             <tr>

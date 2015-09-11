@@ -140,7 +140,6 @@
 
 #metric-table-area {
     clear: both;
-    margin-top: 5%;
 }
 
 #metric-funnel-legend {
@@ -157,9 +156,19 @@
   margin-top: 20px;
 }
 
-/* Dimension */
+#intra-day-table{
+    border: 1px solid #ddd;
+}
 
+
+/* Dimension */
 /* Dimension - Tabular */
+
+.dimension-tabular-table{
+    border: 1px solid #ddd;
+}
+
+/* Dimension - Heat Map Tabular */
 
 .dimension-heat-map-table-section{
     padding:0 0 10px;
@@ -285,7 +294,7 @@ td[dimension-val]{
 }
 
 /* Dimension Tree Map */
-.treemap-area{
+.treemap-section{
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     margin-top:20px;
     margin-bottom:20px;
@@ -302,7 +311,7 @@ td[dimension-val]{
     width: 100%;
 }
 
-#dimension-heat-map-wrapper .treemap-display-tbl-dim{
+#dimension-heat-map-area .treemap-display-tbl-dim{
     width: 30px;
     white-space: nowrap;
     height: 102px;
@@ -354,7 +363,7 @@ td[dimension-val]{
 }
 
 
-#dimension-heat-map-area,
+#dimension-heat-map-section-heat-map-area,
 #dimension-time-series-area {
     clear: both;
 }
@@ -459,6 +468,14 @@ td[dimension-val]{
   background-color:red;
 }
 
+.collapser h2,
+.collapser h3,
+.collapser h4{
+    color: #069;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
 .red{
     color: red;
     font-weight: 800;
@@ -468,6 +485,8 @@ td[dimension-val]{
     color: blue;
     font-weight: 800;
 }
+
+
 
 
 /* overwriting UIkit css */
