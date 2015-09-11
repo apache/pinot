@@ -83,7 +83,7 @@
             </#if>
           </#list>
         <#else>
-          <td style="${reportEmailCssSpec.cellStyle3}"><span class="aBn" data-term="goog_481112314" tabindex="0"><span class="aQJ">&nbsp;&nbsp;${tableReportRow.groupByDimensions.startTime}&nbsp;&nbsp;</span></span></td>
+          <td style="${reportEmailCssSpec.cellStyle3}"><span class="aBn" data-term="goog_481112314" tabindex="0"><span class="aQJ">&nbsp;${tableReportRow.groupByDimensions.startTime}&nbsp;</span></span></td>
           <#if (table.tableSpec.groupBy)??><td style="${reportEmailCssSpec.cellStyle3}"><span class="aBn" data-term="goog_481112314" tabindex="0"><span class="aQJ">&nbsp;&nbsp;&nbsp;&nbsp;${tableReportRow.groupByDimensions.dimension}&nbsp;&nbsp;</span></span></td></#if>
 
           <#list tableReportRow.rows as row>

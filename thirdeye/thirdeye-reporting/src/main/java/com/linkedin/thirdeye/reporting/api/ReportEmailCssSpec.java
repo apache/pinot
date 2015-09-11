@@ -41,7 +41,7 @@ public class ReportEmailCssSpec {
   private String anomalyCell2;
   private String anomalyCell3;
 
-  public ReportEmailCssSpec() {
+  public ReportEmailCssSpec() throws IOException {
 
     timeTitleStyle = loadCss("time-title-style.css");
     titleStyle2 = loadCss("title-style-2.css");
@@ -186,15 +186,13 @@ public class ReportEmailCssSpec {
     return anomalyCell3;
   }
 
-  private String loadCss(String cssFile) {
+  private String loadCss(String cssFile) throws IOException {
 
     String css = null;
     InputStream is = ClassLoader.getSystemResourceAsStream("assets/css/" + cssFile);
 
     try {
       css = IOUtils.toString(is);
-    } catch (IOException e) {
-
     } finally {
       IOUtils.closeQuietly(is);
     }
