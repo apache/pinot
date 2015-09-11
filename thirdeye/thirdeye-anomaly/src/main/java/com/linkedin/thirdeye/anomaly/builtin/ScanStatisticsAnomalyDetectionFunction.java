@@ -344,7 +344,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     STLDecomposition.Config config = new STLDecomposition.Config();
     config.setNumberOfObservations(seasonality);
     config.setNumberOfInnerLoopPasses(2);
-    config.setNumberOfRobustnessIterations(1);
+    config.setNumberOfRobustnessIterations(4);
 
     /*
      * There isn't a particularly good reason to use these exact values other than that the results closely match the

@@ -190,11 +190,6 @@ public class STLDecomposition {
         double[] detrend = new double[series.length];
         for (int i = 0; i < series.length; i++) {
           detrend[i] = series[i] - trend[i];
-
-          // Apply robustness weight if have passed one inner loop
-          if (robustness != null) {
-            detrend[i] *= robustness[i];
-          }
         }
 
         // Get cycle sub-series with padding on either side
@@ -202,26 +197,39 @@ public class STLDecomposition {
 
         ArrayList<double[]> cycleSubseries = new ArrayList<>(numberOfObservations);
         ArrayList<double[]> cycleTimes = new ArrayList<>(numberOfObservations);
+        ArrayList<double[]> cycleRobustnessWeights = new ArrayList<double[]>(numberOfObservations);
+
         for (int i = 0; i < numberOfObservations; i++) {
           int subseriesLength = series.length / numberOfObservations;
           subseriesLength += (i < series.length % numberOfObservations) ? 1 : 0;
           double[] subseriesValues = new double[subseriesLength];
           double[] subseriesTimes = new double[subseriesLength];
+          double[] subseriesRobustnessWeights = null;
+          if (robustness != null) {
+            subseriesRobustnessWeights = new double[subseriesLength];
+          }
+
           for (int cycleIdx = 0; cycleIdx < subseriesLength; cycleIdx++) {
             subseriesValues[cycleIdx] = detrend[cycleIdx * numberOfObservations + i];
             subseriesTimes[cycleIdx] = times[cycleIdx * numberOfObservations + i];
+            if (subseriesRobustnessWeights != null) {
+              subseriesRobustnessWeights[cycleIdx] = robustness[cycleIdx * numberOfObservations + i];
+            }
           }
+
           cycleSubseries.add(subseriesValues);
           cycleTimes.add(subseriesTimes);
+          cycleRobustnessWeights.add(subseriesRobustnessWeights);
         }
 
         // Step 2: Cycle-subseries Smoothing
         for (int i = 0; i < cycleSubseries.size(); i++) {
           double[] smoothed;
           if (config.isPeriodic()) {
-            smoothed = meanSmooth(cycleSubseries.get(i));
+            smoothed = weightedMeanSmooth(cycleSubseries.get(i), cycleRobustnessWeights.get(i));
           } else {
-            smoothed = loessSmooth(cycleTimes.get(i), cycleSubseries.get(i), config.getSeasonalComponentBandwidth());
+            smoothed = loessSmooth(cycleTimes.get(i), cycleSubseries.get(i), config.getSeasonalComponentBandwidth(),
+                cycleRobustnessWeights.get(i));
           }
           cycleSubseries.set(i, smoothed);
         }
@@ -236,7 +244,7 @@ public class STLDecomposition {
         }
 
         // Step 3: Low-Pass Filtering of Smoothed Cycle-Subseries
-        double[] filtered = lowPassFilter(combinedSmoothed);
+        double[] filtered = lowPassFilter(combinedSmoothed, robustness);
 
         // Step 4: Detrending of Smoothed Cycle-Subseries
         for (int i = 0; i < seasonal.length; i++) {
@@ -249,7 +257,7 @@ public class STLDecomposition {
         }
 
         // Step 6: Trend Smoothing
-        trend = loessSmooth(trend, config.getTrendComponentBandwidth());
+        trend = loessSmooth(trend, config.getTrendComponentBandwidth(), robustness);
       }
 
       // --- Now in outer loop ---
@@ -294,35 +302,60 @@ public class STLDecomposition {
     }
   }
 
-  private double[] lowPassFilter(double[] series) {
+  private double[] lowPassFilter(double[] series, double[] weights) {
     // Apply moving average of length n_p, twice
     series = movingAverage(series, config.getNumberOfObservations());
     series = movingAverage(series, config.getNumberOfObservations());
     // Apply moving average of length 3
     series = movingAverage(series, 3);
     // Loess smoothing with d = 1, q = n_l
-    series = loessSmooth(series, config.getLowPassFilterBandwidth());
+    series = loessSmooth(series, config.getLowPassFilterBandwidth(), weights);
     return series;
   }
 
-  private double[] loessSmooth(double[] series, double bandwidth) {
+  /**
+   * @param series
+   * @param bandwidth
+   * @param weights
+   *  The weights to use for smoothing, if null, equal weights are assumed
+   * @return
+   *  Smoothed series
+   */
+  private double[] loessSmooth(double[] series, double bandwidth, double[] weights) {
     double[] times = new double[series.length];
     for (int i = 0; i < series.length; i++) {
       times[i] = i;
     }
-    return loessSmooth(times, series, bandwidth);
+    return loessSmooth(times, series, bandwidth, weights);
   }
 
-  private double[] loessSmooth(double[] times, double[] series, double bandwidth) {
-    return new LoessInterpolator(bandwidth, LOESS_ROBUSTNESS_ITERATIONS).smooth(times, series);
+  /**
+   * @param times
+   * @param series
+   * @param bandwidth
+   * @param weights
+   *  The weights to use for smoothing, if null, equal weights are assumed
+   * @return
+   *  Smoothed series
+   */
+  private double[] loessSmooth(double[] times, double[] series, double bandwidth, double[] weights) {
+    if (weights == null) {
+      return new LoessInterpolator(bandwidth, LOESS_ROBUSTNESS_ITERATIONS).smooth(times, series);
+    } else {
+      return new LoessInterpolator(bandwidth, LOESS_ROBUSTNESS_ITERATIONS).smooth(times, series, weights);
+    }
   }
 
-  private double[] meanSmooth(double[] series) {
+  private double[] weightedMeanSmooth(double[] series, double[] weights) {
     double[] smoothed = new double[series.length];
     double mean = 0;
-    for (double d : series) {
-      mean += d / series.length;
+    double sumOfWeights = 0;
+    for (int i = 0; i < series.length; i++) {
+      double weight = (weights != null) ? weights[i] : 1; // equal weights if none specified
+      mean += weight * series[i];;
+      sumOfWeights += weight;
     }
+    mean /= sumOfWeights;
     for (int i = 0; i < series.length; i++) {
       smoothed[i] = mean;
     }
