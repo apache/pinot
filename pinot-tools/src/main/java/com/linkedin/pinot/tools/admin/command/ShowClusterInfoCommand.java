@@ -72,9 +72,14 @@ public class ShowClusterInfoCommand extends AbstractBaseCommand implements Comma
     clusterInfo.clusterName = _clusterName;
 
     ZKHelixAdmin zkHelixAdmin = new ZKHelixAdmin(_zkAddress);
-    List<String> instancesInCluster = zkHelixAdmin.getInstancesInCluster(_clusterName);
+    if (!zkHelixAdmin.getClusters().contains(_clusterName)) {
+      LOGGER.error("Cluster {} not found in {}.", _clusterName, _zkAddress);
+      return false;
+    }
 
+    List<String> instancesInCluster = zkHelixAdmin.getInstancesInCluster(_clusterName);
     List<String> tables = zkHelixAdmin.getResourcesInCluster(_clusterName);
+
     ZkClient zkClient = new ZkClient(_zkAddress);
     zkClient.setZkSerializer(new ZNRecordStreamingSerializer());
     LOGGER.info("Connecting to Zookeeper at: {}", _zkAddress);
@@ -133,7 +138,16 @@ public class ShowClusterInfoCommand extends AbstractBaseCommand implements Comma
         SegmentInfo segmentInfo = new SegmentInfo();
         segmentInfo.name = segment;
         Map<String, String> serverStateMapFromIS = idealState.getInstanceStateMap(segment);
+        if (serverStateMapFromIS == null) {
+          LOGGER.info("Unassigned segment {} in ideal state", segment);
+          serverStateMapFromIS = Collections.emptyMap();
+        }
         Map<String, String> serverStateMapFromEV = externalView.getStateMap(segment);
+        if (serverStateMapFromEV == null) {
+          LOGGER.info("Unassigned segment {} in external view", segment);
+          serverStateMapFromEV = Collections.emptyMap();
+        }
+
         for (String serverName : serverStateMapFromIS.keySet()) {
           segmentInfo.segmentStateMap.put(serverName, serverStateMapFromEV.get(serverName));
         }
@@ -145,7 +159,7 @@ public class ShowClusterInfoCommand extends AbstractBaseCommand implements Comma
     StringWriter sw = new StringWriter();
     yaml.dump(clusterInfo, sw);
     LOGGER.info(sw.toString());
-    return false;
+    return true;
   }
 
   private String stripTypeFromName(String tableName) {
