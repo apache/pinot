@@ -119,7 +119,8 @@ public class FixedBitCompressedMVForwardIndexReader implements SingleColumnMulti
     if (isMMap) {
       headerSectionBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, headerSize);
     } else {
-      headerSectionBuffer = ByteBuffer.allocateDirect(headerSize);
+      headerSectionBuffer = MmapUtils.allocateDirectByteBuffer(headerSize, file,
+          this.getClass().getSimpleName() + " headerSectionBuffer");
       raf.getChannel().read(headerSectionBuffer);
     }
     headerSectionReader = new FixedByteWidthRowColDataFileReader(
@@ -135,7 +136,8 @@ public class FixedBitCompressedMVForwardIndexReader implements SingleColumnMulti
     if (isMMap) {
       dataSectionBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, headerSize, dataSizeInBytes);
     } else {
-      dataSectionBuffer = ByteBuffer.allocateDirect(dataSizeInBytes);
+      dataSectionBuffer = MmapUtils.allocateDirectByteBuffer(dataSizeInBytes, file,
+          this.getClass().getSimpleName() + " dataSectionBuffer");
       raf.getChannel().read(dataSectionBuffer, headerSize);
       raf.close();
     }

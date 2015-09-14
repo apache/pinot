@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.util;
 
 import com.google.common.primitives.Ints;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.indexsegment.utils.BitUtils;
 import java.nio.ByteBuffer;
 
@@ -43,7 +44,7 @@ public final class CustomBitSet {
       throw new IllegalArgumentException("CustomBitSet requires at least one byte of storage, asked for " + nrBytes);
     }
     this.nrBytes = nrBytes;
-    buf = ByteBuffer.allocateDirect(nrBytes);
+    buf = MmapUtils.allocateDirectByteBuffer(nrBytes, null, this.getClass().getSimpleName() + " buf");
   }
 
   private CustomBitSet(final int nrBytes, final ByteBuffer buffer) {

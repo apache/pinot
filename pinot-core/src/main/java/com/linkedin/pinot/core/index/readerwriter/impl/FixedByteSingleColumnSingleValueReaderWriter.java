@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.readerwriter.impl;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -53,7 +54,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
       rowSize += columnSizesInBytes[i];
     }
     final int totalSize = rowSize * rows;
-    ByteBuffer buffer = ByteBuffer.allocateDirect(totalSize);
+    ByteBuffer buffer = MmapUtils.allocateDirectByteBuffer(totalSize, null,
+        this.getClass().getSimpleName() + " buffer");
     buffer.order(ByteOrder.nativeOrder());
     reader = new FixedByteWidthRowColDataFileReader(buffer, rows, cols, columnSizesInBytes);
     writer = new FixedByteWidthRowColDataFileWriter(buffer, rows, cols, columnSizesInBytes);

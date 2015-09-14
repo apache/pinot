@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.indexsegment.utils;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.nio.ByteBuffer;
 
 
@@ -33,7 +34,7 @@ public class OffHeapCompressedIntArray implements IntArray {
     capacity = numOfElements;
     long requiredBufferSize = getRequiredBufferSize(numOfElements, numOfBitsPerElement);
     assert (requiredBufferSize <= Integer.MAX_VALUE);
-    buf = ByteBuffer.allocateDirect((int) requiredBufferSize);
+    buf = MmapUtils.allocateDirectByteBuffer((int) requiredBufferSize, null, this.getClass().getSimpleName() + " buf");
     tempBuf = getByteBuf();
   }
 
