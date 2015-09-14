@@ -133,9 +133,9 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
-    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getControllerHost() + "_"
-        + controllerConf.getControllerPort(), controllerConf.getDataDir(), controllerConf
-        .getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled());
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
+        controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
+        controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled());
   }
 
   public synchronized void start() throws Exception {
@@ -234,7 +234,7 @@ public class PinotHelixResourceManager {
   }
 
   private boolean ifExternalViewChangeReflectedForState(String tableName, String segmentName, String targetState,
-      long timeoutMillis) {
+      long timeoutMillis, boolean considerErrorStateAsDifferentFromTarget) {
     long externalViewChangeCompletedDeadline = System.currentTimeMillis() + timeoutMillis;
 
     deadlineLoop:
@@ -248,8 +248,12 @@ public class PinotHelixResourceManager {
         for (String instance : segmentStatsMap.keySet()) {
           final String segmentState = segmentStatsMap.get(instance);
           // jfim: Ignore segments in error state as part of checking if the external view change is reflected
-          if (!segmentState.equalsIgnoreCase(targetState) && !"ERROR".equalsIgnoreCase(segmentState)) {
-            continue deadlineLoop;
+          if (!segmentState.equalsIgnoreCase(targetState)) {
+            if ("ERROR".equalsIgnoreCase(segmentState) && !considerErrorStateAsDifferentFromTarget) {
+              // Segment is in error and we don't consider error state as different from target, therefore continue
+            } else {
+              continue deadlineLoop;
+            }
           }
         }
 
@@ -1262,7 +1266,7 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout)) {
+    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout, false)) {
       LOGGER.error(
           "External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
           segmentName, _externalViewOnlineToOfflineTimeout);
@@ -1381,7 +1385,7 @@ public class PinotHelixResourceManager {
     }
 
     // Wait until the partitions are offline in the external view
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, status, _externalViewOnlineToOfflineTimeout)) {
+    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, status, _externalViewOnlineToOfflineTimeout, true)) {
       return new PinotResourceManagerResponse("Error: Failed to update external view, timeout", false);
     }
 
