@@ -2,7 +2,6 @@ $(document).ready(function() {
     var path = parsePath(window.location.pathname)
 
     var queryParams = getQueryParamValue(window.location.search);
-    console.log(queryParams);
 
     if (queryParams.funnels) {
         $(".sidenav-funnel").each(function(i, cell) {
@@ -309,6 +308,11 @@ $(document).ready(function() {
         // Aggregate
         metricFunction = "AGGREGATE_" + aggregateSize + "_" + aggregateUnit + "(" + metricFunction + ")"
 
+        //Query Parameters
+        if(queryParams.hasOwnProperty("")){
+            delete queryParams[""]
+        }
+
 
         // Path
         var path = parsePath(window.location.pathname)
@@ -329,6 +333,6 @@ $(document).ready(function() {
         }
 
         errorAlert.hide()
-        window.location = dashboardPath + encodeHashParameters(params)
+        window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
     });
 })

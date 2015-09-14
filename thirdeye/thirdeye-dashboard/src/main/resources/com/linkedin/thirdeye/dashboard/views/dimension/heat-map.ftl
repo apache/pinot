@@ -187,6 +187,7 @@
       </#list>
 </div>
 
+
 <!--<div class="dimension-heat-map-heat-map-section">
 
     <div class="uk-button-group heat-map-buttons" data-uk-button-radio>
@@ -298,9 +299,6 @@
                     </#list>
                 </#list>
                 ]),
-
-
-
 
                 showTreeMapTooltip : function(row, size, value){
 
@@ -461,7 +459,7 @@
                 var value = ($(this).html().trim() == "unknown") ? "" : $(this).html().trim()
 
                 var dimension = $(this).attr("rel")
-                console.log('value', value)
+
                 //fix the value and dimension in the query and redraw the page
                 var dimensionValues = parseDimensionValues(window.location.search)
                 dimensionValues[dimension] = value
@@ -472,7 +470,6 @@
 
                 //Preselect treeemap mode on pageload (mode 0 = Percentage Change)
                $(".dimension-treemap-mode[mode = '0']").click()
-
         }
     }
 
@@ -480,9 +477,5 @@
 
     google.load("visualization", "1", {packages:["treemap"]});
     google.setOnLoadCallback(Treemap.drawChart);
-
-
-
-
 
 </script>
