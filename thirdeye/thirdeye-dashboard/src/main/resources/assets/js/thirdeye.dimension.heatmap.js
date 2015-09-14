@@ -15,6 +15,7 @@ $(document).ready(function() {
         currentMode = 'self'
     }
 
+
     var options = {
         filter: function(cell) {
             if (filterToggle.attr('state') === 'on') {
@@ -214,7 +215,6 @@ $(document).ready(function() {
     // Hide columns (column-index 7, 8, 9) by default
     var tableWrappers = $(".dimension-heat-map-table-section")
 
-    console.log('tableWrappers',tableWrappers)
     tableWrappers.each(function(index, tableWrapper){
         var tableID = $(".dataTable", tableWrapper).attr('id')
         var table = $('#' + tableID).DataTable()
