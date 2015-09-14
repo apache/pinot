@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.reporting.api;
+package com.linkedin.thirdeye.reporting.util;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -8,30 +8,16 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.reporting.api.ScheduleSpec;
+import com.linkedin.thirdeye.reporting.api.TableSpec;
 
-public class ThirdeyeUri {
+public class ThirdeyeUrlUtils {
 
-  public final String DEFAULT_AGGREGATION_GRANULARITY = "1";
-  public final String DEFAULT_AGGREGATION_UNIT = "HOURS";
-
-  private String dashboardUri;
-  private String collection;
-  private long startTime;
-  private long endTime;
-  private ScheduleSpec scheduleSpec;
-  private TableSpec tableSpec;
+  public final static String DEFAULT_AGGREGATION_GRANULARITY = "1";
+  public final static String DEFAULT_AGGREGATION_UNIT = "HOURS";
 
 
-  public ThirdeyeUri(String dashboardUri, String collection, ScheduleSpec scheduleSpec, TableSpec tableSpec, long startTime, long endTime) {
-    this.dashboardUri = dashboardUri;
-    this.collection = collection;
-    this.startTime = startTime;
-    this.endTime = endTime;
-    this.tableSpec = tableSpec;
-    this.scheduleSpec = scheduleSpec;
-  }
-
-  public URL getThirdeyeUri() throws MalformedURLException {
+  public static URL getThirdeyeUri(String dashboardUri, String collection, ScheduleSpec scheduleSpec, TableSpec tableSpec, long startTime, long endTime) throws MalformedURLException {
 
     List<String> thirdeyeUri = new ArrayList<String>();
     thirdeyeUri.add(dashboardUri);
