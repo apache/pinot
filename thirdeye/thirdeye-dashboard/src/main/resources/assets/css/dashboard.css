@@ -478,12 +478,14 @@ td[dimension-val]{
 
 .red{
     color: red;
-    font-weight: 800;
 }
 
 .blue{
     color: blue;
-    font-weight: 800;
+}
+
+.plus-symbol:before{
+    content: "+";
 }
 
 
