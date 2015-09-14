@@ -45,19 +45,7 @@
                 cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
             }
         });
-        $("#collapser").click(function () {
-            var $header = $(this);
-            //getting the next element
-            var $content = $header.next();
-            //open up the content needed - toggle the slide- if visible, slide up, if not slidedown.
-            $content.slideToggle(800, function () {
-               $header.html(function () {
-                    //change text based on condition
-                    return $content.is(":visible") ? '<h2 style="color:#069;cursor:pointer">(-) Funnel(s)</h2>' : '<h2 style="color:#069;cursor:pointer">(+) Funnel(s)</h2>';
-                });
-            });
 
-        });
     });
     </script>
 </#if>    
