@@ -26,7 +26,6 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -34,7 +33,6 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.reporting.api.TimeRange;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 import com.linkedin.thirdeye.client.util.SqlUtils;
-import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGenerator;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 import com.linkedin.thirdeye.reporting.util.DimensionKeyUtils;
 import com.linkedin.thirdeye.reporting.util.SegmentDescriptorUtils;
