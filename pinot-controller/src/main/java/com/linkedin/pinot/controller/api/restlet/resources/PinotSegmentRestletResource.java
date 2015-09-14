@@ -15,9 +15,21 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -32,20 +44,6 @@ import org.restlet.representation.Variant;
 import org.restlet.resource.Get;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
 /**
@@ -165,7 +163,7 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
   @Summary("Enable, disable or drop specified or all segments")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/", "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
-  private Representation toggleSegmentState(@Parameter(name = "tableName", in = "path",
+  protected Representation toggleSegmentState(@Parameter(name = "tableName", in = "path",
       description = "The name of the table to which segment belongs", required = true) String tableName, @Parameter(
       name = "segmentName", in = "path", description = "Segment to enable, disable or drop", required = false) String segmentName,
       @Parameter(name = "state", in = "query", description = "state to set for segment {enable|disable|drop}",

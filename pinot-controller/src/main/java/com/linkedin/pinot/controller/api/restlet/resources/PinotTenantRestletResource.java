@@ -361,8 +361,4 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     }
     return presentation;
   }
-
-  private StringRepresentation exceptionToStringRepresentation(Exception e) {
-    return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
-  }
 }

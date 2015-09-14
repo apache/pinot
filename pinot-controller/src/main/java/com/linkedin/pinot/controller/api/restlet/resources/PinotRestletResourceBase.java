@@ -1,5 +1,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.ServerResource;
 
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -59,5 +61,9 @@ public class PinotRestletResourceBase extends ServerResource {
   protected static boolean isValidTableType(String tableType) {
     return (TableType.OFFLINE.name().equalsIgnoreCase(tableType) || TableType.REALTIME.name().equalsIgnoreCase(
         tableType));
+  }
+
+  public static StringRepresentation exceptionToStringRepresentation(Exception e) {
+    return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
   }
 }

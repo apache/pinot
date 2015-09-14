@@ -15,16 +15,25 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.controller.api.swagger.HttpVerb;
+import com.linkedin.pinot.controller.api.swagger.Parameter;
+import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.controller.api.swagger.Summary;
+import com.linkedin.pinot.controller.api.swagger.Tags;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.restlet.data.MediaType;
@@ -37,19 +46,6 @@ import org.restlet.resource.Delete;
 import org.restlet.resource.Post;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -150,7 +146,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
         ret.put(url);
       }
     } else {
-      LOGGER.error("Error: Table " + tableName + " not found.");
+      LOGGER.error("Error: Table {} not found.", tableName);
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
     }
 
@@ -280,15 +276,27 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     return new StringRepresentation(response.toJSON().toString());
   }
 
+  /**
+   * URI Mappings:
+   * - "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/":
+   *   Delete the specified segment from the specified table.
+   *
+   * - "/segments/{tableName}/", "/segments/{tableName}":
+   *   Delete all the segments from the specified table.
+   *
+   * {@inheritDoc}
+   * @see org.restlet.resource.ServerResource#delete()
+   */
   @Override
   @Delete
   public Representation delete() {
-    Representation rep = null;
+    Representation rep;
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      rep = deleteSegment(rep, tableName, segmentName);
+      rep = deleteSegment(tableName, segmentName);
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
@@ -301,39 +309,23 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
   @Summary("Deletes a segment from a table")
   @Tags({"segment", "table"})
   @Paths({
-      "/segments/{tableName}/{segmentName}"
+      "/segments/{tableName}/{segmentName}/",
+      "/segments/{tableName}/{segmentName}",
+      "/segments/{tableName}/",
+      "/segments/{tableName}"
   })
-  private Representation deleteSegment(Representation rep,
+  private Representation deleteSegment(
       @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides", required = true)
       String tableName,
-      @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete", required = true)
-      String segmentName) {
-    if (tableName == null || segmentName == null) {
+      @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete", required = false)
+      String segmentName)
+      throws JsonProcessingException, JSONException {
+    if (tableName == null) {
       throw new RuntimeException("either table name or segment name is null");
     }
-    PinotResourceManagerResponse res = null;
-    if (ZKMetadataProvider
-        .isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName),
-            segmentName)) {
-      res = _pinotHelixResourceManager.deleteSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
-      rep = new StringRepresentation(res.toString());
-    }
-    if (ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(),
-        TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName)) {
-      res = _pinotHelixResourceManager.deleteSegment(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName), segmentName);
-      rep = new StringRepresentation(res.toString());
-    }
-    if (res == null) {
-      String error = new String("Cannot find the segment: " + segmentName + " in table: " + tableName);
-      LOGGER.error(error);
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      rep = new StringRepresentation(error);
-    }
-    return rep;
-  }
 
-  public static StringRepresentation exceptionToStringRepresentation(Exception e) {
-    return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
+    PinotSegmentRestletResource segmentRestletResource = new PinotSegmentRestletResource();
+    return segmentRestletResource.toggleSegmentState(tableName, segmentName, "drop", null);
   }
 
   public String constructDownloadUrl(String tableName, String segmentName) {
