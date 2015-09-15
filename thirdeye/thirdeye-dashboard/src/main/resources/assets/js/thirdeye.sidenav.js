@@ -329,7 +329,7 @@ $(document).ready(function() {
         }
 
         if (funnels.length > 0) {
-            dashboardPath = dashboardPath + "?funnels=" + funnels.join();
+          queryParams["funnels"] = funnels.join();
         }
 
         errorAlert.hide()
