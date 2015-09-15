@@ -11,7 +11,7 @@
           <div id="dimension-heat-map-tree-map-section" class="treemap-section">
               <div class="dimension-heat-map-container-title">
                   <h2>${metric}</h2>
-                  <table style="width:100%; table-layout:fixed;">
+                  <table>
                         <tr>
                             <th> Baseline Date: </th>
                             <th> Current Date: </th>
@@ -42,7 +42,7 @@
                     </button>
               </div>
 
-              <div id="metric_${metric?index}_treemap_0" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="0">
+              <div id="metric_${metric?index}_treemap_0" class="treemap-container" mode="0">
                     <table class="treemap-display-tbl">
 
                     <#list dimensionView.view.dimensionNames as dimension>
@@ -53,7 +53,7 @@
                     </table>
 
                 </div>
-                <div id="metric_${metric?index}_treemap_1" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="1">
+                <div id="metric_${metric?index}_treemap_1" class="treemap-container" mode="1">
                     <table class="treemap-display-tbl">
 
                     <#list dimensionView.view.dimensionNames as dimension>
@@ -64,7 +64,7 @@
                     </table>
 
                 </div>
-                <div id="metric_${metric?index}_treemap_2" class="treemap-container" style="width: 100%; height: auto; overflow: hidden;" mode="2">
+                <div id="metric_${metric?index}_treemap_2" class="treemap-container" mode="2">
                     <table class="treemap-display-tbl">
 
                     <#list dimensionView.view.dimensionNames as dimension>
@@ -273,7 +273,7 @@
 </div>-->
 
 
-<script type="text/javascript">
+<script>
 
     var Treemap = {
 
@@ -356,9 +356,9 @@
                 maxColorValue: 25,
                 minColor: '#f00',
                 midColor: '#ddd',
-                maxColor: '#0d0',
+                maxColor: '#00f',
                 headerHeight: 0,
-                fontColor: 'black',
+                fontColor: 'white',
                 showScale: false,
                 highlightOnMouseOver: true,
                 generateTooltip : Tooltip.showTreeMapTooltip

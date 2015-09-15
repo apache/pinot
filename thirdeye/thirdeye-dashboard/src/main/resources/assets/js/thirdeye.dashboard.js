@@ -77,4 +77,22 @@ $(document).ready(function() {
 
     });
 
+    var stickyBoxTop = $('.dimension-combination').offset().top;
+
+    var stickyBox = function(){
+        var scrollTop = $(window).scrollTop();
+
+        if (scrollTop + 43 > stickyBoxTop) {
+            $('.dimension-combination').addClass('sticky');
+        } else {
+            $('.dimension-combination').removeClass('sticky');
+        }
+    };
+
+    stickyBox();
+
+    $(window).scroll(function() {
+        stickyBox();
+    });
+
 })
