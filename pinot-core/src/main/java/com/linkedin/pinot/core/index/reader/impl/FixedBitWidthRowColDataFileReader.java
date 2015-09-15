@@ -284,11 +284,10 @@ public class FixedBitWidthRowColDataFileReader {
 
   public void close() throws IOException {
     if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+
       if (isMmap) {
-        MmapUtils.unloadByteBuffer(byteBuffer);
         file.close();
-      } else {
-        byteBuffer.clear();
       }
     }
   }

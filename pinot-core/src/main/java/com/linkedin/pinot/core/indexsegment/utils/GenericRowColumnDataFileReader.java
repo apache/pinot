@@ -231,5 +231,6 @@ public class GenericRowColumnDataFileReader {
 
   public void close() {
     IOUtils.closeQuietly(file);
+    MmapUtils.unloadByteBuffer(byteBuffer);
   }
 }

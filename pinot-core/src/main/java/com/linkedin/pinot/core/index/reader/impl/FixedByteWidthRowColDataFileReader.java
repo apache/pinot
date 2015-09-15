@@ -271,11 +271,10 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
   }
 
   public void close() throws IOException {
+    MmapUtils.unloadByteBuffer(byteBuffer);
+
     if (isMMap) {
-      MmapUtils.unloadByteBuffer(byteBuffer);
       file.close();
-    } else {
-      byteBuffer.clear();
     }
   }
 
