@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.index.readerwriter.impl;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -35,6 +35,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
   private int cols;
   private int[] colOffSets;
   private int rowSize;
+  private ByteBuffer _buffer;
 
   public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) throws IOException {
     this(rows, new int[]{columnSizesInBytes});
@@ -53,10 +54,10 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
       rowSize += columnSizesInBytes[i];
     }
     final int totalSize = rowSize * rows;
-    ByteBuffer buffer = ByteBuffer.allocateDirect(totalSize);
-    buffer.order(ByteOrder.nativeOrder());
-    reader = new FixedByteWidthRowColDataFileReader(buffer, rows, cols, columnSizesInBytes);
-    writer = new FixedByteWidthRowColDataFileWriter(buffer, rows, cols, columnSizesInBytes);
+    _buffer = MmapUtils.allocateDirectByteBuffer(totalSize, null, this.getClass().getSimpleName() + " buffer");
+    _buffer.order(ByteOrder.nativeOrder());
+    reader = new FixedByteWidthRowColDataFileReader(_buffer, rows, cols, columnSizesInBytes);
+    writer = new FixedByteWidthRowColDataFileWriter(_buffer, rows, cols, columnSizesInBytes);
   }
 
   @Override
@@ -68,6 +69,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
   public void close() throws IOException {
     reader.close();
     writer.close();
+    MmapUtils.unloadByteBuffer(_buffer);
   }
 
   @Override

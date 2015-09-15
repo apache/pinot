@@ -90,17 +90,20 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
       rawDataReader = new FixedByteWidthRowColDataFileReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });
     } else {
       //chunk offsets
-      chunkOffsetsBuffer = ByteBuffer.allocateDirect(chunkOffsetHeaderSize);
+      chunkOffsetsBuffer = MmapUtils.allocateDirectByteBuffer(chunkOffsetHeaderSize, file,
+          this.getClass().getSimpleName() + " chunkOffsetsBuffer");
       raf.getChannel().read(chunkOffsetsBuffer);
       chunkOffsetsReader = new FixedByteWidthRowColDataFileReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT });
 
       //bitset buffer
-      bitsetBuffer = ByteBuffer.allocateDirect(bitsetSize);
+      bitsetBuffer = MmapUtils.allocateDirectByteBuffer(bitsetSize, file,
+          this.getClass().getSimpleName() + " bitsetBuffer");
       raf.getChannel().read(bitsetBuffer);
       customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
 
       //raw data
-      rawDataBuffer = ByteBuffer.allocateDirect(rawDataSize);
+      rawDataBuffer = MmapUtils.allocateDirectByteBuffer(rawDataSize, file,
+        this.getClass().getSimpleName() + " rawDataBuffer");
       raf.getChannel().read(rawDataBuffer);
       rawDataReader = new FixedByteWidthRowColDataFileReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });
 
@@ -159,15 +162,12 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
   }
 
   public void close() throws IOException {
+    MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+    MmapUtils.unloadByteBuffer(bitsetBuffer);
+    MmapUtils.unloadByteBuffer(rawDataBuffer);
+
     if (isMmap) {
-      MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
-      MmapUtils.unloadByteBuffer(bitsetBuffer);
-      MmapUtils.unloadByteBuffer(rawDataBuffer);
       raf.close();
-    } else {
-      chunkOffsetsBuffer.clear();
-      bitsetBuffer.clear();
-      rawDataBuffer.clear();
     }
   }
 

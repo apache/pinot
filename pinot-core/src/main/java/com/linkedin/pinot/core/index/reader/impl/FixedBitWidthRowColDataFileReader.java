@@ -171,7 +171,8 @@ public class FixedBitWidthRowColDataFileReader {
     if (isMmap) {
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes);
     } else {
-      byteBuffer = ByteBuffer.allocateDirect(totalSizeInBytes);
+      byteBuffer = MmapUtils.allocateDirectByteBuffer(totalSizeInBytes, dataFile,
+          this.getClass().getSimpleName() + " byteBuffer");
       file.getChannel().read(byteBuffer);
       file.close();
     }
@@ -283,11 +284,10 @@ public class FixedBitWidthRowColDataFileReader {
 
   public void close() throws IOException {
     if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+
       if (isMmap) {
-        MmapUtils.unloadByteBuffer(byteBuffer);
         file.close();
-      } else {
-        byteBuffer.clear();
       }
     }
   }

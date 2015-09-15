@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.indexsegment.utils;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -96,7 +97,8 @@ public class GenericRowColumnDataFileReader {
     if (isMmap)
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSize);
     else {
-      byteBuffer = ByteBuffer.allocateDirect((int) totalSize);
+      byteBuffer = MmapUtils
+          .allocateDirectByteBuffer((int) totalSize, dataFile, this.getClass().getSimpleName() + " byteBuffer");
       file.getChannel().read(byteBuffer);
     }
   }
@@ -229,5 +231,6 @@ public class GenericRowColumnDataFileReader {
 
   public void close() {
     IOUtils.closeQuietly(file);
+    MmapUtils.unloadByteBuffer(byteBuffer);
   }
 }

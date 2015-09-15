@@ -103,7 +103,8 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     this.columnSizeInBytes = columnSizeInBytes;
     this.maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
     headerSize = rows * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    headerBuffer = ByteBuffer.allocateDirect(headerSize);
+    headerBuffer = MmapUtils.allocateDirectByteBuffer(headerSize, null,
+        this.getClass().getSimpleName() + " headerBuffer");
     headerBuffer.order(ByteOrder.nativeOrder());
     //dataBufferId, startIndex, length
     headerWriter =
@@ -125,7 +126,8 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
   private void addCapacity(int rowCapacity) throws RuntimeException {
     ByteBuffer dataBuffer;
     try {
-      dataBuffer = ByteBuffer.allocateDirect(rowCapacity * columnSizeInBytes);
+      dataBuffer = MmapUtils.allocateDirectByteBuffer(rowCapacity * columnSizeInBytes, null,
+          this.getClass().getSimpleName() + " dataBuffer");
       dataBuffer.order(ByteOrder.nativeOrder());
       dataBuffers.add(dataBuffer);
       currentDataWriter =

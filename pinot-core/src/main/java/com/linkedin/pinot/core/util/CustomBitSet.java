@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.util;
 
 import com.google.common.primitives.Ints;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.indexsegment.utils.BitUtils;
 import java.nio.ByteBuffer;
 
@@ -31,6 +32,7 @@ public final class CustomBitSet {
   private final ByteBuffer buf;
   private final static int[] bitCountArray = new int[256];
   private final static int IGNORED_ZEROS_COUNT = Integer.SIZE - Byte.SIZE;
+  private final boolean ownsByteBuffer;
 
   static {
     for (int i = 0; i < 256; i++) {
@@ -43,7 +45,8 @@ public final class CustomBitSet {
       throw new IllegalArgumentException("CustomBitSet requires at least one byte of storage, asked for " + nrBytes);
     }
     this.nrBytes = nrBytes;
-    buf = ByteBuffer.allocateDirect(nrBytes);
+    buf = MmapUtils.allocateDirectByteBuffer(nrBytes, null, this.getClass().getSimpleName() + " buf");
+    ownsByteBuffer = true;
   }
 
   private CustomBitSet(final int nrBytes, final ByteBuffer buffer) {
@@ -57,6 +60,7 @@ public final class CustomBitSet {
     }
     this.nrBytes = nrBytes;
     this.buf = buffer;
+    ownsByteBuffer = false;
   }
 
   public static CustomBitSet withByteBuffer(final int numBytes, ByteBuffer byteBuffer) {
@@ -255,4 +259,11 @@ public final class CustomBitSet {
     return ((b & (1 << offset)) != 0);
   }
 
+  protected void finalize() throws Throwable {
+    if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(buf);
+    }
+
+    super.finalize();
+  }
 }

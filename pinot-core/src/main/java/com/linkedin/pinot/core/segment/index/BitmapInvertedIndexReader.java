@@ -118,7 +118,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
     if (isMmap) {
       buffer = _rndFile.getChannel().map(MapMode.READ_ONLY, 0, lastOffset);
     } else {
-      buffer = ByteBuffer.allocateDirect(lastOffset);
+      buffer = MmapUtils.allocateDirectByteBuffer(lastOffset, file, this.getClass().getSimpleName() + " buffer");
       _rndFile.getChannel().read(buffer);
     }
   }
