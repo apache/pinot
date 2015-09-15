@@ -14,6 +14,11 @@
 
 /* Dashboard */
 
+li{
+    font-size: 1em;
+    vertical-align: top;
+}
+
 #dashboard-metric-view,
 #dashboard-dimension-view {
     padding: 2%;
@@ -36,8 +41,33 @@
 
 .dimension-combination {
     font-weight: bold;
+    border: 1px solid #ddd;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
     margin-bottom: 1%;
+    text-align: center;
+
 }
+
+.dimension-combination table{
+    width: 93%;
+    min-height: 31px;
+    table-layout: fixed;
+    border: 2px solid #ddd;
+    overflow-wrap: break-word;
+}
+
+.dimension-combination td span{
+    font-weight: 400;
+}
+
+.dimension-combination td:first-child{
+    width: 110px;
+}
+
+
 
 .uk-panel-title a:hover {
     text-decoration: none;
@@ -114,8 +144,6 @@
 
 #time-nav-buttons {
     float: right;
-    margin-right: 2%;
-    margin-top: 2%;
 }
 
 #metric-funnel-area {
@@ -198,6 +226,11 @@
 .dimension-heat-map-container-title h2{
     display: inline-block;
     font-weight: 800;
+}
+
+.dimension-heat-map-container-title table{
+    width:100%;
+    table-layout:fixed;
 }
 
 .dimension-heat-map-container-title th{
@@ -294,6 +327,7 @@ td[dimension-val]{
 }
 
 /* Dimension Tree Map */
+
 .treemap-section{
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     margin-top:20px;
@@ -305,6 +339,12 @@ td[dimension-val]{
 .dimension-treemap-toggle-buttons{
     margin-left: 12px;
     margin-bottom: 15px;
+}
+
+.treemap-container{
+    width: 100%;
+    height: auto;
+    overflow: hidden;
 }
 
 .treemap-display-tbl{
@@ -478,16 +518,27 @@ td[dimension-val]{
 
 .red{
     color: red;
-    font-weight: 800;
 }
 
 .blue{
     color: blue;
-    font-weight: 800;
 }
 
+.plus-symbol:before{
+    content: "+";
+}
 
+.sticky {
+    position: fixed;
+    top: 40px;
+    z-index: 100;
+    border-top: 0;
+    margin-right: 1.5%;
+}
 
+.sticky td{
+    padding-top:0px;
+}
 
 /* overwriting UIkit css */
 .uk-button.uk-active, .uk-button:active{

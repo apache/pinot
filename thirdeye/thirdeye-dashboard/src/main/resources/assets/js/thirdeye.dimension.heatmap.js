@@ -132,23 +132,35 @@ $(document).ready(function() {
 			   }
 			   }
 			],
+            //turn off default table resizing when toggling columns
             "bAutoWidth": false,
             "iDisplayLength": 10,
+            //Set cell font color to blue/red based on cell value
             "createdRow": function(row, data, index) {
                 if (data[5].replace(/[\$,]/g, '') * 1 < 0) {
                     $('td', row).eq(5).css('color', 'Red');
+                }else if (data[5].replace(/[\$,]/g, '') * 1 > 0){
+                    $('td', row).eq(5).css('color', 'Blue');
                 }
                 if (data[6].replace(/[\$,]/g, '') * 1 < 0) {
                     $('td', row).eq(6).css('color', 'Red');
+                }else if(data[6].replace(/[\$,]/g, '') * 1 > 0){
+                    $('td', row).eq(6).css('color', 'Blue');
                 }
                 if (data[7].replace(/[\$,]/g, '') * 1 < 0) {
                     $('td', row).eq(7).css('color', 'Red');
+                }else if(data[7].replace(/[\$,]/g, '') * 1 > 0){
+                    $('td', row).eq(7).css('color', 'Blue');
                 }
                 if (data[8].replace(/[\$,]/g, '') * 1 < 0) {
                     $('td', row).eq(8).css('color', 'Red');
+                }else if(data[8].replace(/[\$,]/g, '') * 1 > 0){
+                    $('td', row).eq(8).css('color', 'Blue');
                 }
                 if (data[9].replace(/[\$,]/g, '') * 1 < 0) {
                     $('td', row).eq(9).css('color', 'Red');
+                }else if(data[9].replace(/[\$,]/g, '') * 1 > 0){
+                    $('td', row).eq(9).css('color', 'Blue');
                 }
 
             },
@@ -157,6 +169,7 @@ $(document).ready(function() {
         }).columnFilter({
             sRangeFormat: "min {from} max {to}",
             sPlaceHolder: "head:after",
+            //turn off default table resizing when toggling columns
             'bAutoWidth': false,
             aoColumns: [{
                 type: "select"
@@ -306,11 +319,13 @@ $(document).ready(function() {
 
 
     //Indicate baseline total value increase/decrease with red/blue colors next to the title of the table and the treemap
-    $(".dimension-heat-map-container-title .delta-ratio").each(function(index, currentDelta){
+    $(".dimension-heat-map-container-title .delta-ratio, .dimension-heat-map-container-title .delta-value").each(function(index, currentDelta){
 
-        var delta = Number( $(currentDelta).html().trim() )
-        if (  delta != 0 && !isNaN(delta)){
-            var color = delta > 0 ? "blue" : "red"
+        var delta = $(currentDelta).html().trim().replace(/[\$,]/g, '') * 1
+
+        if ( delta != 0 && !isNaN(delta)){
+            var color = delta > 0 ? "blue plus-symbol" : "red"
+
             $(currentDelta).addClass(color)
         }
     })
