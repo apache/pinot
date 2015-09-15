@@ -168,10 +168,6 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
 
     if (isMmap) {
       raf.close();
-    } else {
-      chunkOffsetsBuffer.clear();
-      bitsetBuffer.clear();
-      rawDataBuffer.clear();
     }
   }
 
