@@ -17,7 +17,8 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -27,7 +28,9 @@ public class StarColumnListAstNode extends BaseAstNode {
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     Selection selection = new Selection();
-    selection.setSelectionColumns(Collections.singletonList("*"));
-    brokerRequest.setSelections(selection);
+    List<String> modifiableList = new ArrayList<>(1);
+    modifiableList.add("*");
+    selection.setSelectionColumns(modifiableList);
+        brokerRequest.setSelections(selection);
   }
 }
