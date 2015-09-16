@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,13 +20,9 @@ public class DimensionKeyUtils {
   private static final TypeReference<List<String>> LIST_TYPE_REF = new TypeReference<List<String>>(){};
 
 
-  public static String createQueryKey(String[] filteredDimension) {
-    StringBuilder sb = new StringBuilder();
-    sb = sb.append("[\"");
-    Joiner joiner = Joiner.on("\",\"");
-    sb.append(joiner.join(filteredDimension));
-    sb.append("\"]");
-    return sb.toString();
+  public static String createQueryKey(String[] filteredDimension) throws JsonProcessingException {
+    ObjectMapper objectMapper = new ObjectMapper();
+    return objectMapper.writeValueAsString(filteredDimension);
   }
 
   public static DimensionKey createDimensionKey(String dimension) throws JsonParseException, JsonMappingException, IOException {
