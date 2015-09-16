@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.reporting.api;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -26,18 +28,24 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.reporting.api.TimeRange;
+import com.linkedin.thirdeye.client.DefaultThirdEyeClient;
+import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 import com.linkedin.thirdeye.client.util.SqlUtils;
+import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGeneratorApi;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 import com.linkedin.thirdeye.reporting.util.DimensionKeyUtils;
 import com.linkedin.thirdeye.reporting.util.SegmentDescriptorUtils;
-import com.linkedin.thirdeye.reporting.util.ThirdeyeAnomalyUtils;
-import com.linkedin.thirdeye.reporting.util.ThirdeyeServerUtils;
 import com.linkedin.thirdeye.reporting.util.ThirdeyeUrlUtils;
 
 
@@ -47,6 +55,8 @@ public class ReportGenerator implements Job{
   private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("0.00");
   private static int DEFAULT_AGGREGATION_GRANULARITY = 1;
   private static TimeUnit DEFAULT_AGGREGATION_UNIT = TimeUnit.HOURS;
+  private static final int DEFAULT_CACHE_EXPIRATION_MINUTES = 5;
+  private static final String RATIO_METRIC_PREFIX = "RATIO";
 
   private String collection;
   private String serverUri;
@@ -54,29 +64,49 @@ public class ReportGenerator implements Job{
   private ReportConfig reportConfig;
   private String templatePath;
   private StarTreeConfig starTreeConfig;
+  private ThirdEyeClient thirdeyeClient;
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
-    generateReports(context.getJobDetail().getDescription(), context.getJobDetail().getJobDataMap());
+    try {
+      generateReports(context.getJobDetail().getDescription(), context.getJobDetail().getJobDataMap());
+    } catch (Exception e) {
+      LOGGER.error(e.toString());
+    }
+  }
+
+  private void createThirdeyeClient() throws URISyntaxException {
+
+    DefaultThirdEyeClientConfig thirdEyeClientConfig = new DefaultThirdEyeClientConfig();
+    thirdEyeClientConfig.setExpirationTime(DEFAULT_CACHE_EXPIRATION_MINUTES);
+    thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
+    thirdEyeClientConfig.setExpireAfterAccess(false);
+
+    thirdeyeClient = new DefaultThirdEyeClient(getThirdeyeHost(), getThirdeyePort(), thirdEyeClientConfig);
   }
 
   /**
    * This method will generate the reports according to config
    * @param jobDescription : description set in Quartz Job
    * @param jobDataMap : data map from Quartz Job
+   * @throws Exception
    */
-  private void generateReports(String jobDescription, JobDataMap jobDataMap) {
+  private void generateReports(String jobDescription, JobDataMap jobDataMap) throws Exception {
 
     LOGGER.info("Executing {}", jobDescription);
     try {
       File reportConfigFile = new File(jobDataMap.get(ReportConstants.CONFIG_FILE_KEY).toString());
+
       // get report and schedule config
       reportConfig = ReportConfig.decode(new FileInputStream(reportConfigFile));
       templatePath = jobDataMap.getString(ReportConstants.TEMPLATE_PATH_KEY).toString();
       collection = reportConfig.getCollection();
       serverUri = jobDataMap.get(ReportConstants.SERVER_URI_KEY).toString();
       dashboardUri = jobDataMap.getString(ReportConstants.DASHBOARD_URI_KEY.toString());
-      starTreeConfig = ThirdeyeServerUtils.getStarTreeConfig(serverUri, collection);
+
+      createThirdeyeClient();
+      starTreeConfig = thirdeyeClient.getStarTreeConfig(collection);
+
       ScheduleSpec scheduleSpec = reportConfig.getSchedules().get(jobDescription);
       int aggregationSize = scheduleSpec.getAggregationSize();
       TimeUnit aggregationUnit = scheduleSpec.getAggregationUnit();
@@ -124,9 +154,9 @@ public class ReportGenerator implements Job{
         LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
 
         Map<String, String> dimensionValues = DimensionKeyUtils.createDimensionValues(tableSpec);
-
         Map<String, List<ReportRow>> metricTableRows = new HashMap<>();
         List<TableReportRow> tableReportRows = new ArrayList<>();
+
         for (int i = 0; i < scheduleSpec.getReportWindow(); i++) {
           currentEndHour = currentStartHour.plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
           baselineEndHour = baselineStartHour.plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
@@ -138,8 +168,8 @@ public class ReportGenerator implements Job{
             String currentSql = SqlUtils.getSql(metric, collection, currentStartHour, currentEndHour, dimensionValues);
             String baselineSql = SqlUtils.getSql(metric, collection, baselineStartHour, baselineEndHour, dimensionValues);
 
-            ThirdEyeRawResponse currentQueryResult = ThirdeyeServerUtils.getReport(serverUri, currentSql);
-            ThirdEyeRawResponse baselineQueryResult = ThirdeyeServerUtils.getReport(serverUri, baselineSql);
+            ThirdEyeRawResponse currentQueryResult = thirdeyeClient.getRawResponse(currentSql);
+            ThirdEyeRawResponse baselineQueryResult = thirdeyeClient.getRawResponse(baselineSql);
 
             // apply filters
             Map<DimensionKey, Number> currentReportOutput = applyFilters(currentQueryResult, tableSpec, metric, currentStartHour, currentEndHour);
@@ -166,7 +196,8 @@ public class ReportGenerator implements Job{
         }
 
         // compute Total row
-        calculateSummaryRow(metricTableRows, tableSpec);
+        calculateSummaryRow(metricTableRows);
+        calculateRatioTotal(metricTableRows);
         tableReportRows = getGroupBy(metricTableRows, tableSpec.getMetrics());
 
         // find anomalies
@@ -175,8 +206,8 @@ public class ReportGenerator implements Job{
             anomalyReportTables = new HashMap<String, AnomalyReportTable>();
           }
           LOGGER.info("Finding anomalies...");
-          anomalyReportTables.putAll(
-              ThirdeyeAnomalyUtils.getAnomalies(reportConfig, tableSpec, collection));
+          AnomalyReportGeneratorApi anomalyReportGeneratorApi = new AnomalyReportGeneratorApi();
+          anomalyReportTables.putAll(anomalyReportGeneratorApi.getAnomalies(reportConfig, tableSpec, collection));
         }
 
         Table table = new Table(tableReportRows, tableSpec, thirdeyeUri);
@@ -214,28 +245,16 @@ public class ReportGenerator implements Job{
       }
       break;
     }
-
     for (String metric : metrics) {
       List<ReportRow> metricRows = metricTableRows.get(metric);
-
       for (int i = 0; i < metricRows.size(); i++) {
         tableReportRows.get(i).getRows().add(metricRows.get(i));
       }
-
     }
     return tableReportRows;
   }
 
-  /**
-   * Method to compute Total row from given list of rows
-   * @param metricTableRows
-   * @param tableSpec
-   */
-  private void calculateSummaryRow(Map<String, List<ReportRow>> metricTableRows, TableSpec tableSpec) {
-    Map<String, Integer> metricPosition = new HashMap<String, Integer>();
-    for (int position = 0; position < starTreeConfig.getMetrics().size(); position++) {
-      metricPosition.put(starTreeConfig.getMetrics().get(position).getName(), position);
-    }
+  private void calculateRatioTotal(Map<String, List<ReportRow>> metricTableRows) {
 
     for (Entry<String, List<ReportRow>> entry : metricTableRows.entrySet()) {
       List<ReportRow> tableRows = entry.getValue();
@@ -243,28 +262,51 @@ public class ReportGenerator implements Job{
       if (tableRows.size() == 0) {
         throw new IllegalStateException("No rows found for metric " + metric);
       }
-      MetricTimeSeries currentSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics()));
-      MetricTimeSeries baselineSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics()));
+      if (metric.startsWith(RATIO_METRIC_PREFIX)) {
+        String[] tokens = metric.split("[\\W]");
+        String metric1 = tokens[1];
+        String metric2 = tokens[2];
+
+        List<ReportRow> metric1Rows = metricTableRows.get(metric1);
+        List<ReportRow> metric2Rows = metricTableRows.get(metric2);
+        List<ReportRow> metricRows = metricTableRows.get(metric);
+        if (metric1Rows == null || metric2Rows == null) {
+          throw new IllegalStateException("Ratio metrics not present in report");
+        }
+        ReportRow lastMetric1Row = metric1Rows.get(metric1Rows.size() - 1);
+        ReportRow lastMetric2Row = metric2Rows.get(metric2Rows.size() - 1);
+        ReportRow lastMetricRow = metricRows.get(metricRows.size() - 1);
+        lastMetricRow.setBaseline(lastMetric1Row.getBaseline().doubleValue() / lastMetric2Row.getBaseline().doubleValue());
+        lastMetricRow.setCurrent(lastMetric1Row.getCurrent().doubleValue() / lastMetric2Row.getCurrent().doubleValue());
+      }
+    }
+  }
+
+  /**
+   * Method to compute Total row from given list of rows
+   */
+  private void calculateSummaryRow(Map<String, List<ReportRow>> metricTableRows) {
+
+    for (Entry<String, List<ReportRow>> entry : metricTableRows.entrySet()) {
+      List<ReportRow> tableRows = entry.getValue();
+      String metric = entry.getKey();
+      if (tableRows.size() == 0) {
+        throw new IllegalStateException("No rows found for metric " + metric);
+      }
 
       ReportRow summary = new ReportRow(tableRows.get(0));
 
-      if (metric.startsWith("RATIO")) {
-        double currentSum = 0;
-        double baselineSum = 0;
-        for (int i = 0; i < tableRows.size(); i++) {
-          currentSum += tableRows.get(i).getCurrent().doubleValue();
-          baselineSum += tableRows.get(i).getBaseline().doubleValue();
-        }
-        summary.setCurrent(currentSum);
-        summary.setBaseline(baselineSum);
-      } else {
-        for (int i = 0; i < tableRows.size(); i++) {
-          currentSeries.set(i, metric, tableRows.get(i).getCurrent());
-          baselineSeries.set(i, metric, tableRows.get(i).getBaseline());
-        }
-        summary.setCurrent(currentSeries.getMetricSums()[metricPosition.get(metric)]);
-        summary.setBaseline(baselineSeries.getMetricSums()[metricPosition.get(metric)]);
+      int metricPosition = 0;
+      List<MetricSpec> metricSpecs = getMetricSpecs(metric);
+      MetricTimeSeries currentSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(metricSpecs));
+      MetricTimeSeries baselineSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(metricSpecs));
+
+      for (int i = 0; i < tableRows.size(); i++) {
+        currentSeries.set(i, metric, tableRows.get(i).getCurrent());
+        baselineSeries.set(i, metric, tableRows.get(i).getBaseline());
       }
+      summary.setCurrent(currentSeries.getMetricSums()[metricPosition]);
+      summary.setBaseline(baselineSeries.getMetricSums()[metricPosition]);
 
       summary.setRatio(DOUBLE_FORMAT.format((summary.getCurrent().doubleValue() - summary.getBaseline().doubleValue())/(summary.getBaseline().doubleValue()) * 100));
       summary.setDimension("Total");
@@ -272,18 +314,8 @@ public class ReportGenerator implements Job{
     }
   }
 
-
   /**
    * Create report rows
-   * @param currentStartHour
-   * @param currentEndHour
-   * @param baselineStartHour
-   * @param baselineEndHour
-   * @param currentReportOutput
-   * @param baselineReportOutput
-   * @param metric
-   * @param dimensionPosition
-   * @return
    */
   private List<ReportRow> createRow(DateTime currentStartHour, DateTime currentEndHour, DateTime baselineStartHour, DateTime baselineEndHour,
       Map<DimensionKey, Number> currentReportOutput, Map<DimensionKey, Number> baselineReportOutput, String metric, int dimensionPosition) {
@@ -297,26 +329,11 @@ public class ReportGenerator implements Job{
         dimension = entry.getKey().getDimensionValues()[dimensionPosition];
       }
 
-      ReportRow row = null;
-      try {
-        if (metric.startsWith("RATIO")) {
-          row = new ReportRow(currentStartHour, currentEndHour,
-              baselineStartHour, baselineEndHour,
-              entry.getKey(), dimension, metric,
-              baselineReportOutput.get(entry.getKey()) == null ? 0 : baselineReportOutput.get(entry.getKey()),
-              entry.getValue());
-
-        } else {
-          row = new ReportRow(currentStartHour, currentEndHour,
-              baselineStartHour, baselineEndHour,
-              entry.getKey(), dimension, metric,
-              baselineReportOutput.get(entry.getKey()) == null ? 0 : baselineReportOutput.get(entry.getKey()).longValue(),
-              entry.getValue().longValue());
-        }
-
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
+      ReportRow row = new ReportRow(currentStartHour, currentEndHour,
+            baselineStartHour, baselineEndHour,
+            entry.getKey(), dimension, metric,
+            baselineReportOutput.get(entry.getKey()) == null ? 0 : baselineReportOutput.get(entry.getKey()),
+            entry.getValue());
       row.setRatio(DOUBLE_FORMAT.format((row.getCurrent().doubleValue() - row.getBaseline().doubleValue()) / (row.getBaseline().doubleValue()) * 100));
       reportRows.add(row);
     }
@@ -326,17 +343,13 @@ public class ReportGenerator implements Job{
   /**
    * Apply filters to thirdeye raw sql response
    * @param queryResult : Thirdeye raw sql response
-   * @param tableSpec
-   * @param metric
-   * @param startTime
-   * @param endTime
    * @return
    */
-  private Map<DimensionKey, Number> applyFilters(ThirdEyeRawResponse queryResult, TableSpec tableSpec, String metric, DateTime startTime, DateTime endTime) {
+  private Map<DimensionKey, Number> applyFilters(ThirdEyeRawResponse queryResult, TableSpec tableSpec, String metric, DateTime startTime, DateTime endTime) throws JsonParseException, JsonMappingException, IOException {
 
     Map<DimensionKey, Number> reportOutput = new HashMap<DimensionKey, Number>();
 
-    // apply fixed dimensions
+    // apply fixed dimensions filter
     String[] filteredDimension = new String[queryResult.getDimensions().size()];
     for (int i = 0; i < queryResult.getDimensions().size(); i++) {
       if (tableSpec.getFixedDimensions() != null && tableSpec.getFixedDimensions().containsKey(queryResult.getDimensions().get(i))) {
@@ -346,7 +359,7 @@ public class ReportGenerator implements Job{
       }
     }
 
-    // get dimensions to include in group by
+    // get dimensions to include in group by filter
     Set<String> includeDimensions = new HashSet<>();
     Set<String> excludeDimensions = new HashSet<String>();
     int dimensionPosition = -1;
@@ -371,45 +384,46 @@ public class ReportGenerator implements Job{
 
     // get metric position
     int metricPosition = 0;
-    MetricSchema schema = MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics());
-    for (int i = 0; i < starTreeConfig.getMetrics().size(); i ++) {
-      if (metric.equals(starTreeConfig.getMetrics().get(i).getName())) {
-        metricPosition = i;
-        break;
-      }
-    }
+    List<MetricSpec> metricSpecs = getMetricSpecs(metric);
+    MetricSchema schema = MetricSchema.fromMetricSpecs(metricSpecs);
 
-    if (metric.startsWith("RATIO")) {
-      for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
-        DimensionKey dimensionKey = DimensionKeyUtils.createDimensionKey(entry.getKey());
-        Map<String, Number[]> data = entry.getValue();
-        double ratioSum = 0;
-        for (Entry<String, Number[]> dataEntry : data.entrySet()) {
-          if (!String.valueOf(endTime.getMillis()).equals(dataEntry.getKey())) {
-            int position = queryResult.getMetrics().indexOf(metric);
-            ratioSum += dataEntry.getValue()[position].doubleValue();
-          }
+    for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
+      DimensionKey dimensionKey = DimensionKeyUtils.createDimensionKey(entry.getKey());
+      Map<String, Number[]> data = entry.getValue();
+      MetricTimeSeries series = new MetricTimeSeries(schema);
+      for (Entry<String, Number[]> dataEntry : data.entrySet()) {
+        if (!String.valueOf(endTime.getMillis()).equals(dataEntry.getKey())) {
+          int position = queryResult.getMetrics().indexOf(metric);
+          series.set(Long.valueOf(dataEntry.getKey()), metric, dataEntry.getValue()[position]);
         }
-        reportOutput.put(dimensionKey, ratioSum);
       }
-    } else {
-      for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
-        DimensionKey dimensionKey = DimensionKeyUtils.createDimensionKey(entry.getKey());
-        Map<String, Number[]> data = entry.getValue();
-        MetricTimeSeries series = new MetricTimeSeries(schema);
-        for (Entry<String, Number[]> dataEntry : data.entrySet()) {
-          if (!String.valueOf(endTime.getMillis()).equals(dataEntry.getKey())) {
-
-            int position = queryResult.getMetrics().indexOf(metric);
-            series.set(Long.valueOf(dataEntry.getKey()), metric, dataEntry.getValue()[position]);
-          }
-        }
-        Number[] seriesSums = series.getMetricSums();
-        reportOutput.put(dimensionKey, seriesSums[metricPosition]);
-      }
+      Number[] seriesSums = series.getMetricSums();
+      reportOutput.put(dimensionKey, seriesSums[metricPosition]);
     }
     return reportOutput;
   }
 
+  private List<MetricSpec> getMetricSpecs(String metric) {
+    List<MetricSpec> metricSpecs = new ArrayList<MetricSpec>();
+    MetricSpec metricSpec = new MetricSpec(metric, MetricType.DOUBLE);
+    for (MetricSpec spec : starTreeConfig.getMetrics()) {
+      if (spec.getName().equals(metric)) {
+        metricSpec = new MetricSpec(metric, MetricType.LONG);
+        break;
+      }
+    }
+    metricSpecs.add(metricSpec);
+    return metricSpecs;
+  }
+
+  private String getThirdeyeHost() throws URISyntaxException {
+    URI uri = new URI(serverUri);
+    return uri.getHost();
+  }
+
+  private int getThirdeyePort() throws URISyntaxException {
+    URI uri = new URI(serverUri);
+    return uri.getPort();
+  }
 
 }
