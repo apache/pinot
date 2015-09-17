@@ -71,8 +71,7 @@ public class ReportGenerator implements Job{
     try {
       generateReports(context.getJobDetail().getDescription(), context.getJobDetail().getJobDataMap());
     } catch (Exception e) {
-      e.printStackTrace();
-      LOGGER.error(e.toString());
+      LOGGER.error("Generate Reports failed", e);
     }
   }
 
@@ -234,8 +233,7 @@ public class ReportGenerator implements Job{
       reportEmailSender.emailReport();
 
     } catch (IOException e) {
-      e.printStackTrace();
-      LOGGER.error(e.toString());
+      LOGGER.error("Job failed", e);
     }
   }
 
