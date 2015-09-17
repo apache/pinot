@@ -71,6 +71,7 @@ public class ReportGenerator implements Job{
     try {
       generateReports(context.getJobDetail().getDescription(), context.getJobDetail().getJobDataMap());
     } catch (Exception e) {
+      e.printStackTrace();
       LOGGER.error(e.toString());
     }
   }
@@ -154,6 +155,7 @@ public class ReportGenerator implements Job{
         LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
 
         Map<String, String> dimensionValues = DimensionKeyUtils.createDimensionValues(tableSpec);
+        LOGGER.info("Generated dimension values");
         Map<String, List<ReportRow>> metricTableRows = new HashMap<>();
         List<TableReportRow> tableReportRows = new ArrayList<>();
 
@@ -164,17 +166,22 @@ public class ReportGenerator implements Job{
           // generate report for every metric
           for (String metric : tableSpec.getMetrics()) {
 
+            LOGGER.info("Metric : "+metric);
             // sql query
             String currentSql = SqlUtils.getSql(metric, collection, currentStartHour, currentEndHour, dimensionValues);
             String baselineSql = SqlUtils.getSql(metric, collection, baselineStartHour, baselineEndHour, dimensionValues);
 
+            LOGGER.info("Current sql : "+currentSql);
+            LOGGER.info("Baseline sql : "+baselineSql);
             ThirdEyeRawResponse currentQueryResult = thirdeyeClient.getRawResponse(currentSql);
             ThirdEyeRawResponse baselineQueryResult = thirdeyeClient.getRawResponse(baselineSql);
 
+            LOGGER.info("Applying filters");
             // apply filters
             Map<DimensionKey, Number> currentReportOutput = applyFilters(currentQueryResult, tableSpec, metric, currentStartHour, currentEndHour);
             Map<DimensionKey, Number> baselineReportOutput = applyFilters(baselineQueryResult, tableSpec, metric, baselineStartHour, baselineEndHour);
 
+            LOGGER.info("Creating report rows");
             // create report rows
             List<ReportRow> reportRows;
             if (tableSpec.getGroupBy() != null) {
@@ -195,8 +202,10 @@ public class ReportGenerator implements Job{
           baselineStartHour = baselineEndHour;
         }
 
+        LOGGER.info("Calculating summary row");
         // compute Total row
         calculateSummaryRow(metricTableRows);
+        LOGGER.info("Calculating ratio summary row");
         calculateRatioTotal(metricTableRows);
         tableReportRows = getGroupBy(metricTableRows, tableSpec.getMetrics());
 
@@ -214,15 +223,18 @@ public class ReportGenerator implements Job{
         tables.add(table);
       }
 
+      LOGGER.info("Applying aliases");
       // apply alias
       AliasSpec.alias(reportConfig, tables, anomalyReportTables);
 
+      LOGGER.info("Creating data model");
       // send data to email sender
       ReportEmailDataModel reportObjects = new ReportEmailDataModel(reportConfig, tables, anomalyReportTables, missingSegments, scheduleSpec, new ReportEmailCssSpec());
       ReportEmailSender reportEmailSender = new ReportEmailSender(reportObjects, templatePath);
       reportEmailSender.emailReport();
 
     } catch (IOException e) {
+      e.printStackTrace();
       LOGGER.error(e.toString());
     }
   }
