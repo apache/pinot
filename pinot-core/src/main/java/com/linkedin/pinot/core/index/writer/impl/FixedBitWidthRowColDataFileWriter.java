@@ -23,7 +23,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
@@ -42,7 +41,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private int[] columnOffsetsInBits;
 
   private int[] offsets;
-  private MappedByteBuffer byteBuffer;
+  private ByteBuffer byteBuffer;
   private RandomAccessFile raf;
   private int rowSizeInBits;
   private int[] colSizesInBits;
@@ -118,8 +117,8 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private void createBuffer(File file) throws FileNotFoundException,
       IOException {
     raf = new RandomAccessFile(file, "rw");
-    byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        bytesRequired);
+    byteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        bytesRequired, file, this.getClass().getSimpleName() + " byteBuffer");
     byteBuffer.position(0);
     for (int i = 0; i < bytesRequired; i++) {
       byteBuffer.put((byte) 0);

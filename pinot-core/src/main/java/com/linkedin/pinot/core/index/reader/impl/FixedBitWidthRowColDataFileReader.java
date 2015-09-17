@@ -169,7 +169,8 @@ public class FixedBitWidthRowColDataFileReader {
     file = new RandomAccessFile(dataFile, "rw");
     this.isMmap = isMmap;
     if (isMmap) {
-      byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes);
+      byteBuffer = MmapUtils.mmapFile(file, FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes, dataFile,
+          this.getClass().getSimpleName() + " byteBuffer");
     } else {
       byteBuffer = MmapUtils.allocateDirectByteBuffer(totalSizeInBytes, dataFile,
           this.getClass().getSimpleName() + " byteBuffer");

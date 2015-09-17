@@ -79,10 +79,13 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     raf = new RandomAccessFile(file, "rw");
     this.isMmap = isMmap;
     if (isMmap) {
-      chunkOffsetsBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize);
-      bitsetBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize);
+      chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize, file,
+          this.getClass().getSimpleName() + " chunkOffsetsBuffer");
+      bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize, file,
+          this.getClass().getSimpleName() + " bitsetBuffer");
       rawDataBuffer =
-          raf.getChannel().map(FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize);
+          MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize, file,
+              this.getClass().getSimpleName() + " rawDataBuffer");
 
       chunkOffsetsReader =
           new FixedByteWidthRowColDataFileReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER,
