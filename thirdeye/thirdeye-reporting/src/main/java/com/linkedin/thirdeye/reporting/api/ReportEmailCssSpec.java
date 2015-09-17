@@ -6,6 +6,8 @@ import java.io.InputStream;
 
 import org.apache.commons.io.IOUtils;
 
+import com.linkedin.thirdeye.reporting.ThirdEyeReportingApplication;
+
 public class ReportEmailCssSpec {
 
   private String timeTitleStyle;
@@ -189,7 +191,8 @@ public class ReportEmailCssSpec {
   private String loadCss(String cssFile) throws IOException {
 
     String css = null;
-    InputStream is = ClassLoader.getSystemResourceAsStream("assets/css/" + cssFile);
+    ClassLoader classLoader = Thread.class.getClassLoader();
+    InputStream is = classLoader.getSystemResourceAsStream("assets/css/" + cssFile);
 
     try {
       css = IOUtils.toString(is);
