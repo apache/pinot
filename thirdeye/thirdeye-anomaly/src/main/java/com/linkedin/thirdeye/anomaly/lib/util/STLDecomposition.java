@@ -56,6 +56,8 @@ public class STLDecomposition {
     private double seasonalComponentBandwidth = 0.25;
     /** Whether the series is periodic, if this is true, then seasonalComponentBandwidth is ignored. */
     private boolean periodic = false;
+    /** total length of time series */
+    private int numberOfDataPoints;
 
     public Config() {}
 
@@ -115,16 +117,29 @@ public class STLDecomposition {
       this.periodic = periodic;
     }
 
-
-    public void check() {
-      checkPeriodicity(numberOfObservations);
-
-      // TODO: Check n_t, needs to be n_t >= 1.5 * n_p / (1 - 1.5/n_s)
+    public int getNumberOfDataPoints() {
+      return numberOfDataPoints;
     }
 
-    private int checkPeriodicity(int numberOfObservations) {
+    public void setNumberOfDataPoints(int numberOfDataPoints) {
+      this.numberOfDataPoints = numberOfDataPoints;
+    }
+
+    public void check() {
+      checkPeriodicity(numberOfObservations, numberOfDataPoints);
+      // Check n_t, needs to be n_t >= 1.5 * n_p / (1 - 1.5/n_s)
+      if (periodic == true) {
+        double t_window_span = (1.5 * (double)numberOfObservations)/ (1- 1.5/((double)numberOfDataPoints * 10 + 1)) / (double) numberOfDataPoints;
+        setTrendComponentBandwidth(t_window_span);
+      }
+    }
+
+    private int checkPeriodicity(int numberOfObservations, int numberOfDataPoints) {
       if (numberOfObservations < 2) {
         throw new IllegalArgumentException("Periodicity (numberOfObservations) must be >= 2");
+      }
+      if (numberOfDataPoints <= 2 * numberOfObservations) {
+        throw new IllegalArgumentException("numberOfDataPoints(total length) must contain at least 2 * Periodicity (numberOfObservations) points");
       }
       return numberOfObservations;
     }
@@ -183,6 +198,8 @@ public class STLDecomposition {
     double[] seasonal = new double[series.length];
     double[] remainder = new double[series.length];
     double[] robustness = null;
+    //test
+    System.out.println(config.getTrendComponentBandwidth());
 
     for (int l = 0; l < config.getNumberOfRobustnessIterations(); l++) {
       for (int k = 0; k < config.getNumberOfInnerLoopPasses(); k++) {

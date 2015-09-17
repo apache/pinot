@@ -26,7 +26,7 @@ import org.apache.commons.math3.stat.inference.TTest;
 public class STLTest {
   @Test
   public void stlTest() throws IOException {
-    testSTL("timeseries.csv", "outputTimeSeries.csv", 168, 1, 15, 0.75, 0.75, true);
+    testSTL("timeseries.csv", "outputTimeSeries.csv", 168, 1, 15, 0.75, 0.10, true);
     testSTL("outputtest1.csv", 24, 10, 1.0, 0.1, 1, 15, 0.75, 0.75, true);
     testSTL("outputtest2.csv", 24, 5, -2.0, 1.0, 1, 15, 0.75, 0.75, true);
     testSTL("outputtest3.csv", 12, 1, 1, 10.0, 1, 15, 0.75, 0.75, true);
@@ -171,6 +171,7 @@ public class STLTest {
     config.setLowPassFilterBandwidth(lowpassbandwidth);
     config.setTrendComponentBandwidth(trendcomponentbandwidth);
     config.setPeriodic(periodic);
+    config.setNumberOfDataPoints(timestamps.length);
     STLDecomposition stl = new STLDecomposition(config);
 
     STLResult res = stl.decompose(timestamps, series);

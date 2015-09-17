@@ -321,6 +321,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
    *
    * Note, the first data point cannot be a hole by construction from the conversion of MetricTimeSeries with
    * (min, max) times.
+   * (TODO): linear interpolation for missing data later.
    */
   public static void removeMissingValuesByAveragingNeighbors(double[] arr) {
     for (int i = 0; i < arr.length; i++) {
@@ -343,8 +344,12 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private double[] removeSeasonality(long[] timestamps, double[] series, int seasonality) {
     STLDecomposition.Config config = new STLDecomposition.Config();
     config.setNumberOfObservations(seasonality);
-    config.setNumberOfInnerLoopPasses(2);
-    config.setNumberOfRobustnessIterations(4);
+    /*
+     * InnerLoopPasses set to 1 and RobustnessIterations set to 15 matches the stl using robust option in R implementation
+     * For reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html
+     */
+    config.setNumberOfInnerLoopPasses(1);
+    config.setNumberOfRobustnessIterations(15);
 
     /*
      * There isn't a particularly good reason to use these exact values other than that the results closely match the
@@ -354,6 +359,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     config.setTrendComponentBandwidth(stlTrendBandwidth); // default is 0.5
 
     config.setPeriodic(true);
+    config.setNumberOfDataPoints(series.length);
     STLDecomposition stl = new STLDecomposition(config);
 
     STLResult res = stl.decompose(timestamps, series);
