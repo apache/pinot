@@ -192,7 +192,7 @@ public class ReportEmailCssSpec {
 
     String css = null;
     ClassLoader classLoader = Thread.class.getClassLoader();
-    InputStream is = classLoader.getSystemResourceAsStream("assets/css/" + cssFile);
+    InputStream is = classLoader.getResourceAsStream("assets/css/" + cssFile);
 
     try {
       css = IOUtils.toString(is);
