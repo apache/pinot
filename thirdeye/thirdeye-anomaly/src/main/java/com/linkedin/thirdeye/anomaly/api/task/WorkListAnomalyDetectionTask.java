@@ -82,7 +82,7 @@ public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTa
     LOGGER.info("begin executing AnomalyDetectionTask : {}", getTaskInfo());
     List<Future<?>> futures = new LinkedList<>();
 
-    for (final DimensionKeySeries dimensionKeySeries : dimensionKeySeries) {
+    for (final DimensionKeySeries dimensionKeySeries : this.dimensionKeySeries) {
       futures.add(SHARED_EXECUTORS.submit(new Runnable() {
         @Override
         public void run() {

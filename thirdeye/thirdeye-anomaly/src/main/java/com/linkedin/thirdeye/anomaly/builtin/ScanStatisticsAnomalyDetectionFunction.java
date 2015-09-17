@@ -322,7 +322,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
    * Note, the first data point cannot be a hole by construction from the conversion of MetricTimeSeries with
    * (min, max) times.
    */
-  private void removeMissingValuesByAveragingNeighbors(double[] arr) {
+  public static void removeMissingValuesByAveragingNeighbors(double[] arr) {
     for (int i = 0; i < arr.length; i++) {
       if (Double.isNaN(arr[i])) {
         double sum = 0.0;
