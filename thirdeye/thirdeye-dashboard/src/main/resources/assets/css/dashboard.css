@@ -122,6 +122,15 @@ li{
     padding:8px;
 }
 
+/* Funnel Heatmap */
+.thumbnail td{
+     padding: 0px;
+     font-size:6px;
+ }
+.thumbnail th{
+    word-wrap: break-word;
+}
+
 /* Metric */
 
 .metric-table-down-cell {
@@ -345,6 +354,10 @@ td[dimension-val]{
     width: 100%;
     height: auto;
     overflow: hidden;
+}
+
+.treemap-container * {
+    box-sizing: border-box;
 }
 
 .treemap-display-tbl{
