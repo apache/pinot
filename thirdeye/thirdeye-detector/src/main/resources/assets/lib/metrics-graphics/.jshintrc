@@ -1,0 +1,12 @@
+{
+  "globals": {
+    "$": false,
+    "jQuery": false,
+    "MG": false,
+    "d3": false
+  },
+  "laxbreak": true,
+  "validthis": true,
+  "loopfunc": true,
+  "sub": true
+}

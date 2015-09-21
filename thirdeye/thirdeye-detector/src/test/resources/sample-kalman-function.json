@@ -1,0 +1,13 @@
+{
+  "collection": "myCollection",
+  "metric": "impressions",
+  "type": "KALMAN_FILTER",
+  "isActive": true,
+  "cron": "* 0/5 * * * ?",
+  "windowSize": 672,
+  "windowUnit": "HOURS",
+  "windowDelay": 3,
+  "bucketSize": 1,
+  "bucketUnit": "HOURS",
+  "properties": "seasonal=168"
+}

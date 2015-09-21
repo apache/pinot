@@ -42,7 +42,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private static final String PROP_DEFAULT_NUM_SIMULATIONS = "1000";
   private static final String PROP_DEFAULT_MIN_INCREMENT = "1";
   private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + TimeUnit.DAYS.toHours(7);
-  private static final String PROP_DEFAULT_BOOTSTRAP = "true";
+  private static final String PROP_DEFAULT_BOOTSTRAP = "false";
   private static final String PROP_DEFAULT_STL_TREND_BANDWIDTH = "0.5";
 
   private static final String PROP_DEFAULT_MONITORING_WINDOW_SIZE = "3";

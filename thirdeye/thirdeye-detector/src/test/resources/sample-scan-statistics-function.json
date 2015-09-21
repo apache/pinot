@@ -1,0 +1,13 @@
+{
+  "collection": "myCollection",
+  "metric": "impressions",
+  "type": "SCAN_STATISTICS",
+  "isActive": true,
+  "cron": "* 0/5 * * * ?",
+  "windowSize": 912,
+  "windowUnit": "HOURS",
+  "windowDelay": 3,
+  "bucketSize": 1,
+  "bucketUnit": "HOURS",
+  "properties": "pattern=DOWN"
+}

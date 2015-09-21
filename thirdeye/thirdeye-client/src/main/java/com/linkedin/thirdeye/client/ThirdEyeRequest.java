@@ -16,6 +16,14 @@ public class ThirdEyeRequest {
 
   public ThirdEyeRequest() {}
 
+  public ThirdEyeRequest(ThirdEyeRequest other) {
+    this.collection = other.getCollection();
+    this.metricFunction = other.getMetricFunction();
+    this.startTime = other.getStartTime();
+    this.endTime = other.getEndTime();
+    this.dimensionValues = LinkedListMultimap.create(other.getDimensionValues());
+  }
+
   public ThirdEyeRequest setCollection(String collection) {
     this.collection = collection;
     return this;
@@ -48,6 +56,11 @@ public class ThirdEyeRequest {
 
   public ThirdEyeRequest addDimensionValue(String name, String value) {
     this.dimensionValues.put(name, value);
+    return this;
+  }
+
+  public ThirdEyeRequest setDimensionValues(Multimap<String, String> dimensionValues) {
+    this.dimensionValues = dimensionValues;
     return this;
   }
 

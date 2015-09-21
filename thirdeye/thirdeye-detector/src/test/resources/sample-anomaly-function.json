@@ -1,0 +1,14 @@
+{
+  "collection": "myCollection",
+  "metric": "impressions",
+  "type": "USER_RULE",
+  "isActive": true,
+  "cron": "* 0/5 * * * ?",
+  "properties": "changeThreshold=-0.10;averageVolumeThreshold=10000;baseline=w/w",
+  "windowSize": 672,
+  "windowUnit": "HOURS",
+  "windowDelay": 3,
+  "bucketSize": 1,
+  "bucketUnit": "HOURS",
+  "exploreDimensions": "source,countryCode"
+}
