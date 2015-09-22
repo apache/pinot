@@ -10,7 +10,6 @@
 
 #dashboard-start-logo {
     margin-top: 10%;
-    margin-left: 50%;
 }
 
 /* Dashboard */
@@ -132,12 +131,12 @@ li{
 
 /* Funnel Heatmap */
 .custom-funnel-section table{
-    line-height: 10px;
+    line-height: 9px;
     text-align: center;
 }
 
 #custom-funnels-container td:hover{
-    text-shadow: #fff -1px -2px;
+    color: #808080;
 }
 
 .funnel-thumbnail-container{
