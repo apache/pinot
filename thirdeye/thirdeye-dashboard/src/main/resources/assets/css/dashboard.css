@@ -20,8 +20,7 @@ li{
     vertical-align: top;
 }
 
-#dashboard-metric-view,
-#dashboard-dimension-view {
+#dashboard-metric-view {
     padding: 2%;
 }
 
@@ -33,10 +32,6 @@ li{
 #dashboard-dimension-view {
     padding-top: 75px;
     margin-top: -75px;
-}
-
-#dashboard-output{
-    margin-left: 20%;
 }
 
 #dashboard-output hr {
@@ -79,11 +74,6 @@ li{
 }
 
 /* Side nav */
-#dashboard-sidenav{
-    position:fixed;
-    top:0;
-    bottom:0;
-}
 #sidenav-time-input-form .uk-form-row {
     margin-left: 5%;
 }
@@ -141,11 +131,19 @@ li{
 }
 
 /* Funnel Heatmap */
+.custom-funnel-section table{
+    line-height: 10px;
+    text-align: center;
+}
+
+#custom-funnels-container td:hover{
+    text-shadow: #fff -1px -2px;
+}
+
 .funnel-thumbnail-container{
     background-color: #ddd;
     text-align: center;
     padding: 10px;
-
 }
 
 #funnel-thumbnails td{
@@ -165,13 +163,22 @@ li{
 
 #funnel-thumbnails>div{
     display: inline-block;
+    border: 1px solid #000;
+    border-radius: 4px;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
     margin: auto;
     padding:5px;
-    border: 1px solid #ccc;
+
 }
 
-#funnel-thumbnails>div[selected]{
-    background-color: #fff;
+#funnel-thumbnails>div:not(.uk-panel-box){
+    background-color: #ddd;
+}
+
+#funnel-thumbnails>div.uk-panel-box{
+    border: 1px solid #ccc;
+
 }
 
 #funnel-thumbnails>div:hover{
@@ -612,6 +619,8 @@ td[dimension-val]{
     color: #444;
     font-weight: 800;
 }
+
+
 
 
 

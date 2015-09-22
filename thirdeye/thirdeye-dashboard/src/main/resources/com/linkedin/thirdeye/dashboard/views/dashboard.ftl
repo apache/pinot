@@ -10,11 +10,11 @@
     <body>
         <div class="uk-grid">
             <#-- Side nav -->
-            <div id="dashboard-sidenav" class="uk-width-1-5">
+            <div id="dashboard-sidenav" class="uk-width-1-4">
                 <#include "common/sidenav.ftl">
             </div>
 
-            <div id="dashboard-output" class="uk-width-4-5">
+            <div id="dashboard-output" class="uk-width-3-4">
                 <div id="dashboard-output-nav" data-uk-sticky>
                     <#include "common/headnav.ftl">
                 </div>
@@ -25,6 +25,7 @@
                     </div>
 
                     <#-- Metric view-->
+
                     <#if (metricView.type == "INTRA_DAY")>
                         <#include "metric/intra-day.ftl">
                     <#elseif (metricView.type == "TIME_SERIES_FULL" || metricView.type == "TIME_SERIES_OVERLAY")>
@@ -38,10 +39,12 @@
                             </p>
                         </div>
                     </#if>
+
                 </div>
 
                 <#-- Dimension view-->
                 <div id="dashboard-dimension-view">
+
                     <#if (dimensionView.type == "HEAT_MAP")>
                         <#include "dimension/heat-map.ftl">
                     <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
@@ -55,6 +58,7 @@
                             </p>
                         </div>
                     </#if>
+
                 </div>
             </div>
         </div>
