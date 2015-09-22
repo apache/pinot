@@ -10,11 +10,11 @@
     <body>
         <div class="uk-grid">
             <#-- Side nav -->
-            <div id="dashboard-sidenav" class="uk-width-1-4">
+            <div id="dashboard-sidenav" class="uk-width-1-5">
                 <#include "common/sidenav.ftl">
             </div>
 
-            <div id="dashboard-output" class="uk-width-3-4">
+            <div id="dashboard-output" class="uk-width-4-5">
                 <div id="dashboard-output-nav" data-uk-sticky>
                     <#include "common/headnav.ftl">
                 </div>

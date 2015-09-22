@@ -10,6 +10,7 @@
 
 #dashboard-start-logo {
     margin-top: 10%;
+    margin-left: 50%;
 }
 
 /* Dashboard */
@@ -32,6 +33,10 @@ li{
 #dashboard-dimension-view {
     padding-top: 75px;
     margin-top: -75px;
+}
+
+#dashboard-output{
+    margin-left: 20%;
 }
 
 #dashboard-output hr {
@@ -74,7 +79,11 @@ li{
 }
 
 /* Side nav */
-
+#dashboard-sidenav{
+    position:fixed;
+    top:0;
+    bottom:0;
+}
 #sidenav-time-input-form .uk-form-row {
     margin-left: 5%;
 }
@@ -122,13 +131,52 @@ li{
     padding:8px;
 }
 
+#funnel-thumbnails table{
+    width: 20%;
+    height: 200px;
+    font-size:8px;
+    padding:0px;
+    border: 1px solid #ccc;
+    margin: auto;
+}
+
 /* Funnel Heatmap */
-.thumbnail td{
+.funnel-thumbnail-container{
+    background-color: #ddd;
+    text-align: center;
+    padding: 10px;
+
+}
+
+#funnel-thumbnails td{
      padding: 0px;
-     font-size:6px;
+     font-size:3px;
+    line-height: 8px;
  }
-.thumbnail th{
+
+#funnel-thumbnails tr:first-child td{
     word-wrap: break-word;
+}
+
+#funnel-thumbnails .metric-list{
+    font-size: 9px;
+    font-weight:800;
+}
+
+#funnel-thumbnails>div{
+    display: inline-block;
+    margin: auto;
+    padding:5px;
+    border: 1px solid #ccc;
+}
+
+#funnel-thumbnails>div[selected]{
+    background-color: #fff;
+}
+
+#funnel-thumbnails>div:hover{
+    cursor: pointer;
+    background-color: #fff;
 }
 
 /* Metric */
@@ -404,6 +452,7 @@ td[dimension-val]{
     -webkit-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
     -moz-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
     font-family: Calibri, Tahoma, Geneva, sans-serif;
+    z-index: 100;
 }
 
 
@@ -551,6 +600,10 @@ td[dimension-val]{
 
 .sticky td{
     padding-top:0px;
+}
+
+.hidden{
+    display : none;
 }
 
 /* overwriting UIkit css */
