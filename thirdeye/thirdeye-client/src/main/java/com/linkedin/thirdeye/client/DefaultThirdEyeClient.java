@@ -9,6 +9,8 @@ import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConfig;
+
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -39,6 +41,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
   private final CloseableHttpClient httpClient;
   private final LoadingCache<QuerySpec, Map<DimensionKey, MetricTimeSeries>> resultCache;
   private final LoadingCache<String, Map<String, MetricType>> schemaCache;
+  private final LoadingCache<String, StarTreeConfig> starTreeConfigCache;
+  private final LoadingCache<String, ThirdEyeRawResponse> rawResultCache;
 
   public DefaultThirdEyeClient(String hostname, int port) {
     this(hostname, port, new DefaultThirdEyeClientConfig());
@@ -56,10 +60,15 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
       builder.expireAfterWrite(config.getExpirationTime(), config.getExpirationUnit());
     }
     this.resultCache = builder.build(new ResultCacheLoader());
+    this.rawResultCache = builder.build(new RawResultCacheLoader());
 
     this.schemaCache = CacheBuilder.newBuilder()
         .expireAfterWrite(Long.MAX_VALUE, TimeUnit.MILLISECONDS) // never
         .build(new SchemaCacheLoader());
+
+    this.starTreeConfigCache = CacheBuilder.newBuilder()
+        .expireAfterWrite(Long.MAX_VALUE, TimeUnit.MILLISECONDS) // never
+        .build(new StarTreeConfigCacheLoader());
 
     LOG.info("Created DefaultThirdEyeClient to {}", httpHost);
   }
@@ -69,6 +78,17 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     QuerySpec querySpec = new QuerySpec(request.getCollection(), request.toSql());
     LOG.debug("Generated SQL {}", request.toSql());
     return resultCache.get(querySpec);
+  }
+
+
+  @Override
+  public ThirdEyeRawResponse getRawResponse(String sql) throws Exception {
+    return rawResultCache.get(sql);
+  }
+
+  @Override
+  public StarTreeConfig getStarTreeConfig(String collection) throws Exception {
+    return starTreeConfigCache.get(collection);
   }
 
   @Override
@@ -105,6 +125,59 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
         }
 
         return rawResponse.convert(projectionTypes);
+      } finally {
+        if (res.getEntity() != null) {
+          EntityUtils.consume(res.getEntity());
+        }
+        res.close();
+      }
+    }
+  }
+
+  /**
+   * Executes SQL statements against the /query resource.
+   */
+  private class RawResultCacheLoader extends CacheLoader<String, ThirdEyeRawResponse> {
+    @Override
+    public ThirdEyeRawResponse load(String sql) throws Exception {
+      HttpGet req = new HttpGet("/query/" + URLEncoder.encode(sql, "UTF-8"));
+      CloseableHttpResponse res = httpClient.execute(httpHost, req);
+      try {
+        if (res.getStatusLine().getStatusCode() != 200) {
+          throw new IllegalStateException(res.getStatusLine().toString());
+        }
+
+        // Parse response
+        InputStream content = res.getEntity().getContent();
+        ThirdEyeRawResponse rawResponse = OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
+        return rawResponse;
+
+      } finally {
+        if (res.getEntity() != null) {
+          EntityUtils.consume(res.getEntity());
+        }
+        res.close();
+      }
+    }
+  }
+
+  /**
+   * Retrieves starTreeConfig from server
+   */
+  private class StarTreeConfigCacheLoader extends CacheLoader<String, StarTreeConfig> {
+    @Override
+    public StarTreeConfig load(String collection) throws Exception {
+
+      HttpGet req = new HttpGet("/collections/" + URLEncoder.encode(collection, "UTF-8"));
+      CloseableHttpResponse res = httpClient.execute(httpHost, req);
+      try {
+        if (res.getStatusLine().getStatusCode() != 200) {
+          throw new IllegalStateException(res.getStatusLine().toString());
+        }
+        InputStream content = res.getEntity().getContent();
+        StarTreeConfig starTreeConfig = OBJECT_MAPPER.readValue(content, StarTreeConfig.class);
+
+        return starTreeConfig;
       } finally {
         if (res.getEntity() != null) {
           EntityUtils.consume(res.getEntity());
@@ -209,4 +282,5 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
       client.close();
     }
   }
+
 }

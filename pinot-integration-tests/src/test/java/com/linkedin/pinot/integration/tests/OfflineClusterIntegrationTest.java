@@ -221,6 +221,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
     query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    query = "select * from 'mytable' limit 5";
+    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
 
   }
 

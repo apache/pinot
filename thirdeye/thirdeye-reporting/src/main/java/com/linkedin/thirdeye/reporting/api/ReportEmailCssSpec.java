@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.reporting.api;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 
 import org.apache.commons.io.IOUtils;
 
@@ -189,8 +191,9 @@ public class ReportEmailCssSpec {
   private String loadCss(String cssFile) throws IOException {
 
     String css = null;
-    InputStream is = ClassLoader.getSystemResourceAsStream("assets/css/" + cssFile);
-
+    //InputStream is = ClassLoader.getSystemResourceAsStream("assets/css/" + cssFile);
+    URL resource = getClass().getClassLoader().getResource(cssFile);
+    InputStream is = resource.openStream();
     try {
       css = IOUtils.toString(is);
     } finally {

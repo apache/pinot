@@ -65,7 +65,11 @@
           <programs>
             <program>
               <mainClass>com.linkedin.pinot.perf.PerfBenchmarkTest</mainClass>
-              <name>pinot-perfBenchmark</name>
+              <name>pinot-perfBenchmarkTest</name>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.perf.PerfBenchmarkRunner</mainClass>
+              <name>pinot-perfBenchmarkRunner</name>
             </program>
           </programs>
           <binFileExtensions>

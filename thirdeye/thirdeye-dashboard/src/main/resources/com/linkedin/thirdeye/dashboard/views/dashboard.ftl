@@ -18,16 +18,6 @@
                 <div id="dashboard-output-nav" data-uk-sticky>
                     <#include "common/headnav.ftl">
                 </div>
-
-                <div id="time-nav-buttons" class="uk-button-group">
-                    <button class="uk-button" id="time-nav-left">
-                        <i class="uk-icon-angle-left"></i>
-                    </button>
-                    <button class="uk-button" id="time-nav-right">
-                        <i class="uk-icon-angle-right"></i>
-                    </button>
-                </div>
-
                 
                 <div id="dashboard-metric-view">
                     <div id="dashboard-funnels-view">

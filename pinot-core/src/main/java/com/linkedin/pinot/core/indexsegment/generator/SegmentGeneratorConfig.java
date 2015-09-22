@@ -204,8 +204,9 @@ public class SegmentGeneratorConfig {
   }
 
   public void setIndexOutputDir(String dir) {
-    if (new File(dir).exists()) {
-
+    final File outputDirectory = new File(dir);
+    if (!outputDirectory.exists()) {
+      outputDirectory.mkdirs();
     }
     indexOutputDir = dir;
   }
@@ -267,9 +268,11 @@ public class SegmentGeneratorConfig {
   }
 
   public void setInputFilePath(String path) {
-    inputDataFilePath = new File(path);
-    if (!inputDataFilePath.exists()) {
-      throw new RuntimeException("input path needs to exist");
+    if (path != null) {
+      inputDataFilePath = new File(path);
+      if (!inputDataFilePath.exists()) {
+        throw new RuntimeException("input path needs to exist");
+      }
     }
   }
 
