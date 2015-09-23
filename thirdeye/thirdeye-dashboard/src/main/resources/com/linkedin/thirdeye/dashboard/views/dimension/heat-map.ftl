@@ -1,6 +1,5 @@
 <script src="/assets/js/thirdeye.dimension.heatmap.js"></script>
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-
 <div class="collapser"><h2>(-) Dimension Heat Map</h2></div>
 <div id="dimension-heat-map-area">
 

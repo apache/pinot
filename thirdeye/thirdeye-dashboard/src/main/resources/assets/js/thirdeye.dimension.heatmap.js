@@ -117,7 +117,7 @@ $(document).ready(function() {
     $("#dimension-heat-map-mode-" + currentMode).trigger('click')
 
 
-    /* Tabular view related code */
+    // Tabular view related code
     //Add DataTables plugin functionality to the HeatMap Tabular mode tables
     $('.dimension-heat-map-table-section table').each(function() {
         var currentID = this.id;
@@ -271,19 +271,14 @@ $(document).ready(function() {
         window.location.search = encodeDimensionValues(dimensionValues)
     })
 
-  /* Treemap related code */
+  // Treemap related code
 
     $(".dimension-treemap-mode").click(function() {
 
         var currentMode = $(this).attr('mode')
 
        var currentArea = $(this).closest(".treemap-section");
-       // var currentID = $(this).attr('id')
-       // console.log("currentArea", currentArea)
-       // var currentContainer = $(".treemap-container", currentArea)////
-       // var currentContainerID = $(currentContainer).attr("id")
-       // var currentMetric = currentContainerID.substr(0, currentContainerID.length - 10)
-       // console.log("current metric", currentMetric )
+
 
         // Set in URI
         var hash = parseHashParameters(window.location.hash)
@@ -304,7 +299,7 @@ $(document).ready(function() {
 
 
 
-    /*  Heat Map Tabular view & Treemap related code*/
+    //  Heat Map Tabular view & Treemap related code
 
     //Display baseline and current date time next to the title of the table and the treemap
     var path = parsePath(window.location.pathname)
