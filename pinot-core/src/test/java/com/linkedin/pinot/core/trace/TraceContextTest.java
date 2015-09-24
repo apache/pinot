@@ -127,7 +127,7 @@ public class TraceContextTest {
         @Override
         public void runJob() {
           String tid = Thread.currentThread().getId() + "";
-          TraceContext.log(tid, request.getRequestId() + SEP + taskId);
+          TraceContext.logException(tid, request.getRequestId() + SEP + taskId);
         }
       });
     }

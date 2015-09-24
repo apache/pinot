@@ -15,16 +15,15 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import java.util.Arrays;
 
 
 public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
@@ -72,17 +71,14 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   public static class BlockValSetBlockDocIdIterator implements BlockDocIdIterator {
     BlockMultiValIterator valueIterator;
     int currentDocId = -1;
-    private Set<Integer> dictIdSet;
+    private IntSet dictIdSet;
     final int[] intArray;
     private int startDocId;
     private int endDocId;
 
     public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
       if (dictIds.length > 0) {
-        this.dictIdSet = new HashSet<Integer>(dictIds.length);
-        for (int dictId : dictIds) {
-          dictIdSet.add(dictId);
-        }
+        this.dictIdSet = new IntOpenHashSet(dictIds);
         this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
         Arrays.fill(intArray, 0);
         setStartDocId(blockMetadata.getStartDocId());

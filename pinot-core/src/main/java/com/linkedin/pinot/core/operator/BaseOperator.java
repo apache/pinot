@@ -34,7 +34,7 @@ public abstract class BaseOperator implements Operator {
         Block ret = getNextBlock();
         long end = System.currentTimeMillis();
         LOGGER.info("Time spent in {}: {}", getOperatorName(), (end - start));
-        TraceContext.log(getOperatorName() + "Time", (end - start));
+        TraceContext.logLatency(getOperatorName(), (end - start));
         return ret;
     }
 
@@ -44,7 +44,7 @@ public abstract class BaseOperator implements Operator {
         Block ret = getNextBlock(BlockId);
         long end = System.currentTimeMillis();
         LOGGER.info("Time spent in {}: {}", getOperatorName(), (end - start));
-        TraceContext.log(getOperatorName() + "Time", (end - start));
+        TraceContext.logLatency(getOperatorName(), (end - start));
         return ret;
     }
 

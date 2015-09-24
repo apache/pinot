@@ -15,17 +15,16 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 
 public class InPredicateEvaluator extends AbstractPredicateEvaluator {
 
   public InPredicateEvaluator(InPredicate predicate, Dictionary dictionary) {
-    Set<Integer> dictIds = new HashSet<Integer>();
+    IntSet dictIds = new IntOpenHashSet();
     final String[] inValues = predicate.getInRange();
     for (final String value : inValues) {
       final int index = dictionary.indexOf(value);

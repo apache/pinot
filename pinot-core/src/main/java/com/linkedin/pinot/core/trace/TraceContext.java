@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.core.trace;
 
+import com.linkedin.pinot.common.request.InstanceRequest;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-
-import com.linkedin.pinot.common.request.InstanceRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -241,26 +239,37 @@ public class TraceContext {
   /**
    * Thread-safe log operation, all fields referenced in this method should be ThreadLocal.
    *
-   * @param key
-   * @param value
+   * @param operator
+   * @param latencyMs
    */
-  public static void log(String key, Object value){
+  public static void logLatency(String operator, long latencyMs) {
+    if (shouldTrace()) {
+      _localTrace.get().log(operator + "Time", latencyMs);
+    }
+  }
+
+  public static void logException(String key, String value) {
+    if (shouldTrace()) {
+      _localTrace.get().log(key, value);
+    }
+  }
+
+  private static boolean shouldTrace() {
     if (_request.get() == null) {
       logInfo(CONSTANT.REQUEST_FOR_THREAD_NOT_FOUND, null);
-      return;
+      return false;
     }
 
     if (!_request.get().isEnableTrace()) {
-      return;
+      return false;
     }
 
     if (!_isActive.get()) {
-      long threadId = Thread.currentThread().getId();
       logInfo(CONSTANT.START_NEW_TRACE, _request.get());
       _isActive.set(true);
     }
 
-    _localTrace.get().log(key, value);
+    return true;
   }
 
   /**
