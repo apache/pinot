@@ -29,9 +29,16 @@ public class TimeUtils {
     }
   }
 
+  /**
+   * Converts timeValue in timeUnitString to milliseconds
+   * @param timeUnitString the time unit string to convert, such as DAYS or SECONDS
+   * @param timeValue the time value to convert to milliseconds
+   * @return corresponding value in milliseconds or LONG.MIN_VALUE if timeUnitString is invalid
+   *         Returning LONG.MIN_VALUE gives consistent beahvior with the java library
+   */
   public static long toMillis(String timeUnitString, String timeValue) {
     TimeUnit timeUnit = timeUnitFromString(timeUnitString);
-    return timeUnit.toMillis(Long.parseLong(timeValue));
+    return (timeUnit == null) ? Long.MIN_VALUE : timeUnit.toMillis(Long.parseLong(timeValue));
   }
 
   /**
