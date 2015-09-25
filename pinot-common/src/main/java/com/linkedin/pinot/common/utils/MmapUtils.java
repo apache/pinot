@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.utils;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
@@ -32,7 +34,7 @@ public class MmapUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapUtils.class);
   private static final AtomicLong DIRECT_BYTE_BUFFER_USAGE = new AtomicLong(0L);
   private static final long BYTES_IN_MEGABYTE = 1024L * 1024L;
-  private static final WeakHashMap<ByteBuffer, String> BUFFER_TO_CONTEXT_MAP = new WeakHashMap<>();
+  private static final Map<ByteBuffer, String> BUFFER_TO_CONTEXT_MAP = Collections.synchronizedMap(new WeakHashMap<>());
 
   /**
    * Unloads a byte buffer from memory
