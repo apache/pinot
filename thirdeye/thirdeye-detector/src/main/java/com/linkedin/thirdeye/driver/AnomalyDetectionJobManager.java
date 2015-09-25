@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.driver;
 
+import com.codahale.metrics.MetricRegistry;
 import com.linkedin.thirdeye.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.db.AnomalyFunctionSpecDAO;
@@ -27,17 +28,20 @@ public class AnomalyDetectionJobManager {
   private final SessionFactory sessionFactory;
   private final Object sync;
   private final Map<Long, String> jobKeys;
+  private final MetricRegistry metricRegistry;
 
   public AnomalyDetectionJobManager(Scheduler quartzScheduler,
                                     ThirdEyeClient thirdEyeClient,
                                     AnomalyFunctionSpecDAO specDAO,
                                     AnomalyResultDAO resultDAO,
-                                    SessionFactory sessionFactory) {
+                                    SessionFactory sessionFactory,
+                                    MetricRegistry metricRegistry) {
     this.quartzScheduler = quartzScheduler;
     this.thirdEyeClient = thirdEyeClient;
     this.specDAO = specDAO;
     this.resultDAO = resultDAO;
     this.sessionFactory = sessionFactory;
+    this.metricRegistry = metricRegistry;
     this.sync = new Object();
     this.jobKeys = new HashMap<>();
   }
@@ -64,7 +68,7 @@ public class AnomalyDetectionJobManager {
     }
   }
 
-  public void runAdHoc(Long id, String windowEndISO8601String) throws Exception {
+  public void runAdHoc(Long id, String windowStartIsoString, String windowEndIsoString) throws Exception {
     synchronized (sync) {
       AnomalyFunctionSpec spec = getAnomalyFunctionSpec(id);
       AnomalyFunction anomalyFunction = AnomalyFunctionFactory.fromSpec(spec);
@@ -82,9 +86,11 @@ public class AnomalyDetectionJobManager {
 
       job.getJobDataMap().put(AnomalyDetectionJob.FUNCTION, anomalyFunction);
       job.getJobDataMap().put(AnomalyDetectionJob.CLIENT, thirdEyeClient);
-      job.getJobDataMap().put(AnomalyDetectionJob.WINDOW_END, windowEndISO8601String);
+      job.getJobDataMap().put(AnomalyDetectionJob.WINDOW_START, windowStartIsoString);
+      job.getJobDataMap().put(AnomalyDetectionJob.WINDOW_END, windowEndIsoString);
       job.getJobDataMap().put(AnomalyDetectionJob.RESULT_DAO, resultDAO);
       job.getJobDataMap().put(AnomalyDetectionJob.SESSION_FACTORY, sessionFactory);
+      job.getJobDataMap().put(AnomalyDetectionJob.METRIC_REGISTRY, metricRegistry);
 
       quartzScheduler.scheduleJob(job, trigger);
 
@@ -113,6 +119,7 @@ public class AnomalyDetectionJobManager {
       job.getJobDataMap().put(AnomalyDetectionJob.CLIENT, thirdEyeClient);
       job.getJobDataMap().put(AnomalyDetectionJob.RESULT_DAO, resultDAO);
       job.getJobDataMap().put(AnomalyDetectionJob.SESSION_FACTORY, sessionFactory);
+      job.getJobDataMap().put(AnomalyDetectionJob.METRIC_REGISTRY, metricRegistry);
 
       quartzScheduler.scheduleJob(job, trigger);
 

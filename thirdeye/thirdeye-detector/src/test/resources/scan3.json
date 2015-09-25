@@ -3,11 +3,11 @@
   "metric": "myMetric",
   "type": "SCAN_STATISTICS",
   "isActive": true,
-  "cron": "* 0/5 * * * ?",
+  "cron": "0 * * * * ?",
   "windowSize": 912,
   "windowUnit": "HOURS",
   "windowDelay": 3,
   "bucketSize": 1,
   "bucketUnit": "HOURS",
-  "properties": "pattern=UP;minWindowLength=24;numSimulations=1000;monitoringWindow=72"
+  "properties": "pattern=NOTEQUAL;seasonal=168;minWindowLength=1;numSimulations=1000;monitoringWindow=72"
 }

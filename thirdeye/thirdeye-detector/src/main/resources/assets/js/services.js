@@ -13,10 +13,13 @@ thirdEyeDetectorServices.factory('TimeSeries', ['$resource', '$routeParams',
         queryParams.push('groupBy=:groupBy');
     }
     if ($routeParams['topK']) {
-        queryParams.push('topK=:topK')
+        queryParams.push('topK=:topK');
+    }
+    if ($routeParams['functionId']) {
+        queryParams.push('functionId=:functionId');
     }
     if (queryParams.length > 0) {
-        uri += '?' + queryParams.join('&')
+        uri += '?' + queryParams.join('&');
     }
 
     return $resource(uri, {}, {

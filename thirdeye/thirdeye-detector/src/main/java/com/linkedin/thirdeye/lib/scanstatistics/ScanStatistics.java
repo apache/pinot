@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.lib.scanstatistics;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.Range;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.slf4j.Logger;
@@ -43,6 +44,19 @@ public class ScanStatistics {
 		_bootstrap = bootstrap;
 	}
 
+	@Override
+	public String toString() {
+		return MoreObjects.toStringHelper(this)
+				.add("_numSimulation", _numSimulation)
+				.add("_minWindowLength", _minWindowLength)
+				.add("_maxWindowLength", _maxWindowLength)
+				.add("_minIncrement", _minIncrement)
+				.add("_pValue", _pValue)
+				.add("_pattern", _pattern)
+				.add("_bootstrap", _bootstrap)
+				.toString();
+	}
+
 	 /**
    * This function finds the given interval in the monitoring window of which the maximum likelihood
    * values above the simulated quantile.
@@ -55,6 +69,7 @@ public class ScanStatistics {
     OnlineNormalStatistics trainDataDs = new OnlineNormalStatistics(trainingData);
     NormalDistribution trainDataNormal = new NormalDistribution(trainDataDs.getMean(),
         Math.sqrt(trainDataDs.getPopulationVariance()));
+		LOGGER.info("Training data mean={}, stdev={}", trainDataNormal.getMean(), trainDataNormal.getStandardDeviation());
 
     ScanIntervalIterator scanWindowIterator = new ScanIntervalIterator(
         0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
@@ -62,6 +77,7 @@ public class ScanStatistics {
     if (realDataInterval.getInterval() == null) {
       throw new IllegalStateException("no interval generated");
     }
+		LOGGER.info("Generated realDataInterval {}", realDataInterval);
 
     int numExceeded = 0;
     int exceededCountThreshold = (int) (_pValue * _numSimulation);
@@ -69,7 +85,6 @@ public class ScanStatistics {
     // simulation buffer
     double[] simulationBuffer = new double[monitoringData.length];
     for (int ii = 0; ii < _numSimulation; ii++) {
-      LOGGER.info("started simulation {}", ii);
       if (_bootstrap) {
         simulateBootstrapInPlace(simulationBuffer, trainingData);
       } else {
@@ -81,7 +96,9 @@ public class ScanStatistics {
       MaxInterval simulationResult = generateMaxLikelihood(simulationScanWindowIterator, trainingData, simulationBuffer,
           trainDataDs);
 
-      LOGGER.info("finished simulation {} : {}", ii, simulationResult.getMaxLikelihood());
+			LOGGER.info("simulation ({}) {} (numExceeded={}) : {}",
+					_bootstrap ? "bootstrap" : "gaussian", ii, numExceeded, simulationResult);
+
       if (simulationResult.getInterval() != null
           && realDataInterval.getMaxLikelihood() < simulationResult.getMaxLikelihood())
       {
@@ -93,7 +110,7 @@ public class ScanStatistics {
       }
     }
 
-    LOGGER.info("real one: {} (percentile {})", realDataInterval.getMaxLikelihood(),
+    LOGGER.info("real data interval: {} (percentile {})", realDataInterval,
         1 - (numExceeded / (double)_numSimulation));
 
     if (numExceeded < exceededCountThreshold) {

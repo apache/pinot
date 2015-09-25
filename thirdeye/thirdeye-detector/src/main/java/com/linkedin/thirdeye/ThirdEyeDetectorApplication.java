@@ -105,7 +105,8 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
         thirdEyeClient,
         anomalyFunctionSpecDAO,
         anomalyResultDAO,
-        hibernate.getSessionFactory());
+        hibernate.getSessionFactory(),
+        environment.metrics());
 
     // Jersey resources
     environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionSpecDAO));

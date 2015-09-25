@@ -35,7 +35,14 @@ import java.util.Properties;
         query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " +
             "AND r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc " +
             "AND r.metric = :metric "
-    )
+    ),
+    @NamedQuery(
+    name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric",
+    query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " +
+        "AND r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc " +
+        "AND r.functionId = :functionId " +
+        "AND r.metric = :metric "
+)
 })
 public class AnomalyResult implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");

@@ -49,6 +49,7 @@ public class MetricsGraphicsTimeSeriesResource {
       @QueryParam("bucketSize") String bucketSize,
       @QueryParam("groupBy") String groupBy,
       @QueryParam("topK") @DefaultValue("5") Integer topK,
+      @QueryParam("functionId") Long functionId,
       @Context UriInfo uriInfo) throws Exception {
     DateTime startTime = parseDateTime(startTimeISO, timeZone);
     DateTime endTime = parseDateTime(endTimeISO, timeZone);
@@ -154,10 +155,22 @@ public class MetricsGraphicsTimeSeriesResource {
     timeSeries.setyAccessor("value");
 
     // Get any anomalies
-    List<AnomalyResult> anomalies = resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
+    List<AnomalyResult> anomalies;
+    if (functionId == null) {
+      anomalies = resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
+    } else {
+      anomalies = resultDAO.findAllByCollectionTimeFunctionIdAndMetric(collection, metric, functionId, startTime, endTime);
+    }
     List<Map<String, Object>> markers = new ArrayList<>();
     for (AnomalyResult anomaly : anomalies) {
-      markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) anomaly.getId()));
+      if (anomaly.getEndTimeUtc() == null) {
+        // Point
+        markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) anomaly.getId()));
+      } else {
+        // Interval
+        markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) ("START_" + anomaly.getId())));
+        markers.add(ImmutableMap.of("time", anomaly.getEndTimeUtc(), "label", (Object) ("END_" + anomaly.getId())));
+      }
     }
     timeSeries.setMarkers(markers);
     timeSeries.setAnomalyResults(anomalies);
