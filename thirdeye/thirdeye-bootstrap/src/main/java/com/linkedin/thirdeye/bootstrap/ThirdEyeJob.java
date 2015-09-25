@@ -2,39 +2,27 @@ package com.linkedin.thirdeye.bootstrap;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.mapred.Merger;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Job.JobState;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.security.AccessControlException;
 import org.joda.time.DateTime;
@@ -145,6 +133,8 @@ public class ThirdEyeJob {
   private static final String DEFAULT_CLEANUP_SKIP = "false";
   private static final String DEFAULT_SKIP_MISSING = "true";
   private static final String DEFAULT_FOLDER_PERMISSION = "755";
+  private static final String DEFAULT_THIRDEYE_COMPACTION = "false";
+  private static final String DEFAULT_THIRDEYE_PRESERVE_TIME_COMPACTION = "false";
   private static final String FOLDER_PERMISSION_REGEX = "0?[1-7]{3}";
   private static final String DEFAULT_POLL_ENABLE = "false";
   private static final String DEFAULT_POLL_FREQUENCY = "60000";
@@ -263,6 +253,9 @@ public class ThirdEyeJob {
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
             + StarTreeConstants.DIMENSION_STATS_FOLDER);
 
+        config.setProperty(AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PRESERVE_TIME_COMPACTION.getName(), DEFAULT_THIRDEYE_PRESERVE_TIME_COMPACTION));
+
         return config;
       }
     },
@@ -285,9 +278,18 @@ public class ThirdEyeJob {
 
         config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_CONFIG_PATH.toString(),
             getConfigPath(root, collection));
-        config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH.toString(),
-            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
-                + AGGREGATION.getName());
+
+        boolean compaction = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_COMPACTION.getName(), DEFAULT_THIRDEYE_COMPACTION));
+        if (compaction) {
+          config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH.toString(),
+              inputPaths);
+
+        } else {
+
+          config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH.toString(),
+              getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                  + AGGREGATION.getName());
+        }
         config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + ROLLUP_PHASE1.getName());
@@ -458,6 +460,9 @@ public class ThirdEyeJob {
             StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + STARTREE_BOOTSTRAP_PHASE1.getName());
+
+        config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_COMPACTION.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_COMPACTION.getName(), DEFAULT_THIRDEYE_COMPACTION));
 
         return config;
       }
@@ -936,6 +941,7 @@ public class ThirdEyeJob {
         getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getName(), inputConfig);
     String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getName(), inputConfig);
 
+
         FlowSpec flowSpec = null;
     switch (phaseSpec) {
     case WAIT:
@@ -1076,6 +1082,7 @@ public class ThirdEyeJob {
 
         LOGGER.info("Cleaning up {} {} days ago from paths {} and {}", cleanupDaysAgo, cleanupDaysAgoDate.getMillis(), dimensionIndexDir, metricIndexDir);
 
+        boolean preserveAggregation = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PRESERVE_TIME_COMPACTION.getName(), DEFAULT_THIRDEYE_PRESERVE_TIME_COMPACTION));
 
         // list folders in dimensionDir starting with data_
         FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexDir, new PathFilter() {
@@ -1089,13 +1096,19 @@ public class ThirdEyeJob {
 
         for (FileStatus file : fileStatus)
         {
-          //get last modified date
-          DateTime lastModifiedDate = new DateTime(file.getModificationTime());
+          if (preserveAggregation) {
+            FileStatus[] phases = fileSystem.listStatus(file.getPath(), new PathFilter() {
 
-          if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis()))
-          {
-            LOGGER.info("Deleting {}", file.getPath());
-            fileSystem.delete(file.getPath(), true);
+              @Override
+              public boolean accept(Path path) {
+                return !path.getName().equals(PhaseSpec.AGGREGATION.getName());
+              }
+            });
+            for (FileStatus phase: phases) {
+              cleanupFolder(phase, cleanupDaysAgoDate, fileSystem);
+            }
+          } else {
+            cleanupFolder(file, cleanupDaysAgoDate, fileSystem);
           }
         }
 
@@ -1180,6 +1193,17 @@ public class ThirdEyeJob {
   }
 
 
+
+  private void cleanupFolder(FileStatus fileStatus, DateTime cleanupDaysAgoDate, FileSystem fileSystem) throws IOException {
+    DateTime lastModifiedDate = new DateTime(fileStatus.getModificationTime());
+
+    if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis()))
+    {
+      LOGGER.info("Deleting {}", fileStatus.getPath());
+      fileSystem.delete(fileStatus.getPath(), true);
+    }
+
+  }
 
   public static void main(String[] args) throws Exception {
     if (args.length != 2) {
