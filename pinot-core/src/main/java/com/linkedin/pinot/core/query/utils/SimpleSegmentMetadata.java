@@ -118,6 +118,11 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
+  public int getTotalAggregateDocs() {
+    return 0;
+  }
+
+  @Override
   public String getIndexDir() {
     return null;
   }
@@ -155,5 +160,10 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public boolean close() {
     return true;
+  }
+
+  @Override
+  public boolean hasStarTree() {
+    return _schema.getStarTreeIndexSpec() != null;
   }
 }

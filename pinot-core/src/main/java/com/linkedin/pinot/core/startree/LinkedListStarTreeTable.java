@@ -22,8 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 public class LinkedListStarTreeTable implements StarTreeTable {
-  private final List<ByteBuffer> list;
-
+  protected final List<ByteBuffer> list;
   protected final List<FieldSpec.DataType> dimensionTypes;
   protected final List<FieldSpec.DataType> metricTypes;
   protected final int rowSize;
@@ -82,7 +81,7 @@ public class LinkedListStarTreeTable implements StarTreeTable {
     };
 
     // Sort a copy of the list on the included dimensions
-    List<ByteBuffer> listCopy = new LinkedList<>(list);
+    final List<ByteBuffer> listCopy = new LinkedList<>(list);
     Collections.sort(listCopy, new Comparator<ByteBuffer>() {
       @Override
       public int compare(ByteBuffer o1, ByteBuffer o2) {
@@ -108,6 +107,7 @@ public class LinkedListStarTreeTable implements StarTreeTable {
       private boolean shouldReset = true;
       private boolean hasReturnedCurrent = true;
       private boolean hasStarted = false;
+      private int numReturned = 0;
 
       @Override
       public boolean hasNext() {
@@ -140,6 +140,13 @@ public class LinkedListStarTreeTable implements StarTreeTable {
           hasReturnedCurrent = false;
         }
 
+        // If we fell off the end, we should reset to the next one
+        if (!itr.hasNext() && hasReturnedCurrent && shouldReset) {
+          copyStarTreeTableRow(nextFromItr, nextToReturn, excludedDimensions);
+          shouldReset = false;
+          hasReturnedCurrent = false;
+        }
+
         return itr.hasNext() || !hasReturnedCurrent;
       }
 
@@ -149,6 +156,7 @@ public class LinkedListStarTreeTable implements StarTreeTable {
           throw new NoSuchElementException();
         }
         hasReturnedCurrent = true;
+        numReturned++;
         return nextToReturn;
       }
 
@@ -258,8 +266,10 @@ public class LinkedListStarTreeTable implements StarTreeTable {
 
   @Override
   public void printTable(PrintStream printStream) {
+    StarTreeTableRow row = new StarTreeTableRow(dimensionTypes.size(), metricTypes.size());
     for (int i = 0; i < list.size(); i++) {
-      printStream.println(i + ": " + list.get(i));
+      fromByteBuffer(list.get(i), row);
+      printStream.println(i + ": " + row);
     }
   }
 
@@ -333,7 +343,7 @@ public class LinkedListStarTreeTable implements StarTreeTable {
     return buffer;
   }
 
-  private void fromByteBuffer(ByteBuffer buffer, StarTreeTableRow row) {
+  protected void fromByteBuffer(ByteBuffer buffer, StarTreeTableRow row) {
     buffer.rewind();
 
     for (int i = 0; i < dimensionTypes.size(); i++) {

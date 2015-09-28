@@ -78,6 +78,11 @@ public interface SegmentMetadata {
   /**
    * @return
    */
+  public int getTotalAggregateDocs();
+
+  /**
+   * @return
+   */
   public String getIndexDir();
 
   /**
@@ -105,6 +110,9 @@ public interface SegmentMetadata {
    * Returns if a column has dictionary or not.
    */
   public boolean hasDictionary(String columnName);
+
+  /** Returns true if the segment has a StarTree index defined */
+  public boolean hasStarTree();
 
   /**
    *

@@ -99,7 +99,7 @@ public class TestLinkedListStarTreeTable {
     Iterator<StarTreeTableRow> itr = table.getUniqueCombinations(excludedDimensions);
     int actualCombinations = 0;
     while (itr.hasNext()) {
-      itr.next();
+      StarTreeTableRow next = itr.next();
       actualCombinations++;
     }
 

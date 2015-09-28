@@ -37,6 +37,8 @@ public class StarTreeIndexNode implements Serializable {
   private Integer childDimensionName;
   private Map<Integer, StarTreeIndexNode> children;
   private StarTreeIndexNode parent;
+  private Integer startDocumentId;
+  private Integer documentCount;
 
   /**
    * An element in the StarTreeIndex.
@@ -103,9 +105,25 @@ public class StarTreeIndexNode implements Serializable {
     return children == null;
   }
 
+  public Integer getStartDocumentId() {
+    return startDocumentId;
+  }
+
+  public void setStartDocumentId(Integer startDocumentId) {
+    this.startDocumentId = startDocumentId;
+  }
+
+  public Integer getDocumentCount() {
+    return documentCount;
+  }
+
+  public void setDocumentCount(Integer documentCount) {
+    this.documentCount = documentCount;
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName);
+    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName, startDocumentId, documentCount);
   }
 
   @Override
@@ -119,7 +137,9 @@ public class StarTreeIndexNode implements Serializable {
         && Objects.equal(dimensionName, n.getDimensionName())
         && Objects.equal(dimensionValue, n.getDimensionValue())
         && Objects.equal(childDimensionName, n.getChildDimensionName())
-        && Objects.equal(children, n.getChildren());
+        && Objects.equal(children, n.getChildren())
+        && Objects.equal(startDocumentId, n.getStartDocumentId())
+        && Objects.equal(documentCount, n.getDocumentCount());
   }
 
   @Override
@@ -131,6 +151,8 @@ public class StarTreeIndexNode implements Serializable {
         .add("dimensionValue", dimensionValue)
         .add("childDimensionName", childDimensionName)
         .add("childCount", children == null ? 0 : children.size())
+        .add("startDocumentId", startDocumentId)
+        .add("documentCount", documentCount)
         .toString();
   }
 

@@ -15,48 +15,39 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-
-/**
- * AggregationFunctionPlanNode takes care of how to apply one aggregation
- * function for given data sources.
- *
- *
- * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
- * @see BaseAggregationFunctionPlanNode
- */
-@Deprecated
-public class AggregationFunctionPlanNode implements PlanNode {
+// TODO: No need to make abstract yet
+public class BaseAggregationFunctionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
-  private final AggregationInfo _aggregationInfo;
-  private final ProjectionPlanNode _projectionPlanNode;
-  private final boolean _hasDictionary;
+  protected final AggregationInfo aggregationInfo;
+  protected final BaseProjectionPlanNode projectionPlanNode;
+  protected final boolean hasDictionary;
 
-  public AggregationFunctionPlanNode(AggregationInfo aggregationInfo, ProjectionPlanNode projectionPlanNode, boolean hasDictionary) {
-    _aggregationInfo = aggregationInfo;
-    _projectionPlanNode = projectionPlanNode;
-    _hasDictionary = hasDictionary;
+  public BaseAggregationFunctionPlanNode(AggregationInfo aggregationInfo,
+                                         BaseProjectionPlanNode projectionPlanNode,
+                                         boolean hasDictionary) {
+    this.aggregationInfo = aggregationInfo;
+    this.projectionPlanNode = projectionPlanNode;
+    this.hasDictionary = hasDictionary;
   }
 
   @Override
   public Operator run() {
-    return new BAggregationFunctionOperator(_aggregationInfo, new UReplicatedProjectionOperator(
-        (MProjectionOperator) _projectionPlanNode.run()), _hasDictionary);
+    return new BAggregationFunctionOperator(aggregationInfo, new UReplicatedProjectionOperator(
+        (MProjectionOperator) projectionPlanNode.run()), hasDictionary);
   }
 
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Operator: BAggregationFunctionOperator");
-    LOGGER.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
+    LOGGER.debug(prefix + "Argument 0: Aggregation  - " + aggregationInfo);
     LOGGER.debug(prefix + "Argument 1: Projection - Shown Above");
   }
-
 }

@@ -92,6 +92,7 @@ public class V1Constants {
     public static final String METADATA_FILE_NAME = "metadata.properties";
 
     public static class StarTree {
+      public static final String STAR_TREE_ENABLED = "startree.enabled";
       public static final String SPLIT_ORDER = "startree.split.order";
       public static final String MAX_LEAF_RECORDS = "startree.max.leaf.records";
       public static final String SPLIT_EXCLUDES = "startree.split.excludes";
@@ -109,6 +110,7 @@ public class V1Constants {
       public static final String TIME_INTERVAL = "segment.time.interval";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
+      public static final String SEGMENT_TOTAL_AGGREGATE_DOCS = "segment.total.aggregate.docs";
       public static final String SEGMENT_CRC = "segment.crc";
       public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
 

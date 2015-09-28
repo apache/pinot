@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.roaringbitmap.IntIterator;
@@ -574,5 +576,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   public boolean hasDictionary(String columnName) {
     return dictionaryMap.containsKey(columnName);
+  }
+
+  @Override
+  public StarTreeIndexNode getStarTreeRoot() {
+    return null;
   }
 }

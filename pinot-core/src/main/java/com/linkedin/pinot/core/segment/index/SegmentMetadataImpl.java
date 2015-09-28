@@ -15,17 +15,14 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.ConfigurationException;
@@ -236,6 +233,51 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
     }
 
+    // StarTree config here
+    Boolean starTreeEnabled = _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
+    if (starTreeEnabled) {
+      StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
+
+      // Splits
+      List<String> splitOrderList = new ArrayList<>();
+      Iterator<String> splitOrder = _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.SPLIT_ORDER).iterator();
+      while (splitOrder.hasNext()) {
+        String split = splitOrder.next();
+        if (split.trim().length() > 0) {
+          splitOrderList.add(split);
+        }
+      }
+      starTreeIndexSpec.setSplitOrder(splitOrderList);
+
+      // Split excludes
+      List<String> splitExcludesList = new ArrayList<>();
+      Iterator<String> splitExcludes = _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.SPLIT_EXCLUDES).iterator();
+      while (splitExcludes.hasNext()) {
+        String splitExclude = splitExcludes.next();
+        if (splitExclude.trim().length() > 0) {
+          splitExcludesList.add(splitExclude);
+        }
+      }
+      starTreeIndexSpec.setSplitExcludes(splitExcludesList);
+
+      // Dimension excludes
+      List<String> dimensionExcludesList = new ArrayList<>();
+      Iterator<String> dimensionExcludes = _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.EXCLUDED_DIMENSIONS).iterator();
+      while (dimensionExcludes.hasNext()) {
+        String dimensionExclude = dimensionExcludes.next();
+        if (dimensionExclude.trim().length() > 0) {
+          dimensionExcludesList.add(dimensionExclude);
+        }
+      }
+      starTreeIndexSpec.setExcludedDimensions(dimensionExcludesList);
+
+      // Max leaf records
+      int maxLeafRecords = Integer.valueOf((String) _segmentMetadataPropertiesConfiguration.getProperty(MetadataKeys.StarTree.MAX_LEAF_RECORDS));
+      starTreeIndexSpec.setMaxLeafRecords(maxLeafRecords);
+
+      _schema.setStarTreeIndexSpec(starTreeIndexSpec);
+    }
+
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
 
     for (final String column : _allColumns) {
@@ -244,6 +286,36 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     for (final String column : _columnMetadataMap.keySet()) {
       _schema.addSchema(column, _columnMetadataMap.get(column).toFieldSpec());
+    }
+
+    // Check that all the split dimensions are in the schema, if applicable
+    if (_schema.getStarTreeIndexSpec() != null) {
+      // Split order
+      if (_schema.getStarTreeIndexSpec().getSplitOrder() != null) {
+        for (String dimension : _schema.getStarTreeIndexSpec().getSplitOrder()) {
+          if (!_schema.getDimensionNames().contains(dimension)) {
+            throw new IllegalStateException("Split order dimension " + dimension + " not in schema " + _schema);
+          }
+        }
+      }
+
+      // Split excludes
+      if (_schema.getStarTreeIndexSpec().getSplitExcludes() != null) {
+        for (String dimension : _schema.getStarTreeIndexSpec().getSplitExcludes()) {
+          if (!_schema.getDimensionNames().contains(dimension)) {
+            throw new IllegalStateException("Split exclude dimension " + dimension + " not in schema " + _schema);
+          }
+        }
+      }
+
+      // Excluded dimensions
+      if (_schema.getStarTreeIndexSpec().getExcludedDimensions() != null) {
+        for (String dimension : _schema.getStarTreeIndexSpec().getExcludedDimensions()) {
+          if (!_schema.getDimensionNames().contains(dimension)) {
+            throw new IllegalStateException("Excluded dimension " + dimension + " not in schema " + _schema);
+          }
+        }
+      }
     }
   }
 
@@ -362,6 +434,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
+  public int getTotalAggregateDocs() {
+    return _segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_AGGREGATE_DOCS, 0);
+  }
+
+  @Override
   public String getIndexDir() {
     return _indexDir;
   }
@@ -446,5 +523,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public boolean close() {
     return false;
+  }
+
+  @Override
+  public boolean hasStarTree() {
+    return _schema.getStarTreeIndexSpec() != null;
   }
 }
