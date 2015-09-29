@@ -9,8 +9,10 @@ import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricsGraphicsTimeSeries;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
@@ -53,6 +55,7 @@ public class MetricsGraphicsTimeSeriesResource {
       @Context UriInfo uriInfo) throws Exception {
     DateTime startTime = parseDateTime(startTimeISO, timeZone);
     DateTime endTime = parseDateTime(endTimeISO, timeZone);
+    Multimap<String, String> fixedValues = extractDimensionValues(uriInfo);
 
     // Get time series data
     ThirdEyeRequest req = new ThirdEyeRequest()
@@ -60,7 +63,7 @@ public class MetricsGraphicsTimeSeriesResource {
         .setMetricFunction(getMetricFunction(metric, bucketSize))
         .setStartTime(startTime)
         .setEndTime(endTime)
-        .setDimensionValues(extractDimensionValues(uriInfo));
+        .setDimensionValues(fixedValues);
 
     if (groupBy != null) {
       req.setGroupBy(groupBy);
@@ -161,6 +164,59 @@ public class MetricsGraphicsTimeSeriesResource {
     } else {
       anomalies = resultDAO.findAllByCollectionTimeFunctionIdAndMetric(collection, metric, functionId, startTime, endTime);
     }
+
+    StarTreeConfig config = thirdEyeClient.getStarTreeConfig(collection);
+    if (groupBy == null) {
+      // Only show values that match current combination
+      List<AnomalyResult> filtered = new ArrayList<>();
+      for (AnomalyResult anomaly : anomalies) {
+        String[] dimensions = anomaly.getDimensions().split(",");
+
+        boolean matches = true;
+        for (int i = 0; i < config.getDimensions().size(); i++) {
+          DimensionSpec spec = config.getDimensions().get(i);
+          if (!fixedValues.containsKey(spec.getName()) && !"*".equals(dimensions[i])) {
+            matches = false;
+            break;
+          } else if (fixedValues.containsKey(spec.getName()) && !fixedValues.get(spec.getName()).contains(dimensions[i])) {
+            matches = false;
+            break;
+          }
+        }
+
+        if (matches) {
+          filtered.add(anomaly);
+        }
+      }
+      anomalies = filtered;
+    } else {
+      // If there's a group by, only show those for the visible dimension values
+      int idx = -1;
+      for (int i = 0; i < config.getDimensions().size(); i++) {
+        if (config.getDimensions().get(i).getName().equals(groupBy)) {
+          idx = i;
+          break;
+        }
+      }
+
+      // Get the represented values from the time series
+      Set<String> representedValues = new HashSet<>();
+      for (DimensionKey key : sortedAndFilteredKeys) {
+        representedValues.add(key.getDimensionValues()[idx]);
+      }
+
+      // Filter the anomalies
+      List<AnomalyResult> filtered = new ArrayList<>();
+      for (AnomalyResult anomaly : anomalies) {
+        String[] dimensions = anomaly.getDimensions().split(",");
+        if (representedValues.contains(dimensions[idx])) {
+          filtered.add(anomaly);
+        }
+      }
+      anomalies = filtered;
+    }
+
+    // Add the anomaly markers
     List<Map<String, Object>> markers = new ArrayList<>();
     for (AnomalyResult anomaly : anomalies) {
       if (anomaly.getEndTimeUtc() == null) {
