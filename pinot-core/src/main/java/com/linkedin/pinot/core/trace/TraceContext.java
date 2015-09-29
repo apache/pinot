@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.trace;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +34,9 @@ import org.slf4j.LoggerFactory;
  * At the end of tracing a request, the request handler thread should unregister by calling
  * {@link #unregister(InstanceRequest)} to avoid any resource leaks.
  *
- * For place where trace info needs to be recorded, just call {@link TraceContext#log(String, Object)}.
- *
+ * For place where trace info needs to be recorded, just call {@link TraceContext#logInfo(CONSTANT, long)},
+ * {@link TraceContext#logInfo(CONSTANT, InstanceRequest)}, {@link TraceContext#logException(String, String)} or
+ * {@link TraceContext#logLatency(String, long)}.
  */
 public class TraceContext {
 
