@@ -75,7 +75,7 @@ public class ScanStatistics {
         0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
     MaxInterval realDataInterval = generateMaxLikelihood(scanWindowIterator, trainingData, monitoringData, trainDataDs);
     if (realDataInterval.getInterval() == null) {
-      throw new IllegalStateException("no interval generated");
+			return null;
     }
 		LOGGER.info("Generated realDataInterval {}", realDataInterval);
 
@@ -96,7 +96,7 @@ public class ScanStatistics {
       MaxInterval simulationResult = generateMaxLikelihood(simulationScanWindowIterator, trainingData, simulationBuffer,
           trainDataDs);
 
-			LOGGER.info("simulation ({}) {} (numExceeded={}) : {}",
+			LOGGER.debug("simulation ({}) {} (numExceeded={}) : {}",
 					_bootstrap ? "bootstrap" : "gaussian", ii, numExceeded, simulationResult);
 
       if (simulationResult.getInterval() != null

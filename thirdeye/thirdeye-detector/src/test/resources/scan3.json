@@ -3,7 +3,7 @@
   "metric": "myMetric",
   "type": "SCAN_STATISTICS",
   "isActive": true,
-  "cron": "0 * * * * ?",
+  "cron": "0 0 * * * ?",
   "windowSize": 912,
   "windowUnit": "HOURS",
   "windowDelay": 3,
