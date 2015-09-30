@@ -16,7 +16,10 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class AnomalyDetectionJobManager {
@@ -46,31 +49,20 @@ public class AnomalyDetectionJobManager {
     this.jobKeys = new HashMap<>();
   }
 
-  private AnomalyFunctionSpec getAnomalyFunctionSpec(Long id) {
-    Session session = sessionFactory.openSession();
-    try {
-      ManagedSessionContext.bind(session);
-      Transaction transaction = session.beginTransaction();
-      try {
-        AnomalyFunctionSpec spec = specDAO.findById(id);
-        if (spec == null) {
-          throw new IllegalArgumentException("No function with id " + id);
-        }
-        transaction.commit();
-        return spec;
-      } catch (Exception e) {
-        transaction.rollback();
-        throw new RuntimeException(e);
-      }
-    } finally {
-      session.close();
-      ManagedSessionContext.unbind(sessionFactory);
+  public List<Long> getActiveJobs() {
+    synchronized (sync) {
+      List<Long> jobs = new ArrayList<>(jobKeys.keySet());
+      Collections.sort(jobs);
+      return jobs;
     }
   }
 
   public void runAdHoc(Long id, String windowStartIsoString, String windowEndIsoString) throws Exception {
     synchronized (sync) {
-      AnomalyFunctionSpec spec = getAnomalyFunctionSpec(id);
+      AnomalyFunctionSpec spec = specDAO.findById(id);
+      if (spec == null) {
+        throw new IllegalArgumentException("No function with id " + id);
+      }
       AnomalyFunction anomalyFunction = AnomalyFunctionFactory.fromSpec(spec);
 
       String triggerKey = String.format("ad_hoc_anomaly_function_trigger_%d", spec.getId());
@@ -100,7 +92,10 @@ public class AnomalyDetectionJobManager {
 
   public void start(Long id) throws Exception {
     synchronized (sync) {
-      AnomalyFunctionSpec spec = getAnomalyFunctionSpec(id);
+      AnomalyFunctionSpec spec = specDAO.findById(id);
+      if (spec == null) {
+        throw new IllegalArgumentException("No function with id " + id);
+      }
       AnomalyFunction anomalyFunction = AnomalyFunctionFactory.fromSpec(spec);
 
       String triggerKey = String.format("scheduled_anomaly_function_trigger_%d", spec.getId());
@@ -129,7 +124,7 @@ public class AnomalyDetectionJobManager {
 
   public void stop(Long id) throws Exception {
     synchronized (sync) {
-      String jobKey = jobKeys.get(id);
+      String jobKey = jobKeys.remove(id);
       if (jobKey == null) {
         throw new IllegalArgumentException("No scheduled job for function id " + id);
       }

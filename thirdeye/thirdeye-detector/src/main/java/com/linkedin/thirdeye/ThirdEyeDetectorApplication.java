@@ -8,13 +8,13 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.ContextualEventDAO;
+import com.linkedin.thirdeye.db.HibernateSessionWrapper;
 import com.linkedin.thirdeye.driver.AnomalyDetectionJobManager;
+import com.linkedin.thirdeye.resources.AnomalyDetectionJobResource;
 import com.linkedin.thirdeye.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.resources.ContextualEventResource;
 import com.linkedin.thirdeye.resources.MetricsGraphicsTimeSeriesResource;
-import com.linkedin.thirdeye.task.AdHocAnomalyDetectionJobTask;
-import com.linkedin.thirdeye.task.ScheduleAnomalyDetectionJobTask;
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.db.DataSourceFactory;
@@ -26,8 +26,14 @@ import io.dropwizard.setup.Environment;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.concurrent.Callable;
 
 public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorConfiguration> {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
 
   private final HibernateBundle<ThirdEyeDetectorConfiguration> hibernate =
       new HibernateBundle<ThirdEyeDetectorConfiguration>(
@@ -100,7 +106,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     });
 
     // ThirdEye driver
-    AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(
+    final AnomalyDetectionJobManager jobManager = new AnomalyDetectionJobManager(
         quartzScheduler,
         thirdEyeClient,
         anomalyFunctionSpecDAO,
@@ -108,14 +114,37 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
         hibernate.getSessionFactory(),
         environment.metrics());
 
+    // Start all active jobs on startup
+    environment.lifecycle().manage(new Managed() {
+      @Override
+      public void start() throws Exception {
+        new HibernateSessionWrapper<Void>(hibernate.getSessionFactory()).execute(new Callable<Void>() {
+          @Override
+          public Void call() throws Exception {
+            List<AnomalyFunctionSpec> functions;
+            functions = anomalyFunctionSpecDAO.findAll();
+            for (AnomalyFunctionSpec function : functions) {
+              if (function.isActive()) {
+                jobManager.start(function.getId());
+                LOG.info("Starting {}", function);
+              }
+            }
+            return null;
+          };
+        });
+      }
+
+      @Override
+      public void stop() throws Exception {
+        // NOP (quartz scheduler just dies)
+      }
+    });
+
     // Jersey resources
     environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionSpecDAO));
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     environment.jersey().register(new ContextualEventResource(contextualEventDAO));
     environment.jersey().register(new MetricsGraphicsTimeSeriesResource(thirdEyeClient, anomalyResultDAO));
-
-    // Tasks
-    environment.admin().addTask(new ScheduleAnomalyDetectionJobTask(jobManager));
-    environment.admin().addTask(new AdHocAnomalyDetectionJobTask(jobManager));
+    environment.jersey().register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
   }
 }

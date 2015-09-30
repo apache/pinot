@@ -21,7 +21,11 @@ import java.util.concurrent.TimeUnit;
         query = "SELECT af FROM AnomalyFunctionSpec af"),
     @NamedQuery(
         name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection",
-        query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection")
+        query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
+    @NamedQuery(
+        name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive",
+        query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"
+    )
 })
 public class AnomalyFunctionSpec {
   @Id
