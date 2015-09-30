@@ -111,7 +111,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
     }
     long totalSizeInBits = ((long) rowSizeInBits) * rows;
     // jfim: We keep the number of bytes required as an int, as Java Buffers cannot be larger than 2GB
-    this.bytesRequired = Ints.checkedCast((totalSizeInBits + 7) / 8);
+    this.bytesRequired = (int)((totalSizeInBits + 7) / 8);
   }
 
   private void createBuffer(File file) throws FileNotFoundException,

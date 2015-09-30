@@ -167,7 +167,7 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
     return docsPerChunk;
   }
 
-  private int computeLength(long rowOffSetStart) {
+  private int computeLength(int rowOffSetStart) {
     long rowOffSetEnd = customBitSet.nextSetBitAfter(rowOffSetStart);
     if (rowOffSetEnd < 0) {
       return (int) (totalNumValues - rowOffSetStart);
