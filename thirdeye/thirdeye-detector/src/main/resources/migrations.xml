@@ -112,5 +112,42 @@
         <constraints nullable="true"/>
       </column>
     </createTable>
+    
+    <!-- EmailConfiguration -->
+    <createTable tableName="email_configurations">
+      <column name="id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="collection" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="from_address" type="varchar(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="to_address" type="varchar(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="cron" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="smtp_host" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="smtp_port" type="int">
+        <constraints nullable="false"/>
+      </column>
+      <column name="smtp_user" type="varchar(127)">
+        <constraints nullable="true"/>
+      </column>
+      <column name="smtp_password" type="varchar(127)">
+        <constraints nullable="true"/>
+      </column>
+      <column name="window_size" type="int">
+        <constraints nullable="false"/>
+      </column>
+      <column name="window_unit" type="int">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
   </changeSet>
 </databaseChangeLog>
