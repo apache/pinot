@@ -56,13 +56,29 @@ public class InstancePlanMakerImplV3 implements PlanMaker {
         PlanNode aggregationGroupByPlanNode;
         if (indexSegment instanceof IndexSegmentImpl) {
           if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
-            aggregationGroupByPlanNode =
-                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.Dictionary);
+            // Optimization if can use Long as key for group by, as opposed to string
+//            aggregationGroupByPlanNode =
+//                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.Dictionary);
+            if (indexSegment.getSegmentMetadata().hasStarTree() && isConjunctiveAggregateQuery(brokerRequest)) {
+              aggregationGroupByPlanNode = new StarTreeAggregationGroupByOperatorPlanNode(
+                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.Dictionary);
+            } else {
+              aggregationGroupByPlanNode = new RawAggregationGroupByOperatorPlanNode(
+                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.Dictionary);
+            }
           } else {
-            aggregationGroupByPlanNode =
-                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.DictionaryAndTrie);
+//            aggregationGroupByPlanNode =
+//                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.DictionaryAndTrie);
+            if (indexSegment.getSegmentMetadata().hasStarTree() && isConjunctiveAggregateQuery(brokerRequest)) {
+              aggregationGroupByPlanNode = new StarTreeAggregationGroupByOperatorPlanNode(
+                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.DictionaryAndTrie);
+            } else {
+              aggregationGroupByPlanNode = new RawAggregationGroupByOperatorPlanNode(
+                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.DictionaryAndTrie);
+            }
           }
         } else {
+          // This is used for real-time segment when the buffer is not yet ready to be flushed
           aggregationGroupByPlanNode =
               new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.NoDictionary);
         }
