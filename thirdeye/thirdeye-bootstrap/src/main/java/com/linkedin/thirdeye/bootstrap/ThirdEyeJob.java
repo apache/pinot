@@ -52,6 +52,7 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
+import com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
 import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
@@ -164,6 +165,23 @@ public class ThirdEyeJob {
       @Override
       String getDescription() {
         return "Joins multiple data sets based on join key";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths) {
+        return inputConfig;
+      }
+    },
+    TRANSFORM {
+      @Override
+      Class<?> getKlazz() {
+        return TransformPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Transforms avro record";
       }
 
       @Override
@@ -932,6 +950,11 @@ public class ThirdEyeJob {
      */
     if (PhaseSpec.JOIN.equals(phaseSpec)) {
       JoinPhaseJob job = new JoinPhaseJob("Join Job", inputConfig);
+      job.run();
+      return;
+    }
+    if (PhaseSpec.TRANSFORM.equals(phaseSpec)) {
+      TransformPhaseJob job = new TransformPhaseJob("Transform Job", inputConfig);
       job.run();
       return;
     }
