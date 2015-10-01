@@ -43,6 +43,8 @@ public class AbstractBaseCommand {
   static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
   static final String DEFAULT_CONTROLLER_PORT = "9000";
   static final String DEFAULT_CLUSTER_NAME = "PinotCluster";
+  static final String URI_TABLES_PATH = "/tables/";
+
   static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
 
   public AbstractBaseCommand(boolean addShutdownHook) {
