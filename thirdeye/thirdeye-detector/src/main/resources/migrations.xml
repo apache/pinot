@@ -121,10 +121,13 @@
       <column name="collection" type="varchar(127)">
         <constraints nullable="false"/>
       </column>
+      <column name="metric" type="varchar(127)">
+        <constraints nullable="false"/>
+      </column>
       <column name="from_address" type="varchar(255)">
         <constraints nullable="false"/>
       </column>
-      <column name="to_address" type="varchar(255)">
+      <column name="to_addresses" type="varchar(255)">
         <constraints nullable="false"/>
       </column>
       <column name="cron" type="varchar(127)">
@@ -146,6 +149,9 @@
         <constraints nullable="false"/>
       </column>
       <column name="window_unit" type="int">
+        <constraints nullable="false"/>
+      </column>
+      <column name="is_active" type="boolean">
         <constraints nullable="false"/>
       </column>
     </createTable>

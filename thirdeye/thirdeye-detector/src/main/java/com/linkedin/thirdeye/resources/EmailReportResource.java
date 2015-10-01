@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.resources;
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.EmailConfiguration;
 import com.linkedin.thirdeye.db.EmailConfigurationDAO;
+import com.linkedin.thirdeye.email.EmailReportJobManager;
 import io.dropwizard.hibernate.UnitOfWork;
 
 import javax.ws.rs.DELETE;
@@ -17,13 +18,15 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
 
-@Path("/email-configurations")
+@Path("/email-reports")
 @Produces(MediaType.APPLICATION_JSON)
-public class EmailConfigurationResource {
+public class EmailReportResource {
   private final EmailConfigurationDAO dao;
+  private final EmailReportJobManager manager;
 
-  public EmailConfigurationResource(EmailConfigurationDAO dao) {
+  public EmailReportResource(EmailConfigurationDAO dao, EmailReportJobManager manager) {
     this.dao = dao;
+    this.manager = manager;
   }
 
   @POST
@@ -32,6 +35,15 @@ public class EmailConfigurationResource {
   public Response create(EmailConfiguration configuration) {
     Long id = dao.create(configuration);
     return Response.ok(id).build();
+  }
+
+  @POST
+  @Timed
+  @UnitOfWork
+  @Path("/{id}/ad-hoc")
+  public Response sendAdHoc(@PathParam("id") Long id) throws Exception {
+    manager.sendAdHoc(id);
+    return Response.ok().build();
   }
 
   @DELETE

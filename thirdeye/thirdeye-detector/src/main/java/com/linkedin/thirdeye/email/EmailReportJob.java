@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.email;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.ThirdEyeDetectorConfiguration;
 import com.linkedin.thirdeye.api.AnomalyResult;
 import com.linkedin.thirdeye.api.EmailConfiguration;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
@@ -10,12 +9,11 @@ import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
 import org.apache.commons.mail.DefaultAuthenticator;
-import org.apache.commons.mail.Email;
 import org.apache.commons.mail.HtmlEmail;
-import org.apache.commons.mail.SimpleEmail;
 import org.hibernate.SessionFactory;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -25,6 +23,9 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -36,12 +37,14 @@ public class EmailReportJob implements Job {
   public static final String CONFIG = "CONFIG";
   public static final String RESULT_DAO = "RESULT_DAO";
   public static final String SESSION_FACTORY = "SESSION_FACTORY";
+  public static final String APPLICATION_PORT = "APPLICATION_PORT";
   public static final String CHARSET = "UTF-8";
 
   @Override
   public void execute(final JobExecutionContext context) throws JobExecutionException {
     final EmailConfiguration config = (EmailConfiguration) context.getJobDetail().getJobDataMap().get(CONFIG);
     SessionFactory sessionFactory = (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
+    int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
 
     // Get time
     long deltaMillis = TimeUnit.MILLISECONDS.convert(config.getWindowSize(), config.getWindowUnit());
@@ -62,6 +65,23 @@ public class EmailReportJob implements Job {
       throw new JobExecutionException(e);
     }
 
+    // Sort them in descending time (newest appear first)
+    Collections.sort(results, Collections.reverseOrder());
+
+    // Get link to visualizer
+    String visualizerLink;
+    try {
+      visualizerLink = String.format("http://%s:%d/#/time-series/%s/%s/%s/%s?overlay=1w",
+          InetAddress.getLocalHost().getCanonicalHostName(),
+          applicationPort,
+          config.getCollection(),
+          config.getMetric(),
+          then,
+          now);
+    } catch (Exception e) {
+      throw new JobExecutionException(e);
+    }
+
     // Render template
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
@@ -72,7 +92,8 @@ public class EmailReportJob implements Job {
       Map<String, Object> templateData = ImmutableMap.of(
           "anomalyResults", (Object) results,
           "startTime", then,
-          "endTime", now
+          "endTime", now,
+          "visualizerLink", visualizerLink
       );
       Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
       template.process(templateData, out);
@@ -91,9 +112,15 @@ public class EmailReportJob implements Job {
         email.setSSLOnConnect(true);
       }
       email.setFrom(config.getFromAddress());
-      email.addTo(config.getToAddress());
-      email.setSubject(String.format("[ThirdEye] (%s) %d anomalies (%s to %s)",
-          config.getCollection(), results.size(), then, now));
+      for (String toAddress : config.getToAddresses().split(",")) {
+        email.addTo(toAddress);
+      }
+      email.setSubject(String.format("[ThirdEye] (%s:%s) %d anomalies (%s to %s)",
+          config.getCollection(),
+          config.getMetric(),
+          results.size(),
+          DateTimeFormat.longDateTime().print(then),
+          DateTimeFormat.longDateTime().print(now)));
       email.setHtmlMsg(new String(baos.toByteArray(), CHARSET));
       email.send();
     } catch (Exception e) {

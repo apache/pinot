@@ -25,6 +25,7 @@ public class ScanStatistics {
 	private final boolean _bootstrap;
 	private final double _pValue;
 	private final Pattern _pattern;
+	private final double _notEqualEpsilon;
 
 	/**
 	 * The direction of the hypothesis test
@@ -34,7 +35,12 @@ public class ScanStatistics {
 	}
 
 	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
-	    int minIncrement, boolean bootstrap)  {
+												int minIncrement, boolean bootstrap)  {
+		this(numSimulation, minWindowLength, maxWindowLength, pValue, pattern, minIncrement, bootstrap, 0);
+	}
+
+	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
+	    int minIncrement, boolean bootstrap, double notEqualEpsilon)  {
 		_numSimulation = numSimulation;
 		_minWindowLength = minWindowLength;
 		_maxWindowLength = maxWindowLength;
@@ -42,6 +48,7 @@ public class ScanStatistics {
 		_pValue = pValue;
 		_pattern = pattern;
 		_bootstrap = bootstrap;
+		_notEqualEpsilon = notEqualEpsilon;
 	}
 
 	@Override
@@ -221,7 +228,7 @@ public class ScanStatistics {
 			    break;
 			  }
 			  case NOTEQUAL: {
-			    matchesPattern = equalsDouble(inMean, outMean, 0.001); // TODO : this epsilon is arbitrary
+					matchesPattern = Math.abs(inMean - outMean) > _notEqualEpsilon * outMean;
 			    break;
 			  }
 			}
@@ -234,10 +241,6 @@ public class ScanStatistics {
 
 		MaxInterval maxDataInterval = new MaxInterval(maxValue, maxInterval);
 		return maxDataInterval;
-	}
-
-	private boolean equalsDouble(double d1, double d2, double epsilon) {
-	  return Math.abs(d1 - d2) < epsilon;
 	}
 
 	/**

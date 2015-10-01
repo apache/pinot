@@ -13,6 +13,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import java.util.List;
 
 @Path("/anomaly-jobs")
@@ -35,25 +36,28 @@ public class AnomalyDetectionJobResource {
   @POST
   @Path("/{id}")
   @UnitOfWork
-  public void enable(@PathParam("id") Long id) throws Exception {
+  public Response enable(@PathParam("id") Long id) throws Exception {
     specDAO.toggleActive(id, true);
     manager.start(id);
+    return Response.ok().build();
   }
 
   @POST
   @Path("/{id}/ad-hoc")
   @UnitOfWork
-  public void adHoc(@PathParam("id") Long id,
+  public Response adHoc(@PathParam("id") Long id,
                     @QueryParam("start") String start,
                     @QueryParam("end") String end) throws Exception {
     manager.runAdHoc(id, start, end);
+    return Response.ok().build();
   }
 
   @DELETE
   @Path("/{id}")
   @UnitOfWork
-  public void disable(@PathParam("id") Long id) throws Exception {
+  public Response disable(@PathParam("id") Long id) throws Exception {
     specDAO.toggleActive(id, false);
     manager.stop(id);
+    return Response.ok().build();
   }
 }

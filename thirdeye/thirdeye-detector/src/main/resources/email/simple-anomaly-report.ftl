@@ -1,24 +1,45 @@
+<p>
+    <a href="${visualizerLink}">${visualizerLink}</a>
+</p>
+
 <#if (anomalyResults?has_content)>
 
-    <#list anomalyResults as anomalyResult>
-        <dl>
-            <dt>id</dt>
-            <dd>${anomalyResult.id}</dd>
-            <dt>function_id</dt>
-            <dd>${anomalyResult.function_id}</dd>
-            <dt>function_type</dt>
-            <dd>${anomalyResult.function_type}</dd>
-            <dt>function_properties</dt>
-            <dd>${anomalyResult.function_properties}</dd>
-            <dt>dimensions</dt>
-            <dd>${anomalyResult.dimensions}</dd>
-            <dt>score</dt>
-            <dd>${anomalyResult.score}</dd>
-            <dt>weight</dt>
-            <dd>${anomalyResult.weight}</dd>
-            <dt>properties</dt>
-            <dd>${anomalyResult.properties}</dd>
-        </dl>
+    <#list anomalyResults as r>
+        <table>
+            <tr>
+                <th style="text-align: left">id</th>
+                <td>${r.id}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">function_id</th>
+                <td>${r.functionId}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">function_type</th>
+                <td>${r.functionType}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">function_properties</th>
+                <td>${r.functionProperties}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">dimensions</th>
+                <td>${r.dimensions}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">score</th>
+                <td>${r.score}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">weight</th>
+                <td>${r.weight}</td>
+            </tr>
+            <tr>
+                <th style="text-align: left">properties</th>
+                <td>${r.properties}</td>
+            </tr>
+        </table>
+        <hr/>
     </#list>
 
 <#else>

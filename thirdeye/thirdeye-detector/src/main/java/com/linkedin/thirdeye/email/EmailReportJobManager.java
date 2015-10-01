@@ -7,13 +7,7 @@ import com.linkedin.thirdeye.db.EmailConfigurationDAO;
 import com.linkedin.thirdeye.driver.AnomalyDetectionJob;
 import io.dropwizard.lifecycle.Managed;
 import org.hibernate.SessionFactory;
-import org.quartz.CronScheduleBuilder;
-import org.quartz.CronTrigger;
-import org.quartz.JobBuilder;
-import org.quartz.JobDetail;
-import org.quartz.JobKey;
-import org.quartz.Scheduler;
-import org.quartz.TriggerBuilder;
+import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +16,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class EmailReportJobManager implements Managed {
   private static final Logger LOG = LoggerFactory.getLogger(EmailReportJobManager.class);
@@ -30,46 +26,74 @@ public class EmailReportJobManager implements Managed {
   private final Map<String, EmailConfiguration> jobKeys;
   private final AnomalyResultDAO resultDAO;
   private final SessionFactory sessionFactory;
+  private final AtomicInteger applicationPort;
   private final Object sync;
 
   public EmailReportJobManager(Scheduler quartzScheduler,
                                EmailConfigurationDAO configurationDAO,
                                AnomalyResultDAO resultDAO,
-                               SessionFactory sessionFactory) {
+                               SessionFactory sessionFactory,
+                               AtomicInteger applicationPort) {
     this.quartzScheduler = quartzScheduler;
     this.configurationDAO = configurationDAO;
     this.sessionFactory = sessionFactory;
     this.resultDAO = resultDAO;
+    this.applicationPort = applicationPort;
     this.jobKeys = new HashMap<>();
     this.sync = new Object();
+  }
+
+  public void sendAdHoc(Long id) throws Exception {
+    synchronized (sync) {
+      EmailConfiguration emailConfig = configurationDAO.findById(id);
+
+      String triggerKey = String.format("ad_hoc_email_trigger_%d", emailConfig.getId());
+      Trigger trigger = TriggerBuilder.newTrigger()
+          .withIdentity(triggerKey)
+          .startNow()
+          .build();
+
+      String jobKey = String.format("ad_hoc_email_job_%d", emailConfig.getId());
+      JobDetail job = JobBuilder.newJob(EmailReportJob.class)
+          .withIdentity(jobKey)
+          .build();
+
+      job.getJobDataMap().put(EmailReportJob.RESULT_DAO, resultDAO);
+      job.getJobDataMap().put(EmailReportJob.CONFIG, emailConfig);
+      job.getJobDataMap().put(EmailReportJob.SESSION_FACTORY, sessionFactory);
+      job.getJobDataMap().put(EmailReportJob.APPLICATION_PORT, applicationPort.get());
+
+      quartzScheduler.scheduleJob(job, trigger);
+      LOG.info("Started {}: {}", jobKey, emailConfig);
+    }
   }
 
   @Override
   public void start() throws Exception {
     synchronized (sync) {
       List<EmailConfiguration> emailConfigs = configurationDAO.findAll();
-      int i = 0;
       for (EmailConfiguration emailConfig : emailConfigs) {
-        String triggerKey = String.format("email_trigger_%d", i);
-        CronTrigger trigger = TriggerBuilder.newTrigger()
-            .withIdentity(triggerKey)
-            .withSchedule(CronScheduleBuilder.cronSchedule(emailConfig.getCron()))
-            .build();
+        if (emailConfig.isActive()) {
+          String triggerKey = String.format("email_trigger_%d", emailConfig.getId());
+          CronTrigger trigger = TriggerBuilder.newTrigger()
+              .withIdentity(triggerKey)
+              .withSchedule(CronScheduleBuilder.cronSchedule(emailConfig.getCron()))
+              .build();
 
-        String jobKey = String.format("email_job_%d", i);
-        JobDetail job = JobBuilder.newJob(EmailReportJob.class)
-            .withIdentity(jobKey)
-            .build();
+          String jobKey = String.format("email_job_%d", emailConfig.getId());
+          JobDetail job = JobBuilder.newJob(EmailReportJob.class)
+              .withIdentity(jobKey)
+              .build();
 
-        job.getJobDataMap().put(EmailReportJob.RESULT_DAO, resultDAO);
-        job.getJobDataMap().put(EmailReportJob.CONFIG, emailConfig);
-        job.getJobDataMap().put(EmailReportJob.SESSION_FACTORY, sessionFactory);
+          job.getJobDataMap().put(EmailReportJob.RESULT_DAO, resultDAO);
+          job.getJobDataMap().put(EmailReportJob.CONFIG, emailConfig);
+          job.getJobDataMap().put(EmailReportJob.SESSION_FACTORY, sessionFactory);
+          job.getJobDataMap().put(EmailReportJob.APPLICATION_PORT, applicationPort.get());
 
-        jobKeys.put(jobKey, emailConfig);
-        quartzScheduler.scheduleJob(job, trigger);
-        LOG.info("Started {}: {}", jobKey, emailConfig);
-
-        i++;
+          jobKeys.put(jobKey, emailConfig);
+          quartzScheduler.scheduleJob(job, trigger);
+          LOG.info("Started {}: {}", jobKey, emailConfig);
+        }
       }
     }
   }

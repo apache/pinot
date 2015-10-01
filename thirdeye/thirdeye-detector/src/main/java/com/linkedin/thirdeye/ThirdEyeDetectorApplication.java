@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.resources.AnomalyDetectionJobResource;
 import com.linkedin.thirdeye.resources.AnomalyFunctionSpecResource;
 import com.linkedin.thirdeye.resources.AnomalyResultResource;
 import com.linkedin.thirdeye.resources.ContextualEventResource;
-import com.linkedin.thirdeye.resources.EmailConfigurationResource;
+import com.linkedin.thirdeye.resources.EmailReportResource;
 import com.linkedin.thirdeye.resources.MetricsGraphicsTimeSeriesResource;
 import com.linkedin.thirdeye.task.EmailReportJobManagerTask;
 import io.dropwizard.Application;
@@ -25,9 +25,13 @@ import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
 import io.dropwizard.lifecycle.Managed;
+import io.dropwizard.lifecycle.ServerLifecycleListener;
 import io.dropwizard.migrations.MigrationsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
@@ -36,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDetectorApplication.class);
@@ -103,11 +108,13 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
+        LOG.info("Starting Quartz scheduler");
         quartzScheduler.start();
       }
 
       @Override
       public void stop() throws Exception {
+        LOG.info("Stopping Quartz scheduler");
         quartzScheduler.shutdown();
       }
     });
@@ -148,34 +155,43 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     });
 
     // Email reports
+    final AtomicInteger applicationPort = new AtomicInteger(-1);
     final EmailReportJobManager emailReportJobManager = new EmailReportJobManager(
         quartzScheduler,
         emailConfigurationDAO,
         anomalyResultDAO,
-        hibernate.getSessionFactory());
-    environment.lifecycle().manage(new Managed() {
+        hibernate.getSessionFactory(),
+        applicationPort);
+    environment.lifecycle().addServerLifecycleListener(new ServerLifecycleListener() {
       @Override
-      public void start() throws Exception {
-        new HibernateSessionWrapper<Void>(hibernate.getSessionFactory()).execute(new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            emailReportJobManager.start();
-            return null;
+      public void serverStarted(Server server) {
+        for (Connector connector : server.getConnectors()) {
+          if (connector instanceof ServerConnector) {
+            ServerConnector serverConnector = (ServerConnector) connector;
+            applicationPort.set(serverConnector.getLocalPort());
           }
-        });
-      }
+        }
 
-      @Override
-      public void stop() throws Exception {
-        new HibernateSessionWrapper<Void>(hibernate.getSessionFactory()).execute(new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            emailReportJobManager.stop();
-            return null;
-          }
-        });
+        if (applicationPort.get() == -1) {
+          throw new IllegalStateException("Could not determine application port");
+        }
+
+        // Start the email report job manager once we know the application port
+        try {
+          new HibernateSessionWrapper<Void>(hibernate.getSessionFactory()).execute(new Callable<Void>() {
+            @Override
+            public Void call() throws Exception {
+              LOG.info("Starting email report job manager");
+              emailReportJobManager.start();
+              return null;
+            }
+          });
+        } catch (Exception e) {
+          throw new IllegalStateException(e);
+        }
       }
     });
+
 
     // Jersey resources
     environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionSpecDAO));
@@ -183,7 +199,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     environment.jersey().register(new ContextualEventResource(contextualEventDAO));
     environment.jersey().register(new MetricsGraphicsTimeSeriesResource(thirdEyeClient, anomalyResultDAO));
     environment.jersey().register(new AnomalyDetectionJobResource(jobManager, anomalyFunctionSpecDAO));
-    environment.jersey().register(new EmailConfigurationResource(emailConfigurationDAO));
+    environment.jersey().register(new EmailReportResource(emailConfigurationDAO, emailReportJobManager));
 
     // Tasks
     environment.admin().addTask(new EmailReportJobManagerTask(emailReportJobManager, hibernate.getSessionFactory()));

@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.api;
 
 import com.google.common.base.MoreObjects;
 import org.hibernate.validator.constraints.Email;
-import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -36,15 +35,19 @@ public class EmailConfiguration {
 
   @Valid
   @NotNull
+  @Column(name = "metric", nullable = false)
+  private String metric;
+
+  @Valid
+  @NotNull
   @Email
   @Column(name = "from_address", nullable = false)
   private String fromAddress;
 
   @Valid
   @NotNull
-  @Email
-  @Column(name = "to_address", nullable = false)
-  private String toAddress;
+  @Column(name = "to_addresses", nullable = false)
+  private String toAddresses;
 
   @Valid
   @NotNull
@@ -69,12 +72,15 @@ public class EmailConfiguration {
   @Valid
   @NotNull
   @Column(name = "window_size", nullable = false)
-  private int windowSize = 1;
+  private int windowSize = 7;
 
   @Valid
   @NotNull
   @Column(name = "window_unit", nullable = false)
   private TimeUnit windowUnit = TimeUnit.DAYS;
+
+  @Column(name = "is_active", nullable = false)
+  private boolean isActive;
 
   public long getId() {
     return id;
@@ -92,6 +98,14 @@ public class EmailConfiguration {
     this.collection = collection;
   }
 
+  public String getMetric() {
+    return metric;
+  }
+
+  public void setMetric(String metric) {
+    this.metric = metric;
+  }
+
   public String getFromAddress() {
     return fromAddress;
   }
@@ -100,12 +114,12 @@ public class EmailConfiguration {
     this.fromAddress = fromAddress;
   }
 
-  public String getToAddress() {
-    return toAddress;
+  public String getToAddresses() {
+    return toAddresses;
   }
 
-  public void setToAddress(String toAddress) {
-    this.toAddress = toAddress;
+  public void setToAddresses(String toAddresses) {
+    this.toAddresses = toAddresses;
   }
 
   public String getCron() {
@@ -164,18 +178,28 @@ public class EmailConfiguration {
     this.windowUnit = windowUnit;
   }
 
+  public boolean isActive() {
+    return isActive;
+  }
+
+  public void setIsActive(boolean isActive) {
+    this.isActive = isActive;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
         .add("collection", collection)
+        .add("metric", metric)
         .add("fromAddress", fromAddress)
-        .add("toAddress", toAddress)
+        .add("toAddresses", toAddresses)
         .add("cron", cron)
         .add("smtpHost", smtpHost)
         .add("smtpPort", smtpPort)
         .add("smtpUser", smtpUser)
         .add("windowSize", windowSize)
         .add("windowUnit", windowUnit)
+        .add("isActive", isActive)
         .toString();
   }
 }

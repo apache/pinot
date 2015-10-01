@@ -32,6 +32,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   private static final String PROP_DEFAULT_STL_TREND_BANDWIDTH = "0.5";
   private static final String PROP_DEFAULT_MONITORING_WINDOW_SIZE = "168"; // 1 week in hours
   private static final String PROP_DEFAULT_ONLY_ALERT_BOUNDARIES = "false";
+  private static final String PROP_DEFAULT_DOUBLE_NOT_EQUAL_EPSILON = "0.1";
 
   public static final String SEASONAL = "seasonal";
   public static final String MAX_WINDOW_LENGTH = "maxWindowLength";
@@ -43,6 +44,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   public static final String BOOTSTRAP = "bootstrap";
   public static final String STL_TREND_BANDWIDTH = "stlTrendBandwidth";
   public static final String MONITORING_WINDOW = "monitoringWindow";
+  public static final String NOT_EQUAL_EPSILON = "notEqualEpsilon";
 
   private int seasonal;
   private int maxWindowLength;
@@ -54,6 +56,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   private boolean bootstrap;
   private double stlTrendBandwidth;
   private int monitoringWindow;
+  private double notEqualEpsilon;
 
   @Override
   public void init(AnomalyFunctionSpec spec) throws Exception {
@@ -69,6 +72,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     this.bootstrap = Boolean.valueOf(props.getProperty(BOOTSTRAP, PROP_DEFAULT_BOOTSTRAP));
     this.stlTrendBandwidth = Double.valueOf(props.getProperty(STL_TREND_BANDWIDTH, PROP_DEFAULT_STL_TREND_BANDWIDTH));
     this.monitoringWindow = Integer.valueOf(props.getProperty(MONITORING_WINDOW, PROP_DEFAULT_MONITORING_WINDOW_SIZE));
+    this.notEqualEpsilon = Double.valueOf(props.getProperty(NOT_EQUAL_EPSILON, PROP_DEFAULT_DOUBLE_NOT_EQUAL_EPSILON));
   }
 
   @Override
@@ -109,7 +113,8 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
         pValueThreshold,
         pattern,
         minIncrement,
-        bootstrap);
+        bootstrap,
+        notEqualEpsilon);
     LOGGER.info("Created {}", scanStatistics);
 
     int totalNumBuckets = observationsMinusSeasonality.length;
