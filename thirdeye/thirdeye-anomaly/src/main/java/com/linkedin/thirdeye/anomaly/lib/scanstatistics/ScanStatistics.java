@@ -31,6 +31,10 @@ public class ScanStatistics {
 	private final boolean _bootstrap;
 	private final double _pValue;
 	private final Pattern _pattern;
+	private final double _upLevel;
+	private final double _downLevel;
+	private final double _notEqualLevel;
+
 
 	/**
 	 * The direction of the hypothesis test
@@ -40,14 +44,33 @@ public class ScanStatistics {
 	}
 
 	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
+      int minIncrement, boolean bootstrap, double upLevel, double downLevel, double notEqualLevel)  {
+    _numSimulation = numSimulation;
+    _minWindowLength = minWindowLength;
+    _maxWindowLength = maxWindowLength;
+    _minIncrement = minIncrement;
+    _pValue = pValue;
+    _pattern = pattern;
+    _bootstrap = bootstrap;
+    _upLevel = upLevel;
+    _downLevel = downLevel;
+    _notEqualLevel = notEqualLevel;
+
+  }
+
+	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
 	    int minIncrement, boolean bootstrap)  {
-		_numSimulation = numSimulation;
-		_minWindowLength = minWindowLength;
-		_maxWindowLength = maxWindowLength;
-		_minIncrement = minIncrement;
-		_pValue = pValue;
-		_pattern = pattern;
-		_bootstrap = bootstrap;
+	  _numSimulation = numSimulation;
+    _minWindowLength = minWindowLength;
+    _maxWindowLength = maxWindowLength;
+    _minIncrement = minIncrement;
+    _pValue = pValue;
+    _pattern = pattern;
+    _bootstrap = bootstrap;
+    _upLevel = 1.0;
+    _downLevel = 1.0;
+    _notEqualLevel = 1.0;
+
 	}
 
 	 /**
@@ -64,6 +87,9 @@ public class ScanStatistics {
   public Range<Integer> getInterval(double[] trainingData, double[] monitoringData) {
 
     OnlineNormalStatistics trainDataDs = new OnlineNormalStatistics(trainingData);
+    if (trainDataDs.getPopulationVariance() == 0) {
+      return null;
+    }
     NormalDistribution trainDataNormal = new NormalDistribution(trainDataDs.getMean(),
         Math.sqrt(trainDataDs.getPopulationVariance()));
 
@@ -71,7 +97,8 @@ public class ScanStatistics {
         0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
     MaxInterval realDataInterval = generateMaxLikelihood(scanWindowIterator, trainingData, monitoringData, trainDataDs);
     if (realDataInterval.getInterval() == null) {
-      throw new FunctionDidNotEvaluateException("no interval generated");
+      LOGGER.info("no interval generated");
+      return null;
     }
 
     int numExceeded = 0;
@@ -210,15 +237,15 @@ public class ScanStatistics {
 			switch (_pattern)
 			{
 			  case UP: {
-			    matchesPattern = inMean > outMean;
+			    matchesPattern = inMean > outMean * _upLevel;
 			    break;
 			  }
 			  case DOWN: {
-			    matchesPattern = inMean < outMean;
+			    matchesPattern = inMean < outMean * _downLevel;
 			    break;
 			  }
 			  case NOTEQUAL: {
-			    matchesPattern = equalsDouble(inMean, outMean, 0.001); // TODO : this epsilon is arbitrary
+			    matchesPattern = equalsDouble(inMean, outMean, _notEqualLevel);
 			    break;
 			  }
 			}
@@ -234,7 +261,7 @@ public class ScanStatistics {
 	}
 
 	private boolean equalsDouble(double d1, double d2, double epsilon) {
-	  return Math.abs(d1 - d2) < epsilon;
+	  return Math.abs(d1 - d2) >= epsilon * d2;
 	}
 
 	/**

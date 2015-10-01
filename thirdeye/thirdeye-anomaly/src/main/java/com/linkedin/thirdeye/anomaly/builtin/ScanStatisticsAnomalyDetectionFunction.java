@@ -183,9 +183,6 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     double[] observations = arraysFromSeries.getSecond();
     removeMissingValuesByAveragingNeighbors(observations);
 
-    // call stl library
-    double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal);
-
     int effectiveMaxWindowLength = (int) (monitoringWindow.totalBuckets() / bucketMillis);
     effectiveMaxWindowLength = Math.min(effectiveMaxWindowLength, maxWindowLength);
 
@@ -200,8 +197,11 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
         bootstrap);
 
     int numBucketsToScan = (int) ((monitoringWindow.getEnd() - monitoringWindow.getStart()) / bucketMillis);
-    int totalNumBuckets = observationsMinusSeasonality.length;
+    int totalNumBuckets = observations.length;
     int numTrain = totalNumBuckets - numBucketsToScan;
+
+ // call stl library
+    double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal, numTrain);
 
     // set of timestamps with anomalies
     Set<Long> anomalousTimestamps = new HashSet<Long>();
@@ -301,7 +301,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
    * @return
    *  The data with anomalies removed. Timestamps will no longer match this array.
    */
-  private double[] removeAnomalies(long[] timestamps, double[] data, Set<Long> anomalousTimestamps) {
+  public static double[] removeAnomalies(long[] timestamps, double[] data, Set<Long> anomalousTimestamps) {
     int collapsedIdx = 0;
     double[] dataWithAnomaliesRemoved = new double[timestamps.length];
     for (int i = 0; i < timestamps.length; i++) {
@@ -341,7 +341,9 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     }
   }
 
-  private double[] removeSeasonality(long[] timestamps, double[] series, int seasonality) {
+  private double[] removeSeasonality(long[] timestamps, double[] series, int seasonality, int numTrain) {
+    long[] trainTimestamps = Arrays.copyOfRange(timestamps, 0, numTrain);
+    double[] trainSeries =  Arrays.copyOfRange(series, 0, numTrain);
     STLDecomposition.Config config = new STLDecomposition.Config();
     config.setNumberOfObservations(seasonality);
     /*
@@ -359,16 +361,15 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     config.setTrendComponentBandwidth(stlTrendBandwidth); // default is 0.5
 
     config.setPeriodic(true);
-    config.setNumberOfDataPoints(series.length);
+    config.setNumberOfDataPoints(trainSeries.length);
     STLDecomposition stl = new STLDecomposition(config);
 
-    STLResult res = stl.decompose(timestamps, series);
+    STLResult res = stl.decompose(trainTimestamps, trainSeries);
 
-    double[] trend = res.getTrend();
-    double[] remainder = res.getRemainder();
-    double[] seasonalityRemoved = new double[trend.length];
-    for (int i = 0; i < trend.length; i++) {
-      seasonalityRemoved[i] = trend[i] + remainder[i];
+    double[] seasonal = res.getSeasonal();
+    double[] seasonalityRemoved = new double[series.length];
+    for (int i = 0; i < series.length; i++) {
+      seasonalityRemoved[i] = series[i] - seasonal[i%seasonality];
     }
     return seasonalityRemoved;
   }
