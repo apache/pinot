@@ -8,8 +8,6 @@ thirdEyeDetectorControllers.controller('TimeSeriesCtrl', ['$scope', '$routeParam
   function($scope, $routeParams, TimeSeries) {
     $scope.isLoaded = false;
     $scope.timeSeries = TimeSeries.query(function(res) {
-      $scope.isLoaded = true;
-
       // Convert milliseconds to dates for series
       for (var i = 0; i < res.data.length; i++) {
         for (var j = 0; j < res.data[i].length; j++) {
@@ -32,6 +30,10 @@ thirdEyeDetectorControllers.controller('TimeSeriesCtrl', ['$scope', '$routeParam
       res.legend_target = '#time-series-legend';
       res.width = $('#time-series-display').width();
       res.height = 300;
+      res.transition_on_update = false;
+      res.interpolate = 'linear';
+
+      $scope.isLoaded = true;
       MG.data_graphic(res);
     });
   }
