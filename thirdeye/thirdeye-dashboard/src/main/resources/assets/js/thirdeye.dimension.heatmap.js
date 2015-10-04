@@ -277,7 +277,7 @@ $(document).ready(function() {
 
         var currentMode = $(this).attr('mode')
 
-       var currentArea = $(this).closest(".treemap-section");
+       var currentArea = $(this).closest(".dimension-heat-map-treemap-section");
 
 
         // Set in URI
@@ -314,7 +314,7 @@ $(document).ready(function() {
 
 
     //Indicate baseline total value increase/decrease with red/blue colors next to the title of the table and the treemap
-    $(".dimension-heat-map-container-title .delta-ratio, .dimension-heat-map-container-title .delta-value").each(function(index, currentDelta){
+    $(".title-box .delta-ratio, .title-box .delta-value").each(function(index, currentDelta){
 
         var delta = $(currentDelta).html().trim().replace(/[\$,]/g, '') * 1
 
@@ -325,6 +325,28 @@ $(document).ready(function() {
         }
     })
 
+
+    //Heatmap and Datatable Tabs
+    $(".heatmap-tabs li").on("click", function(){
+        if(!$(this).hasClass("uk-active")) {
+            $(".dimension-heat-map-table-section").toggleClass("hidden")
+            $(".dimension-heat-map-treemap-section").toggleClass("hidden")
+        }
+    })
+
+    //Current query display ALL when no fixed element in the query
+    if($("ul.dimension-combination li").length == 0){
+        $("ul.dimension-combination").append("<li style='list-style-type: none;'>None</li>")
+    }
+
+    $(".section-selector").on("change", function(){
+        $(".section-wrapper").hide();
+        $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();
+    })
+
+
+
 })
+
 
 

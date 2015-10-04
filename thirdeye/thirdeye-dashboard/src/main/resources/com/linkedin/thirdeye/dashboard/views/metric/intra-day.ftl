@@ -8,19 +8,16 @@
 <#list (metricView.view.metricTables)!metricTables as metricTable>
     <#assign dimensions = metricTable.dimensionValues>
     <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-    <#include "../common/dimension-header.ftl">
 
-
-<div class="collapser"><h2>(-) Metric Intra-day View</h2></div>
-<div id="metric-table-area">
+<div id="metric-table-area" class="hidden">
     <#if (((metricView.view.metricTables)!metricTables)?size == 0)>
         <div class="uk-alert uk-alert-warning">
             <p>No data available</p>
         </div>
     </#if>
 
-        <div id="intra-day-buttons">
-          <button class="uk-button uk-modal-close" data-uk-modal="{target:'#intra-day-config'}">
+        <div id="intra-day-buttons hidden">
+          <button class="uk-button uk-modal-close uk-float-right" data-uk-modal="{target:'#intra-day-config'}">
             <i class="uk-icon-cog"></i>
           </button>
         </div>
@@ -51,7 +48,7 @@
           </div>
         </div>
 
-        <table id="intra-day-table" class="uk-table uk-table-striped">
+        <table id="intra-day-table" class="uk-table uk-table-striped uk-margin-small-top hidden">
             <thead>
                 <tr>
                     <th></th>

@@ -1,13 +1,14 @@
 $(document).ready(function() {
 
     //When a funnel thumbnail is clicked display it's content in the main funnel display section
-    $("#funnel-thumbnails>div").click(function(){
+    $("#funnel-thumbnails .funnel").click(function(){
 
         //Draw the selected thumbnail table and title in the main section
-        $(".custom-funnel-section").html($(this).html())
+        $("#custom-funnel-section").html($(this).html())
+        $("#custom-funnel-section h3").css("display", "inline")
 
         //Highlight currently selected thumbnail
-        $("#funnel-thumbnails>div").removeClass("uk-panel-box")
+        $("#funnel-thumbnails .funnel").removeClass("uk-panel-box")
         $(this).addClass("uk-panel-box")
     })
 
@@ -25,6 +26,17 @@ $(document).ready(function() {
     });
 
     //Preselect the 1st funnel
-    $("#funnel-thumbnails>div:first-of-type").trigger("click")
+    $("#funnel-thumbnails .funnel:first-of-type").trigger("click")
+
+    //Funnel and Metric Intraday tabs
+    $(".funnel-tabs li").on("click", function(){
+        if(!$(this).hasClass("uk-active")) {
+            $("#custom-funnel-section").toggleClass("hidden")
+            $("#funnel-thumbnails").toggleClass("hidden")
+            $("#metric-table-area").toggleClass("hidden")
+            $("#intra-day-buttons").toggleClass("hidden")
+            $("#intra-day-table").toggleClass("hidden")
+        }
+    })
 
 });

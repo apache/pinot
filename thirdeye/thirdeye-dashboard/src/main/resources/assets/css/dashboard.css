@@ -24,7 +24,7 @@ li{
 }
 
 #dashboard-metric-view {
-    padding-top: 175px;
+    padding-top: 155px;
     margin-top: -150px;
 }
 
@@ -36,18 +36,6 @@ li{
 #dashboard-output hr {
     margin-left: 2%;
     margin-right: 2%;
-}
-
-.dimension-combination {
-    font-weight: bold;
-    border: 1px solid #ddd;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    -moz-border-radius: 4px;
-    -webkit-border-radius: 4px;
-    margin-bottom: 1%;
-    text-align: center;
-
 }
 
 .dimension-combination table{
@@ -120,19 +108,21 @@ li{
     padding:8px;
 }
 
-#funnel-thumbnails table{
-    width: 20%;
-    height: 200px;
-    font-size:8px;
-    padding:0px;
-    border: 1px solid #ccc;
-    margin: auto;
-}
+
 
 /* Funnel Heatmap */
-.custom-funnel-section table{
-    line-height: 9px;
+#custom-funnel-section{
+    min-height: 600px;
+}
+
+#custom-funnel-section table,
+#custom-funnel-section table th{
+    line-height: 8px;
     text-align: center;
+    font-size: 10px;
+    padding: 6px;
+    font-family: Arial,sans-serif;
+    color: #898989;
 }
 
 #custom-funnels-container td:hover{
@@ -145,22 +135,33 @@ li{
     padding: 10px;
 }
 
+#funnel-thumbnails table{
+    width: 20%;
+    height: 200px;
+    font-size:8px;
+    padding:0px;
+    border: 1px solid #ccc;
+    margin: auto;
+}
+
+#funnel-thumbnails th,
 #funnel-thumbnails td{
      padding: 0px;
      font-size:3px;
-    line-height: 8px;
+     line-height: 8px;
  }
 
-#funnel-thumbnails tr:first-child td{
+#funnel-thumbnails th{
     word-wrap: break-word;
 }
 
 #funnel-thumbnails .metric-list{
     font-size: 9px;
     font-weight:800;
+    margin:0px;
 }
 
-#funnel-thumbnails>div{
+#funnel-thumbnails .funnel{
     display: inline-block;
     border: 1px solid #000;
     border-radius: 4px;
@@ -171,11 +172,11 @@ li{
 
 }
 
-#funnel-thumbnails>div:not(.uk-panel-box){
+#funnel-thumbnails .funnel:not(.uk-panel-box){
     background-color: #ddd;
 }
 
-#funnel-thumbnails>div.uk-panel-box{
+#funnel-thumbnails .funnel.uk-panel-box{
     border: 1px solid #ccc;
 
 }
@@ -251,10 +252,22 @@ li{
     border: 1px solid #ddd;
 }
 
-
 /* Dimension */
-/* Dimension - Tabular */
+.heatmap-tabs,
+.funnel-tabs{
+    margin-top:10px;
+    margin-bottom: -2px;
+}
 
+.heatmap-tabs li a,
+.funnel-tabs li a{
+    border-color: #ddd #ddd transparent;
+    border-radius: 4px 4px 0 0;
+    -moz-border-radius: 4px 4px 0 0;
+    -webkit-border-radius: 4px 4px 0 0;
+    color: #444;
+}
+/* Dimension - Tabular */
 .dimension-tabular-table{
     border: 1px solid #ddd;
 }
@@ -276,33 +289,43 @@ li{
     font-size: 9px;
 }
 
-.dimension-heat-map-container-title{
+.title-box{
     background-color: #f5f5f5;
     -moz-box-sizing: border-box;
     box-sizing: border-box;
+    border-radius: 4px;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
+    border: 1px solid #ddd;
     height: auto;
     margin: 0 0 15px;
-    padding: 10px 0 2px 12px;
+    padding: 10px 0 0 12px;
     width: 100%;
 
 }
-.dimension-heat-map-container-title h2{
-    display: inline-block;
+.title-box h2{
+    margin: 0;
     font-weight: 800;
+    line-height: 10px;
+
 }
 
-.dimension-heat-map-container-title table{
+.title-box table{
     width:100%;
     table-layout:fixed;
+    line-height: 10px;
+    border-collapse: collapse;
+    margin-bottom:10px;
 }
 
-.dimension-heat-map-container-title th{
-    font-size: 14px;
+.title-box th{
+    font-size: 12px;
     font-weight: 400;
+    padding:5px;
 }
 
 .title-stat{
-    font-size: 14px;
+    font-size: 10px;
     font-weight: 800;
     text-align: center;
 }
@@ -391,7 +414,7 @@ td[dimension-val]{
 
 /* Dimension Tree Map */
 
-.treemap-section{
+.dimension-heat-map-treemap-section{
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     margin-top:20px;
     margin-bottom:20px;
@@ -613,11 +636,15 @@ td[dimension-val]{
 }
 
 /* overwriting UIkit css */
-.uk-button.uk-active, .uk-button:active{
+.uk-button.uk-active,
+.uk-button:active,
+li.uk-active a{
     background-color: #ddd;
     color: #444;
     font-weight: 800;
 }
+
+
 
 
 

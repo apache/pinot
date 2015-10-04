@@ -9,7 +9,6 @@
 
 <#assign dimensions = (metricView.view.dimensionValues)!dimensionValues>
 <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-<#include "../common/dimension-header.ftl">
 
 <div id="metric-funnel-area">
     <div id="metric-funnel-baseline-placeholder"></div>
