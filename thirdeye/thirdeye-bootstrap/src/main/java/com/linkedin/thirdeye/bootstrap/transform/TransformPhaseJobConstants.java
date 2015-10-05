@@ -5,7 +5,8 @@ public enum TransformPhaseJobConstants {
   TRANSFORM_INPUT_PATH("transform.input.path"),
   TRANSFORM_OUTPUT_PATH("transform.output.path"),
   TRANSFORM_OUTPUT_AVRO_SCHEMA("transform.output.schema"),
-  TRANSFORM_UDF("transform.udf.class");
+  TRANSFORM_UDF("transform.udf.class"),
+  TRANSFORM_CONFIG_UDF("transform.config.udf.class");
 
   String name;
 

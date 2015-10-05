@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstan
 import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_OUTPUT_AVRO_SCHEMA;
 import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_UDF;
+import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_CONFIG_UDF;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Transform job to transform input files from one schema to another
@@ -105,20 +107,27 @@ public class TransformPhaseJob extends Configured {
 
   public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
-    Configuration conf = job.getConfiguration();
+    Configuration configuration = job.getConfiguration();
     job.setJobName(name);
     job.setJarByClass(TransformPhaseJob.class);
-    FileSystem fs = FileSystem.get(conf);
 
+    // Set custom config like adding distributed caches
+    String transformConfigUDFClass = getAndSetConfiguration(configuration, TRANSFORM_CONFIG_UDF);
+    LOGGER.info("Initializing TransformUDFClass:{} with params:{}", transformConfigUDFClass);
+    Constructor<?> constructor = Class.forName(transformConfigUDFClass).getConstructor();
+    TransformConfigUDF transformConfigUDF = (TransformConfigUDF) constructor.newInstance();
+    transformConfigUDF.setTransformConfig(job);
+
+    FileSystem fs = FileSystem.get(configuration);
 
     String outputSchemaPath =
-        getAndSetConfiguration(conf, TRANSFORM_OUTPUT_AVRO_SCHEMA);
+        getAndSetConfiguration(configuration, TRANSFORM_OUTPUT_AVRO_SCHEMA);
     Schema.Parser parser = new Schema.Parser();
     Schema outputSchema = parser.parse(fs.open(new Path(outputSchemaPath)));
     LOGGER.info("{}", outputSchema);
 
     String inputSchemaPath =
-        getAndSetConfiguration(conf, TRANSFORM_INPUT_AVRO_SCHEMA);
+        getAndSetConfiguration(configuration, TRANSFORM_INPUT_AVRO_SCHEMA);
     parser = new Schema.Parser();
     Schema inputSchema = parser.parse(fs.open(new Path(inputSchemaPath)));
     LOGGER.info("{}", inputSchema);
@@ -134,7 +143,6 @@ public class TransformPhaseJob extends Configured {
     job.setMapOutputValueClass(NullWritable.class);
 
     // transform phase config
-    Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, TRANSFORM_INPUT_PATH);
     String outputPathDir = getAndSetConfiguration(configuration, TRANSFORM_OUTPUT_PATH);
     getAndSetConfiguration(configuration, TRANSFORM_UDF);
