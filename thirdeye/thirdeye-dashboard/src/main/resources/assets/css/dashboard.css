@@ -21,14 +21,12 @@ li{
 
 #dashboard-metric-view {
     padding: 2%;
-}
-
-#dashboard-metric-view {
     padding-top: 155px;
     margin-top: -150px;
 }
 
 #dashboard-dimension-view {
+    padding: 2%;
     padding-top: 75px;
     margin-top: -75px;
 }
@@ -589,6 +587,7 @@ td[dimension-val]{
 
 .time-series-legend {
     overflow: hidden;
+    margin-top: 15px;
 }
 
 .up {

@@ -2,6 +2,10 @@
 
 <#if (funnelViews?size > 0)>
 <div id="custom-funnels-container">
+
+    <!-- todo: after the uri config change the following title box will be imported as a partial: cofig-form.ftl
+    currently the metric intraday and the dimension heatmap can be both present in the URI and in this case the config-form would not render the proper view
+    -->
     <div class="title-box uk-clearfix">
         <div class="uk-display-inline-block">
             <div class="funnel-cummulative" data-uk-button-checkbox><button type="button" id="funnel-cummulative" class="uk-button">Cummulative</button>
@@ -50,8 +54,8 @@
         </ul>
     </div>
 </div>
-<div id="custom-funnel-section">
-    <i class="uk-icon-spin uk-icon-large"></i>
+<div id="custom-funnel-section" style="text-align: center; ">
+    <i class="uk-icon-spinner uk-icon-spin uk-icon-large" style="margin: auto; vertical-align: center;"></i>
 </div>
 <div id="funnel-thumbnails" class="funnel-thumbnail-container uk-margin-bottom" data-uk-grid data-uk-slider>
     <#list funnelViews as funnel>

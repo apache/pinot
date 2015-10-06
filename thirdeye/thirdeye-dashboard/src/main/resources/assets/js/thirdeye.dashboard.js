@@ -78,7 +78,7 @@ $(document).ready(function() {
 
     });
 
-    //Allow user to switch dimension on the dropdown
+    //Allow user to switch dimension view on the dropdown
     $(".section-selector").on("change", function(){
         $(".section-wrapper").hide();
         $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();
@@ -87,7 +87,7 @@ $(document).ready(function() {
     //Set default dimension view on Timeseries and the default metric view on Heatmap
     window.onload = load
     function load() {
-        $(".section-selector").trigger("change")
+        window.setTimeout(function(){$(".section-selector").trigger("change")}, 1500);
     }
 
     var path = parsePath(window.location.pathname)
