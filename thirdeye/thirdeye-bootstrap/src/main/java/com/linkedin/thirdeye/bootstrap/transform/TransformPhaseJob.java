@@ -6,6 +6,7 @@ import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstan
 import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_UDF;
 import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_CONFIG_UDF;
+import static com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJobConstants.TRANSFORM_NUM_REDUCERS;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.util.Properties;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
+import org.apache.avro.mapred.AvroValue;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.avro.mapreduce.AvroKeyOutputFormat;
@@ -23,9 +25,11 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
@@ -56,9 +60,11 @@ public class TransformPhaseJob extends Configured {
   }
 
   public static class GenericTransformMapper extends
-      Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, NullWritable> {
+      Mapper<AvroKey<GenericRecord>, NullWritable, IntWritable, AvroValue<GenericRecord>> {
 
     TransformUDF transformUDF;
+    int numReducers;
+    int reducerKey;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -66,6 +72,10 @@ public class TransformPhaseJob extends Configured {
       LOGGER.info("GenericAvroTransformJob.GenericTransformMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fs = FileSystem.get(configuration);
+
+      String numTransformReducers = configuration.get(TRANSFORM_NUM_REDUCERS.toString());
+      numReducers = Integer.parseInt(numTransformReducers);
+      reducerKey = 1;
       try {
 
         String transformUDFClass = configuration.get(TRANSFORM_UDF.toString());
@@ -91,7 +101,10 @@ public class TransformPhaseJob extends Configured {
       GenericRecord outputRecord = transformUDF.transformRecord(record);
 
       if (outputRecord != null) {
-        context.write(new AvroKey<GenericRecord>(outputRecord), NullWritable.get());
+
+        IntWritable key = new IntWritable(reducerKey);
+        reducerKey = (reducerKey == numReducers) ? (1) : (reducerKey + 1);
+        context.write(key, new AvroValue<GenericRecord>(outputRecord));
       }
 
     }
@@ -101,6 +114,20 @@ public class TransformPhaseJob extends Configured {
 
     }
 
+  }
+
+  public static class GenericTransformReducer extends Reducer<IntWritable, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable>
+  {
+    @Override
+    public void reduce(IntWritable key, Iterable<AvroValue<GenericRecord>> values, Context context)
+            throws IOException, InterruptedException
+    {
+      for (AvroValue<GenericRecord> value : values)
+      {
+        GenericRecord record = value.datum();
+        context.write(new AvroKey<GenericRecord>(record), NullWritable.get());
+      }
+    }
   }
 
 
@@ -131,16 +158,22 @@ public class TransformPhaseJob extends Configured {
     parser = new Schema.Parser();
     Schema inputSchema = parser.parse(fs.open(new Path(inputSchemaPath)));
     LOGGER.info("{}", inputSchema);
-    job.setNumReduceTasks(0);
+
 
     // Map config
     job.setMapperClass(GenericTransformMapper.class);
     AvroJob.setInputKeySchema(job, inputSchema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
+    job.setMapOutputKeyClass(IntWritable.class);
+    job.setMapOutputValueClass(AvroValue.class);
+    AvroJob.setMapOutputValueSchema(job, outputSchema);
+
+    // Reducer config
+    job.setReducerClass(GenericTransformReducer.class);
+    job.setOutputKeyClass(AvroKey.class);
+    job.setOutputValueClass(NullWritable.class);
     AvroJob.setOutputKeySchema(job, outputSchema);
     job.setOutputFormatClass(AvroKeyOutputFormat.class);
-    job.setMapOutputKeyClass(AvroKey.class);
-    job.setMapOutputValueClass(NullWritable.class);
 
     // transform phase config
     String inputPathDir = getAndSetConfiguration(configuration, TRANSFORM_INPUT_PATH);
@@ -168,6 +201,14 @@ public class TransformPhaseJob extends Configured {
       }
     }
     FileOutputFormat.setOutputPath(job, new Path(outputPathDir));
+
+    String numReducers = getAndSetConfiguration(configuration, TRANSFORM_NUM_REDUCERS);
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
+    }
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     job.waitForCompletion(true);
 
