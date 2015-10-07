@@ -18,7 +18,6 @@ function getQueryParamValue(queryString) {
  */
 function parsePath(dashboardPath) {
     var tokens = dashboardPath.split("/")
-
     var type = tokens[1]
 
     if (type == 'dashboard') {

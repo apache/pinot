@@ -1,5 +1,4 @@
 <script src="/assets/js/thirdeye.dimension.timeseries.js"></script>
-<#include "../common/config-form.ftl">
 
 <div id="dimension-time-series-area">
     <#list dimensionView.view.dimensions as dimension>

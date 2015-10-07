@@ -21,16 +21,17 @@
                 </div>
                 
 
-                <div id="dashboard-metric-view">
+                <!--<div id="dashboard-metric-view">
 
                     <#-- Metric view-->
 
-                <#if (metricView.type == "INTRA_DAY")>
+                <#--<#if (metricView.type == "INTRA_DAY")>
                        <div id="dashboard-funnels-view">
+                           <#include "common/config-form.ftl">
                             <#include "funnel-heatmap.ftl">
                        </div>
                        <#include "metric/intra-day.ftl">
-                <!-- Metric time series and metric funnel are currently not included in the new design -->
+
                 <#elseif (metricView.type == "TIME_SERIES_FULL" || metricView.type == "TIME_SERIES_OVERLAY")>
                      <#include "metric/time-series.ftl">
                 <#elseif (metricView.type == "FUNNEL")>
@@ -41,19 +42,26 @@
                             No metric view named ${metricView.type}
                         </p>
                     </div>
-                </#if>
+                </#if>-->
 
-               </div>
+               </div>-->
 
                <#-- Dimension view-->
                 <div id="dashboard-dimension-view">
+                    <#include "common/config-form.ftl">
 
                     <#if (dimensionView.type == "HEAT_MAP")>
                         <#include "dimension/heat-map.ftl">
                     <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
                         <#include "dimension/multi-time-series.ftl">
                     <#elseif (dimensionView.type == "TABULAR")>
-                        <#include "dimension/tabular.ftl">
+                        <div id="dashboard-funnels-view">
+
+                            <#include "funnel-heatmap.ftl">
+                        </div>
+                        <#include "metric/intra-day.ftl">
+
+                        <#--<#include "dimension/tabular.ftl">-->
                     <#else>
                         <div class="uk-alert uk-alert-danger">
                             <p>

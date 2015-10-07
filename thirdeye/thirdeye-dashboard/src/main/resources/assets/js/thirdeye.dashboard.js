@@ -78,6 +78,9 @@ $(document).ready(function() {
 
     });
 
+    var view = parsePath(window.location.pathname).dimensionViewType == null ? "TABULAR" : parsePath(window.location.pathname).dimensionViewType
+    $("#dashboard-output-nav a[view='" + view + "' ]").closest("li").addClass("uk-active")
+
     //Allow user to switch dimension view on the dropdown
     $(".section-selector").on("change", function(){
         $(".section-wrapper").hide();
@@ -87,24 +90,23 @@ $(document).ready(function() {
     //Set default dimension view on Timeseries and the default metric view on Heatmap
     window.onload = load
     function load() {
-        window.setTimeout(function(){$(".section-selector").trigger("change")}, 1500);
+        window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000);
     }
 
     var path = parsePath(window.location.pathname)
     var queryParams = getQueryParamValue(window.location.search);
-
 
     $(".time-input-form-submit").click(function(event) {
 
         event.preventDefault()
 
         // Clear any existing alert
-        var errorAlert = $("#funnel-form-error")
-        var errorMessage = $("#funnel-form-error > p")
+        var errorAlert = $("#time-input-form-error")
+        var errorMessage = $("#time-input-form-error > p")
         errorMessage.empty()
 
         // Date input field validation
-        var date = $(".time-input-form-current-date").val()
+        var date = $("#time-input-form-current-date").val()
         if (!date) {
             errorMessage.html("Must provide date")
             errorAlert.fadeIn(100)
@@ -112,13 +114,13 @@ $(document).ready(function() {
         }
 
         //Baseline checkbox validation
-        if ($(".baseline-unit.uk-active").length == 0 ) {
+        if ($(".baseline-aggregate.uk-active").length == 0 ) {
             errorMessage.html("Please select a baseline: hours or days")
             errorAlert.fadeIn(100)
             return
         }
 
-        if($(".funnel-moving-average-size.uk-active").length == 0 ){
+        if($(".moving-average-size.uk-active").length == 0 ){
             errorMessage.html("Please select a moving average size: WoW, Wo2W, Wo4W")
             errorAlert.fadeIn(100)
             return
@@ -127,14 +129,13 @@ $(document).ready(function() {
         // Timezone
         var timezone = getTimeZone()
 
-        // Aggregate  todo: take the metrics from the URI instead of the sidenav
-        //var aggregateSize = parseInt($("#sidenav-aggregate-size").val())
-        //var aggregateUnit = $("#sidenav-aggregate-unit").val()
-        //var aggregateMillis = toMillis(aggregateSize, aggregateUnit)
+        // Aggregate  todo:
+        var aggregateSize = parseInt($(".baseline-aggregate.uk-active").val())
+        var aggregateUnit = $("baseline-aggregate.uk-active").attr("unit")
 
         // Baseline
         var baselineSize = 1
-        var baselineUnit = parseInt($(".baseline-unit.uk-active").val())
+        var baselineUnit = parseInt($(".baseline-aggregate.uk-active").val())
 
         // Date
         var current = moment.tz(date, timezone)
@@ -165,8 +166,8 @@ $(document).ready(function() {
         var metricFunction = metrics.join(",")
 
         // Moving average
-        if ($(".funnel-moving-average-size.uk-active").length > 0) {
-            var movingAverageSize = $(".funnel-moving-average-size.uk-active").val()
+        if ($(".moving-average-size.uk-active").length > 0) {
+            var movingAverageSize = $(".moving-average-size.uk-active").val()
             var movingAverageUnit = "DAYS"
             metricFunction = "MOVING_AVERAGE_" + movingAverageSize + "_" + movingAverageUnit + "(" + metricFunction + ")"
         }
@@ -183,7 +184,7 @@ $(document).ready(function() {
         var path = parsePath(window.location.pathname)
         path.metricFunction = metricFunction
         path.metricViewType = path.metricViewType == null ? "INTRA_DAY" : path.metricViewType
-        path.dimensionViewType = path.dimensionViewType == null ? "HEAT_MAP" : path.dimensionViewType
+        path.dimensionViewType = path.dimensionViewType == null ? "TABULAR" : path.dimensionViewType
         path.baselineMillis = baselineMillisUTC
         path.currentMillis = currentMillisUTC
 
@@ -209,12 +210,12 @@ $(document).ready(function() {
     //Load existing date selection
      var currentDateTime = moment(parseInt(path.currentMillis))
      var currentDateString = currentDateTime.format("YYYY-MM-DD")
-     $(".time-input-form-current-date").val(currentDateString)
+     $("#time-input-form-current-date").val(currentDateString)
 
     //Load existing date selection
       var baselineDateTime = moment(parseInt(path.baselineMillis))
       var baselineDateString = baselineDateTime.format("YYYY-MM-DD")
-      $(".time-input-form-baseline-date").val(baselineDateString)
+      $("#time-input-form-baseline-date").val(baselineDateString)
 
      // Load existing metrics selection metrics function if the value is present in the options of the funnel form
      var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
@@ -227,8 +228,8 @@ $(document).ready(function() {
          metricFunctionObj = firstArg
          var tokens = metricFunctionObj.name.split("_")
 
-         if($(".funnel-moving-average-size[value='" + tokens[tokens.length - 2] + "']").length > 0){
-            $(".funnel-moving-average-size[value='" + tokens[tokens.length - 2] + "']").trigger("click")
+         if($(".moving-average-size[value='" + tokens[tokens.length - 2] + "']").length > 0){
+            $(".moving-average-size[value='" + tokens[tokens.length - 2] + "']").trigger("click")
          }
      }
  }
@@ -236,7 +237,7 @@ $(document).ready(function() {
      var baselineDateTime = moment(parseInt(path.baselineMillis))
      var diffMillis = currentDateTime.valueOf() - baselineDateTime.valueOf()
      var diffDescriptor = describeMillis(diffMillis)
-     if($(".baseline-unit[value='" + diffDescriptor.sizeMillis +"'").length > 0){
-         $(".baseline-unit[value='" + diffDescriptor.sizeMillis +"'").trigger("click")
+     if($(".baseline-aggregate[value='" + diffDescriptor.sizeMillis +"'").length > 0){
+         $(".baseline-aggregate[value='" + diffDescriptor.sizeMillis +"'").trigger("click")
      }
 })

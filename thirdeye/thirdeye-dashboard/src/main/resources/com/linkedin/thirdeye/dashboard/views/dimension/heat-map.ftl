@@ -1,6 +1,5 @@
 <script src="/assets/js/thirdeye.dimension.heatmap.js"></script>
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-<#include "../common/config-form.ftl">
 
 
 <div id="dimension-heat-map-area">
