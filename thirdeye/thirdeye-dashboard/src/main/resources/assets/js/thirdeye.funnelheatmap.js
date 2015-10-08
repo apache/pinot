@@ -42,8 +42,12 @@ $(document).ready(function() {
     //todo: heat-map-cell eventlistener
     $("#custom-funnel-section .heat-map-cell").click(function(){
         console.log("target heat-map-cell:",this)
+        var rowIndex = $(this).parent().children().index($(this));
+        var columnIndex = $(this).parent().parent().children().index($(this).parent());
+        console.log("target heat-map-cell row index: ",rowIndex + ", column index: " + columnIndex )
         var hour = $("td:first-child", $(this).closest("tr")).html()
-        console.log("target hour:", hour )
+        var metric =  $("#custom-funnel-section thead tr:first-of-type th:nth-child(" + (columnIndex + 2) +")").html()
+        console.log("target hour:", hour + ", metric: " + metric)
     })
 
 });
