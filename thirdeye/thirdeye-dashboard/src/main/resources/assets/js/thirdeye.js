@@ -430,7 +430,7 @@ function plotOne(container, tooltip, options, data) {
         },
         xaxis: {
             tickFormatter: function(millis) {
-                return moment.utc(millis).tz(jstz().timezone_name).format("YYYY-MM-DD HH:mm")
+                return moment.utc(millis).tz(jstz().timezone_name).format("YYYY-MM-DD HH:mm z")
             },
             minTickSize: options.minTickSize
         }
@@ -438,7 +438,7 @@ function plotOne(container, tooltip, options, data) {
 
     container.bind("plothover", function(event, pos, item) {
         if (item) {
-            var dateString = moment.utc(item.datapoint[0]).tz(jstz().timezone_name).format()
+            var dateString = moment.utc(item.datapoint[0]).tz(getTimeZone()).format("YYYY-MM-DD HH:mm z")
             var value = item.datapoint[1]
             if (item.series.label.indexOf("ANOMALY_") >= 0) {
                 var metric =  item.series.label.substring('ANOMALY_'.length, item.series.label.indexOf(' '))

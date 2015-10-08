@@ -14,7 +14,7 @@
 
 /* Dashboard */
 
-li{
+li {
     font-size: 1em;
     vertical-align: top;
 }
@@ -36,7 +36,7 @@ li{
     margin-right: 2%;
 }
 
-.dimension-combination table{
+.dimension-combination table {
     width: 93%;
     min-height: 31px;
     table-layout: fixed;
@@ -44,27 +44,26 @@ li{
     overflow-wrap: break-word;
 }
 
-.dimension-combination td span{
+.dimension-combination td span {
     font-weight: 400;
 }
 
-.dimension-combination td:first-child{
+.dimension-combination td:first-child {
     width: 110px;
 }
-
-
 
 .uk-panel-title a:hover {
     text-decoration: none;
 }
 
 /* Side nav */
+
 #sidenav-time-input-form .uk-form-row {
     margin-left: 5%;
 }
 
 #sidenav-timezone {
-  text-indent: 20px;
+    text-indent: 20px;
 }
 
 #sidenav-error {
@@ -102,84 +101,81 @@ li{
     font-weight: bold;
 }
 
-.sidenav-feedback-link{
-    padding:8px;
+.sidenav-feedback-link {
+    padding: 8px;
 }
 
-
-
 /* Funnel Heatmap */
-#custom-funnel-section{
+
+#custom-funnel-section {
     min-height: 600px;
 }
 
 #custom-funnel-section table,
-#custom-funnel-section table th{
+#custom-funnel-section table th {
     line-height: 8px;
     text-align: center;
     font-size: 10px;
     padding: 6px;
-    font-family: Arial,sans-serif;
+    font-family: Arial, sans-serif;
     color: #898989;
 }
 
-#custom-funnel-section td:hover{
+#custom-funnel-section td:hover {
     color: #808080;
 }
 
-.funnel-thumbnail-container{
+.funnel-thumbnail-container {
     background-color: #ddd;
     text-align: center;
     padding: 10px;
 }
 
-#funnel-thumbnails table{
+#funnel-thumbnails table {
     width: 20%;
     height: 200px;
-    font-size:8px;
-    padding:0px;
+    font-size: 8px;
+    padding: 0px;
     border: 1px solid #ccc;
     margin: auto;
 }
 
 #funnel-thumbnails th,
-#funnel-thumbnails td{
-     padding: 0px;
-     font-size:3px;
-     line-height: 8px;
- }
+#funnel-thumbnails td {
+    padding: 0px;
+    font-size: 3px;
+    line-height: 8px;
+}
 
-#funnel-thumbnails th{
+#funnel-thumbnails th {
     word-wrap: break-word;
 }
 
-#funnel-thumbnails .metric-list{
+#funnel-thumbnails .metric-list {
     font-size: 9px;
-    font-weight:800;
-    margin:0px;
+    font-weight: 800;
+    margin: 0px;
 }
 
-#funnel-thumbnails .funnel{
+#funnel-thumbnails .funnel {
     display: inline-block;
     border: 1px solid #000;
     border-radius: 4px;
     -moz-border-radius: 4px;
     -webkit-border-radius: 4px;
     margin: auto;
-    padding:5px;
-
+    padding: 5px;
 }
 
-#funnel-thumbnails .funnel:not(.uk-panel-box){
+#funnel-thumbnails .funnel:not(.uk-panel-box) {
     background-color: #ddd;
 }
 
-#funnel-thumbnails .funnel.uk-panel-box{
+#funnel-thumbnails .funnel.uk-panel-box {
     border: 1px solid #ccc;
-
 }
 
-#funnel-thumbnails>div:hover{
+#funnel-thumbnails>div:hover {
     cursor: pointer;
     background-color: #fff;
 }
@@ -237,60 +233,63 @@ li{
 }
 
 #intra-day-buttons {
-  clear: both;
-  float: right;
-  margin-bottom: 20px;
+    clear: both;
+    float: right;
+    margin-bottom: 20px;
 }
 
 #intra-day-update-area {
-  margin-top: 20px;
+    margin-top: 20px;
 }
 
-#intra-day-table{
+#intra-day-table {
     border: 1px solid #ddd;
 }
 
 /* Dimension */
+
 .heatmap-tabs,
-.funnel-tabs{
-    margin-top:10px;
+.funnel-tabs {
+    margin-top: 10px;
     margin-bottom: -2px;
 }
 
 .heatmap-tabs li a,
-.funnel-tabs li a{
+.funnel-tabs li a {
     border-color: #ddd #ddd transparent;
     border-radius: 4px 4px 0 0;
     -moz-border-radius: 4px 4px 0 0;
     -webkit-border-radius: 4px 4px 0 0;
     color: #444;
 }
+
 /* Dimension - Tabular */
-.dimension-tabular-table{
+
+.dimension-tabular-table {
     border: 1px solid #ddd;
 }
 
 /* Dimension - Heat Map Tabular */
 
-.dimension-heat-map-table-section{
+.dimension-heat-map-table-section {
     border: 1px solid #ccc;
     border-radius: 5px 5px 0px 0px;
     -moz-border-radius: 5px 5px 0px 0px;
     -webkit-border-radius: 5px 5px 0px 0px;
-    padding:0 0 10px;
-    margin-bottom:20px;
+    padding: 0 0 10px;
+    margin-bottom: 20px;
 }
 
-.dimension-heat-map-table-section td{
+.dimension-heat-map-table-section td {
     width: 100px;
-    text-align:center;
+    text-align: center;
 }
 
-.dimension-heat-map-table-section th{
+.dimension-heat-map-table-section th {
     font-size: 9px;
 }
 
-.title-box{
+.title-box {
     background-color: #f5f5f5;
     -moz-box-sizing: border-box;
     box-sizing: border-box;
@@ -302,89 +301,89 @@ li{
     margin: 0 0 15px;
     padding: 10px 0 0 12px;
     width: 100%;
-
 }
-.title-box h2{
+
+.title-box h2 {
     margin: 0;
     font-weight: 800;
     line-height: 10px;
-
 }
 
-.title-box table{
-    width:100%;
-    table-layout:fixed;
+.title-box table {
+    width: 100%;
+    table-layout: fixed;
     line-height: 10px;
     border-collapse: collapse;
-    margin-bottom:10px;
+    margin-bottom: 10px;
 }
 
-.title-box th{
+.title-box th {
     font-size: 12px;
     font-weight: 400;
-    padding:5px;
+    padding: 5px;
 }
 
-.title-stat{
+.title-stat {
     font-size: 10px;
     font-weight: 800;
     text-align: center;
 }
 
-.delta-ratio:after{
+.delta-ratio:after {
     content: "%";
 }
 
-.dimension-tabular-column-toggle-buttons{
+.dimension-tabular-column-toggle-buttons {
     margin-bottom: 15px;
     margin-left: 12px;
 }
 
-.number_range_filter{
+.number_range_filter {
     width: 50px;
 }
 
-.dataTables_wrapper{
+.dataTables_wrapper {
     display: table;
     width: 100%;
 }
 
 .dataTables_length,
-.dataTables_info{
+.dataTables_info {
     padding-left: 12px;
 }
 
-.dataTables_filter{
+.dataTables_filter {
     padding-right: 12px;
 }
-.dimension-heat-map-table-section table{
+
+.dimension-heat-map-table-section table {
     white-space: normal;
-    table-layout:fixed;
-    width:100%
+    table-layout: fixed;
+    width: 100%
 }
 
-.filter-header th{
+.filter-header th {
     text-align: center;
 }
 
-.filter-header .filter-header-s{
-    width:60px;
+.filter-header .filter-header-s {
+    width: 60px;
 }
 
-.filter-header .filter-header-m{
-    max-width:90px;
+.filter-header .filter-header-m {
+    max-width: 90px;
 }
 
-.filter-header .filter-header-l{
-    width:110px;
+.filter-header .filter-header-l {
+    width: 110px;
 }
 
-.select_filter[rel="0"]{
-    width:90px;
+.select_filter[rel="0"] {
+    width: 90px;
     font-size: 10px;
 }
 
-.filter_column input:not([value="Dimension Value"]){
+.filter_column input:not([value="Dimension Value"]) {
     display: block;
     margin: auto;
 }
@@ -397,7 +396,7 @@ input[value="Dimension Value"] {
     font-size: 10px;
 }
 
-td[dimension-val]{
+td[dimension-val] {
     cursor: pointer;
     text-decoration: underline;
 }
@@ -405,30 +404,33 @@ td[dimension-val]{
 .dimension-heat-map-table-section td:nth-child(7)::after,
 .dimension-heat-map-table-section td:nth-child(8)::after,
 .dimension-heat-map-table-section td:nth-child(9)::after,
-.dimension-heat-map-table-section td:nth-child(10)::after{
+.dimension-heat-map-table-section td:nth-child(10)::after {
     content: "%";
 }
 
-.datatable-empty-cell::after{
+.datatable-empty-cell::after {
     content: "-"
 }
 
 /* Dimension Tree Map */
 
-.dimension-heat-map-treemap-section{
+.dimension-heat-map-treemap-section {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    margin-top:20px;
-    margin-bottom:20px;
+    margin-top: 20px;
+    margin-bottom: 20px;
     border: 1px solid #ddd;
-    padding: 0px
+    border-radius: 5px 5px 0px 0px;
+    -moz-border-radius: 5px 5px 0px 0px;
+    -webkit-border-radius: 5px 5px 0px 0px;
+    padding: 0px;
 }
 
-.dimension-treemap-toggle-buttons{
+.dimension-treemap-toggle-buttons {
     margin-left: 12px;
     margin-bottom: 15px;
 }
 
-.treemap-container{
+.treemap-container {
     width: 100%;
     height: auto;
     overflow: hidden;
@@ -438,36 +440,36 @@ td[dimension-val]{
     box-sizing: border-box;
 }
 
-.treemap-display-tbl{
+.treemap-display-tbl {
     width: 100%;
 }
 
-#dimension-heat-map-area .treemap-display-tbl-dim{
+#dimension-heat-map-area .treemap-display-tbl-dim {
     width: 30px;
     white-space: nowrap;
     height: 102px;
 }
 
-.treemap-rotate{
+.treemap-rotate {
     transform: translate(25px, 51px) rotate(315deg);
     -webkit-transform: translate(25px, 51px) rotate(305deg);
     width: 70px;
 }
 
-.treemap-rotate > div{
+.treemap-rotate > div {
     position: relative;
     top: -50px;
     left: 20px;
     text-align: right;
 }
 
-.dimension-treemap{
+.dimension-treemap {
     width: 100%;
-    height:102px;
-    display:inline-block
+    height: 102px;
+    display: inline-block
 }
 
-.treemap-tooltip{
+.treemap-tooltip {
     color: #000000;
     outline: none;
     text-decoration: none;
@@ -475,7 +477,7 @@ td[dimension-val]{
     background: #9FDAEE;
     border: 1px solid #2BB0D7;
     padding: 0.5em 0.8em 0.8em 2em;
-    border-radius: 5px 5px;
+    border-radius: 5px;
     -moz-border-radius: 5px;
     -webkit-border-radius: 5px;
     box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.1);
@@ -485,15 +487,12 @@ td[dimension-val]{
     z-index: 100;
 }
 
-
-
 /* Dimension - Heat Map */
 
-.dimension-heat-map-heat-map-section{
-   border: 1px solid #ddd;
-   padding: 12px;
+.dimension-heat-map-heat-map-section {
+    border: 1px solid #ddd;
+    padding: 12px;
 }
-
 
 #dimension-heat-map-section-heat-map-area,
 #dimension-time-series-area {
@@ -506,39 +505,39 @@ td[dimension-val]{
     clear: both;
 }
 
-.dimension-heat-map-filter-label{
+.dimension-heat-map-filter-label {
     position: relative;
     left: -25px;
     top: -1px;
     padding: 4px 26px 7px 30px;
     -webkit-border-radius: 4px 0px 0px 4px;
-    -moz-border-radius:  4px 0px 0px 4px;
+    -moz-border-radius: 4px 0px 0px 4px;
     border-radius: 4px 0px 0px 4px;
 }
 
-#dimension-heat-map-filter:checked + label{
+#dimension-heat-map-filter:checked + label {
     background-color: #b9b9b9;
-    border:1px solid #777;
+    border: 1px solid #777;
 }
 
-.heat-map-buttons{
+.heat-map-buttons {
     float: right;
     padding-left: 20px;
 }
 
 .heat-map-buttons i,
-.heat-map-buttons i:hover{
+.heat-map-buttons i:hover {
     border: transparent;
     margin-top: 2px;
     margin-bottom: 2px;
 }
 
 .dimension-heat-map-filter-btn,
-.dimension-heat-map-help-btn{
-   width: 68px;
+.dimension-heat-map-help-btn {
+    width: 68px;
 }
 
-.dimension-heat-map-help-link{
+.dimension-heat-map-help-link {
     color: #444;
     position: relative;
     left: -13px;
@@ -547,77 +546,73 @@ td[dimension-val]{
     -moz-border-radius: 0px 4px 4px 0px;
     border-radius: 0px 4px 4px 0px;
 }
-
-.dimension-heat-map-help-link:hover{
+.dimension-heat-map-help-link:hover {
     color: #222;
 }
-
-
-.dimension-heat-map-filter{
-    width:1px; height:1px;
+.dimension-heat-map-filter {
+    width: 1px;
+    height: 1px;
 }
 
 #dimension-view-heat-map-rendered table {
     border-collapse: collapse;
 }
 
-
-#dimension-heat-map-container td{
+#dimension-heat-map-container td {
     border: 1px solid #ddd;
 }
 
-.cell-up, .cell-down{
+.cell-up,
+.cell-down {
     float: right;
 }
 
 #dimension-heat-map-explanation {
-  clear: both;
-  padding-top: 10px;
-  padding-bottom: 10px;
+    clear: both;
+    padding-top: 10px;
+    padding-bottom: 10px;
 }
 
 #dimension-heat-map-explanation div {
-  display: none;
+    display: none;
 }
 
 #dimension-heat-map-explanation em {
-  color: #ccc;
+    color: #ccc;
 }
-
-
 
 /* Both: Metric and Dimension */
 
 .time-series-legend {
     overflow: hidden;
-    margin-top: 15px;
+    margin-top: 30px;
 }
 
 .up {
-  background-color:green;
+    background-color: green;
 }
 
 .down {
-  background-color:red;
+    background-color: red;
 }
 
 .collapser h2,
 .collapser h3,
-.collapser h4{
+.collapser h4 {
     color: #069;
     cursor: pointer;
     margin-top: 15px;
 }
 
-.red{
+.red {
     color: red;
 }
 
-.blue{
+.blue {
     color: blue;
 }
 
-.plus-symbol:before{
+.plus-symbol:before {
     content: "+";
 }
 
@@ -629,32 +624,19 @@ td[dimension-val]{
     margin-right: 1.5%;
 }
 
-.sticky td{
-    padding-top:0px;
+.sticky td {
+    padding-top: 0px;
 }
 
-.hidden{
-    display : none;
+.hidden {
+    display: none;
 }
-
 /* overwriting UIkit css */
+
 .uk-button.uk-active,
 .uk-button:active,
-li.uk-active a{
+li.uk-active a {
     background-color: #ddd;
     color: #444;
     font-weight: 800;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

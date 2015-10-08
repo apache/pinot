@@ -3,7 +3,9 @@ $(document).ready(function() {
     var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())
 
     $("#dimension-time-series-area").find('.dimension-time-series-placeholder').each(function(i, container) {
+
         var containerObj = $(container)
+
         var dimension = containerObj.attr('dimension')
         containers[dimension] = {
             plot: containerObj
@@ -24,10 +26,8 @@ $(document).ready(function() {
 
     $("#dimension-time-series-area").find('.dimension-time-series-legend').each(function(i, container) {
         var containerObj = $(container)
-        console.log("containerObj", containerObj)
         var dimension = containerObj.attr('dimension')
         containers[dimension].legend = containerObj
-
     })
 
     var hash = parseHashParameters(window.location.hash)
@@ -100,5 +100,6 @@ $(document).ready(function() {
     }
 
     plotAllSeries()
+
 
 })

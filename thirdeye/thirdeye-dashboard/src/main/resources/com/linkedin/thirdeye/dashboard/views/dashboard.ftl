@@ -6,6 +6,7 @@
         <#include "common/script.ftl">
         <script src="/assets/js/thirdeye.dashboard.js"></script>
         <script src="/assets/js/thirdeye.sidenav.js"></script>
+        <script src="/assets/js/thirdeye.configform.js"></script>
     </head>
     <body>
         <div class="uk-grid">

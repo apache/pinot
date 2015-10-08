@@ -52,15 +52,15 @@
             </#if>
 
         </#list>
+        </ul>
     </#if>
 
-    </ul>
+
 
     <form class="time-input-form uk-form uk-form-stacked uk-float-right">
         <div id="time-input-form-error" class="uk-alert uk-alert-danger hidden">
             <p></p>
         </div>
-
         <div class="uk-margin-small-top uk-margin-bottom">
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
@@ -90,7 +90,7 @@
                 </div>
             </div>
 
-            <#if (dimensionView.type == "HEAT_MAP")>
+            <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
                 <div class="uk-display-inline-block">
                     <div class="uk-button-group" data-uk-button-radio>
                         <button type="button" class="moving-average-size uk-button" unit="WoW" value="7">WoW</button>
