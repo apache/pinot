@@ -20,5 +20,5 @@ public interface TransformUDF {
    * @param record
    * @return
    */
-  GenericRecord transformRecord(GenericRecord record);
+  GenericRecord transformRecord(String sourceName, GenericRecord record);
 }

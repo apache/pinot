@@ -31,6 +31,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,13 +66,20 @@ public class TransformPhaseJob extends Configured {
     TransformUDF transformUDF;
     int numReducers;
     int reducerKey;
+    String sourceName;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
 
       LOGGER.info("GenericAvroTransformJob.GenericTransformMapper.setup()");
+
       Configuration configuration = context.getConfiguration();
       FileSystem fs = FileSystem.get(configuration);
+
+      FileSplit fileSplit = (FileSplit) context.getInputSplit();
+      LOGGER.info("split name:" + fileSplit.toString());
+      sourceName = DelegatingAvroKeyInputFormat.getSourceNameFromPath(fileSplit, configuration);
+      LOGGER.info("Input: {} belongs to Source:{}", fileSplit, sourceName);
 
       String numTransformReducers = configuration.get(TRANSFORM_NUM_REDUCERS.toString());
       numReducers = Integer.parseInt(numTransformReducers);
@@ -98,7 +106,7 @@ public class TransformPhaseJob extends Configured {
     public void map(AvroKey<GenericRecord> recordWrapper, NullWritable value, Context context)
         throws IOException, InterruptedException {
       GenericRecord record = recordWrapper.datum();
-      GenericRecord outputRecord = transformUDF.transformRecord(record);
+      GenericRecord outputRecord = transformUDF.transformRecord(sourceName, record);
 
       if (outputRecord != null) {
 

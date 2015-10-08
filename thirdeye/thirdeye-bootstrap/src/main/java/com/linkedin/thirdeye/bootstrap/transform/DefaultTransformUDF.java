@@ -21,7 +21,7 @@ public class DefaultTransformUDF implements TransformUDF {
   }
 
   @Override
-  public GenericRecord transformRecord(GenericRecord record) {
+  public GenericRecord transformRecord(String sourceName, GenericRecord record) {
     // Default implementation returns input record as is
     return record;
   }
