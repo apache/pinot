@@ -39,4 +39,11 @@ $(document).ready(function() {
         }
     })
 
+    //todo: heat-map-cell eventlistener
+    $("#custom-funnel-section .heat-map-cell").click(function(){
+        console.log("target heat-map-cell:",this)
+        var hour = $("td:first-child", $(this).closest("tr")).html()
+        console.log("target hour:", hour )
+    })
+
 });

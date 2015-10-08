@@ -71,6 +71,7 @@
                     <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
                 </div>
             </div>
+            <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "MULTI_TIME_SERIES")>
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
                     Baseline Date
@@ -80,6 +81,7 @@
                     <input id="time-input-form-baseline-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
                 </div>
             </div>
+            </#if>
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
                     Baseline Granularity
