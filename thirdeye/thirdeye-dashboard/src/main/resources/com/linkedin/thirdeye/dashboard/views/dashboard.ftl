@@ -25,6 +25,7 @@
                     </div>
 
                     <#-- Metric view-->
+
                     <#if (metricView.type == "INTRA_DAY")>
                         <#include "metric/intra-day.ftl">
                     <#elseif (metricView.type == "TIME_SERIES_FULL" || metricView.type == "TIME_SERIES_OVERLAY")>
@@ -38,10 +39,12 @@
                             </p>
                         </div>
                     </#if>
+
                 </div>
 
                 <#-- Dimension view-->
                 <div id="dashboard-dimension-view">
+
                     <#if (dimensionView.type == "HEAT_MAP")>
                         <#include "dimension/heat-map.ftl">
                     <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
@@ -55,6 +58,7 @@
                             </p>
                         </div>
                     </#if>
+
                 </div>
             </div>
         </div>

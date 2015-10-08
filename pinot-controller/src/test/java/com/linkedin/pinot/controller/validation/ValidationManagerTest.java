@@ -347,5 +347,15 @@ public class ValidationManagerTest {
       // TODO Auto-generated method stub
       return false;
     }
+
+    @Override
+    public boolean hasStarTree() {
+      return false;
+    }
+
+    @Override
+    public int getTotalAggregateDocs() {
+      return 0;
+    }
   }
 }

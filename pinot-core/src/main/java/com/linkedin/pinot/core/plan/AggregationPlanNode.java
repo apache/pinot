@@ -38,7 +38,10 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
  * AggregationPlanNode takes care of how to apply an aggregation query to an IndexSegment.
  *
  *
+ * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
+ * @see RawAggregationPlanNode
  */
+@Deprecated
 public class AggregationPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;

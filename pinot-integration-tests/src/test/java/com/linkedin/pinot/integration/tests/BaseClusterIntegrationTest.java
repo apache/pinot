@@ -187,14 +187,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       JSONObject response = postQuery(pqlQuery);
       if (response.getJSONArray("exceptions").length() > 0) {
         String processingException = (String) response.getJSONArray("exceptions").get(0);
-        // Ignore all the PQL parsing error.
-        if (processingException.contains("ProcessingException(errorCode:350,")) {
-          return;
-        }
         if (GATHER_FAILED_QUERIES) {
-          saveFailedQuery(pqlQuery, sqlQueries, "Got exceptions in pql query " + pqlQuery + ", got " + response);
+          saveFailedQuery(pqlQuery, sqlQueries, "Got exceptions in pql query " + pqlQuery + ", got " + response + " " +
+              processingException);
         } else {
-          Assert.fail("Got exceptions in pql query: " + pqlQuery);
+          Assert.fail("Got exceptions in pql query: " + pqlQuery + " " + processingException);
         }
       }
 

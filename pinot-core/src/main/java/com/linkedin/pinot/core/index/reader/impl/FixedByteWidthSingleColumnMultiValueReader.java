@@ -92,7 +92,8 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
     this.isMMap = isMMap;
     raf = new RandomAccessFile(file, "rw");
     if (isMMap) {
-      headerSectionByteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, headerSize);
+      headerSectionByteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_ONLY, 0, headerSize, file,
+          this.getClass().getSimpleName() + " headerSectionByteBuffer");
     } else {
       headerSectionByteBuffer = MmapUtils.allocateDirectByteBuffer((int) headerSize, file,
           this.getClass().getSimpleName() + " headerSectionByteBuffer");
@@ -109,8 +110,8 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
     int totalNumValues = startIndex + length;
     int dataSize = totalNumValues * columnSizeInBytes;
     if (isMMap) {
-      dataSectionByteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
-          headerSize, dataSize);
+      dataSectionByteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_ONLY,
+          headerSize, dataSize, file, this.getClass().getSimpleName() + " dataSectionByteBuffer");
     } else {
       dataSectionByteBuffer = MmapUtils.allocateDirectByteBuffer((int) dataSize, file,
           this.getClass().getSimpleName() + " dataSectionByteBuffer");

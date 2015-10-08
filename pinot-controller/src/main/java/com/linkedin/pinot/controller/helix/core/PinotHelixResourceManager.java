@@ -329,6 +329,7 @@ public class PinotHelixResourceManager {
         res.message = "Segment " + segmentId + " not in IDEALSTATE.";
         LOGGER.info("Segment: {} is not in IDEALSTATE", segmentId);
       }
+
       _segmentDeletionManager.deleteSegment(tableName, segmentId);
 
       res.message = "Segment successfully deleted.";

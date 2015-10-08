@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -59,7 +58,6 @@ public class StarTreeSegmentCreator implements SegmentCreator {
   private Map<String, ColumnIndexCreationInfo> columnInfo;
   private Schema schema;
   private File outDir;
-  private File starTreeDir;
   private String segmentName;
   private File starTreeTableFile;
 
@@ -76,8 +74,6 @@ public class StarTreeSegmentCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> dictionaryCreatorMap;
   private Map<String, ForwardIndexCreator> forwardIndexCreatorMap;
   private Map<String, InvertedIndexCreator> invertedIndexCreatorMap;
-  private Map<String, ForwardIndexCreator> aggregateForwardIndexCreatorMap;
-  private Map<String, InvertedIndexCreator> aggregateInvertedIndexCreatorMap;
 
   public StarTreeSegmentCreator(StarTreeIndexSpec starTreeIndexSpec, RecordReader recordReader) {
     this.starTreeIndexSpec = starTreeIndexSpec;
@@ -87,8 +83,6 @@ public class StarTreeSegmentCreator implements SegmentCreator {
     this.currentMatchingNodes = new HashSet<StarTreeIndexNode>();
     this.forwardIndexCreatorMap = new HashMap<String, ForwardIndexCreator>();
     this.invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
-    this.aggregateForwardIndexCreatorMap = new HashMap<String, ForwardIndexCreator>();
-    this.aggregateInvertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
     this.nextDocumentIds = new HashMap<Integer, Integer>();
   }
 
@@ -179,15 +173,8 @@ public class StarTreeSegmentCreator implements SegmentCreator {
     endMillis = System.currentTimeMillis();
     LOG.info("Finished re-computing unique metric values (took {} ms)", endMillis - startMillis);
 
-    // StarTree directory
-    starTreeDir = new File(outDir, V1Constants.STARTREE_DIR);
-    if (!starTreeDir.mkdir()) {
-      throw new RuntimeException("Could not create star tree directory " + starTreeDir.getAbsolutePath());
-    }
-
     // For each column, build its dictionary and initialize a forwards and an inverted index for raw / agg segment
-    int totalAggDocs = starTreeBuilder.getTotalAggregateDocumentCount();
-    int totalRawDocs = starTreeBuilder.getTotalRawDocumentCount();
+    int totalCombinedDocs = starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount();
     for (final String column : dictionaryCreatorMap.keySet()) {
       ColumnIndexCreationInfo indexCreationInfo = columnInfo.get(column);
 
@@ -201,28 +188,17 @@ public class StarTreeSegmentCreator implements SegmentCreator {
         if (indexCreationInfo.isSorted()) {
           forwardIndexCreatorMap.put(column,
               new SingleValueSortedForwardIndexCreator(outDir, uniqueValueCount, schema.getFieldSpecFor(column)));
-          aggregateForwardIndexCreatorMap.put(column,
-              new SingleValueSortedForwardIndexCreator(starTreeDir, uniqueValueCount, schema.getFieldSpecFor(column)));
         } else {
           forwardIndexCreatorMap.put(
               column,
               new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), outDir,
-                  uniqueValueCount, totalRawDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
-          aggregateForwardIndexCreatorMap.put(
-              column,
-              new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), starTreeDir, uniqueValueCount,
-                  totalAggDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
+                  uniqueValueCount, totalCombinedDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
         }
       } else {
         forwardIndexCreatorMap.put(
             column,
             new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), outDir,
-                uniqueValueCount, totalRawDocs, indexCreationInfo.getTotalNumberOfEntries(),
-                indexCreationInfo.hasNulls()));
-        aggregateForwardIndexCreatorMap.put(
-            column,
-            new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), starTreeDir,
-                uniqueValueCount, totalAggDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                uniqueValueCount, totalCombinedDocs, indexCreationInfo.getTotalNumberOfEntries(),
                 indexCreationInfo.hasNulls()));
       }
 
@@ -230,9 +206,6 @@ public class StarTreeSegmentCreator implements SegmentCreator {
         invertedIndexCreatorMap.put(
             column,
             new BitmapInvertedIndexCreator(outDir, uniqueValueCount, schema.getFieldSpecFor(column)));
-        aggregateInvertedIndexCreatorMap.put(
-            column,
-            new BitmapInvertedIndexCreator(starTreeDir, uniqueValueCount, schema.getFieldSpecFor(column)));
       }
     }
   }
@@ -290,7 +263,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
     // Write all the aggregate rows to the aggregate segment
     LOG.info("Writing aggregate segment...");
     long startMillis = System.currentTimeMillis();
-    int currentAggregateDocumentId = 0;
+    int currentAggregateDocumentId = starTreeBuilder.getTotalRawDocumentCount();
     Iterator<StarTreeTableRow> itr = starTreeBuilder.getTable().getAllCombinations();
     while (itr.hasNext()) {
       StarTreeTableRow next = itr.next();
@@ -334,15 +307,15 @@ public class StarTreeSegmentCreator implements SegmentCreator {
           }
 
           if (schema.getFieldSpecFor(column).isSingleValueField()) {
-            ((SingleValueForwardIndexCreator)aggregateForwardIndexCreatorMap.get(column))
+            ((SingleValueForwardIndexCreator)forwardIndexCreatorMap.get(column))
                 .index(currentAggregateDocumentId, (Integer) dictionaryIndex);
           } else {
-            ((MultiValueForwardIndexCreator)aggregateForwardIndexCreatorMap.get(column))
+            ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column))
                 .index(currentAggregateDocumentId, (int[]) dictionaryIndex);
           }
 
           if (config.isCreateInvertedIndexEnabled()) {
-            aggregateInvertedIndexCreatorMap.get(column).add(currentAggregateDocumentId, dictionaryIndex);
+            invertedIndexCreatorMap.get(column).add(currentAggregateDocumentId, dictionaryIndex);
           }
         }
         currentAggregateDocumentId++;
@@ -359,39 +332,20 @@ public class StarTreeSegmentCreator implements SegmentCreator {
       dictionaryCreatorMap.get(column).close();
     }
 
-    for (final String column : aggregateForwardIndexCreatorMap.keySet()) {
-      aggregateForwardIndexCreatorMap.get(column).close();
-      if (config.isCreateInvertedIndexEnabled()) {
-        aggregateInvertedIndexCreatorMap.get(column).seal();
-      }
-    }
-
-    writeMetadata(outDir, starTreeBuilder.getTotalRawDocumentCount());
+    writeMetadata(outDir,
+        starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount(),
+        starTreeBuilder.getTotalAggregateDocumentCount(),
+        true /* raw segment has star tree */);
 
     // Write star tree
     LOG.info("Writing " + V1Constants.STARTREE_FILE);
     startMillis = System.currentTimeMillis();
-    File starTreeFile = new File(starTreeDir, V1Constants.STARTREE_FILE);
+    File starTreeFile = new File(outDir, V1Constants.STARTREE_FILE);
     OutputStream starTreeOutputStream = new FileOutputStream(starTreeFile);
     starTreeBuilder.getTree().writeTree(starTreeOutputStream);
     starTreeOutputStream.close();
     endMillis = System.currentTimeMillis();
     LOG.info("Wrote StarTree file (took {} ms)", endMillis - startMillis);
-
-    // Copy the dictionary files into startree directory
-    // n.b. this is done so the segment is as stand-alone as possible, though could be removed as an optimization
-    File[] dictionaryFiles = outDir.listFiles(new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.endsWith(V1Constants.Dict.FILE_EXTENTION);
-      }
-    });
-    for (File dictionaryFile : dictionaryFiles) {
-      FileUtils.copyFile(dictionaryFile, new File(starTreeDir, dictionaryFile.getName()));
-    }
-
-    // Write star tree metadata
-    writeMetadata(starTreeDir, starTreeBuilder.getTotalAggregateDocumentCount());
 
     // Delete tmp star tree data
     LOG.info("Deleting StarTree table file {}", starTreeTableFile);
@@ -549,7 +503,10 @@ public class StarTreeSegmentCreator implements SegmentCreator {
   }
 
   /** Constructs the segment metadata file, and writes in outputDir */
-  private void writeMetadata(File outputDir, int totalDocs) throws ConfigurationException {
+  private void writeMetadata(File outputDir,
+                             int totalDocs,
+                             int totalAggDocs,
+                             boolean starTreeEnabled) throws ConfigurationException {
     final PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(outputDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
@@ -560,9 +517,11 @@ public class StarTreeSegmentCreator implements SegmentCreator {
     properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());
     properties.setProperty(TIME_INTERVAL, "not_there");
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
+    properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
 
     // StarTree
     Joiner csv = Joiner.on(",");
+    properties.setProperty(STAR_TREE_ENABLED, String.valueOf(starTreeEnabled));
     properties.setProperty(SPLIT_ORDER, csv.join(splitOrder));
     properties.setProperty(SPLIT_EXCLUDES, csv.join(starTreeIndexSpec.getSplitExcludes()));
     properties.setProperty(MAX_LEAF_RECORDS, starTreeIndexSpec.getMaxLeafRecords());

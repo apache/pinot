@@ -169,7 +169,7 @@ public class IntermediateResultsBlock implements Block {
     for (int i = 0; i < _aggregationResultList.size(); ++i) {
       switch (_aggregationFunctionList.get(i).aggregateResultDataType()) {
         case LONG:
-          builder.setColumn(i, ((Long) _aggregationResultList.get(i)).longValue());
+          builder.setColumn(i, ((Number) _aggregationResultList.get(i)).longValue());
           break;
         case DOUBLE:
           builder.setColumn(i, ((Double) _aggregationResultList.get(i)).doubleValue());

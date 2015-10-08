@@ -39,12 +39,12 @@
       "name" : "outgoingName1"
     }
   },
-  "starTreeIndexSpecs": [{
+  "starTreeIndexSpec": {
     "splitOrder": [
       "dim2",
       "dim1",
       "dim3"
     ]
-  }],
+  },
   "schemaName" : "schemaName"
 }

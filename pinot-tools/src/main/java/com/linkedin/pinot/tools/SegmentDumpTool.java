@@ -59,14 +59,8 @@ public class SegmentDumpTool {
     parser.parseArgument(args);
 
     File segmentDir = new File(segmentPath);
-    File starTreeDir = new File(segmentDir, V1Constants.STARTREE_DIR);
 
     SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
-
-    if (dumpStarTree) {
-      // Look at star tree instead
-      segmentDir = starTreeDir;
-    }
 
     // All columns by default
     if (columnNames == null) {
@@ -89,13 +83,17 @@ public class SegmentDumpTool {
       dictionaries.put(columnName, dataSource.getDictionary());
     }
 
+    System.out.print("Doc\t");
     for (String columnName : columnNames) {
       System.out.print(columnName);
       System.out.print("\t");
     }
     System.out.println();
 
+
     for (int i = 0; i < indexSegment.getTotalDocs(); i++) {
+      System.out.print(i);
+      System.out.print("\t");
       for (String columnName : columnNames) {
         FieldSpec.DataType columnType = metadata.getSchema().getFieldSpecFor(columnName).getDataType();
         BlockSingleValIterator itr = iterators.get(columnName);
@@ -109,7 +107,7 @@ public class SegmentDumpTool {
 
     if (dumpStarTree) {
       System.out.println();
-      File starTreeFile = new File(starTreeDir, V1Constants.STARTREE_FILE);
+      File starTreeFile = new File(segmentDir, V1Constants.STARTREE_FILE);
       StarTreeIndexNode tree = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
       StarTreeIndexNode.printTree(tree, 0);
     }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.roaringbitmap.IntIterator;
@@ -89,7 +92,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Map<String, DataFileReader> columnIndexReaderWriterMap;
 
   public RealtimeSegmentImpl(Schema schema, int capacity) throws IOException {
-    // intial variable setup
+    // initial variable setup
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
@@ -163,7 +166,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     if (numDocsIndexed >= capacity) {
       return false;
     }
-    // updating dictionary for dimesions only
+    // updating dictionary for dimensions only
     // its ok to insert this first
     // since filtering won't return back anything unless a new entry is made in the inverted index
     for (String dimension : dataSchema.getDimensionNames()) {
@@ -340,7 +343,26 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public void destroy() {
-    throw new UnsupportedOperationException("not implemented");
+    for (DataFileReader dfReader : columnIndexReaderWriterMap.values()) {
+      try {
+        dfReader.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close index. Service will continue with potential memory leak, error: ", e);
+        //fall through to close other segments
+      }
+    }
+    // clear map now that index is closed to prevent accidental usage
+    columnIndexReaderWriterMap.clear();
+
+    for (RealtimeInvertedIndex index : invertedIndexMap.values()) {
+      try {
+        index.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close inverted index. Service will continue with memory leaks, error: ", e);
+      }
+    }
+    invertedIndexMap.clear();
+    _segmentMetadata.close();
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(final String columnToSortOn) {
@@ -574,5 +596,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   public boolean hasDictionary(String columnName) {
     return dictionaryMap.containsKey(columnName);
+  }
+
+  @Override
+  public StarTreeIndexNode getStarTreeRoot() {
+    return null;
   }
 }

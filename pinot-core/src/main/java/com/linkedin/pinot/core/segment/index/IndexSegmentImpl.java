@@ -18,6 +18,8 @@ package com.linkedin.pinot.core.segment.index;
 import java.io.File;
 import java.util.Map;
 
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,12 +44,16 @@ public class IndexSegmentImpl implements IndexSegment {
   private final File indexDir;
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ColumnIndexContainer> indexContainerMap;
+  private final StarTreeIndexNode starTreeRoot;
 
-  public IndexSegmentImpl(File indexDir, SegmentMetadataImpl segmentMetadata,
-      Map<String, ColumnIndexContainer> columnIndexContainerMap) throws Exception {
+  public IndexSegmentImpl(File indexDir,
+                          SegmentMetadataImpl segmentMetadata,
+                          Map<String, ColumnIndexContainer> columnIndexContainerMap,
+                          StarTreeIndexNode starTreeRoot) throws Exception {
     this.indexDir = indexDir;
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
+    this.starTreeRoot = starTreeRoot;
     LOGGER.info("successfully loaded the index segment : " + indexDir.getName());
   }
 
@@ -128,4 +134,8 @@ public class IndexSegmentImpl implements IndexSegment {
     return segmentMetadata.getTotalDocs();
   }
 
+  @Override
+  public StarTreeIndexNode getStarTreeRoot() {
+    return starTreeRoot;
+  }
 }

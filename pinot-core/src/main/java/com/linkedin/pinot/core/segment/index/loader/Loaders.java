@@ -16,14 +16,19 @@
 package com.linkedin.pinot.core.segment.index.loader;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,6 +36,7 @@ import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
  */
 
 public class Loaders {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Loaders.class);
 
   public static class IndexSegment {
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode) throws Exception {
@@ -47,7 +53,16 @@ public class Loaders {
         indexContainerMap.put(column, ColumnIndexContainer.init(column, indexDir,
             metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata, readMode));
       }
-      return new IndexSegmentImpl(indexDir, metadata, indexContainerMap);
+
+      // The star tree index (if available)
+      StarTreeIndexNode starTreeRoot = null;
+      if (metadata.hasStarTree()) {
+        File starTreeFile = new File(indexDir, V1Constants.STARTREE_FILE);
+        LOGGER.debug("Loading star tree index file {}", starTreeFile);
+        starTreeRoot = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
+      }
+
+      return new IndexSegmentImpl(indexDir, metadata, indexContainerMap, starTreeRoot);
     }
   }
 }

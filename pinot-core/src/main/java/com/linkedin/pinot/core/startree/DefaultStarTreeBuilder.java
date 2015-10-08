@@ -89,6 +89,7 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
     LOG.info("Computing document ID ranges...");
     startMillis = System.currentTimeMillis();
     computeDocumentIdRanges();
+    assignDocumentIdRanges();
     endMillis = System.currentTimeMillis();
     LOG.info("Document ID range computation complete, took {} ms", endMillis - startMillis);
 
@@ -153,6 +154,7 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
    * @return
    *  The number of records that were added at this level
    */
+
   private int constructStarTree(StarTreeIndexNode node, StarTreeTable table) {
     long startMillis;
     long endMillis;
@@ -238,6 +240,32 @@ public class DefaultStarTreeBuilder implements StarTreeBuilder {
       StarTreeIndexNode current = queue.remove();
       current.setNodeId(nodeId++);
       if (!current.isLeaf()) {
+        for (StarTreeIndexNode child : current.getChildren().values()) {
+          queue.add(child);
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets the document ID range for each leaf node to the adjusted values.
+   */
+  private void assignDocumentIdRanges() {
+    Queue<StarTreeIndexNode> queue = new LinkedList<>();
+    queue.add(starTree);
+    while (!queue.isEmpty()) {
+      StarTreeIndexNode current = queue.remove();
+      if (current.isLeaf()) {
+        // The aggregate segment is appended to the end of the raw segment
+        int offset = 0;
+        if (current.getPathValues().values().contains(StarTreeIndexNode.all())) {
+          offset = totalRawDocumentCount;
+        }
+
+        StarTreeTableRange range = adjustedDocumentIdRanges.get(current.getNodeId());
+        current.setStartDocumentId(range.getStartDocumentId() + offset);
+        current.setDocumentCount(range.getDocumentCount());
+      } else {
         for (StarTreeIndexNode child : current.getChildren().values()) {
           queue.add(child);
         }
