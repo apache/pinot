@@ -16,11 +16,13 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.trace.TraceContext;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -101,12 +103,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public DataTable processQuery(final InstanceRequest instanceRequest) {
     DataTable instanceResponse;
     long start = System.currentTimeMillis();
+    final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<>();
     try {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.info("Incoming query is : {}", brokerRequest);
       long startPruningTime = System.nanoTime();
-      final List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
+      getPrunedQueryableSegments(queryableSegmentDataManagerList, instanceRequest);
       long pruningTime = System.nanoTime() - startPruningTime;
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.SEGMENT_PRUNING, pruningTime);
       LOGGER.info("Matched {} segments! ", queryableSegmentDataManagerList.size());
@@ -156,14 +159,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return instanceResponse;
     } finally {
       if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
+        List<String> segmentsToDecrement = new ArrayList<>();
+        for (IndexSegment segment : queryableSegmentDataManagerList) {
+          segmentsToDecrement.add(segment.getSegmentName());
+        }
         _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
-            .returnSegmentReaders(instanceRequest.getSearchSegments());
+            .returnSegmentReaders(segmentsToDecrement);
       }
       TraceContext.unregister(instanceRequest);
     }
   }
 
-  private List<IndexSegment> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
+  private List<IndexSegment> getPrunedQueryableSegments(final List<IndexSegment> listOfQueryableSegments, final InstanceRequest instanceRequest) {
     LOGGER
         .info("InstanceRequest request {} segments", instanceRequest.getSearchSegments().size());
 
@@ -174,14 +181,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     final List<SegmentDataManager> matchedSegmentDataManagerFromServer = tableDataManager.getSegments(instanceRequest.getSearchSegments());
     LOGGER.info("TableDataManager found {} segments before pruning", matchedSegmentDataManagerFromServer.size());
-    final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
+
     for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
       final IndexSegment indexSegment = segmentDataManager.getSegment();
       if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
-        queryableSegmentDataManagerList.add(indexSegment);
+        listOfQueryableSegments.add(indexSegment);
+      } else {
+        tableDataManager.returnSegmentReaders(Lists.newArrayList(indexSegment.getSegmentName()));
       }
     }
-    return queryableSegmentDataManagerList;
+    return listOfQueryableSegments;
   }
 
   @Override
