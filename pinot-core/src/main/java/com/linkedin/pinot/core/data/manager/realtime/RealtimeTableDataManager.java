@@ -332,4 +332,9 @@ public class RealtimeTableDataManager implements TableDataManager {
   public Object getGlobalLock() {
     return _globalLock;
   }
+
+  @Override
+  public void returnSegmentReader(String segmentId) {
+    decrementCount(segmentId);
+  }
 }

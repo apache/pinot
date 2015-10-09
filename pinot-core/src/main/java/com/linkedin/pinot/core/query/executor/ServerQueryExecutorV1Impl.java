@@ -159,12 +159,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return instanceResponse;
     } finally {
       if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
-        List<String> segmentsToDecrement = new ArrayList<>();
-        for (IndexSegment segment : queryableSegmentDataManagerList) {
-          segmentsToDecrement.add(segment.getSegmentName());
-        }
-        _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
-            .returnSegmentReaders(segmentsToDecrement);
+       for (IndexSegment segment : queryableSegmentDataManagerList) {
+         _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
+         .returnSegmentReader(segment.getSegmentName());
+       }
       }
       TraceContext.unregister(instanceRequest);
     }
@@ -187,7 +185,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
         listOfQueryableSegments.add(indexSegment);
       } else {
-        tableDataManager.returnSegmentReaders(Lists.newArrayList(indexSegment.getSegmentName()));
+        tableDataManager.returnSegmentReader(indexSegment.getSegmentName());
       }
     }
     return listOfQueryableSegments;

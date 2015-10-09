@@ -321,4 +321,9 @@ public class OfflineTableDataManager implements TableDataManager {
     }
   }
 
+  @Override
+  public void returnSegmentReader(String segmentId) {
+    decrementCount(segmentId);
+  }
+
 }
