@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.*;
@@ -10,6 +11,7 @@ import com.sun.jersey.api.NotFoundException;
 import io.dropwizard.views.View;
 
 import org.joda.time.DateTime;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +75,21 @@ public class DashboardResource {
     }
     return new LandingView(collections);
   }
-
+  
+  @GET
+  @Path("/dashboard/{collection}/configs")
+  public String getCollectionInfoJSON(@PathParam("collection") String collection) throws Exception {
+	
+	if (collection == null) {
+		return null;
+	}
+    JSONObject ret = new JSONObject(new ObjectMapper().writeValueAsString(funnelResource.getFunnelSpecFor(collection)));
+    JSONObject dimGroups = new JSONObject(new ObjectMapper().writeValueAsString(configCache.getDimensionGroupSpec(collection)));
+    ret.put("dimension_groups", dimGroups.get("groups"));
+    return ret.toString();
+  }
+  
+  
   @GET
   @Path("/dashboard/{collection}")
   public DashboardStartView getDashboardStartView(@PathParam("collection") String collection) throws Exception {

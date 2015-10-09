@@ -56,6 +56,10 @@ public class FunnelsDataProvider {
     LOG.info("loaded custom funnel configs with {} ", new ObjectMapper().writeValueAsString(funnelSpecsMap));
   }
 
+  public CustomFunnelSpec getFunnelSpecFor(String collection) {	
+	  return funnelSpecsMap.get(collection);
+  }
+  
   public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels, DateTime currentDateTime, MultivaluedMap<String, String> dimensionValues) throws Exception {
     String[] funnels = selectedFunnels.split(",");
     if (funnels.length == 0) {
