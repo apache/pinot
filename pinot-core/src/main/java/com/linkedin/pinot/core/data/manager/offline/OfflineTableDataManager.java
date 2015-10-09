@@ -317,7 +317,7 @@ public class OfflineTableDataManager implements TableDataManager {
   @Override
   public void returnSegmentReaders(List<String> segmentList) {
     for (String segmentId : segmentList) {
-      decrementCount(segmentId);
+      returnSegmentReader(segmentId);
     }
   }
 

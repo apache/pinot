@@ -319,7 +319,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   public void returnSegmentReaders(List<String> segmentList) {
     synchronized (getGlobalLock()) {
       for (String segmentId : segmentList) {
-        decrementCount(segmentId);
+        returnSegmentReader(segmentId);
       }
     }
   }
