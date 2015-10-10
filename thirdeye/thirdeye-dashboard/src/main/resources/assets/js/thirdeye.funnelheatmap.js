@@ -39,9 +39,8 @@ $(document).ready(function() {
         }
     })
 
-    //todo: heat-map-cell eventlistener
+    //heat-map-cell eventlistener
     $("#custom-funnel-section .heat-map-cell").click(function(){
-        console.log("target heat-map-cell:",this)
         var  columnIndex = $(this).parent().children().index($(this));
         var  rowIndex = $(this).parent().parent().children().index($(this).parent());
         var hour = $("td:first-child", $(this).closest("tr")).html()
@@ -66,7 +65,6 @@ $(document).ready(function() {
 
         //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
         var data = {"funnels":{"Member_2_Member_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","m2m_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)","m2m_sent":"memberInvitationsSubmitted","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","avg_sent":"RATIO(memberInvitationsSubmitted,memberCreateEvents)","create":"RATIO(memberCreateEvents,memberResultsLandingImpressions)"},"visulizationType":"HEATMAP","name":"Member_2_Member_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","RATIO(memberCreateEvents,memberResultsLandingImpressions)","RATIO(memberInvitationsSubmitted,memberCreateEvents)","memberInvitationsSubmitted"]},"Member_2_Guest_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","m2g_sent":"guestInvitationsSubmitted","avg_sent":"RATIO(guestInvitationsSubmitted,guestCreateEvents)","create":"RATIO(guestCreateEvents,memberResultsLandingImpressions)","m2g_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)"},"visulizationType":"HEATMAP","name":"Member_2_Guest_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","RATIO(guestCreateEvents,memberResultsLandingImpressions)","RATIO(guestInvitationsSubmitted,guestCreateEvents)","guestInvitationsSubmitted"]}},"dimension_groups":[],"collection":"abook"}
-
 
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
         var metricratio = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
@@ -100,7 +98,6 @@ $(document).ready(function() {
         var queryParams = getQueryParamValue(window.location.search);
         if (queryParams.funnels) {
             var funnels = decodeURIComponent(queryParams.funnels).split( ",")
-
             if (funnels.length > 0) {
                 queryParams["funnels"] = funnels.join();
             }
@@ -117,5 +114,79 @@ $(document).ready(function() {
 
         //}); //end of ajax callback
     })
+
+    //funnel heatmap table header eventlistener
+    $("#custom-funnel-section .metric-label").click(function(){
+
+        var  columnIndex = $(this).parent().children().index($(this))
+        if(columnIndex > 1){
+            /* $.ajax({
+             url:
+             statusCode: {
+             404: function() {
+             $("#funnel-heat-map-error").empty()
+             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+             warning.append($('<p></p>', { html: 'No metric available' }))
+             $("#funnel-heat-map-error").append(warning)
+             },
+             500: function() {
+             $("#funnel-heat-map-error").empty()
+             var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+             error.append($('<p></p>', { html: 'Internal server error' }))
+             $("#funnel-heat-map-error").append(error)
+
+
+             }).done(function(data){*/
+            //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
+            var data = {"funnels":{"Member_2_Member_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","m2m_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)","m2m_sent":"memberInvitationsSubmitted","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","avg_sent":"RATIO(memberInvitationsSubmitted,memberCreateEvents)","create":"RATIO(memberCreateEvents,memberResultsLandingImpressions)"},"visulizationType":"HEATMAP","name":"Member_2_Member_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","RATIO(memberCreateEvents,memberResultsLandingImpressions)","RATIO(memberInvitationsSubmitted,memberCreateEvents)","memberInvitationsSubmitted"]},"Member_2_Guest_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","m2g_sent":"guestInvitationsSubmitted","avg_sent":"RATIO(guestInvitationsSubmitted,guestCreateEvents)","create":"RATIO(guestCreateEvents,memberResultsLandingImpressions)","m2g_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)"},"visulizationType":"HEATMAP","name":"Member_2_Guest_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","RATIO(guestCreateEvents,memberResultsLandingImpressions)","RATIO(guestInvitationsSubmitted,guestCreateEvents)","guestInvitationsSubmitted"]}},"dimension_groups":[],"collection":"abook"}
+            var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
+            var metricratio = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
+            var metrics = []
+            if(metricratio.indexOf("RATIO") >= 0){
+                var metricNames = (metricratio.substring(6, metricratio.length - 1).split(","))
+                for(var i = 0, len = metricNames.length; i < len;i++){
+                    var metric = metricNames[i]
+                    metrics.push("'" + metric + "'")
+                }
+            }else{
+                metrics.push("'" + metricratio + "'")
+            }
+
+            // Metric function
+            var metricFunction = metrics.join(",")
+
+            var path = parsePath(window.location.pathname)
+
+            var firstindex = path.metricFunction.indexOf("'");
+            var lastindex = path.metricFunction.lastIndexOf("'");
+            var previousMetricFunction = path.metricFunction
+            var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
+
+            path.metricFunction = newMetricFunction
+            path.dimensionViewType = "MULTI_TIME_SERIES"
+            var dashboardPath = getDashboardPath(path)
+
+            //Funnels
+            var queryParams = getQueryParamValue(window.location.search);
+            if (queryParams.funnels) {
+                var funnels = decodeURIComponent(queryParams.funnels).split( ",")
+                if (funnels.length > 0) {
+                    queryParams["funnels"] = funnels.join();
+                }
+            }
+
+            // Timezone
+            var timezone = $("#sidenav-timezone").val()
+            var params = {}
+            if(timezone !== getLocalTimeZone().split(' ')[1]) {
+                params.timezone = timezone.split('/').join('-')
+            }
+            window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
+            //}) //end of ajax callback
+
+        }
+    })
+
+
 
 });

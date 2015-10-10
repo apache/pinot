@@ -175,4 +175,14 @@ $(document).ready(function() {
             }
         }
     }
+
+    //Current query display ALL when no fixed element in the query
+    if($("ul.dimension-combination li").length == 0){
+        $("ul.dimension-combination").append("<li style='list-style-type: none;'>None</li>")
+    }
+
+    $(".section-selector").on("change", function(){
+        $(".section-wrapper").hide();
+        $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();
+    })
 })
