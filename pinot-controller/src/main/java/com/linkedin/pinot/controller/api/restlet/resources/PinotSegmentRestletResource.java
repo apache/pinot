@@ -54,12 +54,16 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);
 
   private final ObjectMapper mapper;
+  private long _offlineToOnlineTimeoutInseconds;
 
   public PinotSegmentRestletResource() {
     getVariants().add(new Variant(MediaType.TEXT_PLAIN));
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
     mapper = new ObjectMapper();
+
+    // Timeout of 5 seconds per segment to come up to online from offline
+    _offlineToOnlineTimeoutInseconds = 5L;
   }
 
   /**
@@ -197,39 +201,37 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
    * @return
    * @throws JSONException
    */
-  private JSONArray toggleSegmentsForTable(String tableName, String segmentName, String state) throws JSONException {
+  private PinotResourceManagerResponse toggleSegmentsForTable(String tableName, String segmentName, String state) throws JSONException {
     List<String> segmentsToToggle;
     JSONArray ret = new JSONArray();
 
+    long timeOutInSeconds = 10L;
     if (segmentName != null) {
       segmentsToToggle = new ArrayList<String>();
       segmentsToToggle.add(segmentName);
     } else {
       segmentsToToggle = _pinotHelixResourceManager.getAllSegmentsForResource(tableName);
-    }
 
-    long timeOutInSeconds = 10;
-    for (String segmentToToggle : segmentsToToggle) {
-      JSONObject jsonObj = new JSONObject();
-      jsonObj.put(TABLE_NAME, tableName);
-
+      // For enable, allow 5 seconds per segment for an instance as timeout.
       if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
-        jsonObj.put(STATE,
-            _pinotHelixResourceManager.toggleSegmentState(tableName, segmentToToggle, true, timeOutInSeconds).toJSON()
-                .toString());
-      } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
-        jsonObj.put(STATE,
-            _pinotHelixResourceManager.toggleSegmentState(tableName, segmentToToggle, false, timeOutInSeconds));
-      } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
-        jsonObj.put(STATE, _pinotHelixResourceManager.dropSegment(tableName, segmentToToggle).toJSON().toString());
-      } else {
-        jsonObj.put(STATE, new PinotResourceManagerResponse(INVALID_STATE_ERROR, false).toJSON().toString());
+        int instanceCount = _pinotHelixResourceManager.getAllInstanceNames().size();
+        if (instanceCount != 0) {
+          timeOutInSeconds = (long) ((_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount);
+        } else {
+          return new PinotResourceManagerResponse("Error: could not find any instances in table " + tableName, false);
+        }
       }
-
-      ret.put(jsonObj);
     }
 
-    return ret;
+    if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
+      return _pinotHelixResourceManager.toggleSegmentState(tableName, segmentsToToggle, true, timeOutInSeconds);
+    } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
+      return _pinotHelixResourceManager.toggleSegmentState(tableName, segmentsToToggle, false, timeOutInSeconds);
+    } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
+      return _pinotHelixResourceManager.dropSegments(tableName, segmentsToToggle, timeOutInSeconds);
+    } else {
+      return new PinotResourceManagerResponse(INVALID_STATE_ERROR, false);
+    }
   }
 
   @HttpVerb("get")
