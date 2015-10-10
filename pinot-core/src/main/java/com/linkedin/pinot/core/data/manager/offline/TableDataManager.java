@@ -116,6 +116,12 @@ public interface TableDataManager {
   public void returnSegmentReaders(List<String> segmentList);
 
   /**
+  *
+  * give back segmentReader, so the segment could be safely deleted.
+  */
+  public void returnSegmentReader(String segmentId);
+  
+  /**
    * @return ExecutorService for query.
    */
   public ExecutorService getExecutorService();

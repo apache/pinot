@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
@@ -48,7 +49,6 @@ public class SimpleRequestHandler implements RequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleRequestHandler.class);
 
   private ServerMetrics _serverMetrics;
-
   QueryExecutor _queryExecutor = null;
 
   public SimpleRequestHandler(QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
@@ -58,6 +58,7 @@ public class SimpleRequestHandler implements RequestHandler {
 
   @Override
   public byte[] processRequest(ByteBuf request) {
+
     long queryStartTime = System.nanoTime();
     _serverMetrics.addMeteredValue(null, ServerMeter.QUERIES, 1);
 

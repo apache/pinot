@@ -58,7 +58,7 @@ var HELPERS = {
     $.get("/tables", function(data) {
       var source   = $("#table-names-template").html();
       var template = Handlebars.compile(source);
-      var d = template({"tables" : JSON.parse(data)});
+      var d = template(JSON.parse(data));
       $(".schema-list-view").html(d);
       $("#table-names").DataTable({
         "searching":true,
