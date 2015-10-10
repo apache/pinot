@@ -1,6 +1,7 @@
 <script src="/assets/js/thirdeye.funnelheatmap.js"></script>
 
 <#if (funnelViews?size > 0)>
+<div id="funnel-heat-map-error"></div>
 <div id="custom-funnel-section">
     <i class="uk-icon-spinner uk-icon-spin uk-icon-large" style="margin: 50%;"></i>
 </div>
@@ -39,6 +40,7 @@
                     </#list>
                     </tbody>
 
+
                 </table>
 
         </div>
@@ -46,4 +48,5 @@
 
 
 </div>
+
 </#if>

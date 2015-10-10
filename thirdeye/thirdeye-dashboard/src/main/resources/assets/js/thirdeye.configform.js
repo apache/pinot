@@ -56,21 +56,12 @@ $(document).ready(function() {
             return
         }
 
-        /*Moving average is not required
-         if($(".moving-average-size.uk-active").length == 0 ){
-         errorMessage.html("Please select a moving average size: WoW, Wo2W, Wo4W")
-         errorAlert.fadeIn(100)
-         return
-         }*/
-
         // Timezone
         var timezone = getTimeZone()
 
         // Aggregate  todo:
         var aggregateSize = 1
         var aggregateUnit = $(".baseline-aggregate.uk-active").attr("unit")
-
-        console.log("aggregateSize, aggregateUnit:", aggregateSize + " " + aggregateUnit)
 
         // Date
         var current = moment.tz(date, timezone)
@@ -133,12 +124,14 @@ $(document).ready(function() {
 
         if (queryParams.funnels) {
             var funnels = decodeURIComponent(queryParams.funnels).split( ",")
+
             if (funnels.length > 0) {
                 queryParams["funnels"] = funnels.join();
             }
         }
 
         errorAlert.hide()
+
         window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
     });
 

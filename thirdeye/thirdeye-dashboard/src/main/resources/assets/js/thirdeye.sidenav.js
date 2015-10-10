@@ -316,11 +316,13 @@ $(document).ready(function() {
 
         // Path
         var path = parsePath(window.location.pathname)
-        path.metricFunction = metricFunction
-        path.metricViewType = path.metricViewType == null ? "INTRA_DAY" : path.metricViewType
-        path.dimensionViewType = path.dimensionViewType == null ? "HEAT_MAP" : path.dimensionViewType
-        path.baselineMillis = baselineMillisUTC
-        path.currentMillis = currentMillisUTC
+
+            path.metricFunction = metricFunction
+            path.metricViewType = path.metricViewType == null ? "INTRA_DAY" : path.metricViewType
+            path.dimensionViewType = path.dimensionViewType == null ? "TABULAR" : path.dimensionViewType
+            path.baselineMillis = baselineMillisUTC
+            path.currentMillis = currentMillisUTC
+
 
         var dashboardPath = getDashboardPath(path)
         var params = {}

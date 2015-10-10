@@ -1,8 +1,8 @@
 <div class="title-box uk-clearfix">
     <#if (dimensionView.type == "TABULAR")>
-    <div class="uk-display-inline-block">
+    <div class="uk-display-inline-block hidden">
         <div data-uk-button-checkbox>
-            <button type="button" id="funnel-cumulative" class="uk-button">Cummulative</button>
+            <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
         </div>
     </div>
     <!-- Metric selection dropdown -->
@@ -33,7 +33,9 @@
     </#if>
 
     <!-- Dimension Combination -->
-    <#if dimensions??>
+    <#list (metricView.view.metricTables)!metricTables as metricTable>
+    <#assign dimensions = metricTable.dimensionValues>
+    <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
         <ul class="dimension-combination" style="display: inline-block;">Filters:
         <#list dimensions?keys as dimensionName>
             <#assign dimensionValue = dimensions[dimensionName]>
@@ -53,7 +55,7 @@
 
         </#list>
         </ul>
-    </#if>
+    </#list>
 
 
 
