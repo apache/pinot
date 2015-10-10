@@ -42,7 +42,6 @@ $(document).ready(function() {
     //heat-map-cell eventlistener
     $("#custom-funnel-section .heat-map-cell").click(function(){
         var  columnIndex = $(this).parent().children().index($(this));
-        var  rowIndex = $(this).parent().parent().children().index($(this).parent());
         var hour = $("td:first-child", $(this).closest("tr")).html()
 
         /* $.ajax({
@@ -119,7 +118,7 @@ $(document).ready(function() {
     $("#custom-funnel-section .metric-label").click(function(){
 
         var  columnIndex = $(this).parent().children().index($(this))
-        if(columnIndex > 1){
+        if(columnIndex > 0){
             /* $.ajax({
              url:
              statusCode: {
