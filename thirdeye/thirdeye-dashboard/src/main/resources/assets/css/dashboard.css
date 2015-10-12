@@ -107,12 +107,12 @@ li {
 
 /* Funnel Heatmap */
 
-#custom-funnel-section {
+#custom-funnel-section{
     min-height: 600px;
 }
 
 #custom-funnel-section table,
-#custom-funnel-section table th {
+#custom-funnel-section table th{
     line-height: 8px;
     text-align: center;
     font-size: 10px;
@@ -121,7 +121,7 @@ li {
     color: #898989;
 }
 
-#custom-funnel-section td:hover {
+#custom-funnel-section td:hover{
     color: #808080;
 }
 
@@ -242,8 +242,14 @@ li {
     margin-top: 20px;
 }
 
-#intra-day-table {
-    border: 1px solid #ddd;
+#intra-day-table,
+#intra-day-table th{
+    line-height: 8px;
+    font-size: 10px;
+    padding: 6px;
+    font-family: Arial, sans-serif;
+    color: #898989;
+    border-collapse: collapse;
 }
 
 /* Dimension */
@@ -554,7 +560,7 @@ td[dimension-val] {
     height: 1px;
 }
 
-#dimension-view-heat-map-rendered table {
+#dimension-view-funnel-heat-map-rendered table{
     border-collapse: collapse;
 }
 

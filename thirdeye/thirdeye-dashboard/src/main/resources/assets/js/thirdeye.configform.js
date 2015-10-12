@@ -93,8 +93,8 @@ $(document).ready(function() {
         var metricFunction = metrics.join(",")
 
         // Moving average
-        if ($(".moving-average-size.uk-active").length > 0) {
-            var movingAverageSize = $(".moving-average-size.uk-active").val()
+        if ($("#moving-average-size").val() != "") {
+            var movingAverageSize = $("#moving-average-size").val()
             var movingAverageUnit = "DAYS"
             metricFunction = "MOVING_AVERAGE_" + movingAverageSize + "_" + movingAverageUnit + "(" + metricFunction + ")"
         }
@@ -169,8 +169,9 @@ $(document).ready(function() {
                 metricFunctionObj = firstArg
                 var tokens = metricFunctionObj.name.split("_")
 
-                if($(".moving-average-size[value='" + tokens[tokens.length - 2] + "']").length > 0){
-                    $(".moving-average-size[value='" + tokens[tokens.length - 2] + "']").trigger("click")
+                if($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0){
+                    $("#moving-average-size").val(tokens[tokens.length - 2])
+                    $("#time-input-form-moving-average span").html($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
                 }
             }
         }

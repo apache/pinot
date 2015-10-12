@@ -560,7 +560,7 @@ function renderHeatMap(rawData, container, options) {
         container.append(header)
 
         $.each(group, function(i, heatMap) {
-            var table = $('<table></table>', { class: 'uk-table dimension-view-heat-map-rendered' })
+            var table = $('<table></table>', { class: 'uk-table dimension-view-funnel-heat-map-rendered' })
             var caption = $('<caption></caption>', { html: heatMap.caption })
             var cells = heatMap.cells
             var heatMapId = heatMap.id

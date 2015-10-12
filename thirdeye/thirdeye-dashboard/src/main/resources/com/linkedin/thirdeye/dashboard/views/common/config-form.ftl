@@ -1,7 +1,7 @@
 <div class="title-box uk-clearfix">
     <#if (dimensionView.type == "TABULAR")>
-    <div class="uk-display-inline-block hidden">
-        <div data-uk-button-checkbox>
+    <div class="uk-display-inline-block">
+        <div data-uk-button-checkbox class="hidden">
             <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
         </div>
     </div>
@@ -66,7 +66,7 @@
         <div class="uk-margin-small-top uk-margin-bottom">
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
-                    Current Date
+                    End Date
                 </label>
                 <div class="uk-form-icon">
                     <i class="uk-icon-calendar"></i>
@@ -76,7 +76,7 @@
             <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "MULTI_TIME_SERIES")>
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
-                    Baseline Date
+                    Start Date
                 </label>
                 <div class="uk-form-icon">
                     <i class="uk-icon-calendar"></i>
@@ -86,7 +86,7 @@
             </#if>
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
-                    Baseline Granularity
+                    Granularity
                 </label>
                 <div  class="uk-button-group" data-uk-button-radio>
                     <button type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >hour(s)</button>
@@ -94,7 +94,7 @@
                 </div>
             </div>
 
-            <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
+            <#--<#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
                 <div class="uk-display-inline-block">
                     <div class="uk-button-group" data-uk-button-radio>
                         <button type="button" class="moving-average-size uk-button" unit="WoW" value="7">WoW</button>
@@ -102,6 +102,21 @@
                         <button type="button" class="moving-average-size uk-button" unit="Wo4W" value="28">Wo4W</button>
                     </div>
                 </div>
+            </#if>-->
+
+            <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
+            <div id="time-input-form-moving-average" style="display: inline-block">Moving Average<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Moving Average:</span>
+                <i class="uk-icon-caret-down"></i>
+                    <select id="moving-average-size">
+                        <option class="uk-button" unit="WoW" value="">None</option>
+                        <option class="uk-button" unit="WoW" value="7">WoW</option>
+                        <option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>
+                        <option class="uk-button" unit="Wo4W" value="28">Wo4W</option>
+                    </select>
+                </div>
+            </div>
             </#if>
 
             <div class="uk-display-inline-block uk-margin-right">
@@ -122,10 +137,10 @@
     <#elseif (dimensionView.type == "TABULAR")>
         <ul class="uk-tab funnel-tabs" data-uk-tab>
             <li class="uk-active">
-                <a href="#">Ratio</a>
+                <a href="#">Summary</a>
             </li>
             <li>
-                <a href="#">Detailed Data</a>
+                <a href="#">Details</a>
             </li>
         </ul>
     </#if>

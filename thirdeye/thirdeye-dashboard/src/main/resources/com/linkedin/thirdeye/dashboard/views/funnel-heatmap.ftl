@@ -12,7 +12,7 @@
             <h3 class="metric-list"> (current = ${funnel.current} & baseline = ${funnel.baseline})
             </h3>
 
-                <table class="uk-table dimension-view-heat-map-rendered">
+                <table class="uk-table dimension-view-funnel-heat-map-rendered">
                     <thead>
                         <tr>
                             <th class="metric-label">Hour</th>
@@ -23,13 +23,14 @@
                     </thead>
                     <tbody>
                     <#list funnel.table as row>
-                        <tr>
+                        <tr data-row=${row}>
                             <td>${row.first}</td>
                             <#list row.second as column>
                                 <#if (column??)>
+                                    <!--data-uk-tooltip"  title="baseline value: current value:" < Add this class and attribute to the td element if you want the tooltip to show up on hover.-->
                                     <td
                                             class="heat-map-cell custom-tooltip"
-                                            tooltip="${column}"
+                                    tooltip="${column}"
                                             value="${column}"
                                             >${(column * 100)?string["0.0"]}%</td>
                                 <#else>
