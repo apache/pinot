@@ -25,6 +25,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 
 
@@ -133,9 +134,9 @@ public class Quickstart {
 
     File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
     String tableName = "baseballStats";
-    final QuickstartRunner runner =
-        new QuickstartRunner(schemaFile, _quickStartDataDir, tempDir, tableName,
-            tableCreationJsonFileName.getAbsolutePath());
+    QuickstartTableRequest request = new QuickstartTableRequest(tableName, schemaFile, tableCreationJsonFileName, _quickStartDataDir);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
+
     runner.clean();
     runner.startAll();
     printStatus(color.CYAN, "Deployed Zookeeper");

@@ -19,18 +19,18 @@ import static com.linkedin.pinot.tools.Quickstart.prettyprintResponse;
 import static com.linkedin.pinot.tools.Quickstart.printStatus;
 
 import java.io.File;
-import java.net.URISyntaxException;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONException;
 
-import kafka.server.KafkaServerStartable;
-
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.tools.Quickstart.color;
 import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 import com.linkedin.pinot.tools.streams.MeetupRsvpStream;
+
+import kafka.server.KafkaServerStartable;
 
 
 public class RealtimeQuickStart {
@@ -62,10 +62,11 @@ public class RealtimeQuickStart {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR);
-
-    final QuickstartRunner runner =
-        new QuickstartRunner(schema, null, new File("/tm/" + System.currentTimeMillis()), "meetupRsvp",
-            tableCreate.getAbsolutePath());
+    
+    File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
+    
+    QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schema, tableCreate);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
 
     runner.startAll();
 
