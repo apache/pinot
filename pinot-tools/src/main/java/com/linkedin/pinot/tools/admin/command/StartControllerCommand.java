@@ -146,8 +146,9 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();
-
-    savePID(TMP_DIR + ".pinotAdminController.pid");
+    
+    String pidFile = ".pinotAdminController-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
     return true;
   }
 
