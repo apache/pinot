@@ -24,14 +24,17 @@
                     <tbody>
                     <#list funnel.table as row>
                         <tr>
-                            <td class="funnel-table-time" data-hour="${row.first}"  currentUTC="${funnel.current}">${row.first}</td>
-                            <#list row.second as column>
+                            <td class="funnel-table-time" data-hour="${row.hour}"  currentUTC="${funnel.current}">${row.hour}</td>
+                            <#list row.ratio as column>
                                 <#if (column??)>
-                                    <!--data-uk-tooltip  title="baseline value: current value:" < Add these attributes to the td element if you want the tooltip to show up on hover.-->
+                                    <#assign baselineValue = row.baseline[column?index]>
+                                    <#assign currentValue = row.current[column?index]>
                                     <td
                                             class="heat-map-cell custom-tooltip"
-                                    tooltip="${column}"
+                                            data-uk-tooltip
+                                            tooltip="${column}"
                                             value="${column}"
+                                            title="Baseline Value: ${baselineValue}<br> Current Value: ${currentValue}"
                                             >${(column * 100)?string["0.0"]}%</td>
                                 <#else>
                                     <td class="not-available">N/A</td>

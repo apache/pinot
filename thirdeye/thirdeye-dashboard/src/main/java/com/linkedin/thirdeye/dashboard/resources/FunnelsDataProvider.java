@@ -7,13 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
 
-import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,15 +19,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
+import com.linkedin.thirdeye.dashboard.api.FunnelHeatMapRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.api.funnel.CustomFunnelSpec;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.views.CustomFunnelTabularView;
 import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
-import com.sun.jersey.core.util.MultivaluedMapImpl;
+
 
 public class FunnelsDataProvider {
   private static String FUNNELS_CONFIG_FILE_NAME = "funnels.yml";
@@ -56,11 +51,12 @@ public class FunnelsDataProvider {
     LOG.info("loaded custom funnel configs with {} ", new ObjectMapper().writeValueAsString(funnelSpecsMap));
   }
 
-  public CustomFunnelSpec getFunnelSpecFor(String collection) {	
-	  return funnelSpecsMap.get(collection);
+  public CustomFunnelSpec getFunnelSpecFor(String collection) {
+    return funnelSpecsMap.get(collection);
   }
-  
-  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels, DateTime currentDateTime, MultivaluedMap<String, String> dimensionValues) throws Exception {
+
+  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels, DateTime currentDateTime,
+      MultivaluedMap<String, String> dimensionValues) throws Exception {
     String[] funnels = selectedFunnels.split(",");
     if (funnels.length == 0) {
       return null;
@@ -70,8 +66,8 @@ public class FunnelsDataProvider {
 
     for (String funnel : funnels) {
       LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
-      funnelViews.add(getFunnelDataFor(collection, funnel, currentDateTime.getYear(),
-          currentDateTime.getMonthOfYear(), currentDateTime.getDayOfMonth(), dimensionValues));
+      funnelViews.add(getFunnelDataFor(collection, funnel, currentDateTime.getYear(), currentDateTime.getMonthOfYear(),
+          currentDateTime.getDayOfMonth(), dimensionValues));
     }
 
     return funnelViews;
@@ -90,19 +86,13 @@ public class FunnelsDataProvider {
 
     return funnelNames;
   }
+
   // currently funnels will overlook the current granularity and baseline granularity
   // it will only present views for every hour within the 24 hour period
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
 
-
-  public FunnelHeatMapView getFunnelDataFor(
-      String collection,
-      String funnel,
-      Integer year,
-      Integer month,
-      Integer day,
+  public FunnelHeatMapView getFunnelDataFor(String collection, String funnel, Integer year, Integer month, Integer day,
       MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
-
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge them
 
@@ -120,11 +110,13 @@ public class FunnelsDataProvider {
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
-    Map<String, Map<String, List<String>>> dimensionGroups = DimensionGroupSpec.emptySpec(collection).getReverseMapping();
+    Map<String, Map<String, List<String>>> dimensionGroups =
+        DimensionGroupSpec.emptySpec(collection).getReverseMapping();
 
-
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, dimensionValuesMap, dimensionGroups);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, dimensionValuesMap, dimensionGroups);
+    String baselineSql =
+        SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, dimensionValuesMap, dimensionGroups);
+    String currentSql =
+        SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, dimensionValuesMap, dimensionGroups);
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
     LOG.info("Generated SQL: {}", baselineSql);
@@ -139,7 +131,7 @@ public class FunnelsDataProvider {
     Map<Long, Number[]> currentData = CustomDashboardResource.extractFunnelData(currentResult.get());
 
     // Compose result
-    List<Pair<Long, Number[]>> table = new ArrayList<>();
+    List<FunnelHeatMapRow> table = new ArrayList<FunnelHeatMapRow>();
     DateTime currentCursor = new DateTime(currentStart.getMillis());
     DateTime baselineCursor = new DateTime(baselineStart.getMillis());
     while (currentCursor.compareTo(currentEnd) < 0 && baselineCursor.compareTo(baselineEnd) < 0) {
@@ -148,22 +140,8 @@ public class FunnelsDataProvider {
       Number[] currentValues = currentData.get(currentCursor.getMillis());
       long hourOfDay = currentCursor.getHourOfDay(); // same as baseline
 
-      if (baselineValues == null || currentValues == null) {
-        table.add(new Pair<Long, Number[]>(hourOfDay, null));
-      } else {
-        // Compute percent change
-        Number[] change = new Number[baselineValues.length];
-        for (int i = 0; i < baselineValues.length; i++) {
-          if (baselineValues[i] == null || currentValues[i] == null || baselineValues[i].doubleValue() == 0.0) {
-            change[i] = null; // i.e. N/A, or cannot compute ratio to baseline
-          } else {
-            change[i] = (currentValues[i].doubleValue() - baselineValues[i].doubleValue()) / baselineValues[i].doubleValue();
-          }
-        }
-
-        // Store in table
-        table.add(new Pair<>(hourOfDay, change));
-      }
+      FunnelHeatMapRow row = new FunnelHeatMapRow(hourOfDay, baselineValues, currentValues);
+      table.add(row);
 
       // Increment
       currentCursor = currentCursor.plusHours(1);
@@ -178,27 +156,39 @@ public class FunnelsDataProvider {
     }
 
     // Filter (since query result set will contain primitive metrics for each derived one)
-    List<Pair<Long, Number[]>> filteredTable = new ArrayList<>();
-    for (Pair<Long, Number[]> pair : table) {
-      Number[] filtered = new Number[spec.getActualMetricNames().size()];
-      for (int i = 0; i < spec.getActualMetricNames().size(); i++) {
+    List<FunnelHeatMapRow> filteredTable = new ArrayList<>();
+    int metricCount = spec.getActualMetricNames().size();
+
+    for (FunnelHeatMapRow row : table) {
+      Number[] filteredBaseline = new Number[metricCount];
+      Number[] filteredCurrent = new Number[metricCount];
+      for (int i = 0; i < metricCount; i++) {
         String metricName = spec.getActualMetricNames().get(i);
         Integer metricIdx = metricNameToIndex.get(metricName);
-        if (pair.getSecond() == null) {
-          filtered[i] = 0;
-        } else {
-          Number value = null;
+
+        Number baselineValue = null;
+        if (row.getBaseline() != null) {
           try {
-            value = pair.getSecond()[metricIdx];
+            baselineValue = row.getBaseline()[metricIdx];
           } catch (Exception e) {
             LOG.error("", e);
           }
-          filtered[i] = value;
         }
-      }
-      filteredTable.add(new Pair<>(pair.getFirst(), filtered));
-    }
+        filteredBaseline[i] = baselineValue;
 
+        Number currentValue = null;
+        if (row.getCurrent() != null) {
+          try {
+            currentValue = row.getCurrent()[metricIdx];
+          } catch (Exception e) {
+            LOG.error("", e);
+          }
+        }
+        filteredCurrent[i] = currentValue;
+      }
+      FunnelHeatMapRow filteredRow = new FunnelHeatMapRow(row.getHour(), filteredBaseline, filteredCurrent);
+      filteredTable.add(filteredRow);
+    }
     return new FunnelHeatMapView(spec, filteredTable, currentEnd, baselineEnd);
   }
 

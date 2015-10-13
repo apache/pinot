@@ -4,9 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 
+import com.linkedin.thirdeye.dashboard.api.FunnelHeatMapRow;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
 
 
@@ -15,12 +15,12 @@ public class FunnelHeatMapView {
 
   private final List<String> metricLabels;
   private final Map<String, String> aliasToActualMap;
-  private final List<Pair<Long, Number[]>> table;
+  private final List<FunnelHeatMapRow> table;
   private final Map<String, Integer> metricIndex;
   private final String current;
   private final String baseline;
 
-  public FunnelHeatMapView(FunnelSpec spec, List<Pair<Long, Number[]>> table, DateTime current, DateTime baseline) {
+  public FunnelHeatMapView(FunnelSpec spec, List<FunnelHeatMapRow> table, DateTime current, DateTime baseline) {
     this.metricLabels = spec.getActualMetricNames();
     this.table = table;
     int counter = 1;
@@ -58,7 +58,7 @@ public class FunnelHeatMapView {
     return metricLabels;
   }
 
-  public List<Pair<Long, Number[]>> getTable() {
+  public List<FunnelHeatMapRow> getTable() {
     return table;
   }
 }
