@@ -16,13 +16,16 @@ public class FunnelHeatMapView {
   private final List<String> metricLabels;
   private final Map<String, String> aliasToActualMap;
   private final List<FunnelHeatMapRow> table;
+  private final List<FunnelHeatMapRow> cumulativeTable;
   private final Map<String, Integer> metricIndex;
   private final String current;
   private final String baseline;
 
-  public FunnelHeatMapView(FunnelSpec spec, List<FunnelHeatMapRow> table, DateTime current, DateTime baseline) {
+  public FunnelHeatMapView(FunnelSpec spec, List<FunnelHeatMapRow> table, List<FunnelHeatMapRow> cumulativeTable,
+      DateTime current, DateTime baseline) {
     this.metricLabels = spec.getActualMetricNames();
     this.table = table;
+    this.cumulativeTable = cumulativeTable;
     int counter = 1;
     this.metricIndex = new LinkedHashMap<String, Integer>();
     this.name = spec.getName();
@@ -60,5 +63,9 @@ public class FunnelHeatMapView {
 
   public List<FunnelHeatMapRow> getTable() {
     return table;
+  }
+
+  public List<FunnelHeatMapRow> getCumulativeTable() {
+    return cumulativeTable;
   }
 }

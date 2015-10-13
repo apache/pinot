@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -158,6 +159,11 @@ public class FunnelsDataProvider {
     // Filter (since query result set will contain primitive metrics for each derived one)
     List<FunnelHeatMapRow> filteredTable = new ArrayList<>();
     int metricCount = spec.getActualMetricNames().size();
+    List<FunnelHeatMapRow> filteredCumulativeTable = new ArrayList<>();
+    Number[] cumulativeBaseline = new Number[metricCount];
+    Arrays.fill(cumulativeBaseline, 0.0);
+    Number[] cumulativeCurrent = new Number[metricCount];
+    Arrays.fill(cumulativeCurrent, 0.0);
 
     for (FunnelHeatMapRow row : table) {
       Number[] filteredBaseline = new Number[metricCount];
@@ -185,11 +191,25 @@ public class FunnelsDataProvider {
           }
         }
         filteredCurrent[i] = currentValue;
+
+        if (baselineValue != null && currentValue != null) {
+          //TODO what to do if either value is null? Treat as 0?
+          cumulativeBaseline[i] = cumulativeBaseline[i].doubleValue() + baselineValue.doubleValue();
+          cumulativeCurrent[i] = cumulativeCurrent[i].doubleValue() + currentValue.doubleValue();
+        }
       }
+
       FunnelHeatMapRow filteredRow = new FunnelHeatMapRow(row.getHour(), filteredBaseline, filteredCurrent);
       filteredTable.add(filteredRow);
+
+      Number[] cumulativeBaselineCopy = Arrays.copyOf(cumulativeBaseline, cumulativeBaseline.length);
+      Number[] cumulativeCurrentCopy = Arrays.copyOf(cumulativeCurrent, cumulativeCurrent.length);
+
+      FunnelHeatMapRow cumulativeFilteredRow =
+          new FunnelHeatMapRow(row.getHour(), cumulativeBaselineCopy, cumulativeCurrentCopy);
+      filteredCumulativeTable.add(cumulativeFilteredRow);
     }
-    return new FunnelHeatMapView(spec, filteredTable, currentEnd, baselineEnd);
+    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentEnd, baselineEnd);
   }
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out late}
