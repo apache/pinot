@@ -17,17 +17,17 @@
                         <tr>
                             <th class="metric-label">Hour</th>
                             <#list funnel.aliasToActualMap?keys as key>
-                                <th class="metric-label">${key}</th>
+                                <th class="metric-label" data-uk-tooltip>${key}</th>
                             </#list>
                         </tr>
                     </thead>
                     <tbody>
                     <#list funnel.table as row>
-                        <tr data-row=${row}>
-                            <td>${row.first}</td>
+                        <tr>
+                            <td class="funnel-table-time" data-hour="${row.first}"  currentUTC="${funnel.current}">${row.first}</td>
                             <#list row.second as column>
                                 <#if (column??)>
-                                    <!--data-uk-tooltip"  title="baseline value: current value:" < Add this class and attribute to the td element if you want the tooltip to show up on hover.-->
+                                    <!--data-uk-tooltip  title="baseline value: current value:" < Add these attributes to the td element if you want the tooltip to show up on hover.-->
                                     <td
                                             class="heat-map-cell custom-tooltip"
                                     tooltip="${column}"

@@ -125,6 +125,10 @@ li {
     color: #808080;
 }
 
+#custom-funnel-section .heat-map-cell{
+    cursor: pointer;
+}
+
 .funnel-thumbnail-container {
     background-color: #ddd;
     text-align: center;
@@ -145,6 +149,10 @@ li {
     padding: 0px;
     font-size: 3px;
     line-height: 8px;
+}
+
+#funnel-thumbnails td:first-child{
+    font-size: 0px;
 }
 
 #funnel-thumbnails th {

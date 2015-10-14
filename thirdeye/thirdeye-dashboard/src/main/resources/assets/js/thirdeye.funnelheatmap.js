@@ -12,6 +12,7 @@ $(document).ready(function() {
         $(this).addClass("uk-panel-box")
     })
 
+
     //Assign background color value to each cells
     $(".heat-map-cell").each(function(i, cell) {
         var cellObj = $(cell)
@@ -25,10 +26,11 @@ $(document).ready(function() {
         }
     });
 
+
     //Preselect the 1st funnel
     $("#funnel-thumbnails .funnel:first-of-type").trigger("click")
 
-    //Funnel and Metric Intraday tabs
+    //Toggle funnel and Metric Intraday tabs
     $(".funnel-tabs li").on("click", function(){
         if(!$(this).hasClass("uk-active")) {
             $("#custom-funnel-section").toggleClass("hidden")
@@ -39,50 +41,67 @@ $(document).ready(function() {
         }
     })
 
-    //heat-map-cell eventlistener
+
+    //Create funnel table header tooltip displaying the base metrics of the derived metric
+    var path = parsePath(window.location.pathname)
+    var url = "/dashboard/" + path.collection + "/configs"
+    //Add tooltip data to funnel column header
+     /*$.ajax({
+         url: url
+     }).done(function(data){console.log("data",data)}).fail(function() { console.log( "error" )
+     })*/
+
+    //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
+    var data = {"funnels":{"Member_2_Member_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","m2m_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)","m2m_sent":"memberInvitationsSubmitted","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","avg_sent":"RATIO(memberInvitationsSubmitted,memberCreateEvents)","create":"RATIO(memberCreateEvents,memberResultsLandingImpressions)"},"visulizationType":"HEATMAP","name":"Member_2_Member_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","RATIO(memberCreateEvents,memberResultsLandingImpressions)","RATIO(memberInvitationsSubmitted,memberCreateEvents)","memberInvitationsSubmitted"]},"Member_2_Guest_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","m2g_sent":"guestInvitationsSubmitted","avg_sent":"RATIO(guestInvitationsSubmitted,guestCreateEvents)","create":"RATIO(guestCreateEvents,memberResultsLandingImpressions)","m2g_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)"},"visulizationType":"HEATMAP","name":"Member_2_Guest_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","RATIO(guestCreateEvents,memberResultsLandingImpressions)","RATIO(guestInvitationsSubmitted,guestCreateEvents)","guestInvitationsSubmitted"]}},"dimension_groups":[],"collection":"abook"}
+    var metricLabels = $("#custom-funnel-section .metric-label[data-uk-tooltip]")
+    var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
+
+    for(var i = 0, len = metricLabels.length; i < len; i++){
+        var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][i]
+        var metrics = []
+
+        if (baseMetrics.indexOf("RATIO") >= 0) {
+            metrics.push( baseMetrics.substring(6, baseMetrics.length - 1).split(',').join(" ") )
+        }else {
+            metrics.push( baseMetrics )
+        }
+        $(metricLabels[i]).attr("title", metrics )
+    }
+
+    //Display time in selected timezone
+    $(".funnel-table-time").each(function(i, cell){
+            var tz = getTimeZone();
+            var cellObj = $(cell)
+            var currentUTCMillis = path.currentMillis - 86400000 + ($(cell).attr("data-hour") * 3600000);
+            var currentTime =  moment(currentUTCMillis)
+            cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm:ss z'))
+        }
+
+    )
+
+    //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
     $("#custom-funnel-section .heat-map-cell").click(function(){
         var  columnIndex = $(this).parent().children().index($(this));
-        var hour = $("td:first-child", $(this).closest("tr")).html()
-
-        /* $.ajax({
-             url:
-         statusCode: {
-         404: function() {
-             $("#funnel-heat-map-error").empty()
-             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-             warning.append($('<p></p>', { html: 'No metric available' }))
-             $("#funnel-heat-map-error").append(warning)
-         },
-         500: function() {
-             $("#funnel-heat-map-error").empty()
-             var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
-             error.append($('<p></p>', { html: 'Internal server error' }))
-             $("#funnel-heat-map-error").append(error)
-
-
-         }).done(function(data){*/
+        var hour = $("td:first-child", $(this).closest("tr")).attr("data-hour")
 
         //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
-        var data = {"funnels":{"Member_2_Member_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","m2m_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)","m2m_sent":"memberInvitationsSubmitted","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","avg_sent":"RATIO(memberInvitationsSubmitted,memberCreateEvents)","create":"RATIO(memberCreateEvents,memberResultsLandingImpressions)"},"visulizationType":"HEATMAP","name":"Member_2_Member_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","RATIO(memberCreateEvents,memberResultsLandingImpressions)","RATIO(memberInvitationsSubmitted,memberCreateEvents)","memberInvitationsSubmitted"]},"Member_2_Guest_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","m2g_sent":"guestInvitationsSubmitted","avg_sent":"RATIO(guestInvitationsSubmitted,guestCreateEvents)","create":"RATIO(guestCreateEvents,memberResultsLandingImpressions)","m2g_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)"},"visulizationType":"HEATMAP","name":"Member_2_Guest_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","RATIO(guestCreateEvents,memberResultsLandingImpressions)","RATIO(guestInvitationsSubmitted,guestCreateEvents)","guestInvitationsSubmitted"]}},"dimension_groups":[],"collection":"abook"}
 
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
-        var metricratio = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
+        var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
         var metrics = []
-        if(metricratio.indexOf("RATIO") >= 0){
-            var metricNames = (metricratio.substring(6, metricratio.length - 1).split(","))
+        if(baseMetrics.indexOf("RATIO") >= 0){
+            var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
            for(var i = 0, len = metricNames.length; i < len;i++){
                var metric = metricNames[i]
                metrics.push("'" + metric + "'")
            }
         }else{
-            metrics.push("'" + metricratio + "'")
+            metrics.push("'" + baseMetrics + "'")
         }
 
         // Metric function
         var metricFunction = metrics.join(",")
-
         var path = parsePath(window.location.pathname)
-
         var firstindex = path.metricFunction.indexOf("'");
         var lastindex = path.metricFunction.lastIndexOf("'");
         var previousMetricFunction = path.metricFunction
@@ -110,65 +129,45 @@ $(document).ready(function() {
         }
 
         window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
-
-        //}); //end of ajax callback
     })
 
-    //funnel heatmap table header eventlistener
+    //Clicking a cell in the header should fix the related metrics in the query
     $("#custom-funnel-section .metric-label").click(function(){
 
         var  columnIndex = $(this).parent().children().index($(this))
         if(columnIndex > 0){
-            /* $.ajax({
-             url:
-             statusCode: {
-             404: function() {
-             $("#funnel-heat-map-error").empty()
-             var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-             warning.append($('<p></p>', { html: 'No metric available' }))
-             $("#funnel-heat-map-error").append(warning)
-             },
-             500: function() {
-             $("#funnel-heat-map-error").empty()
-             var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
-             error.append($('<p></p>', { html: 'Internal server error' }))
-             $("#funnel-heat-map-error").append(error)
 
-
-             }).done(function(data){*/
-            //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
-            var data = {"funnels":{"Member_2_Member_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","m2m_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)","m2m_sent":"memberInvitationsSubmitted","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","avg_sent":"RATIO(memberInvitationsSubmitted,memberCreateEvents)","create":"RATIO(memberCreateEvents,memberResultsLandingImpressions)"},"visulizationType":"HEATMAP","name":"Member_2_Member_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","RATIO(memberCreateEvents,memberResultsLandingImpressions)","RATIO(memberInvitationsSubmitted,memberCreateEvents)","memberInvitationsSubmitted"]},"Member_2_Guest_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","m2g_sent":"guestInvitationsSubmitted","avg_sent":"RATIO(guestInvitationsSubmitted,guestCreateEvents)","create":"RATIO(guestCreateEvents,memberResultsLandingImpressions)","m2g_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)"},"visulizationType":"HEATMAP","name":"Member_2_Guest_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","RATIO(guestCreateEvents,memberResultsLandingImpressions)","RATIO(guestInvitationsSubmitted,guestCreateEvents)","guestInvitationsSubmitted"]}},"dimension_groups":[],"collection":"abook"}
+            //Find the related metrics
             var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
-            var metricratio = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
+            var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
             var metrics = []
-            if(metricratio.indexOf("RATIO") >= 0){
-                var metricNames = (metricratio.substring(6, metricratio.length - 1).split(","))
+            if(baseMetrics.indexOf("RATIO") >= 0){
+                var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
                 for(var i = 0, len = metricNames.length; i < len;i++){
                     var metric = metricNames[i]
                     metrics.push("'" + metric + "'")
                 }
             }else{
-                metrics.push("'" + metricratio + "'")
+                metrics.push("'" + baseMetrics + "'")
             }
 
-            // Metric function
-            var metricFunction = metrics.join(",")
-
+            //Create metric function
             var path = parsePath(window.location.pathname)
 
             var firstindex = path.metricFunction.indexOf("'");
             var lastindex = path.metricFunction.lastIndexOf("'");
             var previousMetricFunction = path.metricFunction
             var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
-
             path.metricFunction = newMetricFunction
             path.dimensionViewType = "MULTI_TIME_SERIES"
+
             var dashboardPath = getDashboardPath(path)
 
             //Funnels
             var queryParams = getQueryParamValue(window.location.search);
             if (queryParams.funnels) {
                 var funnels = decodeURIComponent(queryParams.funnels).split( ",")
+
                 if (funnels.length > 0) {
                     queryParams["funnels"] = funnels.join();
                 }
@@ -181,11 +180,7 @@ $(document).ready(function() {
                 params.timezone = timezone.split('/').join('-')
             }
             window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
-            //}) //end of ajax callback
-
         }
     })
-
-
 
 });
