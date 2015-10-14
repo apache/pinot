@@ -16,12 +16,16 @@
 package com.linkedin.pinot.common.utils;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
-import java.util.WeakHashMap;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.avro.util.WeakIdentityHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,12 +37,39 @@ import org.slf4j.LoggerFactory;
 public class MmapUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapUtils.class);
   private static final AtomicLong DIRECT_BYTE_BUFFER_USAGE = new AtomicLong(0L);
+  private static final AtomicLong MMAP_BUFFER_USAGE = new AtomicLong(0L);
   private static final long BYTES_IN_MEGABYTE = 1024L * 1024L;
-  private static final Map<ByteBuffer, String> BUFFER_TO_CONTEXT_MAP = Collections.synchronizedMap(new WeakHashMap<>());
+  private static final Map<ByteBuffer, AllocationContext> BUFFER_TO_CONTEXT_MAP =
+      Collections.synchronizedMap(new WeakIdentityHashMap<>());
+
+  private enum AllocationType {
+    MMAP,
+    DIRECT_BYTE_BUFFER
+  }
+
+  private static class AllocationContext {
+    private final String context;
+    private final AllocationType allocationType;
+
+    public AllocationContext(String context, AllocationType allocationType) {
+      this.context = context;
+      this.allocationType = allocationType;
+    }
+
+    public String getContext() {
+      return context;
+    }
+
+    @Override
+    public String toString() {
+      return context;
+    }
+  }
 
   /**
    * Unloads a byte buffer from memory
-   * @param buffer The buffer to unload
+   *
+   * @param buffer The buffer to unload, can be null
    */
   public static void unloadByteBuffer(ByteBuffer buffer) {
     if (null == buffer)
@@ -50,9 +81,7 @@ public class MmapUtils {
 
     // Remove usage from direct byte buffer usage
     final int bufferSize = buffer.capacity();
-    DIRECT_BYTE_BUFFER_USAGE.addAndGet(-bufferSize);
-    LOGGER.info("Releasing byte buffer of size {} with context {}, currently allocated {} MB",
-        bufferSize, BUFFER_TO_CONTEXT_MAP.get(buffer), DIRECT_BYTE_BUFFER_USAGE.get() / BYTES_IN_MEGABYTE);
+    final AllocationContext bufferContext = BUFFER_TO_CONTEXT_MAP.get(buffer);
 
     // A DirectByteBuffer can be cleaned up by doing buffer.cleaner().clean(), but this is not a public API. This is
     // probably not portable between JVMs.
@@ -67,6 +96,28 @@ public class MmapUtils {
       Object cleaner = cleanerMethod.invoke(buffer);
       if (cleaner != null) {
         cleanMethod.invoke(cleaner);
+
+        if (bufferContext != null) {
+          switch (bufferContext.allocationType) {
+            case DIRECT_BYTE_BUFFER:
+              DIRECT_BYTE_BUFFER_USAGE.addAndGet(-bufferSize);
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Releasing byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
+                    bufferContext, getTrackedAllocationStatus());
+              }
+              break;
+            case MMAP:
+              MMAP_BUFFER_USAGE.addAndGet(-bufferSize);
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Unmapping byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
+                    bufferContext, getTrackedAllocationStatus());
+              }
+              break;
+          }
+          BUFFER_TO_CONTEXT_MAP.remove(buffer);
+        } else {
+          LOGGER.warn("Attempted to release byte buffer of size {} with no context", bufferSize);
+        }
       }
     } catch (Exception e) {
       LOGGER.warn("Caught (ignored) exception while unloading byte buffer", e);
@@ -91,13 +142,57 @@ public class MmapUtils {
 
     DIRECT_BYTE_BUFFER_USAGE.addAndGet(capacity);
 
-    LOGGER.info("Allocating byte buffer of size {} with context {}, currently allocated {} MB", capacity,
-        context, DIRECT_BYTE_BUFFER_USAGE.get() / BYTES_IN_MEGABYTE);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Allocating byte buffer of size {} with context {}, allocation after operation {}", capacity, context,
+          getTrackedAllocationStatus());
+    }
 
     final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(capacity);
 
-    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, context);
+    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, new AllocationContext(context, AllocationType.DIRECT_BYTE_BUFFER));
 
     return byteBuffer;
+  }
+
+  /**
+   * Memory maps a file, tracking usage information.
+   *
+   * @param randomAccessFile The random access file to mmap
+   * @param mode The mmap mode
+   * @param position The byte position to mmap
+   * @param size The number of bytes to mmap
+   * @param allocationContext The file that is mmap'ed
+   * @param details Additional details about the allocation
+   */
+  public static MappedByteBuffer mmapFile(RandomAccessFile randomAccessFile, FileChannel.MapMode mode, long position,
+      long size, File allocationContext, String details) throws IOException {
+    String context;
+    if (allocationContext != null) {
+      context = allocationContext.getAbsolutePath() + " (" + details + ")";
+    } else {
+      context = "no file (" + details + ")";
+    }
+
+    MMAP_BUFFER_USAGE.addAndGet(size);
+
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Memory mapping file, mmap size {} with context {}, allocation after operation {}", size, context,
+          getTrackedAllocationStatus());
+    }
+
+    final MappedByteBuffer byteBuffer = randomAccessFile.getChannel().map(mode, position, size);
+
+    BUFFER_TO_CONTEXT_MAP.put(byteBuffer, new AllocationContext(context, AllocationType.MMAP));
+
+    return byteBuffer;
+  }
+
+  private static String getTrackedAllocationStatus() {
+    long directByteBufferUsage = DIRECT_BYTE_BUFFER_USAGE.get();
+    long mmapBufferUsage = MMAP_BUFFER_USAGE.get();
+
+    return "direct " + (directByteBufferUsage / BYTES_IN_MEGABYTE) + " MB, mmap " +
+        (mmapBufferUsage / BYTES_IN_MEGABYTE) + " MB, total " +
+        ((directByteBufferUsage + mmapBufferUsage) / BYTES_IN_MEGABYTE) + " MB";
   }
 }

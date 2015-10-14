@@ -87,14 +87,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
 
     // Check if has star tree
-    List<StarTreeIndexSpec> starTreeIndexSpecList = dataSchema.getStarTreeIndexSpecs();
-    if (starTreeIndexSpecList == null || starTreeIndexSpecList.isEmpty()) {
-      indexCreator = new SegmentColumnarIndexCreator();
-    } else if (starTreeIndexSpecList.size() != 1) {
-      throw new IllegalStateException("Cannot build index with more than one star tree!");
-    } else {
-      indexCreator = new StarTreeSegmentCreator(starTreeIndexSpecList.get(0), recordReader);
+    if (dataSchema.getStarTreeIndexSpec() != null) {
+      indexCreator = new StarTreeSegmentCreator(dataSchema.getStarTreeIndexSpec(), recordReader);
       isStarTree = true;
+    } else {
+      indexCreator = new SegmentColumnarIndexCreator();
     }
 
     // Ensure that the output directory exists

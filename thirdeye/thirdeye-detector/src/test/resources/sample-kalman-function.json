@@ -1,6 +1,6 @@
 {
   "collection": "myCollection",
-  "metric": "impressions",
+  "metric": "myMetric",
   "type": "KALMAN_FILTER",
   "isActive": true,
   "cron": "* 0/5 * * * ?",

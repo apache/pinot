@@ -28,7 +28,10 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  * BDocIdSetOperator as an input for ColumnarReaderDataSource.
  *
  *
+ * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
+ * @see RawColumnarDataSourcePlanNode
  */
+@Deprecated
 public class ColumnarDataSourcePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;

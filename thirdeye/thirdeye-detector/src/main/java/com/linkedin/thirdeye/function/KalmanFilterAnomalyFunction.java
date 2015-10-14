@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.lib.kalman.StateSpaceDataPoint;
 import com.linkedin.thirdeye.lib.util.MetricTimeSeriesUtils;
 import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +134,7 @@ public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
         resultProperties.put("stdError", "" + stateSpaceDataPoint.stdError);
         resultProperties.put("pValue", "" + stateSpaceDataPoint.pValue);
         resultProperties.put("predictedDate", "" + stateSpaceDataPoint.predictedDate);
-        resultProperties.setProperty("timestamp", new DateTime(timeWindow).toString());
+        resultProperties.setProperty("timestamp", new DateTime(timeWindow, DateTimeZone.UTC).toString());
 
         AnomalyResult anomalyResult = new AnomalyResult();
         anomalyResult.setScore(stateSpaceDataPoint.pValue);

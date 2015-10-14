@@ -20,7 +20,7 @@ database:
   driverClass: com.mysql.jdbc.Driver
   user: thirdeye
   password: thirdeye
-  url: 'jdbc:mysql://localhost:3306/thirdeye'
+  url: 'jdbc:mysql://localhost:5705/thirdeye'
   properties:
     charSet: UTF-8
   maxWaitForConnection: 1s
@@ -28,6 +28,8 @@ database:
   validationQueryTimeout: 3s
   minSize: 8
   maxSize: 32
-  checkConnectionWhileIdle: false
+  checkConnectionWhileIdle: true
+  checkConnectionOnReturn: true
+  checkConnectionOnBorrow: true
   evictionInterval: 10s
   minIdleTime: 1 minute

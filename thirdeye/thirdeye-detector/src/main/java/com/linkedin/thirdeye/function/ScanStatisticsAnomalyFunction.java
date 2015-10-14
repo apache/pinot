@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.lib.util.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.lib.util.STLDecomposition;
 import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +30,9 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + TimeUnit.DAYS.toHours(7);
   private static final String PROP_DEFAULT_BOOTSTRAP = "false";
   private static final String PROP_DEFAULT_STL_TREND_BANDWIDTH = "0.5";
-  private static final String PROP_DEFAULT_MONITORING_WINDOW_SIZE = "72";
+  private static final String PROP_DEFAULT_MONITORING_WINDOW_SIZE = "168"; // 1 week in hours
   private static final String PROP_DEFAULT_ONLY_ALERT_BOUNDARIES = "false";
+  private static final String PROP_DEFAULT_DOUBLE_NOT_EQUAL_EPSILON = "0.1";
 
   public static final String SEASONAL = "seasonal";
   public static final String MAX_WINDOW_LENGTH = "maxWindowLength";
@@ -42,6 +44,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   public static final String BOOTSTRAP = "bootstrap";
   public static final String STL_TREND_BANDWIDTH = "stlTrendBandwidth";
   public static final String MONITORING_WINDOW = "monitoringWindow";
+  public static final String NOT_EQUAL_EPSILON = "notEqualEpsilon";
 
   private int seasonal;
   private int maxWindowLength;
@@ -53,6 +56,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   private boolean bootstrap;
   private double stlTrendBandwidth;
   private int monitoringWindow;
+  private double notEqualEpsilon;
 
   @Override
   public void init(AnomalyFunctionSpec spec) throws Exception {
@@ -68,6 +72,7 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     this.bootstrap = Boolean.valueOf(props.getProperty(BOOTSTRAP, PROP_DEFAULT_BOOTSTRAP));
     this.stlTrendBandwidth = Double.valueOf(props.getProperty(STL_TREND_BANDWIDTH, PROP_DEFAULT_STL_TREND_BANDWIDTH));
     this.monitoringWindow = Integer.valueOf(props.getProperty(MONITORING_WINDOW, PROP_DEFAULT_MONITORING_WINDOW_SIZE));
+    this.notEqualEpsilon = Double.valueOf(props.getProperty(NOT_EQUAL_EPSILON, PROP_DEFAULT_DOUBLE_NOT_EQUAL_EPSILON));
   }
 
   @Override
@@ -108,7 +113,9 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
         pValueThreshold,
         pattern,
         minIncrement,
-        bootstrap);
+        bootstrap,
+        notEqualEpsilon);
+    LOGGER.info("Created {}", scanStatistics);
 
     int totalNumBuckets = observationsMinusSeasonality.length;
     int numTrain = totalNumBuckets - monitoringWindow;
@@ -163,20 +170,21 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
       long[] monitoringTimestamps,
       Range<Integer> anomalousInterval,
       double averageValue) {
+    long startTimeUtc = monitoringTimestamps[anomalousInterval.lowerEndpoint()];
+    long endTimeUtc = monitoringTimestamps[anomalousInterval.upperEndpoint() - 1 /* inclusive */];
+
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
     Properties startProperties = new Properties();
-    startProperties.setProperty("anomalyStart", new DateTime(
-        monitoringTimestamps[anomalousInterval.lowerEndpoint()]).toString());
-    startProperties.setProperty("anomalyEnd", new DateTime(
-        monitoringTimestamps[anomalousInterval.upperEndpoint()]).toString());
+    startProperties.setProperty("anomalyStart", new DateTime(startTimeUtc, DateTimeZone.UTC).toString());
+    startProperties.setProperty("anomalyEnd", new DateTime(endTimeUtc, DateTimeZone.UTC).toString());
     startProperties.setProperty("bound", "START");
 
     AnomalyResult startResult = new AnomalyResult();
     startResult.setScore(pValueThreshold); // TODO: is this right?
     startResult.setProperties(AnomalyResult.encodeCompactedProperties(startProperties));
     startResult.setWeight(averageValue);
-    startResult.setStartTimeUtc(monitoringTimestamps[anomalousInterval.lowerEndpoint()]);
-    startResult.setEndTimeUtc(monitoringTimestamps[anomalousInterval.upperEndpoint()]);
+    startResult.setStartTimeUtc(startTimeUtc);
+    startResult.setEndTimeUtc(endTimeUtc);
     startResult.setCollection(getSpec().getCollection());
     startResult.setDimensions(CSV.join(dimensionKey.getDimensionValues()));
     startResult.setFunctionId(getSpec().getId());

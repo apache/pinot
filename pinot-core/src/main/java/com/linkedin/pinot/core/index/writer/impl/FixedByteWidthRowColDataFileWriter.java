@@ -35,6 +35,7 @@ public class FixedByteWidthRowColDataFileWriter {
   private ByteBuffer byteBuffer;
   private RandomAccessFile raf;
   private int rowSizeInBytes;
+  private final boolean ownsByteBuffer;
 
   public FixedByteWidthRowColDataFileWriter(File file, int rows, int cols,
       int[] columnSizes) throws Exception {
@@ -50,8 +51,9 @@ public class FixedByteWidthRowColDataFileWriter {
       rowSizeInBytes += colSize;
     }
     int totalSize = rowSizeInBytes * rows;
-    byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        totalSize);
+    byteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        totalSize, file, this.getClass().getSimpleName() + " byteBuffer");
+    ownsByteBuffer = true;
   }
 
   public FixedByteWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
@@ -66,6 +68,7 @@ public class FixedByteWidthRowColDataFileWriter {
       rowSizeInBytes += colSize;
     }
     this.byteBuffer = byteBuffer;
+    ownsByteBuffer = false;
   }
 
   public boolean open() {
@@ -115,6 +118,8 @@ public class FixedByteWidthRowColDataFileWriter {
   public void close() {
     IOUtils.closeQuietly(raf);
     raf = null;
-    MmapUtils.unloadByteBuffer(byteBuffer);
+    if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+    }
   }
 }

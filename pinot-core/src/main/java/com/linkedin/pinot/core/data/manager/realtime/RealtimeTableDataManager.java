@@ -319,7 +319,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   public void returnSegmentReaders(List<String> segmentList) {
     synchronized (getGlobalLock()) {
       for (String segmentId : segmentList) {
-        decrementCount(segmentId);
+        returnSegmentReader(segmentId);
       }
     }
   }
@@ -331,5 +331,10 @@ public class RealtimeTableDataManager implements TableDataManager {
 
   public Object getGlobalLock() {
     return _globalLock;
+  }
+
+  @Override
+  public void returnSegmentReader(String segmentId) {
+    decrementCount(segmentId);
   }
 }

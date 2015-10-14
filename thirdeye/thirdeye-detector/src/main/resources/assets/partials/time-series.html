@@ -1,4 +1,9 @@
-<div id="time-series-display" ng-controller="TimeSeriesCtrl">
+<div id="time-series-display">
+
+  <div ng-if="!isLoaded">
+    <p>Loading...</p>
+  </div>
+
   <div id="time-series"></div>
   <div id="time-series-legend"></div>
 
@@ -12,7 +17,13 @@
       <dt>function_type</dt>
       <dd>{{anomaly.functionType}}</dd>
       <dt>function_properties</dt>
-      <dd>{{anomaly.functionProperties}}</dd>
+      <dd>
+        <ul>
+          <li ng-repeat="property in anomaly.parsedFunctionProperties">
+            {{property}}
+          </li>
+        </ul>
+      </dd>
       <dt>dimensions</dt>
       <dd>{{anomaly.dimensions}}</dd>
       <dt>score</dt>
@@ -20,7 +31,13 @@
       <dt>weight</dt>
       <dd>{{anomaly.weight}}</dd>
       <dt>properties</dt>
-      <dd>{{anomaly.properties}}</dd>
+      <dd>
+        <ul>
+          <li ng-repeat="property in anomaly.parsedProperties">
+            {{property}}
+          </li>
+        </ul>
+      </dd>
     </dl>
   </div>
 </div>

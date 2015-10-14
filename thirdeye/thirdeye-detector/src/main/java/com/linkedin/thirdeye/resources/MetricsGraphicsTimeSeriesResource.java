@@ -9,8 +9,10 @@ import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricsGraphicsTimeSeries;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
@@ -24,6 +26,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Path("/time-series/metrics-graphics")
 public class MetricsGraphicsTimeSeriesResource {
@@ -49,9 +52,12 @@ public class MetricsGraphicsTimeSeriesResource {
       @QueryParam("bucketSize") String bucketSize,
       @QueryParam("groupBy") String groupBy,
       @QueryParam("topK") @DefaultValue("5") Integer topK,
+      @QueryParam("functionId") Long functionId,
+      @QueryParam("overlay") String overlay,
       @Context UriInfo uriInfo) throws Exception {
     DateTime startTime = parseDateTime(startTimeISO, timeZone);
     DateTime endTime = parseDateTime(endTimeISO, timeZone);
+    Multimap<String, String> fixedValues = extractDimensionValues(uriInfo);
 
     // Get time series data
     ThirdEyeRequest req = new ThirdEyeRequest()
@@ -59,7 +65,7 @@ public class MetricsGraphicsTimeSeriesResource {
         .setMetricFunction(getMetricFunction(metric, bucketSize))
         .setStartTime(startTime)
         .setEndTime(endTime)
-        .setDimensionValues(extractDimensionValues(uriInfo));
+        .setDimensionValues(fixedValues);
 
     if (groupBy != null) {
       req.setGroupBy(groupBy);
@@ -72,45 +78,7 @@ public class MetricsGraphicsTimeSeriesResource {
 
     // Transform result
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
-      MetricTimeSeries timeSeries = entry.getValue();
-      List<Long> sortedTimes = new ArrayList<>(timeSeries.getTimeWindowSet());
-      Collections.sort(sortedTimes);
-
-      Set<Long> timeSet = new HashSet<>();
-      if (sortedTimes.size() > 1) {
-        // Get min difference
-        Long minDiff = null;
-        for (int i = 0; i < sortedTimes.size() - 1; i++) {
-          long diff = sortedTimes.get(i + 1) - sortedTimes.get(i);
-          if (minDiff == null || diff < minDiff) {
-            minDiff = diff;
-          }
-        }
-
-        // Fill in any missing spots with zero
-        for (long time = sortedTimes.get(0); time <= sortedTimes.get(sortedTimes.size() - 1); time += minDiff) {
-          timeSet.add(time);
-        }
-      } else {
-        timeSet.addAll(sortedTimes);
-      }
-
-      // Series
-      List<Map<String, Object>> series = new ArrayList<>(timeSeries.getTimeWindowSet().size());
-      for (Long time : timeSet) {
-        Number value = timeSeries.get(time, metric);
-        if (value == null) {
-          value = 0;
-        }
-        series.add(ImmutableMap.of("time", time, "value", (Object) value));
-
-        // Total volume for top K
-        Double volume = totalVolume.get(entry.getKey());
-        if (volume == null) {
-          volume = 0.0;
-        }
-        totalVolume.put(entry.getKey(), volume + value.doubleValue());
-      }
+      List<Map<String, Object>> series = convertSeries(entry.getKey(), entry.getValue(), metric, totalVolume);
       if (!series.isEmpty()) {
         dataByDimensionKey.put(entry.getKey(), series);
       }
@@ -146,6 +114,52 @@ public class MetricsGraphicsTimeSeriesResource {
       legend.add(CSV.join(dimensionValues));
     }
 
+    // Add overlay
+    if (overlay != null) {
+      if (groupBy != null) {
+        throw new BadRequestException("Cannot specify both overlay and groupBy");
+      }
+
+      // Parse overlay
+      String overlayUnit = overlay.substring(overlay.length() - 1);
+      int overlaySize = Integer.valueOf(overlay.substring(0, overlay.length() - 1));
+
+      // Get overlay
+      DateTime overlayStart;
+      DateTime overlayEnd;
+      if ("d".equals(overlayUnit)) {
+        overlayStart = startTime.minusDays(overlaySize);
+        overlayEnd = endTime.minusDays(overlaySize);
+      } else if ("w".equals(overlayUnit)) {
+        overlayStart = startTime.minusWeeks(overlaySize);
+        overlayEnd = endTime.minusWeeks(overlaySize);
+      } else if ("m".equals(overlayUnit)) {
+        overlayStart = startTime.minusMonths(overlaySize);
+        overlayEnd = endTime.minusMonths(overlaySize);
+      } else if ("y".equals(overlayUnit)) {
+        overlayStart = startTime.minusYears(overlaySize);
+        overlayEnd = endTime.minusYears(overlaySize);
+      } else {
+        throw new BadRequestException("Invalid overlay unit " + overlayUnit);
+      }
+
+      long shiftMillis = endTime.getMillis() - overlayEnd.getMillis();
+
+      ThirdEyeRequest overlayReq = new ThirdEyeRequest()
+          .setCollection(collection)
+          .setMetricFunction(getMetricFunction(metric, bucketSize))
+          .setStartTime(overlayStart)
+          .setEndTime(overlayEnd)
+          .setDimensionValues(fixedValues);
+
+      Map<DimensionKey, MetricTimeSeries> overlayRes = thirdEyeClient.execute(overlayReq);
+      for (Map.Entry<DimensionKey, MetricTimeSeries> entry : overlayRes.entrySet()) {
+        List<Map<String, Object>> overlaySeries = convertSeries(entry.getKey(), entry.getValue(), metric, null);
+        overlaySeries = shiftSeries(overlaySeries, shiftMillis);
+        data.add(overlaySeries);
+      }
+    }
+
     MetricsGraphicsTimeSeries timeSeries = new MetricsGraphicsTimeSeries();
     timeSeries.setTitle(metric + (groupBy == null || "".equals(groupBy) ? "" : " by " + groupBy));
     timeSeries.setDescription(req.toSql());
@@ -154,10 +168,81 @@ public class MetricsGraphicsTimeSeriesResource {
     timeSeries.setyAccessor("value");
 
     // Get any anomalies
-    List<AnomalyResult> anomalies = resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
+    List<AnomalyResult> anomalies;
+    if (functionId == null) {
+      anomalies = resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
+    } else {
+      anomalies = resultDAO.findAllByCollectionTimeFunctionIdAndMetric(collection, metric, functionId, startTime, endTime);
+    }
+
+    StarTreeConfig config = thirdEyeClient.getStarTreeConfig(collection);
+    if (groupBy == null) {
+      // Only show values that match current combination
+      List<AnomalyResult> filtered = new ArrayList<>();
+      for (AnomalyResult anomaly : anomalies) {
+        String[] dimensions = anomaly.getDimensions().split(",");
+
+        boolean matches = true;
+        for (int i = 0; i < config.getDimensions().size(); i++) {
+          DimensionSpec spec = config.getDimensions().get(i);
+          if (!fixedValues.containsKey(spec.getName()) && !"*".equals(dimensions[i])) {
+            matches = false;
+            break;
+          } else if (fixedValues.containsKey(spec.getName()) && !fixedValues.get(spec.getName()).contains(dimensions[i])) {
+            matches = false;
+            break;
+          }
+        }
+
+        if (matches) {
+          filtered.add(anomaly);
+        }
+      }
+      anomalies = filtered;
+    } else {
+      // If there's a group by, only show those for the visible dimension values
+      int idx = -1;
+      for (int i = 0; i < config.getDimensions().size(); i++) {
+        if (config.getDimensions().get(i).getName().equals(groupBy)) {
+          idx = i;
+          break;
+        }
+      }
+
+      // Get the represented values from the time series
+      Set<String> representedValues = new HashSet<>();
+      for (DimensionKey key : sortedAndFilteredKeys) {
+        representedValues.add(key.getDimensionValues()[idx]);
+      }
+
+      // Filter the anomalies
+      List<AnomalyResult> filtered = new ArrayList<>();
+      for (AnomalyResult anomaly : anomalies) {
+        String[] dimensions = anomaly.getDimensions().split(",");
+        if (representedValues.contains(dimensions[idx])) {
+          filtered.add(anomaly);
+        }
+      }
+      anomalies = filtered;
+    }
+
+    // Add the anomaly markers
     List<Map<String, Object>> markers = new ArrayList<>();
     for (AnomalyResult anomaly : anomalies) {
-      markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) anomaly.getId()));
+      if (anomaly.getEndTimeUtc() == null) {
+        // Point
+        if (anomaly.getStartTimeUtc() >= startTime.getMillis() && anomaly.getStartTimeUtc() <= endTime.getMillis()) {
+          markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) anomaly.getId()));
+        }
+      } else {
+        // Interval
+        if (anomaly.getStartTimeUtc() >= startTime.getMillis() && anomaly.getStartTimeUtc() <= endTime.getMillis()) {
+          markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) ("START_" + anomaly.getId())));
+        }
+        if (anomaly.getEndTimeUtc() >= startTime.getMillis() && anomaly.getEndTimeUtc() <= endTime.getMillis()) {
+          markers.add(ImmutableMap.of("time", anomaly.getEndTimeUtc(), "label", (Object) ("END_" + anomaly.getId())));
+        }
+      }
     }
     timeSeries.setMarkers(markers);
     timeSeries.setAnomalyResults(anomalies);
@@ -221,5 +306,58 @@ public class MetricsGraphicsTimeSeriesResource {
       }
     }
     return values;
+  }
+
+  private List<Map<String, Object>> shiftSeries(List<Map<String, Object>> series, long shiftMillis) {
+    List<Map<String, Object>> shifted = new ArrayList<>();
+    for (Map<String, Object> point : series) {
+      shifted.add(ImmutableMap.of("time", (Long) point.get("time") + shiftMillis, "value", point.get("value")));
+    }
+    return shifted;
+  }
+
+  private List<Map<String, Object>> convertSeries(DimensionKey dimensionKey, MetricTimeSeries timeSeries, String metric, Map<DimensionKey, Double> totalVolume) {
+    List<Long> sortedTimes = new ArrayList<>(timeSeries.getTimeWindowSet());
+    Collections.sort(sortedTimes);
+
+    Set<Long> timeSet = new HashSet<>();
+    if (sortedTimes.size() > 1) {
+      // Get min difference
+      Long minDiff = null;
+      for (int i = 0; i < sortedTimes.size() - 1; i++) {
+        long diff = sortedTimes.get(i + 1) - sortedTimes.get(i);
+        if (minDiff == null || diff < minDiff) {
+          minDiff = diff;
+        }
+      }
+
+      // Fill in any missing spots with zero
+      for (long time = sortedTimes.get(0); time <= sortedTimes.get(sortedTimes.size() - 1); time += minDiff) {
+        timeSet.add(time);
+      }
+    } else {
+      timeSet.addAll(sortedTimes);
+    }
+
+    // Series
+    List<Map<String, Object>> series = new ArrayList<>(timeSeries.getTimeWindowSet().size());
+    for (Long time : timeSet) {
+      Number value = timeSeries.get(time, metric);
+      if (value == null) {
+        value = 0;
+      }
+      series.add(ImmutableMap.of("time", time, "value", (Object) value));
+
+      // Total volume for top K
+      if (totalVolume != null) {
+        Double volume = totalVolume.get(dimensionKey);
+        if (volume == null) {
+          volume = 0.0;
+        }
+        totalVolume.put(dimensionKey, volume + value.doubleValue());
+      }
+    }
+
+    return series;
   }
 }

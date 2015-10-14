@@ -132,7 +132,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     indexingThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        // continue indexing until critertia is met
+        // continue indexing until criteria is met
         while (((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next()) && keepIndexing) {
         }
 

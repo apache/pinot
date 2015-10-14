@@ -1,6 +1,6 @@
 {
   "collection": "myCollection",
-  "metric": "impressions",
+  "metric": "myMetric",
   "type": "SCAN_STATISTICS",
   "isActive": true,
   "cron": "* 0/5 * * * ?",
@@ -9,5 +9,5 @@
   "windowDelay": 3,
   "bucketSize": 1,
   "bucketUnit": "HOURS",
-  "properties": "pattern=DOWN"
+  "properties": "pattern=UP;minWindowLength=24;numSimulations=1000;monitoringWindow=72"
 }

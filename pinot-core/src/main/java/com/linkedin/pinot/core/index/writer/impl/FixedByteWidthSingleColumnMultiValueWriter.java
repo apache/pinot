@@ -47,10 +47,10 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
     int dataSize = totalNumValues * columnSizeInBytes;
     int totalSize = headerSize + dataSize;
     raf = new RandomAccessFile(file, "rw");
-    headerBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        headerSize);
-    dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE,
-        headerSize, dataSize);
+    headerBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        headerSize, file, this.getClass().getSimpleName() + " headerBuffer");
+    dataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE,
+        headerSize, dataSize, file, this.getClass().getSimpleName() + " dataBuffer");
     headerWriter = new FixedByteWidthRowColDataFileWriter(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
     headerReader = new FixedByteWidthRowColDataFileReader(headerBuffer,

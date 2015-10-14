@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import java.io.Serializable;
 import com.linkedin.pinot.common.Utils;
 import java.util.List;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * This function will take a column and do sum on that.
  *
  */
-public class CountAggregationFunction implements AggregationFunction<Long, Long> {
+public class CountAggregationFunction implements AggregationFunction<Number, Number> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CountAggregationFunction.class);
 
   public CountAggregationFunction() {
@@ -49,55 +50,56 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public Long aggregate(Block docIdSetBlock, Block[] block) {
-    return (long) ((DocIdSetBlock) docIdSetBlock).getSearchableLength();
+  public MutableLongValue aggregate(Block docIdSetBlock, Block[] block) {
+    return new MutableLongValue(((DocIdSetBlock) docIdSetBlock).getSearchableLength());
   }
 
   @Override
-  public Long aggregate(Long mergedResult, int docId, Block[] block) {
+  public Number aggregate(Number mergedResult, int docId, Block[] block) {
     if (mergedResult == null) {
-      return (long) 1;
+      return new MutableLongValue(1L);
     } else {
-      return (mergedResult + 1);
+      ((MutableLongValue) mergedResult).addToValue(1L);
+      return mergedResult;
     }
   }
 
   @Override
-  public List<Long> combine(List<Long> aggregationResultList, CombineLevel combineLevel) {
+  public List<Number> combine(List<Number> aggregationResultList, CombineLevel combineLevel) {
     long combinedValue = 0;
-    for (Long value : aggregationResultList) {
-      combinedValue += value;
+    for (Number value : aggregationResultList) {
+      combinedValue += value.longValue();
     }
     aggregationResultList.clear();
-    aggregationResultList.add(combinedValue);
+    aggregationResultList.add(new MutableLongValue(combinedValue));
     return aggregationResultList;
   }
 
   @Override
-  public Long combineTwoValues(Long aggregationResult0, Long aggregationResult1) {
+  public Number combineTwoValues(Number aggregationResult0, Number aggregationResult1) {
     if (aggregationResult0 == null) {
       return aggregationResult1;
     }
     if (aggregationResult1 == null) {
       return aggregationResult0;
     }
-    return aggregationResult0 + aggregationResult1;
+    return new MutableLongValue(aggregationResult0.longValue() + aggregationResult1.longValue());
   }
 
   @Override
-  public Long reduce(List<Long> combinedResultList) {
+  public Number reduce(List<Number> combinedResultList) {
     long reducedValue = 0;
-    for (Long value : combinedResultList) {
-      reducedValue += value;
+    for (Number value : combinedResultList) {
+      reducedValue += value.longValue();
     }
-    return reducedValue;
+    return new MutableLongValue(reducedValue);
   }
 
   @Override
-  public JSONObject render(Long reduceResult) {
+  public JSONObject render(Number reduceResult) {
     try {
       if (reduceResult == null) {
-        reduceResult = new Long(0);
+        reduceResult = new MutableLongValue(0L);
       }
       return new JSONObject().put("value", reduceResult.toString());
     } catch (JSONException e) {
@@ -119,7 +121,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public Serializable getDefaultValue() {
-    return Long.valueOf(0);
+    return new MutableLongValue(0L);
   }
 
 }

@@ -29,7 +29,10 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
  * Configure filter query and max size of docId cache here.
  *
  *
+ * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
+ * @see RawDocIdSetPlanNode
  */
+@Deprecated
 public class DocIdSetPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
   private final IndexSegment _indexSegment;
@@ -51,14 +54,15 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
+    int totalRawDocs = _indexSegment.getTotalDocs() - _indexSegment.getSegmentMetadata().getTotalAggregateDocs();
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
       if (_filterNode != null) {
         _projectOp =
-            new BReusableFilteredDocIdSetOperator(_filterNode.run(), _indexSegment.getTotalDocs(),
+            new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs,
                 _maxDocPerAggregation);
       } else {
-        _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), _maxDocPerAggregation);
+        _projectOp = new BReusableFilteredDocIdSetOperator(null, totalRawDocs, _maxDocPerAggregation);
       }
       long end = System.currentTimeMillis();
       LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));

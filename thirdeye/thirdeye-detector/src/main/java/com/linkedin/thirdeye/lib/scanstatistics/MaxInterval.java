@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.lib.scanstatistics;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.Range;
 
 public class MaxInterval {
@@ -21,6 +22,13 @@ public class MaxInterval {
     return _maxLikelihood;
   }
 
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this)
+        .add("_interval", _interval)
+        .add("_maxLikelihood", _maxLikelihood)
+        .toString();
+  }
 }
 
 

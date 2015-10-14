@@ -23,7 +23,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
@@ -42,7 +41,7 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private int[] columnOffsetsInBits;
 
   private int[] offsets;
-  private MappedByteBuffer byteBuffer;
+  private ByteBuffer byteBuffer;
   private RandomAccessFile raf;
   private int rowSizeInBits;
   private int[] colSizesInBits;
@@ -112,14 +111,14 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
     }
     long totalSizeInBits = ((long) rowSizeInBits) * rows;
     // jfim: We keep the number of bytes required as an int, as Java Buffers cannot be larger than 2GB
-    this.bytesRequired = Ints.checkedCast((totalSizeInBits + 7) / 8);
+    this.bytesRequired = (int)((totalSizeInBits + 7) / 8);
   }
 
   private void createBuffer(File file) throws FileNotFoundException,
       IOException {
     raf = new RandomAccessFile(file, "rw");
-    byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        bytesRequired);
+    byteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        bytesRequired, file, this.getClass().getSimpleName() + " byteBuffer");
     byteBuffer.position(0);
     for (int i = 0; i < bytesRequired; i++) {
       byteBuffer.put((byte) 0);

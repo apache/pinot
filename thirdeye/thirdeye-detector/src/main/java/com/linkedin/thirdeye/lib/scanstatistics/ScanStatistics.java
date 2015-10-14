@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.lib.scanstatistics;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.Range;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ public class ScanStatistics {
 	private final boolean _bootstrap;
 	private final double _pValue;
 	private final Pattern _pattern;
+	private final double _notEqualEpsilon;
 
 	/**
 	 * The direction of the hypothesis test
@@ -33,7 +35,12 @@ public class ScanStatistics {
 	}
 
 	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
-	    int minIncrement, boolean bootstrap)  {
+												int minIncrement, boolean bootstrap)  {
+		this(numSimulation, minWindowLength, maxWindowLength, pValue, pattern, minIncrement, bootstrap, 0);
+	}
+
+	public ScanStatistics(int numSimulation, int minWindowLength, int maxWindowLength, double pValue, Pattern pattern,
+	    int minIncrement, boolean bootstrap, double notEqualEpsilon)  {
 		_numSimulation = numSimulation;
 		_minWindowLength = minWindowLength;
 		_maxWindowLength = maxWindowLength;
@@ -41,6 +48,20 @@ public class ScanStatistics {
 		_pValue = pValue;
 		_pattern = pattern;
 		_bootstrap = bootstrap;
+		_notEqualEpsilon = notEqualEpsilon;
+	}
+
+	@Override
+	public String toString() {
+		return MoreObjects.toStringHelper(this)
+				.add("_numSimulation", _numSimulation)
+				.add("_minWindowLength", _minWindowLength)
+				.add("_maxWindowLength", _maxWindowLength)
+				.add("_minIncrement", _minIncrement)
+				.add("_pValue", _pValue)
+				.add("_pattern", _pattern)
+				.add("_bootstrap", _bootstrap)
+				.toString();
 	}
 
 	 /**
@@ -55,13 +76,15 @@ public class ScanStatistics {
     OnlineNormalStatistics trainDataDs = new OnlineNormalStatistics(trainingData);
     NormalDistribution trainDataNormal = new NormalDistribution(trainDataDs.getMean(),
         Math.sqrt(trainDataDs.getPopulationVariance()));
+		LOGGER.info("Training data mean={}, stdev={}", trainDataNormal.getMean(), trainDataNormal.getStandardDeviation());
 
     ScanIntervalIterator scanWindowIterator = new ScanIntervalIterator(
         0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
     MaxInterval realDataInterval = generateMaxLikelihood(scanWindowIterator, trainingData, monitoringData, trainDataDs);
     if (realDataInterval.getInterval() == null) {
-      throw new IllegalStateException("no interval generated");
+			return null;
     }
+		LOGGER.info("Generated realDataInterval {}", realDataInterval);
 
     int numExceeded = 0;
     int exceededCountThreshold = (int) (_pValue * _numSimulation);
@@ -69,7 +92,6 @@ public class ScanStatistics {
     // simulation buffer
     double[] simulationBuffer = new double[monitoringData.length];
     for (int ii = 0; ii < _numSimulation; ii++) {
-      LOGGER.info("started simulation {}", ii);
       if (_bootstrap) {
         simulateBootstrapInPlace(simulationBuffer, trainingData);
       } else {
@@ -81,7 +103,9 @@ public class ScanStatistics {
       MaxInterval simulationResult = generateMaxLikelihood(simulationScanWindowIterator, trainingData, simulationBuffer,
           trainDataDs);
 
-      LOGGER.info("finished simulation {} : {}", ii, simulationResult.getMaxLikelihood());
+			LOGGER.debug("simulation ({}) {} (numExceeded={}) : {}",
+					_bootstrap ? "bootstrap" : "gaussian", ii, numExceeded, simulationResult);
+
       if (simulationResult.getInterval() != null
           && realDataInterval.getMaxLikelihood() < simulationResult.getMaxLikelihood())
       {
@@ -93,7 +117,7 @@ public class ScanStatistics {
       }
     }
 
-    LOGGER.info("real one: {} (percentile {})", realDataInterval.getMaxLikelihood(),
+    LOGGER.info("real data interval: {} (percentile {})", realDataInterval,
         1 - (numExceeded / (double)_numSimulation));
 
     if (numExceeded < exceededCountThreshold) {
@@ -204,7 +228,7 @@ public class ScanStatistics {
 			    break;
 			  }
 			  case NOTEQUAL: {
-			    matchesPattern = equalsDouble(inMean, outMean, 0.001); // TODO : this epsilon is arbitrary
+					matchesPattern = Math.abs(inMean - outMean) > _notEqualEpsilon * outMean;
 			    break;
 			  }
 			}
@@ -217,10 +241,6 @@ public class ScanStatistics {
 
 		MaxInterval maxDataInterval = new MaxInterval(maxValue, maxInterval);
 		return maxDataInterval;
-	}
-
-	private boolean equalsDouble(double d1, double d2, double epsilon) {
-	  return Math.abs(d1 - d2) < epsilon;
 	}
 
 	/**

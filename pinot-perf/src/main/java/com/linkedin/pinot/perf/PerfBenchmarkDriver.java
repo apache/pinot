@@ -282,6 +282,8 @@ public class PerfBenchmarkDriver {
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName,
             numReplicas, segmentAssignmentStrategy).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
+    offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
+    offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
     helixResourceManager.addTable(offlineTableConfig);
   }
 

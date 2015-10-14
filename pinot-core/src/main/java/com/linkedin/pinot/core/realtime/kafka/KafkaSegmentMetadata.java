@@ -89,6 +89,11 @@ public class KafkaSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
+  public int getTotalAggregateDocs() {
+    return 0;
+  }
+
+  @Override
   public String getIndexDir() {
     // TODO Auto-generated method stub
     return null;
@@ -146,4 +151,8 @@ public class KafkaSegmentMetadata implements SegmentMetadata {
     return false;
   }
 
+  @Override
+  public boolean hasStarTree() {
+    return false;
+  }
 }

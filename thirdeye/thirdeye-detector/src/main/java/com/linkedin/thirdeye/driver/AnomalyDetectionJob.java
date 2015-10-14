@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.driver;
 
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.thirdeye.api.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionKey;
@@ -33,11 +35,15 @@ public class AnomalyDetectionJob implements Job {
   public static final String RESULT_DAO = "RESULT_DAO";
   public static final String SESSION_FACTORY = "SESSION_FACTORY";
   public static final String WINDOW_END = "WINDOW_END";
+  public static final String WINDOW_START = "WINDOW_START";
+  public static final String METRIC_REGISTRY = "METRIC_REGISTRY";
 
   private AnomalyFunction anomalyFunction;
   private ThirdEyeClient thirdEyeClient;
   private AnomalyResultDAO resultDAO;
   private SessionFactory sessionFactory;
+  private MetricRegistry metricRegistry;
+  private Histogram histogram;
   private String collection;
   private String metricFunction;
   private DateTime windowStart;
@@ -50,7 +56,16 @@ public class AnomalyDetectionJob implements Job {
     thirdEyeClient = (ThirdEyeClient) context.getJobDetail().getJobDataMap().get(CLIENT);
     resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
     sessionFactory = (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
+    metricRegistry = (MetricRegistry) context.getJobDetail().getJobDataMap().get(METRIC_REGISTRY);
     String windowEndProp = context.getJobDetail().getJobDataMap().getString(WINDOW_END);
+    String windowStartProp = context.getJobDetail().getJobDataMap().getString(WINDOW_START);
+
+    // Get histogram for this job execution time
+    String histogramName = context.getJobDetail().getKey().getName();
+    histogram = metricRegistry.getHistograms().get(histogramName);
+    if (histogram == null) {
+      histogram = metricRegistry.histogram(histogramName);
+    }
 
     // Compute window end
     if (windowEndProp == null) {
@@ -66,10 +81,14 @@ public class AnomalyDetectionJob implements Job {
     }
 
     // Compute window start
-    long windowMillis = TimeUnit.MILLISECONDS.convert(
-        anomalyFunction.getSpec().getWindowSize(),
-        anomalyFunction.getSpec().getWindowUnit());
-    windowStart = windowEnd.minus(windowMillis);
+    if (windowStartProp == null) {
+      long windowMillis = TimeUnit.MILLISECONDS.convert(
+          anomalyFunction.getSpec().getWindowSize(),
+          anomalyFunction.getSpec().getWindowUnit());
+      windowStart = windowEnd.minus(windowMillis);
+    } else {
+      windowStart = ISODateTimeFormat.dateTimeParser().parseDateTime(windowStartProp);
+    }
 
     // Compute metric function
     metricFunction = String.format("AGGREGATE_%d_%s(%s)",
@@ -125,14 +144,22 @@ public class AnomalyDetectionJob implements Job {
     }
 
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
+      if (entry.getValue().getTimeWindowSet().size() < 2) {
+        LOG.warn("Insufficient data for {} to run anomaly detection function", entry.getKey());
+        continue;
+      }
+
       try {
         // Run algorithm
+        long startTime = System.currentTimeMillis();
         List<AnomalyResult> results = anomalyFunction.analyze(
             entry.getKey(),
             entry.getValue(),
             windowStart,
             windowEnd,
             knownAnomalies);
+        long endTime = System.currentTimeMillis();
+        histogram.update(endTime - startTime);
 
         // Handle results
         handleResults(results);

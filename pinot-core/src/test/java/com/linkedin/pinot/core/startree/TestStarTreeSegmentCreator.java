@@ -88,7 +88,7 @@ public class TestStarTreeSegmentCreator {
 //    starTreeIndexSpec.setSplitExcludes(Arrays.asList("D1", "daysSinceEpoch"));
     starTreeIndexSpec.setSplitExcludes(Arrays.asList("daysSinceEpoch"));
     starTreeIndexSpec.setMaxLeafRecords(4);
-    config.getSchema().setStarTreeIndexSpecs(ImmutableList.of(starTreeIndexSpec));
+    config.getSchema().setStarTreeIndexSpec(starTreeIndexSpec);
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);

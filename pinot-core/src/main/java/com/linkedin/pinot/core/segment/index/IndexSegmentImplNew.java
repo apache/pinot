@@ -19,6 +19,7 @@ import java.io.File;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -87,5 +88,11 @@ public class IndexSegmentImplNew implements IndexSegment {
   @Override
   public int getTotalDocs() {
     return segmentMetadata.getTotalDocs();
+  }
+
+  @Override
+  public StarTreeIndexNode getStarTreeRoot() {
+    // TODO: It appears that this class is not used anywhere, so not implementing (gbrandt@linkedin.com)
+    return null;
   }
 }

@@ -19,6 +19,13 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
     return persist(anomalyFunctionSpec).getId();
   }
 
+  public void toggleActive(Long id, boolean isActive) {
+    namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive")
+        .setParameter("id", id)
+        .setParameter("isActive", isActive)
+        .executeUpdate();
+  }
+
   public void delete(Long id) {
     AnomalyFunctionSpec anomalyFunctionSpec = new AnomalyFunctionSpec();
     anomalyFunctionSpec.setId(id);

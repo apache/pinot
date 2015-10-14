@@ -80,13 +80,16 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
     raf = new RandomAccessFile(file, "rw");
     if (isMmap) {
       //mmap chunk offsets 
-      chunkOffsetsBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize);
+      chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize, file,
+          this.getClass().getSimpleName() + " chunkOffsetsBuffer");
       chunkOffsetsReader = new FixedByteWidthRowColDataFileReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT });
       //mmap bitset buffer
-      bitsetBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize);
+      bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize, file,
+          this.getClass().getSimpleName() + " bitsetBuffer");
       customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
       //mmap rawData
-      rawDataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize);
+      rawDataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize, file,
+          this.getClass().getSimpleName() + " rawDataBuffer");
       rawDataReader = new FixedByteWidthRowColDataFileReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });
     } else {
       //chunk offsets
@@ -148,7 +151,7 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
     if (rowOffSetEnd < 0) {
       return totalNumValues - rowOffSetStart;
     }
-    return Ints.checkedCast(rowOffSetEnd - rowOffSetStart);
+    return (int)(rowOffSetEnd - rowOffSetStart);
   }
 
   private int computeStartOffset(int row) {
@@ -158,7 +161,7 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
       return chunkIdOffset;
     }
     long rowOffSetStart = customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
-    return Ints.checkedCast(rowOffSetStart);
+    return (int)(rowOffSetStart);
   }
 
   public void close() throws IOException {

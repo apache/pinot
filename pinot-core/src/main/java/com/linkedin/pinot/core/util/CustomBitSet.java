@@ -80,7 +80,7 @@ public final class CustomBitSet {
       throw new IllegalArgumentException("Negative bitOffset value " + bitOffset);
     }
 
-    final int byteToSet = Ints.checkedCast(bitOffset / 8);
+    final int byteToSet = (int)(bitOffset / 8);
     if (byteToSet > nrBytes) {
       throw new IllegalArgumentException("bitOffset value " + bitOffset + " (byte offset " + byteToSet + ") exceeds buffer capacity of " + nrBytes + " bytes");
     }
@@ -96,12 +96,12 @@ public final class CustomBitSet {
     if (bitOffset < 0) {
       throw new IllegalArgumentException("Negative bitOffset value " + bitOffset);
     }
-    final int byteToSet = Ints.checkedCast(bitOffset / 8);
+    final int byteToSet = (int)(bitOffset / 8);
     if (byteToSet > nrBytes) {
       throw new IllegalArgumentException("bitOffset value " + bitOffset + " (byte offset " + byteToSet + ") exceeds buffer capacity of " + nrBytes + " bytes");
     }
 
-    final int offset = Ints.checkedCast(bitOffset % 8);
+    final int offset = (int)(bitOffset % 8);
     byte b = buf.get(byteToSet);
     b &= ~(1 << (7 - offset));
     buf.put(byteToSet, b);
@@ -113,29 +113,38 @@ public final class CustomBitSet {
    * @return
    */
   public int readInt(long startBitIndex, long endBitIndex) {
-    int bytePosition = Ints.checkedCast(startBitIndex >>> 3);
-    int startBitOffset = Ints.checkedCast(startBitIndex & 7);
-    long sum = startBitOffset + (endBitIndex - startBitIndex);
-    int endBitOffset = Ints.checkedCast((8 - (sum & 7)) & 7);
+    int bitLength = (int) (endBitIndex - startBitIndex);
+    if (bitLength < 16 && endBitIndex + 32 < nrBytes * 8L) {
+      int bytePosition = (int) (startBitIndex / 8);
+      int bitOffset = (int) (startBitIndex % 8);
+      int shiftOffset = 32 - (bitOffset + bitLength);
+      int intValue = buf.getInt(bytePosition);
+      int bitMask = (1 << bitLength) - 1;
+      return (intValue >> shiftOffset) & bitMask;
+    } else {
+      int bytePosition = (int) (startBitIndex >>> 3);
+      int startBitOffset = (int) (startBitIndex & 7);
+      long sum = startBitOffset + bitLength;
+      int endBitOffset = (int) ((8 - (sum & 7)) & 7);
 
-    // int numberOfBytesUsed = (sum >>> 3) + ((sum & 7) != 0 ? 1 : 0);
-    int numberOfBytesUsed = Ints.checkedCast((sum + 7) >>> 3);
-    int i = -1;
+      // int numberOfBytesUsed = (sum >>> 3) + ((sum & 7) != 0 ? 1 : 0);
+      int numberOfBytesUsed = (int) ((sum + 7) >>> 3);
+      int i = -1;
 
-    long number = 0;
-    while (true) {
-      number |= (buf.get(bytePosition)) & 0xFF;
-      i++;
-      bytePosition++;
-      if (i == numberOfBytesUsed - 1) {
-        break;
+      long number = 0;
+      while (true) {
+        number |= (buf.get(bytePosition)) & 0xFF;
+        i++;
+        bytePosition++;
+        if (i == numberOfBytesUsed - 1) {
+          break;
+        }
+        number <<= 8;
       }
-      number <<= 8;
+      number >>= endBitOffset;
+      number &= (0xFFFFFFFF >>> (32 - bitLength));
+      return (int) number;
     }
-    number >>= endBitOffset;
-    number &= (0xFFFFFFFF >>> (32 - (endBitIndex - startBitIndex)));
-    return (int) number;
-
   }
 
   public byte[] toByteArray() {
@@ -164,8 +173,8 @@ public final class CustomBitSet {
   public long findNthBitSetAfter(long startBitIndex, int n) {
     long searchStartBitIndex = startBitIndex + 1;
 
-    int bytePosition = Ints.checkedCast(searchStartBitIndex / 8);
-    int bitPosition = Ints.checkedCast(searchStartBitIndex % 8);
+    int bytePosition = (int)(searchStartBitIndex / 8);
+    int bitPosition = (int)(searchStartBitIndex % 8);
     if (bytePosition >= nrBytes) {
       return -1;
     }
@@ -206,8 +215,8 @@ public final class CustomBitSet {
    * index.
    */
   public long nextSetBit(long index) {
-    int bytePosition = Ints.checkedCast(index / 8);
-    int bitPosition = Ints.checkedCast(index % 8);
+    int bytePosition = (int)(index / 8);
+    int bitPosition = (int)(index % 8);
 
     if (bytePosition >= nrBytes) {
       return -1;
@@ -251,11 +260,11 @@ public final class CustomBitSet {
   }
 
   public boolean isBitSet(long index) {
-    final int byteToCheck = Ints.checkedCast(index >>> 3);
+    final int byteToCheck = (int)(index >>> 3);
     assert (byteToCheck < nrBytes);
     byte b = buf.get(byteToCheck);
     //    System.out.println(Integer.toBinaryString((b & 0xFF) + 0x100).substring(1));
-    final int offset = Ints.checkedCast(7 - index % 8);
+    final int offset = (int)(7 - index % 8);
     return ((b & (1 << offset)) != 0);
   }
 
