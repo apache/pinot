@@ -51,6 +51,10 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
+  @Option(name = "-tenantIsolation", required = false, metaVar = "<String>",
+      usage = "Set this to false if you want to create tenants and allow tenant based isolation")
+  private boolean _tenantIsolation = false;
+
   @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
       usage = "Controller Starter config file",
       forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
@@ -80,13 +84,18 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     return this;
   }
 
-  public StartControllerCommand setClusterName(String clusterName) {
-    _clusterName = clusterName;
+  public StartControllerCommand setTenantIsolation(boolean tenantIsolation) {
+    _tenantIsolation = tenantIsolation;
     return this;
   }
 
   public StartControllerCommand setConfigFileName(String configFileName) {
     _configFileName = configFileName;
+    return this;
+  }
+
+  public StartControllerCommand setClusterName(String clusterName) {
+    _clusterName = clusterName;
     return this;
   }
 
@@ -137,6 +146,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
       conf.setHelixClusterName(_clusterName);
       conf.setControllerVipHost(_controllerHost);
+      conf.setTenantIsolationEnabled(_tenantIsolation);
 
       conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
       conf.setValidationControllerFrequencyInSeconds(3600);
@@ -146,7 +156,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();
-    
+
     String pidFile = ".pinotAdminController-" + String.valueOf(System.currentTimeMillis()) + ".pid";
     savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
     return true;
@@ -191,8 +201,8 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     }
 
     if (conf.getHelixClusterName() == null) {
-      LOGGER
-          .error("Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
+      LOGGER.error(
+          "Error: missing helix cluster name, please specify 'controller.helix.cluster.name' property in config file.");
       return false;
     }
 

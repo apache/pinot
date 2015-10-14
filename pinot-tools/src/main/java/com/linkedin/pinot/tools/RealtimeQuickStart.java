@@ -36,22 +36,23 @@ import kafka.server.KafkaServerStartable;
 public class RealtimeQuickStart {
   private File _quickStartDataDir;
 
-  public void  execute() throws JSONException, Exception {
-      _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
-      String quickStartDataDirName = _quickStartDataDir.getName();
+  public void execute() throws JSONException, Exception {
+    _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+    String quickStartDataDirName = _quickStartDataDir.getName();
 
-      if (!_quickStartDataDir.exists()) {
-        _quickStartDataDir.mkdir();
-      }
+    if (!_quickStartDataDir.exists()) {
+      _quickStartDataDir.mkdir();
+    }
 
     File schema = new File(quickStartDataDirName + "/rsvp_pinot_schema.json");
     File tableCreate = new File(quickStartDataDirName + "/rsvp_create_table_request.json");
 
-    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().
-        getResource("sample_data/rsvp_pinot_schema.json"), schema);
+    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().getResource("sample_data/rsvp_pinot_schema.json"),
+        schema);
 
-    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().
-        getResource("sample_data/rsvp_create_table_request.json"), tableCreate);
+    FileUtils.copyURLToFile(
+        RealtimeQuickStart.class.getClassLoader().getResource("sample_data/rsvp_create_table_request.json"),
+        tableCreate);
 
     printStatus(color.CYAN, "Starting Kafka");
 
@@ -62,9 +63,9 @@ public class RealtimeQuickStart {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR);
-    
+
     File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
-    
+
     QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schema, tableCreate);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
 
@@ -115,8 +116,7 @@ public class RealtimeQuickStart {
     printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q5)));
     printStatus(color.GREEN, "***************************************************");
 
-    printStatus(color.GREEN,
-        "you can always go to http://localhost:9000/query/ to play around in the query console");
+    printStatus(color.GREEN, "you can always go to http://localhost:9000/query/ to play around in the query console");
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
@@ -146,14 +146,14 @@ public class RealtimeQuickStart {
 
   }
 
-    public static void main(String[] args) {
-      RealtimeQuickStart rst = new RealtimeQuickStart();
-      try {
-        rst.execute();
-      } catch (Exception e) {
-        System.out.println(e.getMessage());
-        e.printStackTrace();
-      }
+  public static void main(String[] args) {
+    RealtimeQuickStart rst = new RealtimeQuickStart();
+    try {
+      rst.execute();
+    } catch (Exception e) {
+      System.out.println(e.getMessage());
+      e.printStackTrace();
     }
+  }
 
 }

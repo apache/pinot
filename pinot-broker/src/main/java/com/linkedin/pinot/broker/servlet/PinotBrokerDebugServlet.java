@@ -31,8 +31,9 @@ import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 
 public class PinotBrokerDebugServlet extends HttpServlet {
-  
+  // for serde
   private static final long serialVersionUID = -3516093545255816357L;
+  
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequestServlet.class);
 
   private BrokerRequestHandler broker;

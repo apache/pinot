@@ -23,6 +23,8 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.tools.QuickstartTableRequest;
 
@@ -37,7 +39,7 @@ public class QuickstartRunner {
 
   private static int _zkPort = 2123;
   private final static String _zkAddress = "localhost:" + String.valueOf(_zkPort);
-  
+
   private static int _brokerPort = 7000;
   private static int _serverPort = 8000;
   private static int _controllerPort = 9000;
@@ -58,7 +60,9 @@ public class QuickstartRunner {
   private List<Integer> serverPorts = new ArrayList<>();
   private List<Integer> brokerPorts = new ArrayList<>();
   private List<String> segments = new ArrayList<>();
-  
+  private List<String> dirs = new ArrayList<>();
+  private boolean enableIsolation = true;
+
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
       int numControllers, File tempDir) throws Exception {
     this.tableRequests = tableRequests;
@@ -66,6 +70,17 @@ public class QuickstartRunner {
     this.numBrokers = numBrokers;
     this.numControllers = numControllers;
     this.numServers = numServers;
+    clean();
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
+      int numControllers, File tempDir, boolean enableIsolation) throws Exception {
+    this.tableRequests = tableRequests;
+    this._tempDir = tempDir;
+    this.numBrokers = numBrokers;
+    this.numControllers = numControllers;
+    this.numServers = numServers;
+    this.enableIsolation = enableIsolation;
     clean();
   }
 
@@ -79,7 +94,7 @@ public class QuickstartRunner {
     for (int i = 0; i < numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(_controllerPort)).setZkAddress(_zkAddress)
-          .setClusterName(_clusterName);
+          .setClusterName(_clusterName).setTenantIsolation(enableIsolation);
       controllerStarter.execute();
       controllerPorts.add(new Integer(_controllerPort));
       _controllerPort = _controllerPort + 1;
@@ -103,6 +118,8 @@ public class QuickstartRunner {
           .setDataDir(TMP_DIR + "PinotServerData" + String.valueOf(i))
           .setSegmentDir(TMP_DIR + "PinotServerSegment" + String.valueOf(i));
       serverStarter.execute();
+      dirs.add(TMP_DIR + "PinotServerData" + String.valueOf(i));
+      dirs.add(TMP_DIR + "PinotServerSegment" + String.valueOf(i));
       serverPorts.add(new Integer(_serverPort));
       _serverPort = _serverPort + 1;
     }
@@ -123,6 +140,9 @@ public class QuickstartRunner {
     FileUtils.deleteDirectory(serverDir1);
     FileUtils.deleteDirectory(serverDir2);
     FileUtils.deleteDirectory(_tempDir);
+    for (String dir : dirs) {
+      FileUtils.deleteDirectory(new File(dir));
+    }
   }
 
   public void stop() throws Exception {
@@ -135,6 +155,18 @@ public class QuickstartRunner {
     stopper.execute();
 
     _isStopped = true;
+  }
+
+  public void createServerTenantWith(int numOffline, int numRealtime, String tenantName) throws Exception {
+    AddTenantCommand command = new AddTenantCommand().setControllerUrl("http://localhost:" + controllerPorts.get(0))
+        .setName(tenantName).setOffline(1).setRealtime(1).setInstances(2).setRole(TenantRole.SERVER).setExecute(true);
+    command.execute();
+  }
+
+  public void createBrokerTenantWith(int number, String tenantName) throws Exception {
+    AddTenantCommand command = new AddTenantCommand().setControllerUrl("http://localhost:" + controllerPorts.get(0))
+        .setName(tenantName).setInstances(number).setRole(TenantRole.BROKER).setExecute(true);
+    command.execute();
   }
 
   public void addSchema() throws Exception {
@@ -159,19 +191,21 @@ public class QuickstartRunner {
 
   public void buildSegment() throws Exception {
     for (QuickstartTableRequest request : tableRequests) {
-      CreateSegmentCommand segmentBuilder = new CreateSegmentCommand();
-      File tempDir = new File(_tempDir, request.getTableName() + "_segment");
-      segmentBuilder.setDataDir(request.getDataDir().getAbsolutePath()).setFormat(FileFormat.CSV)
-          .setSchemaFile(request.getSchemaFile().getAbsolutePath()).setTableName(request.getTableName())
-          .setSegmentName(request.getTableName() + "_" + String.valueOf(System.currentTimeMillis()))
-          .setOutputDir(tempDir.getAbsolutePath()).setOverwrite(true);
-      segmentBuilder.execute();
-      segments.add(tempDir.getAbsolutePath());
+      if (request.getTableType() == TableType.OFFLINE) {
+        CreateSegmentCommand segmentBuilder = new CreateSegmentCommand();
+        File tempDir = new File(_tempDir, request.getTableName() + "_segment");
+        segmentBuilder.setDataDir(request.getDataDir().getAbsolutePath()).setFormat(request.getSegmentFileFormat())
+            .setSchemaFile(request.getSchemaFile().getAbsolutePath()).setTableName(request.getTableName())
+            .setSegmentName(request.getTableName() + "_" + String.valueOf(System.currentTimeMillis()))
+            .setOutputDir(tempDir.getAbsolutePath()).setOverwrite(true);
+        segmentBuilder.execute();
+        segments.add(tempDir.getAbsolutePath());
+      }
     }
   }
 
   public void pushSegment() throws Exception {
-    
+
     for (String segmentDir : segments) {
       UploadSegmentCommand segmentUploader = new UploadSegmentCommand();
       segmentUploader.setControllerHost(_localHost).setControllerPort(String.valueOf(--_controllerPort))

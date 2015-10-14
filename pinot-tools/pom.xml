@@ -145,6 +145,18 @@
               </jvmSettings>
             </program>
             <program>
+              <mainClass>com.linkedin.pinot.tools.HybridQuickstart</mainClass>
+              <name>quick-start-hybrid</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=6g</extraArgument>
+                  <extraArgument>-Dlog4j.configuration=conf/quickstart-offline-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
               <mainClass>com.linkedin.pinot.tools.RealtimeQuickStart</mainClass>
               <name>quick-start-realtime</name>
               <jvmSettings>
