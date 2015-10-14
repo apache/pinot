@@ -97,7 +97,7 @@ public class ScanStatistics {
         0, monitoringData.length, _minWindowLength, _maxWindowLength, _minIncrement);
     MaxInterval realDataInterval = generateMaxLikelihood(scanWindowIterator, trainingData, monitoringData, trainDataDs);
     if (realDataInterval.getInterval() == null) {
-      LOGGER.info("no interval generated");
+      //LOGGER.info("no interval generated");
       return null;
     }
 
@@ -107,7 +107,7 @@ public class ScanStatistics {
     // simulation buffer
     double[] simulationBuffer = new double[monitoringData.length];
     for (int ii = 0; ii < _numSimulation; ii++) {
-      LOGGER.info("started simulation {}", ii);
+      //LOGGER.info("started simulation {}", ii);
       if (_bootstrap) {
         simulateBootstrapInPlace(simulationBuffer, trainingData);
       } else {
@@ -119,7 +119,7 @@ public class ScanStatistics {
       MaxInterval simulationResult = generateMaxLikelihood(simulationScanWindowIterator, trainingData, simulationBuffer,
           trainDataDs);
 
-      LOGGER.info("finished simulation {} : {}", ii, simulationResult.getMaxLikelihood());
+      //LOGGER.info("finished simulation {} : {}", ii, simulationResult.getMaxLikelihood());
       if (simulationResult.getInterval() != null
           && realDataInterval.getMaxLikelihood() < simulationResult.getMaxLikelihood())
       {
@@ -131,8 +131,8 @@ public class ScanStatistics {
       }
     }
 
-    LOGGER.info("real one: {} (percentile {})", realDataInterval.getMaxLikelihood(),
-        1 - (numExceeded / (double)_numSimulation));
+    //LOGGER.info("real one: {} (percentile {})", realDataInterval.getMaxLikelihood(),
+    //    1 - (numExceeded / (double)_numSimulation));
 
     if (numExceeded < exceededCountThreshold) {
       return realDataInterval.getInterval();
@@ -245,7 +245,7 @@ public class ScanStatistics {
 			    break;
 			  }
 			  case NOTEQUAL: {
-			    matchesPattern = equalsDouble(inMean, outMean, _notEqualLevel);
+			    matchesPattern = NotEqual(inMean, outMean, _notEqualLevel);
 			    break;
 			  }
 			}
@@ -260,7 +260,7 @@ public class ScanStatistics {
 		return maxDataInterval;
 	}
 
-	private boolean equalsDouble(double d1, double d2, double epsilon) {
+	private boolean NotEqual(double d1, double d2, double epsilon) {
 	  return Math.abs(d1 - d2) >= epsilon * d2;
 	}
 
