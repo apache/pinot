@@ -27,17 +27,18 @@
                         <#list data as row>
                             <tr>
                                 <td class="funnel-table-time" data-hour="${row.hour}"  currentUTC="${funnel.current}" title="baseline date:${funnel.baseline}">${row.hour}</td>
-                                <#list row.ratio as column>
-                                    <#if (column??)>
-                                        <#assign baselineValue = row.baseline[column?index]>
-                                        <#assign currentValue = row.current[column?index]>
+                                <#list 0..(row.numColumns-1) as i>
+                                    <#assign ratioValue = row.ratio[i]>
+                                    <#if (ratioValue??)>
+                                        <#assign baselineValue = row.baseline[i]>
+                                        <#assign currentValue = row.current[i]>
                                         <td
                                                 class="heat-map-cell custom-tooltip"
                                                 data-uk-tooltip
-                                                tooltip="${column}"
-                                                value="${column}"
+                                                tooltip="${ratioValue}"
+                                                value="${ratioValue}"
                                                 title="Baseline Value: ${baselineValue}<br> Current Value: ${currentValue}"
-                                                >${(column * 100)?string["0.0"]}%</td>
+                                                >${(ratioValue * 100)?string["0.0"]}%</td>
                                     <#else>
                                         <td class="not-available">N/A</td>
                                     </#if>
@@ -48,8 +49,8 @@
                 </#macro>
                 
                 <@heatmapTableBody data=funnel.table isCumulative=false/>
-                <!-- Uncomment this once the logic for hiding the unselected values is in place -->
-                <!-- <@heatmapTableBody data=funnel.cumulativeTable isCumulative=true/> -->
+                <#-- Uncomment this once the logic for hiding the unselected values is in place -->
+                <#-- <@heatmapTableBody data=funnel.cumulativeTable isCumulative=true/> -->
             </table>
 
         </div>

@@ -73,31 +73,39 @@
                     </#list>
                 </tr>
             </thead>
-
-            <tbody>
-                <#list metricTable.rows as row>
-                    <tr>
-                        <#-- This renders time in UTC (moment.js used to convert to local) -->
-                        <td class="metric-table-time" title="${row.baselineTime}" currentUTC="${row.currentTime}">${row.currentTime}</td>
-                        <#list 0..(row.numColumns-1) as i>
-                            <#assign groupId = (i % 2)>
-                            <td class="metric-table-group-${groupId}">${row.current[i]?string!"N/A"}</td>
-                            <td class="metric-table-group-${groupId}">${row.baseline[i]?string!"N/A"}</td>
-                                <#if row.ratio[i]??>
-                                    <td class="
-                                        ${(row.ratio[i] < 0)?string('metric-table-down-cell', '')}
-                                        ${(row.ratio[i] == 0)?string('metric-table-same-cell', '')}
-                                        metric-table-group-${groupId}
-                                    ">
-                                    ${(row.ratio[i] * 100)?string["0.00"] + "%"}
-                                    </td>
-                                <#else>
-                                    <td class="metric-table-group-${groupId}">N/A</td>
-                                </#if>
-                        </#list>
-                    </tr>
-                </#list>
-            </tbody>
+            
+            <#macro intradayTableBody data isCumulative>
+                <!-- TODO: Martha - feel free to change the tbody identifier as needed -->
+                <tbody id="${isCumulative?string('test-cumulative','test')}">
+                    <#list data as row>
+                        <tr>
+                            <#-- This renders time in UTC (moment.js used to convert to local) -->
+                            <td class="metric-table-time" title="${row.baselineTime}" currentUTC="${row.currentTime}">${row.currentTime}</td>
+                            <#list 0..(row.numColumns-1) as i>
+                                <#assign groupId = (i % 2)>
+                                <td class="metric-table-group-${groupId}">${row.current[i]?string!"N/A"}</td>
+                                <td class="metric-table-group-${groupId}">${row.baseline[i]?string!"N/A"}</td>
+                                    <#if row.ratio[i]??>
+                                        <td class="
+                                            ${(row.ratio[i] < 0)?string('metric-table-down-cell', '')}
+                                            ${(row.ratio[i] == 0)?string('metric-table-same-cell', '')}
+                                            metric-table-group-${groupId}
+                                        ">
+                                        ${(row.ratio[i] * 100)?string["0.00"] + "%"}
+                                        </td>
+                                    <#else>
+                                        <td class="metric-table-group-${groupId}">N/A</td>
+                                    </#if>
+                            </#list>
+                        </tr>
+                    </#list>
+                </tbody>
+            </#macro>
+            
+            <@intradayTableBody data=metricTable.rows isCumulative=false/>
+            <#-- Uncomment this once the logic for hiding the unselected values is in place -->
+            <#-- <@intradayTableBody data=metricTable.cumulativeRows isCumulative=true/> -->
+            
         </table>
     </#list>
 </div>

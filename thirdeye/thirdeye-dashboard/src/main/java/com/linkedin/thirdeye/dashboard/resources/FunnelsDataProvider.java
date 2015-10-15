@@ -192,11 +192,10 @@ public class FunnelsDataProvider {
         }
         filteredCurrent[i] = currentValue;
 
-        if (baselineValue != null && currentValue != null) {
-          //TODO what to do if either value is null? Treat as 0?
-          cumulativeBaseline[i] = cumulativeBaseline[i].doubleValue() + baselineValue.doubleValue();
-          cumulativeCurrent[i] = cumulativeCurrent[i].doubleValue() + currentValue.doubleValue();
-        }
+        cumulativeBaseline[i] =
+            cumulativeBaseline[i].doubleValue() + (baselineValue == null ? 0.0 : baselineValue.doubleValue());
+        cumulativeCurrent[i] =
+            cumulativeCurrent[i].doubleValue() + (currentValue == null ? 0.0 : currentValue.doubleValue());
       }
 
       FunnelHeatMapRow filteredRow = new FunnelHeatMapRow(row.getHour(), filteredBaseline, filteredCurrent);

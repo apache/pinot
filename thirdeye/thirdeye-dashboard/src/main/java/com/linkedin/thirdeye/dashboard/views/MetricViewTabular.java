@@ -1,19 +1,31 @@
 package com.linkedin.thirdeye.dashboard.views;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.MetricTableRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import io.dropwizard.views.View;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
-import java.util.*;
+import io.dropwizard.views.View;
+
 
 public class MetricViewTabular extends View {
-  private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>() {
+  };
 
   private final CollectionSchema collectionSchema;
   private final ObjectMapper objectMapper;
@@ -24,11 +36,8 @@ public class MetricViewTabular extends View {
   private final Map<String, String> metricAliases;
   private final Map<String, String> dimensionAliases;
 
-  public MetricViewTabular(CollectionSchema collectionSchema,
-                           ObjectMapper objectMapper,
-                           QueryResult result,
-                           long baselineOffsetMillis,
-                           long intraDayPeriod) throws Exception {
+  public MetricViewTabular(CollectionSchema collectionSchema, ObjectMapper objectMapper, QueryResult result,
+      long baselineOffsetMillis, long intraDayPeriod) throws Exception {
     super("metric/intra-day.ftl");
     this.collectionSchema = collectionSchema;
     this.objectMapper = objectMapper;
@@ -89,6 +98,7 @@ public class MetricViewTabular extends View {
 
     for (Map.Entry<String, Map<String, Number[]>> entry : result.getData().entrySet()) {
       List<MetricTableRow> rows = new LinkedList<>();
+      List<MetricTableRow> cumulativeRows = new LinkedList<>();
       List<Long> times = getReverseSortedTimes(entry.getValue().keySet());
 
       long windowFilled = 0;
@@ -110,12 +120,40 @@ public class MetricViewTabular extends View {
         Number[] currentData = entry.getValue().get(String.valueOf(current));
         Number[] baselineData = entry.getValue().get(String.valueOf(baseline));
 
-        rows.add(0, new MetricTableRow(
-            new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineData,
+        rows.add(0, new MetricTableRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineData,
             new DateTime(current).toDateTime(DateTimeZone.UTC), currentData));
       }
 
-      tables.add(new MetricTable(getDimensionValues(entry.getKey()), rows));
+      if (!rows.isEmpty()) {
+
+        int metricCount = result.getMetrics().size();
+        Number[] cumulativeBaselineData = new Number[metricCount];
+        Arrays.fill(cumulativeBaselineData, 0.0);
+        Number[] cumulativeCurrentData = new Number[metricCount];
+        Arrays.fill(cumulativeCurrentData, 0.0);
+
+        for (MetricTableRow row : rows) {
+          Number[] baselineData = row.getBaseline();
+          for (int i = 0; i < baselineData.length; i++) {
+            cumulativeBaselineData[i] = cumulativeBaselineData[i].doubleValue()
+                + (baselineData[i] == null ? 0.0 : baselineData[i].doubleValue());
+          }
+
+          Number[] currentData = row.getCurrent();
+          for (int i = 0; i < currentData.length; i++) {
+            cumulativeCurrentData[i] =
+                cumulativeCurrentData[i].doubleValue() + (currentData[i] == null ? 0.0 : currentData[i].doubleValue());
+          }
+
+          Number[] cumulativeBaselineDataCopy = Arrays.copyOf(cumulativeBaselineData, cumulativeBaselineData.length);
+          Number[] cumulativeCurrentDataCopy = Arrays.copyOf(cumulativeCurrentData, cumulativeCurrentData.length);
+
+          MetricTableRow cumulativeRow = new MetricTableRow(row.getBaselineTime(), cumulativeBaselineDataCopy,
+              row.getCurrentTime(), cumulativeCurrentDataCopy);
+          cumulativeRows.add(cumulativeRow);
+        }
+      }
+      tables.add(new MetricTable(getDimensionValues(entry.getKey()), rows, cumulativeRows));
     }
 
     return tables;
