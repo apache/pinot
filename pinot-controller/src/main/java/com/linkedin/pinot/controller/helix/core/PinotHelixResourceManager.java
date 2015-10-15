@@ -91,8 +91,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * Sep 30, 2014
  */
 public class PinotHelixResourceManager {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
+  private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
 
   private String _zkBaseUrl;
   private String _helixClusterName;
@@ -103,7 +103,7 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
-  private long _externalViewOnlineToOfflineTimeout;
+  private long _externalViewOnlineToOfflineTimeoutMillis = DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS;
   private long _externalViewUpdateRetryInterval = 500L;
   private boolean _isSingleTenantCluster = true;
 
@@ -119,18 +119,18 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
-      String localDiskDir, long externalViewOnlineToOfflineTimeout, boolean isSingleTenantCluster) {
+      String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster) {
     _zkBaseUrl = zkURL;
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _localDiskDir = localDiskDir;
-    _externalViewOnlineToOfflineTimeout = externalViewOnlineToOfflineTimeout;
+    _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
       String localDiskDir) {
-    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, 10000L, false);
+    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -147,7 +147,6 @@ public class PinotHelixResourceManager {
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
-    _externalViewOnlineToOfflineTimeout = 10000L;
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
 
@@ -1281,10 +1280,11 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout, false)) {
+    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE",
+        _externalViewOnlineToOfflineTimeoutMillis, false)) {
       LOGGER.error(
           "External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
-          segmentName, _externalViewOnlineToOfflineTimeout);
+          segmentName, _externalViewOnlineToOfflineTimeoutMillis);
       return false;
     }
 
