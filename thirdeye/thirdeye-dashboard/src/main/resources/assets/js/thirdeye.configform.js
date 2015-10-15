@@ -175,6 +175,14 @@ $(document).ready(function() {
                 }
             }
         }
+
+        //On funnel heatmap preselect WoW
+        var path = parsePath(window.location.pathname)
+        if(path.dimensionViewType == "TABULAR"){
+            $("#moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
+            $("#moving-average-size").val("7")
+            $("#time-input-form-moving-average span").html($("#moving-average-size option[value='7']").html())
+        }
     }
 
     //Current query display ALL when no fixed element in the query

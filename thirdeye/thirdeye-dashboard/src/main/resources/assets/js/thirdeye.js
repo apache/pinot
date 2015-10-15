@@ -212,7 +212,6 @@ function renderFunnel(container, options) {
     path.currentMillis = endMillis
 
     var url = getFlotPath(path, options)
-
     if (window.location.search) {
         url += window.location.search
         if (options.dimension) {
@@ -309,7 +308,6 @@ function renderTimeSeries(container, tooltip, options) {
 
     var path = parsePath(window.location.pathname)
     var url = getFlotPath(path, options)
-
     if (!options) {
         options = {}
     }

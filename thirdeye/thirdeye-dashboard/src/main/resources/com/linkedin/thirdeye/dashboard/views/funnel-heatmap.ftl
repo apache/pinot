@@ -24,7 +24,7 @@
                     <tbody>
                     <#list funnel.table as row>
                         <tr>
-                            <td class="funnel-table-time" data-hour="${row.hour}"  currentUTC="${funnel.current}">${row.hour}</td>
+                            <td class="funnel-table-time" data-hour="${row.hour}"  currentUTC="${funnel.current}" title="baseline date:${funnel.baseline}">${row.hour}</td>
                             <#list row.ratio as column>
                                 <#if (column??)>
                                     <#assign baselineValue = row.baseline[column?index]>

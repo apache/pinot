@@ -57,7 +57,6 @@
                         <#include "dimension/multi-time-series.ftl">
                     <#elseif (dimensionView.type == "TABULAR")>
                         <div id="dashboard-funnels-view">
-
                             <#include "funnel-heatmap.ftl">
                         </div>
                         <#include "metric/intra-day.ftl">

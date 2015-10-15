@@ -599,7 +599,7 @@ td[dimension-val] {
 
 .time-series-legend {
     overflow: hidden;
-    margin-top: 30px;
+    margin-bottom: 15px;
 }
 
 .up {

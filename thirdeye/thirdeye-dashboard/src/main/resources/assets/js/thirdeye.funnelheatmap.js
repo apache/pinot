@@ -1,6 +1,6 @@
 $(document).ready(function() {
 
-    //When a funnel thumbnail is clicked display it's content in the main funnel display section
+    //Click on a funnel thumbnail will display it's content in the main funnel display section
     $("#funnel-thumbnails .funnel").click(function(){
 
         //Draw the selected thumbnail table and title in the main section
@@ -38,6 +38,48 @@ $(document).ready(function() {
             $("#metric-table-area").toggleClass("hidden")
             $("#intra-day-buttons").toggleClass("hidden")
             $("#intra-day-table").toggleClass("hidden")
+            if($(this).text().trim() == "Details"){
+                $("#moving-average-size").html(
+                    '<option class="uk-button" unit="WoW" value="">None</option>'+
+                    '<option class="uk-button" unit="WoW" value="7">WoW</option>' +
+                    '<option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>' +
+                    '<option class="uk-button" unit="Wo4W" value="28">Wo4W</option>')
+                    var path = parsePath(window.location.pathname)
+                    var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
+                    if (typeof(firstArg) === 'object') {
+
+                        var firstArg = metricFunctionObj.args[0]
+                        if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
+                            metricFunctionObj = firstArg
+                            var tokens = metricFunctionObj.name.split("_")
+
+                            if ($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
+                                $("#moving-average-size").val(tokens[tokens.length - 2])
+                                $("#time-input-form-moving-average span").html($("#moving-average-size option)[value='" + tokens[tokens.length - 2] + "']").html())
+                            }
+                        }
+                    }else{
+                        $("#time-input-form-moving-average span").html("None")
+                    }
+                     // May have applied moving average as well
+                     var firstArg = metricFunctionObj.args[0]
+                     if (typeof(firstArg) === 'object') {
+                         if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
+                             metricFunctionObj = firstArg
+                             var tokens = metricFunctionObj.name.split("_")
+
+                             if ($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
+                                 $("#moving-average-size").val(tokens[tokens.length - 2])
+                                 $("#time-input-form-moving-average span").html($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
+                             }
+                         }
+                     }
+
+            }else{
+                 $("#moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
+                 $("#moving-average-size").val("7")
+                 $("#time-input-form-moving-average span").html($("#moving-average-size option[value='7']").html())
+            }
         }
     })
 
@@ -73,19 +115,30 @@ $(document).ready(function() {
             var tz = getTimeZone();
             var cellObj = $(cell)
             var currentUTCMillis = path.currentMillis - 86400000 + ($(cell).attr("data-hour") * 3600000);
-            var currentTime =  moment(currentUTCMillis)
-            cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm:ss z'))
+            //Currently there is a default 7 days moving average applied to the funnel heatmap data
+            var baselineUTCMillis = path.currentMillis - (1 + 7) * 86400000 + ($(cell).attr("data-hour") * 3600000);
+            var currentDateTime =  moment(currentUTCMillis)
+            var baselineDateTime =  moment(baselineUTCMillis)
+            cellObj.html(currentDateTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+            cellObj.attr("title", "baseline:" + baselineDateTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
         }
 
     )
+    // Click on time cell changes current value to that time
+    $(".funnel-table-time").click(function(){
+        var path = parsePath(window.location.pathname)
+        var baselineDiff = path.currentMillis - path.baselineMillis
+        var currentMillis = path.currentMillis - 86400000 + ($(this).attr("data-hour") * 3600000);
+        path.currentMillis = currentMillis
+        path.baselineMillis = currentMillis - baselineDiff
+        window.location.pathname = getDashboardPath(path)
+
+    })
 
     //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
     $("#custom-funnel-section .heat-map-cell").click(function(){
         var  columnIndex = $(this).parent().children().index($(this));
         var hour = $("td:first-child", $(this).closest("tr")).attr("data-hour")
-
-        //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
-
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
         var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
         var metrics = []

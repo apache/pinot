@@ -5,7 +5,6 @@ $(document).ready(function() {
     $("#dimension-time-series-area").find('.dimension-time-series-placeholder').each(function(i, container) {
 
         var containerObj = $(container)
-
         var dimension = containerObj.attr('dimension')
         containers[dimension] = {
             plot: containerObj
@@ -53,33 +52,34 @@ $(document).ready(function() {
                 } else if (!b.data[0] && a.data[0]) {
                     return -1
                 }
-
                 return b.data[0][1] - a.data[0][1]
             })
 
             return data.slice(0, 4)
         },
         click: function(event, pos, item) {
-            // Parse item.series.dimensions
-            var seriesDimensions = JSON.parse(item.series.dimensions)
+            if(item){
+                // Parse item.series.dimensions
+                var seriesDimensions = JSON.parse(item.series.dimensions)
 
-            // Parse item.series.dimensionNames
-            var dimensionNames = JSON.parse(item.series.dimensionNames)
+                // Parse item.series.dimensionNames
+                var dimensionNames = JSON.parse(item.series.dimensionNames)
 
-            // Parse dimensionValues from uri
-            var dimensionValues = parseDimensionValues(window.location.search)
+                // Parse dimensionValues from uri
+                var dimensionValues = parseDimensionValues(window.location.search)
 
-            // Set all non-star values in URI
-            $.each(dimensionNames, function(i, name) {
-                var value = seriesDimensions[i]
-                if (value && value != "*") {
-                    dimensionValues[name] = value
-                }
-            })
+                // Set all non-star values in URI
+                $.each(dimensionNames, function(i, name) {
+                    var value = seriesDimensions[i]
+                    if (value && value != "*") {
+                        dimensionValues[name] = value
+                    }
+                })
 
-            // Change window location
-            var newQuery = encodeDimensionValues(dimensionValues)
-            window.location.search = newQuery
+                // Change window location
+                var newQuery = encodeDimensionValues(dimensionValues)
+                window.location.search = newQuery
+            }
         },
         aggregateMillis: aggregateMillis
     }
@@ -100,6 +100,4 @@ $(document).ready(function() {
     }
 
     plotAllSeries()
-
-
 })

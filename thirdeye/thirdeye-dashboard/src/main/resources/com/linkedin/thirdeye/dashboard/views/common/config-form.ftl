@@ -94,16 +94,6 @@
                 </div>
             </div>
 
-            <#--<#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
-                <div class="uk-display-inline-block">
-                    <div class="uk-button-group" data-uk-button-radio>
-                        <button type="button" class="moving-average-size uk-button" unit="WoW" value="7">WoW</button>
-                        <button type="button" class="moving-average-size uk-button" unit="Wo2W" value="14" >Wo2W</button>
-                        <button type="button" class="moving-average-size uk-button" unit="Wo4W" value="28">Wo4W</button>
-                    </div>
-                </div>
-            </#if>-->
-
             <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
             <div id="time-input-form-moving-average" class="uk-form-label" style="display: inline-block">Overlay<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>

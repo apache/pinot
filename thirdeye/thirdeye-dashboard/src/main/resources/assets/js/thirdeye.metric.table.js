@@ -25,10 +25,10 @@ $(document).ready(function() {
         var cellObj = $(cell)
         var currentTime = moment(cellObj.html())
         var baselineTime = moment(cellObj.attr('title'))
-        cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm:ss z'))
-        cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm:ss z'))
+        cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+        cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
 
-        // Click changes current value to that time
+        // Click on time cell changes current value to that time
         cellObj.click(function() {
           var currentUTC = $(this).attr('currentUTC')
           var dateTime = moment.utc(currentUTC)
