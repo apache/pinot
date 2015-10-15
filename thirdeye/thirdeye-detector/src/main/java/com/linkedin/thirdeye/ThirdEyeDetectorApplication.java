@@ -138,7 +138,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
             List<AnomalyFunctionSpec> functions;
             functions = anomalyFunctionSpecDAO.findAll();
             for (AnomalyFunctionSpec function : functions) {
-              if (function.isActive()) {
+              if (function.getIsActive()) {
                 jobManager.start(function.getId());
                 LOG.info("Starting {}", function);
               }

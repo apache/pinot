@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
         query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
     @NamedQuery(
         name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive",
-        query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"
+        query = "UPDATE AnomalyFunctionSpec set getIsActive = :getIsActive WHERE id = :id"
     )
 })
 public class AnomalyFunctionSpec {
@@ -102,7 +102,7 @@ public class AnomalyFunctionSpec {
     this.type = type;
   }
 
-  public boolean isActive() {
+  public boolean getIsActive() {
     return isActive;
   }
 
@@ -184,7 +184,7 @@ public class AnomalyFunctionSpec {
         && Objects.equals(collection, af.getCollection())
         && Objects.equals(metric, af.getMetric())
         && Objects.equals(type, af.getType())
-        && Objects.equals(isActive, af.isActive())
+        && Objects.equals(isActive, af.getIsActive())
         && Objects.equals(cron, af.getCron())
         && Objects.equals(properties, af.getProperties())
         && Objects.equals(bucketSize, af.getBucketSize())

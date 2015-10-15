@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.api;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.MoreObjects;
 import org.hibernate.validator.constraints.Email;
 
@@ -178,7 +179,7 @@ public class EmailConfiguration {
     this.windowUnit = windowUnit;
   }
 
-  public boolean isActive() {
+  public boolean getIsActive() {
     return isActive;
   }
 
