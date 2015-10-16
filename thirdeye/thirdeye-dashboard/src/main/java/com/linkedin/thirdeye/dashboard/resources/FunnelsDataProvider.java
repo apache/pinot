@@ -11,6 +11,7 @@ import java.util.concurrent.Future;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,9 +140,9 @@ public class FunnelsDataProvider {
       // Get values for this time
       Number[] baselineValues = baselineData.get(baselineCursor.getMillis());
       Number[] currentValues = currentData.get(currentCursor.getMillis());
-      long hourOfDay = currentCursor.getHourOfDay(); // same as baseline
 
-      FunnelHeatMapRow row = new FunnelHeatMapRow(hourOfDay, baselineValues, currentValues);
+      FunnelHeatMapRow row = new FunnelHeatMapRow(new DateTime(baselineCursor).toDateTime(DateTimeZone.UTC),
+          baselineValues, new DateTime(currentCursor).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(row);
 
       // Increment
@@ -198,14 +199,15 @@ public class FunnelsDataProvider {
             cumulativeCurrent[i].doubleValue() + (currentValue == null ? 0.0 : currentValue.doubleValue());
       }
 
-      FunnelHeatMapRow filteredRow = new FunnelHeatMapRow(row.getHour(), filteredBaseline, filteredCurrent);
+      FunnelHeatMapRow filteredRow =
+          new FunnelHeatMapRow(row.getBaselineTime(), filteredBaseline, row.getCurrentTime(), filteredCurrent);
       filteredTable.add(filteredRow);
 
       Number[] cumulativeBaselineCopy = Arrays.copyOf(cumulativeBaseline, cumulativeBaseline.length);
       Number[] cumulativeCurrentCopy = Arrays.copyOf(cumulativeCurrent, cumulativeCurrent.length);
 
-      FunnelHeatMapRow cumulativeFilteredRow =
-          new FunnelHeatMapRow(row.getHour(), cumulativeBaselineCopy, cumulativeCurrentCopy);
+      FunnelHeatMapRow cumulativeFilteredRow = new FunnelHeatMapRow(row.getBaselineTime(), cumulativeBaselineCopy,
+          row.getCurrentTime(), cumulativeCurrentCopy);
       filteredCumulativeTable.add(cumulativeFilteredRow);
     }
     return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentEnd, baselineEnd);

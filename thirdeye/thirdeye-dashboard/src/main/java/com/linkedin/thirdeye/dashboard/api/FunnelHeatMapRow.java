@@ -1,21 +1,27 @@
 package com.linkedin.thirdeye.dashboard.api;
 
+import org.joda.time.DateTime;
+
+
 public class FunnelHeatMapRow {
-  private final long hour;
+  //TODO this is now identical to MetricTableRow - Does it make sense for the two entities to remain separate or should they be merged and renamed?
+  private final DateTime baselineTime;
   private final Number[] baseline;
+  private final DateTime currentTime;
   private final Number[] current;
   private final Number[] ratio;
 
-  public FunnelHeatMapRow(long hour, Number[] baseline, Number[] current) {
-    this.hour = hour;
+  public FunnelHeatMapRow(DateTime baselineTime, Number[] baseline, DateTime currentTime, Number[] current) {
+    this.baselineTime = baselineTime;
     this.baseline = baseline;
+    this.currentTime = currentTime;
     this.current = current;
 
     if (baseline == null || current == null) {
       this.ratio = null;
     } else {
-      this.ratio = new Number[baseline.length];
-      for (int i = 0; i < baseline.length; i++) {
+      this.ratio = new Number[current.length];
+      for (int i = 0; i < current.length; i++) {
         if (baseline[i] == null || baseline[i].doubleValue() == 0.0) {
           ratio[i] = null;
         } else if (current[i] == null) {
@@ -31,8 +37,12 @@ public class FunnelHeatMapRow {
     return current.length;
   }
 
-  public long getHour() {
-    return hour;
+  public DateTime getBaselineTime() {
+    return baselineTime;
+  }
+
+  public DateTime getCurrentTime() {
+    return currentTime;
   }
 
   public Number[] getBaseline() {

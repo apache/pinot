@@ -26,7 +26,8 @@
                     <tbody class="${isCumulative?string('cumulative-values hidden', 'hourly-values')}">
                         <#list data as row>
                             <tr>
-                                <td class="funnel-table-time" data-hour="${row.hour}"  currentUTC="${funnel.current}" title="baseline date:${funnel.baseline}">${isCumulative?string("cumm","no cum")} ${row.hour}</td>
+                                <#-- TODO do we need the {isCumulative?string("cumm","no cum")}? It's being overwritten on the page via js. -->
+                                <td class="funnel-table-time" currentUTC="${row.currentTime}" title="${row.baselineTime}">${isCumulative?string("cumm","no cum")} ${row.currentTime}</td>
                                 <#list 0..(row.numColumns-1) as i>
                                     <#if (row.ratio[i]??)>
                                         <#assign ratioValue = row.ratio[i]>
