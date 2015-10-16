@@ -6,11 +6,11 @@ import java.util.Map;
 
 public class MetricTable {
   private final Map<String, String> dimensionValues;
-  private final List<MetricTableRow> rows;
-  private final List<MetricTableRow> cumulativeRows;
+  private final List<MetricDataRow> rows;
+  private final List<MetricDataRow> cumulativeRows;
 
-  public MetricTable(Map<String, String> dimensionValues, List<MetricTableRow> rows,
-      List<MetricTableRow> cumulativeRows) {
+  public MetricTable(Map<String, String> dimensionValues, List<MetricDataRow> rows,
+      List<MetricDataRow> cumulativeRows) {
     this.dimensionValues = dimensionValues;
     this.rows = rows;
     this.cumulativeRows = cumulativeRows;
@@ -20,11 +20,11 @@ public class MetricTable {
     return dimensionValues;
   }
 
-  public List<MetricTableRow> getRows() {
+  public List<MetricDataRow> getRows() {
     return rows;
   }
 
-  public List<MetricTableRow> getCumulativeRows() {
+  public List<MetricDataRow> getCumulativeRows() {
     return cumulativeRows;
   }
 }

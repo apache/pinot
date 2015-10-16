@@ -17,7 +17,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
-import com.linkedin.thirdeye.dashboard.api.MetricTableRow;
+import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 
 import io.dropwizard.views.View;
@@ -97,8 +97,8 @@ public class MetricViewTabular extends View {
     List<MetricTable> tables = new ArrayList<>();
 
     for (Map.Entry<String, Map<String, Number[]>> entry : result.getData().entrySet()) {
-      List<MetricTableRow> rows = new LinkedList<>();
-      List<MetricTableRow> cumulativeRows = new LinkedList<>();
+      List<MetricDataRow> rows = new LinkedList<>();
+      List<MetricDataRow> cumulativeRows = new LinkedList<>();
       List<Long> times = getReverseSortedTimes(entry.getValue().keySet());
 
       long windowFilled = 0;
@@ -120,7 +120,7 @@ public class MetricViewTabular extends View {
         Number[] currentData = entry.getValue().get(String.valueOf(current));
         Number[] baselineData = entry.getValue().get(String.valueOf(baseline));
 
-        rows.add(0, new MetricTableRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineData,
+        rows.add(0, new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineData,
             new DateTime(current).toDateTime(DateTimeZone.UTC), currentData));
       }
 
@@ -132,7 +132,7 @@ public class MetricViewTabular extends View {
         Number[] cumulativeCurrentData = new Number[metricCount];
         Arrays.fill(cumulativeCurrentData, 0.0);
 
-        for (MetricTableRow row : rows) {
+        for (MetricDataRow row : rows) {
           Number[] baselineData = row.getBaseline();
           for (int i = 0; i < baselineData.length; i++) {
             cumulativeBaselineData[i] = cumulativeBaselineData[i].doubleValue()
@@ -148,7 +148,7 @@ public class MetricViewTabular extends View {
           Number[] cumulativeBaselineDataCopy = Arrays.copyOf(cumulativeBaselineData, cumulativeBaselineData.length);
           Number[] cumulativeCurrentDataCopy = Arrays.copyOf(cumulativeCurrentData, cumulativeCurrentData.length);
 
-          MetricTableRow cumulativeRow = new MetricTableRow(row.getBaselineTime(), cumulativeBaselineDataCopy,
+          MetricDataRow cumulativeRow = new MetricDataRow(row.getBaselineTime(), cumulativeBaselineDataCopy,
               row.getCurrentTime(), cumulativeCurrentDataCopy);
           cumulativeRows.add(cumulativeRow);
         }

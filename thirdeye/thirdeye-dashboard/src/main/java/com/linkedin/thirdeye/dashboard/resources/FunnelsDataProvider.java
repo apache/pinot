@@ -21,7 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
-import com.linkedin.thirdeye.dashboard.api.FunnelHeatMapRow;
+import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.api.funnel.CustomFunnelSpec;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
@@ -133,7 +133,7 @@ public class FunnelsDataProvider {
     Map<Long, Number[]> currentData = CustomDashboardResource.extractFunnelData(currentResult.get());
 
     // Compose result
-    List<FunnelHeatMapRow> table = new ArrayList<FunnelHeatMapRow>();
+    List<MetricDataRow> table = new ArrayList<MetricDataRow>();
     DateTime currentCursor = new DateTime(currentStart.getMillis());
     DateTime baselineCursor = new DateTime(baselineStart.getMillis());
     while (currentCursor.compareTo(currentEnd) < 0 && baselineCursor.compareTo(baselineEnd) < 0) {
@@ -141,8 +141,8 @@ public class FunnelsDataProvider {
       Number[] baselineValues = baselineData.get(baselineCursor.getMillis());
       Number[] currentValues = currentData.get(currentCursor.getMillis());
 
-      FunnelHeatMapRow row = new FunnelHeatMapRow(new DateTime(baselineCursor).toDateTime(DateTimeZone.UTC),
-          baselineValues, new DateTime(currentCursor).toDateTime(DateTimeZone.UTC), currentValues);
+      MetricDataRow row = new MetricDataRow(new DateTime(baselineCursor).toDateTime(DateTimeZone.UTC), baselineValues,
+          new DateTime(currentCursor).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(row);
 
       // Increment
@@ -158,15 +158,15 @@ public class FunnelsDataProvider {
     }
 
     // Filter (since query result set will contain primitive metrics for each derived one)
-    List<FunnelHeatMapRow> filteredTable = new ArrayList<>();
+    List<MetricDataRow> filteredTable = new ArrayList<>();
     int metricCount = spec.getActualMetricNames().size();
-    List<FunnelHeatMapRow> filteredCumulativeTable = new ArrayList<>();
+    List<MetricDataRow> filteredCumulativeTable = new ArrayList<>();
     Number[] cumulativeBaseline = new Number[metricCount];
     Arrays.fill(cumulativeBaseline, 0.0);
     Number[] cumulativeCurrent = new Number[metricCount];
     Arrays.fill(cumulativeCurrent, 0.0);
 
-    for (FunnelHeatMapRow row : table) {
+    for (MetricDataRow row : table) {
       Number[] filteredBaseline = new Number[metricCount];
       Number[] filteredCurrent = new Number[metricCount];
       for (int i = 0; i < metricCount; i++) {
@@ -199,15 +199,15 @@ public class FunnelsDataProvider {
             cumulativeCurrent[i].doubleValue() + (currentValue == null ? 0.0 : currentValue.doubleValue());
       }
 
-      FunnelHeatMapRow filteredRow =
-          new FunnelHeatMapRow(row.getBaselineTime(), filteredBaseline, row.getCurrentTime(), filteredCurrent);
+      MetricDataRow filteredRow =
+          new MetricDataRow(row.getBaselineTime(), filteredBaseline, row.getCurrentTime(), filteredCurrent);
       filteredTable.add(filteredRow);
 
       Number[] cumulativeBaselineCopy = Arrays.copyOf(cumulativeBaseline, cumulativeBaseline.length);
       Number[] cumulativeCurrentCopy = Arrays.copyOf(cumulativeCurrent, cumulativeCurrent.length);
 
-      FunnelHeatMapRow cumulativeFilteredRow = new FunnelHeatMapRow(row.getBaselineTime(), cumulativeBaselineCopy,
-          row.getCurrentTime(), cumulativeCurrentCopy);
+      MetricDataRow cumulativeFilteredRow =
+          new MetricDataRow(row.getBaselineTime(), cumulativeBaselineCopy, row.getCurrentTime(), cumulativeCurrentCopy);
       filteredCumulativeTable.add(cumulativeFilteredRow);
     }
     return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentEnd, baselineEnd);

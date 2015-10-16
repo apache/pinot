@@ -26,8 +26,7 @@
                     <tbody class="${isCumulative?string('cumulative-values hidden', 'hourly-values')}">
                         <#list data as row>
                             <tr>
-                                <#-- TODO do we need the {isCumulative?string("cumm","no cum")}? It's being overwritten on the page via js. -->
-                                <td class="funnel-table-time" currentUTC="${row.currentTime}" title="${row.baselineTime}">${isCumulative?string("cumm","no cum")} ${row.currentTime}</td>
+                                <td class="funnel-table-time" currentUTC="${row.currentTime}" title="${row.baselineTime}">${row.currentTime}</td>
                                 <#list 0..(row.numColumns-1) as i>
                                     <#if (row.ratio[i]??)>
                                         <#assign ratioValue = row.ratio[i]>
@@ -37,7 +36,7 @@
                                                 class="heat-map-cell custom-tooltip"
                                                 tooltip="${ratioValue}"
                                                 value="${ratioValue}"
-                                                title="Baseline Value: ${baselineValue}<br> Current Value: ${currentValue}"
+                                                title="Baseline Value: ${baselineValue} Current Value: ${currentValue}"
                                                 >${(ratioValue * 100)?string["0.0"]}%</td>
                                     <#else>
                                         <td class="not-available">N/A</td>

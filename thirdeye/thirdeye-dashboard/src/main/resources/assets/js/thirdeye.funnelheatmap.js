@@ -111,27 +111,7 @@ $(document).ready(function() {
     //     //$(metricLabels[i]).attr("title", metrics )
     // }
 
-    $(".funnel-table-time").each(function(i, cell) {
-    	//TODO identical to thirdeye.metric.table.js function on '.metric-table-time' - should this be refactored into a more general file/function?
-        var tz = getTimeZone();
-        var cellObj = $(cell)
-        var currentTime = moment(cellObj.attr('currentUTC'))
-        var baselineTime = moment(cellObj.attr('title'))
-        cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
-        cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
-
-        // Click on time cell changes current value to that time
-        cellObj.click(function() {
-          var currentUTC = $(this).attr('currentUTC')
-          var path = parsePath(window.location.pathname)
-          var baselineDiff = path.currentMillis - path.baselineMillis
-          var currentMillis = moment.utc(currentUTC)
-
-          path.currentMillis = currentMillis
-          path.baselineMillis = currentMillis - baselineDiff
-          window.location.pathname = getDashboardPath(path)
-        })
-    })
+    $(".funnel-table-time").each(renderTimeCell)
 
     //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
     $("#custom-funnel-section .heat-map-cell").on("click", " .heat-map-cell", function(){

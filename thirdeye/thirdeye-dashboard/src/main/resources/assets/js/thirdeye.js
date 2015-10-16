@@ -782,3 +782,37 @@ function updateTableOrder(tableContainer, orderContainer) {
   })
   window.location.hash = encodeHashParameters(hashParams)
 }
+
+/**
+ * Sets the html of the provided cell to the time provided 
+ * in its 'currentUTC' attribute, using the selected timezone.
+ *
+ * @param index Currently ignored
+ *  index of element in loop (eg $('.metric-table-time').each(renderTimeCell);
+ * @param cell DOM element containing 
+ *  'currentUTC' and 'title' (baselineTime) attributes.
+ * @function
+ * @public
+ * @returns n/a
+ */
+function renderTimeCell(index, cell) {
+    //index is currently not used. 
+    var tz = getTimeZone();
+    var cellObj = $(cell)
+    var currentTime = moment(cellObj.attr('currentUTC'))
+    var baselineTime = moment(cellObj.attr('title'))
+    cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+    cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+
+    // Click on time cell changes current value to that time
+    cellObj.click(function() {
+      var currentUTC = $(this).attr('currentUTC')
+      var path = parsePath(window.location.pathname)
+      var baselineDiff = path.currentMillis - path.baselineMillis
+      var currentMillis = moment.utc(currentUTC)
+
+      path.currentMillis = currentMillis
+      path.baselineMillis = currentMillis - baselineDiff
+      window.location.pathname = getDashboardPath(path)
+    })
+}
