@@ -11,7 +11,6 @@
         
         <div class="funnel">
             <h3 class="metric-list">${funnel.name} </h3>
-<<<<<<< HEAD
             <h3 class="metric-list"> (current = ${funnel.current} & baseline = ${funnel.baseline})</h3>
 
             <table class="uk-table dimension-view-funnel-heat-map-rendered">
