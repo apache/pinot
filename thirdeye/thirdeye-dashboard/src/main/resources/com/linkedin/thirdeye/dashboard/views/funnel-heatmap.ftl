@@ -28,8 +28,8 @@
                             <tr>
                                 <td class="funnel-table-time" data-hour="${row.hour}"  currentUTC="${funnel.current}" title="baseline date:${funnel.baseline}">${isCumulative?string("cumm","no cum")} ${row.hour}</td>
                                 <#list 0..(row.numColumns-1) as i>
-                                    <#assign ratioValue = row.ratio[i]>
-                                    <#if (ratioValue??)>
+                                    <#if (row.ratio[i]??)>
+                                        <#assign ratioValue = row.ratio[i]>
                                         <#assign baselineValue = row.baseline[i]>
                                         <#assign currentValue = row.current[i]>
                                         <td
