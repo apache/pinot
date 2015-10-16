@@ -1,4 +1,5 @@
 $(document).ready(function() {
+    //Highlight active tab on navbar
     var view = parsePath(window.location.pathname).dimensionViewType == null ? "TABULAR" : parsePath(window.location.pathname).dimensionViewType
     $("#dashboard-output-nav a[view='" + view + "' ]").closest("li").addClass("uk-active")
 
@@ -11,6 +12,8 @@ $(document).ready(function() {
     //Set default dimension view on Timeseries and the default metric view on Heatmap
     window.onload = load
     function load() {
+        //Using settimeout since the table has minor css issues when created on a hidden parent
+        // and flot.js has no callback function for drawing the data
         window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
     }
 
@@ -40,7 +43,7 @@ $(document).ready(function() {
         }
 
         // Date input field validation
-        if($("#time-input-form-baseline-date").lenght > 0) {
+        if($("#time-input-form-baseline-date").length > 0) {
             var baselineDate = $("#time-input-form-baseline-date").val()
             if (!baselineDate) {
                 errorMessage.html("Must provide baseline date")
@@ -146,9 +149,6 @@ $(document).ready(function() {
     var baselineDateString = baselineDateTime.format("YYYY-MM-DD")
     $("#time-input-form-baseline-date").val(baselineDateString)
 
-    // Load existing metrics selection metrics function if the value is present in the options of the funnel form
-    //var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
-
     // Load existing metrics selection / function
     if (path.metricFunction) {
         var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
@@ -185,11 +185,12 @@ $(document).ready(function() {
         }
     }
 
-    //Current query display ALL when no fixed element in the query
+    //Display current query value to none when no fixed element in the query
     if($("ul.dimension-combination li").length == 0){
         $("ul.dimension-combination").append("<li style='list-style-type: none;'>None</li>")
     }
 
+    //Selecting the metric or dimension to display
     $(".section-selector").on("change", function(){
         $(".section-wrapper").hide();
         $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();

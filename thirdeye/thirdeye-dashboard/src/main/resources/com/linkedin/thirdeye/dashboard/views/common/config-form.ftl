@@ -1,7 +1,7 @@
 <div class="title-box uk-clearfix">
     <#if (dimensionView.type == "TABULAR")>
     <div class="uk-display-inline-block">
-        <div data-uk-button-checkbox class="hidden">
+        <div data-uk-button-checkbox>
             <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
         </div>
     </div>

@@ -73,10 +73,9 @@
                     </#list>
                 </tr>
             </thead>
-            
             <#macro intradayTableBody data isCumulative>
-                <!-- TODO: Martha - feel free to change the tbody identifier as needed -->
-                <tbody id="${isCumulative?string('test-cumulative','test')}">
+
+                <tbody class="${isCumulative?string('cumulative-values hidden', 'hourly-values')}" >
                     <#list data as row>
                         <tr>
                             <#-- This renders time in UTC (moment.js used to convert to local) -->
@@ -103,9 +102,9 @@
             </#macro>
             
             <@intradayTableBody data=metricTable.rows isCumulative=false/>
-            <#-- Uncomment this once the logic for hiding the unselected values is in place -->
-            <#-- <@intradayTableBody data=metricTable.cumulativeRows isCumulative=true/> -->
+            <@intradayTableBody data=metricTable.cumulativeRows isCumulative=true/>
             
+
         </table>
     </#list>
 </div>

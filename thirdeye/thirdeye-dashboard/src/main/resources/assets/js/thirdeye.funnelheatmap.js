@@ -30,7 +30,8 @@ $(document).ready(function() {
     //Preselect the 1st funnel
     $("#funnel-thumbnails .funnel:first-of-type").trigger("click")
 
-    //Toggle funnel and Metric Intraday tabs
+    //Toggle funnel and Metric Intraday tabs,
+    //switch the Moving average select options
     $(".funnel-tabs li").on("click", function(){
         if(!$(this).hasClass("uk-active")) {
             $("#custom-funnel-section").toggleClass("hidden")
@@ -95,7 +96,7 @@ $(document).ready(function() {
 
     //Hardcoding the abook funnels configs json till the ajax endpoint is working consistently
     var data = {"funnels":{"Member_2_Member_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","m2m_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)","m2m_sent":"memberInvitationsSubmitted","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","avg_sent":"RATIO(memberInvitationsSubmitted,memberCreateEvents)","create":"RATIO(memberCreateEvents,memberResultsLandingImpressions)"},"visulizationType":"HEATMAP","name":"Member_2_Member_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedMemberInvitations,memberResultsLandingImpressions)","RATIO(memberCreateEvents,memberResultsLandingImpressions)","RATIO(memberInvitationsSubmitted,memberCreateEvents)","memberInvitationsSubmitted"]},"Member_2_Guest_Full_Funnel":{"aliasToActualMetrics":{"import_rate":"RATIO(importsCompleted,submits)","impressions":"impressions","submit":"RATIO(submits,impressions)","avg_suggested":"RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","save_rate":"RATIO(contactsSaved,importsCompleted)","m2g_sent":"guestInvitationsSubmitted","avg_sent":"RATIO(guestInvitationsSubmitted,guestCreateEvents)","create":"RATIO(guestCreateEvents,memberResultsLandingImpressions)","m2g_rl":"RATIO(memberResultsLandingImpressions,contactsSaved)"},"visulizationType":"HEATMAP","name":"Member_2_Guest_Full_Funnel","actualMetricNames":["impressions","RATIO(submits,impressions)","RATIO(importsCompleted,submits)","RATIO(contactsSaved,importsCompleted)","RATIO(memberResultsLandingImpressions,contactsSaved)","RATIO(suggestedGuestInvitations,memberResultsLandingImpressions)","RATIO(guestCreateEvents,memberResultsLandingImpressions)","RATIO(guestInvitationsSubmitted,guestCreateEvents)","guestInvitationsSubmitted"]}},"dimension_groups":[],"collection":"abook"}
-    var metricLabels = $("#custom-funnel-section .metric-label[data-uk-tooltip]")
+    var metricLabels = $("#custom-funnel-section .metric-label[title]")
     var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
 
     for(var i = 0, len = metricLabels.length; i < len; i++){
@@ -111,6 +112,7 @@ $(document).ready(function() {
     }
 
     //Display time in selected timezone
+
     $(".funnel-table-time").each(function(i, cell){
             var tz = getTimeZone();
             var cellObj = $(cell)
@@ -120,7 +122,7 @@ $(document).ready(function() {
             var currentDateTime =  moment(currentUTCMillis)
             var baselineDateTime =  moment(baselineUTCMillis)
             cellObj.html(currentDateTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
-            cellObj.attr("title", "baseline:" + baselineDateTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+            cellObj.attr("title", "baseline: " + baselineDateTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
         }
 
     )
@@ -136,7 +138,7 @@ $(document).ready(function() {
     })
 
     //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
-    $("#custom-funnel-section .heat-map-cell").click(function(){
+    $("#custom-funnel-section .heat-map-cell").on("click", " .heat-map-cell", function(){
         var  columnIndex = $(this).parent().children().index($(this));
         var hour = $("td:first-child", $(this).closest("tr")).attr("data-hour")
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
@@ -235,5 +237,14 @@ $(document).ready(function() {
             window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
         }
     })
+
+
+
+    //Cumulative checkbox
+    $("#funnel-cumulative").click(function() {
+            $(".hourly-values").toggleClass("hidden")
+            $(".cumulative-values").toggleClass("hidden")
+    })
+
 
 });
