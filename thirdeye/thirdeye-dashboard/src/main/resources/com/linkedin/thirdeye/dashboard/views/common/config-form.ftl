@@ -60,20 +60,25 @@
 
 
     <form class="time-input-form uk-form uk-form-stacked uk-float-right">
+        <div class="uk-margin-small-top uk-margin-bottom">
         <div id="time-input-form-error" class="uk-alert uk-alert-danger hidden">
             <p></p>
         </div>
-        <div class="uk-margin-small-top uk-margin-bottom">
-            <div class="uk-display-inline-block">
-                <label class="uk-form-label">
-                    End Date
-                </label>
-                <div class="uk-form-icon">
-                    <i class="uk-icon-calendar"></i>
-                    <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
-                </div>
+
+        <div class="uk-display-inline-block" style="position: relative;">
+            <button id="time-input-metrics" type="button" class="uk-button">Selected Metrics <i class="uk-icon-caret-down"></i> </button>
+            <div id="time-input-metrics-panel" class="hidden" style="position:absolute; top:30px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
+                <ul style="list-style-type: none; padding-left:0; width:250px;">
+                <#list collectionSchema.metrics as metric>
+                    <li style="overflow:hidden;">
+                        <input class="panel-metric" type="checkbox" value="${metric}"/>    ${collectionSchema.metricAliases[metric_index]!metric}
+                    </li>
+                </#list>
+                </ul>
             </div>
-            <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "MULTI_TIME_SERIES")>
+        </div>
+
+        <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "MULTI_TIME_SERIES")>
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
                     Start Date
@@ -83,7 +88,18 @@
                     <input id="time-input-form-baseline-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
                 </div>
             </div>
-            </#if>
+        </#if>
+
+            <div class="uk-display-inline-block">
+                <label class="uk-form-label">
+                    End Date
+                </label>
+                <div class="uk-form-icon">
+                    <i class="uk-icon-calendar"></i>
+                    <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
+                </div>
+            </div>
+
             <div class="uk-display-inline-block">
                 <label class="uk-form-label">
                     Granularity
@@ -99,7 +115,7 @@
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Moving Average:</span>
                 <i class="uk-icon-caret-down"></i>
-                    <select id="moving-average-size">
+                    <select id="time-input-moving-average-size">
                         <option class="uk-button" unit="WoW" value="">None</option>
                         <option class="uk-button" unit="WoW" value="7">WoW</option>
                         <option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>

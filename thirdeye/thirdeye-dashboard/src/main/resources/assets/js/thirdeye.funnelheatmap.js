@@ -40,7 +40,7 @@ $(document).ready(function() {
             $("#intra-day-buttons").toggleClass("hidden")
             $("#intra-day-table").toggleClass("hidden")
             if($(this).text().trim() == "Details"){
-                $("#moving-average-size").html(
+                $("#time-input-moving-average-size").html(
                     '<option class="uk-button" unit="WoW" value="">None</option>'+
                     '<option class="uk-button" unit="WoW" value="7">WoW</option>' +
                     '<option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>' +
@@ -54,9 +54,9 @@ $(document).ready(function() {
                             metricFunctionObj = firstArg
                             var tokens = metricFunctionObj.name.split("_")
 
-                            if ($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
-                                $("#moving-average-size").val(tokens[tokens.length - 2])
-                                $("#time-input-form-moving-average span").html($("#moving-average-size option)[value='" + tokens[tokens.length - 2] + "']").html())
+                            if ($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
+                                $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
+                                $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option)[value='" + tokens[tokens.length - 2] + "']").html())
                             }
                         }
                     }else{
@@ -69,17 +69,17 @@ $(document).ready(function() {
                              metricFunctionObj = firstArg
                              var tokens = metricFunctionObj.name.split("_")
 
-                             if ($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
-                                 $("#moving-average-size").val(tokens[tokens.length - 2])
-                                 $("#time-input-form-moving-average span").html($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
+                             if ($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
+                                 $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
+                                 $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
                              }
                          }
                      }
 
             }else{
-                 $("#moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
-                 $("#moving-average-size").val("7")
-                 $("#time-input-form-moving-average span").html($("#moving-average-size option[value='7']").html())
+                 $("#time-input-moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
+                 $("#time-input-moving-average-size").val("7")
+                 $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='7']").html())
             }
         }
     })

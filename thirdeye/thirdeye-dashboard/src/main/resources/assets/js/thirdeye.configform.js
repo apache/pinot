@@ -34,6 +34,18 @@ $(document).ready(function() {
         var errorMessage = $("#time-input-form-error > p")
         errorMessage.empty()
 
+        // Metric(s)
+        var metrics = []
+        $(".panel-metric").each(function(i, checkbox) {
+            var checkboxObj = $(checkbox)
+            if (checkboxObj.is(':checked')) {
+                metrics.push("'" + checkboxObj.val() + "'")
+            }
+        });
+
+        // Metric function
+        var metricFunction = metrics.join(",")
+
         // Date input field validation
         var date = $("#time-input-form-current-date").val()
         if (!date) {
@@ -62,7 +74,7 @@ $(document).ready(function() {
         // Timezone
         var timezone = getTimeZone()
 
-        // Aggregate  todo:
+        // Aggregate
         var aggregateSize = 1
         var aggregateUnit = $(".baseline-aggregate.uk-active").attr("unit")
 
@@ -73,16 +85,7 @@ $(document).ready(function() {
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
 
-        // Metric(s)  todo: take the metrics from the URI instead of the sidenav
-        var metrics = []
-        $(".sidenav-metric").each(function(i, checkbox) {
-            var checkboxObj = $(checkbox)
-            if (checkboxObj.is(':checked')) {
-                metrics.push("'" + checkboxObj.val() + "'")
-            }
-        });
-
-        // Derived metric(s) todo: take the metrics from the URI instead of the sidenav
+        // Derived metric(s) todo: take the derived metrics from the URI instead of the sidenav
         $("#sidenav-derived-metrics-list").find(".uk-form-row").each(function(i, row) {
             var type = $(row).find(".derived-metric-type").find(":selected").val()
             var args = []
@@ -92,12 +95,9 @@ $(document).ready(function() {
             metrics.push(type + '(' + args.join(',') + ')')
         });
 
-        // Metric function
-        var metricFunction = metrics.join(",")
-
         // Moving average
-        if ($("#moving-average-size").val() != "") {
-            var movingAverageSize = $("#moving-average-size").val()
+        if ($("#time-input-moving-average-size").length > 0 && $("#time-input-moving-average-size").val() != "") {
+            var movingAverageSize = $("#time-input-moving-average-size").val()
             var movingAverageUnit = "DAYS"
             metricFunction = "MOVING_AVERAGE_" + movingAverageSize + "_" + movingAverageUnit + "(" + metricFunction + ")"
         }
@@ -132,9 +132,7 @@ $(document).ready(function() {
                 queryParams["funnels"] = funnels.join();
             }
         }
-
         errorAlert.hide()
-
         window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
     });
 
@@ -153,6 +151,9 @@ $(document).ready(function() {
     if (path.metricFunction) {
         var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
 
+
+
+
         // Always start at AGGREGATE
         var tokens = metricFunctionObj.name.split("_")
 
@@ -169,21 +170,44 @@ $(document).ready(function() {
                 metricFunctionObj = firstArg
                 var tokens = metricFunctionObj.name.split("_")
 
-                if($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0){
-                    $("#moving-average-size").val(tokens[tokens.length - 2])
-                    $("#time-input-form-moving-average span").html($("#moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
+                if($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0){
+                    $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
+                    $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
                 }
             }
         }
 
+        // Rest are metrics (primitive and derived)
+        var primitiveMetrics = []
+        var derivedMetrics = []
+        $.each(metricFunctionObj.args, function(i, arg) {
+            if (typeof(arg) === 'string') {
+                primitiveMetrics.push(arg.replace(/'/g, ""))
+            } else {
+                derivedMetrics.push(arg)
+            }
+        })
+
+        // Rest can be assumed to be plain args or derived metrics
+        $(".panel-metric ").each(function(i, checkbox) {
+            var checkboxObj = $(checkbox)
+            if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
+                checkboxObj.attr("checked", "checked")
+            }
+        })
+
+
+
         //On funnel heatmap preselect WoW
         var path = parsePath(window.location.pathname)
         if(path.dimensionViewType == "TABULAR"){
-            $("#moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
-            $("#moving-average-size").val("7")
-            $("#time-input-form-moving-average span").html($("#moving-average-size option[value='7']").html())
+            $("#time-input-moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
+            $("#time-input-moving-average-size").val("7")
+            $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='7']").html())
         }
     }
+
+
 
     //Display current query value to none when no fixed element in the query
     if($("ul.dimension-combination li").length == 0){
@@ -194,5 +218,9 @@ $(document).ready(function() {
     $(".section-selector").on("change", function(){
         $(".section-wrapper").hide();
         $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();
+    })
+
+    $("#time-input-metrics").click(function(){
+        $("#time-input-metrics-panel").toggleClass("hidden")
     })
 })
