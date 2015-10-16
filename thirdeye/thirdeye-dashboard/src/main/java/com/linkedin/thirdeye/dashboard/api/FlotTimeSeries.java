@@ -1,5 +1,17 @@
 package com.linkedin.thirdeye.dashboard.api;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import javax.ws.rs.core.MultivaluedMap;
+
+import org.apache.commons.lang.StringUtils;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -8,27 +20,23 @@ import com.linkedin.thirdeye.anomaly.database.AnomalyTableRow;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 
-import java.util.*;
-
-import javax.ws.rs.core.MultivaluedMap;
 
 public class FlotTimeSeries {
   private final String metric;
   private final String dimensions;
   private final String dimensionNames;
+  //TODO once confirmed that this is no longer required, get rid of oldLabel.
+  private final String oldLabel;
   private final String label;
   private final List<Number[]> data;
   private final MultivaluedMap<String, String> annotations;
 
-  public FlotTimeSeries(String metric,
-                        String dimensions,
-                        String dimensionNames,
-                        String label,
-                        List<Number[]> data,
-                        MultivaluedMap<String, String> annotations) {
+  public FlotTimeSeries(String metric, String dimensions, String dimensionNames, String oldLabel, String label,
+      List<Number[]> data, MultivaluedMap<String, String> annotations) {
     this.metric = metric;
     this.dimensions = dimensions;
     this.dimensionNames = dimensionNames;
+    this.oldLabel = oldLabel;
     this.label = label;
     this.data = data;
     this.annotations = annotations;
@@ -50,6 +58,11 @@ public class FlotTimeSeries {
   }
 
   @JsonProperty
+  public String getOldLabel() {
+    return oldLabel;
+  }
+
+  @JsonProperty
   public String getLabel() {
     return label;
   }
@@ -64,21 +77,17 @@ public class FlotTimeSeries {
     return annotations;
   }
 
-  public static List<FlotTimeSeries> fromQueryResult(
-      CollectionSchema schema,
-      ObjectMapper objectMapper,
+  public static List<FlotTimeSeries> fromQueryResult(CollectionSchema schema, ObjectMapper objectMapper,
       QueryResult queryResult) throws Exception {
     return fromQueryResult(schema, objectMapper, queryResult, null);
   }
 
-  public static List<FlotTimeSeries> fromQueryResult(
-      CollectionSchema schema,
-      ObjectMapper objectMapper,
-      QueryResult queryResult,
-      String labelPrefix) throws Exception {
+  public static List<FlotTimeSeries> fromQueryResult(CollectionSchema schema, ObjectMapper objectMapper,
+      QueryResult queryResult, String labelPrefix) throws Exception {
     List<FlotTimeSeries> allSeries = new ArrayList<>();
 
-    String dimensionNamesJson = objectMapper.writeValueAsString(queryResult.getDimensions());
+    List<String> dimensions = queryResult.getDimensions();
+    String dimensionNamesJson = objectMapper.writeValueAsString(dimensions);
 
     Map<String, String> aliases = getAliases(schema);
 
@@ -102,9 +111,11 @@ public class FlotTimeSeries {
 
         Collections.sort(series, COMPARATOR_BY_TIME);
 
+        StringBuilder oldLabel = new StringBuilder();
         StringBuilder label = new StringBuilder();
 
         if (labelPrefix != null) {
+          oldLabel.append(labelPrefix);
           label.append(labelPrefix);
         }
 
@@ -112,13 +123,28 @@ public class FlotTimeSeries {
         String metricName = metricSeriesEntry.getKey();
         String metricAlias = aliases.get(metricName);
         if (metricAlias == null) {
+          oldLabel.append(metricName);
           label.append(metricName);
         } else {
+          oldLabel.append(metricAlias);
           label.append(metricAlias);
         }
 
         if (queryResult.getData().size() > 1) {
-          label.append(" (").append(entry.getKey()).append(")"); // multi-dimensional
+          oldLabel.append(" (").append(entry.getKey()).append(")"); // multi-dimensional
+
+          String[] dimensionValues = objectMapper.reader(String[].class).readValue(entry.getKey());
+          List<String> dimensionPairs = new LinkedList<String>();
+          label.append(" (");
+          for (int i = 0; i < dimensions.size(); i++) {
+            String dim = dimensions.get(i);
+            String dimValue = dimensionValues[i];
+            if (!"*".equals(dimValue)) {
+              dimensionPairs.add(String.format("%s:\"%s\"", dim, dimValue));
+            }
+          }
+          label.append(StringUtils.join(dimensionPairs, ","));
+          label.append(")");
         }
 
         if (series.size() > 1) {
@@ -126,31 +152,24 @@ public class FlotTimeSeries {
           if (baseline > 0) {
             double current = series.get(series.size() - 1)[1].doubleValue();
             double percentChange = 100 * (current - baseline) / baseline;
+            oldLabel.append(String.format(" (%.2f%%)", percentChange));
             label.append(String.format(" (%.2f%%)", percentChange));
           } else {
+            oldLabel.append(" (N/A)");
             label.append(" (N/A)");
           }
         }
 
-        allSeries.add(new FlotTimeSeries(
-            metricSeriesEntry.getKey(),
-            entry.getKey(),
-            dimensionNamesJson,
-            label.toString(),
-            series,
-            null));
+        allSeries.add(new FlotTimeSeries(metricSeriesEntry.getKey(), entry.getKey(), dimensionNamesJson,
+            oldLabel.toString(), label.toString(), series, null));
       }
     }
 
     return allSeries;
   }
 
-  public static List<FlotTimeSeries> anomaliesFromQueryResult(
-      CollectionSchema schema,
-      ObjectMapper objectMapper,
-      QueryResult queryResult,
-      String labelPrefix,
-      List<AnomalyTableRow> anomalies) throws Exception {
+  public static List<FlotTimeSeries> anomaliesFromQueryResult(CollectionSchema schema, ObjectMapper objectMapper,
+      QueryResult queryResult, String labelPrefix, List<AnomalyTableRow> anomalies) throws Exception {
 
     // remap anomalies by dimension key
     Multimap<DimensionKey, AnomalyTableRow> anomaliesByDimensionKey = groupAnomaliesByDimensionKey(schema, anomalies);
@@ -178,14 +197,12 @@ public class FlotTimeSeries {
         long timeWindow = anomaly.getTimeWindow();
         String timeWindowString = Long.toString(timeWindow);
         Number[] metricValuesInResult = entry.getValue().get(timeWindowString);
-
         for (String anomalousMetric : anomaly.getMetrics()) {
           int anomalousMetricIndex = queryResult.getMetrics().indexOf(anomalousMetric);
           if (anomalousMetricIndex != -1) {
             Number metricValue = (metricValuesInResult != null) ? metricValuesInResult[anomalousMetricIndex] : 0;
-            timeSeriesByMetric.get(anomalousMetric).add(new Number[] { timeWindow , metricValue });
-            annotationsByMetric.get(anomalousMetric).add(timeWindowString,
-                anomalyTableRowToAnnotation(anomaly));
+            timeSeriesByMetric.get(anomalousMetric).add(new Number[] { timeWindow, metricValue });
+            annotationsByMetric.get(anomalousMetric).add(timeWindowString, anomalyTableRowToAnnotation(anomaly));
           }
         }
       }
@@ -195,8 +212,7 @@ public class FlotTimeSeries {
 
         Collections.sort(series, COMPARATOR_BY_TIME);
 
-        StringBuilder label = new StringBuilder();
-        label.append(labelPrefix);
+        StringBuilder label = new StringBuilder(labelPrefix);
 
         // Metric name or alias
         String metricName = metricSeriesEntry.getKey();
@@ -217,13 +233,9 @@ public class FlotTimeSeries {
           label.append(" (").append(entry.getKey()).append(")"); // multi-dimensional
         }
 
-        allSeries.add(new FlotTimeSeries(
-            metricSeriesEntry.getKey(),
-            entry.getKey(),
-            dimensionNamesJson,
-            label.toString(),
-            series,
-            annotationsByMetric.get(metricName)));
+        // TODO Discuss w/ Greg+Kishore: do we need to modify label appearances for anomalies?
+        allSeries.add(new FlotTimeSeries(metricSeriesEntry.getKey(), entry.getKey(), dimensionNamesJson,
+            label.toString(), label.toString(), series, annotationsByMetric.get(metricName)));
       }
     }
     return allSeries;
@@ -231,13 +243,12 @@ public class FlotTimeSeries {
 
   private static String anomalyTableRowToAnnotation(AnomalyTableRow anomaly) {
     StringBuilder sb = new StringBuilder()
-      .append(String.format("<b>id</b>: %d (%s_%d)<br>", anomaly.getId(), anomaly.getFunctionTable(),
-          anomaly.getFunctionId()))
-      .append(String.format("<b>name</b>: %s<br>", anomaly.getFunctionName()))
-      .append(String.format("<b>description</b>: %s<br>", anomaly.getFunctionDescription()))
-      .append(String.format("<b>score, volume</b>: %.03f, %.03f<br>", anomaly.getAnomalyScore(),
-          anomaly.getAnomalyVolume()))
-      .append(anomaly.getProperties().toString());
+        .append(String.format("<b>id</b>: %d (%s_%d)<br>", anomaly.getId(), anomaly.getFunctionTable(),
+            anomaly.getFunctionId()))
+        .append(String.format("<b>name</b>: %s<br>", anomaly.getFunctionName()))
+        .append(String.format("<b>description</b>: %s<br>", anomaly.getFunctionDescription())).append(String
+            .format("<b>score, volume</b>: %.03f, %.03f<br>", anomaly.getAnomalyScore(), anomaly.getAnomalyVolume()))
+        .append(anomaly.getProperties().toString());
     return sb.toString();
   }
 
