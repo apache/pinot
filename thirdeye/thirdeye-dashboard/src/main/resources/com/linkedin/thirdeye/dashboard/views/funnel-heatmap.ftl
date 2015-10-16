@@ -11,6 +11,7 @@
         
         <div class="funnel">
             <h3 class="metric-list">${funnel.name} </h3>
+<<<<<<< HEAD
             <h3 class="metric-list"> (current = ${funnel.current} & baseline = ${funnel.baseline})</h3>
 
             <table class="uk-table dimension-view-funnel-heat-map-rendered">
@@ -18,7 +19,7 @@
                     <tr>
                         <th class="metric-label">Hour</th>
                         <#list funnel.aliasToActualMap?keys as key>
-                            <th class="metric-label" title>${key}</th>
+                            <th class="metric-label" title="${funnel.aliasToActualMap[key]}" style="cursor:pointer;">${key}</th>
                         </#list>
                     </tr>
                 </thead>
