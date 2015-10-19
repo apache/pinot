@@ -37,7 +37,8 @@ li {
 }
 
 .dimension-combination table {
-    width: 93%;
+    width: 100%;
+    background-color:#ddd;
     min-height: 31px;
     table-layout: fixed;
     border: 2px solid #ddd;

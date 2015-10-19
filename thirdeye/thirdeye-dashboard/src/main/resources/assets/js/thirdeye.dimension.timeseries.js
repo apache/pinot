@@ -35,7 +35,6 @@ $(document).ready(function() {
         mode: hash['dimensionTimeSeriesMode'] ? hash['dimensionTimeSeriesMode'] : 'same',
         legend: true,
         filter: function(data) {
-            console.log("data", data)
             // Don't show anomaly series in this view
             var i = data.length
             while (i--) {

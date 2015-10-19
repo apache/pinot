@@ -26,27 +26,6 @@ $(document).ready(function() {
         })
     })
 
-   /* Currently not using the left-, right buttons
-   $("#time-nav-left").click(function() {
-        var path = parsePath(window.location.pathname)
-        var baselineMillis = parseInt(path.baselineMillis)
-        var currentMillis = parseInt(path.currentMillis)
-        var period = currentMillis - baselineMillis
-        path.baselineMillis = baselineMillis - (period / 2)
-        path.currentMillis = currentMillis - (period / 2)
-        window.location.href = window.location.href.replace(window.location.pathname, getDashboardPath(path))
-    })
-
-    $("#time-nav-right").click(function() {
-        var path = parsePath(window.location.pathname)
-        var baselineMillis = parseInt(path.baselineMillis)
-        var currentMillis = parseInt(path.currentMillis)
-        var period = currentMillis - baselineMillis
-        path.baselineMillis = baselineMillis + (period / 2)
-        path.currentMillis = currentMillis + (period / 2)
-        window.location.href = window.location.href.replace(window.location.pathname, getDashboardPath(path))
-    })*/
-
    $(".collapser").click(function() {
         var $header = $(this);
 
@@ -78,5 +57,11 @@ $(document).ready(function() {
 
    });
 
+
+    $(".dimension-selector").click(function() {
+        var dimensionLabel = $(this);
+        var panel = dimensionLabel.next();
+        panel.toggleClass("hidden")
+    })
 
 })

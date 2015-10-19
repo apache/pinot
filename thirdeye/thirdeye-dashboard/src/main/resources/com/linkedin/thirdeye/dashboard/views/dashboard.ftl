@@ -4,6 +4,7 @@
         <meta charset="UTF-8">
         <#include "common/style.ftl">
         <#include "common/script.ftl">
+
         <script src="/assets/js/thirdeye.dashboard.js"></script>
         <script src="/assets/js/thirdeye.sidenav.js"></script>
         <script src="/assets/js/thirdeye.configform.js"></script>
@@ -19,6 +20,7 @@
             <div id="dashboard-output" class="uk-width-1-1">
                 <div id="dashboard-output-nav" data-uk-sticky>
                     <#include "common/headnav.ftl">
+                    <#include "common/dimension-header.ftl">
                 </div>
                 
 

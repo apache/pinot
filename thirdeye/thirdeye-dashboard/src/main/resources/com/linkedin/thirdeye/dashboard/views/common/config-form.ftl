@@ -71,7 +71,7 @@
                 <ul style="list-style-type: none; padding-left:0; width:250px;">
                 <#list collectionSchema.metrics as metric>
                     <li style="overflow:hidden;">
-                        <input class="panel-metric" type="checkbox" value="${metric}"/>    ${collectionSchema.metricAliases[metric_index]!metric}
+                        <input class="panel-metric" type="checkbox" value="${metric}"/>${collectionSchema.metricAliases[metric_index]!metric}
                     </li>
                 </#list>
                 </ul>
