@@ -31,6 +31,8 @@ public class ScanRemoveAnomalyTest {
    //     ScanStatistics.Pattern.DOWN, 1.0);
    SequentialMonitoringSingleSideInputTwo("debug1_deseasonal.csv",  "RoutputTwo.csv", 648, 72, 24, 500,
        ScanStatistics.Pattern.DOWN, 1.0);
+    SequentialMonitoringSingleSideInputTwo("debug2_deseasonal.csv",  "RoutputThree.csv", 648, 72, 24, 500,
+          ScanStatistics.Pattern.UP, 1.0);
     //NoHistoryAnomaliesRemoved("timeseries.csv", 720, 200);
 
   }
@@ -194,7 +196,8 @@ public class ScanRemoveAnomalyTest {
 
   }
 
-  private void SequentialMonitoringCompareWithR(double[] series,
+  private void SequentialMonitoringCompareWithR(
+      double[] series,
       String[] inputTimestamps,
       String outputFilename,
       int training_size,
@@ -242,7 +245,9 @@ public class ScanRemoveAnomalyTest {
 
     int training_size_for_scan = training_size - monitor_size + scan_size;
     for (int monitor_idx=monitor_start; monitor_idx <= monitor_end; monitor_idx+=scan_size) {
-
+      //if (monitor_idx > monitor_start+scan_size) {
+      //  break;
+      //}
       int current_monitor_start = 0;
       int current_monitor_end = 0;
       int current_train_start = 0;
@@ -309,13 +314,24 @@ public class ScanRemoveAnomalyTest {
           down_level,
           notequal_level);
 
+      Set<Long> currentAnomalousTimestamps = new HashSet<Long>();
+      if (!targetAnomalousTimestamps.isEmpty()) {
+          for (Long oneTimestamp: targetAnomalousTimestamps) {
+            if (oneTimestamp < current_monitor_start & oneTimestamp >= current_train_start) {
+              currentAnomalousTimestamps.add(oneTimestamp);
+              System.out.println("removed anomalies:" + oneTimestamp);
+            }
+          }
+
+     }
     double[] trainingDataWithOutTargetAnomalies = ScanStatisticsAnomalyDetectionFunction.removeAnomalies(
-        trainingTimestamps, train, targetAnomalousTimestamps);
+        trainingTimestamps, train, currentAnomalousTimestamps);
 
     Range<Integer> target_anomaly = scanStatistics.getInterval(
         trainingDataWithOutTargetAnomalies, monitor);
+    System.out.println("anomaly interval" + target_anomaly);
     if (target_anomaly != null) {
-      for (int i = target_anomaly.lowerEndpoint(); i < target_anomaly.upperEndpoint(); i++) {
+      for (int i = target_anomaly.lowerEndpoint(); i < target_anomaly.upperEndpoint() ; i++) {
         targetAnomalousTimestamps.add((long)(i+current_monitor_start));
       }
       Range<Integer> anomalyOffset = Range.closedOpen(target_anomaly.lowerEndpoint() + current_monitor_start,
