@@ -57,8 +57,8 @@ public class FunnelsDataProvider {
     return funnelSpecsMap.get(collection);
   }
 
-  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels, DateTime currentDateTime,
-      MultivaluedMap<String, String> dimensionValues) throws Exception {
+  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels, long baselineMillis,
+      long currentMillis, MultivaluedMap<String, String> dimensionValues) throws Exception {
     String[] funnels = selectedFunnels.split(",");
     if (funnels.length == 0) {
       return null;
@@ -68,8 +68,7 @@ public class FunnelsDataProvider {
 
     for (String funnel : funnels) {
       LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
-      funnelViews.add(getFunnelDataFor(collection, funnel, currentDateTime.getYear(), currentDateTime.getMonthOfYear(),
-          currentDateTime.getDayOfMonth(), dimensionValues));
+      funnelViews.add(getFunnelDataFor(collection, funnel, baselineMillis, currentMillis, dimensionValues));
     }
 
     return funnelViews;
@@ -93,7 +92,7 @@ public class FunnelsDataProvider {
   // it will only present views for every hour within the 24 hour period
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
 
-  public FunnelHeatMapView getFunnelDataFor(String collection, String funnel, Integer year, Integer month, Integer day,
+  public FunnelHeatMapView getFunnelDataFor(String collection, String funnel, long baselineMillis, long currentMillis,
       MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge them
@@ -101,11 +100,11 @@ public class FunnelsDataProvider {
     FunnelSpec spec = funnelSpecsMap.get(collection).getFunnels().get(funnel);
 
     // get current start and end time
-    DateTime currentEnd = new DateTime(year, month, day, 0, 0);
+    DateTime currentEnd = new DateTime(currentMillis);
     DateTime currentStart = currentEnd.minusDays(1);
 
     // get baseline start and end
-    DateTime baselineEnd = currentEnd.minusDays(7);
+    DateTime baselineEnd = new DateTime(baselineMillis);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()) + ")";
