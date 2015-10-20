@@ -20,7 +20,6 @@
             <div id="dashboard-output" class="uk-width-1-1">
                 <div id="dashboard-output-nav" data-uk-sticky>
                     <#include "common/headnav.ftl">
-                    <#include "common/dimension-header.ftl">
                 </div>
                 
 
@@ -51,6 +50,7 @@
 
                <#-- Dimension view-->
                 <div id="dashboard-dimension-view">
+                    <#include "common/dimension-header.ftl">
                     <#include "common/config-form.ftl">
 
                     <#if (dimensionView.type == "HEAT_MAP")>

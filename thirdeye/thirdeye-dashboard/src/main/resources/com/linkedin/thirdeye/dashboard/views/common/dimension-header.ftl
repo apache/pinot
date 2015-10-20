@@ -12,7 +12,7 @@
 
     <table>
         <tr>
-            <td>Current Query: </td>
+            <td>Select Filters: </td>
     <#list (metricView.view.metricTables)!metricTables as metricTable>
          <#assign dimensions = metricTable.dimensionValues>
          <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>

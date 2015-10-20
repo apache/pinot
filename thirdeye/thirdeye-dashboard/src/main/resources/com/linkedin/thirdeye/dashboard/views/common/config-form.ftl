@@ -36,7 +36,7 @@
     <#list (metricView.view.metricTables)!metricTables as metricTable>
     <#assign dimensions = metricTable.dimensionValues>
     <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-        <ul class="dimension-combination" style="display: inline-block;">Filters:
+        <ul class="dimension-combination" style="display: inline-block;">Filters Applied:
         <#list dimensions?keys as dimensionName>
             <#assign dimensionValue = dimensions[dimensionName]>
             <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
