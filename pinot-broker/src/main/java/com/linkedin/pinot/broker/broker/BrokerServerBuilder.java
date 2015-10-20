@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import com.linkedin.pinot.broker.servlet.PinotBrokerDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
@@ -194,7 +195,8 @@ public class BrokerServerBuilder {
 
     WebAppContext context = new WebAppContext();
     context.addServlet(PinotClientRequestServlet.class, "/query");
-
+    context.addServlet(PinotBrokerDebugServlet.class, "/debug");
+    
     if (clientConfig.enableConsole()) {
       context.setResourceBase(clientConfig.getConsoleWebappPath());
     } else {

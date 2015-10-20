@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.codehaus.jackson.map.ObjectMapper;
 
 
 /**
@@ -27,7 +28,10 @@ import java.util.Set;
  */
 public class SegmentIdSet {
   // Set of segments that belong to this group
+  private static final ObjectMapper mapper = new ObjectMapper();
+  
   private final Set<SegmentId> _idSet;
+  
 
   public SegmentIdSet() {
     _idSet = new HashSet<SegmentId>();
@@ -96,6 +100,10 @@ public class SegmentIdSet {
 
   @Override
   public String toString() {
-    return "SegmentIdSet [_idSet=" + _idSet + "]";
+    try {
+      return mapper.writeValueAsString(_idSet);
+    } catch (Exception e) {
+      return "SegmentIdSet [_idSet=" + _idSet + "]";
+    }
   }
 }

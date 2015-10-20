@@ -15,6 +15,39 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -52,45 +85,14 @@ import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.Predicate;
-import org.apache.helix.AccessOption;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.CurrentState;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.LiveInstance;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.json.JSONException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Sep 30, 2014
  */
 public class PinotHelixResourceManager {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
+  private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
 
   private String _zkBaseUrl;
   private String _helixClusterName;
@@ -101,7 +103,7 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
-  private long _externalViewOnlineToOfflineTimeout;
+  private long _externalViewOnlineToOfflineTimeoutMillis = DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS;
   private long _externalViewUpdateRetryInterval = 500L;
   private boolean _isSingleTenantCluster = true;
 
@@ -117,18 +119,18 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
-      String localDiskDir, long externalViewOnlineToOfflineTimeout, boolean isSingleTenantCluster) {
+      String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster) {
     _zkBaseUrl = zkURL;
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _localDiskDir = localDiskDir;
-    _externalViewOnlineToOfflineTimeout = externalViewOnlineToOfflineTimeout;
+    _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
       String localDiskDir) {
-    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, 10000L, false);
+    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -145,7 +147,6 @@ public class PinotHelixResourceManager {
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
-    _externalViewOnlineToOfflineTimeout = 10000L;
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
 
@@ -210,11 +211,26 @@ public class PinotHelixResourceManager {
   /**
    * Returns all tables, remove brokerResource.
    */
+  public Set<String> getAllUniquePinotRawTableNames() {
+    List<String> tableNames = getAllTableNames();
+
+    // Filter table names that are known to be non Pinot tables (ie. brokerResource)
+    Set<String> pinotTableNames = new HashSet<>();
+    for (String tableName : tableNames) {
+      if (CommonConstants.Helix.NON_PINOT_RESOURCE_RESOURCE_NAMES.contains(tableName)) {
+        continue;
+      }
+      pinotTableNames.add(TableNameBuilder.extractRawTableName(tableName));
+    }
+
+    return pinotTableNames;
+  }
+  
   public List<String> getAllPinotTableNames() {
     List<String> tableNames = getAllTableNames();
 
     // Filter table names that are known to be non Pinot tables (ie. brokerResource)
-    ArrayList<String> pinotTableNames = new ArrayList<String>();
+    List<String> pinotTableNames = new ArrayList<>();
     for (String tableName : tableNames) {
       if (CommonConstants.Helix.NON_PINOT_RESOURCE_RESOURCE_NAMES.contains(tableName)) {
         continue;
@@ -224,7 +240,6 @@ public class PinotHelixResourceManager {
 
     return pinotTableNames;
   }
-
   public synchronized void restartTable(String tableName) {
     final Set<String> allInstances =
         HelixHelper.getAllInstancesForResource(HelixHelper.getTableIdealState(_helixZkManager, tableName));
@@ -1265,10 +1280,11 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout, false)) {
+    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE",
+        _externalViewOnlineToOfflineTimeoutMillis, false)) {
       LOGGER.error(
           "External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
-          segmentName, _externalViewOnlineToOfflineTimeout);
+          segmentName, _externalViewOnlineToOfflineTimeoutMillis);
       return false;
     }
 

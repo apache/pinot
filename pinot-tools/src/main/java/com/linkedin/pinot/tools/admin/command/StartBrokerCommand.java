@@ -123,8 +123,9 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
     LOGGER.info("Executing command: " + toString());
     final HelixBrokerStarter pinotHelixBrokerStarter = new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
-
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminBroker.pid");
+    
+    String pidFile = ".pinotAdminBroker-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
     return true;
   }
 }
