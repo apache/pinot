@@ -1,20 +1,34 @@
 package com.linkedin.thirdeye.dashboard.util;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+
+import javax.ws.rs.core.MultivaluedMap;
+
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.core.MultivaluedMap;
-import java.util.*;
-import java.util.regex.Pattern;
 
 public class ViewUtils {
   private static final Joiner OR_JOINER = Joiner.on(" OR ");
-  private static final TypeReference<List<String>> LIST_TYPE_REFERENCE = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> LIST_TYPE_REFERENCE = new TypeReference<List<String>>() {
+  };
   private static final Logger LOGGER = LoggerFactory.getLogger(ViewUtils.class);
 
   public static Map<String, String> fillDimensionValues(CollectionSchema schema, Map<String, String> dimensionValues) {
@@ -37,12 +51,9 @@ public class ViewUtils {
     return flattened;
   }
 
-  public static Map<List<String>, Map<String, Number[]>> processDimensionGroups(
-      QueryResult queryResult,
-      ObjectMapper objectMapper,
-      Map<String, Map<String, String>> dimensionGroupMap,
-      Map<String, Map<Pattern, String>> dimensionRegexMap,
-      String dimensionName) throws Exception {
+  public static Map<List<String>, Map<String, Number[]>> processDimensionGroups(QueryResult queryResult,
+      ObjectMapper objectMapper, Map<String, Map<String, String>> dimensionGroupMap,
+      Map<String, Map<Pattern, String>> dimensionRegexMap, String dimensionName) throws Exception {
     // Aggregate w.r.t. dimension groups
     Map<List<String>, Map<String, Number[]>> processedResult = new HashMap<>(queryResult.getData().size());
     for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
@@ -103,5 +114,43 @@ public class ViewUtils {
     }
 
     return processedResult;
+  }
+
+  /**
+   * Creates a list of {@link MetricDataRow} corresponding to data provided in <tt>baselineData</tt> and <tt>currentData</tt> that fits within the specified time window.
+   * @param baselineData - map containing baseline data for each timestamp in the provided time window.
+   * @param currentData - map containing current data for each timestamp in the provided time window.
+   * @param currentEndMillis - end of the current time window. Note that this is not included in the result list.
+   * @param baselineOffsetMillis - difference between baseline and current timestamps.
+   * @param intraPeriod - difference between start and end of current time window.
+   */
+  public static List<MetricDataRow> extractMetricDataRows(Map<Long, Number[]> baselineData,
+      Map<Long, Number[]> currentData, long currentEndMillis, long baselineOffsetMillis, long intraPeriod) {
+
+    long currentStartMillis = currentEndMillis - intraPeriod;
+
+    List<Long> sortedTimes = new ArrayList<>(currentData.keySet());
+    // Reverse sorting in case currentData contains baselineData as well.
+    Collections.sort(sortedTimes, Collections.reverseOrder());
+
+    List<MetricDataRow> table = new LinkedList<MetricDataRow>();
+    for (long current : sortedTimes) {
+      if (current >= currentEndMillis) {
+        continue;
+      } else if (current < currentStartMillis) {
+        break;
+      }
+      long baseline = current - baselineOffsetMillis;
+
+      //Get values for this current and baseline time.
+      Number[] baselineValues = baselineData.get(baseline);
+      Number[] currentValues = currentData.get(current);
+
+      MetricDataRow row = new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineValues,
+          new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
+      table.add(0, row);
+    }
+
+    return table;
   }
 }

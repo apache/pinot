@@ -11,7 +11,6 @@ import java.util.concurrent.Future;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +27,7 @@ import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
 
 
@@ -131,23 +131,11 @@ public class FunnelsDataProvider {
     Map<Long, Number[]> baselineData = CustomDashboardResource.extractFunnelData(baselineResult.get());
     Map<Long, Number[]> currentData = CustomDashboardResource.extractFunnelData(currentResult.get());
 
+    long baselineOffsetMillis = currentEnd.getMillis() - baselineEnd.getMillis();
+    long intraPeriod = currentEnd.getMillis() - currentStart.getMillis();
     // Compose result
-    List<MetricDataRow> table = new ArrayList<MetricDataRow>();
-    DateTime currentCursor = new DateTime(currentStart.getMillis());
-    DateTime baselineCursor = new DateTime(baselineStart.getMillis());
-    while (currentCursor.compareTo(currentEnd) < 0 && baselineCursor.compareTo(baselineEnd) < 0) {
-      // Get values for this time
-      Number[] baselineValues = baselineData.get(baselineCursor.getMillis());
-      Number[] currentValues = currentData.get(currentCursor.getMillis());
-
-      MetricDataRow row = new MetricDataRow(new DateTime(baselineCursor).toDateTime(DateTimeZone.UTC), baselineValues,
-          new DateTime(currentCursor).toDateTime(DateTimeZone.UTC), currentValues);
-      table.add(row);
-
-      // Increment
-      currentCursor = currentCursor.plusHours(1);
-      baselineCursor = baselineCursor.plusHours(1);
-    }
+    List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData, currentEnd.getMillis(),
+        baselineOffsetMillis, intraPeriod);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();
@@ -231,4 +219,5 @@ public class FunnelsDataProvider {
       }
     }
   }
+
 }

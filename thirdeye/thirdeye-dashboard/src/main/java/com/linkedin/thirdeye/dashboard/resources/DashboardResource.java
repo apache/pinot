@@ -321,7 +321,8 @@ public class DashboardResource {
         LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
         QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
-        return new MetricViewTabular(schema, objectMapper, result, currentMillis - baselineMillis, INTRA_PERIOD);
+        return new MetricViewTabular(schema, objectMapper, result, currentMillis, currentMillis - baselineMillis,
+            INTRA_PERIOD);
       case TIME_SERIES_FULL:
       case TIME_SERIES_OVERLAY:
       case FUNNEL:
