@@ -57,7 +57,6 @@ import com.sun.jersey.api.NotFoundException;
 
 import io.dropwizard.views.View;
 
-
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
 public class DashboardResource {
@@ -77,8 +76,9 @@ public class DashboardResource {
 
   private final ConfigCache configCache;
 
-  public DashboardResource(String serverUri, DataCache dataCache, String feedbackEmailAddress, QueryCache queryCache,
-      ObjectMapper objectMapper, CustomDashboardResource customDashboardResource, ConfigCache configCache,
+  public DashboardResource(String serverUri, DataCache dataCache, String feedbackEmailAddress,
+      QueryCache queryCache, ObjectMapper objectMapper,
+      CustomDashboardResource customDashboardResource, ConfigCache configCache,
       FunnelsDataProvider funnelResource) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
@@ -112,16 +112,18 @@ public class DashboardResource {
     if (collection == null) {
       return null;
     }
-    JSONObject ret = new JSONObject(new ObjectMapper().writeValueAsString(funnelResource.getFunnelSpecFor(collection)));
-    JSONObject dimGroups =
-        new JSONObject(new ObjectMapper().writeValueAsString(configCache.getDimensionGroupSpec(collection)));
+    JSONObject ret = new JSONObject(
+        new ObjectMapper().writeValueAsString(funnelResource.getFunnelSpecFor(collection)));
+    JSONObject dimGroups = new JSONObject(
+        new ObjectMapper().writeValueAsString(configCache.getDimensionGroupSpec(collection)));
     ret.put("dimension_groups", dimGroups.get("groups"));
     return ret.toString();
   }
 
   @GET
   @Path("/dashboard/{collection}")
-  public DashboardStartView getDashboardStartView(@PathParam("collection") String collection) throws Exception {
+  public DashboardStartView getDashboardStartView(@PathParam("collection") String collection)
+      throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
     // Get segment metadata
@@ -134,8 +136,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null
-          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null
+          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -158,24 +160,27 @@ public class DashboardResource {
     if (funnelResource != null) {
       funnelNames = funnelResource.getFunnelNamesFor(collection);
     }
-    return new DashboardStartView(collection, schema, earliestDataTime, latestDataTime, customDashboardNames,
-        funnelNames);
+    return new DashboardStartView(collection, schema, earliestDataTime, latestDataTime,
+        customDashboardNames, funnelNames);
   }
 
   @GET
   @Path("/dashboard/{collection}/{metricFunction}")
   public Response getDashboardView(@PathParam("collection") String collection,
-      @PathParam("metricFunction") String metricFunction, @Context UriInfo uriInfo) throws Exception {
-    return Response.seeOther(URI.create(PATH_JOINER.join("", "dashboard", collection, metricFunction,
-        MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
+      @PathParam("metricFunction") String metricFunction, @Context UriInfo uriInfo)
+          throws Exception {
+    return Response.seeOther(URI.create(PATH_JOINER.join("", "dashboard", collection,
+        metricFunction, MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
   }
 
   @GET
   @Path("/dashboard/{collection}/{metricFunction}/{metricViewType}/{dimensionViewType}/{baselineOffsetMillis}")
   public View getDashboardView(@PathParam("collection") String collection,
-      @PathParam("metricFunction") String metricFunction, @PathParam("metricViewType") MetricViewType metricViewType,
+      @PathParam("metricFunction") String metricFunction,
+      @PathParam("metricViewType") MetricViewType metricViewType,
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
-      @PathParam("baselineOffsetMillis") Long baselineOffsetMillis, @Context UriInfo uriInfo) throws Exception {
+      @PathParam("baselineOffsetMillis") Long baselineOffsetMillis, @Context UriInfo uriInfo)
+          throws Exception {
     // Get segment metadata
     List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
     if (segments.isEmpty()) {
@@ -186,8 +191,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null
-          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null
+          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -207,16 +212,19 @@ public class DashboardResource {
   @GET
   @Path("/dashboard/{collection}/{metricFunction}/{metricViewType}/{dimensionViewType}/{baselineMillis}/{currentMillis}")
   public View getDashboardView(@PathParam("collection") String collection,
-      @PathParam("metricFunction") String metricFunction, @PathParam("metricViewType") MetricViewType metricViewType,
+      @PathParam("metricFunction") String metricFunction,
+      @PathParam("metricViewType") MetricViewType metricViewType,
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
-      @PathParam("baselineMillis") Long baselineMillis, @PathParam("currentMillis") Long currentMillis,
-      @Context UriInfo uriInfo) throws Exception {
-    Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+      @PathParam("baselineMillis") Long baselineMillis,
+      @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
+    Map<String, String> dimensionValues =
+        UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
 
     // Check no group bys
     for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
       if ("!".equals(entry.getValue())) {
-        throw new WebApplicationException(new IllegalArgumentException("No group by dimensions allowed"),
+        throw new WebApplicationException(
+            new IllegalArgumentException("No group by dimensions allowed"),
             Response.Status.BAD_REQUEST);
       }
     }
@@ -231,8 +239,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null
-          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null
+          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -260,22 +268,23 @@ public class DashboardResource {
     if (funnelResource != null && selectedFunnels != null && selectedFunnels.length() > 0) {
       MultivaluedMap<String, String> filterMap = uriInfo.getQueryParameters();
       filterMap.remove("funnels");
-      funnels =
-          funnelResource.computeFunnelViews(collection, selectedFunnels, baselineMillis, currentMillis, filterMap);
+      funnels = funnelResource.computeFunnelViews(collection, selectedFunnels, baselineMillis,
+          currentMillis, filterMap);
       funnelNames = funnelResource.getFunnelNamesFor(collection);
     }
 
     try {
-      View metricView =
-          getMetricView(collection, metricFunction, metricViewType, baselineMillis, currentMillis, uriInfo);
+      View metricView = getMetricView(collection, metricFunction, metricViewType, baselineMillis,
+          currentMillis, uriInfo);
 
-      View dimensionView =
-          getDimensionView(collection, metricFunction, dimensionViewType, baselineMillis, currentMillis, uriInfo);
+      View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
+          baselineMillis, currentMillis, uriInfo);
 
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
-          new DateTime(baselineMillis), new DateTime(currentMillis), new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType), earliestDataTime, latestDataTime, customDashboardNames,
-          feedbackEmailAddress, funnelNames, funnels);
+          new DateTime(baselineMillis), new DateTime(currentMillis),
+          new MetricView(metricView, metricViewType),
+          new DimensionView(dimensionView, dimensionViewType), earliestDataTime, latestDataTime,
+          customDashboardNames, feedbackEmailAddress, funnelNames, funnels);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e; // sends appropriate HTTP response
@@ -290,46 +299,48 @@ public class DashboardResource {
   @GET
   @Path("/metric/{collection}/{metricFunction}/{metricViewType}/{baselineMillis}/{currentMillis}")
   public View getMetricView(@PathParam("collection") String collection,
-      @PathParam("metricFunction") String metricFunction, @PathParam("metricViewType") MetricViewType metricViewType,
-      @PathParam("baselineMillis") Long baselineMillis, @PathParam("currentMillis") Long currentMillis,
-      @Context UriInfo uriInfo) throws Exception {
+      @PathParam("metricFunction") String metricFunction,
+      @PathParam("metricViewType") MetricViewType metricViewType,
+      @PathParam("baselineMillis") Long baselineMillis,
+      @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
     MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
     // Metric view
     switch (metricViewType) {
-      case INTRA_DAY:
-        String timeUnit = metricFunction.split("_")[2];
-        int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
+    case INTRA_DAY:
+      String timeUnit = metricFunction.split("_")[2];
+      int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
 
-        long INTRA_PERIOD = INTRA_DAY_PERIOD;
-        if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
-          INTRA_PERIOD = INTRA_WEEK_PERIOD;
-        } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
-          INTRA_PERIOD = INTRA_MONTH_PERIOD;
-        }
+      long INTRA_PERIOD = INTRA_DAY_PERIOD;
+      if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
+        INTRA_PERIOD = INTRA_WEEK_PERIOD;
+      } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
+        INTRA_PERIOD = INTRA_MONTH_PERIOD;
+      }
 
-        // Dimension groups
-        Map<String, Map<String, List<String>>> dimensionGroups = null;
-        DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
-        if (dimensionGroupSpec != null) {
-          dimensionGroups = dimensionGroupSpec.getReverseMapping();
-        }
+      // Dimension groups
+      Map<String, Map<String, List<String>>> dimensionGroups = null;
+      DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
+      if (dimensionGroupSpec != null) {
+        dimensionGroups = dimensionGroupSpec.getReverseMapping();
+      }
 
-        String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_PERIOD),
-            new DateTime(currentMillis), dimensionValues, dimensionGroups);
-        LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
-        QueryResult result = queryCache.getQueryResult(serverUri, sql);
+      String sql =
+          SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_PERIOD),
+              new DateTime(currentMillis), dimensionValues, dimensionGroups);
+      LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+      QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
-        return new MetricViewTabular(schema, objectMapper, result, currentMillis, currentMillis - baselineMillis,
-            INTRA_PERIOD);
-      case TIME_SERIES_FULL:
-      case TIME_SERIES_OVERLAY:
-      case FUNNEL:
-        // n.b. will query /flot resource async
-        return new MetricViewTimeSeries(schema, ViewUtils.flattenDisjunctions(dimensionValues));
-      default:
-        throw new NotFoundException("No metric view implementation for " + metricViewType);
+      return new MetricViewTabular(schema, objectMapper, result, currentMillis,
+          currentMillis - baselineMillis, INTRA_PERIOD);
+    case TIME_SERIES_FULL:
+    case TIME_SERIES_OVERLAY:
+    case FUNNEL:
+      // n.b. will query /flot resource async
+      return new MetricViewTimeSeries(schema, ViewUtils.flattenDisjunctions(dimensionValues));
+    default:
+      throw new NotFoundException("No metric view implementation for " + metricViewType);
     }
   }
 
@@ -338,8 +349,8 @@ public class DashboardResource {
   public View getDimensionView(@PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction,
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
-      @PathParam("baselineMillis") Long baselineMillis, @PathParam("currentMillis") Long currentMillis,
-      @Context UriInfo uriInfo) throws Exception {
+      @PathParam("baselineMillis") Long baselineMillis,
+      @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
@@ -355,59 +366,61 @@ public class DashboardResource {
     // Dimension view
     Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
     switch (dimensionViewType) {
-      case MULTI_TIME_SERIES:
-        List<String> multiTimeSeriesDimensions = new ArrayList<>();
-        for (String dimension : schema.getDimensions()) {
-          if (!dimensionValues.containsKey(dimension)) {
-            // Generate SQL (n.b. will query /flot resource async)
-            dimensionValues.put(dimension, Arrays.asList("!"));
-            String sql =
-                SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, reverseDimensionGroups);
-            LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
-            dimensionValues.remove(dimension);
+    case MULTI_TIME_SERIES:
+      List<String> multiTimeSeriesDimensions = new ArrayList<>();
+      for (String dimension : schema.getDimensions()) {
+        if (!dimensionValues.containsKey(dimension)) {
+          // Generate SQL (n.b. will query /flot resource async)
+          dimensionValues.put(dimension, Arrays.asList("!"));
+          String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
+              dimensionValues, reverseDimensionGroups);
+          LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+          dimensionValues.remove(dimension);
 
-            multiTimeSeriesDimensions.add(dimension);
-          }
+          multiTimeSeriesDimensions.add(dimension);
         }
-        return new DimensionViewMultiTimeSeries(multiTimeSeriesDimensions);
-      case HEAT_MAP:
-      case TABULAR:
-        for (String dimension : schema.getDimensions()) {
-          if (!dimensionValues.containsKey(dimension)) {
-            // Generate SQL
-            dimensionValues.put(dimension, Arrays.asList("!"));
-            String sql =
-                SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, reverseDimensionGroups);
-            LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
-            dimensionValues.remove(dimension);
+      }
+      return new DimensionViewMultiTimeSeries(multiTimeSeriesDimensions);
+    case HEAT_MAP:
+    case TABULAR:
+      for (String dimension : schema.getDimensions()) {
+        if (!dimensionValues.containsKey(dimension)) {
+          // Generate SQL
+          dimensionValues.put(dimension, Arrays.asList("!"));
+          String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
+              dimensionValues, reverseDimensionGroups);
+          LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+          dimensionValues.remove(dimension);
 
-            // Query (in parallel)
-            resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
-          }
+          // Query (in parallel)
+          resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
         }
+      }
 
-        // Get the possible dimension groups
-        Map<String, Map<String, String>> dimensionGroups = null;
-        Map<String, Map<Pattern, String>> dimensionRegex = null;
-        DimensionGroupSpec groupSpec = configCache.getDimensionGroupSpec(collection);
-        if (groupSpec != null) {
-          dimensionGroups = groupSpec.getMapping();
-          dimensionRegex = groupSpec.getRegexMapping();
-        }
+      // Get the possible dimension groups
+      Map<String, Map<String, String>> dimensionGroups = null;
+      Map<String, Map<Pattern, String>> dimensionRegex = null;
+      DimensionGroupSpec groupSpec = configCache.getDimensionGroupSpec(collection);
+      if (groupSpec != null) {
+        dimensionGroups = groupSpec.getMapping();
+        dimensionRegex = groupSpec.getRegexMapping();
+      }
 
-        // Wait for all queries
-        Map<String, QueryResult> results = new HashMap<>(resultFutures.size());
-        for (Map.Entry<String, Future<QueryResult>> entry : resultFutures.entrySet()) {
-          results.put(entry.getKey(), entry.getValue().get());
-        }
+      // Wait for all queries
+      Map<String, QueryResult> results = new HashMap<>(resultFutures.size());
+      for (Map.Entry<String, Future<QueryResult>> entry : resultFutures.entrySet()) {
+        results.put(entry.getKey(), entry.getValue().get());
+      }
 
-        if (DimensionViewType.HEAT_MAP.equals(dimensionViewType)) {
-          return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups, dimensionRegex);
-        } else if (DimensionViewType.TABULAR.equals(dimensionViewType)) {
-          return new DimensionViewTabular(schema, objectMapper, results, dimensionGroups, dimensionRegex);
-        }
-      default:
-        throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
+      if (DimensionViewType.HEAT_MAP.equals(dimensionViewType)) {
+        return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups,
+            dimensionRegex);
+      } else if (DimensionViewType.TABULAR.equals(dimensionViewType)) {
+        return new DimensionViewTabular(schema, objectMapper, results, dimensionGroups,
+            dimensionRegex);
+      }
+    default:
+      throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }
   }
 

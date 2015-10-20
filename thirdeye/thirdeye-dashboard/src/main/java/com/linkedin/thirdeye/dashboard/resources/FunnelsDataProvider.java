@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,6 @@ import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
 
-
 public class FunnelsDataProvider {
   private static String FUNNELS_CONFIG_FILE_NAME = "funnels.yml";
 
@@ -43,22 +41,24 @@ public class FunnelsDataProvider {
   private final QueryCache queryCache;
   private final Map<String, CustomFunnelSpec> funnelSpecsMap;
 
-  public FunnelsDataProvider(File funnelsRoot, String serverUri, QueryCache queryCache, DataCache dataCache)
-      throws JsonProcessingException {
+  public FunnelsDataProvider(File funnelsRoot, String serverUri, QueryCache queryCache,
+      DataCache dataCache) throws JsonProcessingException {
     this.funnelsRoot = funnelsRoot;
     this.serverUri = serverUri;
     this.queryCache = queryCache;
     this.funnelSpecsMap = new HashMap<String, CustomFunnelSpec>();
     loadConfigs();
-    LOG.info("loaded custom funnel configs with {} ", new ObjectMapper().writeValueAsString(funnelSpecsMap));
+    LOG.info("loaded custom funnel configs with {} ",
+        new ObjectMapper().writeValueAsString(funnelSpecsMap));
   }
 
   public CustomFunnelSpec getFunnelSpecFor(String collection) {
     return funnelSpecsMap.get(collection);
   }
 
-  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels, long baselineMillis,
-      long currentMillis, MultivaluedMap<String, String> dimensionValues) throws Exception {
+  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels,
+      long baselineMillis, long currentMillis, MultivaluedMap<String, String> dimensionValues)
+          throws Exception {
     String[] funnels = selectedFunnels.split(",");
     if (funnels.length == 0) {
       return null;
@@ -68,7 +68,8 @@ public class FunnelsDataProvider {
 
     for (String funnel : funnels) {
       LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
-      funnelViews.add(getFunnelDataFor(collection, funnel, baselineMillis, currentMillis, dimensionValues));
+      funnelViews.add(
+          getFunnelDataFor(collection, funnel, baselineMillis, currentMillis, dimensionValues));
     }
 
     return funnelViews;
@@ -92,10 +93,11 @@ public class FunnelsDataProvider {
   // it will only present views for every hour within the 24 hour period
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
 
-  public FunnelHeatMapView getFunnelDataFor(String collection, String funnel, long baselineMillis, long currentMillis,
-      MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
+  public FunnelHeatMapView getFunnelDataFor(String collection, String funnel, long baselineMillis,
+      long currentMillis, MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
-    // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge them
+    // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
+    // them
 
     FunnelSpec spec = funnelSpecsMap.get(collection).getFunnels().get(funnel);
 
@@ -107,17 +109,18 @@ public class FunnelsDataProvider {
     DateTime baselineEnd = new DateTime(baselineMillis);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
-    String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()) + ")";
+    String metricFunction =
+        "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()) + ")";
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
     Map<String, Map<String, List<String>>> dimensionGroups =
         DimensionGroupSpec.emptySpec(collection).getReverseMapping();
 
-    String baselineSql =
-        SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, dimensionValuesMap, dimensionGroups);
-    String currentSql =
-        SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, dimensionValuesMap, dimensionGroups);
+    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd,
+        dimensionValuesMap, dimensionGroups);
+    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd,
+        dimensionValuesMap, dimensionGroups);
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
     LOG.info("Generated SQL: {}", baselineSql);
@@ -128,14 +131,16 @@ public class FunnelsDataProvider {
     Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentSql);
 
     // Baseline data
-    Map<Long, Number[]> baselineData = CustomDashboardResource.extractFunnelData(baselineResult.get());
-    Map<Long, Number[]> currentData = CustomDashboardResource.extractFunnelData(currentResult.get());
+    Map<Long, Number[]> baselineData =
+        CustomDashboardResource.extractFunnelData(baselineResult.get());
+    Map<Long, Number[]> currentData =
+        CustomDashboardResource.extractFunnelData(currentResult.get());
 
     long baselineOffsetMillis = currentEnd.getMillis() - baselineEnd.getMillis();
     long intraPeriod = currentEnd.getMillis() - currentStart.getMillis();
     // Compose result
-    List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData, currentEnd.getMillis(),
-        baselineOffsetMillis, intraPeriod);
+    List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
+        currentEnd.getMillis(), baselineOffsetMillis, intraPeriod);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();
@@ -147,11 +152,6 @@ public class FunnelsDataProvider {
     // Filter (since query result set will contain primitive metrics for each derived one)
     List<MetricDataRow> filteredTable = new ArrayList<>();
     int metricCount = spec.getActualMetricNames().size();
-    List<MetricDataRow> filteredCumulativeTable = new ArrayList<>();
-    Number[] cumulativeBaseline = new Number[metricCount];
-    Arrays.fill(cumulativeBaseline, 0.0);
-    Number[] cumulativeCurrent = new Number[metricCount];
-    Arrays.fill(cumulativeCurrent, 0.0);
 
     for (MetricDataRow row : table) {
       Number[] filteredBaseline = new Number[metricCount];
@@ -179,35 +179,29 @@ public class FunnelsDataProvider {
           }
         }
         filteredCurrent[i] = currentValue;
-
-        cumulativeBaseline[i] =
-            cumulativeBaseline[i].doubleValue() + (baselineValue == null ? 0.0 : baselineValue.doubleValue());
-        cumulativeCurrent[i] =
-            cumulativeCurrent[i].doubleValue() + (currentValue == null ? 0.0 : currentValue.doubleValue());
       }
 
-      MetricDataRow filteredRow =
-          new MetricDataRow(row.getBaselineTime(), filteredBaseline, row.getCurrentTime(), filteredCurrent);
+      MetricDataRow filteredRow = new MetricDataRow(row.getBaselineTime(), filteredBaseline,
+          row.getCurrentTime(), filteredCurrent);
       filteredTable.add(filteredRow);
-
-      Number[] cumulativeBaselineCopy = Arrays.copyOf(cumulativeBaseline, cumulativeBaseline.length);
-      Number[] cumulativeCurrentCopy = Arrays.copyOf(cumulativeCurrent, cumulativeCurrent.length);
-
-      MetricDataRow cumulativeFilteredRow =
-          new MetricDataRow(row.getBaselineTime(), cumulativeBaselineCopy, row.getCurrentTime(), cumulativeCurrentCopy);
-      filteredCumulativeTable.add(cumulativeFilteredRow);
     }
-    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentEnd, baselineEnd);
+
+    List<MetricDataRow> filteredCumulativeTable =
+        ViewUtils.computeCumulativeRows(filteredTable, metricCount);
+    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentEnd,
+        baselineEnd);
   }
 
-  // TODO : {dpatel : move this to config cache later, would have started with it but found that out late}
+  // TODO : {dpatel : move this to config cache later, would have started with it but found that out
+  // late}
   private void loadConfigs() {
     // looping throuh all the dirs, finding one funnels file and loading it up
     ObjectMapper ymlReader = new ObjectMapper(new YAMLFactory());
     for (File f : funnelsRoot.listFiles()) {
       File funnelsFile = new File(f, FUNNELS_CONFIG_FILE_NAME);
       if (!funnelsFile.exists()) {
-        LOG.warn("did not find funnels config file {} , in folder {}", FUNNELS_CONFIG_FILE_NAME, f.getName());
+        LOG.warn("did not find funnels config file {} , in folder {}", FUNNELS_CONFIG_FILE_NAME,
+            f.getName());
         continue;
       }
 

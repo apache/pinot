@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.dashboard.views;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -18,10 +16,10 @@ import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 
 import io.dropwizard.views.View;
 
-
 public class MetricViewTabular extends View {
-  private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>() {
-  };
+  private static final TypeReference<List<String>> STRING_LIST_REF =
+      new TypeReference<List<String>>() {
+      };
 
   private final CollectionSchema collectionSchema;
   private final ObjectMapper objectMapper;
@@ -33,8 +31,9 @@ public class MetricViewTabular extends View {
   private final Map<String, String> metricAliases;
   private final Map<String, String> dimensionAliases;
 
-  public MetricViewTabular(CollectionSchema collectionSchema, ObjectMapper objectMapper, QueryResult result,
-      long currentMillis, long baselineOffsetMillis, long intraDayPeriod) throws Exception {
+  public MetricViewTabular(CollectionSchema collectionSchema, ObjectMapper objectMapper,
+      QueryResult result, long currentMillis, long baselineOffsetMillis, long intraDayPeriod)
+          throws Exception {
     super("metric/intra-day.ftl");
     this.collectionSchema = collectionSchema;
     this.objectMapper = objectMapper;
@@ -74,7 +73,8 @@ public class MetricViewTabular extends View {
   private Map<String, String> generateDimensionAliases() {
     Map<String, String> aliases = new HashMap<>();
     for (int i = 0; i < collectionSchema.getDimensions().size(); i++) {
-      aliases.put(collectionSchema.getDimensions().get(i), collectionSchema.getDimensionAliases().get(i));
+      aliases.put(collectionSchema.getDimensions().get(i),
+          collectionSchema.getDimensionAliases().get(i));
     }
     return aliases;
   }
@@ -99,43 +99,14 @@ public class MetricViewTabular extends View {
       for (Map.Entry<String, Number[]> dataEntry : entry.getValue().entrySet()) {
         baselineData.put(Long.valueOf(dataEntry.getKey()), dataEntry.getValue());
       }
-      // No way to determine difference between baseline / current yet, so use the same map for both.
+      // No way to determine difference between baseline / current yet, so use the same map for
+      // both.
       Map<Long, Number[]> currentData = baselineData;
 
-      List<MetricDataRow> rows = ViewUtils.extractMetricDataRows(baselineData, currentData, currentMillis,
-          baselineOffsetMillis, intraDayPeriod);
-      List<MetricDataRow> cumulativeRows = new LinkedList<>();
-
-      if (!rows.isEmpty()) {
-
-        int metricCount = result.getMetrics().size();
-        Number[] cumulativeBaselineValues = new Number[metricCount];
-        Arrays.fill(cumulativeBaselineValues, 0.0);
-        Number[] cumulativeCurrentValues = new Number[metricCount];
-        Arrays.fill(cumulativeCurrentValues, 0.0);
-
-        for (MetricDataRow row : rows) {
-          Number[] baselineValues = row.getBaseline();
-          for (int i = 0; i < baselineValues.length; i++) {
-            cumulativeBaselineValues[i] = cumulativeBaselineValues[i].doubleValue()
-                + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
-          }
-
-          Number[] currentValues = row.getCurrent();
-          for (int i = 0; i < currentValues.length; i++) {
-            cumulativeCurrentValues[i] = cumulativeCurrentValues[i].doubleValue()
-                + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
-          }
-
-          Number[] cumulativeBaselineValuesCopy =
-              Arrays.copyOf(cumulativeBaselineValues, cumulativeBaselineValues.length);
-          Number[] cumulativeCurrentValuesCopy = Arrays.copyOf(cumulativeCurrentValues, cumulativeCurrentValues.length);
-
-          MetricDataRow cumulativeRow = new MetricDataRow(row.getBaselineTime(), cumulativeBaselineValuesCopy,
-              row.getCurrentTime(), cumulativeCurrentValuesCopy);
-          cumulativeRows.add(cumulativeRow);
-        }
-      }
+      List<MetricDataRow> rows = ViewUtils.extractMetricDataRows(baselineData, currentData,
+          currentMillis, baselineOffsetMillis, intraDayPeriod);
+      List<MetricDataRow> cumulativeRows =
+          ViewUtils.computeCumulativeRows(rows, result.getMetrics().size());
       tables.add(new MetricTable(getDimensionValues(entry.getKey()), rows, cumulativeRows));
     }
 
