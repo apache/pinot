@@ -22,7 +22,9 @@
    "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
    "stream.kafka.topic.name": "airlineStatsEvents",
    "stream.kafka.zk.broker.url": "localhost:2191/kafka",
-   "streamType": "kafka"
+   "streamType": "kafka",
+   "realtime.segment.flush.threshold.time" : "3600000",
+   "realtime.segment.flush.threshold.size" : "50000"
   }
  },
  "tableName": "airlineStats",

@@ -31,5 +31,8 @@ public interface StreamProviderConfig {
   String getStreamProviderClass();
 
   Schema getSchema();
-
+  
+  public int getSizeThresholdToFlushSegment();
+  
+  public long getTimeThresholdToFlushSegment();
 }
