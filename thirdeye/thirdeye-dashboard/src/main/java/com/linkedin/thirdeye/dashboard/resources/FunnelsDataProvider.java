@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -18,6 +19,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
@@ -30,6 +32,10 @@ import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
 
 public class FunnelsDataProvider {
+  private static final String DEFAULT_FUNNEL_NAME = "Primary Metric View";
+
+  private static final String DEFAULT_FUNNEL_VISUALIZATION_TYPE = "HEATMAP";
+
   private static String FUNNELS_CONFIG_FILE_NAME = "funnels.yml";
 
   private static final Logger LOG = LoggerFactory.getLogger(FunnelsDataProvider.class);
@@ -39,6 +45,7 @@ public class FunnelsDataProvider {
   private final File funnelsRoot;
   private final String serverUri;
   private final QueryCache queryCache;
+  private final DataCache dataCache;
   private final Map<String, CustomFunnelSpec> funnelSpecsMap;
 
   public FunnelsDataProvider(File funnelsRoot, String serverUri, QueryCache queryCache,
@@ -46,6 +53,7 @@ public class FunnelsDataProvider {
     this.funnelsRoot = funnelsRoot;
     this.serverUri = serverUri;
     this.queryCache = queryCache;
+    this.dataCache = dataCache;
     this.funnelSpecsMap = new HashMap<String, CustomFunnelSpec>();
     loadConfigs();
     LOG.info("loaded custom funnel configs with {} ",
@@ -59,19 +67,24 @@ public class FunnelsDataProvider {
   public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels,
       long baselineMillis, long currentMillis, MultivaluedMap<String, String> dimensionValues)
           throws Exception {
-    String[] funnels = selectedFunnels.split(",");
-    if (funnels.length == 0) {
-      return null;
-    }
-
     List<FunnelHeatMapView> funnelViews = new ArrayList<FunnelHeatMapView>();
 
-    for (String funnel : funnels) {
-      LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
-      funnelViews.add(
-          getFunnelDataFor(collection, funnel, baselineMillis, currentMillis, dimensionValues));
-    }
+    if (selectedFunnels != null && selectedFunnels.length() > 0) {
+      String[] funnels = selectedFunnels.split(",");
+      if (funnels.length == 0) {
+        return null;
+      }
 
+      for (String funnel : funnels) {
+        LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
+        FunnelSpec spec = funnelSpecsMap.get(collection).getFunnels().get(funnel);
+        funnelViews.add(
+            getFunnelDataFor(collection, spec, baselineMillis, currentMillis, dimensionValues));
+      }
+    }
+    FunnelSpec defaultSpec = createDefaultFunnelSpec(collection);
+    funnelViews.add(
+        getFunnelDataFor(collection, defaultSpec, baselineMillis, currentMillis, dimensionValues));
     return funnelViews;
   }
 
@@ -92,14 +105,11 @@ public class FunnelsDataProvider {
   // currently funnels will overlook the current granularity and baseline granularity
   // it will only present views for every hour within the 24 hour period
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
-
-  public FunnelHeatMapView getFunnelDataFor(String collection, String funnel, long baselineMillis,
+  public FunnelHeatMapView getFunnelDataFor(String collection, FunnelSpec spec, long baselineMillis,
       long currentMillis, MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
     // them
-
-    FunnelSpec spec = funnelSpecsMap.get(collection).getFunnels().get(funnel);
 
     // get current start and end time
     DateTime currentEnd = new DateTime(currentMillis);
@@ -195,7 +205,7 @@ public class FunnelsDataProvider {
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out
   // late}
   private void loadConfigs() {
-    // looping throuh all the dirs, finding one funnels file and loading it up
+    // looping through all the dirs, finding one funnels file and loading it up
     ObjectMapper ymlReader = new ObjectMapper(new YAMLFactory());
     for (File f : funnelsRoot.listFiles()) {
       File funnelsFile = new File(f, FUNNELS_CONFIG_FILE_NAME);
@@ -208,10 +218,37 @@ public class FunnelsDataProvider {
       try {
         CustomFunnelSpec spec = ymlReader.readValue(funnelsFile, CustomFunnelSpec.class);
         this.funnelSpecsMap.put(spec.getCollection(), spec);
+
       } catch (Exception e) {
         LOG.error("error loading the configFile", e);
       }
     }
+
+  }
+
+  /**
+   * Creates a default funnel spec consisting of all the collection metrics.
+   * @param collection
+   * @throws Exception
+   */
+  private FunnelSpec createDefaultFunnelSpec(String collection) throws Exception {
+    CollectionSchema collectionSchema = dataCache.getCollectionSchema(serverUri, collection);
+    FunnelSpec defaultSpec = new FunnelSpec();
+    defaultSpec.setName(DEFAULT_FUNNEL_NAME);
+    defaultSpec.setVisulizationType(DEFAULT_FUNNEL_VISUALIZATION_TYPE);
+    List<String> metricAliases = collectionSchema.getMetricAliases();
+    List<String> metrics = collectionSchema.getMetrics();
+    LinkedList<String> defaultFunnelMetrics = new LinkedList<>();
+    for (int i = 0; i < metricAliases.size(); i++) {
+      String metricAlias = metricAliases.get(i);
+      String metric = metrics.get(i);
+      metricAlias = metricAlias == null ? metric : metricAlias;
+      String defaultFunnelMetric = String.format("%s=%s", metricAlias, metric);
+
+      defaultFunnelMetrics.add(defaultFunnelMetric);
+    }
+    defaultSpec.setMetrics(defaultFunnelMetrics);
+    return defaultSpec;
   }
 
 }

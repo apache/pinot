@@ -265,7 +265,7 @@ public class DashboardResource {
 
     String selectedFunnels = uriInfo.getQueryParameters().getFirst("funnels");
 
-    if (funnelResource != null && selectedFunnels != null && selectedFunnels.length() > 0) {
+    if (funnelResource != null) {
       MultivaluedMap<String, String> filterMap = uriInfo.getQueryParameters();
       filterMap.remove("funnels");
       funnels = funnelResource.computeFunnelViews(collection, selectedFunnels, baselineMillis,
