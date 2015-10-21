@@ -21,36 +21,9 @@
                 <div id="dashboard-output-nav" data-uk-sticky>
                     <#include "common/headnav.ftl">
                 </div>
-                
-
-                <!--<div id="dashboard-metric-view">
-
-                    <#-- Metric view-->
-
-                <#--<#if (metricView.type == "INTRA_DAY")>
-                       <div id="dashboard-funnels-view">
-                           <#include "common/config-form.ftl">
-                            <#include "funnel-heatmap.ftl">
-                       </div>
-                       <#include "metric/intra-day.ftl">
-
-                <#elseif (metricView.type == "TIME_SERIES_FULL" || metricView.type == "TIME_SERIES_OVERLAY")>
-                     <#include "metric/time-series.ftl">
-                <#elseif (metricView.type == "FUNNEL")>
-                     <#include "metric/funnel.ftl">
-                <#else>
-                    <div class="uk-alert uk-alert-danger">
-                        <p>
-                            No metric view named ${metricView.type}
-                        </p>
-                    </div>
-                </#if>-->
-
-               </div>-->
 
                <#-- Dimension view-->
                 <div id="dashboard-dimension-view">
-                    <#include "common/dimension-header.ftl">
                     <#include "common/config-form.ftl">
 
                     <#if (dimensionView.type == "HEAT_MAP")>

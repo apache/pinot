@@ -36,12 +36,19 @@ li {
     margin-right: 2%;
 }
 
+.dimension-combination{
+    border: 1px solid #ddd;
+    position: relative;
+    top:-30px;
+    width: 99%;
+    background-color: #f5f5f5;
+}
+
 .dimension-combination table {
     width: 100%;
     background-color: #f5f5f5;
     min-height: 31px;
     table-layout: fixed;
-    border-bottom: 1px solid #ddd;
     overflow-wrap: break-word;
 }
 
@@ -105,6 +112,8 @@ li {
 .sidenav-feedback-link {
     padding: 8px;
 }
+
+
 
 /* Funnel Heatmap */
 
@@ -265,8 +274,8 @@ li {
 
 .heatmap-tabs,
 .funnel-tabs {
-    margin-top: 10px;
-    margin-bottom: -2px;
+    margin-top: 20px;
+    margin-bottom: -1px;
 }
 
 .heatmap-tabs li a,
@@ -316,6 +325,7 @@ li {
     margin: 0 0 15px;
     padding: 10px 0 0 12px;
     width: 100%;
+    border-bottom: 1px solid #ddd;
 }
 
 .title-box p {
@@ -327,7 +337,7 @@ li {
 .title-box table {
     width: 100%;
     table-layout: fixed;
-    line-height: 10px;
+    line-height: 18px;
     border-collapse: collapse;
     margin-bottom: 10px;
 }
@@ -520,6 +530,11 @@ td[dimension-val] {
     clear: both;
 }
 
+.time-series-legend {
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
 .dimension-heat-map-filter-label {
     position: relative;
     left: -25px;
@@ -596,12 +611,9 @@ td[dimension-val] {
     color: #ccc;
 }
 
-/* Both: Metric and Dimension */
+/* Both: used on multiple views */
 
-.time-series-legend {
-    overflow: hidden;
-    margin-bottom: 15px;
-}
+
 
 .up {
     background-color: green;
@@ -609,6 +621,11 @@ td[dimension-val] {
 
 .down {
     background-color: red;
+}
+
+.close{
+    position: absolute;
+    right:5px; color:#444;
 }
 
 .collapser h2,
@@ -646,6 +663,7 @@ td[dimension-val] {
 .hidden {
     display: none;
 }
+
 /* overwriting UIkit css */
 
 .uk-button.uk-active,

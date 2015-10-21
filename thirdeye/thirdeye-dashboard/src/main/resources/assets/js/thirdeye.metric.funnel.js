@@ -1,3 +1,4 @@
+/* related view removed from dashboard 09/2015 */
 $(document).ready(function() {
     $("#metric-funnel-placeholder").html("<p>Loading...</p>")
 

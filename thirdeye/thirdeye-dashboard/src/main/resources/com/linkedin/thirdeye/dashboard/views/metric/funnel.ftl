@@ -1,3 +1,4 @@
+<#-- view removed from dashboard 09/2015 -->
 <#-- stand-alone -->
 <#if (!metricView??)>
     <#include "../common/style.ftl">

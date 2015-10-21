@@ -1,16 +1,11 @@
 $(document).ready(function() {
+
     $(".view-links a").each(function(i, link) {
         var linkObj = $(link)
         var linkType = linkObj.attr('type')
         linkObj.click(function() {
             var dashboardPath = parsePath(window.location.pathname)
-            if (linkType === 'METRIC') {
-                dashboardPath.metricViewType = linkObj.attr('view')
-            } else if (linkType === 'DIMENSION') {
-                dashboardPath.dimensionViewType = linkObj.attr('view')
-            } else {
-                throw 'Invalid link type ' + linkType
-            }
+            dashboardPath.dimensionViewType = linkObj.attr('view')
             window.location.pathname = getDashboardPath(dashboardPath)
         })
     })
@@ -57,11 +52,20 @@ $(document).ready(function() {
 
    });
 
-
-    $(".dimension-selector").click(function() {
-        var dimensionLabel = $(this);
-        var panel = dimensionLabel.next();
-        panel.toggleClass("hidden")
+   //Clicking an element will show/hide the next sibling element
+    $(".dimension-selector, .select-button").click(function() {
+        var el = $(this);
+        var details = el.next();
+        details.toggleClass("hidden")
     })
+
+    //Clicking any close icon will close the closest parent div
+    $(".close").click(function() {
+            var el = $(this);
+            var parentDiv = el.closest("div");
+            parentDiv.toggleClass("hidden")
+        }
+
+    )
 
 })
