@@ -20,6 +20,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.transport.common.SegmentId;
@@ -32,6 +37,9 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  *
  */
 public class ServerToSegmentSetMap {
+  private static final ObjectMapper mapper = new ObjectMapper();
+  private static final Logger logger = LoggerFactory.getLogger(ServerToSegmentSetMap.class);
+  
   private Map<String, Set<String>> _serverToSegmentSetMap;
   private Map<ServerInstance, SegmentIdSet> _routingTable;
 
@@ -69,5 +77,19 @@ public class ServerToSegmentSetMap {
 
   public Map<ServerInstance, SegmentIdSet> getRouting() {
     return _routingTable;
+  }
+
+  @Override
+  public String toString() {
+    try {
+      JSONObject ret = new JSONObject();
+      for (ServerInstance i : _routingTable.keySet()) {
+        ret.put(i.toString(), mapper.writeValueAsString(_routingTable.get(i).getSegments()));
+      }
+      return ret.toString();
+    } catch (Exception e) {
+      logger.error("error toString()", e);
+      return "routing table : [ " + _routingTable + " ] ";
+    }
   }
 }

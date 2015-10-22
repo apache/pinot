@@ -112,8 +112,44 @@ public abstract class FieldSpec {
     this.isSingleValueField = isSingleValueField;
   }
 
-  public void setDefaultNullValue(Object defaultNullValue) {
-    this.defaultNullValue = defaultNullValue;
+  // This method is invoked via ObjectMapper, in Schema.java.
+  // Do NOT change the signature or remove it.
+  public void setDefaultNullValue(Object value) {
+    this.defaultNullValue = value;
+  }
+
+  // Called when trying to set a default null value from hadoop.
+  public void defaultNullValueFromString(String value) {
+    Object defaultNullObj;
+    try {
+      switch (getDataType()) {
+        case INT:
+        case INT_ARRAY:
+          defaultNullObj = new Integer(Integer.valueOf(value));
+          break;
+        case LONG:
+        case LONG_ARRAY:
+          defaultNullObj = new Long(Long.valueOf(value));
+          break;
+        case FLOAT:
+        case FLOAT_ARRAY:
+          defaultNullObj = new Float(Float.valueOf(value));
+          break;
+        case DOUBLE:
+        case DOUBLE_ARRAY:
+          defaultNullObj = new Double(Double.valueOf(value));
+          break;
+        case STRING:
+        case STRING_ARRAY:
+          defaultNullObj = value;
+          break;
+        default:
+          throw new UnsupportedOperationException("Default null value not supported for field type " + getDataType());
+      }
+    } catch (NumberFormatException e) {
+      throw new UnsupportedOperationException("Cannot set default null value", e);
+    }
+    this.defaultNullValue = defaultNullObj;
   }
 
   @Override

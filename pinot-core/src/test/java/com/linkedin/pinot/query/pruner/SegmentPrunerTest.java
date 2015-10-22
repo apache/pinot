@@ -17,6 +17,7 @@ package com.linkedin.pinot.query.pruner;
 
 import java.util.Map;
 
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -59,6 +60,11 @@ public class SegmentPrunerTest {
       @Override
       public SegmentMetadata getSegmentMetadata() {
         return new SegmentMetadata() {
+
+          @Override
+          public int getTotalAggregateDocs() {
+            return 0;
+          }
 
           @Override
           public Map<String, String> toMap() {
@@ -158,7 +164,17 @@ public class SegmentPrunerTest {
             // TODO Auto-generated method stub
             return false;
           }
+
+          @Override
+          public boolean hasStarTree() {
+            return false;
+          }
         };
+      }
+
+      @Override
+      public StarTreeIndexNode getStarTreeRoot() {
+        return null;
       }
 
       @Override

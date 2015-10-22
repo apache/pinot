@@ -76,6 +76,10 @@ public class ControllerRestApplication extends Application {
 
   @Override
   public Restlet createInboundRoot() {
+    // Remove server-side HTTP timeout (see http://stackoverflow.com/questions/12943447/restlet-server-socket-timeout)
+    getContext().getParameters().add("maxIoIdleTimeMs", "0");
+    getContext().getParameters().add("ioMaxIdleTimeMs", "0");
+
     router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
 

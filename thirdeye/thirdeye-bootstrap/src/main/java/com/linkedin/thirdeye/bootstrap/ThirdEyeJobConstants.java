@@ -18,7 +18,9 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_FOLDER_PERMISSION("thirdeye.folder.permission"),
   THIRDEYE_POLL_ENABLE("thirdeye.poll.enable"),
   THIRDEYE_POLL_FREQUENCY("thirdeye.poll.frequency"),
-  THIRDEYE_POLL_TIMEOUT("thirdeye.poll.timeout");
+  THIRDEYE_POLL_TIMEOUT("thirdeye.poll.timeout"),
+  THIRDEYE_COMPACTION("thirdeye.compaction"),
+  THIRDEYE_PRESERVE_TIME_COMPACTION("thirdeye.preserve.time.compaction");
 
   private final String propertyName;
 

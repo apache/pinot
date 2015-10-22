@@ -19,8 +19,7 @@ li{
     vertical-align: top;
 }
 
-#dashboard-metric-view,
-#dashboard-dimension-view {
+#dashboard-metric-view {
     padding: 2%;
 }
 
@@ -74,7 +73,6 @@ li{
 }
 
 /* Side nav */
-
 #sidenav-time-input-form .uk-form-row {
     margin-left: 5%;
 }
@@ -120,6 +118,71 @@ li{
 
 .sidenav-feedback-link{
     padding:8px;
+}
+
+#funnel-thumbnails table{
+    width: 20%;
+    height: 200px;
+    font-size:8px;
+    padding:0px;
+    border: 1px solid #ccc;
+    margin: auto;
+}
+
+/* Funnel Heatmap */
+.custom-funnel-section table{
+    line-height: 9px;
+    text-align: center;
+}
+
+#custom-funnels-container td:hover{
+    color: #808080;
+}
+
+.funnel-thumbnail-container{
+    background-color: #ddd;
+    text-align: center;
+    padding: 10px;
+}
+
+#funnel-thumbnails td{
+     padding: 0px;
+     font-size:3px;
+    line-height: 8px;
+ }
+
+#funnel-thumbnails tr:first-child td{
+    word-wrap: break-word;
+}
+
+#funnel-thumbnails .metric-list{
+    font-size: 9px;
+    font-weight:800;
+}
+
+#funnel-thumbnails>div{
+    display: inline-block;
+    border: 1px solid #000;
+    border-radius: 4px;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
+    margin: auto;
+    padding:5px;
+
+}
+
+#funnel-thumbnails>div:not(.uk-panel-box){
+    background-color: #ddd;
+}
+
+#funnel-thumbnails>div.uk-panel-box{
+    border: 1px solid #ccc;
+
+}
+
+#funnel-thumbnails>div:hover{
+    cursor: pointer;
+    background-color: #fff;
 }
 
 /* Metric */
@@ -347,6 +410,10 @@ td[dimension-val]{
     overflow: hidden;
 }
 
+.treemap-container * {
+    box-sizing: border-box;
+}
+
 .treemap-display-tbl{
     width: 100%;
 }
@@ -391,6 +458,7 @@ td[dimension-val]{
     -webkit-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
     -moz-box-shadow: 5px 5px rgba(0, 0, 0, 0.1);
     font-family: Calibri, Tahoma, Geneva, sans-serif;
+    z-index: 100;
 }
 
 
@@ -540,12 +608,18 @@ td[dimension-val]{
     padding-top:0px;
 }
 
+.hidden{
+    display : none;
+}
+
 /* overwriting UIkit css */
 .uk-button.uk-active, .uk-button:active{
     background-color: #ddd;
     color: #444;
     font-weight: 800;
 }
+
+
 
 
 

@@ -60,8 +60,8 @@ public class CommonConstants {
     /**
      * Resources names that are not Pinot resources (such as broker resource)
      */
-    public static final Set<String> NON_PINOT_RESOURCE_RESOURCE_NAMES = Collections.unmodifiableSet(Sets
-        .newHashSet(BROKER_RESOURCE_INSTANCE));
+    public static final Set<String> NON_PINOT_RESOURCE_RESOURCE_NAMES =
+        Collections.unmodifiableSet(Sets.newHashSet(BROKER_RESOURCE_INSTANCE));
 
     public static class DataSource {
       public static final String SCHEMA = "schema";
@@ -85,6 +85,10 @@ public class CommonConstants {
 
       public static class Realtime {
         public static final String STREAM_TYPE = "streamType";
+        // Time threshold that will keep the realtime segment open for before we convert it into an offline segment
+        public static final String REALTIME_SEGMENT_FLUSH_TIME = "realtime.segment.flush.threshold.time";
+        // Num records threshold in the realtime segment
+        public static final String REALTIME_SEGMENT_FLUSH_SIZE = "realtime.segment.flush.threshold.size";
 
         public static enum StreamType {
           kafka

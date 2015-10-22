@@ -40,6 +40,8 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 public class SegmentDeletionManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
+  private static final long MAX_DELETION_DELAY_SECONDS = 3600L;
+  private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
 
   private final ScheduledExecutorService _executorService;
   private final String _localDiskDir;
@@ -67,13 +69,17 @@ public class SegmentDeletionManager {
     _executorService.shutdownNow();
   }
 
-  public void deleteSegment(final String resourceName, final String segmentId) {
+  public void deleteSegment(final String tableName, final String segmentId) {
+    deleteSegmentWithDelay(tableName, segmentId, DEFAULT_DELETION_DELAY_SECONDS);
+  }
+
+  private void deleteSegmentWithDelay(final String tableName, final String segmentId, final long deletionDelaySeconds) {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(resourceName, segmentId);
+        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentId, deletionDelaySeconds);
       }
-    }, 2, TimeUnit.SECONDS);
+    }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
 
   /**
@@ -83,13 +89,14 @@ public class SegmentDeletionManager {
    * @param tableName
    * @param segmentId
    */
-  private synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, String segmentId) {
+  private synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, String segmentId, long deletionDelay) {
     // Check if segment got removed from ExternalView and IdealStates
     if (_helixAdmin.getResourceExternalView(_helixClusterName, tableName) == null ||
         _helixAdmin.getResourceIdealState(_helixClusterName, tableName) == null) {
       LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", tableName);
       return;
     }
+
     boolean isSegmentReadyToDelete = false;
     try {
       Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName).getStateMap(segmentId);
@@ -98,16 +105,33 @@ public class SegmentDeletionManager {
           && (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
         isSegmentReadyToDelete = true;
       } else {
-        LOGGER.info("Segment: {} is still in IdealStates: {} or ExternalView: {}, will wait for next retention period.", segmentId
-            , segmentToInstancesMapFromIdealStates.toString(), segmentToInstancesMapFromExternalView.toString());
+        long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
+        LOGGER.info("Segment: {} is still in IdealStates: {} or ExternalView: {}, will retry in {} seconds.", segmentId,
+            segmentToInstancesMapFromIdealStates, segmentToInstancesMapFromExternalView, effectiveDeletionDelay);
+        deleteSegmentWithDelay(tableName, segmentId, effectiveDeletionDelay);
+        return;
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while processing segment " + segmentId, e);
       isSegmentReadyToDelete = true;
     }
+
     if (isSegmentReadyToDelete) {
+      String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
       LOGGER.info("Trying to delete segment : {} from Property store.", segmentId);
-      _propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId), AccessOption.PERSISTENT);
+      boolean deletionFromPropertyStoreSuccessful = true;
+      if (_propertyStore.exists(segmentPropertyStorePath, AccessOption.PERSISTENT)) {
+        deletionFromPropertyStoreSuccessful = _propertyStore.remove(segmentPropertyStorePath, AccessOption.PERSISTENT);
+      }
+
+      if (!deletionFromPropertyStoreSuccessful) {
+        long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
+        LOGGER.warn("Failed to delete segment {} from property store, will retry in {} seconds.", segmentId,
+            effectiveDeletionDelay);
+        deleteSegmentWithDelay(tableName, segmentId, effectiveDeletionDelay);
+        return;
+      }
+
       switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
         case OFFLINE:
           if (_localDiskDir != null) {
@@ -129,7 +153,9 @@ public class SegmentDeletionManager {
           throw new UnsupportedOperationException("Not support ResourceType for semgnet - " + segmentId);
       }
     } else {
-      LOGGER.info("Segment: {} is still in IdealStates or ExternalView, will wait for next retention period.", segmentId);
+      long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
+      LOGGER.info("Segment: {} is still in IdealStates or ExternalView, will retry in {} seconds.", segmentId, effectiveDeletionDelay);
+      deleteSegmentWithDelay(tableName, segmentId, effectiveDeletionDelay);
     }
   }
 }

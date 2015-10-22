@@ -183,7 +183,7 @@ public class AnomalyTable {
     try {
       dbConfig.runSQL(buildAnomalyTableCreateStmt(dbConfig.getAnomalyTableName()));
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
+      throw new IOException(e);
     }
   }
 

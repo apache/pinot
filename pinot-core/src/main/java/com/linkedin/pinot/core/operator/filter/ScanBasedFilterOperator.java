@@ -39,9 +39,17 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
 
   private DataSource dataSource;
+  private Integer startDocId;
+  private Integer endDocId;
 
   public ScanBasedFilterOperator(DataSource dataSource) {
+    this(dataSource, null, null);
+  }
+
+  public ScanBasedFilterOperator(DataSource dataSource, Integer startDocId, Integer endDocId) {
     this.dataSource = dataSource;
+    this.startDocId = startDocId;
+    this.endDocId = endDocId;
   }
 
   @Override
@@ -64,6 +72,14 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
       docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
     } else {
       docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
+    }
+
+    if (startDocId != null) {
+      docIdSet.setStartDocId(startDocId);
+    }
+
+    if (endDocId != null) {
+      docIdSet.setEndDocId(endDocId);
     }
 
     return new ScanBlock(docIdSet);

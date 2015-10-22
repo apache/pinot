@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS `%s`(
   anomaly_score DOUBLE NOT NULL,
   anomaly_volume DOUBLE NOT NULL,
   properties VARCHAR(60000),
-  CONSTRAINT unique_anomaly UNIQUE (function_table, function_id, time_window, dimensions, anomaly_score)
+  CONSTRAINT unique_anomaly UNIQUE (function_table, function_id, time_window, anomaly_score)
 );

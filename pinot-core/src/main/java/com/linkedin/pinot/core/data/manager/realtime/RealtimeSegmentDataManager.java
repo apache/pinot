@@ -42,16 +42,8 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 
 public class RealtimeSegmentDataManager implements SegmentDataManager {
-  private static final int FIVE_MILLION = 5000000;
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
-
-  private final static String CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING =
-      "metadata.realtime.segment.timeInMillisToStopIndexing";
-  private final static String CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING =
-      "metadata.realtime.segment.numIndexedEventsToStopIndexing";
-  private final static long DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING = ONE_MINUTE_IN_MILLSEC * 60;
-  private final static long DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING = 5000000;
 
   private final String segmentName;
   private final Schema schema;
@@ -72,17 +64,13 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private TimerTask segmentStatusTask;
   private final RealtimeTableDataManager notifier;
   private Thread indexingThread;
-  private long timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
-  private long numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
+  
   private final String sortedColumn;
 
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
       RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema) throws Exception {
-    this.timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
-    segmentEndTimeThreshold = start + this.timeInMillisToStopIndexing;
-    this.numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
     this.schema = schema;
     if (tableConfig.getIndexingConfig().getSortedColumn().isEmpty()) {
       LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column");
@@ -105,6 +93,9 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
     this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
     this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
+    
+    segmentEndTimeThreshold = start + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    
     this.resourceDir = new File(resourceDataDir);
     this.resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!resourceTmpDir.exists()) {
@@ -116,7 +107,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig);
     this.kafkaStreamProvider.start();
     // lets create a new realtime segment
-    realtimeSegment = new RealtimeSegmentImpl(schema, FIVE_MILLION);
+    realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment());
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentName(segmentMetadata.getSegmentName());
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeResourceManager;
@@ -132,7 +123,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     indexingThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        // continue indexing until critertia is met
+        // continue indexing until criteria is met
         while (((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next()) && keepIndexing) {
         }
 
@@ -186,7 +177,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // start a schedule timer to keep track of the segment
     TimerService.timer.schedule(segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
     LOGGER.debug("finished scheduling keepIndexing timer check");
-
   }
 
   public void swap() throws Exception {
@@ -208,14 +198,14 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   private void computeKeepIndexing() {
     if (keepIndexing) {
-      LOGGER.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+      LOGGER.debug("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
           + " raw events, success = " + ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount()
           + " docs, total = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
-          || ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= numIndexedEventsToStopIndexing) {
+          || ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
         if (((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() == 0) {
           LOGGER.info("no new events coming in, extending the end time by another hour");
-          segmentEndTimeThreshold = System.currentTimeMillis() + this.timeInMillisToStopIndexing;
+          segmentEndTimeThreshold = System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
           return;
         }
         LOGGER.info("Stopped indexing due to reaching segment limit: "

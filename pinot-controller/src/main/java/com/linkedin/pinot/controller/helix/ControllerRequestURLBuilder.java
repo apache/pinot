@@ -145,4 +145,8 @@ public class ControllerRequestURLBuilder {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
   }
 
+  public String forSegmentDelete(String resourceName, String segmentName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles", resourceName, segmentName);
+  }
+
 }

@@ -4,6 +4,7 @@
       "dataType" : "FLOAT",
       "delimiter" : null,
       "singleValueField" : true,
+      "defaultNullValue" : "-1",
       "name" : "percent"
     }
   ],
@@ -12,6 +13,7 @@
       "dataType" : "STRING",
       "delimiter" : null,
       "singleValueField" : true,
+      "defaultNullValue" : " ",
       "name" : "dim1"
     },
     {

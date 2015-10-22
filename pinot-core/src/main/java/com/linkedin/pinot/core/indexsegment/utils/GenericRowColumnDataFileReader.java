@@ -95,7 +95,7 @@ public class GenericRowColumnDataFileReader {
     file = new RandomAccessFile(dataFile, "rw");
     long totalSize = rowSize * rows;
     if (isMmap)
-      byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSize);
+      byteBuffer = MmapUtils.mmapFile(file, FileChannel.MapMode.READ_ONLY, 0, totalSize, dataFile,  this.getClass().getSimpleName() + " byteBuffer");
     else {
       byteBuffer = MmapUtils
           .allocateDirectByteBuffer((int) totalSize, dataFile, this.getClass().getSimpleName() + " byteBuffer");

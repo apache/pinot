@@ -26,60 +26,63 @@ import java.util.List;
 import java.util.Map;
 
 public class StarTreeIndexNode implements Serializable {
-  private static final int ALL = -1;
-  private static final int GROUP = -2;
   private static final long serialVersionUID = 1;
 
-  private Integer nodeId;
-  private Integer level;
-  private Integer dimensionName;
-  private Integer dimensionValue;
-  private Integer childDimensionName;
+  private static final int ALL = -1;
+  private static final int GROUP = -2;
+
+  private int nodeId;
+  private int level;
+  private int dimensionName;
+  private int dimensionValue;
+  private int childDimensionName;
   private Map<Integer, StarTreeIndexNode> children;
   private StarTreeIndexNode parent;
+  private int startDocumentId;
+  private int documentCount;
 
   /**
    * An element in the StarTreeIndex.
    */
   public StarTreeIndexNode() {}
 
-  public Integer getNodeId() {
+  public int getNodeId() {
     return nodeId;
   }
 
-  public void setNodeId(Integer nodeId) {
+  public void setNodeId(int nodeId) {
     this.nodeId = nodeId;
   }
 
-  public Integer getLevel() {
+  public int getLevel() {
     return level;
   }
 
-  public void setLevel(Integer level) {
+  public void setLevel(int level) {
     this.level = level;
   }
 
-  public Integer getDimensionName() {
+  public int getDimensionName() {
     return dimensionName;
   }
 
-  public void setDimensionName(Integer dimensionName) {
+  public void setDimensionName(int dimensionName) {
     this.dimensionName = dimensionName;
   }
 
-  public Integer getDimensionValue() {
+  public int getDimensionValue() {
     return dimensionValue;
   }
 
-  public void setDimensionValue(Integer dimensionValue) {
+  public void setDimensionValue(int dimensionValue) {
     this.dimensionValue = dimensionValue;
   }
 
-  public Integer getChildDimensionName() {
+  public int getChildDimensionName() {
     return childDimensionName;
   }
 
-  public void setChildDimensionName(Integer childDimensionName) {
+  public void setChildDimensionName(int childDimensionName) {
     this.childDimensionName = childDimensionName;
   }
 
@@ -103,9 +106,25 @@ public class StarTreeIndexNode implements Serializable {
     return children == null;
   }
 
+  public int getStartDocumentId() {
+    return startDocumentId;
+  }
+
+  public void setStartDocumentId(int startDocumentId) {
+    this.startDocumentId = startDocumentId;
+  }
+
+  public int getDocumentCount() {
+    return documentCount;
+  }
+
+  public void setDocumentCount(int documentCount) {
+    this.documentCount = documentCount;
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName);
+    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName, startDocumentId, documentCount);
   }
 
   @Override
@@ -119,7 +138,9 @@ public class StarTreeIndexNode implements Serializable {
         && Objects.equal(dimensionName, n.getDimensionName())
         && Objects.equal(dimensionValue, n.getDimensionValue())
         && Objects.equal(childDimensionName, n.getChildDimensionName())
-        && Objects.equal(children, n.getChildren());
+        && Objects.equal(children, n.getChildren())
+        && Objects.equal(startDocumentId, n.getStartDocumentId())
+        && Objects.equal(documentCount, n.getDocumentCount());
   }
 
   @Override
@@ -131,6 +152,8 @@ public class StarTreeIndexNode implements Serializable {
         .add("dimensionValue", dimensionValue)
         .add("childDimensionName", childDimensionName)
         .add("childCount", children == null ? 0 : children.size())
+        .add("startDocumentId", startDocumentId)
+        .add("documentCount", documentCount)
         .toString();
   }
 

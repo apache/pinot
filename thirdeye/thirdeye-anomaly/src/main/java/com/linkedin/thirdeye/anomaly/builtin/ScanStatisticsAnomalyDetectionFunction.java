@@ -42,7 +42,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
   private static final String PROP_DEFAULT_NUM_SIMULATIONS = "1000";
   private static final String PROP_DEFAULT_MIN_INCREMENT = "1";
   private static final String PROP_DEFAULT_MAX_WINDOW_LEN = "" + TimeUnit.DAYS.toHours(7);
-  private static final String PROP_DEFAULT_BOOTSTRAP = "true";
+  private static final String PROP_DEFAULT_BOOTSTRAP = "false";
   private static final String PROP_DEFAULT_STL_TREND_BANDWIDTH = "0.5";
 
   private static final String PROP_DEFAULT_MONITORING_WINDOW_SIZE = "3";
@@ -183,9 +183,6 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     double[] observations = arraysFromSeries.getSecond();
     removeMissingValuesByAveragingNeighbors(observations);
 
-    // call stl library
-    double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal);
-
     int effectiveMaxWindowLength = (int) (monitoringWindow.totalBuckets() / bucketMillis);
     effectiveMaxWindowLength = Math.min(effectiveMaxWindowLength, maxWindowLength);
 
@@ -200,8 +197,11 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
         bootstrap);
 
     int numBucketsToScan = (int) ((monitoringWindow.getEnd() - monitoringWindow.getStart()) / bucketMillis);
-    int totalNumBuckets = observationsMinusSeasonality.length;
+    int totalNumBuckets = observations.length;
     int numTrain = totalNumBuckets - numBucketsToScan;
+
+ // call stl library
+    double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal, numTrain);
 
     // set of timestamps with anomalies
     Set<Long> anomalousTimestamps = new HashSet<Long>();
@@ -301,7 +301,7 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
    * @return
    *  The data with anomalies removed. Timestamps will no longer match this array.
    */
-  private double[] removeAnomalies(long[] timestamps, double[] data, Set<Long> anomalousTimestamps) {
+  public static double[] removeAnomalies(long[] timestamps, double[] data, Set<Long> anomalousTimestamps) {
     int collapsedIdx = 0;
     double[] dataWithAnomaliesRemoved = new double[timestamps.length];
     for (int i = 0; i < timestamps.length; i++) {
@@ -321,8 +321,9 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
    *
    * Note, the first data point cannot be a hole by construction from the conversion of MetricTimeSeries with
    * (min, max) times.
+   * (TODO): linear interpolation for missing data later.
    */
-  private void removeMissingValuesByAveragingNeighbors(double[] arr) {
+  public static void removeMissingValuesByAveragingNeighbors(double[] arr) {
     for (int i = 0; i < arr.length; i++) {
       if (Double.isNaN(arr[i])) {
         double sum = 0.0;
@@ -340,11 +341,17 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     }
   }
 
-  private double[] removeSeasonality(long[] timestamps, double[] series, int seasonality) {
+  private double[] removeSeasonality(long[] timestamps, double[] series, int seasonality, int numTrain) {
+    long[] trainTimestamps = Arrays.copyOfRange(timestamps, 0, numTrain);
+    double[] trainSeries =  Arrays.copyOfRange(series, 0, numTrain);
     STLDecomposition.Config config = new STLDecomposition.Config();
     config.setNumberOfObservations(seasonality);
-    config.setNumberOfInnerLoopPasses(2);
-    config.setNumberOfRobustnessIterations(4);
+    /*
+     * InnerLoopPasses set to 1 and RobustnessIterations set to 15 matches the stl using robust option in R implementation
+     * For reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html
+     */
+    config.setNumberOfInnerLoopPasses(1);
+    config.setNumberOfRobustnessIterations(15);
 
     /*
      * There isn't a particularly good reason to use these exact values other than that the results closely match the
@@ -354,15 +361,15 @@ public class ScanStatisticsAnomalyDetectionFunction implements AnomalyDetectionF
     config.setTrendComponentBandwidth(stlTrendBandwidth); // default is 0.5
 
     config.setPeriodic(true);
+    config.setNumberOfDataPoints(trainSeries.length);
     STLDecomposition stl = new STLDecomposition(config);
 
-    STLResult res = stl.decompose(timestamps, series);
+    STLResult res = stl.decompose(trainTimestamps, trainSeries);
 
-    double[] trend = res.getTrend();
-    double[] remainder = res.getRemainder();
-    double[] seasonalityRemoved = new double[trend.length];
-    for (int i = 0; i < trend.length; i++) {
-      seasonalityRemoved[i] = trend[i] + remainder[i];
+    double[] seasonal = res.getSeasonal();
+    double[] seasonalityRemoved = new double[series.length];
+    for (int i = 0; i < series.length; i++) {
+      seasonalityRemoved[i] = series[i] - seasonal[i%seasonality];
     }
     return seasonalityRemoved;
   }

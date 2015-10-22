@@ -59,4 +59,9 @@ public class CfgBasedRouting implements RoutingTable {
   public void shutdown() {
     // Nothing to be done here
   }
+
+  @Override
+  public String dumpSnapShot() throws Exception {
+    return null;
+  }
 }

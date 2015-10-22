@@ -2,7 +2,7 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.codehaus.jackson.JsonParseException;
@@ -168,9 +168,9 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
   private Representation getAllTables() throws JSONException {
     JSONObject object = new JSONObject();
     JSONArray tableArray = new JSONArray();
-    List<String> tableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    Set<String> tableNames = _pinotHelixResourceManager.getAllUniquePinotRawTableNames();
     for (String pinotTableName : tableNames) {
-      tableArray.put(TableNameBuilder.extractRawTableName(pinotTableName));
+      tableArray.put(pinotTableName);
     }
     object.put("tables", tableArray);
     return new StringRepresentation(object.toString());

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
+import com.linkedin.pinot.core.operator.MatchEntireSegmentDocIdSetBlock;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 
 import java.io.Serializable;
@@ -101,13 +102,46 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
       _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
     }
 
-    while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
-      if (!_isGroupByColumnsContainMultiValueColumn) {
-        final long groupKey = getGroupKey(docId);
-        _tempAggregationResults.put(groupKey,
-            _aggregationFunction.aggregate(_tempAggregationResults.get(groupKey), docId, _aggregationFunctionBlocks));
+    if (!_isGroupByColumnsContainMultiValueColumn) {
+      int dictionaryLength = _dictionaries[0].length();
 
+      // Special case: 1 column, small dictionary (<=256 values)
+      if (_groupBy.getColumnsSize() == 1 && dictionaryLength <= 256) {
+        final Serializable[] aggregates = new Serializable[dictionaryLength];
+        final BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
+
+        // Special case: entire block matches
+        if (docIdSetBlock instanceof MatchEntireSegmentDocIdSetBlock) {
+          int rowCount = docIdSetBlock.getSearchableLength();
+          blockValIterator.reset();
+          for (int row = 0; row < rowCount; ++row) {
+            int index = blockValIterator.nextIntVal();
+            aggregates[index] = _aggregationFunction.aggregate(aggregates[index], row, _aggregationFunctionBlocks);
+          }
+        } else {
+          while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+            blockValIterator.skipTo(docId);
+            int index = blockValIterator.nextIntVal();
+            aggregates[index] = _aggregationFunction.aggregate(aggregates[index], docId, _aggregationFunctionBlocks);
+          }
+        }
+
+        for (int i = 0; i < aggregates.length; i++) {
+          Serializable aggregate = aggregates[i];
+          if (aggregate != null) {
+            long key = i;
+            _tempAggregationResults
+                .put(key, _aggregationFunction.combineTwoValues(_tempAggregationResults.get(key), aggregate));
+          }
+        }
       } else {
+        while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+          final long groupKey = getGroupKey(docId);
+          _tempAggregationResults.put(groupKey, _aggregationFunction.aggregate(_tempAggregationResults.get(groupKey), docId, _aggregationFunctionBlocks));
+        }
+      }
+    } else {
+      while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
         for (long groupKey : getGroupKeys(docId)) {
           _tempAggregationResults.put(groupKey,
               _aggregationFunction.aggregate(_tempAggregationResults.get(groupKey), docId, _aggregationFunctionBlocks));

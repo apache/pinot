@@ -16,6 +16,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -194,6 +195,7 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
 
   private static final String OPT_POLLING_INTERVAL = "pollingInterval";
   private static final String OPT_TIME_RANGE = "timeRange";
+  private static final String OPT_ISO_TIME_RANGE = "isoTimeRange";
   private static final String OPT_DETECTION_INTERVAL = "detectionInterval";
   private static final String OPT_HELP = "help";
   private static final String OPT_SETUP = "setup";
@@ -216,6 +218,11 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
         .longOpt(OPT_TIME_RANGE)
         .desc("Run anomaly detection on this time range in milliseconds. If detection interval is also specified, "
             + "the application will run in simulated online mode.")
+        .hasArgs().numberOfArgs(2).build());
+    options.addOption(Option.builder("i")
+        .argName("start end")
+        .longOpt(OPT_ISO_TIME_RANGE)
+        .desc("Same as --timeRange but args are in ISO8601 format")
         .hasArgs().numberOfArgs(2).build());
     options.addOption(Option.builder("d")
         .argName("size-unit")
@@ -291,10 +298,20 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
           /*
            * Run anomaly detection
            */
-          if (cmd.hasOption(OPT_TIME_RANGE)) {
+          if (cmd.hasOption(OPT_TIME_RANGE) || cmd.hasOption(OPT_ISO_TIME_RANGE)) {
             // run with fixed time range
-            String[] timeRangeArgs = cmd.getOptionValues(OPT_TIME_RANGE);
-            TimeRange timeRange = new TimeRange(Long.valueOf(timeRangeArgs[0]), Long.valueOf(timeRangeArgs[1]));
+            TimeRange timeRange;
+
+            if (cmd.hasOption(OPT_TIME_RANGE)) {
+              String[] timeRangeArgs = cmd.getOptionValues(OPT_TIME_RANGE);
+              timeRange = new TimeRange(Long.valueOf(timeRangeArgs[0]), Long.valueOf(timeRangeArgs[1]));
+            } else {
+              String[] timeRangeArgs = cmd.getOptionValues(OPT_ISO_TIME_RANGE);
+              timeRange = new TimeRange(
+                  ISODateTimeFormat.dateTimeParser().parseDateTime(timeRangeArgs[0]).getMillis(),
+                  ISODateTimeFormat.dateTimeParser().parseDateTime(timeRangeArgs[1]).getMillis());
+            }
+
             if (cmd.hasOption(OPT_DETECTION_INTERVAL)) {
               runWithOnlineSimulation(config, timeRange, detectionInterval);
             } else {

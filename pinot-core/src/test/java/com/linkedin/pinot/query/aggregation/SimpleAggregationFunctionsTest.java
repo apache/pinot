@@ -77,14 +77,14 @@ public class SimpleAggregationFunctionsTest {
       List<Serializable> aggregationResults = getLongValues(i);
       List<Serializable> combinedResults = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
 
-      assertEquals(combinedResults.get(0), (long) (((i - 1) * i) / 2));
+      assertEquals(((Number)combinedResults.get(0)).longValue(), (long) (((i - 1) * i) / 2));
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getLongValues(i);
       Serializable reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals(reduceResults, (long) ((i - 1) * i) / 2);
+      assertEquals(((Number)reduceResults).longValue(), (long) ((i - 1) * i) / 2);
     }
   }
 

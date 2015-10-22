@@ -37,14 +37,12 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   private Duration _retentionDuration;
 
   public TimeRetentionStrategy(String timeUnit, String timeValue) throws Exception {
-    try {
-      _retentionDuration = new Duration(TimeUtils.toMillis(timeUnit, timeValue));
-      if (_retentionDuration.getMillis() <= 0) {
-        throw new RuntimeException("No retention value set.");
-      }
-    } catch (Exception e) {
+    long retentionMillis = TimeUtils.toMillis(timeUnit, timeValue);
+    if (retentionMillis == Long.MIN_VALUE) {
+      LOGGER.error("Failed to set retention duration, timeUnit: {}, timeValue: {}", timeUnit, timeValue);
       _retentionDuration = null;
-      throw e;
+    } else {
+      _retentionDuration = new Duration(TimeUtils.toMillis(timeUnit, timeValue));
     }
   }
 

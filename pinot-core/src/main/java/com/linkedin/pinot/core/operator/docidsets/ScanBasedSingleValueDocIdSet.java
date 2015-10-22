@@ -15,15 +15,14 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 
 public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
@@ -69,7 +68,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   public static class BlockValSetBasedDocIdIterator implements BlockDocIdIterator {
     int currentDocId = -1;
     BlockSingleValIterator valueIterator;
-    private Set<Integer> dictIdSet;
+    private IntSet dictIdSet;
     private int startDocId;
     private int endDocId;
 
@@ -80,10 +79,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
         setStartDocId(Constants.EOF);
         setEndDocId(Constants.EOF);
       } else {
-        this.dictIdSet = new HashSet<Integer>(dictIds.length);
-        for (int dictId : dictIds) {
-          dictIdSet.add(dictId);
-        }
+        this.dictIdSet = new IntOpenHashSet(dictIds);
         setStartDocId(blockMetadata.getStartDocId());
         setEndDocId(blockMetadata.getEndDocId());
       }

@@ -378,6 +378,11 @@ public class RetentionManagerTest {
           segmentTimeUnit.toMillis(Long.parseLong(endTime)));
 
       @Override
+      public int getTotalAggregateDocs() {
+        return 0;
+      }
+
+      @Override
       public Map<String, String> toMap() {
         final Map<String, String> ret = new HashMap<String, String>();
         ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
@@ -465,6 +470,11 @@ public class RetentionManagerTest {
 
       @Override
       public boolean hasDictionary(String columnName) {
+        return false;
+      }
+
+      @Override
+      public boolean hasStarTree() {
         return false;
       }
 

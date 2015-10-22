@@ -61,7 +61,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
-    addRealtimeTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+    addRealtimeTable(tableName, timeColumnName, timeColumnType, 900, "Days", kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
         null, null, avroFile);
   }
 

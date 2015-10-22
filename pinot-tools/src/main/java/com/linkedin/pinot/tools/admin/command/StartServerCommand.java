@@ -42,7 +42,7 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
-  private String _dataDir = TMP_DIR  + "pinotServerData";
+  private String _dataDir = TMP_DIR + "pinotServerData";
 
   @Option(name = "-segmentDir", required = false, metaVar = "<string>",
       usage = "Path to directory containing segments.")
@@ -54,14 +54,13 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.",
-      forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
+      usage = "Broker Starter Config file.", forbids = { "-serverHost", "-serverPort", "-dataDir", "-segmentDir", })
   private String _configFileName;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
-
 
   public boolean getHelp() {
     return _help;
@@ -100,11 +99,11 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
   @Override
   public String toString() {
     if (_configFileName != null) {
-      return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort "
-          + _serverPort + " -configFileName " + _configFileName + " -zkAddress " + _zkAddress);
+      return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort " + _serverPort
+          + " -configFileName " + _configFileName + " -zkAddress " + _zkAddress);
     } else {
-      return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort "
-          + _serverPort + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
+      return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort " + _serverPort
+          + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
     }
   }
 
@@ -145,8 +144,8 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
 
     LOGGER.info("Executing command: " + toString());
     final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);
-
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminServer.pid");
+    String pidFile = ".pinotAdminServer-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
     return true;
   }
 }

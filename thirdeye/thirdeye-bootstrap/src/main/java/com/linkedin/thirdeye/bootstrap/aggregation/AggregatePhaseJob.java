@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_INPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_DIMENSION_STATS_PATH;
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -81,6 +82,7 @@ public class AggregatePhaseJob extends Configured {
     private MetricSchema metricSchema;
     private String[] dimensionValues;
     private RollupThresholdFunction rollupThresholdFunction;
+    private boolean preserveTime;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -101,6 +103,7 @@ public class AggregatePhaseJob extends Configured {
         Map<String, String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
         rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
+        preserveTime = Boolean.parseBoolean(configuration.get(AGG_PRESERVE_TIME_COMPACTION.toString()));
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -124,17 +127,23 @@ public class AggregatePhaseJob extends Configured {
 
       // Create flattened series
       MetricTimeSeries originalSeries = starTreeRecord.getMetricTimeSeries();
-      MetricTimeSeries flattenedSeries = new MetricTimeSeries(metricSchema);
-      for (Long time : originalSeries.getTimeWindowSet()) {
-        for (int i = 0; i < metricNames.size(); i++) {
-          String name = metricNames.get(i);
-          flattenedSeries.increment(-1, name, originalSeries.get(time, name));
+      MetricTimeSeries series = originalSeries;
+      LOGGER.info("Preserve time {} ", preserveTime);
+
+      if (!preserveTime) {
+        MetricTimeSeries flattenedSeries = new MetricTimeSeries(metricSchema);
+        for (Long time : originalSeries.getTimeWindowSet()) {
+          for (int i = 0; i < metricNames.size(); i++) {
+            String name = metricNames.get(i);
+            flattenedSeries.increment(-1, name, originalSeries.get(time, name));
+          }
         }
+        series = flattenedSeries;
       }
 
       byte[] serializedKey = starTreeRecord.getDimensionKey().toBytes();
 
-      byte[] serializedMetrics = flattenedSeries.toBytes();
+      byte[] serializedMetrics = series.toBytes();
 
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -258,6 +267,7 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
     getAndSetConfiguration(configuration, AGG_DIMENSION_STATS_PATH);
+    getAndSetConfiguration(configuration, AGG_PRESERVE_TIME_COMPACTION);
     LOGGER.info("Input path dir: " + inputPathDir);
 
     FileInputFormat.setInputDirRecursive(job, true);
