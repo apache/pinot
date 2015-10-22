@@ -20,6 +20,8 @@ import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.URLConnection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.Attributes;
 import org.slf4j.Logger;
@@ -85,13 +87,26 @@ public class Utils {
    * Write the version of Pinot components to the log at info level.
    */
   public static void logVersions() {
+    for (Map.Entry<String, String> titleVersionEntry : getComponentVersions().entrySet()) {
+      LOGGER.info("Using {} {}", titleVersionEntry.getKey(), titleVersionEntry.getValue());
+    }
+  }
+
+  /**
+   * Obtains the version numbers of the Pinot components.
+   *
+   * @return A map of component name to component version.
+   */
+  public static Map<String, String> getComponentVersions() {
+    Map<String, String> componentVersions = new HashMap<>();
+
     // Find the first URLClassLoader, walking up the chain of parent classloaders if necessary
     ClassLoader classLoader = Utils.class.getClassLoader();
     while (classLoader != null && !(classLoader instanceof URLClassLoader)) {
       classLoader = classLoader.getParent();
     }
 
-    if (classLoader instanceof URLClassLoader) {
+    if (classLoader != null) {
       URLClassLoader urlClassLoader = (URLClassLoader) classLoader;
       URL[] urls = urlClassLoader.getURLs();
       for (URL url : urls) {
@@ -109,7 +124,7 @@ public class Utils {
               String implementationTitle = attributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE);
               String implementationVersion = attributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION);
               if (implementationTitle != null && implementationTitle.contains("pinot")) {
-                LOGGER.info("Using {} {}", implementationTitle, implementationVersion);
+                componentVersions.put(implementationTitle, implementationVersion);
               }
             }
           }
@@ -118,5 +133,7 @@ public class Utils {
         }
       }
     }
+
+    return componentVersions;
   }
 }

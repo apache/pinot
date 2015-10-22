@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
 import com.linkedin.pinot.controller.api.swagger.Paths;
 
@@ -104,6 +105,8 @@ public class ControllerRestApplication extends Application {
 
     // Uploading Downloading segments
     attachRoutesForClass(router, PinotSegmentUploadRestletResource.class);
+
+    attachRoutesForClass(router, PinotVersionRestletResource.class);
 
     router.attach("/api", SwaggerResource.class);
 
