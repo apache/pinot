@@ -1,19 +1,5 @@
 package com.linkedin.thirdeye.dashboard.util;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.util.EntityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,6 +9,18 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.SegmentDescriptor;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class DataCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataCache.class);
@@ -32,27 +30,21 @@ public class DataCache {
   private final LoadingCache<String, CollectionSchema> schemas;
   private final LoadingCache<String, List<String>> collections;
   private final LoadingCache<String, List<SegmentDescriptor>> segments;
-  private final LoadingCache<String, Map<String, Collection<String>>> dimensionValues;
 
   // TODO: Expose cache expiration policy via config for each
   public DataCache(final HttpClient httpClient, final ObjectMapper objectMapper) {
-    this.schemas = CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.SECONDS)
+    this.schemas = CacheBuilder.newBuilder()
+        .expireAfterWrite(5, TimeUnit.SECONDS)
         .build(new CollectionSchemaCacheLoader(httpClient, objectMapper));
-    this.collections = CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.SECONDS)
+    this.collections = CacheBuilder.newBuilder()
+        .expireAfterWrite(5, TimeUnit.SECONDS)
         .build(new CollectionsCacheLoader(httpClient, objectMapper));
-    this.segments = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES) // longer
-                                                                                     // because
-                                                                                     // request
-                                                                                     // involves
-                                                                                     // file system
-                                                                                     // operations
+    this.segments = CacheBuilder.newBuilder()
+        .expireAfterAccess(5, TimeUnit.MINUTES) // longer because request involves file system operations
         .build(new SegmentsCacheLoader(httpClient, objectMapper));
-    this.dimensionValues = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.SECONDS)
-        .build(new DimensionsCacheLoader(httpClient, objectMapper));
   }
 
-  public CollectionSchema getCollectionSchema(String serverUri, String collection)
-      throws Exception {
+  public CollectionSchema getCollectionSchema(String serverUri, String collection) throws Exception {
     return schemas.get(serverUri + "/collections/" + URLEncoder.encode(collection, ENCODING));
   }
 
@@ -60,41 +52,13 @@ public class DataCache {
     return collections.get(serverUri + "/collections");
   }
 
-  public List<SegmentDescriptor> getSegmentDescriptors(String serverUri, String collection)
-      throws Exception {
-    String cacheKey =
-        serverUri + "/collections/" + URLEncoder.encode(collection, ENCODING) + "/segments";
+  public List<SegmentDescriptor> getSegmentDescriptors(String serverUri, String collection) throws Exception {
+    String cacheKey = serverUri + "/collections/" + URLEncoder.encode(collection, ENCODING) + "/segments";
     List<SegmentDescriptor> descriptors = segments.get(cacheKey);
     if (descriptors.isEmpty()) {
       segments.invalidate(cacheKey); // don't cache when there is no data
     }
     return descriptors;
-  }
-
-  public Map<String, Collection<String>> getDimensionValues(String serverUri, String collection,
-      long start, long end, Map<String, Collection<String>> fixedValues) throws Exception {
-    StringBuilder cacheKey = new StringBuilder(serverUri + "/dimensions/"
-        + URLEncoder.encode(collection, ENCODING) + "/" + start + "/" + end);
-
-    if (fixedValues != null) {
-      boolean firstQueryParam = true;
-      for (Map.Entry<String, Collection<String>> entry : fixedValues.entrySet()) {
-        String name = entry.getKey();
-        for (String value : entry.getValue()) {
-          if (firstQueryParam) {
-            cacheKey.append("?");
-            firstQueryParam = false;
-          } else {
-            cacheKey.append("&");
-          }
-          cacheKey
-              .append(URLEncoder.encode(name, ENCODING) + "=" + URLEncoder.encode(value, ENCODING));
-        }
-      }
-    }
-
-    return dimensionValues.get(cacheKey.toString());
-
   }
 
   public void clear() {
@@ -125,8 +89,7 @@ public class DataCache {
         List<String> dimensionAliases = new ArrayList<>();
         for (JsonNode dimension : json.get("dimensions")) {
           dimensions.add(dimension.get("name").asText());
-          dimensionAliases.add(!dimension.has("alias") || dimension.get("alias").isNull() ? null
-              : dimension.get("alias").asText());
+          dimensionAliases.add(!dimension.has("alias") || dimension.get("alias").isNull() ? null : dimension.get("alias").asText());
         }
         schema.setDimensions(dimensions);
         schema.setDimensionAliases(dimensionAliases);
@@ -136,8 +99,7 @@ public class DataCache {
         List<String> metricAliases = new ArrayList<>();
         for (JsonNode metric : json.get("metrics")) {
           metrics.add(metric.get("name").asText());
-          metricAliases.add(!metric.has("alias") || metric.get("alias").isNull() ? null
-              : metric.get("alias").asText());
+          metricAliases.add(!metric.has("alias") || metric.get("alias").isNull() ? null : metric.get("alias").asText());
         }
         schema.setMetrics(metrics);
         schema.setMetricAliases(metricAliases);
@@ -164,9 +126,7 @@ public class DataCache {
       HttpGet httpGet = new HttpGet(URI.create(uri));
       HttpResponse response = httpClient.execute(httpGet);
       try {
-        collections = objectMapper.readValue(response.getEntity().getContent(),
-            new TypeReference<List<String>>() {
-            });
+        collections = objectMapper.readValue(response.getEntity().getContent(), new TypeReference<List<String>>(){});
       } finally {
         EntityUtils.consume(response.getEntity());
       }
@@ -190,41 +150,12 @@ public class DataCache {
       HttpGet httpGet = new HttpGet(URI.create(uri));
       HttpResponse response = httpClient.execute(httpGet);
       try {
-        descriptors = objectMapper.readValue(response.getEntity().getContent(),
-            new TypeReference<List<SegmentDescriptor>>() {
-            });
+        descriptors = objectMapper.readValue(response.getEntity().getContent(), new TypeReference<List<SegmentDescriptor>>(){});
       } finally {
         EntityUtils.consume(response.getEntity());
       }
       LOGGER.info("Cached segment descriptors for {}: {}", uri, descriptors);
       return descriptors;
-    }
-  }
-
-  private static class DimensionsCacheLoader
-      extends CacheLoader<String, Map<String, Collection<String>>> {
-    private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
-
-    DimensionsCacheLoader(HttpClient httpClient, ObjectMapper objectMapper) {
-      this.httpClient = httpClient;
-      this.objectMapper = objectMapper;
-    }
-
-    @Override
-    public Map<String, Collection<String>> load(String uri) throws Exception {
-      Map<String, Collection<String>> dimensions;
-      HttpGet httpGet = new HttpGet(URI.create(uri));
-      HttpResponse response = httpClient.execute(httpGet);
-      try {
-        dimensions = objectMapper.readValue(response.getEntity().getContent(),
-            new TypeReference<Map<String, Collection<String>>>() {
-            });
-      } finally {
-        EntityUtils.consume(response.getEntity());
-      }
-      LOGGER.info("Cached dimension values for {}: {}", uri, dimensions);
-      return dimensions;
     }
   }
 }

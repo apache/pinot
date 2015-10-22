@@ -19,12 +19,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.annotation.Timed;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.query.ThirdEyeQueryExecutor;
 
 @Path("/dimensions")
 @Produces(MediaType.APPLICATION_JSON)
 public class DimensionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionResource.class);
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final ThirdEyeQueryExecutor queryExecutor;
 
@@ -39,8 +42,7 @@ public class DimensionResource {
       @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
       @Context UriInfo uriInfo) throws Exception {
     Map<String, Collection<String>> fixedDimensions = toMap(uriInfo.getQueryParameters());
-    LOGGER.info("Retrieving dimension values for {} between {} and {} with fixed values {}",
-        collection, startTime, endTime, fixedDimensions);
+
     DateTime queryStart = new DateTime(startTime);
     DateTime queryEnd = new DateTime(endTime);
     return queryExecutor.getAllDimensionValues(collection, queryStart, queryEnd, fixedDimensions);

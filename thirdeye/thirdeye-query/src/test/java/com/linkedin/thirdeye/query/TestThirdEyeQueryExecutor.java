@@ -5,9 +5,9 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.PrintWriter;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +15,9 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import com.google.common.collect.ImmutableList;
+import com.linkedin.thirdeye.api.*;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -24,16 +27,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.StarTree;
-import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
@@ -60,9 +55,9 @@ public class TestThirdEyeQueryExecutor {
     for (int i = 0; i < 1024; i++) {
       MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
       timeSeries.increment(i / 256, "M", 1);
-      starTree.add(new StarTreeRecordImpl(config, new DimensionKey(new String[] {
-          "A" + i % 2, "B" + i % 4, "C" + i % 8
-      }), timeSeries));
+      starTree.add(new StarTreeRecordImpl(config,
+          new DimensionKey(new String[]{"A" + i % 2, "B" + i % 4, "C" + i % 8}),
+          timeSeries));
     }
 
     PrintWriter printWriter = new PrintWriter(System.out);
@@ -72,11 +67,11 @@ public class TestThirdEyeQueryExecutor {
     StarTreeManager starTreeManager = mock(StarTreeManager.class);
     when(starTreeManager.getCollections()).thenReturn(ImmutableSet.of(config.getCollection()));
     when(starTreeManager.getConfig(config.getCollection())).thenReturn(config);
-    when(starTreeManager.getStarTrees(config.getCollection()))
-        .thenReturn(ImmutableMap.of(new File("dummy"), starTree));
-    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId()))
-        .thenReturn(new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
-            0L, Long.MAX_VALUE, "HOURLY", TimeUnit.HOURS.toString(), 1, IndexFormat.VARIABLE_SIZE));
+    when(starTreeManager.getStarTrees(config.getCollection())).thenReturn(ImmutableMap.of(new File("dummy"), starTree));
+    when(starTreeManager.getIndexMetadata(starTree.getRoot().getId())).thenReturn
+    (new IndexMetadata(0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
+        0L, Long.MAX_VALUE, 0L, Long.MAX_VALUE,
+        "HOURLY", TimeUnit.HOURS.toString(), 1, IndexFormat.VARIABLE_SIZE));
 
     executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     queryExecutor = new ThirdEyeQueryExecutor(executorService, starTreeManager);
@@ -89,16 +84,16 @@ public class TestThirdEyeQueryExecutor {
 
   @Test
   public void testSimple_all() throws Exception {
-    ThirdEyeQuery query =
-        new ThirdEyeQuery().setCollection(config.getCollection()).setStart(start).setEnd(end);
+    ThirdEyeQuery query = new ThirdEyeQuery()
+        .setCollection(config.getCollection())
+        .setStart(start)
+        .setEnd(end);
 
     ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
 
     Assert.assertEquals(result.getData().size(), 1);
 
-    DimensionKey key = new DimensionKey(new String[] {
-        "*", "*", "*"
-    });
+    DimensionKey key = new DimensionKey(new String[] { "*", "*", "*" });
     MetricTimeSeries timeSeries = result.getData().get(key);
     Assert.assertNotNull(timeSeries);
     checkData(timeSeries, 256);
@@ -106,8 +101,11 @@ public class TestThirdEyeQueryExecutor {
 
   @Test
   public void testGroupBy_simple() throws Exception {
-    ThirdEyeQuery query = new ThirdEyeQuery().setCollection(config.getCollection()).setStart(start)
-        .setEnd(end).addGroupByColumn("A");
+    ThirdEyeQuery query = new ThirdEyeQuery()
+        .setCollection(config.getCollection())
+        .setStart(start)
+        .setEnd(end)
+        .addGroupByColumn("A");
 
     ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
 
@@ -116,9 +114,7 @@ public class TestThirdEyeQueryExecutor {
     Assert.assertEquals(result.getData().size(), 3); // including other
 
     for (int i = 0; i < 2; i++) {
-      DimensionKey key = new DimensionKey(new String[] {
-          "A" + i, "*", "*"
-      });
+      DimensionKey key = new DimensionKey(new String[] { "A" + i, "*", "*" });
       Assert.assertNotNull(result.getData().get(key));
       checkData(result.getData().get(key), 128);
     }
@@ -126,40 +122,41 @@ public class TestThirdEyeQueryExecutor {
 
   @Test
   public void testOr_simple() throws Exception {
-    ThirdEyeQuery query = new ThirdEyeQuery().setCollection(config.getCollection()).setStart(start)
-        .setEnd(end).addDimensionValue("A", "A0").addDimensionValue("A", "A1");
+    ThirdEyeQuery query = new ThirdEyeQuery()
+        .setCollection(config.getCollection())
+        .setStart(start)
+        .setEnd(end)
+        .addDimensionValue("A", "A0")
+        .addDimensionValue("A", "A1");
 
     ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
 
     Assert.assertEquals(result.getData().size(), 1);
 
-    DimensionKey key = new DimensionKey(new String[] {
-        "A0 OR A1", "*", "*"
-    });
+    DimensionKey key = new DimensionKey(new String[] { "A0 OR A1", "*", "*" });
     Assert.assertNotNull(result.getData().get(key));
     checkData(result.getData().get(key), 256); // A can be A0 or A1, so all
   }
 
   @Test
   public void testGroupBy_includesOtherNode() throws Exception {
-    ThirdEyeQuery query = new ThirdEyeQuery().setCollection(config.getCollection()).setStart(start)
-        .setEnd(end).addGroupByColumn("B"); // tree has split on B
+    ThirdEyeQuery query = new ThirdEyeQuery()
+        .setCollection(config.getCollection())
+        .setStart(start)
+        .setEnd(end)
+        .addGroupByColumn("B"); // tree has split on B
 
     ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
 
     Assert.assertEquals(result.getData().size(), 5); // Including other category
 
     for (int i = 0; i < 4; i++) {
-      DimensionKey key = new DimensionKey(new String[] {
-          "*", "B" + i, "*"
-      });
+      DimensionKey key = new DimensionKey(new String[]{ "*", "B" + i, "*"});
       Assert.assertNotNull(result.getData().get(key));
       checkData(result.getData().get(key), 64);
     }
 
-    DimensionKey otherKey = new DimensionKey(new String[] {
-        "*", "?", "*"
-    });
+    DimensionKey otherKey = new DimensionKey(new String[] { "*", "?", "*" });
     Assert.assertNotNull(result.getData().get(otherKey));
     checkData(result.getData().get(otherKey), 0);
   }
@@ -168,60 +165,23 @@ public class TestThirdEyeQueryExecutor {
   public void testSelectTreeForQueryTimeRange_alignedDataTime() throws Exception {
     Object[][] indexMetadata = {
         // MONTHLY
-        {
-            UUID.randomUUID(),
-            createIndexMetadata("2014-10TZ", "2014-11TZ", "2014-10TZ", "2014-11TZ", "MONTHLY")
-        }, {
-            UUID.randomUUID(),
-            createIndexMetadata("2014-11TZ", "2014-12TZ", "2014-11TZ", "2014-12TZ", "MONTHLY")
-        }, {
-            UUID.randomUUID(),
-            createIndexMetadata("2014-12TZ", "2015-01TZ", "2014-12TZ", "2015-01TZ", "MONTHLY")
-        }, // use
+        { UUID.randomUUID(), createIndexMetadata("2014-10TZ", "2014-11TZ", "2014-10TZ", "2014-11TZ", "MONTHLY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-11TZ", "2014-12TZ", "2014-11TZ", "2014-12TZ", "MONTHLY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12TZ", "2015-01TZ", "2014-12TZ", "2015-01TZ", "MONTHLY") }, // use
         // DAILY
-        {
-            UUID.randomUUID(), createIndexMetadata("2014-12-24TZ", "2014-12-25TZ", "2014-12-24TZ",
-                "2014-12-25TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2014-12-25TZ", "2014-12-26TZ", "2014-12-25TZ",
-                "2014-12-26TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2014-12-26TZ", "2014-12-27TZ", "2014-12-26TZ",
-                "2014-12-27TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2014-12-27TZ", "2014-12-28TZ", "2014-12-27TZ",
-                "2014-12-28TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2014-12-28TZ", "2014-12-29TZ", "2014-12-28TZ",
-                "2014-12-29TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2014-12-29TZ", "2014-12-30TZ", "2014-12-29TZ",
-                "2014-12-30TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2014-12-30TZ", "2014-12-31TZ", "2014-12-30TZ",
-                "2014-12-31TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2015-01-01TZ", "2015-01-02TZ", "2015-01-01TZ",
-                "2015-01-02TZ", "DAILY")
-        }, // use
-        {
-            UUID.randomUUID(), createIndexMetadata("2015-01-02TZ", "2015-01-03TZ", "2015-01-02TZ",
-                "2015-01-03TZ", "DAILY")
-        }, // use
-        {
-            UUID.randomUUID(), createIndexMetadata("2015-01-03TZ", "2015-01-04TZ", "2015-01-03TZ",
-                "2015-01-04TZ", "DAILY")
-        }, // use
-        {
-            UUID.randomUUID(), createIndexMetadata("2015-01-04TZ", "2015-01-05TZ", "2015-01-04TZ",
-                "2015-01-05TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2015-01-05TZ", "2015-01-06TZ", "2015-01-05TZ",
-                "2015-01-06TZ", "DAILY")
-        }, {
-            UUID.randomUUID(), createIndexMetadata("2015-01-06TZ", "2015-01-07TZ", "2015-01-06TZ",
-                "2015-01-07TZ", "DAILY")
-        },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-24TZ", "2014-12-25TZ", "2014-12-24TZ", "2014-12-25TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-25TZ", "2014-12-26TZ", "2014-12-25TZ", "2014-12-26TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-26TZ", "2014-12-27TZ", "2014-12-26TZ", "2014-12-27TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-27TZ", "2014-12-28TZ", "2014-12-27TZ", "2014-12-28TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-28TZ", "2014-12-29TZ", "2014-12-28TZ", "2014-12-29TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-29TZ", "2014-12-30TZ", "2014-12-29TZ", "2014-12-30TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2014-12-30TZ", "2014-12-31TZ", "2014-12-30TZ", "2014-12-31TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2015-01-01TZ", "2015-01-02TZ", "2015-01-01TZ", "2015-01-02TZ", "DAILY") }, // use
+        { UUID.randomUUID(), createIndexMetadata("2015-01-02TZ", "2015-01-03TZ", "2015-01-02TZ", "2015-01-03TZ", "DAILY") }, // use
+        { UUID.randomUUID(), createIndexMetadata("2015-01-03TZ", "2015-01-04TZ", "2015-01-03TZ", "2015-01-04TZ", "DAILY") }, // use
+        { UUID.randomUUID(), createIndexMetadata("2015-01-04TZ", "2015-01-05TZ", "2015-01-04TZ", "2015-01-05TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2015-01-05TZ", "2015-01-06TZ", "2015-01-05TZ", "2015-01-06TZ", "DAILY") },
+        { UUID.randomUUID(), createIndexMetadata("2015-01-06TZ", "2015-01-07TZ", "2015-01-06TZ", "2015-01-07TZ", "DAILY") },
     };
 
     Map<UUID, IndexMetadata> indexMetadataMap = new HashMap<>();
@@ -229,28 +189,19 @@ public class TestThirdEyeQueryExecutor {
       indexMetadataMap.put((UUID) datum[0], (IndexMetadata) datum[1]);
     }
 
-    DateTime queryStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime("2014-12-02TZ")
-        .toDateTime(DateTimeZone.UTC);
-    DateTime queryEndTime = ISODateTimeFormat.dateTimeParser().parseDateTime("2015-01-04TZ")
-        .toDateTime(DateTimeZone.UTC);
+    DateTime queryStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime("2014-12-02TZ").toDateTime(DateTimeZone.UTC);
+    DateTime queryEndTime = ISODateTimeFormat.dateTimeParser().parseDateTime("2015-01-04TZ").toDateTime(DateTimeZone.UTC);
     TimeRange queryTimeRange = new TimeRange(queryStartTime.getMillis(), queryEndTime.getMillis());
 
     List<UUID> ids = queryExecutor.selectTreesToQuery(indexMetadataMap, queryTimeRange);
 
-    Assert.assertEquals(ids,
-        ImmutableList.of((UUID) indexMetadata[2][0], (UUID) indexMetadata[10][0],
-            (UUID) indexMetadata[11][0], (UUID) indexMetadata[12][0], (UUID) indexMetadata[13][0]));
-  }
-
-  @Test
-  public void testGetDimensions() throws Exception {
-    Map<String, Collection<String>> dimensionValues = queryExecutor.getAllDimensionValues(
-        config.getCollection(), start, end, Collections.<String, Collection<String>> emptyMap());
-    Map<String, Collection<String>> expectedValues = new HashMap<>();
-    expectedValues.put("A", Arrays.asList("A0", "A1", "?"));
-    expectedValues.put("B", Arrays.asList("B0", "B1", "B2", "B3", "?"));
-    expectedValues.put("C", Arrays.asList("C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "?"));
-    Assert.assertEquals(dimensionValues, expectedValues);
+    Assert.assertEquals(ids, ImmutableList.of(
+        (UUID) indexMetadata[2][0],
+        (UUID) indexMetadata[10][0],
+        (UUID) indexMetadata[11][0],
+        (UUID) indexMetadata[12][0],
+        (UUID) indexMetadata[13][0]
+    ));
   }
 
   private void checkData(MetricTimeSeries timeSeries, long expectedValue) {
@@ -263,20 +214,27 @@ public class TestThirdEyeQueryExecutor {
     }
   }
 
-  private IndexMetadata createIndexMetadata(String startWallTime, String endWallTime,
-      String startDataTime, String endDataTime, String timeGranularity) {
-    DateTime startWall = ISODateTimeFormat.dateTimeParser().parseDateTime(startWallTime)
-        .toDateTime(DateTimeZone.UTC);
-    DateTime endWall =
-        ISODateTimeFormat.dateTimeParser().parseDateTime(endWallTime).toDateTime(DateTimeZone.UTC);
-    DateTime startData = ISODateTimeFormat.dateTimeParser().parseDateTime(startDataTime)
-        .toDateTime(DateTimeZone.UTC);
-    DateTime endData =
-        ISODateTimeFormat.dateTimeParser().parseDateTime(endDataTime).toDateTime(DateTimeZone.UTC);
+  private IndexMetadata createIndexMetadata(String startWallTime,
+                                            String endWallTime,
+                                            String startDataTime,
+                                            String endDataTime,
+                                            String timeGranularity) {
+    DateTime startWall = ISODateTimeFormat.dateTimeParser().parseDateTime(startWallTime).toDateTime(DateTimeZone.UTC);
+    DateTime endWall = ISODateTimeFormat.dateTimeParser().parseDateTime(endWallTime).toDateTime(DateTimeZone.UTC);
+    DateTime startData = ISODateTimeFormat.dateTimeParser().parseDateTime(startDataTime).toDateTime(DateTimeZone.UTC);
+    DateTime endData = ISODateTimeFormat.dateTimeParser().parseDateTime(endDataTime).toDateTime(DateTimeZone.UTC);
 
-    return new IndexMetadata(startData.getMillis(), endData.getMillis(), startData.getMillis(),
-        endData.getMillis(), startWall.getMillis(), endWall.getMillis(), startWall.getMillis(),
-        endWall.getMillis(), timeGranularity, TimeUnit.MILLISECONDS.toString(), 1,
+    return new IndexMetadata(startData.getMillis(),
+        endData.getMillis(),
+        startData.getMillis(),
+        endData.getMillis(),
+        startWall.getMillis(),
+        endWall.getMillis(),
+        startWall.getMillis(),
+        endWall.getMillis(),
+        timeGranularity,
+        TimeUnit.MILLISECONDS.toString(),
+        1,
         IndexFormat.VARIABLE_SIZE);
   }
 }

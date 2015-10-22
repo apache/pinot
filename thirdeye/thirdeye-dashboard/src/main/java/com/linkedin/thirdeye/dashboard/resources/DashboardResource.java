@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -218,11 +217,11 @@ public class DashboardResource {
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineMillis") Long baselineMillis,
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
-    Map<String, String> fixedDimensionValues =
+    Map<String, String> dimensionValues =
         UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
 
     // Check no group bys
-    for (Map.Entry<String, String> entry : fixedDimensionValues.entrySet()) {
+    for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
       if ("!".equals(entry.getValue())) {
         throw new WebApplicationException(
             new IllegalArgumentException("No group by dimensions allowed"),
@@ -281,13 +280,8 @@ public class DashboardResource {
       View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
           baselineMillis, currentMillis, uriInfo);
 
-      // TODO check if earliest/latest data time is appropriate for selection.
-      // if desired, fixedDimensionValues can be passed as a param to filter out unavailable
-      // dimension values.
-      Map<String, Collection<String>> dimensionValuesOptions = dataCache.getDimensionValues(
-          serverUri, collection, earliestDataTime.getMillis(), latestDataTime.getMillis(), null);
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
-          dimensionValuesOptions, new DateTime(baselineMillis), new DateTime(currentMillis),
+          new DateTime(baselineMillis), new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
           new DimensionView(dimensionView, dimensionViewType), earliestDataTime, latestDataTime,
           customDashboardNames, feedbackEmailAddress, funnelNames, funnels);
