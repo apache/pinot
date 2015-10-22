@@ -117,8 +117,10 @@ public class JoinPhaseJob extends Configured {
       String joinKeyValue = joinKeyExtractor.extractJoinKey(sourceName, record);
       LOGGER.info("Join Key:{}", joinKeyValue);
 
-      context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
+      if (!"INVALID".equals(joinKeyValue)) {
+        context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
           mapOutputValue.toBytes()));
+      }
     }
 
     @Override

@@ -31,7 +31,7 @@ public class MapOutputValue {
     this.schemaName = schemaName;
     this.record = record;
   }
-  
+
 
   public String getSchemaName() {
     return schemaName;
@@ -77,10 +77,8 @@ public class MapOutputValue {
     byte[] sourceNameBytes = new byte[length];
     dataInputStream.read(sourceNameBytes);
     String schemaName = new String(sourceNameBytes);
-    System.out.println("schema name:" + schemaName + "  length:"+ length);
 
     int recordDataLength = dataInputStream.readInt();
-    System.out.println("Data Buffer length:" + recordDataLength);
 
     byte[] recordBytes = new byte[recordDataLength];
     dataInputStream.read(recordBytes);
