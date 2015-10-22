@@ -66,6 +66,7 @@ import org.slf4j.LoggerFactory;
 
 public class ControllerRestApplication extends Application {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
+  private static final String ONE_HOUR_IN_MILLIS = Long.toString(3600L * 1000L);
 
   private static String CONSOLE_WEBAPP_ROOT_PATH;
   public static Router router;
@@ -78,8 +79,8 @@ public class ControllerRestApplication extends Application {
   @Override
   public Restlet createInboundRoot() {
     // Remove server-side HTTP timeout (see http://stackoverflow.com/questions/12943447/restlet-server-socket-timeout)
-    getContext().getParameters().add("maxIoIdleTimeMs", "0");
-    getContext().getParameters().add("ioMaxIdleTimeMs", "0");
+    getContext().getParameters().add("maxIoIdleTimeMs", ONE_HOUR_IN_MILLIS);
+    getContext().getParameters().add("ioMaxIdleTimeMs", ONE_HOUR_IN_MILLIS);
 
     router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
