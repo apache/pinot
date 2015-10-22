@@ -38,6 +38,8 @@ import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 public class ThirdEyeQueryExecutor {
+  private static final String UNKNOWN_DIMENSION_VALUE = "";
+  private static final String OTHER_DIMENSION_VALUE = "?";
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeQueryExecutor.class);
   private static final Joiner OR_JOINER = Joiner.on(" OR ");
 
@@ -114,7 +116,6 @@ public class ThirdEyeQueryExecutor {
           dimensionSetFutures.add(executorService.submit(new Callable<Set<String>>() {
             @Override
             public Set<String> call() throws Exception {
-              // will probably want to do this for each metric (groupByColumn).
               return starTree.getDimensionValues(groupByColumn, query.getDimensionValues().asMap());
             }
           }));
@@ -183,11 +184,7 @@ public class ThirdEyeQueryExecutor {
     }
 
     // Aggregate across all trees and apply functions
-    for (
-
-    Map.Entry<DimensionKey, MetricTimeSeries> entry : mergedResults.entrySet())
-
-    {
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : mergedResults.entrySet()) {
       MetricTimeSeries timeSeries = entry.getValue();
       // Compute aggregate functions
       for (ThirdEyeFunction function : query.getFunctions()) {
@@ -219,54 +216,52 @@ public class ThirdEyeQueryExecutor {
 
   /**
    * Returns sorted list of all observed dimension values for each unfixed dimension in the provided
-   * query range, using the provided fixed dimension values.
+   * query range, using the provided fixed dimension values. UNKNOWN("") and OTHER("?") dimension
+   * values
+   * will appear at the end of the collection if present.
    * @throws ExecutionException
    * @throws InterruptedException
    */
-  public Map<String, Collection<String>> getAllDimensionValues(String collection,
-      DateTime queryStart, DateTime queryEnd, final Map<String, Collection<String>> fixedDimensions)
+  public Map<String, Collection<String>> getAllDimensionValues(final String collection,
+      final DateTime queryStart, final DateTime queryEnd,
+      final Map<String, Collection<String>> fixedDimensions)
           throws InterruptedException, ExecutionException {
-    final StarTreeConfig config = starTreeManager.getConfig(collection);
-
-    Map<String, Collection<String>> dimensionValues = new HashMap<>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      String dimensionName = dimensionSpec.getName();
-      if (fixedDimensions.containsKey(dimensionName)) {
-        // dimension already fixed, no need to explore further.
-        continue;
-      }
-      // TODO use futures on this as well?
-      List<String> values =
-          getDimensionValues(collection, queryStart, queryEnd, dimensionName, fixedDimensions);
-      dimensionValues.put(dimensionName, values);
-    }
-
-    return dimensionValues;
-  }
-
-  /**
-   * Returns sorted list of all observed dimension values for the given dimension in the provided
-   * query range, using the provided fixed dimension values.
-   * @throws ExecutionException
-   * @throws InterruptedException
-   */
-  private List<String> getDimensionValues(String collection, DateTime queryStart, DateTime queryEnd,
-      final String dimension, final Map<String, Collection<String>> fixedDimensions)
-          throws InterruptedException, ExecutionException {
-
     final StarTreeConfig config = starTreeManager.getConfig(collection);
 
     if (config == null) {
       throw new IllegalArgumentException("No collection " + collection);
     }
 
-    final List<String> dimensionNames = new ArrayList<>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      dimensionNames.add(dimensionSpec.getName());
-    }
-
     final TreeSelections treeSelections = calculateTreeSelections(config, queryStart, queryEnd);
     final List<StarTree> starTrees = getStarTrees(config, treeSelections.getAllTreeIdsToQuery());
+
+    Map<String, Collection<String>> dimensionValues = new HashMap<>(config.getDimensions().size());
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
+      final String dimensionName = dimensionSpec.getName();
+      if (fixedDimensions.containsKey(dimensionName)) {
+        // dimension already fixed, no need to explore further.
+        continue;
+      }
+      // TODO trying to submit the getDimensionValues calls via executorService/Futures results in
+      // hanging?
+      dimensionValues.put(dimensionName,
+          getDimensionValues(dimensionName, fixedDimensions, starTrees));
+    }
+
+    return dimensionValues;
+  }
+
+  /**
+   * Returns sorted list of all observed dimension values for the given dimension
+   * from the provided StarTrees, using the provided fixed dimension values.
+   * UNKNOWN("") and OTHER("?") dimension values will appear at the end of the
+   * collection if present.
+   * @throws ExecutionException
+   * @throws InterruptedException
+   */
+  private List<String> getDimensionValues(final String dimension,
+      final Map<String, Collection<String>> fixedDimensions, List<StarTree> starTrees)
+          throws InterruptedException, ExecutionException {
 
     List<Future<Set<String>>> dimensionValuesFutures = new LinkedList<>();
 
@@ -287,8 +282,16 @@ public class ThirdEyeQueryExecutor {
       dimensionValues.addAll(values);
     }
 
+    boolean hasOther = dimensionValues.remove(OTHER_DIMENSION_VALUE);
+    boolean hasUnknown = dimensionValues.remove(UNKNOWN_DIMENSION_VALUE);
     List<String> sortedValues = new ArrayList<>(dimensionValues);
     Collections.sort(sortedValues);
+    if (hasOther) {
+      sortedValues.add(OTHER_DIMENSION_VALUE);
+    }
+    if (hasUnknown) {
+      dimensionValues.add(UNKNOWN_DIMENSION_VALUE);
+    }
     return sortedValues;
   }
 

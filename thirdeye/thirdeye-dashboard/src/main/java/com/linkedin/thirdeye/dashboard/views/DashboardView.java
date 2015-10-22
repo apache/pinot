@@ -1,14 +1,19 @@
 package com.linkedin.thirdeye.dashboard.views;
 
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-import io.dropwizard.views.View;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 import org.joda.time.DateTime;
 
-import java.util.List;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+
+import io.dropwizard.views.View;
 
 public class DashboardView extends View {
   private final String collection;
   private final CollectionSchema collectionSchema;
+  private final Map<String, Collection<String>> dimensionValuesOptions;
   private final DateTime baselineTime;
   private final DateTime currentTime;
   private final MetricView metricView;
@@ -20,22 +25,16 @@ public class DashboardView extends View {
   private final List<String> funnelNames;
   private final List<FunnelHeatMapView> funnelViews;
 
-  public DashboardView(String collection,
-                       CollectionSchema collectionSchema,
-                       DateTime baselineTime,
-                       DateTime currentTime,
-                       MetricView metricView,
-                       DimensionView dimensionView,
-                       DateTime earliestDataTime,
-                       DateTime latestDataTime,
-                       List<String> customDashboardNames,
-                       String feedbackEmailAddress,
-                       List<String> allFunnelNames,
-                       List<FunnelHeatMapView> funnelViews) {
+  public DashboardView(String collection, CollectionSchema collectionSchema,
+      Map<String, Collection<String>> dimensionValues, DateTime baselineTime, DateTime currentTime,
+      MetricView metricView, DimensionView dimensionView, DateTime earliestDataTime,
+      DateTime latestDataTime, List<String> customDashboardNames, String feedbackEmailAddress,
+      List<String> allFunnelNames, List<FunnelHeatMapView> funnelViews) {
     super("dashboard.ftl");
     this.collection = collection;
     this.feedbackEmailAddress = feedbackEmailAddress;
     this.collectionSchema = collectionSchema;
+    this.dimensionValuesOptions = dimensionValues;
     this.baselineTime = baselineTime;
     this.currentTime = currentTime;
     this.metricView = metricView;
@@ -46,7 +45,6 @@ public class DashboardView extends View {
     this.funnelNames = allFunnelNames;
     this.funnelViews = funnelViews;
   }
-
 
   public List<String> getFunnelNames() {
     return funnelNames;
@@ -61,11 +59,15 @@ public class DashboardView extends View {
   }
 
   public String getFeedbackEmailAddress() {
-        return feedbackEmailAddress;
-    }
+    return feedbackEmailAddress;
+  }
 
   public CollectionSchema getCollectionSchema() {
     return collectionSchema;
+  }
+
+  public Map<String, Collection<String>> getDimensionValuesOptions() {
+    return dimensionValuesOptions;
   }
 
   public DateTime getBaselineTime() {

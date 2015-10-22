@@ -14,7 +14,6 @@
                     <#assign dimensions = metricTable.dimensionValues>
                     <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
                     <#list dimensions?keys as dimensionName>
-                        <#assign dimensionValue = dimensions[dimensionName]>
                         <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
                         <td style="position:relative;">
                             <span>${dimensionDisplay}:</span><br>
@@ -22,10 +21,17 @@
                             <button type="button" class="dimension-selector uk-button">Select Values <i class="uk-icon-caret-down"></i> </button>
                             <div class="hidden" style="position:absolute; top:50px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
                                 <ul style="list-style-type: none; padding-left:0; width:250px;">
-
-                                    <li style="overflow:hidden;">
-                                        <input class="panel-metric" type="checkbox" value="${dimensionName}"/>${dimensions[dimensionName]}
-                                    </li>
+                                    <#list dimensionValuesOptions[dimensionName]![] as dimensionValue>
+                                        <li style="overflow:hidden;">
+                                            <#assign dimensionValueDisplay=dimensionValue?html>
+                                            <#if dimensionValue=="">
+                                                <#assign dimensionValueDisplay="UNKNOWN">
+                                            <#elseif dimensionValue=="?">
+                                                <#assign dimensionValueDisplay="OTHER">
+                                            </#if>
+                                            <input class="panel-dimension-option" type="checkbox" dimension-name="${dimensionName}"/>${dimensionValueDisplay?html}
+                                        </li>
+                                    </#list>
 
                                 </ul>
                             </div>
