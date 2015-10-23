@@ -21,6 +21,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +85,11 @@ public class ServerToSegmentSetMap {
     try {
       JSONObject ret = new JSONObject();
       for (ServerInstance i : _routingTable.keySet()) {
-        ret.put(i.toString(), mapper.writeValueAsString(_routingTable.get(i).getSegments()));
+        JSONArray serverInstanceSegmentList = new JSONArray();
+        for (SegmentId segmentId : _routingTable.get(i).getSegments()) {
+          serverInstanceSegmentList.put(segmentId.getSegmentId());
+        }
+        ret.put(i.toString(), serverInstanceSegmentList);
       }
       return ret.toString();
     } catch (Exception e) {

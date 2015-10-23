@@ -17,7 +17,6 @@ package com.linkedin.pinot.routing;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -28,13 +27,11 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.thrift.transport.TFileTransport.tailPolicy;
-import org.json.JSONException;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -197,18 +194,22 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   @Override
   public String dumpSnapShot() throws Exception {
-    JSONArray ret = new JSONArray();
+    JSONObject ret = new JSONObject();
+    JSONArray routingTableSnapshot = new JSONArray();
     for (String tableName : _brokerRoutingTable.keySet()) {
       JSONObject tableEntry = new JSONObject();
       tableEntry.put("tableName", tableName);
+
       JSONArray entries = new JSONArray();
       List<ServerToSegmentSetMap> routableTable = _brokerRoutingTable.get(tableName);
       for (ServerToSegmentSetMap serverToInstaceMap : routableTable) {
-        entries.add(serverToInstaceMap.toString());
+        entries.put(new JSONObject(serverToInstaceMap.toString()));
       }
       tableEntry.put("routingTableEntries", entries);
-      ret.add(tableEntry);
+
+      routingTableSnapshot.put(tableEntry);
     }
+    ret.put("routingTableSnapshot", routingTableSnapshot);
     return ret.toString();
   }
 }
