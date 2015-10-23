@@ -111,12 +111,14 @@ $(document).ready(function() {
     //     //$(metricLabels[i]).attr("title", metrics )
     // }
 
-    $(".funnel-table-time").each(renderTimeCell)
+    //Clicking the time cell will set current time in the URI to the selected time
+    //$(".funnel-table-time").each(renderTimeCell)
 
     //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
-    $("#custom-funnel-section .heat-map-cell").on("click", " .heat-map-cell", function(){
+    $("#custom-funnel-section").on("click", " .heat-map-cell", function(){
         var  columnIndex = $(this).parent().children().index($(this));
-        var hour = $("td:first-child", $(this).closest("tr")).attr("data-hour")
+        var currentUTC = $("td:first-child", $(this).closest("tr")).attr("currentUTC")
+
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
         var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
         var metrics = []
@@ -130,6 +132,8 @@ $(document).ready(function() {
             metrics.push("'" + baseMetrics + "'")
         }
 
+
+
         // Metric function
         var metricFunction = metrics.join(",")
         var path = parsePath(window.location.pathname)
@@ -140,7 +144,11 @@ $(document).ready(function() {
 
         path.metricFunction = newMetricFunction
         path.dimensionViewType = "HEAT_MAP"
-        path.currentMillis = Number(path.currentMillis) + (hour * 3600000)
+
+        var baselineDiff = path.currentMillis - path.baselineMillis
+        var currentMillis = moment.utc(currentUTC)
+        path.currentMillis = currentMillis
+        path.baselineMillis = currentMillis - baselineDiff
         var dashboardPath = getDashboardPath(path)
 
         //Funnels

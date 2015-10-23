@@ -44,7 +44,7 @@
                         <ul style="list-style-type: none; padding-left:0; width:250px;">
 
                                 <li style="overflow:hidden;">
-                                    <input class="panel-metric" type="checkbox" value="${dimensionName}"/>${dimensions[dimensionName]}
+                                    <input class="panel-metric-option" type="checkbox" value="${dimensionName}"/>${dimensions[dimensionName]}
                                 </li>
 
                         </ul>

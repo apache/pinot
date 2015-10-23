@@ -188,7 +188,7 @@
 </div>
 
 <script>
-
+    //Creating the heatmap and the tootlip data
     var Treemap = {
 
         drawChart : function() {
@@ -371,13 +371,24 @@
 
                 //get value and dimension from the current tooltip
                 var value = ($(this).html().trim() == "unknown") ? "" : $(this).html().trim()
+                console.log("value", value)
 
                 var dimension = $(this).attr("rel")
 
-                //fix the value and dimension in the query and redraw the page
+               /* earlier version when the URI was handled as an object
+               //fix the value and dimension in the query and redraw the page
                 var dimensionValues = parseDimensionValues(window.location.search)
+                //setting the dimension's query to 1 dimension value only
                 dimensionValues[dimension] = value
-                window.location.search = encodeDimensionValues(dimensionValues)
+                console.log("encodeDimensionValues(dimensionValues)", encodeDimensionValues(dimensionValues))
+                window.location.search = encodeDimensionValues(dimensionValues)*/
+
+                 //fix the value and dimension in the query and redraw the page
+                var dimensionValues = parseDimensionValuesAry(window.location.search)
+                //setting the dimension's query to 1 dimension value only
+                dimensionValues.push( dimension + "=" + value )
+                console.log("encodeDimensionValues(dimensionValues)", encodeDimensionValues(dimensionValues))
+                window.location.search = encodeDimensionValuesAry(dimensionValues)
             })
 
             $(".treemap-container svg").on("mousedown", "g", CreateNewQuery.mouseDownHandler)

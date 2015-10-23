@@ -18,8 +18,7 @@ $(document).ready(function() {
     }
 
     var path = parsePath(window.location.pathname)
-    var queryParams = getQueryParamValue(window.location.search);
-
+    var queryParams = parseDimensionValuesAry(window.location.search)
     $(".baseline-aggregate").click(function(){
         var aggregateUnit = $(".baseline-aggregate.uk-active").attr("unit")
 
@@ -45,7 +44,6 @@ $(document).ready(function() {
 
         // Metric function
         var metricFunction = metrics.join(",")
-
         // Date input field validation
         var date = $("#time-input-form-current-date").val()
         if (!date) {
@@ -105,11 +103,6 @@ $(document).ready(function() {
         // Aggregate
         metricFunction = "AGGREGATE_" + aggregateSize + "_" + aggregateUnit + "(" + metricFunction + ")"
 
-        //Query Parameters
-        if(queryParams.hasOwnProperty("")){
-            delete queryParams[""]
-        }
-
         // Path
         var path = parsePath(window.location.pathname)
         path.metricFunction = metricFunction
@@ -120,20 +113,35 @@ $(document).ready(function() {
 
         var dashboardPath = getDashboardPath(path)
 
+        //Dimension Parameters
+        var queryDimensionParams = []
+        $(".panel-dimension-option").each(function(i, checkbox) {
+            var checkboxObj = $(checkbox)
+            if (checkboxObj.is(':checked')) {
+                var dimension = checkboxObj.attr("dimension-name")
+                var value = (checkboxObj.attr("dimension-value") == "-") ? "" : checkboxObj.attr("dimension-value")
+                queryDimensionParams.push(dimension + "=" + value)
+            }
+
+        });
+        var queryParams = parseDimensionValuesAry(window.location.search)
+
+        if(queryParams.length > 0){
+            var firstArg = queryParams[0]
+            if(firstArg.indexOf("funnels") == 0){
+               queryDimensionParams.unshift(queryParams[0])
+            }
+        }
+        queryParams = queryDimensionParams
+
+        //Hash parameters
         var params = parseHashParameters(window.location.hash)
         if(timezone !== getLocalTimeZone().split(' ')[1]) {
             params.timezone = timezone.split('/').join('-')
         }
 
-        if (queryParams.funnels) {
-            var funnels = decodeURIComponent(queryParams.funnels).split( ",")
-
-            if (funnels.length > 0) {
-                queryParams["funnels"] = funnels.join();
-            }
-        }
         errorAlert.hide()
-        window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
+        window.location = dashboardPath + encodeDimensionValuesAry(queryParams) + encodeHashParameters(params)
     });
 
 
@@ -150,9 +158,6 @@ $(document).ready(function() {
     // Load existing metrics selection / function
     if (path.metricFunction) {
         var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
-
-
-
 
         // Always start at AGGREGATE
         var tokens = metricFunctionObj.name.split("_")
@@ -189,29 +194,44 @@ $(document).ready(function() {
         })
 
         // Rest can be assumed to be plain args or derived metrics
-        $(".panel-metric ").each(function(i, checkbox) {
+        for(var i= 0, len = primitiveMetrics.length; i< len; i++){
+            $(".panel-metric[ value = " + primitiveMetrics[i] + "]").attr("checked", "checked")
+        }
+
+        /*$(".panel-metric ").each(function(i, checkbox) {
             var checkboxObj = $(checkbox)
             if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
                 checkboxObj.attr("checked", "checked")
             }
-        })
+        })*/
 
-
-
-        //On funnel heatmap preselect WoW
+        /*//On funnel heatmap preselect WoW
         var path = parsePath(window.location.pathname)
         if(path.dimensionViewType == "TABULAR"){
             $("#time-input-moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
             $("#time-input-moving-average-size").val("7")
             $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='7']").html())
-        }
+        }*/
     }
 
+    //Set selected dimesnion query selectors
+    var queryParams = parseDimensionValuesAry(window.location.search)
+    var firstArg = queryParams[0]
 
+    if(firstArg.indexOf("funnels") == 0){
+        queryParams.shift(queryParams[0])
+    }
+
+    for(var i = 0, len = queryParams.length; i < len; i++){
+        var keyValue = queryParams[i].split("=")
+        var dimensionName = keyValue[0]
+        var dimensionValue = keyValue[1]
+        $("[dimension-name = '" + dimensionName +"'][dimension-value = '" + dimensionValue +"']").attr("checked", "checked")
+    }
 
     //Display current query value to none when no fixed element in the query
-    if($("ul.dimension-combination li").length == 0){
-        $("ul.dimension-combination").append("<li style='list-style-type: none;'>None</li>")
+    if($("ul.filters-applied li").length == 0){
+        $("ul.filters-applied").append("<li style='list-style-type: none;'>None</li>")
     }
 
     //Selecting the metric or dimension to display

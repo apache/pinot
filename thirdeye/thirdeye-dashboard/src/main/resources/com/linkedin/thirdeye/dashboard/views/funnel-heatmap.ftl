@@ -25,7 +25,7 @@
                 <#macro heatmapTableBody data isCumulative>
                     <tbody class="${isCumulative?string('cumulative-values hidden', 'hourly-values')}">
                         <#list data as row>
-                            <tr>
+                            <tr  currentUTC="${row.currentTime}">
                                 <td class="funnel-table-time" currentUTC="${row.currentTime}" title="${row.baselineTime}">${row.currentTime}</td>
                                 <#list 0..(row.numColumns-1) as i>
                                     <#if (row.ratio[i]??)>

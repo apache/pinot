@@ -186,6 +186,25 @@ function parseDimensionValues(queryString) {
     return dimensionValues
 }
 
+function parseDimensionValuesAry(queryString) {
+    var dimensionValues = []
+
+    if (queryString) {
+        var query = queryString
+        if (query.indexOf("?") >= 0) {
+            query = query.substring(1)
+        }
+        var tokens = query.split("&")
+        $.each(tokens, function(i, token) {
+            var keyValue = token.split("=")
+            var key = decodeURIComponent(keyValue[0])
+            var value = decodeURIComponent(keyValue[1])
+            dimensionValues.push(key + "=" + value)
+        })
+    }
+    return dimensionValues
+}
+
 function encodeDimensionValues(dimensionValues) {
     var components = []
 
@@ -194,6 +213,23 @@ function encodeDimensionValues(dimensionValues) {
         var encodedValue = encodeURIComponent(value)
         components.push(encodedKey + "=" + encodedValue)
     })
+
+    return "?" + components.join("&")
+}
+
+function encodeDimensionValuesAry(dimensionValues) {
+    var components = []
+     for (var i= 0, len = dimensionValues.length; i < len; i++){
+         var keyValue = dimensionValues[i].split("=")
+         var key  = keyValue[0]
+         var value = keyValue[1]
+         var encodedKey = encodeURIComponent(key)
+         var encodedValue = encodeURIComponent(value)
+
+              components.push(encodedKey + "=" + encodedValue)
+
+     }
+
 
     return "?" + components.join("&")
 }
@@ -614,9 +650,9 @@ function renderHeatMap(rawData, container, options) {
                     td.click(function() {
                         var name = $(this).attr('dimension')
                         var value = cell.value
-                        var dimensionValues = parseDimensionValues(window.location.search)
-                        dimensionValues[name] = value
-                        window.location.search = encodeDimensionValues(dimensionValues)
+                        var dimensionValues = parseDimensionValuesAry(window.location.search)
+                        dimensionValues.push(name + "=" + value )
+                        window.location.search = encodeDimensionValuesAry(dimensionValues)
                     })
 
                     tr.append(td)
@@ -709,6 +745,7 @@ function getTimeZone() {
     }
     return tz
 }
+
 
 function updateTableOrder(tableContainer, orderContainer) {
   // Get column headers

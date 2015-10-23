@@ -266,9 +266,14 @@ $(document).ready(function() {
         var dimension = $('td:first-child' , currentRow).html().trim()
 
         var value =  $(this).html().trim()
+        /* when URI was handled as an object
         var dimensionValues = parseDimensionValues(window.location.search)
         dimensionValues[dimension] = value
-        window.location.search = encodeDimensionValues(dimensionValues)
+        window.location.search = encodeDimensionValues(dimensionValues)*/
+
+        var dimensionValues = parseDimensionValuesAry(window.location.search)
+        dimensionValues.push(dimension + "=" + value)
+        window.location.search = encodeDimensionValuesAry(dimensionValues)
     })
 
   // Treemap related code

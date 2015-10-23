@@ -38,10 +38,12 @@ li {
 
 .dimension-combination{
     border: 1px solid #ddd;
-    position: relative;
-    top:-30px;
-    width: 99%;
+    position: absolute;
+    top:111px;
+    left: 30px;
+    width: 95%;
     background-color: #f5f5f5;
+    z-index:100;
 }
 
 .dimension-combination table {
@@ -137,6 +139,10 @@ li {
 
 #custom-funnel-section .heat-map-cell{
     cursor: pointer;
+}
+
+#custom-funnel-section .heat-map-cell:hover{
+    text-decoration: underline;
 }
 
 .funnel-thumbnail-container {
