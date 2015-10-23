@@ -59,7 +59,7 @@ public class HelixBrokerStarter {
   private static final String TABLES_KEY = "tables";
   private static final String PROPERTY_STORE = "PROPERTYSTORE";
 
-  private final HelixManager _helixManager; // being accessed via reflection in pinot-broker MP.
+  private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final ZkClient _zkClient;
   private final Configuration _pinotHelixProperties;
