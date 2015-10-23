@@ -79,7 +79,7 @@ $(document).ready(function() {
         // Date
         var current = moment.tz(date, timezone)
         //Baseline is the user selected baseline or 1 week prior to current
-        var baseline = baselineDate ? moment.tz(baselineDate, timezone) :  moment(current.valueOf() - (604800000))
+        var baseline = baselineDate ? moment.tz(baselineDate, timezone)  : moment(current.valueOf() - $("#time-input-comparison-size").val() * 86400000)
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
 
@@ -94,11 +94,11 @@ $(document).ready(function() {
         });
 
         // Moving average
-        if ($("#time-input-moving-average-size").length > 0 && $("#time-input-moving-average-size").val() != "") {
+        /*if ($("#time-input-moving-average-size").length > 0 && $("#time-input-moving-average-size").val() != "") {
             var movingAverageSize = $("#time-input-moving-average-size").val()
             var movingAverageUnit = "DAYS"
             metricFunction = "MOVING_AVERAGE_" + movingAverageSize + "_" + movingAverageUnit + "(" + metricFunction + ")"
-        }
+        */
 
         // Aggregate
         metricFunction = "AGGREGATE_" + aggregateSize + "_" + aggregateUnit + "(" + metricFunction + ")"
@@ -170,7 +170,7 @@ $(document).ready(function() {
         // May have applied moving average as well
         var firstArg = metricFunctionObj.args[0]
 
-        if (typeof(firstArg) === 'object') {
+        /*if (typeof(firstArg) === 'object') {
             if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
                 metricFunctionObj = firstArg
                 var tokens = metricFunctionObj.name.split("_")
@@ -180,7 +180,7 @@ $(document).ready(function() {
                     $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
                 }
             }
-        }
+        }*/
 
         // Rest are metrics (primitive and derived)
         var primitiveMetrics = []
@@ -205,13 +205,19 @@ $(document).ready(function() {
             }
         })*/
 
-        /*//On funnel heatmap preselect WoW
-        var path = parsePath(window.location.pathname)
-        if(path.dimensionViewType == "TABULAR"){
-            $("#time-input-moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
-            $("#time-input-moving-average-size").val("7")
-            $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='7']").html())
-        }*/
+        //Set the comparison size to WoW / Wo2W / Wo4W based on the URI currentmillis - baselinemillis
+        if($("#time-input-comparison-size").length > 0 ){
+            var path = parsePath(window.location.pathname)
+            var baselineDiff = path.currentMillis - path.baselineMillis
+            var hasWoWProfile = [7,14,28].indexOf(baselineDiff / 86400000 ) > -1
+
+            if(hasWoWProfile){
+                var baselineDiffDays = (baselineDiff / 86400000 )
+                $("#time-input-comparison-size").val(baselineDiffDays)
+                console.log( $("#time-input-comparison-size option[value='" + baselineDiffDays + "']").html())
+                $("span", $("#time-input-comparison-size").parent()).html($("#time-input-comparison-size option[value='" + baselineDiffDays + "']").html())
+            }
+        }
     }
 
     //Set selected dimesnion query selectors

@@ -111,33 +111,6 @@
                 </table>
             </div>
         </div>
-    <#--<div id="dimension-input" class="uk-display-inline-block" style="position: relative;">
-        <button class="select-button uk-button" type="button" style="width: 225px;"><span>Change Dimension Query </span><i class="uk-icon-caret-down"></i></button>
-        <div class="hidden" style="width: 100%; z-index:100; position:absolute; top:30px; left:0; background-color: #f5f5f5; border: 1px solid #ccc; height: auto;">
-            <span class="multiselect-close"><a href="#"><i style="position: relative;
-            left: 205px; color:#444;" class="uk-icon-close"></i></a></span>
-
-            <ul class="multiselect-panel" style="z-index: 100; list-style-type: none; padding-left: 0px; margin-bottom: 0px;">
-                 <#list (metricView.view.metricTables)!metricTables as metricTable>
-                <#assign dimensions = metricTable.dimensionValues>
-                <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-                <#list dimensions?keys as dimensionName>
-                    <#assign dimensionValue = dimensions[dimensionName]>
-                    <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
-                    <li class="multiselect-optgroup-label" style="display: inline;" ><a href="#"  style="  display: block; padding: 3px; margin: 1px 0; text-align: center; text-decoration: none; color: #444; background-image: -webkit-linear-gradient(top,#eee,#999);background-image: linear-gradient(to bottom,#eee,#999);">${dimensionDisplay}:</a>
-                        <ul style="list-style-type: none; padding-left: 0px;">
-                            <li class="multiselect-optgroup" style="display: inline-block; width: 100px;">
-                                <input id="${DIMENSIONINDEX}_${dimensions[dimensionName]}" type="checkbox" value="${dimensions[dimensionName]}"/><span>${dimensions[dimensionName]}</span></label>
-                            </li>
-                        </ul>
-                    </li>
-                </#list>
-            </#list>
-            </ul>
-        </div>
-        </div>-->
-
-
         <div class="uk-display-inline-block hidden" style="position: relative;">
             <button id="time-input-metrics" type="button" class="uk-button hidden" style="width: 200px;">Select Metrics <i class="uk-icon-caret-down"></i> </button>
             <div id="time-input-metrics-panel" class="hidden" style="position:absolute; top:30px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
@@ -188,8 +161,7 @@
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Moving Average:</span>
                 <i class="uk-icon-caret-down"></i>
-                <select id="time-input-moving-average-size">
-                    <option class="uk-button" unit="WoW" value="">None</option>
+                <select id="time-input-comparison-size">
                     <option class="uk-button" unit="WoW" value="7">WoW</option>
                     <option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>
                     <option class="uk-button" unit="Wo4W" value="28">Wo4W</option>

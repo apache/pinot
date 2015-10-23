@@ -31,7 +31,6 @@ $(document).ready(function() {
     $("#funnel-thumbnails .funnel:first-of-type").trigger("click")
 
     //Toggle funnel and Metric Intraday tabs,
-    //switch the Moving average select options
     $(".funnel-tabs li").on("click", function(){
         if(!$(this).hasClass("uk-active")) {
             $("#custom-funnel-section").toggleClass("hidden")
@@ -40,46 +39,9 @@ $(document).ready(function() {
             $("#intra-day-buttons").toggleClass("hidden")
             $("#intra-day-table").toggleClass("hidden")
             if($(this).text().trim() == "Details"){
-                $("#time-input-moving-average-size").html(
-                    '<option class="uk-button" unit="WoW" value="">None</option>'+
-                    '<option class="uk-button" unit="WoW" value="7">WoW</option>' +
-                    '<option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>' +
-                    '<option class="uk-button" unit="Wo4W" value="28">Wo4W</option>')
                     var path = parsePath(window.location.pathname)
-                    var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
-                    if (typeof(firstArg) === 'object') {
-
-                        var firstArg = metricFunctionObj.args[0]
-                        if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
-                            metricFunctionObj = firstArg
-                            var tokens = metricFunctionObj.name.split("_")
-
-                            if ($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
-                                $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
-                                $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option)[value='" + tokens[tokens.length - 2] + "']").html())
-                            }
-                        }
-                    }else{
-                        $("#time-input-form-moving-average span").html("None")
-                    }
-                     // May have applied moving average as well
-                     var firstArg = metricFunctionObj.args[0]
-                     if (typeof(firstArg) === 'object') {
-                         if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
-                             metricFunctionObj = firstArg
-                             var tokens = metricFunctionObj.name.split("_")
-
-                             if ($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0) {
-                                 $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
-                                 $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
-                             }
-                         }
-                     }
-
             }else{
-                 $("#time-input-moving-average-size").html('<option class="uk-button" unit="WoW" value="7">WoW</option>')
-                 $("#time-input-moving-average-size").val("7")
-                 $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='7']").html())
+                 $("#time-input-form-comparison-size span").html($("#time-input-form-comparison-size option[value='7']").html())
             }
         }
     })
