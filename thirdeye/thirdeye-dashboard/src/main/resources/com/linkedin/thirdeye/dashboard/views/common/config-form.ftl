@@ -33,7 +33,7 @@
 </div>
 <!-- Metric selection dropdown -->
 <#elseif (dimensionView.type == "HEAT_MAP")>
-<div class="uk-display-inline-block uk-float-right uk-margin-small">Metric:<br>
+<div class="uk-display-inline-block uk-margin-small">Metric:<br>
     <div  class="uk-button uk-form-select" data-uk-form-select>
         <span>Metric</span>
         <i class="uk-icon-caret-down"></i>
@@ -184,7 +184,7 @@
         </div>
 
     <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
-        <div id="time-input-form-moving-average" class="uk-form-label" style="display: inline-block">Overlay<br>
+        <div id="time-input-form-moving-average" class="uk-form-label" style="display: inline-block">Compare to:<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Moving Average:</span>
                 <i class="uk-icon-caret-down"></i>
