@@ -22,7 +22,7 @@
                             <button type="button" class="dimension-selector uk-button">Select Values <i class="uk-icon-caret-down"></i> </button>
                             <div class="hidden" style="position:absolute; top:50px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
                                 <ul style="list-style-type: none; padding-left:0; width:250px;">
-                                    <#list dimensionView.view.dimensionValuesOptions[dimensionName]![] as dimensionValue>
+                                    <#list dimensionView.dimensionValuesOptions[dimensionName]![] as dimensionValue>
                                         <li style="overflow:hidden;">
                                             <#assign dimensionValueDisplay=dimensionValue?html>
                                             <#if dimensionValue=="">

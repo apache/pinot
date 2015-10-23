@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,30 +25,23 @@ public class DimensionViewTabular extends View {
   private final Map<String, QueryResult> results;
   private final Map<String, Map<String, String>> dimensionGroupMap;
   private final Map<String, Map<Pattern, String>> dimensionRegexMap;
-  private final Map<String, Collection<String>> dimensionValuesOptions;
 
   private final List<DimensionTable> dimensionTables;
 
   public DimensionViewTabular(CollectionSchema schema, ObjectMapper objectMapper,
       Map<String, QueryResult> results, Map<String, Map<String, String>> dimensionGroupMap,
-      Map<String, Map<Pattern, String>> dimensionRegexMap,
-      Map<String, Collection<String>> dimensionValuesOptions) throws Exception {
+      Map<String, Map<Pattern, String>> dimensionRegexMap) throws Exception {
     super("dimension/tabular.ftl");
     this.objectMapper = objectMapper;
     this.schema = schema;
     this.results = results;
     this.dimensionGroupMap = dimensionGroupMap;
     this.dimensionRegexMap = dimensionRegexMap;
-    this.dimensionValuesOptions = dimensionValuesOptions;
     this.dimensionTables = generateDimensionTables();
   }
 
   public List<DimensionTable> getDimensionTables() {
     return dimensionTables;
-  }
-
-  public Map<String, Collection<String>> getDimensionValuesOptions() {
-    return dimensionValuesOptions;
   }
 
   private List<DimensionTable> generateDimensionTables() throws Exception {

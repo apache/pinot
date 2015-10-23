@@ -289,11 +289,15 @@ public class DashboardResource {
       View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
           baselineMillis, currentMillis, uriInfo);
 
+      Map<String, Collection<String>> dimensionValueOptions =
+          retrieveDimensionValues(metricFunction, collection, baselineMillis, currentMillis);
+
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
           new DateTime(baselineMillis), new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType), earliestDataTime, latestDataTime,
-          customDashboardNames, feedbackEmailAddress, funnelNames, funnels);
+          new DimensionView(dimensionView, dimensionViewType, dimensionValueOptions),
+          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress, funnelNames,
+          funnels);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e; // sends appropriate HTTP response
@@ -363,6 +367,7 @@ public class DashboardResource {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
+
     MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
 
     // Dimension groups
@@ -425,10 +430,9 @@ public class DashboardResource {
         return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups,
             dimensionRegex);
       } else if (DimensionViewType.TABULAR.equals(dimensionViewType)) {
-        Map<String, Collection<String>> dimensionValueOptions =
-            retrieveDimensionValues(schema, metricFunction, collection, baseline, current);
+
         return new DimensionViewTabular(schema, objectMapper, results, dimensionGroups,
-            dimensionRegex, dimensionValueOptions);
+            dimensionRegex);
       }
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
@@ -440,9 +444,11 @@ public class DashboardResource {
    * window, with unknown ("") and other ("?") values appearing at the end of the collection if
    * present.
    */
-  private Map<String, Collection<String>> retrieveDimensionValues(CollectionSchema schema,
-      String metricFunction, String collection, DateTime baseline, DateTime current)
-          throws Exception {
+  private Map<String, Collection<String>> retrieveDimensionValues(String metricFunction,
+      String collection, long baselineMillis, long currentMillis) throws Exception {
+    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    DateTime baseline = new DateTime(baselineMillis);
+    DateTime current = new DateTime(currentMillis);
 
     // query w/ group by for each dimension.
     List<String> dimensions = schema.getDimensions();
