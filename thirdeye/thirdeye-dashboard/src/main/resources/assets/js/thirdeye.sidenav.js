@@ -217,9 +217,6 @@ $(document).ready(function() {
         $(elt).attr('checked', 'checked')
     })
 
-    //Set moving average to WoW by default
-    $("#sidenav-moving-average").trigger("click")
-
     $(".custom-dashboard-link").click(function(event) {
         event.preventDefault()
         var dateTime = $("#sidenav-date").val().split('-').join('/')
