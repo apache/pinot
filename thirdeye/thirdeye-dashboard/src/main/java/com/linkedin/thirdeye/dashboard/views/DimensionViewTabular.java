@@ -1,5 +1,12 @@
 package com.linkedin.thirdeye.dashboard.views;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
@@ -7,39 +14,42 @@ import com.linkedin.thirdeye.dashboard.api.DimensionTable;
 import com.linkedin.thirdeye.dashboard.api.DimensionTableRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
+
 import io.dropwizard.views.View;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
-
 public class DimensionViewTabular extends View {
-  private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> STRING_LIST_REF =
+      new TypeReference<List<String>>() {
+      };
   private final ObjectMapper objectMapper;
   private final CollectionSchema schema;
   private final Map<String, QueryResult> results;
   private final Map<String, Map<String, String>> dimensionGroupMap;
   private final Map<String, Map<Pattern, String>> dimensionRegexMap;
+  private final Map<String, Collection<String>> dimensionValuesOptions;
+
   private final List<DimensionTable> dimensionTables;
 
-  public DimensionViewTabular(CollectionSchema schema,
-                              ObjectMapper objectMapper,
-                              Map<String, QueryResult> results,
-                              Map<String, Map<String, String>> dimensionGroupMap,
-                              Map<String, Map<Pattern, String>> dimensionRegexMap) throws Exception {
+  public DimensionViewTabular(CollectionSchema schema, ObjectMapper objectMapper,
+      Map<String, QueryResult> results, Map<String, Map<String, String>> dimensionGroupMap,
+      Map<String, Map<Pattern, String>> dimensionRegexMap,
+      Map<String, Collection<String>> dimensionValuesOptions) throws Exception {
     super("dimension/tabular.ftl");
     this.objectMapper = objectMapper;
     this.schema = schema;
     this.results = results;
     this.dimensionGroupMap = dimensionGroupMap;
     this.dimensionRegexMap = dimensionRegexMap;
+    this.dimensionValuesOptions = dimensionValuesOptions;
     this.dimensionTables = generateDimensionTables();
   }
 
   public List<DimensionTable> getDimensionTables() {
     return dimensionTables;
+  }
+
+  public Map<String, Collection<String>> getDimensionValuesOptions() {
+    return dimensionValuesOptions;
   }
 
   private List<DimensionTable> generateDimensionTables() throws Exception {
@@ -65,7 +75,8 @@ public class DimensionViewTabular extends View {
           result, objectMapper, dimensionGroupMap, dimensionRegexMap, dimensionName);
 
       List<DimensionTableRow> rows = new ArrayList<>();
-      for (Map.Entry<List<String>, Map<String, Number[]>> combination : processedResult.entrySet()) {
+      for (Map.Entry<List<String>, Map<String, Number[]>> combination : processedResult
+          .entrySet()) {
         // Find min / max times (for current / baseline)
         long minTime = -1;
         long maxTime = -1;
@@ -88,12 +99,8 @@ public class DimensionViewTabular extends View {
         }
       }
 
-      DimensionTable dimensionTable = new DimensionTable(
-          result.getMetrics(),
-          metricAliases,
-          dimensionName,
-          dimensionAliases.get(dimensionName),
-          rows);
+      DimensionTable dimensionTable = new DimensionTable(result.getMetrics(), metricAliases,
+          dimensionName, dimensionAliases.get(dimensionName), rows);
       tables.add(dimensionTable);
     }
 

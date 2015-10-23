@@ -3,8 +3,10 @@ package com.linkedin.thirdeye.dashboard.resources;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -27,6 +29,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
@@ -54,6 +57,7 @@ import com.linkedin.thirdeye.dashboard.views.MetricView;
 import com.linkedin.thirdeye.dashboard.views.MetricViewTabular;
 import com.linkedin.thirdeye.dashboard.views.MetricViewTimeSeries;
 import com.sun.jersey.api.NotFoundException;
+import com.sun.jersey.core.util.MultivaluedMapImpl;
 
 import io.dropwizard.views.View;
 
@@ -64,6 +68,11 @@ public class DashboardResource {
   private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
   private static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
   private static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
+  private static final String OTHER_DIMENSION_VALUE = "?";
+  private static final String UNKNOWN_DIMENSION_VALUE = "";
+  private static final TypeReference<List<String>> LIST_TYPE_REF =
+      new TypeReference<List<String>>() {
+      };
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
   private final String serverUri;
@@ -416,12 +425,66 @@ public class DashboardResource {
         return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups,
             dimensionRegex);
       } else if (DimensionViewType.TABULAR.equals(dimensionViewType)) {
+        Map<String, Collection<String>> dimensionValueOptions =
+            retrieveDimensionValues(schema, metricFunction, collection, baseline, current);
         return new DimensionViewTabular(schema, objectMapper, results, dimensionGroups,
-            dimensionRegex);
+            dimensionRegex, dimensionValueOptions);
       }
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }
+  }
+
+  /**
+   * Returns a map of dimensions -> sorted list of observed dimension values in the given time
+   * window, with unknown ("") and other ("?") values appearing at the end of the collection if
+   * present.
+   */
+  private Map<String, Collection<String>> retrieveDimensionValues(CollectionSchema schema,
+      String metricFunction, String collection, DateTime baseline, DateTime current)
+          throws Exception {
+
+    // query w/ group by for each dimension.
+    List<String> dimensions = schema.getDimensions();
+    MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
+    Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
+    for (String dimension : schema.getDimensions()) {
+      // Generate SQL
+      dimensionValues.put(dimension, Arrays.asList("!"));
+      String sql =
+          SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, null);
+      LOGGER.info("Generated SQL for {}: {}", serverUri, sql);
+      dimensionValues.remove(dimension);
+
+      // Query (in parallel)
+      resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
+    }
+
+    Map<String, Collection<String>> collectedDimensionValues = new HashMap<>();
+
+    // Wait for all queries and generate the ordered list from the result.
+    for (int i = 0; i < dimensions.size(); i++) {
+      String dimension = dimensions.get(i);
+      QueryResult queryResult = resultFutures.get(dimension).get();
+      HashSet<String> values = new HashSet<>();
+      for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
+        List<String> combination = objectMapper.readValue(entry.getKey(), LIST_TYPE_REF);
+        String dimensionValue = combination.get(i);
+        values.add(dimensionValue);
+      }
+      boolean hasOther = values.remove(OTHER_DIMENSION_VALUE);
+      boolean hasUnknown = values.remove(UNKNOWN_DIMENSION_VALUE);
+      List<String> sortedValues = new ArrayList<>(values);
+      Collections.sort(sortedValues);
+      if (hasOther) {
+        sortedValues.add(OTHER_DIMENSION_VALUE);
+      }
+      if (hasUnknown) {
+        sortedValues.add(UNKNOWN_DIMENSION_VALUE);
+      }
+      collectedDimensionValues.put(dimension, sortedValues);
+    }
+    return collectedDimensionValues;
   }
 
 }
