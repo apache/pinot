@@ -139,8 +139,17 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
     IOUtils.closeQuietly(raf);
     raf = null;
     MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+    chunkOffsetsBuffer = null;
     MmapUtils.unloadByteBuffer(bitsetBuffer);
+    bitsetBuffer = null;
     MmapUtils.unloadByteBuffer(rawDataBuffer);
+    rawDataBuffer = null;
+    customBitSet.close();
+    customBitSet = null;
+    chunkOffsetsWriter.close();
+    chunkOffsetsWriter = null;
+    rawDataWriter.close();
+    rawDataWriter = null;
   }
 
   private int updateHeader(int rowId, int length) {

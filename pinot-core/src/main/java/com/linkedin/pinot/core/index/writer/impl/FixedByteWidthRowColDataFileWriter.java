@@ -120,6 +120,7 @@ public class FixedByteWidthRowColDataFileWriter {
     raf = null;
     if (ownsByteBuffer) {
       MmapUtils.unloadByteBuffer(byteBuffer);
+      byteBuffer = null;
     }
   }
 }

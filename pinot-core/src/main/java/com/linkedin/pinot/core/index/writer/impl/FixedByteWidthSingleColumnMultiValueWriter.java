@@ -16,15 +16,14 @@
 package com.linkedin.pinot.core.index.writer.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.index.reader.DataFileMetadata;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
-import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
 import org.apache.commons.io.IOUtils;
 
 
@@ -68,11 +67,19 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     IOUtils.closeQuietly(raf);
     raf = null;
     MmapUtils.unloadByteBuffer(dataBuffer);
+    dataBuffer = null;
     MmapUtils.unloadByteBuffer(headerBuffer);
+    headerBuffer = null;
+    dataWriter.close();
+    dataWriter = null;
+    headerWriter.close();
+    headerWriter = null;
+    headerReader.close();
+    headerReader = null;
   }
 
   private int updateHeader(int row, int length) {

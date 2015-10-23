@@ -114,6 +114,8 @@ public class FixedBitSkipListSCMVWriterTest {
       file.delete();
       System.out.println("END test maxBit:" + maxBits);
       maxBits = maxBits + 1;
+      bitSet.close();
+      customBit.close();
     }
   }
 }

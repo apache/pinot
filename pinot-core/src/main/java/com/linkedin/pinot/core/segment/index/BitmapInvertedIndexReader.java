@@ -127,6 +127,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(buffer);
+    buffer = null;
     if (_rndFile != null) {
       _rndFile.close();
     }

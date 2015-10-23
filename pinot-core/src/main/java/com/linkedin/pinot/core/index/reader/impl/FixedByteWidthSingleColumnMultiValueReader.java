@@ -131,7 +131,13 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
   @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(headerSectionByteBuffer);
+    headerSectionByteBuffer = null;
     MmapUtils.unloadByteBuffer(dataSectionByteBuffer);
+    dataSectionByteBuffer = null;
+    headerSectionReader.close();
+    headerSectionReader = null;
+    dataSectionReader.close();
+    dataSectionReader = null;
 
     if (isMMap) {
       raf.close();

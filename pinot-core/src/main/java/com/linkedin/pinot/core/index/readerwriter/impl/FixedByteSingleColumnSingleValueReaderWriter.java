@@ -16,16 +16,13 @@
 package com.linkedin.pinot.core.index.readerwriter.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.index.reader.DataFileMetadata;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.readerwriter.SingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
-import com.linkedin.pinot.core.index.writer.SingleColumnSingleValueWriter;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColumnSingleValueReaderWriter {
@@ -68,8 +65,11 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
   @Override
   public void close() throws IOException {
     reader.close();
+    reader = null;
     writer.close();
+    writer = null;
     MmapUtils.unloadByteBuffer(_buffer);
+    _buffer = null;
   }
 
   @Override

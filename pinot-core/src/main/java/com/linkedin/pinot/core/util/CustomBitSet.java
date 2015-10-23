@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.util;
 
-import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.indexsegment.utils.BitUtils;
+import java.io.Closeable;
 import java.nio.ByteBuffer;
 
 
@@ -26,10 +26,10 @@ import java.nio.ByteBuffer;
  * Util class to store bit set, provides additional utility over java bit set by
  * allowing reading int from start bit to end bit
  */
-public final class CustomBitSet {
+public final class CustomBitSet implements Closeable {
 
   private final int nrBytes;
-  private final ByteBuffer buf;
+  private ByteBuffer buf;
   private final static int[] bitCountArray = new int[256];
   private final static int IGNORED_ZEROS_COUNT = Integer.SIZE - Byte.SIZE;
   private final boolean ownsByteBuffer;
@@ -268,11 +268,11 @@ public final class CustomBitSet {
     return ((b & (1 << offset)) != 0);
   }
 
-  protected void finalize() throws Throwable {
+  @Override
+  public void close() {
     if (ownsByteBuffer) {
       MmapUtils.unloadByteBuffer(buf);
+      buf = null;
     }
-
-    super.finalize();
   }
 }
