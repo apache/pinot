@@ -1,24 +1,12 @@
 package com.linkedin.thirdeye;
 
-import com.linkedin.thirdeye.api.AnomalyFunctionSpec;
-import com.linkedin.thirdeye.api.AnomalyResult;
-import com.linkedin.thirdeye.api.ContextualEvent;
-import com.linkedin.thirdeye.api.EmailConfiguration;
+import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.client.DefaultThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.db.AnomalyFunctionSpecDAO;
-import com.linkedin.thirdeye.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.db.ContextualEventDAO;
-import com.linkedin.thirdeye.db.EmailConfigurationDAO;
-import com.linkedin.thirdeye.db.HibernateSessionWrapper;
+import com.linkedin.thirdeye.db.*;
 import com.linkedin.thirdeye.driver.AnomalyDetectionJobManager;
 import com.linkedin.thirdeye.email.EmailReportJobManager;
-import com.linkedin.thirdeye.resources.AnomalyDetectionJobResource;
-import com.linkedin.thirdeye.resources.AnomalyFunctionSpecResource;
-import com.linkedin.thirdeye.resources.AnomalyResultResource;
-import com.linkedin.thirdeye.resources.ContextualEventResource;
-import com.linkedin.thirdeye.resources.EmailReportResource;
-import com.linkedin.thirdeye.resources.MetricsGraphicsTimeSeriesResource;
+import com.linkedin.thirdeye.resources.*;
 import com.linkedin.thirdeye.task.EmailReportJobManagerTask;
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
@@ -48,6 +36,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
   private final HibernateBundle<ThirdEyeDetectorConfiguration> hibernate =
       new HibernateBundle<ThirdEyeDetectorConfiguration>(
           AnomalyFunctionSpec.class,
+          AnomalyFunctionRelation.class,
           AnomalyResult.class,
           ContextualEvent.class,
           EmailConfiguration.class) {
@@ -87,6 +76,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     final AnomalyResultDAO anomalyResultDAO = new AnomalyResultDAO(hibernate.getSessionFactory());
     final ContextualEventDAO contextualEventDAO = new ContextualEventDAO(hibernate.getSessionFactory());
     final EmailConfigurationDAO emailConfigurationDAO = new EmailConfigurationDAO(hibernate.getSessionFactory());
+    final AnomalyFunctionRelationDAO anomalyFunctionRelationDAO = new AnomalyFunctionRelationDAO(hibernate.getSessionFactory());
 
     // ThirdEye client
     final ThirdEyeClient thirdEyeClient = new DefaultThirdEyeClient(config.getThirdEyeHost(), config.getThirdEyePort());
@@ -124,6 +114,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
         quartzScheduler,
         thirdEyeClient,
         anomalyFunctionSpecDAO,
+        anomalyFunctionRelationDAO,
         anomalyResultDAO,
         hibernate.getSessionFactory(),
         environment.metrics());
@@ -195,6 +186,7 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
 
     // Jersey resources
     environment.jersey().register(new AnomalyFunctionSpecResource(anomalyFunctionSpecDAO));
+    environment.jersey().register(new AnomalyFunctionRelationResource(anomalyFunctionRelationDAO));
     environment.jersey().register(new AnomalyResultResource(anomalyResultDAO));
     environment.jersey().register(new ContextualEventResource(contextualEventDAO));
     environment.jersey().register(new MetricsGraphicsTimeSeriesResource(thirdEyeClient, anomalyResultDAO));

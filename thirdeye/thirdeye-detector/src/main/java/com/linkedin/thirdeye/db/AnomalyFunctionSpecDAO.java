@@ -22,7 +22,7 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   public void toggleActive(Long id, boolean isActive) {
     namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive")
         .setParameter("id", id)
-        .setParameter("getIsActive", isActive)
+        .setParameter("isActive", isActive)
         .executeUpdate();
   }
 

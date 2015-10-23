@@ -156,4 +156,17 @@
       </column>
     </createTable>
   </changeSet>
+
+  <!-- Allows relations among anomaly function (parent considers results of all children) -->
+  <changeSet id="2" author="gbrandt">
+    <createTable tableName="anomaly_function_relations">
+      <column name="parent_id" type="bigint">
+        <constraints nullable="false" foreignKeyName="fk_anomaly_function_parent" references="anomaly_functions(id)"/>
+      </column>
+      <column name="child_id" type="bigint">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <addPrimaryKey tableName="anomaly_function_relations" columnNames="parent_id, child_id" constraintName="pk_anomaly_function_relations"/>
+  </changeSet>
 </databaseChangeLog>
