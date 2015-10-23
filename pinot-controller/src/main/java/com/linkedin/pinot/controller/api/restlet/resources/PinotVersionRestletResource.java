@@ -28,6 +28,6 @@ public class PinotVersionRestletResource extends PinotRestletResourceBase {
   @Paths({ "/version" })
   private Representation buildVersionResponse() {
     JSONObject jsonObject = new JSONObject(Utils.getComponentVersions());
-    return new StringRepresentation(jsonObject.toString(), MediaType.APPLICATION_ALL_JSON);
+    return new StringRepresentation(jsonObject.toString(), MediaType.APPLICATION_JSON);
   }
 }
