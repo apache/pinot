@@ -30,7 +30,7 @@
     },
     "tableType":"REALTIME",
     "metadata": {
-        customConfigs : {
+        "customConfigs" : {
             "d2Name":"xlntBetaPinot"
         }
     }
