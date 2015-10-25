@@ -17,11 +17,32 @@ $(document).ready(function() {
         window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
     }
 
-    var path = parsePath(window.location.pathname)
-    var queryParams = parseDimensionValuesAry(window.location.search)
-    $(".baseline-aggregate").click(function(){
-        var aggregateUnit = $(".baseline-aggregate.uk-active").attr("unit")
+    //If filters applied link is clicked remove it's value/s from the URI
+    // so it won't be fixed in the query WHERE clause, reload the page with the new query
+    $(".dimension-link").each(function(i, link) {
+        var linkObj = $(link)
+        var dimension = linkObj.attr('dimension')
+        var value =  linkObj.attr('dimension-value')
 
+        linkObj.click(function() {
+            var values = []
+            if(value.indexOf(" OR ") >= 0){
+                var values = value.split(" OR ")
+            }else{
+                values.push(value)
+            }
+
+            var dimensionValues = parseDimensionValuesAry(window.location.search)
+            for(var i = 0, len = values.length; i < len; i++) {
+
+                var dimensionValue = dimension + "=" + values[i]
+                if ( dimensionValues.indexOf(dimensionValue) > -1) {
+                    dimensionValues.splice(dimensionValues.indexOf(dimensionValue), 1);
+                }
+            }
+            var updatedQuery = encodeDimensionValuesAry(dimensionValues)
+            window.location.search = updatedQuery
+        })
     })
 
     $(".time-input-form-submit").click(function(event) {
@@ -146,6 +167,7 @@ $(document).ready(function() {
 
 
     //Load existing date selection
+    var path = parsePath(window.location.pathname)
     var currentDateTime = moment(parseInt(path.currentMillis))
     var currentDateString = currentDateTime.format("YYYY-MM-DD")
     $("#time-input-form-current-date").val(currentDateString)
@@ -168,9 +190,8 @@ $(document).ready(function() {
         }
 
         // May have applied moving average as well
-        var firstArg = metricFunctionObj.args[0]
-
-        /*if (typeof(firstArg) === 'object') {
+        /*var firstArg = metricFunctionObj.args[0]
+        if (typeof(firstArg) === 'object') {
             if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
                 metricFunctionObj = firstArg
                 var tokens = metricFunctionObj.name.split("_")
@@ -198,13 +219,6 @@ $(document).ready(function() {
             $(".panel-metric[ value = " + primitiveMetrics[i] + "]").attr("checked", "checked")
         }
 
-        /*$(".panel-metric ").each(function(i, checkbox) {
-            var checkboxObj = $(checkbox)
-            if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
-                checkboxObj.attr("checked", "checked")
-            }
-        })*/
-
         //Set the comparison size to WoW / Wo2W / Wo4W based on the URI currentmillis - baselinemillis
         if($("#time-input-comparison-size").length > 0 ){
             var path = parsePath(window.location.pathname)
@@ -214,7 +228,6 @@ $(document).ready(function() {
             if(hasWoWProfile){
                 var baselineDiffDays = (baselineDiff / 86400000 )
                 $("#time-input-comparison-size").val(baselineDiffDays)
-                console.log( $("#time-input-comparison-size option[value='" + baselineDiffDays + "']").html())
                 $("span", $("#time-input-comparison-size").parent()).html($("#time-input-comparison-size option[value='" + baselineDiffDays + "']").html())
             }
         }

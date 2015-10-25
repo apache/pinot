@@ -27,22 +27,29 @@ $(document).ready(function() {
     });
 
 
+    $(".funnel-table-time").each(function(i, cell){
+        var cellObj = $(cell)
+        var currentTime = moment(cellObj.attr('currentUTC'))
+        cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+    })
+
     //Preselect the 1st funnel
     $("#funnel-thumbnails .funnel:first-of-type").trigger("click")
 
-    //Toggle funnel and Metric Intraday tabs,
+        //Toggle Sunmmary and Details tabs,
     $(".funnel-tabs li").on("click", function(){
         if(!$(this).hasClass("uk-active")) {
-            $("#custom-funnel-section").toggleClass("hidden")
+
+            $(".details-cell").toggleClass("hidden")
+            $('#custom-funnel-section .metric-label,#funnel-thumbnails  .metric-label').attr('colspan', function(index, attr){
+                return attr == 3 ? null : 3;
+            });
+            $("#custom-funnel-section .funnel-table-time").css("width","110px")
+            /*$("#custom-funnel-section").toggleClass("hidden")
             $("#funnel-thumbnails").toggleClass("hidden")
             $("#metric-table-area").toggleClass("hidden")
             $("#intra-day-buttons").toggleClass("hidden")
-            $("#intra-day-table").toggleClass("hidden")
-            if($(this).text().trim() == "Details"){
-                    var path = parsePath(window.location.pathname)
-            }else{
-                 $("#time-input-form-comparison-size span").html($("#time-input-form-comparison-size option[value='7']").html())
-            }
+            $("#intra-day-table").toggleClass("hidden")*/
         }
     })
 
@@ -134,54 +141,50 @@ $(document).ready(function() {
 
     //Clicking a cell in the header should fix the related metrics in the query
     $("#custom-funnel-section .metric-label").click(function(){
-
-        var  columnIndex = $(this).parent().children().index($(this))
-        if(columnIndex > 0){
-
-            //Find the related metrics
-            var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
-            var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
-            var metrics = []
-            if(baseMetrics.indexOf("RATIO") >= 0){
-                var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
-                for(var i = 0, len = metricNames.length; i < len;i++){
-                    var metric = metricNames[i]
-                    metrics.push("'" + metric + "'")
-                }
-            }else{
-                metrics.push("'" + baseMetrics + "'")
+        //Find the related metrics
+        var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
+        var baseMetrics = data["funnels"][funnelName]["actualMetricNames"][columnIndex-1]
+        var metrics = []
+        if(baseMetrics.indexOf("RATIO") >= 0){
+            var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
+            for(var i = 0, len = metricNames.length; i < len;i++){
+                var metric = metricNames[i]
+                metrics.push("'" + metric + "'")
             }
-
-            //Create metric function
-            var path = parsePath(window.location.pathname)
-
-            var firstindex = path.metricFunction.indexOf("'");
-            var lastindex = path.metricFunction.lastIndexOf("'");
-            var previousMetricFunction = path.metricFunction
-            var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
-            path.metricFunction = newMetricFunction
-            path.dimensionViewType = "MULTI_TIME_SERIES"
-
-            var dashboardPath = getDashboardPath(path)
-
-            //Funnels
-            var queryParams = getQueryParamValue(window.location.search);
-            if (queryParams.funnels) {
-                var funnels = decodeURIComponent(queryParams.funnels).split( ",")
-
-                if (funnels.length > 0) {
-                    queryParams["funnels"] = funnels.join();
-                }
-            }
-
-            // Timezone
-            var timezone = $("#sidenav-timezone").val()
-            var params = {}
-            if(timezone !== getLocalTimeZone().split(' ')[1]) {
-                params.timezone = timezone.split('/').join('-')
-            }
-            window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
+        }else{
+            metrics.push("'" + baseMetrics + "'")
         }
+
+        //Create metric function
+        var path = parsePath(window.location.pathname)
+
+        var firstindex = path.metricFunction.indexOf("'");
+        var lastindex = path.metricFunction.lastIndexOf("'");
+        var previousMetricFunction = path.metricFunction
+        var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
+        path.metricFunction = newMetricFunction
+        path.dimensionViewType = "MULTI_TIME_SERIES"
+
+        var dashboardPath = getDashboardPath(path)
+
+        //Funnels
+        var queryParams = getQueryParamValue(window.location.search);
+        if (queryParams.funnels) {
+            var funnels = decodeURIComponent(queryParams.funnels).split( ",")
+
+            if (funnels.length > 0) {
+                queryParams["funnels"] = funnels.join();
+            }
+        }
+
+        // Timezone
+        var timezone = $("#sidenav-timezone").val()
+        var params = {}
+        if(timezone !== getLocalTimeZone().split(' ')[1]) {
+            params.timezone = timezone.split('/').join('-')
+        }
+        window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
+
     })
 
 

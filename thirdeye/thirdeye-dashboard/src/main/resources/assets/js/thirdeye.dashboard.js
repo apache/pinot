@@ -10,32 +10,6 @@ $(document).ready(function() {
         })
     })
 
-    $(".dimension-link").each(function(i, link) {
-        var linkObj = $(link)
-        var dimension = linkObj.attr('dimension')
-        var value =  linkObj.attr('dimension-value')
-
-        linkObj.click(function() {
-            var values = []
-            if(value.indexOf(" OR ") >= 0){
-                var values = value.split(" OR ")
-            }else{
-                values.push(value)
-            }
-
-            var dimensionValues = parseDimensionValuesAry(window.location.search)
-            for(var i = 0, len = values.length; i < len; i++) {
-
-                var dimensionValue = dimension + "=" + values[i]
-                    if ( dimensionValues.indexOf(dimensionValue) > -1) {
-                        dimensionValues.splice(dimensionValues.indexOf(dimensionValue), 1);
-                    }
-            }
-            var updatedQuery = encodeDimensionValuesAry(dimensionValues)
-            window.location.search = updatedQuery
-        })
-    })
-
    $(".collapser").click(function() {
         var $header = $(this);
 

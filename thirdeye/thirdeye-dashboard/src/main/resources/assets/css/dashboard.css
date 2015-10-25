@@ -133,38 +133,53 @@ li {
     color: #898989;
 }
 
+#custom-funnel-section{
+    width: 100%;
+    overflow-x: scroll;
+}
+
+
 #custom-funnel-section td:hover{
     color: #808080;
 }
 
-#custom-funnel-section .heat-map-cell{
+#custom-funnel-section .heat-map-cell:hover{
+    text-decoration: underline;
     cursor: pointer;
 }
 
-#custom-funnel-section .heat-map-cell:hover{
-    text-decoration: underline;
+#custom-funnel-section .funnel-table-time,
+#custom-funnel-section th:first-child,
+#custom-funnel-section td:first-child{
+    white-space: nowrap;
 }
 
-.funnel-thumbnail-container {
+.funnel-thumbnail-container{
     background-color: #ddd;
     text-align: center;
     padding: 10px;
 }
 
-#funnel-thumbnails table {
+#funnel-thumbnails .funnel{
+    width: 200px;
+    overflow-x:scroll;
+}
+
+#funnel-thumbnails table{
     width: 20%;
     height: 200px;
-    font-size: 8px;
+    font-size: 7px;
     padding: 0px;
     border: 1px solid #ccc;
     margin: auto;
 }
 
 #funnel-thumbnails th,
-#funnel-thumbnails td {
+#funnel-thumbnails td{
     padding: 0px;
     font-size: 3px;
     line-height: 8px;
+    overflow: hidden;
 }
 
 #funnel-thumbnails td:first-child{
@@ -175,13 +190,13 @@ li {
     word-wrap: break-word;
 }
 
-#funnel-thumbnails .metric-list {
+#funnel-thumbnails .metric-list{
     font-size: 9px;
     font-weight: 800;
     margin: 0px;
 }
 
-#funnel-thumbnails .funnel {
+#funnel-thumbnails .funnel{
     display: inline-block;
     border: 1px solid #000;
     border-radius: 4px;
@@ -191,18 +206,20 @@ li {
     padding: 5px;
 }
 
-#funnel-thumbnails .funnel:not(.uk-panel-box) {
+#funnel-thumbnails .funnel:not(.uk-panel-box){
     background-color: #ddd;
 }
 
-#funnel-thumbnails .funnel.uk-panel-box {
+#funnel-thumbnails .funnel.uk-panel-box{
     border: 1px solid #ccc;
 }
 
-#funnel-thumbnails>div:hover {
+#funnel-thumbnails>div:hover{
     cursor: pointer;
     background-color: #fff;
 }
+
+
 
 /* Metric */
 

@@ -21,6 +21,14 @@
                             <th class="metric-label" title="${funnel.aliasToActualMap[key]}" style="cursor:pointer;">${key}</th>
                         </#list>
                     </tr>
+                    <tr>
+                        <th></th>
+                        <#list funnel.aliasToActualMap?keys as key>
+                            <th class="details-cell hidden" title="${funnel.aliasToActualMap[key]}">Baseline</th>
+                            <th class="details-cell hidden" title="${funnel.aliasToActualMap[key]}">Current</th>
+                            <th class="" title="${funnel.aliasToActualMap[key]}">Ratio</th>
+                        </#list>
+                    </tr>
                 </thead>
                 <#macro heatmapTableBody data isCumulative>
                     <tbody class="${isCumulative?string('cumulative-values hidden', 'hourly-values')}">
@@ -32,6 +40,8 @@
                                         <#assign ratioValue = row.ratio[i]>
                                         <#assign baselineValue = row.baseline[i]>
                                         <#assign currentValue = row.current[i]>
+                                        <td class="details-cell hidden" style="border-left: 1px solid #ddd;">${baselineValue}</td>
+                                        <td class="details-cell hidden">${currentValue}</td>
                                         <td
                                                 class="heat-map-cell custom-tooltip"
                                                 tooltip="${ratioValue}"
@@ -54,3 +64,4 @@
     </#list>
 </div>
 </#if>
+
