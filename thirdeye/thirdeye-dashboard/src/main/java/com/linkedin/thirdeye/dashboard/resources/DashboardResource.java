@@ -7,10 +7,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -26,6 +28,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -64,12 +67,15 @@ import com.sun.jersey.core.util.MultivaluedMapImpl;
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
 public class DashboardResource {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
   private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
   private static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
   private static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
-  private static final String OTHER_DIMENSION_VALUE = "?";
-  private static final String UNKNOWN_DIMENSION_VALUE = "";
+
+  private static final String DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION = "AGGREGATE_1_HOURS(%s)";
+  private static final double DIMENSION_VALUES_OPTIONS_THRESHOLD = 0.01;
+  private static final int DIMENSION_VALUES_LIMIT = 25;
   private static final TypeReference<List<String>> LIST_TYPE_REF =
       new TypeReference<List<String>>() {
       };
@@ -295,7 +301,7 @@ public class DashboardResource {
               currentMillis, uriInfo);
 
       Map<String, Collection<String>> dimensionValueOptions =
-          retrieveDimensionValues(collection, metricFunction, baselineMillis, currentMillis);
+          retrieveDimensionValues(collection, baselineMillis, currentMillis);
 
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
           new DateTime(baselineMillis), new DateTime(currentMillis), new MetricView(metricView,
@@ -343,6 +349,7 @@ public class DashboardResource {
 
       return new MetricViewTabular(schema, objectMapper, result, currentMillis, currentMillis
           - baselineMillis, intraPeriod);
+
     case TIME_SERIES_FULL:
     case TIME_SERIES_OVERLAY:
     case FUNNEL:
@@ -457,16 +464,19 @@ public class DashboardResource {
   }
 
   /**
-   * Returns a map of dimensions -> sorted list of observed dimension values in the given time
-   * window, with unknown ("") and other ("?") values appearing at the end of the collection if
-   * present.
+   * Returns a map of dimensions -> list of observed dimension values in the given time
+   * window, sorted in decreasing order of overall contribution. Any items not meeting a
+   * contribution threshold of {@value #DIMENSION_VALUES_OPTIONS_THRESHOLD} are omitted, and a
+   * maximum of {@value #DIMENSION_VALUES_LIMIT} results are returned for any given dimension.
    */
   private Map<String, Collection<String>> retrieveDimensionValues(String collection,
-      String metricFunction, long baselineMillis, long currentMillis) throws Exception {
+      long baselineMillis, long currentMillis) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
 
+    String firstMetric = schema.getMetrics().get(0);
+    String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION, firstMetric);
     // query w/ group by for each dimension.
     List<String> dimensions = schema.getDimensions();
     MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
@@ -475,8 +485,8 @@ public class DashboardResource {
       // Generate SQL
       dimensionValues.put(dimension, Arrays.asList("!"));
       String sql =
-          SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, null);
-      LOGGER.info("Generated SQL for {}: {}", serverUri, sql);
+          SqlUtils.getSql(dummyFunction, collection, baseline, current, dimensionValues, null);
+      LOGGER.info("Generated SQL for dimension retrieval {}: {}", serverUri, sql);
       dimensionValues.remove(dimension);
 
       // Query (in parallel)
@@ -484,30 +494,59 @@ public class DashboardResource {
     }
 
     Map<String, Collection<String>> collectedDimensionValues = new HashMap<>();
-
     // Wait for all queries and generate the ordered list from the result.
     for (int i = 0; i < dimensions.size(); i++) {
       String dimension = dimensions.get(i);
       QueryResult queryResult = resultFutures.get(dimension).get();
-      HashSet<String> values = new HashSet<>();
+
+      // Sum up hourly data over entire dataset for each dimension combination
+      double total = 0.0;
+      Map<String, Number> summedValues = new HashMap<>();
+
       for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
+        double sum = 0.0;
+        for (Map.Entry<String, Number[]> hourlyEntry : entry.getValue().entrySet()) {
+          double value = hourlyEntry.getValue()[0].doubleValue();
+          sum += value;
+        }
+        summedValues.put(entry.getKey(), sum);
+        total += sum;
+      }
+
+      // compare by value ascending (want poll to remove smallest element)
+      PriorityQueue<Pair<String, Double>> topNValues =
+          new PriorityQueue<>(DIMENSION_VALUES_LIMIT, new Comparator<Pair<String, Double>>() {
+            @Override
+            public int compare(Pair<String, Double> a, Pair<String, Double> b) {
+              return Double.compare(a.getValue().doubleValue(), b.getValue().doubleValue());
+            }
+          });
+
+      double threshold = total * DIMENSION_VALUES_OPTIONS_THRESHOLD;
+
+      // For each dimension value, add it only if it meets the threshold and drop an element from
+      // the priority queue if over the limit.
+      for (Map.Entry<String, Number> entry : summedValues.entrySet()) {
         List<String> combination = objectMapper.readValue(entry.getKey(), LIST_TYPE_REF);
         String dimensionValue = combination.get(i);
-        values.add(dimensionValue);
+        double dimensionValueContribution = entry.getValue().doubleValue();
+        if (dimensionValueContribution >= threshold) {
+          topNValues.add(new Pair<>(dimensionValue, dimensionValueContribution));
+          if (topNValues.size() > DIMENSION_VALUES_LIMIT) {
+            Pair<String, Double> removed = topNValues.poll();
+          }
+        }
       }
-      boolean hasOther = values.remove(OTHER_DIMENSION_VALUE);
-      boolean hasUnknown = values.remove(UNKNOWN_DIMENSION_VALUE);
-      List<String> sortedValues = new ArrayList<>(values);
-      Collections.sort(sortedValues);
-      if (hasOther) {
-        sortedValues.add(OTHER_DIMENSION_VALUE);
-      }
-      if (hasUnknown) {
-        sortedValues.add(UNKNOWN_DIMENSION_VALUE);
+
+      // Poll returns the elements in order of ascending contribution, so poll and reverse the
+      // order.
+      List<String> sortedValues = new LinkedList<>();
+      while (!topNValues.isEmpty()) {
+        Pair<String, Double> pair = topNValues.poll();
+        sortedValues.add(0, pair.getKey());
       }
       collectedDimensionValues.put(dimension, sortedValues);
     }
     return collectedDimensionValues;
   }
-
 }
