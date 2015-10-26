@@ -57,7 +57,7 @@ $(document).ready(function() {
 
     //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
     $("#custom-funnel-section").on("click", " .heat-map-cell", function(){
-        var  columnIndex = $(this).parent().children().index($(this)) /3 -1;
+        var  columnIndex = $(this).parent().children().index($(this)) /3 + 1 ;
         var currentUTC = $("td:first-child", $(this).closest("tr")).attr("currentUTC")
 
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
