@@ -73,10 +73,10 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
       }
       if (instanceToStateMap.size() > 0) {
         List<String> instanceList = new ArrayList<String>(instanceToStateMap.keySet());
-        Collections.shuffle(instanceList);
-        String[] instances = instanceList.toArray(new String[0]);
-
         for (int i = 0; i < _numberOfRoutingTables; ++i) {
+          Collections.shuffle(instanceList);
+          String[] instances = instanceList.toArray(new String[instanceList.size()]);
+
           int minInstances = Integer.MAX_VALUE;
           int minIdx = -1;
           int base = 2;

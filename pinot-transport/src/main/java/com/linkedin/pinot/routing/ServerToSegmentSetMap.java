@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
@@ -96,5 +97,29 @@ public class ServerToSegmentSetMap {
       logger.error("error toString()", e);
       return "routing table : [ " + _routingTable + " ] ";
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    ServerToSegmentSetMap other = (ServerToSegmentSetMap) o;
+
+    return
+        EqualityUtils.isEqual(_serverToSegmentSetMap, other._serverToSegmentSetMap) &&
+        EqualityUtils.isEqual(_routingTable, other._routingTable);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_serverToSegmentSetMap);
+    result = EqualityUtils.hashCodeOf(result, _routingTable);
+    return result;
   }
 }
