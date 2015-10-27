@@ -49,6 +49,8 @@ $(document).ready(function() {
         if(!$(this).hasClass("uk-active")) {
 
             $(".details-cell").toggleClass("hidden")
+            $("#custom-funnel-section .subheader").toggleClass("hidden")
+
             $('#custom-funnel-section .metric-label,#funnel-thumbnails  .metric-label').attr('colspan', function(index, attr){
                 return attr == 3 ? null : 3;
             });

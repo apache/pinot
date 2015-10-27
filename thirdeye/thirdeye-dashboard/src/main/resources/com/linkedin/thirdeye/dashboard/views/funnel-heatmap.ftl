@@ -21,12 +21,12 @@
                             <th class="metric-label" title="${funnel.aliasToActualMap[key]}" style="cursor:pointer;">${key}</th>
                         </#list>
                     </tr>
-                    <tr>
+                    <tr class="subheader hidden">
                         <th></th>
                         <#list funnel.aliasToActualMap?keys as key>
                             <th class="details-cell hidden" title="${funnel.aliasToActualMap[key]}">Baseline</th>
                             <th class="details-cell hidden" title="${funnel.aliasToActualMap[key]}">Current</th>
-                            <th class="" title="${funnel.aliasToActualMap[key]}">Ratio</th>
+                            <th title="${funnel.aliasToActualMap[key]}">Ratio</th>
                         </#list>
                     </tr>
                 </thead>
