@@ -26,11 +26,12 @@ $(document).ready(function() {
         }
     });
 
-
     $(".funnel-table-time").each(function(i, cell){
         var cellObj = $(cell)
         var currentTime = moment(cellObj.attr('currentUTC'))
         cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+        var baselineTime = moment(cellObj.attr('title'))
+        cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
     })
 
     //Preselect the 1st funnel

@@ -151,8 +151,8 @@
                 Granularity
             </label>
             <div  class="uk-button-group" data-uk-button-radio>
-                <button type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >hour(s)</button>
-                <button type="button" class="baseline-aggregate uk-button uk-active" unit="DAYS" value="86400000" >day(s)</button>
+                <button type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >HOUR</button>
+                <button type="button" class="baseline-aggregate uk-button uk-active" unit="DAYS" value="86400000" >DAY</button>
             </div>
         </div>
 

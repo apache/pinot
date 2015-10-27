@@ -120,7 +120,7 @@ li {
 /* Funnel Heatmap */
 
 #custom-funnel-section{
-    min-height: 600px;
+    min-height: 300px;
 }
 
 #custom-funnel-section table,
@@ -131,6 +131,10 @@ li {
     padding: 6px;
     font-family: Arial, sans-serif;
     color: #898989;
+}
+
+#custom-funnel-section .metric-label:hover{
+    text-decoration: underline;
 }
 
 #custom-funnel-section{
