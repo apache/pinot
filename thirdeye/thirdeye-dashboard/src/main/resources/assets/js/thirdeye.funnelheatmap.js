@@ -34,6 +34,13 @@ $(document).ready(function() {
         cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
     })
 
+    $(".funnel .metric-list[currentUTC]").each(function(i, label){
+        var labelObj = $(label)
+        var currentTime = moment(labelObj.attr('currentUTC'))
+        var baselineTime = moment(labelObj.attr('baselineUTC'))
+        labelObj.html("current = " + currentTime.tz(tz).format('YYYY-MM-DD') + " & baseline = " + baselineTime.tz(tz).format('YYYY-MM-DD'))
+    })
+
     //Preselect the 1st funnel
     $("#funnel-thumbnails .funnel:first-of-type").trigger("click")
 

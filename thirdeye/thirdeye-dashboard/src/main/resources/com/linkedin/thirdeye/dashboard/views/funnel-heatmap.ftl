@@ -11,7 +11,7 @@
         
         <div class="funnel">
             <h3 class="metric-list">${funnel.name} </h3>
-            <h3 class="metric-list"> (current = ${funnel.current} & baseline = ${funnel.baseline})</h3>
+            <h3 class="metric-list" currentUTC=${funnel.current} baselineUTC=${funnel.baseline} > (current = ${funnel.current} & baseline = ${funnel.baseline})</h3>
 
             <table class="uk-table dimension-view-funnel-heat-map-rendered">
                 <thead>
