@@ -3,10 +3,16 @@ $(document).ready(function() {
     var view = parsePath(window.location.pathname).dimensionViewType == null ? "TABULAR" : parsePath(window.location.pathname).dimensionViewType
     $("#dashboard-output-nav a[view='" + view + "' ]").closest("li").addClass("uk-active")
 
-    //Allow user to switch dimension view on the dropdown
-    $(".section-selector").on("change", function(){
+    //Allow user to switch dimension displayed on the dropdown
+    $("#view-dimension-selector .section-selector").on("change", function(){
         $(".section-wrapper").hide()
         $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show()
+    })
+
+    //Allow user to switch metric displayed on the dropdown
+    $("#view-metric-selector .metric-section-selector").on("change", function(){
+        $(".metric-section-wrapper").hide()
+        $(".metric-section-wrapper[rel = '" +  $(".metric-section-selector").val() + "' ]").show()
     })
 
     //Set default dimension view on Timeseries and the default metric view on Heatmap
@@ -14,6 +20,7 @@ $(document).ready(function() {
     function load() {
         //Using settimeout since the table has minor css issues when created on a hidden parent
         // and flot.js has no callback function for drawing the data
+        window.setTimeout(function(){$(".metric-section-selector").trigger("change")}, 2000)
         window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
     }
 
@@ -253,7 +260,13 @@ $(document).ready(function() {
         $("ul.filters-applied").append("<li style='list-style-type: none;'>None</li>")
     }
 
-    //Selecting the metric or dimension to display
+    //Selecting the metric to display
+    $(".metric-section-selector").on("change", function(){
+        $(".metric-section-wrapper").hide();
+        $(".metric-section-wrapper[rel = '" +  $(".metric-section-selector").val() + "' ]").show();
+    })
+
+    //Selecting the dimension to display
     $(".section-selector").on("change", function(){
         $(".section-wrapper").hide();
         $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();

@@ -156,10 +156,7 @@ $(document).ready(function() {
             params.timezone = timezone.split('/').join('-')
         }
         window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
-
     })
-
-
 
     //Cumulative checkbox
     $("#funnel-cumulative").click(function() {

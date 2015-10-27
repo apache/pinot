@@ -5,7 +5,7 @@
 <div id="dimension-heat-map-area">
 
       <#list dimensionView.view.metricNames as metric>
-      <div class="section-wrapper" rel="${metric}">
+      <div class="metric-section-wrapper" rel="${metric}">
          <div class="dimension-heat-map-treemap-section">
               <div class="title-box">
                   <table>
@@ -272,7 +272,7 @@
                 midColor: '#ddd',
                 maxColor: '#00f',
                 headerHeight: 0,
-                fontColor: 'white',
+                fontColor: '#000',
                 showScale: false,
                 highlightOnMouseOver: true,
                 generateTooltip : Tooltip.showTreeMapTooltip

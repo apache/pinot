@@ -7,13 +7,13 @@
 
 <script src="/assets/js/thirdeye.metric.timeseries.js"></script>
 
-<#assign dimensions = (metricView.view.dimensionValues)!dimensionValues>
-<#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-
-<div class="collapser"><h2>(-) Metric Time Series View</h2></div>
 <div id="metric-time-series-area">
-    <div id="metric-time-series-placeholder"></div>
-    <div id="metric-time-series-tooltip"></div>
-    <div id="metric-time-series-legend" class="time-series-legend"></div>
+<#list metricView.view.metricNames as metric>
+    <div class="metric-section-wrapper" rel="${metric}">
+        <div id="metric-time-series-legend" class="time-series-legend" rel="${metric}"></div>
+        <div id="metric-time-series-placeholder" rel="${metric}"></div>
+        <div id="metric-time-series-tooltip" rel="${metric}"></div>
+    </div>
+</#list>
 </div>
 

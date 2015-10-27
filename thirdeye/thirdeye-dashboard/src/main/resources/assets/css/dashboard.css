@@ -687,6 +687,8 @@ td[dimension-val] {
     display: none;
 }
 
+.section-wrapper{margin-top: 15px;}
+
 /* overwriting UIkit css */
 
 .uk-button.uk-active,

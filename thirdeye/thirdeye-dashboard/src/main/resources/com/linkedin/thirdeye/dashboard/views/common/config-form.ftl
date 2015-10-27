@@ -33,11 +33,11 @@
 </div>
 <!-- Metric selection dropdown -->
 <#elseif (dimensionView.type == "HEAT_MAP")>
-<div class="uk-display-inline-block uk-margin-small">Metric:<br>
+<div class="uk-display-inline-block uk-margin-medium">Metric:<br>
     <div  class="uk-button uk-form-select" data-uk-form-select>
         <span>Metric</span>
         <i class="uk-icon-caret-down"></i>
-        <select id="view-metric-selector" class="section-selector">
+        <select id="view-metric-selector" class="metric-section-selector">
             <#list dimensionView.view.metricNames as metric>
                 <option value="${metric}">${metric}</option>
             </#list>
@@ -45,8 +45,8 @@
     </div>
 </div>
 <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
-<div class="uk-display-inline-block uk-margin-small">Dimension:<br>
-    <div  class="uk-button uk-form-select uk-right" data-uk-form-select>
+<div class="uk-display-inline-block uk-margin-medium">Dimension:<br>
+    <div  class="uk-button uk-form-select" data-uk-form-select>
         <span>Dimension</span>
         <i class="uk-icon-caret-down"></i>
         <select id="view-dimension-selector" class="section-selector">
@@ -156,10 +156,10 @@
             </div>
         </div>
 
-    <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "TABULAR")>
+    <#if dimensionView.type == "TABULAR">
         <div class="uk-form-label uk-display-inline-block">Compare to:<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>
-                <span>Moving Average:</span>
+                <span>Compare:</span>
                 <i class="uk-icon-caret-down"></i>
                 <select id="time-input-comparison-size">
                     <option class="uk-button" unit="WoW" value="7">WoW</option>

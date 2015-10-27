@@ -29,6 +29,7 @@
                     <#if (dimensionView.type == "HEAT_MAP")>
                         <#include "dimension/heat-map.ftl">
                     <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
+                        <#include "metric/time-series.ftl">
                         <#include "dimension/multi-time-series.ftl">
                     <#elseif (dimensionView.type == "TABULAR")>
                         <div id="dashboard-funnels-view">

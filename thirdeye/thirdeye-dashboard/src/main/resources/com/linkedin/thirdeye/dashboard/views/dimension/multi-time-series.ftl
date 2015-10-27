@@ -7,7 +7,6 @@
             <div class="dimension-time-series-legend time-series-legend" dimension="${dimension}"></div>
             <div class="dimension-time-series-placeholder" dimension="${dimension}"></div>
             <div class="dimension-time-series-tooltip" dimension="${dimension}"></div>
-
         </div>
     </#list>
 </div>
