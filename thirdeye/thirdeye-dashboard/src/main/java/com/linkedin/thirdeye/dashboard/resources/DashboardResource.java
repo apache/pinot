@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import io.dropwizard.views.View;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,8 +60,6 @@ import com.linkedin.thirdeye.dashboard.views.MetricViewTabular;
 import com.linkedin.thirdeye.dashboard.views.MetricViewTimeSeries;
 import com.sun.jersey.api.NotFoundException;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
-
-import io.dropwizard.views.View;
 
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
@@ -121,10 +121,12 @@ public class DashboardResource {
     if (collection == null) {
       return null;
     }
-    JSONObject ret = new JSONObject(
-        new ObjectMapper().writeValueAsString(funnelResource.getFunnelSpecFor(collection)));
-    JSONObject dimGroups = new JSONObject(
-        new ObjectMapper().writeValueAsString(configCache.getDimensionGroupSpec(collection)));
+    JSONObject ret =
+        new JSONObject(new ObjectMapper().writeValueAsString(funnelResource
+            .getFunnelSpecFor(collection)));
+    JSONObject dimGroups =
+        new JSONObject(new ObjectMapper().writeValueAsString(configCache
+            .getDimensionGroupSpec(collection)));
     ret.put("dimension_groups", dimGroups.get("groups"));
     return ret.toString();
   }
@@ -145,8 +147,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null && (earliestDataTime == null
-          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null
+          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -177,9 +179,10 @@ public class DashboardResource {
   @Path("/dashboard/{collection}/{metricFunction}")
   public Response getDashboardView(@PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction, @Context UriInfo uriInfo)
-          throws Exception {
-    return Response.seeOther(URI.create(PATH_JOINER.join("", "dashboard", collection,
-        metricFunction, MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
+      throws Exception {
+    return Response.seeOther(
+        URI.create(PATH_JOINER.join("", "dashboard", collection, metricFunction,
+            MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
   }
 
   @GET
@@ -189,7 +192,7 @@ public class DashboardResource {
       @PathParam("metricViewType") MetricViewType metricViewType,
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineOffsetMillis") Long baselineOffsetMillis, @Context UriInfo uriInfo)
-          throws Exception {
+      throws Exception {
     // Get segment metadata
     List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
     if (segments.isEmpty()) {
@@ -200,8 +203,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null && (earliestDataTime == null
-          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null
+          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -232,9 +235,8 @@ public class DashboardResource {
     // Check no group bys
     for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
       if ("!".equals(entry.getValue())) {
-        throw new WebApplicationException(
-            new IllegalArgumentException("No group by dimensions allowed"),
-            Response.Status.BAD_REQUEST);
+        throw new WebApplicationException(new IllegalArgumentException(
+            "No group by dimensions allowed"), Response.Status.BAD_REQUEST);
       }
     }
 
@@ -248,8 +250,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null && (earliestDataTime == null
-          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null
+          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -277,27 +279,29 @@ public class DashboardResource {
     if (funnelResource != null) {
       MultivaluedMap<String, String> filterMap = uriInfo.getQueryParameters();
       filterMap.remove("funnels");
-      funnels = funnelResource.computeFunnelViews(collection, selectedFunnels, baselineMillis,
-          currentMillis, filterMap);
+      funnels =
+          funnelResource.computeFunnelViews(collection, metricFunction, selectedFunnels,
+              baselineMillis, currentMillis, getIntraPeriod(metricFunction), filterMap);
       funnelNames = funnelResource.getFunnelNamesFor(collection);
     }
 
     try {
-      View metricView = getMetricView(collection, metricFunction, metricViewType, baselineMillis,
-          currentMillis, uriInfo);
+      View metricView =
+          getMetricView(collection, metricFunction, metricViewType, baselineMillis, currentMillis,
+              uriInfo);
 
-      View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
-          baselineMillis, currentMillis, uriInfo);
+      View dimensionView =
+          getDimensionView(collection, metricFunction, dimensionViewType, baselineMillis,
+              currentMillis, uriInfo);
 
       Map<String, Collection<String>> dimensionValueOptions =
-          retrieveDimensionValues(metricFunction, collection, baselineMillis, currentMillis);
+          retrieveDimensionValues(collection, metricFunction, baselineMillis, currentMillis);
 
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
-          new DateTime(baselineMillis), new DateTime(currentMillis),
-          new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType, dimensionValueOptions),
-          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress, funnelNames,
-          funnels);
+          new DateTime(baselineMillis), new DateTime(currentMillis), new MetricView(metricView,
+              metricViewType), new DimensionView(dimensionView, dimensionViewType,
+              dimensionValueOptions), earliestDataTime, latestDataTime, customDashboardNames,
+          feedbackEmailAddress, funnelNames, funnels);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e; // sends appropriate HTTP response
@@ -322,15 +326,7 @@ public class DashboardResource {
     // Metric view
     switch (metricViewType) {
     case INTRA_DAY:
-      String timeUnit = metricFunction.split("_")[2];
-      int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
-
-      long INTRA_PERIOD = INTRA_DAY_PERIOD;
-      if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
-        INTRA_PERIOD = INTRA_WEEK_PERIOD;
-      } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
-        INTRA_PERIOD = INTRA_MONTH_PERIOD;
-      }
+      long intraPeriod = getIntraPeriod(metricFunction);
 
       // Dimension groups
       Map<String, Map<String, List<String>>> dimensionGroups = null;
@@ -340,13 +336,13 @@ public class DashboardResource {
       }
 
       String sql =
-          SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_PERIOD),
+          SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - intraPeriod),
               new DateTime(currentMillis), dimensionValues, dimensionGroups);
       LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
       QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
-      return new MetricViewTabular(schema, objectMapper, result, currentMillis,
-          currentMillis - baselineMillis, INTRA_PERIOD);
+      return new MetricViewTabular(schema, objectMapper, result, currentMillis, currentMillis
+          - baselineMillis, intraPeriod);
     case TIME_SERIES_FULL:
     case TIME_SERIES_OVERLAY:
     case FUNNEL:
@@ -386,8 +382,9 @@ public class DashboardResource {
         if (!dimensionValues.containsKey(dimension)) {
           // Generate SQL (n.b. will query /flot resource async)
           dimensionValues.put(dimension, Arrays.asList("!"));
-          String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
-              dimensionValues, reverseDimensionGroups);
+          String sql =
+              SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues,
+                  reverseDimensionGroups);
           LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
           dimensionValues.remove(dimension);
 
@@ -401,8 +398,9 @@ public class DashboardResource {
         if (!dimensionValues.containsKey(dimension)) {
           // Generate SQL
           dimensionValues.put(dimension, Arrays.asList("!"));
-          String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
-              dimensionValues, reverseDimensionGroups);
+          String sql =
+              SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues,
+                  reverseDimensionGroups);
           LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
           dimensionValues.remove(dimension);
 
@@ -440,12 +438,31 @@ public class DashboardResource {
   }
 
   /**
+   * Determines intra period (day/week/month) based on outermost metric function.
+   * @param metricFunction
+   * @return
+   * @throws NumberFormatException
+   */
+  private long getIntraPeriod(String metricFunction) throws NumberFormatException {
+    String timeUnit = metricFunction.split("_")[2];
+    int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
+
+    long intraPeriod = INTRA_DAY_PERIOD;
+    if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
+      intraPeriod = INTRA_WEEK_PERIOD;
+    } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
+      intraPeriod = INTRA_MONTH_PERIOD;
+    }
+    return intraPeriod;
+  }
+
+  /**
    * Returns a map of dimensions -> sorted list of observed dimension values in the given time
    * window, with unknown ("") and other ("?") values appearing at the end of the collection if
    * present.
    */
-  private Map<String, Collection<String>> retrieveDimensionValues(String metricFunction,
-      String collection, long baselineMillis, long currentMillis) throws Exception {
+  private Map<String, Collection<String>> retrieveDimensionValues(String collection,
+      String metricFunction, long baselineMillis, long currentMillis) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);

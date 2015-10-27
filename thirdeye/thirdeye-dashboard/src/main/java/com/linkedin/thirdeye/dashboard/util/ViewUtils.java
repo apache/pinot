@@ -155,8 +155,9 @@ public class ViewUtils {
       Number[] baselineValues = baselineData.get(baseline);
       Number[] currentValues = currentData.get(current);
 
-      MetricDataRow row = new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC),
-          baselineValues, new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
+      MetricDataRow row =
+          new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineValues,
+              new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(0, row);
     }
 
@@ -167,8 +168,7 @@ public class ViewUtils {
    * Computes cumulative values for the input rows. <tt>metricCount</tt> should be
    * the number of values in each baseline/current dataset for each row.
    */
-  public static List<MetricDataRow> computeCumulativeRows(List<MetricDataRow> rows,
-      int metricCount) {
+  public static List<MetricDataRow> computeCumulativeRows(List<MetricDataRow> rows, int metricCount) {
 
     if (rows.isEmpty()) {
       return Collections.emptyList();
@@ -181,15 +181,21 @@ public class ViewUtils {
 
     for (MetricDataRow row : rows) {
       Number[] baselineValues = row.getBaseline();
-      for (int i = 0; i < baselineValues.length; i++) {
-        cumulativeBaselineValues[i] = cumulativeBaselineValues[i].doubleValue()
-            + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
+      if (baselineValues != null) {
+        for (int i = 0; i < baselineValues.length; i++) {
+          cumulativeBaselineValues[i] =
+              cumulativeBaselineValues[i].doubleValue()
+                  + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
+        }
       }
 
       Number[] currentValues = row.getCurrent();
-      for (int i = 0; i < currentValues.length; i++) {
-        cumulativeCurrentValues[i] = cumulativeCurrentValues[i].doubleValue()
-            + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
+      if (currentValues != null) {
+        for (int i = 0; i < currentValues.length; i++) {
+          cumulativeCurrentValues[i] =
+              cumulativeCurrentValues[i].doubleValue()
+                  + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
+        }
       }
 
       Number[] cumulativeBaselineValuesCopy =
@@ -197,8 +203,9 @@ public class ViewUtils {
       Number[] cumulativeCurrentValuesCopy =
           Arrays.copyOf(cumulativeCurrentValues, cumulativeCurrentValues.length);
 
-      MetricDataRow cumulativeRow = new MetricDataRow(row.getBaselineTime(),
-          cumulativeBaselineValuesCopy, row.getCurrentTime(), cumulativeCurrentValuesCopy);
+      MetricDataRow cumulativeRow =
+          new MetricDataRow(row.getBaselineTime(), cumulativeBaselineValuesCopy,
+              row.getCurrentTime(), cumulativeCurrentValuesCopy);
       cumulativeRows.add(cumulativeRow);
     }
     return cumulativeRows;

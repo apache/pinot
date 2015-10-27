@@ -64,9 +64,9 @@ public class FunnelsDataProvider {
     return funnelSpecsMap.get(collection);
   }
 
-  public List<FunnelHeatMapView> computeFunnelViews(String collection, String selectedFunnels,
-      long baselineMillis, long currentMillis, MultivaluedMap<String, String> dimensionValues)
-          throws Exception {
+  public List<FunnelHeatMapView> computeFunnelViews(String collection, String metricFunction,
+      String selectedFunnels, long baselineMillis, long currentMillis, long intraPeriod,
+      MultivaluedMap<String, String> dimensionValues) throws Exception {
     List<FunnelHeatMapView> funnelViews = new ArrayList<FunnelHeatMapView>();
 
     if (selectedFunnels != null && selectedFunnels.length() > 0) {
@@ -78,13 +78,13 @@ public class FunnelsDataProvider {
       for (String funnel : funnels) {
         LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
         FunnelSpec spec = funnelSpecsMap.get(collection).getFunnels().get(funnel);
-        funnelViews.add(
-            getFunnelDataFor(collection, spec, baselineMillis, currentMillis, dimensionValues));
+        funnelViews.add(getFunnelDataFor(collection, metricFunction, spec, baselineMillis,
+            currentMillis, intraPeriod, dimensionValues));
       }
     }
     FunnelSpec defaultSpec = createDefaultFunnelSpec(collection);
-    funnelViews.add(
-        getFunnelDataFor(collection, defaultSpec, baselineMillis, currentMillis, dimensionValues));
+    funnelViews.add(getFunnelDataFor(collection, metricFunction, defaultSpec, baselineMillis,
+        currentMillis, intraPeriod, dimensionValues));
     return funnelViews;
   }
 
@@ -105,22 +105,27 @@ public class FunnelsDataProvider {
   // currently funnels will overlook the current granularity and baseline granularity
   // it will only present views for every hour within the 24 hour period
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
-  public FunnelHeatMapView getFunnelDataFor(String collection, FunnelSpec spec, long baselineMillis,
-      long currentMillis, MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
+  public FunnelHeatMapView getFunnelDataFor(String collection, String urlMetricFunction,
+      FunnelSpec spec, long baselineMillis, long currentMillis, long intraPeriod,
+      MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
     // them
 
     // get current start and end time
     DateTime currentEnd = new DateTime(currentMillis);
-    DateTime currentStart = currentEnd.minusDays(1);
+    DateTime currentStart = currentEnd.minus(intraPeriod);
 
     // get baseline start and end
     DateTime baselineEnd = new DateTime(baselineMillis);
-    DateTime baselineStart = baselineEnd.minusDays(1);
+    DateTime baselineStart = baselineEnd.minus(intraPeriod);
 
-    String metricFunction =
-        "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()) + ")";
+    String metricFunctionPrefix =
+        urlMetricFunction.substring(0, urlMetricFunction.lastIndexOf('('));
+    String metricFunctionSuffix = urlMetricFunction.substring(urlMetricFunction.indexOf(')') + 1);
+
+    String metricFunction = String.format("%s(%s)%s", metricFunctionPrefix,
+        METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()), metricFunctionSuffix);
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
@@ -147,7 +152,6 @@ public class FunnelsDataProvider {
         CustomDashboardResource.extractFunnelData(currentResult.get());
 
     long baselineOffsetMillis = currentEnd.getMillis() - baselineEnd.getMillis();
-    long intraPeriod = currentEnd.getMillis() - currentStart.getMillis();
     // Compose result
     List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
         currentEnd.getMillis(), baselineOffsetMillis, intraPeriod);
