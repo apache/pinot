@@ -242,10 +242,12 @@ $(document).ready(function() {
 
     //Set selected dimesnion query selectors
     var queryParams = parseDimensionValuesAry(window.location.search)
-    var firstArg = queryParams[0]
-
-    if(firstArg.indexOf("funnels") == 0){
-        queryParams.shift(queryParams[0])
+  
+    if(queryParams.length > 0) {
+        var firstArg = queryParams[0]
+        if (firstArg.indexOf("funnels") == 0) {
+            queryParams.shift(queryParams[0])
+        }
     }
 
     for(var i = 0, len = queryParams.length; i < len; i++){
