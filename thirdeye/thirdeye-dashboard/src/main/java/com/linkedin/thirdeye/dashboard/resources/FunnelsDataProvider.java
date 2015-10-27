@@ -11,6 +11,7 @@ import java.util.concurrent.Future;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,13 @@ public class FunnelsDataProvider {
     return funnelSpecsMap.get(collection);
   }
 
+  /**
+   * Computes funnel views using the provided metric function w/ the metrics replaced for each of
+   * the selected funnels. Baseline and current times are used solely for their dates (ie hours are
+   * excluded) and are treated as the start of the desired day. Since the client timezone is not
+   * provided, start of day is defined as 12AM in America/Los_Angeles.
+   * dimensionValuesMap specifies fixed dimension values for the query.
+   */
   public List<FunnelHeatMapView> computeFunnelViews(String collection, String metricFunction,
       String selectedFunnels, long baselineMillis, long currentMillis, long intraPeriod,
       MultivaluedMap<String, String> dimensionValues) throws Exception {
@@ -102,9 +110,14 @@ public class FunnelsDataProvider {
     return funnelNames;
   }
 
-  // currently funnels will overlook the current granularity and baseline granularity
-  // it will only present views for every hour within the 24 hour period
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
+  /**
+   * Retrieves funnel data using the provided url metric function w/ the metrics replaced by the
+   * specified funnel. Baseline and current times are used solely for their dates (ie hours are
+   * excluded) and are treated as the start of the desired day. Since the client timezone is not
+   * provided, start of day is defined as 12AM in America/Los_Angeles.
+   * dimensionValuesMap specifies fixed dimension values for the query.
+   */
   public FunnelHeatMapView getFunnelDataFor(String collection, String urlMetricFunction,
       FunnelSpec spec, long baselineMillis, long currentMillis, long intraPeriod,
       MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
@@ -113,12 +126,21 @@ public class FunnelsDataProvider {
     // them
 
     // get current start and end time
-    DateTime currentEnd = new DateTime(currentMillis);
-    DateTime currentStart = currentEnd.minus(intraPeriod);
+    DateTime currentInput = new DateTime(currentMillis, DateTimeZone.UTC);
+
+    // TODO hardcoded to PDT. This should convert to the client's timezone.
+    currentInput = currentInput.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
+    DateTime currentStart = new DateTime(currentInput.getYear(), currentInput.getMonthOfYear(),
+        currentInput.getDayOfMonth(), 0, 0);
+    DateTime currentEnd = currentStart.plus(intraPeriod);
 
     // get baseline start and end
-    DateTime baselineEnd = new DateTime(baselineMillis);
-    DateTime baselineStart = baselineEnd.minus(intraPeriod);
+    DateTime baselineInput = new DateTime(baselineMillis, DateTimeZone.UTC);
+    // TODO hardcoded to PDT. This should convert to the client's timezone.
+    currentInput = currentInput.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
+    DateTime baselineStart = new DateTime(baselineInput.getYear(), baselineInput.getMonthOfYear(),
+        baselineInput.getDayOfMonth(), 0, 0);
+    DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
     String metricFunctionPrefix =
         urlMetricFunction.substring(0, urlMetricFunction.lastIndexOf('('));
@@ -202,8 +224,9 @@ public class FunnelsDataProvider {
 
     List<MetricDataRow> filteredCumulativeTable =
         ViewUtils.computeCumulativeRows(filteredTable, metricCount);
-    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentEnd,
-        baselineEnd);
+
+    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentInput,
+        baselineInput);
   }
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out
