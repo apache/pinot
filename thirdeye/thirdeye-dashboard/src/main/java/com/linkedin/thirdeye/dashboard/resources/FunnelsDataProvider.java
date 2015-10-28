@@ -10,6 +10,7 @@ import java.util.concurrent.Future;
 
 import javax.ws.rs.core.MultivaluedMap;
 
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -142,12 +143,10 @@ public class FunnelsDataProvider {
         baselineInput.getDayOfMonth(), 0, 0);
     DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
-    String metricFunctionPrefix =
-        urlMetricFunction.substring(0, urlMetricFunction.lastIndexOf('('));
-    String metricFunctionSuffix = urlMetricFunction.substring(urlMetricFunction.indexOf(')') + 1);
-
-    String metricFunction = String.format("%s(%s)%s", metricFunctionPrefix,
-        METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()), metricFunctionSuffix);
+    List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
+    String metricFunction = StringUtils.join(metricFunctionLevels, "(")
+        + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
+        + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 

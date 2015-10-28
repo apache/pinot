@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
@@ -155,9 +156,8 @@ public class ViewUtils {
       Number[] baselineValues = baselineData.get(baseline);
       Number[] currentValues = currentData.get(current);
 
-      MetricDataRow row =
-          new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineValues,
-              new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
+      MetricDataRow row = new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC),
+          baselineValues, new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(0, row);
     }
 
@@ -168,7 +168,8 @@ public class ViewUtils {
    * Computes cumulative values for the input rows. <tt>metricCount</tt> should be
    * the number of values in each baseline/current dataset for each row.
    */
-  public static List<MetricDataRow> computeCumulativeRows(List<MetricDataRow> rows, int metricCount) {
+  public static List<MetricDataRow> computeCumulativeRows(List<MetricDataRow> rows,
+      int metricCount) {
 
     if (rows.isEmpty()) {
       return Collections.emptyList();
@@ -183,18 +184,16 @@ public class ViewUtils {
       Number[] baselineValues = row.getBaseline();
       if (baselineValues != null) {
         for (int i = 0; i < baselineValues.length; i++) {
-          cumulativeBaselineValues[i] =
-              cumulativeBaselineValues[i].doubleValue()
-                  + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
+          cumulativeBaselineValues[i] = cumulativeBaselineValues[i].doubleValue()
+              + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
         }
       }
 
       Number[] currentValues = row.getCurrent();
       if (currentValues != null) {
         for (int i = 0; i < currentValues.length; i++) {
-          cumulativeCurrentValues[i] =
-              cumulativeCurrentValues[i].doubleValue()
-                  + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
+          cumulativeCurrentValues[i] = cumulativeCurrentValues[i].doubleValue()
+              + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
         }
       }
 
@@ -203,12 +202,60 @@ public class ViewUtils {
       Number[] cumulativeCurrentValuesCopy =
           Arrays.copyOf(cumulativeCurrentValues, cumulativeCurrentValues.length);
 
-      MetricDataRow cumulativeRow =
-          new MetricDataRow(row.getBaselineTime(), cumulativeBaselineValuesCopy,
-              row.getCurrentTime(), cumulativeCurrentValuesCopy);
+      MetricDataRow cumulativeRow = new MetricDataRow(row.getBaselineTime(),
+          cumulativeBaselineValuesCopy, row.getCurrentTime(), cumulativeCurrentValuesCopy);
       cumulativeRows.add(cumulativeRow);
     }
     return cumulativeRows;
   }
 
+  /**
+   * Returns a path to the shallowest nested metric function that takes in multiple arguments:
+   * <ul>
+   * <li>A(B(C)) --> A,B</li>
+   * <li>A(B(C), D) --> A</li>
+   * <li>A(B, C(D)) --> A</li>
+   * </ul>
+   * <br/>
+   * If envisioned as a tree, the last function returned is the topmost node that has more than one
+   * child.
+   */
+  public static List<String> getMetricFunctionLevels(String metricFunction) {
+
+    Stack<String> path = new Stack<>();
+    List<Boolean> validDepths = new ArrayList<>();
+    validDepths.add(true); // first level should always be valid
+    int currentDepth = 0;
+    StringBuilder sb = new StringBuilder();
+    for (char c : metricFunction.toCharArray()) {
+      switch (c) {
+      case '(':
+        if (currentDepth < validDepths.size() && validDepths.get(currentDepth)) {
+          path.push(sb.toString());
+          validDepths.add(true);
+        }
+        currentDepth++;
+        sb.setLength(0);
+        break;
+      case ')':
+        currentDepth--;
+        break;
+      case ',':
+        if (currentDepth < validDepths.size()) {
+          validDepths.set(currentDepth, false);
+          // trim off any values no longer needed.
+          while (validDepths.size() > currentDepth + 1) {
+            validDepths.remove(currentDepth + 1);
+            path.pop();
+          }
+        }
+
+        break;
+      default:
+        sb.append(c);
+        break;
+      }
+    }
+    return new ArrayList<>(path);
+  }
 }
