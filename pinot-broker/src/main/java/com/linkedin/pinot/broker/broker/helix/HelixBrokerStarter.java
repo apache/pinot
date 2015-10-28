@@ -27,6 +27,8 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyPathConfig;
+import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -102,14 +104,15 @@ public class HelixBrokerStarter {
     String zkServers = zkServer.replaceAll("\\s+", "");
 
     ZkClient zkClient =
-        new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
+        new ZkClient(zkServers,
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
+    String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, helixClusterName);
+    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), propertyStorePath, null);
+
     _helixExternalViewBasedRouting =
         new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder,
             tableToRoutingTableBuilderMap, _propertyStore);
 
-    // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
@@ -196,16 +199,6 @@ public class HelixBrokerStarter {
       }
     });
     return brokerServerBuilder;
-  }
-
-  private String getZkAddressForBroker(String zkServers, String helixClusterName) {
-    List tokens = new ArrayList<String>();
-
-    for (String token : zkServers.split(",")) {
-      tokens.add(StringUtil.join("/", StringUtils.chomp(token, "/"), helixClusterName, PROPERTY_STORE));
-    }
-
-    return StringUtils.join(tokens, ",");
   }
 
   public HelixExternalViewBasedRouting getHelixExternalViewBasedRouting() {
