@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.controller.api.restlet.resources.PinotRestletResourceBase;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
 import com.linkedin.pinot.controller.api.swagger.Paths;
@@ -30,6 +31,7 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.ComparatorUtils;
 import org.restlet.Application;
+import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
 import org.restlet.Restlet;
@@ -37,6 +39,7 @@ import org.restlet.data.MediaType;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Directory;
 import org.restlet.resource.ServerResource;
+import org.restlet.routing.Filter;
 import org.restlet.routing.Redirector;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
@@ -174,7 +177,19 @@ public class ControllerRestApplication extends Application {
 
     for (String routePath : pathsOrderedByLength) {
       LOGGER.info("Attaching route {} -> {}", routePath, clazz.getSimpleName());
-      router.attach(routePath, clazz);
+      router.attach(routePath, new AddHeaderFilter(getContext(), createFinder(clazz)));
+    }
+  }
+
+  private class AddHeaderFilter extends Filter {
+    public AddHeaderFilter(Context context, Restlet next) {
+      super(context, next);
+    }
+
+    @Override
+    protected int beforeHandle(Request request, Response response) {
+      PinotRestletResourceBase.addExtraHeaders(response);
+      return Filter.CONTINUE;
     }
   }
 }

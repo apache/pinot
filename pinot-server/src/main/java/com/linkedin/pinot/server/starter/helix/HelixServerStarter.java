@@ -172,6 +172,17 @@ public class HelixServerStarter {
   }
 
   public static void main(String[] args) throws Exception {
+    /*
+    // Another way to start a server via IDE
+    final int port = 3800;
+    final String serverFQDN = "server.host.foo";
+    final String server = "Server_" + serverFQDN + "_" + port;
+    final Configuration configuration = new PropertiesConfiguration();
+    configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
+    configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
+    configuration.addProperty("instanceId",  server);
+    final HelixServerStarter pinotHelixStarter = new HelixServerStarter("pinotDevDeploy", "localhost:2181", configuration);
+    */
     startDefault();
   }
 }
