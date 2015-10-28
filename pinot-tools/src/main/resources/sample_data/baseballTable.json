@@ -1,11 +1,11 @@
 {
   "tableIndexConfig": {
-    "invertedIndexColumns":["column1","column2"],
+    "invertedIndexColumns":["playerID","teamID"],
     "loadMode":"HEAP",
     "lazyLoad":"false"
    },
    "tenants":{"server":"","broker":""},
-   "tableType":"OFFLINE","metadata":{"customConfigs":{"d2Name":"xlntBetaPinot"}},
+   "tableType":"OFFLINE","metadata":{"customConfigs":{"d2Name":"baseballPinot"}},
    "segmentsConfig":{
      "retentionTimeUnit":"DAYS",
      "segmentPushFrequency":"daily",

@@ -51,4 +51,7 @@ public class IndexLoadingConfigMetadata {
     return _loadingInvertedIndexColumnSet.contains(columnName);
   }
 
+  public static String getKeyOfLoadingInvertedIndex() {
+    return KEY_OF_LOADING_INVERTED_INDEX;
+  }
 }
