@@ -22,7 +22,7 @@
     },
     "tableType":"OFFLINE",
     "metadata": {
-        customConfigs : {
+        "customConfigs" : {
             "d2Name":"xlntBetaPinot"
         }
     }

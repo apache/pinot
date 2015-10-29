@@ -1,6 +1,6 @@
 {
     "role" : "server",
-    "numberOfInstances : "5",
+    "numberOfInstances" : "5",
     "name" : "serverOne",
     "offlineInstances" : "3",
     "realtimeInstances" : "2"
