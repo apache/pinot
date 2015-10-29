@@ -37,7 +37,7 @@ import com.sun.jersey.core.util.MultivaluedMapImpl;
  * REST controller providing general collection information such as dimensions and metrics.
  * @author jteoh
  */
-@Path("/dashboard-config")
+@Path("/dashboardConfig")
 @Produces(MediaType.APPLICATION_JSON)
 public class DashboardConfigResource {
 
@@ -93,7 +93,7 @@ public class DashboardConfigResource {
   @GET
   @Path("/dimensionValues/{collection}/{baseline}/{current}")
   public Map<String, Collection<String>> getDimensionValues(
-      @PathParam("collection") String collection, @PathParam("baselineMillis") long baselineMillis,
+      @PathParam("collection") String collection, @PathParam("baseline") long baselineMillis,
       @PathParam("current") long currentMillis,
       @DefaultValue(DIMENSION_VALUES_OPTIONS_THRESHOLD) @QueryParam("threshold") double contributionThreshold,
       @DefaultValue(DIMENSION_VALUES_LIMIT) @QueryParam("limit") int dimensionValuesLimit)
