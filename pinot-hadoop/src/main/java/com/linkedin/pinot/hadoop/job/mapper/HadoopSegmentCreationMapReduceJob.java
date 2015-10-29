@@ -29,7 +29,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.stringtemplate.v4.compiler.STParser.list_return;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -49,6 +48,7 @@ public class HadoopSegmentCreationMapReduceJob {
     private String _inputFilePath;
     private String _outputPath;
     private String _tableName;
+    private String _postfix;
 
     private Path _currentHdfsWorkDir;
     private String _currentDiskWorkDir;
@@ -83,6 +83,7 @@ public class HadoopSegmentCreationMapReduceJob {
 
       _outputPath = _properties.get("path.to.output");
       _tableName = _properties.get("segment.table.name");
+      _postfix = _properties.get("segment.name.postfix", null);
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
             "Missing configs: " +
@@ -160,7 +161,11 @@ public class HadoopSegmentCreationMapReduceJob {
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setInputFileFormat(fileFormat);
-      segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+      if (null != _postfix) {
+        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
+      } else {
+        segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+      }
       segmentGeneratorConfig.setRecordeReaderConfig(getReaderConfig(fileFormat));
 
       segmentGeneratorConfig.setIndexOutputDir(_localDiskSegmentDirectory);
