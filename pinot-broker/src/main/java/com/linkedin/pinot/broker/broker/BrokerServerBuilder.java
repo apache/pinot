@@ -15,30 +15,11 @@
  */
 package com.linkedin.pinot.broker.broker;
 
-import com.linkedin.pinot.common.Utils;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.WebAppContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import com.linkedin.pinot.broker.servlet.PinotBrokerDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -59,6 +40,19 @@ import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
 import com.yammer.metrics.core.MetricsRegistry;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -68,10 +62,10 @@ public class BrokerServerBuilder {
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
-  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.time.out";
+  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
-  private static final long DEFAULT_BROKER_TIME_OUT = 10 * 1000L;
+  private static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
 
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
@@ -167,19 +161,19 @@ public class BrokerServerBuilder {
     _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
     // Setup Broker Request Handler
-    long brokerTimeOut = DEFAULT_BROKER_TIME_OUT;
+    long brokerTimeOutMs = DEFAULT_BROKER_TIME_OUT_MS;
     if (_config.containsKey(BROKER_TIME_OUT_CONFIG)) {
       try {
-        brokerTimeOut = _config.getLong(BROKER_TIME_OUT_CONFIG);
+        brokerTimeOutMs = _config.getLong(BROKER_TIME_OUT_CONFIG);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while reading broker timeout from config, using default value", e);
       }
     }
-    LOGGER.info("Broker timeout is - " + brokerTimeOut + " ms");
+    LOGGER.info("Broker timeout is - " + brokerTimeOutMs + " ms");
 
     _requestHandler =
         new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(),
-            _brokerMetrics, brokerTimeOut);
+            _brokerMetrics, brokerTimeOutMs);
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 
@@ -221,7 +215,7 @@ public class BrokerServerBuilder {
     _routingTable.start();
     _state.set(State.RUNNING);
     if (listener != null) {
-      listener.init(_connPool, DEFAULT_BROKER_TIME_OUT);
+      listener.init(_connPool, DEFAULT_BROKER_TIME_OUT_MS);
     }
     LOGGER.info("Network running !!");
 

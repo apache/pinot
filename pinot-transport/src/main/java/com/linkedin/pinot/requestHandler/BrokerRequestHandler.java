@@ -78,13 +78,13 @@ public class BrokerRequestHandler {
   private final ReduceService _reduceService;
   private final BrokerMetrics _brokerMetrics;
   private final TimeBoundaryService _timeBoundaryService;
-  private final long _brokerTimeOut;
+  private final long _brokerTimeOutMs;
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
-      ScatterGather scatterGatherer, ReduceService reduceService, BrokerMetrics brokerMetrics, long brokerTimeOut) {
+      ScatterGather scatterGatherer, ReduceService reduceService, BrokerMetrics brokerMetrics, long brokerTimeOutMs) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _scatterGatherer = scatterGatherer;
@@ -92,7 +92,7 @@ public class BrokerRequestHandler {
     _replicaSelection = new RoundRobinReplicaSelection();
     _reduceService = reduceService;
     _brokerMetrics = brokerMetrics;
-    _brokerTimeOut = brokerTimeOut;
+    _brokerTimeOutMs = brokerTimeOutMs;
   }
 
   /**
@@ -249,7 +249,7 @@ public class BrokerRequestHandler {
     ScatterGatherRequestImpl scatterRequest =
         new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
             ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
-            overriddenSelection, _requestIdGen.incrementAndGet(), _brokerTimeOut);
+            overriddenSelection, _requestIdGen.incrementAndGet(), _brokerTimeOutMs);
     CompositeFuture<ServerInstance, ByteBuf> response = _scatterGatherer.scatterGather(scatterRequest);
 
     //Step 5 - Deserialize Responses and build instance response map
@@ -341,7 +341,7 @@ public class BrokerRequestHandler {
       ScatterGatherRequestImpl scatterRequest =
           new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
               ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
-              overriddenSelection, _requestIdGen.incrementAndGet(), _brokerTimeOut);
+              overriddenSelection, _requestIdGen.incrementAndGet(), _brokerTimeOutMs);
       responseFuturesList.put(request, _scatterGatherer.scatterGather(scatterRequest));
     }
     _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);

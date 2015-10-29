@@ -71,7 +71,7 @@ public abstract class ClusterTest extends ControllerTest {
       for (int i = 0; i < brokerCount; ++i) {
         final String helixClusterName = getHelixClusterName();
         Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
-        configuration.setProperty("pinot.broker.time.out", 100 * 1000L);
+        configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
         configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(18099 + i));
         configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
         overrideBrokerConf(configuration);

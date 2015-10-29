@@ -223,7 +223,7 @@ public class HelixBrokerStarter {
     Configuration configuration = new PropertiesConfiguration();
     int port = 5001;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-    configuration.addProperty("pinot.broker.time.out", 500 * 1000L);
+    configuration.addProperty("pinot.broker.timeoutMs", 500 * 1000L);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
         new HelixBrokerStarter("quickstart", "localhost:2122", configuration);
