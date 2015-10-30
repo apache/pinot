@@ -1,3 +1,12 @@
+/* Color reference
+normal text: #
+grey text: #98989
+main content background-color: #fff
+grey background-color: #f5f5f5\
+border color: #ddd
+Note: Do not use this color scheme in a real design. It will look horrible.
+*/
+
 /* Landing */
 
 #landing-area,
@@ -19,21 +28,15 @@ li {
     vertical-align: top;
 }
 
-#dashboard-metric-view {
-    padding: 2%;
-    padding-top: 155px;
-    margin-top: -150px;
+#dashboard-output hr {
+    margin-left: 2%;
+    margin-right: 2%;
 }
 
 #dashboard-dimension-view {
     padding: 2%;
     padding-top: 75px;
     margin-top: -75px;
-}
-
-#dashboard-output hr {
-    margin-left: 2%;
-    margin-right: 2%;
 }
 
 .dimension-combination{
@@ -144,7 +147,7 @@ li {
 
 
 #custom-funnel-section td:hover{
-    color: #808080;
+    color: #898989;
 }
 
 #custom-funnel-section .heat-map-cell:hover{
@@ -243,10 +246,6 @@ li {
 
 .metric-table-group-1 {
     background-color: #eee
-}
-
-#time-nav-buttons {
-    float: right;
 }
 
 #metric-funnel-area {
@@ -492,6 +491,10 @@ td[dimension-val] {
     box-sizing: border-box;
 }
 
+.treemap-container tbody{
+    vertical-align: middle;
+}
+
 .treemap-display-tbl {
     width: 100%;
 }
@@ -522,7 +525,7 @@ td[dimension-val] {
 }
 
 .treemap-tooltip {
-    color: #000000;
+    color: #000;
     outline: none;
     text-decoration: none;
     position: relative;
@@ -562,81 +565,34 @@ td[dimension-val] {
     margin-bottom: 15px;
 }
 
-.dimension-heat-map-filter-label {
-    position: relative;
-    left: -25px;
-    top: -1px;
-    padding: 4px 26px 7px 30px;
-    -webkit-border-radius: 4px 0px 0px 4px;
-    -moz-border-radius: 4px 0px 0px 4px;
-    border-radius: 4px 0px 0px 4px;
-}
-
-#dimension-heat-map-filter:checked + label {
-    background-color: #b9b9b9;
-    border: 1px solid #777;
-}
-
-.heat-map-buttons {
-    float: right;
-    padding-left: 20px;
-}
-
-.heat-map-buttons i,
-.heat-map-buttons i:hover {
-    border: transparent;
-    margin-top: 2px;
-    margin-bottom: 2px;
-}
-
-.dimension-heat-map-filter-btn,
-.dimension-heat-map-help-btn {
-    width: 68px;
-}
-
-.dimension-heat-map-help-link {
-    color: #444;
-    position: relative;
-    left: -13px;
-    padding: 6px 30px 6px 30px;
-    -webkit-border-radius: 0px 4px 4px 0px;
-    -moz-border-radius: 0px 4px 4px 0px;
-    border-radius: 0px 4px 4px 0px;
-}
-.dimension-heat-map-help-link:hover {
-    color: #222;
-}
-.dimension-heat-map-filter {
-    width: 1px;
-    height: 1px;
-}
-
-#dimension-view-funnel-heat-map-rendered table{
-    border-collapse: collapse;
-}
-
-#dimension-heat-map-container td {
-    border: 1px solid #ddd;
-}
 
 .cell-up,
 .cell-down {
     float: right;
 }
 
-#dimension-heat-map-explanation {
-    clear: both;
-    padding-top: 10px;
-    padding-bottom: 10px;
+
+/* Contributors */
+.contributors-table{
+   width: 100%;
+   border: 1px solid #ddd;
+   vertical-align: middle;
+   text-align: center;
 }
 
-#dimension-heat-map-explanation div {
-    display: none;
+.contributors-table td,
+.contributors-table th{
+    border: 1px solid #ddd;
+    vertical-align: middle;
+    text-align: center;
 }
 
-#dimension-heat-map-explanation em {
-    color: #ccc;
+.contributors-table .devider-row td{
+    border: none;
+    height: 45px;
 }
+
+
 
 /* Both: used on multiple views */
 
