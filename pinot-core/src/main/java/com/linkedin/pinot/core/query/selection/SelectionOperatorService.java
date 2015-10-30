@@ -287,45 +287,55 @@ public class SelectionOperatorService {
       @Override
       public int compare(Serializable[] o1, Serializable[] o2) {
         for (int i = 0; i < sortSequence.size(); ++i) {
+          int ret = 0;
           switch (dataSchema.getColumnType(i)) {
             case INT:
               if (!sortSequence.get(i).isIsAsc()) {
-                return ((Integer) o1[i]).compareTo((Integer) o2[i]);
+                ret = ((Integer) o1[i]).compareTo((Integer) o2[i]);
               } else {
-                return ((Integer) o2[i]).compareTo((Integer) o1[i]);
+                ret = ((Integer) o2[i]).compareTo((Integer) o1[i]);
               }
+              break;
             case SHORT:
               if (!sortSequence.get(i).isIsAsc()) {
-                return ((Short) o1[i]).compareTo((Short) o2[i]);
+                ret = ((Short) o1[i]).compareTo((Short) o2[i]);
               } else {
-                return ((Short) o2[i]).compareTo((Short) o1[i]);
+                ret = ((Short) o2[i]).compareTo((Short) o1[i]);
               }
+              break;
             case LONG:
               if (!sortSequence.get(i).isIsAsc()) {
-                return ((Long) o1[i]).compareTo((Long) o2[i]);
+                ret = ((Long) o1[i]).compareTo((Long) o2[i]);
               } else {
-                return ((Long) o2[i]).compareTo((Long) o1[i]);
+                ret = ((Long) o2[i]).compareTo((Long) o1[i]);
               }
+              break;
             case FLOAT:
               if (!sortSequence.get(i).isIsAsc()) {
-                return ((Float) o1[i]).compareTo((Float) o2[i]);
+                ret = ((Float) o1[i]).compareTo((Float) o2[i]);
               } else {
-                return ((Float) o2[i]).compareTo((Float) o1[i]);
+                ret = ((Float) o2[i]).compareTo((Float) o1[i]);
               }
+              break;
             case DOUBLE:
               if (!sortSequence.get(i).isIsAsc()) {
-                return ((Double) o1[i]).compareTo((Double) o2[i]);
+                ret = ((Double) o1[i]).compareTo((Double) o2[i]);
               } else {
-                return ((Double) o2[i]).compareTo((Double) o1[i]);
+                ret = ((Double) o2[i]).compareTo((Double) o1[i]);
               }
+              break;
             case STRING:
               if (!sortSequence.get(i).isIsAsc()) {
-                return ((String) o1[i]).compareTo((String) o2[i]);
+                ret = ((String) o1[i]).compareTo((String) o2[i]);
               } else {
-                return ((String) o2[i]).compareTo((String) o1[i]);
+                ret = ((String) o2[i]).compareTo((String) o1[i]);
               }
+              break;
             default:
               break;
+          }
+          if (ret != 0){
+            return ret;
           }
         }
         return 0;
