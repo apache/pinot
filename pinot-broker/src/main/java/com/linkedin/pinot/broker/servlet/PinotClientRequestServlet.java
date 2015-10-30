@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.servlet;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -66,7 +67,8 @@ public class PinotClientRequestServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      resp.getOutputStream().print(handleRequest(new JSONObject(req.getParameter("bql"))).toJson().toString());
+      resp.setCharacterEncoding("UTF-8");
+      resp.getOutputStream().write(handleRequest(new JSONObject(req.getParameter("bql"))).toJson().toString().getBytes("UTF-8"));
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
     } catch (final Exception e) {
@@ -81,7 +83,8 @@ public class PinotClientRequestServlet extends HttpServlet {
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      resp.getOutputStream().print(handleRequest(extractJSON(req)).toJson().toString());
+      resp.setCharacterEncoding("UTF-8");
+      resp.getOutputStream().write(handleRequest(extractJSON(req)).toJson().toString().getBytes("UTF-8"));
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
     } catch (final Exception e) {
@@ -158,7 +161,8 @@ public class PinotClientRequestServlet extends HttpServlet {
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
     final StringBuilder requestStr = new StringBuilder();
     String line;
-    final BufferedReader reader = req.getReader();
+    final BufferedReader reader = new BufferedReader(new InputStreamReader(
+            req.getInputStream(), "UTF-8"));
     while ((line = reader.readLine()) != null) {
       requestStr.append(line);
     }
