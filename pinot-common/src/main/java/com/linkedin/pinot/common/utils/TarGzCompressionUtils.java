@@ -14,6 +14,7 @@
  ******************************************************************************/
 package com.linkedin.pinot.common.utils;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -157,7 +158,7 @@ public class TarGzCompressionUtils {
     InputStream is = null;
     final List<File> untaredFiles = new LinkedList<File>();
     try {
-      is = new GzipCompressorInputStream(new FileInputStream(inputFile));
+      is = new GzipCompressorInputStream(new BufferedInputStream(new FileInputStream(inputFile)));
       debInputStream = (TarArchiveInputStream) new ArchiveStreamFactory().createArchiveInputStream("tar", is);
       TarArchiveEntry entry = null;
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
