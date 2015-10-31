@@ -82,12 +82,14 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
       environment.jersey().register(collectionConfigResource);
     }
 
+    DashboardConfigResource dashboardConfigResource = new DashboardConfigResource(
+        config.getServerUri(), dataCache, queryCache, environment.getObjectMapper());
+    environment.jersey().register(dashboardConfigResource);
+
     environment.jersey()
         .register(new DashboardResource(config.getServerUri(), dataCache,
             config.getFeedbackEmailAddress(), queryCache, environment.getObjectMapper(),
             customDashboardResource, configCache, funnelsResource));
-    environment.jersey().register(new DashboardConfigResource(config.getServerUri(), dataCache,
-        queryCache, environment.getObjectMapper()));
 
     environment.jersey().register(new FlotTimeSeriesResource(config.getServerUri(), dataCache,
         queryCache, environment.getObjectMapper(), configCache, config.getAnomalyDatabaseConfig()));

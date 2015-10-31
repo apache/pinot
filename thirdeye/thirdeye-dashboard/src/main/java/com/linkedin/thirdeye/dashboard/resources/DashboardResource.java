@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -10,6 +9,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -45,16 +45,15 @@ import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.util.UriUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.DashboardStartView;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.DimensionView;
+import com.linkedin.thirdeye.dashboard.views.DimensionViewFunnel;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewHeatMap;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewMultiTimeSeries;
-import com.linkedin.thirdeye.dashboard.views.DimensionViewTabular;
 import com.linkedin.thirdeye.dashboard.views.ExceptionView;
-import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
+import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 import com.linkedin.thirdeye.dashboard.views.LandingView;
 import com.linkedin.thirdeye.dashboard.views.MetricView;
 import com.linkedin.thirdeye.dashboard.views.MetricViewTabular;
@@ -123,7 +122,7 @@ public class DashboardResource {
   @GET
   @Path("/dashboard/{collection}/configs")
   public String getCollectionInfoJSON(@PathParam("collection") String collection) throws Exception {
-
+    // TODO check if this is being used outside of dashboard (not used on main page)
     if (collection == null) {
       return null;
     }
@@ -184,6 +183,7 @@ public class DashboardResource {
   public Response getDashboardView(@PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction, @Context UriInfo uriInfo)
           throws Exception {
+    // TODO check if this is being used outside of dashboard (not used on main page)
     return Response.seeOther(URI.create(PATH_JOINER.join("", "dashboard", collection,
         metricFunction, MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
   }
@@ -196,6 +196,7 @@ public class DashboardResource {
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineOffsetMillis") Long baselineOffsetMillis, @Context UriInfo uriInfo)
           throws Exception {
+    // TODO check if this is being used outside of dashboard (not used on main page)
     // Get segment metadata
     List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
     if (segments.isEmpty()) {
@@ -232,15 +233,19 @@ public class DashboardResource {
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineMillis") Long baselineMillis,
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
-    Map<String, String> dimensionValues =
-        UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
+    MultivaluedMap<String, String> selectedDimensions = uriInfo.getQueryParameters();
+    List<String> selectedFunnelsList = selectedDimensions.remove("funnels");
+    String selectedFunnels = (selectedFunnelsList == null || selectedFunnelsList.isEmpty()) ? null
+        : selectedFunnelsList.get(0);
 
     // Check no group bys
-    for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
-      if ("!".equals(entry.getValue())) {
-        throw new WebApplicationException(
-            new IllegalArgumentException("No group by dimensions allowed"),
-            Response.Status.BAD_REQUEST);
+    for (Entry<String, List<String>> entry : selectedDimensions.entrySet()) {
+      for (String value : entry.getValue()) {
+        if ("!".equals(value)) {
+          throw new WebApplicationException(
+              new IllegalArgumentException("No group by dimensions allowed"),
+              Response.Status.BAD_REQUEST);
+        }
       }
     }
 
@@ -275,35 +280,33 @@ public class DashboardResource {
     }
 
     // lets find if there are any funnels
-    List<FunnelHeatMapView> funnels = Collections.emptyList();
+
     List<String> funnelNames = Collections.emptyList();
-
-    String selectedFunnels = uriInfo.getQueryParameters().getFirst("funnels");
-
     if (funnelResource != null) {
-      MultivaluedMap<String, String> filterMap = uriInfo.getQueryParameters();
-      filterMap.remove("funnels");
-      funnels = funnelResource.computeFunnelViews(collection, metricFunction, selectedFunnels,
-          baselineMillis, currentMillis, getIntraPeriod(metricFunction), filterMap);
       funnelNames = funnelResource.getFunnelNamesFor(collection);
     }
 
     try {
-      View metricView = getMetricView(collection, metricFunction, metricViewType, baselineMillis,
-          currentMillis, uriInfo);
+      View metricView = null;
+      if (dimensionViewType == DimensionViewType.MULTI_TIME_SERIES) {
+        // TODO Follow up on multi-time-series.ftl, which is the only user of the metric view in the
+        // intra_day dashboard.
+        metricView = getMetricView(collection, metricFunction, metricViewType, baselineMillis,
+            currentMillis, uriInfo);
+      }
 
       View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
-          baselineMillis, currentMillis, uriInfo);
+          baselineMillis, currentMillis, selectedDimensions, selectedFunnels, uriInfo);
 
       Map<String, Collection<String>> dimensionValueOptions =
           retrieveDimensionValues(collection, baselineMillis, currentMillis);
 
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
-          new DateTime(baselineMillis), new DateTime(currentMillis),
+          selectedDimensions, new DateTime(baselineMillis), new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
           new DimensionView(dimensionView, dimensionViewType, dimensionValueOptions),
-          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress, funnelNames,
-          funnels);
+          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress,
+          funnelNames);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e; // sends appropriate HTTP response
@@ -324,7 +327,8 @@ public class DashboardResource {
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
     MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-
+    // TODO check if anything is using this endpoint. Right now metricViewType is always INTRA_DAY
+    // and is only useful when viewing the multi-time-series.
     // Metric view
     switch (metricViewType) {
     case INTRA_DAY:
@@ -336,11 +340,10 @@ public class DashboardResource {
       if (dimensionGroupSpec != null) {
         dimensionGroups = dimensionGroupSpec.getReverseMapping();
       }
-
       String sql =
           SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - intraPeriod),
               new DateTime(currentMillis), dimensionValues, dimensionGroups);
-      LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+      LOGGER.info("Generated SQL for intraday metric {}: {}", uriInfo.getRequestUri(), sql);
       QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
       return new MetricViewTabular(schema, objectMapper, result, currentMillis,
@@ -363,11 +366,18 @@ public class DashboardResource {
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineMillis") Long baselineMillis,
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
+    // TODO may be useful for refactor later.
+    return getDimensionView(collection, metricFunction, dimensionViewType, baselineMillis,
+        currentMillis, uriInfo.getQueryParameters(), null, uriInfo);
+  }
+
+  private View getDimensionView(String collection, String metricFunction,
+      DimensionViewType dimensionViewType, Long baselineMillis, Long currentMillis,
+      MultivaluedMap<String, String> selectedDimensions, String funnels, UriInfo uriInfo)
+          throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
-
-    MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
 
     // Dimension groups
     Map<String, Map<String, List<String>>> reverseDimensionGroups = null;
@@ -377,33 +387,22 @@ public class DashboardResource {
     }
 
     // Dimension view
-    Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
     switch (dimensionViewType) {
     case MULTI_TIME_SERIES:
-      List<String> multiTimeSeriesDimensions = new ArrayList<>();
-      for (String dimension : schema.getDimensions()) {
-        if (!dimensionValues.containsKey(dimension)) {
-          // Generate SQL (n.b. will query /flot resource async)
-          dimensionValues.put(dimension, Arrays.asList("!"));
-          String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
-              dimensionValues, reverseDimensionGroups);
-          LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
-          dimensionValues.remove(dimension);
-
-          multiTimeSeriesDimensions.add(dimension);
-        }
-      }
-      return new DimensionViewMultiTimeSeries(multiTimeSeriesDimensions);
+      // determine time series dimensions to asynchronously query.
+      // note: this order isn't sorted alphabetically...
+      return new DimensionViewMultiTimeSeries(schema.getDimensions());
     case HEAT_MAP:
-    case TABULAR:
+
+      Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
       for (String dimension : schema.getDimensions()) {
-        if (!dimensionValues.containsKey(dimension)) {
+        if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
-          dimensionValues.put(dimension, Arrays.asList("!"));
+          selectedDimensions.put(dimension, Arrays.asList("!"));
           String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
-              dimensionValues, reverseDimensionGroups);
-          LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
-          dimensionValues.remove(dimension);
+              selectedDimensions, reverseDimensionGroups);
+          LOGGER.info("Generated SQL for heat map {}: {}", uriInfo.getRequestUri(), sql);
+          selectedDimensions.remove(dimension);
 
           // Query (in parallel)
           resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
@@ -425,17 +424,17 @@ public class DashboardResource {
         results.put(entry.getKey(), entry.getValue().get());
       }
 
-      if (DimensionViewType.HEAT_MAP.equals(dimensionViewType)) {
-        return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups,
-            dimensionRegex);
-      } else if (DimensionViewType.TABULAR.equals(dimensionViewType)) {
-
-        return new DimensionViewTabular(schema, objectMapper, results, dimensionGroups,
-            dimensionRegex);
-      }
+      return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups,
+          dimensionRegex);
+    case TABULAR:
+      List<FunnelTable> funnelTables =
+          funnelResource.computeFunnelViews(collection, metricFunction, funnels, baselineMillis,
+              currentMillis, getIntraPeriod(metricFunction), selectedDimensions);
+      return new DimensionViewFunnel(funnelTables);
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }
+
   }
 
   /**

@@ -1,12 +1,12 @@
 <script src="/assets/js/thirdeye.funnelheatmap.js"></script>
 
-<#if (funnelViews?size > 0)>
+<#if (dimensionView.view.funnels?size > 0)>
 <div id="funnel-heat-map-error"></div>
 <div id="custom-funnel-section">
     <i class="uk-icon-spinner uk-icon-spin uk-icon-large" style="margin: 50%;"></i>
 </div>
 <div id="funnel-thumbnails" class="funnel-thumbnail-container uk-margin-bottom" data-uk-grid data-uk-slider>
-    <#list funnelViews as funnel>
+    <#list dimensionView.view.funnels as funnel>
         <#assign funnel=funnel>
         
         <div class="funnel">

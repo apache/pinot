@@ -31,7 +31,7 @@ import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
-import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
+import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 
 public class FunnelsDataProvider {
   private static final String DEFAULT_FUNNEL_NAME = "Primary Metric View";
@@ -73,10 +73,10 @@ public class FunnelsDataProvider {
    * provided, start of day is defined as 12AM in America/Los_Angeles.
    * dimensionValuesMap specifies fixed dimension values for the query.
    */
-  public List<FunnelHeatMapView> computeFunnelViews(String collection, String metricFunction,
+  public List<FunnelTable> computeFunnelViews(String collection, String metricFunction,
       String selectedFunnels, long baselineMillis, long currentMillis, long intraPeriod,
       MultivaluedMap<String, String> dimensionValues) throws Exception {
-    List<FunnelHeatMapView> funnelViews = new ArrayList<FunnelHeatMapView>();
+    List<FunnelTable> funnelViews = new ArrayList<FunnelTable>();
 
     if (selectedFunnels != null && selectedFunnels.length() > 0) {
       String[] funnels = selectedFunnels.split(",");
@@ -119,8 +119,8 @@ public class FunnelsDataProvider {
    * provided, start of day is defined as 12AM in America/Los_Angeles.
    * dimensionValuesMap specifies fixed dimension values for the query.
    */
-  public FunnelHeatMapView getFunnelDataFor(String collection, String urlMetricFunction,
-      FunnelSpec spec, long baselineMillis, long currentMillis, long intraPeriod,
+  public FunnelTable getFunnelDataFor(String collection, String urlMetricFunction, FunnelSpec spec,
+      long baselineMillis, long currentMillis, long intraPeriod,
       MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
@@ -159,8 +159,8 @@ public class FunnelsDataProvider {
         dimensionValuesMap, dimensionGroups);
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
-    LOG.info("Generated SQL: {}", baselineSql);
-    LOG.info("Generated SQL: {}", currentSql);
+    LOG.info("Generated SQL for funnel baseline: {}", baselineSql);
+    LOG.info("Generated SQL for funnel current: {}", currentSql);
 
     // Query
     Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);
@@ -224,7 +224,7 @@ public class FunnelsDataProvider {
     List<MetricDataRow> filteredCumulativeTable =
         ViewUtils.computeCumulativeRows(filteredTable, metricCount);
 
-    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentInput,
+    return new FunnelTable(spec, filteredTable, filteredCumulativeTable, currentInput,
         baselineInput);
   }
 

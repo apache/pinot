@@ -93,7 +93,6 @@ public class MetricViewTabular extends View {
 
   private List<MetricTable> generateMetricTables() throws Exception {
     List<MetricTable> tables = new ArrayList<>();
-
     for (Map.Entry<String, Map<String, Number[]>> entry : result.getData().entrySet()) {
       Map<Long, Number[]> baselineData = new HashMap<>();
       for (Map.Entry<String, Number[]> dataEntry : entry.getValue().entrySet()) {

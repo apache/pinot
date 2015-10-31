@@ -1,28 +1,28 @@
 <div class="title-box uk-clearfix">
-<!-- Filters Applied -->
-<#list (metricView.view.metricTables)!metricTables as metricTable>
-    <#assign dimensions = metricTable.dimensionValues>
-    <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
+<!-- Filters Applied revamped -->
 <ul class="filters-applied" style="display: inline-block;">Filters Applied:
-    <#list dimensions?keys as dimensionName>
-        <#assign dimensionValue = dimensions[dimensionName]>
+    <#list dimensions as dimensionName>
         <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
-
-        <#if dimensionValue == "*">
-        <#--<span>${dimensionDisplay}:</span><br> ALL-->
-        <#elseif dimensionValue == "?">
-            <li>
-                <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> OTHER</a>
-            </li>
-        <#else>
-            <li>
-                <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value="${dimensions[dimensionName]}"><span>${dimensionDisplay}:</span> ${dimensions[dimensionName]}</a>
-            </li>
-        </#if>
+        <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
+            <#if dimensionValue == "*">
+            <#--<span>${dimensionDisplay}:</span><br> ALL-->
+            <#elseif dimensionValue == "?">
+                <li>
+                    <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> OTHER</a>
+                </li>
+            <#elseif dimensionValue == "">
+                <li>
+                    <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> UNKNOWN</a>
+                </li>
+            <#else>
+                <li>
+                    <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value="${dimensionValue}"><span>${dimensionDisplay}:</span> ${dimensionValue}</a>
+                </li>
+            </#if>
 
     </#list>
 </ul>
-</#list>
+
 
 
 <#if (dimensionView.type == "TABULAR")>
@@ -77,12 +77,9 @@
                 <table>
                     <tr>
                         <td>Select Filters: </td>
-                    <#list (metricView.view.metricTables)!metricTables as metricTable>
-                        <#assign dimensions = metricTable.dimensionValues>
-                        <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-                        <#list dimensions?keys as dimensionName>
-                            <#assign dimensionValue = dimensions[dimensionName]>
+                        <#list dimensions as dimensionName>
                             <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
+                            <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
                             <td style="position:relative;">
                                 <span>${dimensionDisplay}:</span><br>
 
@@ -106,9 +103,9 @@
 
                             </td>
                         </#list>
-                    </#list>
                     </tr>
                 </table>
+
             </div>
         </div>
         <div class="uk-display-inline-block hidden" style="position: relative;">
