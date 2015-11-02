@@ -11,6 +11,7 @@ public enum AggregationJobConstants {
   AGG_OUTPUT_PATH("aggregation.output.path"), //
   AGG_CONFIG_PATH("aggregation.config.path"),
   AGG_DIMENSION_STATS_PATH("aggregation.dimension.stats.path"),
+  AGG_METRIC_SUMS_PATH("aggregation.metric.sums.path"),
   AGG_PRESERVE_TIME_COMPACTION("aggregation.preserve.time.compaction");//
 
   String name;

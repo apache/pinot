@@ -453,6 +453,7 @@ public class DataUpdateManager {
         baseConfig.getTime(),
         baseConfig.getJoinSpec(),
         baseConfig.getRollup(),
+        baseConfig.getTopKRollup(),
         baseConfig.getSplit(),
         false);
     final StarTree mergedTree = new StarTreeImpl(inMemoryConfig);

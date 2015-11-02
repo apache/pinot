@@ -58,6 +58,7 @@ public class TestDataUpdateManager {
         baseConfig.getTime(),
         baseConfig.getJoinSpec(),
         baseConfig.getRollup(),
+        baseConfig.getTopKRollup(),
         split,
         false);
 

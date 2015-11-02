@@ -66,6 +66,7 @@ public class TestStarTreeManagerImpl {
         baseConfig.getTime(),
         baseConfig.getJoinSpec(),
         baseConfig.getRollup(),
+        baseConfig.getTopKRollup(),
         split,
         false);
 

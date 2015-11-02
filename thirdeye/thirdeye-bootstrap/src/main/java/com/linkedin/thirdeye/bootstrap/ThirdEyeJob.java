@@ -52,6 +52,12 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
+import com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneConstants;
+import com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneJob;
+import com.linkedin.thirdeye.bootstrap.topkrollup.phase2.TopKRollupPhaseTwoConstants;
+import com.linkedin.thirdeye.bootstrap.topkrollup.phase2.TopKRollupPhaseTwoJob;
+import com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeConstants;
+import com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeJob;
 import com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
 import com.linkedin.thirdeye.impl.storage.IndexFormat;
@@ -273,6 +279,115 @@ public class ThirdEyeJob {
 
         config.setProperty(AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION.toString(),
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PRESERVE_TIME_COMPACTION.getName(), DEFAULT_THIRDEYE_PRESERVE_TIME_COMPACTION));
+
+        config.setProperty(AggregationJobConstants.AGG_METRIC_SUMS_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + StarTreeConstants.METRIC_SUMS_FOLDER + File.separator + StarTreeConstants.METRIC_SUMS_FILE);
+        return config;
+      }
+    },
+    TOPK_ROLLUP_PHASE1 {
+      @Override
+      Class<?> getKlazz() {
+        return TopKRollupPhaseOneJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Topk rollup phase1";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+          throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_SCHEMA_PATH.toString(),
+            getSchemaPath(root, collection));
+
+        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_CONFIG_PATH.toString(),
+            getConfigPath(root, collection));
+
+        boolean skipMissing = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SKIP_MISSING.getName(), DEFAULT_SKIP_MISSING));
+        if (skipMissing) {
+          inputPaths = getFilteredInputPaths(inputPaths);
+        }
+
+        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_INPUT_PATH.toString(), inputPaths);
+        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_OUTPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                + TOPK_ROLLUP_PHASE1.getName());
+
+        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_METRIC_SUMS_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + StarTreeConstants.METRIC_SUMS_FOLDER + File.separator + StarTreeConstants.METRIC_SUMS_FILE);
+
+        return config;
+      }
+    },
+    TOPK_ROLLUP_PHASE2 {
+      @Override
+      Class<?> getKlazz() {
+        return TopKRollupPhaseTwoJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Topk rollup phase2";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+          throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(TopKRollupPhaseTwoConstants.TOPK_ROLLUP_PHASE2_CONFIG_PATH.toString(),
+            getConfigPath(root, collection));
+
+        config.setProperty(TopKRollupPhaseTwoConstants.TOPK_ROLLUP_PHASE2_INPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + TOPK_ROLLUP_PHASE1.getName());
+
+        config.setProperty(TopKRollupPhaseTwoConstants.TOPK_ROLLUP_PHASE2_OUTPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                + TOPK_ROLLUP_PHASE2.getName());
+
+        return config;
+      }
+    },
+    TOPK_ROLLUP_PHASE3 {
+      @Override
+      Class<?> getKlazz() {
+        return TopKRollupPhaseThreeJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Topk rollup phase3";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+          throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(TopKRollupPhaseThreeConstants.TOPK_ROLLUP_PHASE3_CONFIG_PATH.toString(),
+            getConfigPath(root, collection));
+
+        config.setProperty(TopKRollupPhaseThreeConstants.TOPK_ROLLUP_PHASE3_INPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + AGGREGATION.getName());
+
+        config.setProperty(TopKRollupPhaseThreeConstants.TOPK_ROLLUP_PHASE3_OUTPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                + TOPK_ROLLUP_PHASE3.getName());
+
+        config.setProperty(TopKRollupPhaseThreeConstants.TOPK_DIMENSIONS_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                + TOPK_ROLLUP_PHASE2.getName());
 
         return config;
       }
@@ -970,6 +1085,9 @@ public class ThirdEyeJob {
     case WAIT:
     case ANALYSIS:
     case AGGREGATION:
+    case TOPK_ROLLUP_PHASE1:
+    case TOPK_ROLLUP_PHASE2:
+    case TOPK_ROLLUP_PHASE3:
     case ROLLUP_PHASE1:
     case ROLLUP_PHASE2:
     case ROLLUP_PHASE3:

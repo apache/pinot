@@ -6,6 +6,7 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_DIMENSION_STATS_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION;
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_METRIC_SUMS_PATH;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -127,6 +128,18 @@ public class AggregatePhaseJob extends Configured {
 
       // Create flattened series
       MetricTimeSeries originalSeries = starTreeRecord.getMetricTimeSeries();
+
+      // Count metric values
+      for (Long time : originalSeries.getTimeWindowSet())
+      {
+        for (MetricSpec metricSpec : starTreeConfig.getMetrics())
+        {
+          Number metricValue = originalSeries.get(time, metricSpec.getName());
+          context.getCounter(starTreeConfig.getCollection(), metricSpec.getName()).increment(
+              metricValue.longValue());
+        }
+      }
+
       MetricTimeSeries series = originalSeries;
       LOGGER.info("Preserve time {} ", preserveTime);
 
@@ -165,6 +178,7 @@ public class AggregatePhaseJob extends Configured {
 
   public static class AggregationReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+    private StarTreeConfig starTreeConfig;
     private AggregationJobConfig config;
     private List<String> dimensionNames;
     private List<MetricType> metricTypes;
@@ -181,7 +195,7 @@ public class AggregatePhaseJob extends Configured {
       fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricTypes = config.getMetricTypes();
@@ -203,6 +217,8 @@ public class AggregatePhaseJob extends Configured {
         MetricTimeSeries series = MetricTimeSeries.fromBytes(writable.copyBytes(), metricSchema);
         out.aggregate(series);
       }
+
+
       // record the stats
       DimensionKey key = DimensionKey.fromBytes(aggregationKey.getBytes());
       for (int i = 0; i < dimensionNames.size(); i++) {
@@ -215,10 +231,10 @@ public class AggregatePhaseJob extends Configured {
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
       // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks are used (gbrandt, 2015-08-27)
-//      FSDataOutputStream dimensionStatsOutputStream =
-//          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-//      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
-//      dimensionStatsOutputStream.close();
+      FSDataOutputStream dimensionStatsOutputStream =
+          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
+      dimensionStatsOutputStream.close();
 //
 //      FSDataOutputStream outputStream =
 //          fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
@@ -268,6 +284,7 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
     getAndSetConfiguration(configuration, AGG_DIMENSION_STATS_PATH);
     getAndSetConfiguration(configuration, AGG_PRESERVE_TIME_COMPACTION);
+    getAndSetConfiguration(configuration, AGG_METRIC_SUMS_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
 
     FileInputFormat.setInputDirRecursive(job, true);
@@ -298,7 +315,26 @@ public class AggregatePhaseJob extends Configured {
       throw new IllegalStateException("No input records in " + inputPathDir);
     }
 
+    recordMetricSums(configuration, fs, job);
+
     return job;
+  }
+
+  private void recordMetricSums(Configuration configuration, FileSystem fs, Job job) throws IOException {
+
+    Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
+    StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
+    AggregationJobConfig config =
+        AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
+    MetricSums metricSums = new MetricSums();
+    for (String metricName : config.getMetricNames())
+    {
+      Counter metricCounter = job.getCounters().findCounter(starTreeConfig.getCollection(), metricName);
+      metricSums.addMetricSum(metricCounter.getDisplayName(), metricCounter.getValue());
+      LOGGER.info(metricCounter.getDisplayName() + " : " + metricCounter.getValue());
+    }
+    FSDataOutputStream outputStream = fs.create(new Path(configuration.get(AGG_METRIC_SUMS_PATH.toString())));
+    OBJECT_MAPPER.writeValue(outputStream, metricSums);
   }
 
   private String getAndSetConfiguration(Configuration configuration,

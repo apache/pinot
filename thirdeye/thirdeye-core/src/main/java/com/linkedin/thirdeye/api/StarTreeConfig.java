@@ -23,6 +23,7 @@ public final class StarTreeConfig
   private List<MetricSpec> metrics;
   private TimeSpec time = new TimeSpec();
   private RollupSpec rollup = new RollupSpec();
+  private TopKRollupSpec topKRollup = new TopKRollupSpec();
   private JoinSpec joinSpec = new JoinSpec();
 
   private SplitSpec split = new SplitSpec();
@@ -50,6 +51,7 @@ public final class StarTreeConfig
                         TimeSpec time,
                         JoinSpec joinSpec,
                         RollupSpec rollup,
+                        TopKRollupSpec topKRollup,
                         SplitSpec split,
                         boolean fixed)
   {
@@ -66,6 +68,7 @@ public final class StarTreeConfig
     this.time = time;
     this.joinSpec = joinSpec;
     this.rollup = rollup;
+    this.topKRollup = topKRollup;
     this.split = split;
     this.fixed = fixed;
   }
@@ -124,15 +127,20 @@ public final class StarTreeConfig
   {
     return time;
   }
-  
+
   public JoinSpec getJoinSpec()
   {
     return joinSpec;
   }
-  
+
   public RollupSpec getRollup()
   {
     return rollup;
+  }
+
+  public TopKRollupSpec getTopKRollup()
+  {
+    return topKRollup;
   }
 
   public SplitSpec getSplit()
@@ -165,6 +173,7 @@ public final class StarTreeConfig
     private TimeSpec time = new TimeSpec();
     private JoinSpec joinSpec = new JoinSpec();
     private RollupSpec rollup = new RollupSpec();
+    private TopKRollupSpec topKRollup = new TopKRollupSpec();
     private SplitSpec split = new SplitSpec();
     private boolean fixed = true;
 
@@ -288,7 +297,7 @@ public final class StarTreeConfig
       this.time = time;
       return this;
     }
-    
+
     public JoinSpec getJoinSpec()
     {
       return joinSpec;
@@ -308,6 +317,17 @@ public final class StarTreeConfig
     public Builder setRollup(RollupSpec rollup)
     {
       this.rollup = rollup;
+      return this;
+    }
+
+    public TopKRollupSpec getTopKRollup()
+    {
+      return topKRollup;
+    }
+
+    public Builder setTopKRollup(TopKRollupSpec topKRollup)
+    {
+      this.topKRollup = topKRollup;
       return this;
     }
 
@@ -363,6 +383,7 @@ public final class StarTreeConfig
                                 time,
                                 joinSpec,
                                 rollup,
+                                topKRollup,
                                 split,
                                 fixed);
     }
@@ -372,5 +393,5 @@ public final class StarTreeConfig
   {
     return OBJECT_MAPPER.readValue(inputStream, StarTreeConfig.class);
   }
-  
+
 }

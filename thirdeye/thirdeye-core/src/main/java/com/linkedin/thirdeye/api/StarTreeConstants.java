@@ -20,6 +20,8 @@ public final class StarTreeConstants
   public static final String KAFKA_CONFIG_FILE_NAME = "kafka.yml";
   public static final String METADATA_FILE_NAME = "metadata.properties";
   public static final String DIMENSION_STATS_FOLDER = "dimension_stats";
+  public static final String METRIC_SUMS_FOLDER = "metric_sums";
+  public static final String METRIC_SUMS_FILE = "metric.sums";
 
   public static final String INDEX_FILE_SUFFIX = ".idx";
   public static final String BUFFER_FILE_SUFFIX = ".buf";

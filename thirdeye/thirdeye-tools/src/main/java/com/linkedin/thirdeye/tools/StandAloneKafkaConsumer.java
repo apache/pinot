@@ -70,6 +70,7 @@ public class StandAloneKafkaConsumer {
         config.getTime(),
         config.getJoinSpec(),
         config.getRollup(),
+        config.getTopKRollup(),
         config.getSplit(),
         false);
     final StarTree mutableTree = new StarTreeImpl(inMemoryConfig);

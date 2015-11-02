@@ -1,0 +1,296 @@
+package com.linkedin.thirdeye.bootstrap.topkrollup.phase1;
+
+import static com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_CONFIG_PATH;
+import static com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_INPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_OUTPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_SCHEMA_PATH;
+import static com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_METRIC_SUMS_PATH;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import com.linkedin.thirdeye.api.StarTreeConfig;
+
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.mapred.AvroKey;
+import org.apache.avro.mapreduce.AvroJob;
+import org.apache.avro.mapreduce.AvroKeyInputFormat;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.bootstrap.aggregation.MetricSums;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
+
+
+public class TopKRollupPhaseOneJob extends Configured {
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(TopKRollupPhaseOneJob.class);
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  private String name;
+
+  private Properties props;
+
+  /**
+   *
+   * @param name
+   * @param props
+   */
+  public TopKRollupPhaseOneJob(String name, Properties props) {
+    super(new Configuration());
+    this.name = name;
+    this.props = props;
+  }
+
+
+  public static class TopKRollupPhaseOneMapper extends
+    Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+    private TopKRollupPhaseOneConfig config;
+    StarTreeConfig starTreeConfig;
+    private List<String> dimensionNames;
+    BytesWritable keyWritable;
+    BytesWritable valWritable;
+    Map<String, Integer> dimensionNameToIndexMapping;
+
+    @Override
+    public void setup(Context context) throws IOException, InterruptedException {
+      LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneMapper.setup()");
+      Configuration configuration = context.getConfiguration();
+      FileSystem fileSystem = FileSystem.get(configuration);
+      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE1_CONFIG_PATH
+          .toString()));
+      try {
+        starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = TopKRollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
+        dimensionNames = config.getDimensionNames();
+        keyWritable = new BytesWritable();
+        valWritable = new BytesWritable();
+        dimensionNameToIndexMapping = new HashMap<String, Integer>();
+        for (int i = 0; i < dimensionNames.size(); i++) {
+          dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
+        }
+
+      } catch (Exception e) {
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
+        throws IOException, InterruptedException {
+
+      StarTreeRecord starTreeRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
+      DimensionKey dimensionKey = starTreeRecord.getDimensionKey();
+      String[] dimensionValues = dimensionKey.getDimensionValues();
+      MetricTimeSeries series = starTreeRecord.getMetricTimeSeries();
+
+      for (String dimensionName : config.getDimensionNames()) {
+
+        String dimensionValue = dimensionValues[dimensionNameToIndexMapping.get(dimensionName)];
+
+        TopKRollupPhaseOneMapOutputKey keyWrapper;
+        keyWrapper = new TopKRollupPhaseOneMapOutputKey(dimensionName, dimensionValue);
+        byte[] keyBytes = keyWrapper.toBytes();
+        keyWritable.set(keyBytes, 0, keyBytes.length);
+
+        valWritable.set(series.toBytes(), 0, series.toBytes().length);
+
+        context.write(keyWritable, valWritable);
+      }
+    }
+
+    @Override
+    public void cleanup(Context context) throws IOException,
+        InterruptedException {
+    }
+  }
+
+  public static class TopKRollupPhaseOneReducer extends
+    Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+
+    private StarTreeConfig starTreeConfig;
+    private TopKRollupPhaseOneConfig config;
+    private List<String> dimensionNames;
+    private List<MetricType> metricTypes;
+    private Map<String, Double> metricThresholds;
+    private MetricSchema metricSchema;
+    BytesWritable keyWritable;
+    BytesWritable valWritable;
+    Map<String, Long> metricSums;
+
+    @Override
+    public void setup(Context context) throws IOException, InterruptedException {
+
+      LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneReducer.setup()");
+
+      Configuration configuration = context.getConfiguration();
+      FileSystem fileSystem = FileSystem.get(configuration);
+      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE1_CONFIG_PATH
+          .toString()));
+      try {
+        starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = TopKRollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
+        dimensionNames = config.getDimensionNames();
+        metricTypes = config.getMetricTypes();
+        metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
+        metricThresholds = config.getMetricThresholds();
+        keyWritable = new BytesWritable();
+        valWritable = new BytesWritable();
+
+        MetricSums metricSumsObj = OBJECT_MAPPER.readValue(fileSystem.open(
+            new Path(configuration.get(TOPK_ROLLUP_PHASE1_METRIC_SUMS_PATH.toString()))), MetricSums.class);
+        metricSums = metricSumsObj.getMetricSum();
+
+      } catch (Exception e) {
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void reduce(BytesWritable topkRollupKey, Iterable<BytesWritable> timeSeriesIterable,
+        Context context) throws IOException, InterruptedException {
+
+      TopKRollupPhaseOneMapOutputKey wrapper = TopKRollupPhaseOneMapOutputKey.fromBytes(topkRollupKey.getBytes());
+      LOGGER.info("DimensionName {} DimensionValue {}", wrapper.dimensionName, wrapper.dimensionValue);
+
+      MetricTimeSeries aggregateSeries = new MetricTimeSeries(metricSchema);
+      for (BytesWritable writable : timeSeriesIterable) {
+        MetricTimeSeries series = MetricTimeSeries.fromBytes(writable.copyBytes(), metricSchema);
+        aggregateSeries.aggregate(series);
+      }
+
+      Map<String, Long> metricValues = new HashMap<String, Long>();
+      for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
+        metricValues.put(metricSpec.getName(), 0L);
+      }
+      for (Long time : aggregateSeries.getTimeWindowSet()) {
+        for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
+          String metricName = metricSpec.getName();
+          long metricValue = aggregateSeries.get(time, metricName).longValue();
+          metricValues.put(metricName, metricValues.get(metricName) + metricValue);
+        }
+      }
+
+      boolean aboveThreshold = true;
+      for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
+        String metricName = metricSpec.getName();
+
+        long metricValue = metricValues.get(metricName);
+        long metricSum = metricSums.get(metricName);
+        double metricThreshold = metricThresholds.get(metricName);
+
+        LOGGER.info("metricValue : {} metricSum : {}", metricValue, metricSum);
+        if (metricValue < (metricThreshold / 100) * metricSum) {
+          aboveThreshold = false;
+          break;
+        }
+      }
+
+      if (aboveThreshold) {
+        LOGGER.info("Passed threshold");
+        keyWritable.set(topkRollupKey);
+        valWritable.set(aggregateSeries.toBytes(), 0, aggregateSeries.toBytes().length);
+        context.write(keyWritable, valWritable);
+      }
+    }
+
+    protected void cleanup(Context context) throws IOException, InterruptedException {
+
+    }
+  }
+
+
+  public Job run() throws Exception {
+    Job job = Job.getInstance(getConf());
+    job.setJobName(name);
+    job.setJarByClass(TopKRollupPhaseOneJob.class);
+
+    FileSystem fs = FileSystem.get(getConf());
+    // Avro schema
+    Schema schema =
+        new Schema.Parser().parse(fs.open(new Path(
+            getAndCheck(TOPK_ROLLUP_PHASE1_SCHEMA_PATH.toString()))));
+    LOGGER.info("{}", schema);
+    // Map config
+    job.setMapperClass(TopKRollupPhaseOneMapper.class);
+    AvroJob.setInputKeySchema(job, schema);
+    job.setInputFormatClass(AvroKeyInputFormat.class);
+    job.setMapOutputKeyClass(BytesWritable.class);
+    job.setMapOutputValueClass(BytesWritable.class);
+
+
+    // Reduce config
+    job.setReducerClass(TopKRollupPhaseOneReducer.class);
+    job.setOutputKeyClass(BytesWritable.class);
+    job.setOutputValueClass(BytesWritable.class);
+    job.setOutputFormatClass(SequenceFileOutputFormat.class);
+
+    String numReducers = props.getProperty("num.reducers");
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
+    }
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
+
+    // topk_rollup_phase1 phase config
+    Configuration configuration = job.getConfiguration();
+    String inputPathDir = getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE1_INPUT_PATH);
+    getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE1_CONFIG_PATH);
+    getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE1_OUTPUT_PATH);
+    getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE1_METRIC_SUMS_PATH);
+    LOGGER.info("Input path dir: " + inputPathDir);
+    for (String inputPath : inputPathDir.split(",")) {
+      LOGGER.info("Adding input:" + inputPath);
+      Path input = new Path(inputPath);
+      FileInputFormat.addInputPath(job, input);
+    }
+
+    FileOutputFormat.setOutputPath(job, new Path(
+        getAndCheck(TOPK_ROLLUP_PHASE1_OUTPUT_PATH.toString())));
+
+    job.waitForCompletion(true);
+
+    return job;
+
+  }
+
+  private String getAndSetConfiguration(Configuration configuration,
+      TopKRollupPhaseOneConstants constant) {
+    String value = getAndCheck(constant.toString());
+    configuration.set(constant.toString(), value);
+    return value;
+  }
+
+  private String getAndCheck(String propName) {
+    String propValue = props.getProperty(propName);
+    if (propValue == null) {
+      throw new IllegalArgumentException(propName + " required property");
+    }
+    return propValue;
+  }
+
+}
