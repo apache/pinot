@@ -1,3 +1,4 @@
+<#-- view removed from dashboard 09/2015 -->
 <script src="/assets/js/thirdeye.dimension.tabular.js"></script>
 
 <div class="collapser"><h2>(-) Dimension Tabular View</h2></div>

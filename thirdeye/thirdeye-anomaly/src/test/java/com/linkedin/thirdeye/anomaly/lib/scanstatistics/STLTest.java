@@ -162,7 +162,8 @@ public class STLTest {
      return pearson_correlation;
 
   }
-  private double[][] removeSeasonality(long[] timestamps, double[] series, int seasonality,
+
+  public static double[][] removeSeasonality(long[] timestamps, double[] series, int seasonality,
       int innerloop, int outerloop, double lowpassbandwidth, double trendcomponentbandwidth, boolean periodic) {
     STLDecomposition.Config config = new STLDecomposition.Config();
     config.setNumberOfObservations(seasonality);

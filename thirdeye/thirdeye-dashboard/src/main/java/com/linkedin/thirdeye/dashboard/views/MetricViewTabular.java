@@ -1,38 +1,44 @@
 package com.linkedin.thirdeye.dashboard.views;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
-import com.linkedin.thirdeye.dashboard.api.MetricTableRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import io.dropwizard.views.View;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
+import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 
-import java.util.*;
+import io.dropwizard.views.View;
 
 public class MetricViewTabular extends View {
-  private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> STRING_LIST_REF =
+      new TypeReference<List<String>>() {
+      };
 
   private final CollectionSchema collectionSchema;
   private final ObjectMapper objectMapper;
   private final QueryResult result;
   private final List<MetricTable> metricTables;
+  private final long currentMillis;
   private final long baselineOffsetMillis;
   private final long intraDayPeriod;
   private final Map<String, String> metricAliases;
   private final Map<String, String> dimensionAliases;
 
-  public MetricViewTabular(CollectionSchema collectionSchema,
-                           ObjectMapper objectMapper,
-                           QueryResult result,
-                           long baselineOffsetMillis,
-                           long intraDayPeriod) throws Exception {
+  public MetricViewTabular(CollectionSchema collectionSchema, ObjectMapper objectMapper,
+      QueryResult result, long currentMillis, long baselineOffsetMillis, long intraDayPeriod)
+          throws Exception {
     super("metric/intra-day.ftl");
     this.collectionSchema = collectionSchema;
     this.objectMapper = objectMapper;
     this.result = result;
+    this.currentMillis = currentMillis;
     this.baselineOffsetMillis = baselineOffsetMillis;
     this.intraDayPeriod = intraDayPeriod;
     this.metricTables = generateMetricTables();
@@ -67,7 +73,8 @@ public class MetricViewTabular extends View {
   private Map<String, String> generateDimensionAliases() {
     Map<String, String> aliases = new HashMap<>();
     for (int i = 0; i < collectionSchema.getDimensions().size(); i++) {
-      aliases.put(collectionSchema.getDimensions().get(i), collectionSchema.getDimensionAliases().get(i));
+      aliases.put(collectionSchema.getDimensions().get(i),
+          collectionSchema.getDimensionAliases().get(i));
     }
     return aliases;
   }
@@ -88,45 +95,21 @@ public class MetricViewTabular extends View {
     List<MetricTable> tables = new ArrayList<>();
 
     for (Map.Entry<String, Map<String, Number[]>> entry : result.getData().entrySet()) {
-      List<MetricTableRow> rows = new LinkedList<>();
-      List<Long> times = getReverseSortedTimes(entry.getValue().keySet());
-
-      long windowFilled = 0;
-      int idx = 0;
-      while (windowFilled < intraDayPeriod && idx < times.size() - 1) {
-        long current = times.get(idx);
-        long next = times.get(idx + 1);
-        idx++;
-
-        // n.b. this is inefficient, but prevents us from having to pass around aggregation granularity info
-        int timeIndex = times.indexOf(current - baselineOffsetMillis);
-        if (timeIndex < 0) {
-          continue;
-        }
-        long baseline = times.get(timeIndex);
-
-        windowFilled += (current - next);
-
-        Number[] currentData = entry.getValue().get(String.valueOf(current));
-        Number[] baselineData = entry.getValue().get(String.valueOf(baseline));
-
-        rows.add(0, new MetricTableRow(
-            new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineData,
-            new DateTime(current).toDateTime(DateTimeZone.UTC), currentData));
+      Map<Long, Number[]> baselineData = new HashMap<>();
+      for (Map.Entry<String, Number[]> dataEntry : entry.getValue().entrySet()) {
+        baselineData.put(Long.valueOf(dataEntry.getKey()), dataEntry.getValue());
       }
+      // No way to determine difference between baseline / current yet, so use the same map for
+      // both.
+      Map<Long, Number[]> currentData = baselineData;
 
-      tables.add(new MetricTable(getDimensionValues(entry.getKey()), rows));
+      List<MetricDataRow> rows = ViewUtils.extractMetricDataRows(baselineData, currentData,
+          currentMillis, baselineOffsetMillis, intraDayPeriod);
+      List<MetricDataRow> cumulativeRows =
+          ViewUtils.computeCumulativeRows(rows, result.getMetrics().size());
+      tables.add(new MetricTable(getDimensionValues(entry.getKey()), rows, cumulativeRows));
     }
 
     return tables;
-  }
-
-  private static List<Long> getReverseSortedTimes(Set<String> timeStrings) {
-    List<Long> sortedTimes = new ArrayList<>();
-    for (String timeString : timeStrings) {
-      sortedTimes.add(Long.valueOf(timeString));
-    }
-    Collections.sort(sortedTimes, Collections.reverseOrder());
-    return sortedTimes;
   }
 }

@@ -9,6 +9,8 @@ public class JoinSpec {
 
   private List<String> sourceNames;
 
+  private String joinConfigUDFClass;
+
   private String joinKeyExtractorClass;
 
   private Map<String,String> joinKeyExtractorConfig;
@@ -24,22 +26,34 @@ public class JoinSpec {
   }
 
   /**
-   * 
+   *
    * @param sourceNames
    * @param joinKeyExtractClass
    * @param joinKeyExtractorConfig
    * @param joinUDFClass
    * @param joinUDFConfig
    */
-  public JoinSpec(List<String> sourceNames, String joinKeyExtractClass,
+  public JoinSpec(List<String> sourceNames, String joinConfigUDFClass,
+      String joinKeyExtractClass,
       Map<String,String> joinKeyExtractorConfig, String joinUDFClass,
       Map<String,String> joinUDFConfig) {
     super();
     this.sourceNames = sourceNames;
+    this.joinConfigUDFClass = joinConfigUDFClass;
     this.joinKeyExtractorClass = joinKeyExtractClass;
     this.joinKeyExtractorConfig = joinKeyExtractorConfig;
     this.joinUDFClass = joinUDFClass;
     this.joinUDFConfig = joinUDFConfig;
+  }
+
+
+
+  public String getJoinConfigUDFClass() {
+    return joinConfigUDFClass;
+  }
+
+  public void setJoinConfigUDFClass(String joinConfigUDFClass) {
+    this.joinConfigUDFClass = joinConfigUDFClass;
   }
 
   public String getJoinKeyExtractorClass() {

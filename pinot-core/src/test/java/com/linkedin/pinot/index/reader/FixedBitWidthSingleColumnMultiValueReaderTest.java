@@ -74,6 +74,7 @@ public class FixedBitWidthSingleColumnMultiValueReaderTest {
       dos.write(bitSet.toByteArray());
       dos.flush();
       dos.close();
+      bitSet.close();
 
       // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
       final int[] readValues = new int[100];

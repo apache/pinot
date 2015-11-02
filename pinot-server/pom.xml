@@ -52,8 +52,8 @@
       <artifactId>pinot-transport</artifactId>
     </dependency>    
     <dependency>
-	  <groupId>commons-configuration</groupId>
-	  <artifactId>commons-configuration</artifactId>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
     </dependency>    
     <dependency>
       <groupId>commons-cli</groupId>

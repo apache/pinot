@@ -79,6 +79,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
       System.out.println("END test maxBits:" + maxBits);
       maxBits = maxBits + 1;
       file.delete();
+      set.close();
     }
   }
 
@@ -140,6 +141,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
       System.out.println("END test maxBits:" + maxBits);
       maxBits = maxBits + 1;
       file.delete();
+      set.close();
     }
   }
 }

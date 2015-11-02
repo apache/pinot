@@ -1,3 +1,4 @@
+<#-- view removed from dashboard 09/2015 -->
 <#-- stand-alone -->
 <#if (!metricView??)>
     <#include "../common/style.ftl">
@@ -9,7 +10,6 @@
 
 <#assign dimensions = (metricView.view.dimensionValues)!dimensionValues>
 <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-<#include "../common/dimension-header.ftl">
 
 <div id="metric-funnel-area">
     <div id="metric-funnel-baseline-placeholder"></div>

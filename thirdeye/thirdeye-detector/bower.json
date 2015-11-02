@@ -19,7 +19,8 @@
     "underscore": "~1.8.3",
     "bootstrap": "3.3.5",
     "d3": "3.5.6",
-    "metrics-graphics": "2.6"
+    "metrics-graphics": "2.6",
+    "mg-line-brushing": "0.0.3"
   }
 }
 

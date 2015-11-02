@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.index.writer.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -67,11 +68,18 @@ public class FixedBitWidthSingleColumnMultiValueWriter implements
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     IOUtils.closeQuietly(raf);
     raf = null;
     MmapUtils.unloadByteBuffer(dataBuffer);
+    dataBuffer = null;
     MmapUtils.unloadByteBuffer(headerBuffer);
+    headerBuffer = null;
+    headerWriter.close();
+    headerWriter = null;
+    headerReader.close();
+    dataWriter.close();
+    dataWriter = null;
   }
 
   private int updateHeader(int row, int length) {

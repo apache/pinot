@@ -1,3 +1,4 @@
+/* related view removed from dashboard 09/2015 */
 $(document).ready(function() {
     $("#intra-day-update").click(function() {
       $(".dimension-tabular-table").each(function(i, elt) {

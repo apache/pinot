@@ -24,13 +24,14 @@ import com.linkedin.pinot.core.common.*;
 import com.linkedin.pinot.core.common.predicate.*;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.*;
+import com.linkedin.pinot.core.segment.index.readers.*;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 import java.util.*;
 
 public class StarTreeFilterPlanNode extends BaseFilterPlanNode {
-  private StarTreeIndexNode matchingNode;
-  private StarTreeOperator starTreeOperator;
+  private List<StarTreeIndexNode> matchingNodes;
+  private List<StarTreeOperator> starTreeOperators;
 
   public StarTreeFilterPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     super(indexSegment, brokerRequest);
@@ -38,7 +39,9 @@ public class StarTreeFilterPlanNode extends BaseFilterPlanNode {
 
   @Override
   protected Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
-    if (matchingNode == null) {
+    if (matchingNodes == null) {
+      matchingNodes = new ArrayList<>();
+      starTreeOperators = new ArrayList<>();
       List<String> dimensionNames = indexSegment.getSegmentMetadata().getSchema().getDimensionNames();
 
       // Get conjunction values
@@ -61,57 +64,80 @@ public class StarTreeFilterPlanNode extends BaseFilterPlanNode {
         }
       }
 
-      // Find the leaf that corresponds to the query
-      StarTreeIndexNode current = indexSegment.getStarTreeRoot();
-      while (current != null && !current.isLeaf()) {
-        String nextDimension = dimensionNames.get(current.getChildDimensionName());
-        String nextValue = pathValues.get(nextDimension);
-        DataSource dataSource = indexSegment.getDataSource(nextDimension);
+      Queue<StarTreeIndexNode> searchQueue = new LinkedList<>();
+      searchQueue.add(indexSegment.getStarTreeRoot());
 
-        int nextValueId;
-        if (nextValue == null) {
-          nextValueId = StarTreeIndexNode.all();
-        } else {
-          nextValueId = dataSource.getDictionary().indexOf(nextValue);
+      while (!searchQueue.isEmpty()) {
+        StarTreeIndexNode current = searchQueue.remove();
+
+        // Find the leaf that corresponds to the query
+        while (current != null && !current.isLeaf()) {
+          String nextDimension = dimensionNames.get(current.getChildDimensionName());
+          String nextValue = pathValues.get(nextDimension);
+          DataSource nextDataSource = indexSegment.getDataSource(nextDimension);
+
+          int nextValueId;
+          if (nextValue == null) {
+            nextValueId = StarTreeIndexNode.all();
+          } else {
+            nextValueId = nextDataSource.getDictionary().indexOf(nextValue);
+          }
+
+          // If this is a group by, we split the query down several paths, but not star node
+          if (brokerRequest.isSetGroupBy() && brokerRequest.getGroupBy().getColumns().contains(nextDimension)) {
+            for (Map.Entry<Integer, StarTreeIndexNode> entry : current.getChildren().entrySet()) {
+              if (entry.getKey() != StarTreeIndexNode.all()) {
+                searchQueue.add(entry.getValue());
+              }
+            }
+            current = null; // triggers exit out of both loops
+          } else {
+            // Otherwise, we continue down this path
+            current = current.getChildren().get(nextValueId);
+          }
         }
 
-        current = current.getChildren().get(nextValueId);
+        if (current == null) {
+          continue;
+        }
+
+        // We store to avoid traversing tree again, as the leaf node that matches does not change
+        matchingNodes.add(current);
+
+        // Find the remaining path values
+        Map<String, String> pathValuesCopy = new HashMap<>(pathValues);
+        for (Map.Entry<Integer, Integer> entry : current.getPathValues().entrySet()) {
+          String dimensionName = dimensionNames.get(entry.getKey());
+          pathValuesCopy.remove(dimensionName);
+        }
+
+        // Create ScanBasedFilterOperator with EqPredicate for each remaining path values
+        List<Operator> scanOperators = new ArrayList<>();
+        for (Map.Entry<String, String> entry : pathValuesCopy.entrySet()) {
+          Predicate predicate = new EqPredicate(entry.getKey(), Collections.singletonList(entry.getValue()));
+          ScanBasedFilterOperator operator = new ScanBasedFilterOperator(indexSegment.getDataSource(entry.getKey()));
+          operator.setPredicate(predicate);
+          scanOperators.add(operator);
+        }
+
+        // Join those scan operators as AND
+        AndOperator andOperator = null;
+        if (!scanOperators.isEmpty()) {
+          andOperator = new AndOperator(scanOperators);
+        }
+
+        // Scan that sub-segment
+        Integer startDocumentId = current.getStartDocumentId();
+        Integer endDocumentId = startDocumentId + current.getDocumentCount() - 1 /* inclusive end */;
+        StarTreeOperator starTreeOperator = new StarTreeOperator(startDocumentId, endDocumentId, andOperator);
+        starTreeOperators.add(starTreeOperator);
       }
-
-      if (current == null) {
-        return new StarTreeOperator(Constants.EOF, Constants.EOF, null);
-      }
-
-      // We store to avoid traversing tree again, as the leaf node that matches does not change
-      matchingNode = current;
-
-      // Find the remaining path values
-      for (Map.Entry<Integer, Integer> entry : matchingNode.getPathValues().entrySet()) {
-        String dimensionName = dimensionNames.get(entry.getKey());
-        pathValues.remove(dimensionName);
-      }
-
-      // Create ScanBasedFilterOperator with EqPredicate for each remaining path values
-      List<Operator> scanOperators = new ArrayList<>();
-      for (Map.Entry<String, String> entry : pathValues.entrySet()) {
-        Predicate predicate = new EqPredicate(entry.getKey(), Collections.singletonList(entry.getValue()));
-        ScanBasedFilterOperator operator = new ScanBasedFilterOperator(indexSegment.getDataSource(entry.getKey()));
-        operator.setPredicate(predicate);
-        scanOperators.add(operator);
-      }
-
-      // Join those scan operators as AND
-      AndOperator andOperator = null;
-      if (!scanOperators.isEmpty()) {
-        andOperator = new AndOperator(scanOperators);
-      }
-
-      // Scan that sub-segment
-      Integer startDocumentId = matchingNode.getStartDocumentId();
-      Integer endDocumentId = startDocumentId + matchingNode.getDocumentCount() - 1 /* inclusive end */;
-      starTreeOperator = new StarTreeOperator(startDocumentId, endDocumentId, andOperator);
     }
 
-    return starTreeOperator;
+    if (starTreeOperators.isEmpty()) {
+      return new StarTreeOperator(Constants.EOF, Constants.EOF, null);
+    }
+
+    return new CompositeStarTreeOperator(starTreeOperators);
   }
 }

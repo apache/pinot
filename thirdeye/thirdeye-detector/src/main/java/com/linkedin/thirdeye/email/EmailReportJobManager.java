@@ -1,10 +1,8 @@
 package com.linkedin.thirdeye.email;
 
-import com.linkedin.thirdeye.ThirdEyeDetectorConfiguration;
 import com.linkedin.thirdeye.api.EmailConfiguration;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.db.EmailConfigurationDAO;
-import com.linkedin.thirdeye.driver.AnomalyDetectionJob;
 import io.dropwizard.lifecycle.Managed;
 import org.hibernate.SessionFactory;
 import org.quartz.*;
@@ -12,12 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class EmailReportJobManager implements Managed {
   private static final Logger LOG = LoggerFactory.getLogger(EmailReportJobManager.class);
@@ -73,7 +68,7 @@ public class EmailReportJobManager implements Managed {
     synchronized (sync) {
       List<EmailConfiguration> emailConfigs = configurationDAO.findAll();
       for (EmailConfiguration emailConfig : emailConfigs) {
-        if (emailConfig.isActive()) {
+        if (emailConfig.getIsActive()) {
           String triggerKey = String.format("email_trigger_%d", emailConfig.getId());
           CronTrigger trigger = TriggerBuilder.newTrigger()
               .withIdentity(triggerKey)

@@ -12,11 +12,6 @@ public class UriUtils {
     Map<String, String> dimensionValues = new TreeMap<>();
 
     for (Map.Entry<String, List<String>> entry : multiMap.entrySet()) {
-      if (entry.getValue().size() != 1) {
-        throw new WebApplicationException(
-            new Exception("Must provide exactly one value for dimension " + entry.getKey()),
-            Response.Status.BAD_REQUEST);
-      }
 
       if (!entry.getKey().equals("funnels")) {
         dimensionValues.put(entry.getKey(), entry.getValue().get(0));

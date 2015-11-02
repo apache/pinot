@@ -6,3 +6,4 @@
 <link rel="stylesheet" href="/assets/css/uikit/components/datepicker.almost-flat.min.css"/>
 <link rel="stylesheet" href="/assets/css/datatables.min.css"/>
 <link rel="stylesheet" href="/assets/css/dashboard.css"/>
+<link rel="shortcut icon" href="/assets/img/chakra-s.png"/>

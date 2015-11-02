@@ -3,11 +3,13 @@ package com.linkedin.thirdeye.driver;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.ImmutableList;
+import com.linkedin.thirdeye.api.AnomalyFunctionRelation;
 import com.linkedin.thirdeye.api.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.function.AnomalyFunction;
 import org.hibernate.Session;
@@ -22,10 +24,7 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class AnomalyDetectionJob implements Job {
@@ -37,10 +36,12 @@ public class AnomalyDetectionJob implements Job {
   public static final String WINDOW_END = "WINDOW_END";
   public static final String WINDOW_START = "WINDOW_START";
   public static final String METRIC_REGISTRY = "METRIC_REGISTRY";
+  public static final String RELATION_DAO = "RELATION_DAO";
 
   private AnomalyFunction anomalyFunction;
   private ThirdEyeClient thirdEyeClient;
   private AnomalyResultDAO resultDAO;
+  private AnomalyFunctionRelationDAO relationDAO;
   private SessionFactory sessionFactory;
   private MetricRegistry metricRegistry;
   private Histogram histogram;
@@ -55,6 +56,7 @@ public class AnomalyDetectionJob implements Job {
     anomalyFunction = (AnomalyFunction) context.getJobDetail().getJobDataMap().get(FUNCTION);
     thirdEyeClient = (ThirdEyeClient) context.getJobDetail().getJobDataMap().get(CLIENT);
     resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
+    relationDAO = (AnomalyFunctionRelationDAO) context.getJobDetail().getJobDataMap().get(RELATION_DAO);
     sessionFactory = (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     metricRegistry = (MetricRegistry) context.getJobDetail().getJobDataMap().get(METRIC_REGISTRY);
     String windowEndProp = context.getJobDetail().getJobDataMap().getString(WINDOW_END);
@@ -179,15 +181,24 @@ public class AnomalyDetectionJob implements Job {
   }
 
   private List<AnomalyResult> getExistingAnomalies() {
-    List<AnomalyResult> results = null;
+    List<AnomalyResult> results = new ArrayList<>();
 
     Session session = sessionFactory.openSession();
     try {
       ManagedSessionContext.bind(session);
       Transaction transaction = session.beginTransaction();
       try {
-        results = resultDAO.findAllByCollectionTimeAndFunction(
-            collection, windowStart, windowEnd, anomalyFunction.getSpec().getId());
+        // The ones for this function
+        results.addAll(resultDAO.findAllByCollectionTimeAndFunction(
+            collection, windowStart, windowEnd, anomalyFunction.getSpec().getId()));
+
+        // The ones for any related functions
+        List<AnomalyFunctionRelation> relations = relationDAO.findByParent(anomalyFunction.getSpec().getId());
+        for (AnomalyFunctionRelation relation : relations) {
+          results.addAll(resultDAO.findAllByCollectionTimeAndFunction(
+              collection, windowStart, windowEnd, relation.getChildId()));
+        }
+
         transaction.commit();
       } catch (Exception e) {
         transaction.rollback();

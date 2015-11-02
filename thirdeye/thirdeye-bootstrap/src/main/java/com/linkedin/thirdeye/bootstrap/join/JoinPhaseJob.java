@@ -117,8 +117,10 @@ public class JoinPhaseJob extends Configured {
       String joinKeyValue = joinKeyExtractor.extractJoinKey(sourceName, record);
       LOGGER.info("Join Key:{}", joinKeyValue);
 
-      context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
+      if (!"INVALID".equals(joinKeyValue)) {
+        context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
           mapOutputValue.toBytes()));
+      }
     }
 
     @Override
@@ -210,7 +212,9 @@ public class JoinPhaseJob extends Configured {
       // invoke the udf and pass in the join data
       GenericRecord output =
           joinUDF.performJoin(new String(joinKeyWritable.copyBytes()), joinInput);
-      context.write(new AvroKey<GenericRecord>(output), NullWritable.get());
+      if (output != null) {
+        context.write(new AvroKey<GenericRecord>(output), NullWritable.get());
+      }
     }
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
@@ -226,6 +230,7 @@ public class JoinPhaseJob extends Configured {
     Configuration conf = job.getConfiguration();
     job.setJobName(name);
     job.setJarByClass(JoinPhaseJob.class);
+
     FileSystem fs = FileSystem.get(conf);
     String configFilePath = getAndSetConfiguration(conf, JoinPhaseJobConstants.JOIN_CONFIG_PATH);
     LOGGER.info("Config File:{}", configFilePath);
@@ -245,6 +250,15 @@ public class JoinPhaseJob extends Configured {
     } catch (Exception e) {
       throw new IOException(e);
     }
+
+    // Set custom config like adding distributed caches
+    String joinConfigUDFClass = joinPhaseConfig.getJoinSpec().getJoinConfigUDFClass();
+    LOGGER.info("Initializing JoinConfigUDFClass:{} with params:{}", joinConfigUDFClass);
+    Constructor<?> constructor = Class.forName(joinConfigUDFClass).getConstructor();
+    JoinConfigUDF joinConfigUDF = (JoinConfigUDF) constructor.newInstance();
+    joinConfigUDF.setJoinConfig(job);
+
+
     List<String> sourceNames = joinPhaseConfig.getJoinSpec().getSourceNames();
 
     // Map config

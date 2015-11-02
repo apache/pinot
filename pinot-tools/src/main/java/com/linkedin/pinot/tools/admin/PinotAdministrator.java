@@ -48,6 +48,7 @@ public class PinotAdministrator {
       @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
       @SubCommand(name = "StartServer", impl = StartServerCommand.class),
       @SubCommand(name = "AddTable", impl = AddTableCommand.class),
+      @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
       @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
       @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
       @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),

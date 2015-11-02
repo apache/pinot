@@ -41,6 +41,7 @@ public class CustomBitSetTest {
         Assert.assertFalse(customBitSet.isBitSet(i));
       }
     }
+    customBitSet.close();
   }
 
   @Test
@@ -52,6 +53,7 @@ public class CustomBitSetTest {
     customBitSet.setBit(250);
     System.out.println(customBitSet.findNthBitSetAfter(0, 1));
     System.out.println(customBitSet.findNthBitSetAfter(100, 1));
+    customBitSet.close();
 
   }
 
@@ -135,6 +137,7 @@ public class CustomBitSetTest {
       }
       Assert.assertEquals(nthBitSetAfter, expectedIndex, "Bits set " +
           bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
+      customBitSet.close();
     }
   }
 
@@ -153,6 +156,7 @@ public class CustomBitSetTest {
           Assert.assertEquals(foundSetBitIndex, -1, "Found bit at index " + foundSetBitIndex + " while it was set at "
               + setBitIndex + " searching from " + searchStartIndex);
         }
+        customBitSet.close();
       }
     }
   }
@@ -179,6 +183,7 @@ public class CustomBitSetTest {
             Assert.assertEquals(foundSetBitIndex, -1, "Found bit at index " + foundSetBitIndex
                 + " while it was set at " + setBitIndex + " searching from " + searchStartIndex);
           }
+          customBitSet.close();
         }
       }
     }
@@ -200,5 +205,6 @@ public class CustomBitSetTest {
       Assert.assertEquals(foundSetBitIndex, -1, "Found bit at index " + foundSetBitIndex + " while it was set at "
           + setBitIndex + " searching from " + searchStartIndex);
     }
+    customBitSet.close();
   }
 }

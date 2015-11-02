@@ -67,8 +67,6 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
-import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -81,6 +79,8 @@ import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProv
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
@@ -91,8 +91,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * Sep 30, 2014
  */
 public class PinotHelixResourceManager {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
+  private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
 
   private String _zkBaseUrl;
   private String _helixClusterName;
@@ -103,7 +103,8 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
-  private long _externalViewOnlineToOfflineTimeout;
+  private long _externalViewOnlineToOfflineTimeoutMillis = DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS;
+  private long _externalViewUpdateRetryInterval = 500L;
   private boolean _isSingleTenantCluster = true;
 
   private HelixDataAccessor _helixDataAccessor;
@@ -118,18 +119,18 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
-      String localDiskDir, long externalViewOnlineToOfflineTimeout, boolean isSingleTenantCluster) {
+      String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster) {
     _zkBaseUrl = zkURL;
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _localDiskDir = localDiskDir;
-    _externalViewOnlineToOfflineTimeout = externalViewOnlineToOfflineTimeout;
+    _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
   }
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId,
       String localDiskDir) {
-    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, 10000L, false);
+    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -142,11 +143,10 @@ public class PinotHelixResourceManager {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkBaseUrl);
     _helixZkManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
-    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
+    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName, true);
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
-    _externalViewOnlineToOfflineTimeout = 10000L;
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
 
@@ -211,11 +211,26 @@ public class PinotHelixResourceManager {
   /**
    * Returns all tables, remove brokerResource.
    */
+  public Set<String> getAllUniquePinotRawTableNames() {
+    List<String> tableNames = getAllTableNames();
+
+    // Filter table names that are known to be non Pinot tables (ie. brokerResource)
+    Set<String> pinotTableNames = new HashSet<>();
+    for (String tableName : tableNames) {
+      if (CommonConstants.Helix.NON_PINOT_RESOURCE_RESOURCE_NAMES.contains(tableName)) {
+        continue;
+      }
+      pinotTableNames.add(TableNameBuilder.extractRawTableName(tableName));
+    }
+
+    return pinotTableNames;
+  }
+  
   public List<String> getAllPinotTableNames() {
     List<String> tableNames = getAllTableNames();
 
     // Filter table names that are known to be non Pinot tables (ie. brokerResource)
-    ArrayList<String> pinotTableNames = new ArrayList<String>();
+    List<String> pinotTableNames = new ArrayList<>();
     for (String tableName : tableNames) {
       if (CommonConstants.Helix.NON_PINOT_RESOURCE_RESOURCE_NAMES.contains(tableName)) {
         continue;
@@ -225,7 +240,6 @@ public class PinotHelixResourceManager {
 
     return pinotTableNames;
   }
-
   public synchronized void restartTable(String tableName) {
     final Set<String> allInstances =
         HelixHelper.getAllInstancesForResource(HelixHelper.getTableIdealState(_helixZkManager, tableName));
@@ -239,19 +253,19 @@ public class PinotHelixResourceManager {
 
     deadlineLoop:
     while (System.currentTimeMillis() < externalViewChangeCompletedDeadline) {
-      // Will try to read data every 2 seconds.
-      Uninterruptibles.sleepUninterruptibly(2L, TimeUnit.SECONDS);
-
       ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
       Map<String, String> segmentStatsMap = externalView.getStateMap(segmentName);
       if (segmentStatsMap != null) {
         for (String instance : segmentStatsMap.keySet()) {
           final String segmentState = segmentStatsMap.get(instance);
+
           // jfim: Ignore segments in error state as part of checking if the external view change is reflected
           if (!segmentState.equalsIgnoreCase(targetState)) {
             if ("ERROR".equalsIgnoreCase(segmentState) && !considerErrorStateAsDifferentFromTarget) {
               // Segment is in error and we don't consider error state as different from target, therefore continue
             } else {
+              // Will try to read data every 500 ms, only if external view not updated.
+              Uninterruptibles.sleepUninterruptibly(_externalViewUpdateRetryInterval, TimeUnit.MILLISECONDS);
               continue deadlineLoop;
             }
           }
@@ -329,7 +343,6 @@ public class PinotHelixResourceManager {
         res.message = "Segment " + segmentId + " not in IDEALSTATE.";
         LOGGER.info("Segment: {} is not in IDEALSTATE", segmentId);
       }
-
       _segmentDeletionManager.deleteSegment(tableName, segmentId);
 
       res.message = "Segment successfully deleted.";
@@ -1267,10 +1280,11 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE", _externalViewOnlineToOfflineTimeout, false)) {
+    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE",
+        _externalViewOnlineToOfflineTimeoutMillis, false)) {
       LOGGER.error(
           "External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
-          segmentName, _externalViewOnlineToOfflineTimeout);
+          segmentName, _externalViewOnlineToOfflineTimeoutMillis);
       return false;
     }
 
@@ -1348,60 +1362,82 @@ public class PinotHelixResourceManager {
    * Toggle the status of segment between ONLINE (enable = true) and OFFLINE (enable = FALSE).
    *
    * @param tableName: Name of table to which the segment belongs.
-   * @param segmentName: Name of segment for which to toggle the status.
+   * @param segments: List of segment for which to toggle the status.
    * @param enable: True for ONLINE, False for OFFLINE.
+   * @param timeoutInSeconds Time out for toggling segment state.
    * @return
    */
-  public PinotResourceManagerResponse toggleSegmentState(String tableName, String segmentName, boolean enable,
-      long timeOutInSeconds) {
+  public PinotResourceManagerResponse toggleSegmentState(String tableName, List<String> segments, boolean enable,
+      long timeoutInSeconds) {
     String status = (enable) ? "ONLINE" : "OFFLINE";
 
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableName);
 
     boolean updateSuccessful;
-    long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
+    boolean externalViewUpdateSuccessful = true;
+    long deadline = System.currentTimeMillis() + 1000 * timeoutInSeconds;
 
     // Set all partitions to offline to unload them from the servers
     do {
       final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-      final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-      if (instanceSet == null || instanceSet.isEmpty()) {
-        return new PinotResourceManagerResponse("Segment " + segmentName + " not found.", false);
-      }
-      for (final String instance : instanceSet) {
-        idealState.setPartitionState(segmentName, instance, status);
+
+      for (String segmentName : segments) {
+        final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+        if (instanceSet == null || instanceSet.isEmpty()) {
+          return new PinotResourceManagerResponse("Segment " + segmentName + " not found.", false);
+        }
+        for (final String instance : instanceSet) {
+          idealState.setPartitionState(segmentName, instance, status);
+        }
       }
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
     } while (!updateSuccessful && (System.currentTimeMillis() <= deadline));
 
     // Check that the ideal state has been updated.
+    LOGGER.info("Ideal state successfully updated, waiting to update external view");
     IdealState updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-    Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
-    for (String state : instanceStateMap.values()) {
-      if (!status.equals(state)) {
-        return new PinotResourceManagerResponse("Error: External View does not reflect ideal State, timed out (10s).",
-            false);
+    for (String segmentName : segments) {
+      Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
+      for (String state : instanceStateMap.values()) {
+        if (!status.equals(state)) {
+          return new PinotResourceManagerResponse("Error: Failed to update Ideal state when setting status " +
+              status + " for segment " + segmentName, false);
+        }
+      }
+
+      // Wait until the partitions are offline in the external view
+      if (!ifExternalViewChangeReflectedForState(tableName, segmentName, status, (timeoutInSeconds * 1000),
+          true)) {
+        externalViewUpdateSuccessful = false;
       }
     }
 
-    // Wait until the partitions are offline in the external view
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, status, _externalViewOnlineToOfflineTimeout, true)) {
-      return new PinotResourceManagerResponse("Error: Failed to update external view, timeout", false);
-    }
-
-    return new PinotResourceManagerResponse(("Success: Segment " + segmentName + " is now " + status), true);
+    return (externalViewUpdateSuccessful) ? new PinotResourceManagerResponse(("Success: Segment(s) " + " now " + status), true) :
+        new PinotResourceManagerResponse("Error: Timed out. External view not completely updated", false);
   }
 
-  public PinotResourceManagerResponse dropSegment(String tableName, String segmentName) {
-    long timeOutInSeconds = 10;
-
-    // Put the segment in offline state first, and then delete the segment.
-    PinotResourceManagerResponse disableResponse = toggleSegmentState(tableName, segmentName, false, timeOutInSeconds);
-    if (!disableResponse.isSuccessfull()) {
-      return disableResponse;
+  /**
+   * Drop the provided list of segments.
+   *
+   * @param tableName Table to which the segments belong
+   * @param segments List of segments to dropped
+   * @return
+   */
+  public PinotResourceManagerResponse dropSegments(String tableName, List<String> segments, long timeOutInSeconds) {
+    PinotResourceManagerResponse deleteResponse = toggleSegmentState(tableName, segments, false, timeOutInSeconds);
+    if (!deleteResponse.isSuccessfull()) {
+      return deleteResponse;
     }
-    return deleteSegment(tableName, segmentName);
+
+    boolean ret = true;
+    for (String segment : segments) {
+      if (!deleteSegment(tableName, segment).isSuccessfull()) {
+        ret = false;
+      }
+    }
+    return (ret) ? new PinotResourceManagerResponse("Success: Deleted segment(s) list", true) :
+        new PinotResourceManagerResponse("Error: Failed to delete at least one segment before time out ", false);
   }
 
   public boolean hasRealtimeTable(String tableName) {

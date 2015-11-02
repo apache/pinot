@@ -190,10 +190,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void seal() throws ConfigurationException, IOException {
     for (final String column : forwardIndexCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).close();
-      if (config.isCreateInvertedIndexEnabled() && invertedIndexCreatorMap.containsKey(column)) {
-        invertedIndexCreatorMap.get(column).seal();
-      }
       dictionaryCreatorMap.get(column).close();
+    }
+
+    // The map is only initialized for columns that have inverted index creation enabled.
+    for (final String invertedColumn : invertedIndexCreatorMap.keySet()) {
+      invertedIndexCreatorMap.get(invertedColumn).seal();
     }
     writeMetadata();
   }

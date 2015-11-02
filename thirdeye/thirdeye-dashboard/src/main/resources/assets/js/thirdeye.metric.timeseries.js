@@ -1,3 +1,4 @@
+/* related view removed from dashboard 09/2015 */
 $(document).ready(function() {
     var hash = parseHashParameters(window.location.hash)
     var aggregateMillis = toMillis($("#sidenav-aggregate-size").val(), $("#sidenav-aggregate-unit").val())

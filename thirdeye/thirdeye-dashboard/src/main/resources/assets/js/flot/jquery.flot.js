@@ -2761,7 +2761,6 @@ Licensed under the MIT license.
             for (var i = 0; i < entries.length; ++i) {
 
                 var entry = entries[i];
-
                 if (i % options.legend.noColumns == 0) {
                     if (rowStarted)
                         fragments.push('</tr>');

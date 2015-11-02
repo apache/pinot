@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
 import com.linkedin.pinot.controller.api.swagger.Paths;
 
@@ -65,6 +66,7 @@ import org.slf4j.LoggerFactory;
 
 public class ControllerRestApplication extends Application {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
+  private static final String ONE_HOUR_IN_MILLIS = Long.toString(3600L * 1000L);
 
   private static String CONSOLE_WEBAPP_ROOT_PATH;
   public static Router router;
@@ -76,6 +78,10 @@ public class ControllerRestApplication extends Application {
 
   @Override
   public Restlet createInboundRoot() {
+    // Remove server-side HTTP timeout (see http://stackoverflow.com/questions/12943447/restlet-server-socket-timeout)
+    getContext().getParameters().add("maxIoIdleTimeMs", ONE_HOUR_IN_MILLIS);
+    getContext().getParameters().add("ioMaxIdleTimeMs", ONE_HOUR_IN_MILLIS);
+
     router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
 
@@ -100,6 +106,8 @@ public class ControllerRestApplication extends Application {
 
     // Uploading Downloading segments
     attachRoutesForClass(router, PinotSegmentUploadRestletResource.class);
+
+    attachRoutesForClass(router, PinotVersionRestletResource.class);
 
     router.attach("/api", SwaggerResource.class);
 

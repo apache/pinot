@@ -41,4 +41,11 @@ public interface RoutingTable {
    * Shutdown Routing table cleanly
    */
   public void shutdown();
+  
+  /**
+   * @throws Exception 
+   * 
+   */
+  
+  public String dumpSnapShot() throws Exception;
 }

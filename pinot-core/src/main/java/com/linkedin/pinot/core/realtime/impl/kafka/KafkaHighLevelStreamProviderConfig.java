@@ -26,12 +26,17 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
 
 public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {
   private static final Map<String, String> defaultProps;
-
+  
+  public static final int FIVE_MILLION = 5000000;
+  private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
+  public static final long ONE_HOUR = ONE_MINUTE_IN_MILLSEC * 60;
+  
   static {
     defaultProps = new HashMap<String, String>();
     /*defaultProps.put("zookeeper.connect", zookeeper);
@@ -49,6 +54,8 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private String decodeKlass;
   private Schema indexingSchema;
   private Map<String, String> decoderProps;
+  private long segmentTimeInMillis = ONE_HOUR;
+  private int realtimeRecordsThreshold = FIVE_MILLION;
 
   /*
    * kafka.hlc.zk.connect.string : comma separated list of hosts
@@ -82,6 +89,16 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     if (groupId == null || zkString == null || kafkaTopicName == null || this.decodeKlass == null) {
       throw new RuntimeException("Cannot initialize KafkaHighLevelStreamProviderConfig as: " + "groupId = " + groupId
           + ", zkString = " + zkString + ", kafkaTopicName = " + kafkaTopicName + ", decodeKlass = " + decodeKlass);
+    }
+
+    if (properties.containsKey(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
+      realtimeRecordsThreshold =
+          Integer.parseInt(properties.get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE));
+    }
+
+    if (properties.containsKey(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME)) {
+      segmentTimeInMillis =
+          Long.parseLong(properties.get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME));
     }
 
     for (String key : properties.keySet()) {
@@ -136,5 +153,25 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();
     this.zkString = kafkaMetadata.getZkBrokerUrl();
+    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
+      realtimeRecordsThreshold =
+          Integer.parseInt(tableConfig.getIndexingConfig().getStreamConfigs().get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE));
+    }
+    
+    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME)) {
+      segmentTimeInMillis =
+          Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME));
+    }
+    
+  }
+
+  @Override
+  public int getSizeThresholdToFlushSegment() {
+    return realtimeRecordsThreshold;
+  }
+
+  @Override
+  public long getTimeThresholdToFlushSegment() {
+    return segmentTimeInMillis;
   }
 }

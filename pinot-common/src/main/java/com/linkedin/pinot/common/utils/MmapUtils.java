@@ -101,15 +101,15 @@ public class MmapUtils {
           switch (bufferContext.allocationType) {
             case DIRECT_BYTE_BUFFER:
               DIRECT_BYTE_BUFFER_USAGE.addAndGet(-bufferSize);
-              if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("Releasing byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Releasing byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
                     bufferContext, getTrackedAllocationStatus());
               }
               break;
             case MMAP:
               MMAP_BUFFER_USAGE.addAndGet(-bufferSize);
-              if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("Unmapping byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
+              if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Unmapping byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
                     bufferContext, getTrackedAllocationStatus());
               }
               break;
@@ -142,8 +142,8 @@ public class MmapUtils {
 
     DIRECT_BYTE_BUFFER_USAGE.addAndGet(capacity);
 
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info("Allocating byte buffer of size {} with context {}, allocation after operation {}", capacity, context,
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Allocating byte buffer of size {} with context {}, allocation after operation {}", capacity, context,
           getTrackedAllocationStatus());
     }
 
@@ -175,8 +175,8 @@ public class MmapUtils {
 
     MMAP_BUFFER_USAGE.addAndGet(size);
 
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info("Memory mapping file, mmap size {} with context {}, allocation after operation {}", size, context,
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Memory mapping file, mmap size {} with context {}, allocation after operation {}", size, context,
           getTrackedAllocationStatus());
     }
 

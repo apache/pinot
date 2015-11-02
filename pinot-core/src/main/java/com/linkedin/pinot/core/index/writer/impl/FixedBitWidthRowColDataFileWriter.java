@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.index.writer.impl;
 
-import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.util.CustomBitSet;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -25,8 +25,6 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-
-import com.linkedin.pinot.core.util.CustomBitSet;
 import org.apache.commons.io.IOUtils;
 
 
@@ -146,9 +144,13 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
     }
   }
 
+  @Override
   public void close() {
     IOUtils.closeQuietly(raf);
     raf = null;
     MmapUtils.unloadByteBuffer(byteBuffer);
+    byteBuffer = null;
+    bitSet.close();
+    bitSet = null;
   }
 }

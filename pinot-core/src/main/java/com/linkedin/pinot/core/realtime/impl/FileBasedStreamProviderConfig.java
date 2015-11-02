@@ -71,4 +71,15 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   public void init(AbstractTableConfig resourceMetdata, InstanceZKMetadata instanceMetadata, Schema schema) {
   }
 
+  @Override
+  public int getSizeThresholdToFlushSegment() {
+    return 100000;
+  }
+
+  @Override
+  public long getTimeThresholdToFlushSegment() {
+    // TODO Auto-generated method stub
+    return 1000 * 60 * 60;
+  }
+
 }

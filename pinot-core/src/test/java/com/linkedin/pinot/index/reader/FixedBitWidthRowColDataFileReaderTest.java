@@ -72,7 +72,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
       }
       System.out.println("END MAX BITS:" + maxBits);
       maxBits = maxBits + 1;
-
+      customBitSet.close();
     }
   }
 
@@ -88,10 +88,11 @@ public class FixedBitWidthRowColDataFileReaderTest {
     for (int maxBits : maxBitArray) {
       String fileName = "test" + maxBits + "FixedBitWidthSingleCol";
       File file = new File(fileName);
+      CustomBitSet bitset = null;
       try {
         System.out.println("START MAX BITS:" + maxBits);
         int numElements = 100;
-        CustomBitSet bitset = CustomBitSet.withBitLength(numElements * maxBits);
+        bitset = CustomBitSet.withBitLength(numElements * maxBits);
         int max = (int) Math.pow(2, maxBits);
         Random r = new Random();
         int[] values = new int[numElements];
@@ -135,9 +136,8 @@ public class FixedBitWidthRowColDataFileReaderTest {
         System.out.println("END MAX BITS:" + maxBits);
       } finally {
         file.delete();
-
+        bitset.close();
       }
-
     }
   }
 
@@ -153,12 +153,12 @@ public class FixedBitWidthRowColDataFileReaderTest {
     for (int maxBits : maxBitArray) {
       String fileName = "test" + maxBits + "FixedBitWidthSingleCol";
       File file = new File(fileName);
+      CustomBitSet bitset = null;
       try {
         System.out.println("START MAX BITS:" + maxBits);
         int numElements = 100;
         int requiredBits = maxBits + 1;
-        CustomBitSet bitset = CustomBitSet.withBitLength(numElements
-            * requiredBits);
+        bitset = CustomBitSet.withBitLength(numElements * requiredBits);
         int max = (int) Math.pow(2, maxBits);
         Random r = new Random();
         int[] values = new int[numElements];
@@ -207,6 +207,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         System.out.println("END MAX BITS:" + maxBits);
       } finally {
         file.delete();
+        bitset.close();
       }
 
     }

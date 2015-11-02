@@ -35,6 +35,7 @@ import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.Aggregati
  *
  *
  */
+@Deprecated
 public class AggregationFunctionGroupByPlanNode implements PlanNode {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");

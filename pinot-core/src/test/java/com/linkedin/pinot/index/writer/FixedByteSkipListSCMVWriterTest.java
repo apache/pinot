@@ -92,5 +92,6 @@ public class FixedByteSkipListSCMVWriterTest {
     dis.close();
     file.delete();
     raf.close();
+    customBit.close();
   }
 }

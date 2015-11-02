@@ -17,10 +17,13 @@ package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileReader;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,17 +95,57 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
 
     Map<String, String> processes = new HashMap<String, String>();
     String prefix = System.getProperty("java.io.tmpdir") + File.separator;
+    File tempDir = new File(System.getProperty("java.io.tmpdir"));
 
     if (_server) {
-      processes.put("PinotServer", prefix + ".pinotAdminServer.pid");
+      File[] serverFiles = tempDir.listFiles(new FilenameFilter() {
+
+        @Override
+        public boolean accept(File dir, String name) {
+          if (StringUtils.containsIgnoreCase(name, "pinotAdminServer")) {
+            return true;
+          }
+          return false;
+        }
+      });
+      
+      for (File serverFile : serverFiles) {
+        processes.put(serverFile.getName(), serverFile.getAbsolutePath());
+      }
     }
 
     if (_broker) {
-      processes.put("PinotBroker", prefix + ".pinotAdminBroker.pid");
+      File[] serverFiles = tempDir.listFiles(new FilenameFilter() {
+
+        @Override
+        public boolean accept(File dir, String name) {
+          if (StringUtils.containsIgnoreCase(name, "pinotAdminBroker")) {
+            return true;
+          }
+          return false;
+        }
+      });
+      
+      for (File serverFile : serverFiles) {
+        processes.put(serverFile.getName(), serverFile.getAbsolutePath());
+      }
     }
 
     if (_controller) {
-      processes.put("PinotController", prefix + ".pinotAdminController.pid");
+      File[] serverFiles = tempDir.listFiles(new FilenameFilter() {
+
+        @Override
+        public boolean accept(File dir, String name) {
+          if (StringUtils.containsIgnoreCase(name, "pinotAdminController")) {
+            return true;
+          }
+          return false;
+        }
+      });
+      
+      for (File serverFile : serverFiles) {
+        processes.put(serverFile.getName(), serverFile.getAbsolutePath());
+      }
     }
 
     if (_zooKeeper) {

@@ -17,26 +17,32 @@ package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.tools.QuickstartTableRequest;
 
 
 public class QuickstartRunner {
   private static final String _clusterName = "QuickStartCluster";
-  private final static String _zkAddress = "localhost:2181";
 
   private final static String _localHost = "localhost";
-  private final static String _controllerPort = "9000";
   private final static String _controllerAddress = "http://localhost:9000";
   private final static String _segmentName = "baseballStats";
   private final static String TMP_DIR = System.getProperty("java.io.dir") + File.separator;
 
-  private final static int _zkPort = 2181;
-  private final static int _brokerPort = 8099;
-  private final static int _serverPort = 8098;
+  private static int _zkPort = 2123;
+  private final static String _zkAddress = "localhost:" + String.valueOf(_zkPort);
+
+  private static int _brokerPort = 7000;
+  private static int _serverPort = 8000;
+  private static int _controllerPort = 9000;
 
   protected enum quickstartCommands {
     run,
@@ -44,18 +50,37 @@ public class QuickstartRunner {
     help;
   }
 
-  private final File _schemaFile, _dataDir, _tempDir;
-  private final String _tableName;
   private boolean _isStopped = false;
-  private String _tableCreateRequestJsonFile;
+  private final List<QuickstartTableRequest> tableRequests;
+  private File _tempDir;
+  private int numServers;
+  private int numBrokers;
+  private int numControllers;
+  private List<Integer> controllerPorts = new ArrayList<>();
+  private List<Integer> serverPorts = new ArrayList<>();
+  private List<Integer> brokerPorts = new ArrayList<>();
+  private List<String> segments = new ArrayList<>();
+  private List<String> dirs = new ArrayList<>();
+  private boolean enableIsolation = true;
 
-  public QuickstartRunner(File schemaFile, File dataDir, File tempDir, String tableName,
-      String tableCreateRequestJsonFile) throws Exception {
-    this._schemaFile = schemaFile;
-    this._dataDir = dataDir;
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
+      int numControllers, File tempDir) throws Exception {
+    this.tableRequests = tableRequests;
     this._tempDir = tempDir;
-    this._tableName = tableName;
-    _tableCreateRequestJsonFile = tableCreateRequestJsonFile;
+    this.numBrokers = numBrokers;
+    this.numControllers = numControllers;
+    this.numServers = numServers;
+    clean();
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
+      int numControllers, File tempDir, boolean enableIsolation) throws Exception {
+    this.tableRequests = tableRequests;
+    this._tempDir = tempDir;
+    this.numBrokers = numBrokers;
+    this.numControllers = numControllers;
+    this.numServers = numServers;
+    this.enableIsolation = enableIsolation;
     clean();
   }
 
@@ -66,22 +91,38 @@ public class QuickstartRunner {
   }
 
   void StartController() throws Exception {
-    StartControllerCommand controllerStarter = new StartControllerCommand();
-    controllerStarter.setControllerPort(_controllerPort).setZkAddress(_zkAddress).setClusterName(_clusterName);
-    controllerStarter.execute();
+    for (int i = 0; i < numControllers; i++) {
+      StartControllerCommand controllerStarter = new StartControllerCommand();
+      controllerStarter.setControllerPort(String.valueOf(_controllerPort)).setZkAddress(_zkAddress)
+          .setClusterName(_clusterName).setTenantIsolation(enableIsolation);
+      controllerStarter.execute();
+      controllerPorts.add(new Integer(_controllerPort));
+      _controllerPort = _controllerPort + 1;
+    }
   }
 
   void StartBroker() throws Exception {
-    StartBrokerCommand brokerStarter = new StartBrokerCommand();
-    brokerStarter.setClusterName(_clusterName).setPort(_brokerPort).setZkAddress(_zkAddress);
-    brokerStarter.execute();
+    for (int i = 0; i < numBrokers; i++) {
+      StartBrokerCommand brokerStarter = new StartBrokerCommand();
+      brokerStarter.setClusterName(_clusterName).setPort(_brokerPort).setZkAddress(_zkAddress);
+      brokerStarter.execute();
+      brokerPorts.add(new Integer(_brokerPort));
+      _brokerPort = _brokerPort + 1;
+    }
   }
 
   void StartServer() throws Exception {
-    StartServerCommand serverStarter = new StartServerCommand();
-    serverStarter.setClusterName(_clusterName).setZkAddress(_zkAddress).setPort(_serverPort)
-        .setDataDir(TMP_DIR + "PinotServerData").setSegmentDir(TMP_DIR + "PinotServerSegment");
-    serverStarter.execute();
+    for (int i = 0; i < numServers; i++) {
+      StartServerCommand serverStarter = new StartServerCommand();
+      serverStarter.setClusterName(_clusterName).setZkAddress(_zkAddress).setPort(_serverPort)
+          .setDataDir(TMP_DIR + "PinotServerData" + String.valueOf(i))
+          .setSegmentDir(TMP_DIR + "PinotServerSegment" + String.valueOf(i));
+      serverStarter.execute();
+      dirs.add(TMP_DIR + "PinotServerData" + String.valueOf(i));
+      dirs.add(TMP_DIR + "PinotServerSegment" + String.valueOf(i));
+      serverPorts.add(new Integer(_serverPort));
+      _serverPort = _serverPort + 1;
+    }
   }
 
   public void startAll() throws Exception {
@@ -99,6 +140,9 @@ public class QuickstartRunner {
     FileUtils.deleteDirectory(serverDir1);
     FileUtils.deleteDirectory(serverDir2);
     FileUtils.deleteDirectory(_tempDir);
+    for (String dir : dirs) {
+      FileUtils.deleteDirectory(new File(dir));
+    }
   }
 
   public void stop() throws Exception {
@@ -113,39 +157,67 @@ public class QuickstartRunner {
     _isStopped = true;
   }
 
-  public void addSchema() throws Exception {
-    AddSchemaCommand schemaAdder = new AddSchemaCommand();
-    schemaAdder.setControllerHost(_localHost).setControllerPort(_controllerPort)
-        .setSchemaFilePath(_schemaFile.getAbsolutePath()).setExecute(true);
+  public void createServerTenantWith(int numOffline, int numRealtime, String tenantName) throws Exception {
+    AddTenantCommand command = new AddTenantCommand().setControllerUrl("http://localhost:" + controllerPorts.get(0))
+        .setName(tenantName).setOffline(1).setRealtime(1).setInstances(2).setRole(TenantRole.SERVER).setExecute(true);
+    command.execute();
+  }
 
-    schemaAdder.execute();
+  public void createBrokerTenantWith(int number, String tenantName) throws Exception {
+    AddTenantCommand command = new AddTenantCommand().setControllerUrl("http://localhost:" + controllerPorts.get(0))
+        .setName(tenantName).setInstances(number).setRole(TenantRole.BROKER).setExecute(true);
+    command.execute();
+  }
+
+  public void addSchema() throws Exception {
+    for (QuickstartTableRequest request : tableRequests) {
+      AddSchemaCommand schemaAdder = new AddSchemaCommand();
+      schemaAdder.setControllerHost(_localHost).setControllerPort(String.valueOf(controllerPorts.get(0)));
+      schemaAdder.setSchemaFilePath(request.getSchemaFile().getAbsolutePath()).setExecute(true);
+      schemaAdder.execute();
+    }
   }
 
   public void addTable() throws Exception {
-    AddTableCommand tableAdder = new AddTableCommand();
-    tableAdder.setFilePath(_tableCreateRequestJsonFile).setControllerPort(_controllerPort).setExecute(true);
-    tableAdder.execute();
+
+    for (QuickstartTableRequest request : tableRequests) {
+      AddTableCommand tableAdder = new AddTableCommand();
+      tableAdder.setFilePath(request.getTableRequestFile().getAbsolutePath())
+          .setControllerPort(String.valueOf(controllerPorts.get(0))).setExecute(true);
+      tableAdder.execute();
+    }
+
   }
 
   public void buildSegment() throws Exception {
-    CreateSegmentCommand segmentBuilder = new CreateSegmentCommand();
-    segmentBuilder.setDataDir(_dataDir.getAbsolutePath()).setFormat(FileFormat.CSV)
-        .setSchemaFile(_schemaFile.getAbsolutePath()).setTableName(_tableName).setSegmentName(_segmentName)
-        .setOutputDir(new File(_tempDir, "segments").getAbsolutePath()).setOverwrite(true);
-    segmentBuilder.execute();
+    for (QuickstartTableRequest request : tableRequests) {
+      if (request.getTableType() == TableType.OFFLINE) {
+        CreateSegmentCommand segmentBuilder = new CreateSegmentCommand();
+        File tempDir = new File(_tempDir, request.getTableName() + "_segment");
+        segmentBuilder.setDataDir(request.getDataDir().getAbsolutePath()).setFormat(request.getSegmentFileFormat())
+            .setSchemaFile(request.getSchemaFile().getAbsolutePath()).setTableName(request.getTableName())
+            .setSegmentName(request.getTableName() + "_" + String.valueOf(System.currentTimeMillis()))
+            .setOutputDir(tempDir.getAbsolutePath()).setOverwrite(true);
+        segmentBuilder.execute();
+        segments.add(tempDir.getAbsolutePath());
+      }
+    }
   }
 
   public void pushSegment() throws Exception {
-    UploadSegmentCommand segmentUploader = new UploadSegmentCommand();
 
-    segmentUploader.setControllerHost(_localHost).setControllerPort(_controllerPort)
-        .setSegmentDir(new File(_tempDir, "segments").getAbsolutePath());
-    segmentUploader.execute();
+    for (String segmentDir : segments) {
+      UploadSegmentCommand segmentUploader = new UploadSegmentCommand();
+      segmentUploader.setControllerHost(_localHost).setControllerPort(String.valueOf(--_controllerPort))
+          .setSegmentDir(new File(segmentDir).getAbsolutePath());
+      segmentUploader.execute();
+    }
   }
 
   public JSONObject runQuery(String query) throws Exception {
     PostQueryCommand queryCommand = new PostQueryCommand();
-    queryCommand.setBrokerPort(Integer.toString(_brokerPort)).setQuery(query);
+    int brokerPort = brokerPorts.get(new java.util.Random().nextInt(brokerPorts.size()));
+    queryCommand.setBrokerPort(String.valueOf(brokerPort)).setQuery(query);
     String result = queryCommand.run();
     return new JSONObject(result);
   }
@@ -164,7 +236,8 @@ public class QuickstartRunner {
     bld.append("<TOTAL Number Of Records : > select count(*) from baseballStats limit 0");
     bld.append("\n");
 
-    bld.append("<Top 10 Batters in the year 2000 : > select sum('runs') from baseballStats where yearID='2000' group by playerName top 10 limit 0");
+    bld.append(
+        "<Top 10 Batters in the year 2000 : > select sum('runs') from baseballStats where yearID='2000' group by playerName top 10 limit 0");
     bld.append("\n");
 
     bld.append("You can also run the query on the terminal by typing RUN || run <QUERY>");
@@ -172,19 +245,7 @@ public class QuickstartRunner {
     System.out.println(bld.toString());
   }
 
-  public File getSchemaFile() {
-    return _schemaFile;
-  }
-
-  public File getDataFile() {
-    return _dataDir;
-  }
-
   public File getTempDir() {
     return _tempDir;
-  }
-
-  public String getTableName() {
-    return _tableName;
   }
 }

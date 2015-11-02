@@ -164,7 +164,13 @@ public class FixedBitCompressedMVForwardIndexReader implements SingleColumnMulti
   @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(dataSectionBuffer);
+    dataSectionBuffer = null;
     MmapUtils.unloadByteBuffer(headerSectionBuffer);
+    headerSectionBuffer = null;
+    dataSectionReader.close();
+    dataSectionReader = null;
+    headerSectionReader.close();
+    headerSectionReader = null;
 
     if (isMmap) {
       raf.close();

@@ -15,17 +15,15 @@
  */
 package com.linkedin.pinot.core.index.writer.impl;
 
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-
-import org.apache.commons.io.IOUtils;
-
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
+import java.io.File;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import org.apache.commons.io.IOUtils;
 
 
 /**
@@ -132,8 +130,17 @@ public class FixedByteSkipListSCMVWriter implements SingleColumnMultiValueWriter
     IOUtils.closeQuietly(raf);
     raf = null;
     MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+    chunkOffsetsBuffer = null;
     MmapUtils.unloadByteBuffer(bitsetBuffer);
+    bitsetBuffer = null;
     MmapUtils.unloadByteBuffer(rawDataBuffer);
+    rawDataBuffer = null;
+    customBitSet.close();
+    customBitSet = null;
+    chunkOffsetsWriter.close();
+    chunkOffsetsWriter = null;
+    rawDataWriter.close();
+    rawDataWriter = null;
   }
 
   private int updateHeader(int rowId, int length) {

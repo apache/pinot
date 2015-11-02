@@ -155,8 +155,15 @@ public class FixedBitSkipListSCMVReader implements SingleColumnMultiValueReader 
   @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+    chunkOffsetsBuffer = null;
     MmapUtils.unloadByteBuffer(bitsetBuffer);
+    bitsetBuffer = null;
     MmapUtils.unloadByteBuffer(rawDataBuffer);
+    rawDataBuffer = null;
+    customBitSet.close();
+    customBitSet = null;
+    rawDataReader.close();
+    rawDataReader = null;
 
     if (isMmap) {
       raf.close();

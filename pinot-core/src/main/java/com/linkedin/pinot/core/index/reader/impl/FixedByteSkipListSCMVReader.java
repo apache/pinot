@@ -15,17 +15,15 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
-import com.google.common.primitives.Ints;
+import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.index.reader.DataFileMetadata;
+import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.util.CustomBitSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.util.CustomBitSet;
 
 
 /**
@@ -166,8 +164,15 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
 
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+    chunkOffsetsBuffer = null;
     MmapUtils.unloadByteBuffer(bitsetBuffer);
+    bitsetBuffer = null;
     MmapUtils.unloadByteBuffer(rawDataBuffer);
+    rawDataBuffer = null;
+    customBitSet.close();
+    customBitSet = null;
+    rawDataReader.close();
+    rawDataReader = null;
 
     if (isMmap) {
       raf.close();

@@ -19,39 +19,40 @@ import static com.linkedin.pinot.tools.Quickstart.prettyprintResponse;
 import static com.linkedin.pinot.tools.Quickstart.printStatus;
 
 import java.io.File;
-import java.net.URISyntaxException;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONException;
 
-import kafka.server.KafkaServerStartable;
-
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.tools.Quickstart.color;
 import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 import com.linkedin.pinot.tools.streams.MeetupRsvpStream;
 
+import kafka.server.KafkaServerStartable;
+
 
 public class RealtimeQuickStart {
   private File _quickStartDataDir;
 
-  public void  execute() throws JSONException, Exception {
-      _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
-      String quickStartDataDirName = _quickStartDataDir.getName();
+  public void execute() throws JSONException, Exception {
+    _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
+    String quickStartDataDirName = _quickStartDataDir.getName();
 
-      if (!_quickStartDataDir.exists()) {
-        _quickStartDataDir.mkdir();
-      }
+    if (!_quickStartDataDir.exists()) {
+      _quickStartDataDir.mkdir();
+    }
 
     File schema = new File(quickStartDataDirName + "/rsvp_pinot_schema.json");
     File tableCreate = new File(quickStartDataDirName + "/rsvp_create_table_request.json");
 
-    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().
-        getResource("sample_data/rsvp_pinot_schema.json"), schema);
+    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().getResource("sample_data/rsvp_pinot_schema.json"),
+        schema);
 
-    FileUtils.copyURLToFile(RealtimeQuickStart.class.getClassLoader().
-        getResource("sample_data/rsvp_create_table_request.json"), tableCreate);
+    FileUtils.copyURLToFile(
+        RealtimeQuickStart.class.getClassLoader().getResource("sample_data/rsvp_create_table_request.json"),
+        tableCreate);
 
     printStatus(color.CYAN, "Starting Kafka");
 
@@ -63,9 +64,10 @@ public class RealtimeQuickStart {
 
     KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR);
 
-    final QuickstartRunner runner =
-        new QuickstartRunner(schema, null, new File("/tm/" + System.currentTimeMillis()), "meetupRsvp",
-            tableCreate.getAbsolutePath());
+    File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
+
+    QuickstartTableRequest request = new QuickstartTableRequest("meetupRsvp", schema, tableCreate);
+    final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
 
     runner.startAll();
 
@@ -114,8 +116,7 @@ public class RealtimeQuickStart {
     printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q5)));
     printStatus(color.GREEN, "***************************************************");
 
-    printStatus(color.GREEN,
-        "you can always go to http://localhost:9000/query/ to play around in the query console");
+    printStatus(color.GREEN, "you can always go to http://localhost:9000/query/ to play around in the query console");
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
@@ -145,14 +146,14 @@ public class RealtimeQuickStart {
 
   }
 
-    public static void main(String[] args) {
-      RealtimeQuickStart rst = new RealtimeQuickStart();
-      try {
-        rst.execute();
-      } catch (Exception e) {
-        System.out.println(e.getMessage());
-        e.printStackTrace();
-      }
+  public static void main(String[] args) {
+    RealtimeQuickStart rst = new RealtimeQuickStart();
+    try {
+      rst.execute();
+    } catch (Exception e) {
+      System.out.println(e.getMessage());
+      e.printStackTrace();
     }
+  }
 
 }

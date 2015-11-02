@@ -61,6 +61,7 @@ public class HelixBrokerStarter {
 
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
+  private final ZkClient _zkClient;
   private final Configuration _pinotHelixProperties;
   private final HelixBrokerRoutingTable _helixBrokerRoutingTable;
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
@@ -88,7 +89,7 @@ public class HelixBrokerStarter {
                         + NetUtil.getHostAddress()
                         + "_"
                         + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
-                        CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
+                    CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
     RoutingTableBuilder defaultOfflineRoutingTableBuilder =
@@ -101,10 +102,10 @@ public class HelixBrokerStarter {
     // Remove all white-spaces from the list of zkServers (if any).
     String zkServers = zkServer.replaceAll("\\s+", "");
 
-    ZkClient zkClient =
+    _zkClient =
         new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
+    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
     _helixExternalViewBasedRouting =
         new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder,
             tableToRoutingTableBuilderMap, _propertyStore);
@@ -225,6 +226,20 @@ public class HelixBrokerStarter {
     final HelixBrokerStarter pinotHelixBrokerStarter =
         new HelixBrokerStarter("quickstart", "localhost:2122", configuration);
     return pinotHelixBrokerStarter;
+  }
+
+  protected void shutdown() {
+    LOGGER.info("Shutting down");
+
+    if (_helixManager != null) {
+      LOGGER.info("Disconnecting Helix Manager");
+      _helixManager.disconnect();
+    }
+
+    if (_zkClient != null) {
+      LOGGER.info("Closing ZK Client");
+      _zkClient.close();
+    }
   }
 
   public static void main(String[] args) throws Exception {

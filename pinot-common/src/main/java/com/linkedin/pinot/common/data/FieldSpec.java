@@ -112,7 +112,14 @@ public abstract class FieldSpec {
     this.isSingleValueField = isSingleValueField;
   }
 
-  public void setDefaultNullValue(String value) {
+  // This method is invoked via ObjectMapper, in Schema.java.
+  // Do NOT change the signature or remove it.
+  public void setDefaultNullValue(Object value) {
+    this.defaultNullValue = value;
+  }
+
+  // Called when trying to set a default null value from hadoop.
+  public void defaultNullValueFromString(String value) {
     Object defaultNullObj;
     try {
       switch (getDataType()) {

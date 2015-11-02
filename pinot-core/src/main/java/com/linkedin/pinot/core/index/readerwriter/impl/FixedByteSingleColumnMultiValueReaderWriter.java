@@ -156,7 +156,9 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     for (ByteBuffer dataBuffer : dataBuffers) {
       MmapUtils.unloadByteBuffer(dataBuffer);
     }
+    dataBuffers.clear();
     MmapUtils.unloadByteBuffer(headerBuffer);
+    headerBuffer = null;
   }
 
   private int updateHeader(int row, int length) {

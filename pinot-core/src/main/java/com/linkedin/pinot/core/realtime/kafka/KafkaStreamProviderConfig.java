@@ -61,4 +61,16 @@ public class KafkaStreamProviderConfig implements StreamProviderConfig {
     // TODO Auto-generated method stub
 
   }
+
+  @Override
+  public int getSizeThresholdToFlushSegment() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public long getTimeThresholdToFlushSegment() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
 }

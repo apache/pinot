@@ -1,17 +1,16 @@
 <script src="/assets/js/thirdeye.dimension.heatmap.js"></script>
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-<div class="collapser"><h2>(-) Dimension Heat Map</h2></div>
+
+
 <div id="dimension-heat-map-area">
 
       <#list dimensionView.view.metricNames as metric>
-      <div class="collapser"><h3>(-) ${metric} </h3></div>
-      <div class="metric-wrapper">
-          <div class="collapser"><h4>(-) ${metric} heat map</h4></div>
-          <div id="dimension-heat-map-tree-map-section" class="treemap-section">
-              <div class="dimension-heat-map-container-title">
-                  <h2>${metric}</h2>
+      <div class="metric-section-wrapper" rel="${metric}">
+         <div class="dimension-heat-map-treemap-section">
+              <div class="title-box">
                   <table>
                         <tr>
+                            <th><p>${metric}</p></th>
                             <th> Baseline Date: </th>
                             <th> Current Date: </th>
                             <th> Baseline Total:</th>
@@ -20,6 +19,7 @@
                             <th> Delta (%):</th>
                             </tr>
                         <tr>
+                            <td></td>
                             <td class="title-stat baseline-date-time"></td>
                             <td class="title-stat current-date-time"></td>
                             <td class="title-stat baseline-total">${dimensionView.view.metricGlobalStats[metric]['baseline_total']}</td>
@@ -74,12 +74,12 @@
                     </table>
               </div>
           </div>
-          <div class="collapser"><h4>(-) ${metric} heat map tabular view</h4></div>
-          <div class="dimension-heat-map-table-section">
-                   <div id='div-tabularView-metric_${metric?index}' class="dimension-heat-map-container-title">
-                     <h2>${metric}</h2>
+
+          <div id="dimension-heat-map-table-section" class="dimension-heat-map-table-section hidden" rel="table-section">
+                   <div id='div-tabularView-metric_${metric?index}' class="title-box">
                        <table style="width:100%; table-layout:fixed;">
                            <tr>
+                               <th><h2>${metric}</h2></th>
                                <th> Baseline Date: </th>
                                <th> Current Date: </th>
                                <th> Baseline Total:</th>
@@ -88,6 +88,7 @@
                                <th> Delta (%):</th>
                            </tr>
                            <tr>
+                               <td></td>
                                <td class="title-stat baseline-date-time"></td>
                                <td class="title-stat current-date-time"></td>
                                <td class="title-stat baseline-total">${dimensionView.view.metricGlobalStats[metric]['baseline_total']}</td>
@@ -186,94 +187,8 @@
       </#list>
 </div>
 
-
-<!--<div class="dimension-heat-map-heat-map-section">
-
-    <div class="uk-button-group heat-map-buttons" data-uk-button-radio>
-        <button class="uk-button dimension-heat-map-mode" id="dimension-heat-map-mode-self" mode="self">Self</button>
-        <button class="uk-button dimension-heat-map-mode" id="dimension-heat-map-mode-others" mode="others">Others</button>
-        <button class="uk-button dimension-heat-map-mode" id="dimension-heat-map-mode-all" mode="all">All</button>
-    </div>
-    <div class="heat-map-buttons">
-        <button id="dimension-heat-map-filter" class="uk-button dimension-heat-map-filter-btn data-uk-tooltip" title="Only show elements with 1% or greater volume change" state="on">
-             <i id="heat-map-filter-icon" class="uk-icon-filter"></i>
-        </button>
-    </div>
-
-    <div id="dimension-heat-map-explanation">
-      <div id="dimension-heat-map-explanation-self">
-        <p>
-          Shows percent change with respect to self: <code>(current - baseline) / baseline</code>
-        </p>
-        <p>
-          <em>
-            This view is appropriate for analyzing dimension values in isolation
-          </em>
-        </p>
-      </div>
-      <div id="dimension-heat-map-explanation-others">
-        <p>
-          Shows baseline percentage of whole, and difference with respect to current ratio: <br/>
-          <code>baseline / sum(baseline)</code> +/-<code>(current / sum(current) - baseline / sum(baseline))</code>
-        </p>
-        <p>
-          <em>
-            This view shows displacement among dimension values, which can be used to determine the change
-            of a dimension's composition
-          </em>
-        </p>
-      </div>
-      <div id="dimension-heat-map-explanation-all">
-        <p>
-          Shows contribution to overall change: <code>(current - baseline) / sum(baseline)</code>
-        </p>
-        <p>
-          <em>
-            This view weights dimension values by the total, so it can be used to break down the change in a metric</br>
-            (That is, the heat map cells sum to the overall change in the metric)
-          </em>
-        </p>
-      </div>
-      <p>
-        Cells are ordered in descending order based on current value, and
-        shaded based on baseline value (darker is greater)
-      </p>
-    </div>
-
-    <div id="dimension-heat-map-section-heat-map-area">
-        <#if (dimensionView.view.heatMaps?size == 0)>
-            <div class="uk-alert uk-alert-warning">
-                <p>No data available</p>
-            </div>
-        </#if>
-
-
-        <div id="dimension-heat-map-container"></div>
-
-        <div id="dimension-heat-map-data">
-            <#list dimensionView.view.heatMaps as heatMap>
-                <div class="dimension-view-heat-map"
-                     id='dimension-view-heat-map-${heatMap.metric}-${heatMap.dimension?replace(".", "-")}'
-                     metric='${heatMap.metric}'
-                     metric-display='${heatMap.metricAlias!heatMap.metric}'
-                     dimension='${heatMap.dimension}'
-                     dimension-display='${heatMap.dimensionAlias!heatMap.dimension}'
-                     stats-names='${heatMap.statsNamesJson}'>
-                    <#list heatMap.cells as cell>
-                        <div class='dimension-view-heat-map-cell'
-                             value='${cell.value?html}'
-                             stats='${cell.statsJson}'></div>
-                    </#list>
-                </div>
-            </#list>
-        </div>
-    </div>
-
-</div>-->
-
-
 <script>
-
+    //Creating the heatmap and the tootlip data
     var Treemap = {
 
         drawChart : function() {
@@ -357,7 +272,7 @@
                 midColor: '#ddd',
                 maxColor: '#00f',
                 headerHeight: 0,
-                fontColor: 'white',
+                fontColor: '#000',
                 showScale: false,
                 highlightOnMouseOver: true,
                 generateTooltip : Tooltip.showTreeMapTooltip
@@ -456,13 +371,24 @@
 
                 //get value and dimension from the current tooltip
                 var value = ($(this).html().trim() == "unknown") ? "" : $(this).html().trim()
+                console.log("value", value)
 
                 var dimension = $(this).attr("rel")
 
-                //fix the value and dimension in the query and redraw the page
+               /* earlier version when the URI was handled as an object
+               //fix the value and dimension in the query and redraw the page
                 var dimensionValues = parseDimensionValues(window.location.search)
+                //setting the dimension's query to 1 dimension value only
                 dimensionValues[dimension] = value
-                window.location.search = encodeDimensionValues(dimensionValues)
+                console.log("encodeDimensionValues(dimensionValues)", encodeDimensionValues(dimensionValues))
+                window.location.search = encodeDimensionValues(dimensionValues)*/
+
+                 //fix the value and dimension in the query and redraw the page
+                var dimensionValues = parseDimensionValuesAry(window.location.search)
+                //setting the dimension's query to 1 dimension value only
+                dimensionValues.push( dimension + "=" + value )
+                console.log("encodeDimensionValues(dimensionValues)", encodeDimensionValues(dimensionValues))
+                window.location.search = encodeDimensionValuesAry(dimensionValues)
             })
 
             $(".treemap-container svg").on("mousedown", "g", CreateNewQuery.mouseDownHandler)
@@ -471,8 +397,6 @@
                $(".dimension-treemap-mode[mode = '0']").click()
         }
     }
-
-
 
     google.load("visualization", "1", {packages:["treemap"]});
     google.setOnLoadCallback(Treemap.drawChart);

@@ -515,4 +515,8 @@ public class BrokerRequestHandler {
       setMessage(rootCause.getMessage());
     }
   }
+  
+  public String getDebugInfo() throws Exception {
+    return _routingTable.dumpSnapShot();
+  }
 }

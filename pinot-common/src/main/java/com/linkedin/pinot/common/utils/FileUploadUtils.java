@@ -49,6 +49,7 @@ public class FileUploadUtils {
     try {
 
       client.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
+      client.getParams().setSoTimeout(3600 * 1000); // One hour
       PostMethod post = new PostMethod("http://" + host + ":" + port + "/" + path);
       Part[] parts = { new FilePart(fileName, new PartSource() {
         @Override
