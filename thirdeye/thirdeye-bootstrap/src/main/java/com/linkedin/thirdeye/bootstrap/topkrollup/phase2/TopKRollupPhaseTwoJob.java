@@ -8,49 +8,42 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroKey;
-import org.apache.avro.mapreduce.AvroJob;
-import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
-import com.linkedin.thirdeye.bootstrap.aggregation.MetricSums;
 import com.linkedin.thirdeye.bootstrap.topkrollup.phase1.TopKRollupPhaseOneMapOutputKey;
-import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
-
+/**
+ * Map Input = Key:(dimensionName, dimensionValue) Value:(metricTimeSeries)
+ *
+ * Map Output = Key:(dimensionName), Value:(dimensionValue, metricTimeSeries)
+ *
+ * Reduce Output = Key:(dimensionName) Value: (dimensionValue)
+ * Reduce picks top k dimension values for that dimension,
+ * according to metric specified in the config
+ */
 public class TopKRollupPhaseTwoJob extends Configured {
   private static final Logger LOGGER = LoggerFactory
       .getLogger(TopKRollupPhaseTwoJob.class);
@@ -160,8 +153,6 @@ public class TopKRollupPhaseTwoJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupDimensionConfig = config.getRollupDimensionConfig();
-
-
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
         topKDimensionValues = new TopKDimensionValues();
@@ -198,11 +189,6 @@ public class TopKRollupPhaseTwoJob extends Configured {
         LOGGER.info("Taking all dimension values");
         for (TopKRollupPhaseTwoMapOutputValue mapOutput : mapOutputValues) {
           String dimensionValue = mapOutput.getDimensionValue();
-          //byte[] valueBytes = dimensionValue.getBytes();
-          //keyWritable.set(dimensionName.getBytes(), 0, dimensionName.getBytes().length);
-          //valWritable.set(valueBytes, 0, valueBytes.length);
-          LOGGER.info("Emitting {} {}", dimensionName, dimensionValue);
-          //context.write(keyWritable, valWritable);
           topKDimensionValues.addValue(dimensionName, dimensionValue);
         }
       } else {
@@ -236,10 +222,6 @@ public class TopKRollupPhaseTwoJob extends Configured {
           TopKRollupPhaseTwoMapOutputValue valueWrapper = mapOutputValues.get(k);
           String dimensionValue = valueWrapper.getDimensionValue();
           LOGGER.info("K : {} dimensionvalue : {}", k, dimensionValue);
-          //keyWritable.set(dimensionName.getBytes(), 0, dimensionName.getBytes().length);
-          //valWritable.set(dimensionValue.getBytes(), 0, dimensionValue.getBytes().length);
-          //context.write(keyWritable, valWritable);
-
           topKDimensionValues.addValue(dimensionName, dimensionValue);
 
         }
@@ -270,9 +252,6 @@ public class TopKRollupPhaseTwoJob extends Configured {
 
     // Reduce config
     job.setReducerClass(TopKRollupPhaseTwoReducer.class);
-    //job.setOutputKeyClass(BytesWritable.class);
-    //job.setOutputValueClass(BytesWritable.class);
-    //job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
     String numReducers = props.getProperty("num.reducers");
     if (numReducers != null) {

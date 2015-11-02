@@ -43,7 +43,15 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.bootstrap.aggregation.MetricSums;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
-
+/**
+ * Map Input = Record
+ *
+ * Map Output = Key:(dimensionName, dimensionValue) Value:(metricTimeSeries)
+ *
+ * Reduce Output = Key:(dimensionName, dimensionValue) Value:(aggregated metricTimeSeries)
+ * Reduce emits the record only if metric sums
+ * are greater than threshold specified in config
+ */
 public class TopKRollupPhaseOneJob extends Configured {
   private static final Logger LOGGER = LoggerFactory
       .getLogger(TopKRollupPhaseOneJob.class);
@@ -234,13 +242,13 @@ public class TopKRollupPhaseOneJob extends Configured {
         new Schema.Parser().parse(fs.open(new Path(
             getAndCheck(TOPK_ROLLUP_PHASE1_SCHEMA_PATH.toString()))));
     LOGGER.info("{}", schema);
+
     // Map config
     job.setMapperClass(TopKRollupPhaseOneMapper.class);
     AvroJob.setInputKeySchema(job, schema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
-
 
     // Reduce config
     job.setReducerClass(TopKRollupPhaseOneReducer.class);

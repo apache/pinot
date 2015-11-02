@@ -5,8 +5,6 @@ import static com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseT
 import static com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeConstants.TOPK_ROLLUP_PHASE3_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeConstants.TOPK_DIMENSIONS_PATH;
 
-import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -39,10 +37,17 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TopKDimensionSpec;
 import com.linkedin.thirdeye.bootstrap.topkrollup.phase2.TopKDimensionValues;
 
-
+/**
+ * Map Input = Key:(Serialized dimensionKey) Value:(Serialized metricTimeSeries) from
+ * aggregation phase
+ *
+ * Map Output = Key:(Serialized dimensionKey) Value:(Serialized metricTimeSeries)
+ * Map replaces every dimension value which is not in top k by ?
+ *
+ * Reduce Output = Key:(Serialized dimensionKey) Value:(Serialized metricTimeSeries)
+ */
 public class TopKRollupPhaseThreeJob extends Configured {
   private static final Logger LOGGER = LoggerFactory
       .getLogger(TopKRollupPhaseThreeJob.class);
@@ -99,11 +104,11 @@ public class TopKRollupPhaseThreeJob extends Configured {
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
         topKDimensionValues = new TopKDimensionValues();
+
         FileStatus[] fileStatuses = fileSystem.listStatus(topKDimensionsPath, new PathFilter() {
 
           @Override
           public boolean accept(Path p) {
-            // TODO Auto-generated method stub
             return p.getName().startsWith("attempt");
           }
         });
@@ -127,9 +132,8 @@ public class TopKRollupPhaseThreeJob extends Configured {
 
       DimensionKey dimensionKey;
       dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("dimension key {}", dimensionKey);
-      }
+      LOGGER.info("dimension key {}", dimensionKey);
+
       String[] dimensionValues = dimensionKey.getDimensionValues();
       for (String dimension : dimensionNames) {
         int index = dimensionNameToIndexMapping.get(dimension);
@@ -160,7 +164,6 @@ public class TopKRollupPhaseThreeJob extends Configured {
     private StarTreeConfig starTreeConfig;
     private TopKRollupPhaseThreeConfig config;
     private List<MetricType> metricTypes;
-    private List<TopKDimensionSpec> rollupDimensionConfig;
     private MetricSchema metricSchema;
     BytesWritable keyWritable;
     BytesWritable valWritable;
@@ -168,7 +171,7 @@ public class TopKRollupPhaseThreeJob extends Configured {
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
 
-      LOGGER.info("TopKRollupPhaseTwoJob.TopKRollupPhaseTwoReducer.setup()");
+      LOGGER.info("TopKRollupPhaseThreeJob.TopKRollupPhaseThreeReducer.setup()");
 
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
