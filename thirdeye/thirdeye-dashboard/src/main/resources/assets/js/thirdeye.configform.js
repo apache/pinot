@@ -15,14 +15,13 @@ $(document).ready(function() {
         $(".metric-section-wrapper[rel = '" +  $(".metric-section-selector").val() + "' ]").show()
     })
 
-    //Set default dimension view on Timeseries and the default metric view on Heatmap
-    window.onload = load
-    function load() {
-        //Using settimeout since the table has minor css issues when created on a hidden parent
-        // and flot.js has no callback function for drawing the data
-        window.setTimeout(function(){$(".metric-section-selector").trigger("change")}, 2000)
-        window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
-    }
+    //Cumulative checkbox
+    $("#funnel-cumulative").click(function() {
+        $(".hourly-values").toggleClass("hidden")
+        $(".cumulative-values").toggleClass("hidden")
+    })
+
+
 
     //If filters applied link is clicked remove it's value/s from the URI
     // so it won't be fixed in the query WHERE clause, reload the page with the new query
@@ -80,16 +79,6 @@ $(document).ready(function() {
             return
         }
 
-        // Date input field validation
-        if($("#time-input-form-baseline-date").length > 0) {
-            var baselineDate = $("#time-input-form-baseline-date").val()
-            if (!baselineDate) {
-                errorMessage.html("Must provide baseline date")
-                errorAlert.fadeIn(100)
-                return
-            }
-        }
-
         //Baseline aggregate checkbox validation
         if ($(".baseline-aggregate.uk-active").length == 0 ) {
             errorMessage.html("Please select a baseline: hours or days")
@@ -107,19 +96,9 @@ $(document).ready(function() {
         // Date
         var current = moment.tz(date, timezone)
         //Baseline is the user selected baseline or 1 week prior to current
-        var baseline = baselineDate ? moment.tz(baselineDate, timezone)  : moment(current.valueOf() - $("#time-input-comparison-size").val() * 86400000)
+        var baseline =  moment(current.valueOf() - $("#time-input-comparison-size").val() * 86400000)
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
-
-        // Derived metric(s) todo: take the derived metrics from the URI instead of the sidenav
-        $("#sidenav-derived-metrics-list").find(".uk-form-row").each(function(i, row) {
-            var type = $(row).find(".derived-metric-type").find(":selected").val()
-            var args = []
-            $(row).find(".derived-metric-arg").each(function(j, arg) {
-                args.push("'" + $(arg).find(":selected").val() + "'")
-            })
-            metrics.push(type + '(' + args.join(',') + ')')
-        });
 
         // Moving average
         /*if ($("#time-input-moving-average-size").length > 0 && $("#time-input-moving-average-size").val() != "") {
@@ -179,11 +158,6 @@ $(document).ready(function() {
     var currentDateString = currentDateTime.format("YYYY-MM-DD")
     $("#time-input-form-current-date").val(currentDateString)
 
-    //Load existing baseline date selection
-    var baselineDateTime = moment(parseInt(path.baselineMillis))
-    var baselineDateString = baselineDateTime.format("YYYY-MM-DD")
-    $("#time-input-form-baseline-date").val(baselineDateString)
-
     // Load existing metrics selection / function
     if (path.metricFunction) {
         var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
@@ -210,27 +184,22 @@ $(document).ready(function() {
             }
         }*/
 
-        // Rest are metrics (primitive and derived)
-        var primitiveMetrics = []
-        var derivedMetrics = []
-        $.each(metricFunctionObj.args, function(i, arg) {
-            if (typeof(arg) === 'string') {
-                primitiveMetrics.push(arg.replace(/'/g, ""))
-            } else {
-                derivedMetrics.push(arg)
-            }
-        })
+        // Rest are metrics
+        var metrics = []
 
-        // Rest can be assumed to be plain args or derived metrics
-        for(var i= 0, len = primitiveMetrics.length; i< len; i++){
-            $(".panel-metric[ value = " + primitiveMetrics[i] + "]").attr("checked", "checked")
+        $.each(metricFunctionObj.args, function(i, arg) {
+             metrics.push(arg.replace(/'/g, ""))
+        })
+        for(var i= 0, len = metrics.length; i< len; i++){
+
+            $(".panel-metric[ value = " + metrics[i] + "]").attr("checked", "checked")
         }
 
         //Set the comparison size to WoW / Wo2W / Wo4W based on the URI currentmillis - baselinemillis
         if($("#time-input-comparison-size").length > 0 ){
             var path = parsePath(window.location.pathname)
             var baselineDiff = path.currentMillis - path.baselineMillis
-            var hasWoWProfile = [7,14,28].indexOf(baselineDiff / 86400000 ) > -1
+            var hasWoWProfile = [7,14,21,28].indexOf(baselineDiff / 86400000 ) > -1
 
             if(hasWoWProfile){
                 var baselineDiffDays = (baselineDiff / 86400000 )
@@ -277,4 +246,14 @@ $(document).ready(function() {
     $("#time-input-metrics").click(function(){
         $("#time-input-metrics-panel").toggleClass("hidden")
     })
+
+
+    //Set default dimension view on Timeseries and the default metric view on Heatmap
+    window.onload = load
+    function load() {
+        //Using settimeout since the table has minor css issues when created on a hidden parent
+        // and flot.js has no callback function for drawing the data
+        window.setTimeout(function(){$(".metric-section-selector").trigger("change")}, 2000)
+        window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
+    }
 })

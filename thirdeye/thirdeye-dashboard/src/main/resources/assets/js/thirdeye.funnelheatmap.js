@@ -168,11 +168,7 @@ $(document).ready(function() {
         window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
     })
 
-    //Cumulative checkbox
-    $("#funnel-cumulative").click(function() {
-            $(".hourly-values").toggleClass("hidden")
-            $(".cumulative-values").toggleClass("hidden")
-    })
+
 
 
 });

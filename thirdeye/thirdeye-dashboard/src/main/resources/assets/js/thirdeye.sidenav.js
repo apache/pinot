@@ -18,93 +18,6 @@ $(document).ready(function() {
             cellObj.prop( "checked", true );
         });
     }
-    
-    // Derived metrics
-    var addDerivedMetric = function(event) {
-        if (event) {
-            event.preventDefault()
-        }
-
-        var derivedMetrics = [
-            { type: "RATIO", numArgs: 2 }
-            // TODO: More
-        ]
-
-        var controls = $("<div></div>", {
-            class: "uk-form-row uk-form-controls uk-panel uk-panel-box"
-        })
-        $("#sidenav-derived-metrics-list").append(controls)
-
-        // Close button
-        var exit = $("<a></a>", { href: "#" }).append($("<i></i>", { class: "uk-icon-close" }))
-        var badge = $("<div></div>", { class: "uk-panel-badge" }).append(exit)
-        exit.click(function(event) {
-            event.preventDefault()
-            controls.remove()
-        })
-        controls.append(badge)
-        
-        // Function type select
-        var select = $("<select></select>", { class: "derived-metric-type" })
-        controls.append(select)
-        $.each(derivedMetrics, function(i, derivedMetric) {
-            var option = $("<option></option>", {
-                value: derivedMetric.type,
-                html: derivedMetric.type
-            })
-            option.attr('idx', i)
-            if (i == 0) {
-                option.attr('selected', 'selected')
-            }
-            select.append(option)
-        })
-
-        var inputs = $("<div></div>")
-        controls.append(inputs)
-
-        var selectChange = function() {
-            inputs.empty()
-            var selected = select.find(':selected')
-            var idx = $(selected).attr('idx')
-            var derivedMetric = derivedMetrics[idx]
-
-            for (var i = 0; i < derivedMetric.numArgs; i++) {
-                var metricSelect = $("<select></select>", {
-                    id: derivedMetric.type + '-arg' + i,
-                    class: 'derived-metric-arg'
-                })
-
-                $(".sidenav-metric").each(function(j, metric) {
-                    var metricName = $(metric).val()
-                    var option = $("<option></option>", {
-                        value: metricName,
-                        html: metricName
-                    })
-                    if (i == j) {
-                        option.attr('selected', 'selected')
-                    }
-                    metricSelect.append(option)
-                })
-
-                inputs.append(metricSelect)
-            }
-        }
-
-        select.change(selectChange)
-        selectChange()
-    }
-
-    $("#sidenav-derived-metrics-add").click(addDerivedMetric)
-
-    // Moving average toggle
-    $("#sidenav-moving-average").change(function() {
-        var thisObj = $(this)
-        if (thisObj.is(':checked')) {
-            $("#sidenav-moving-average-controls").fadeIn(100)
-        } else {
-            $("#sidenav-moving-average-controls").hide()
-        }
-    })
 
     // Generate Timezone drop down
     var timezones = moment.tz.names()
@@ -149,34 +62,17 @@ $(document).ready(function() {
         }
       }
 
-      // Rest are metrics (primitive and derived)
-      var primitiveMetrics = []
-      var derivedMetrics = []
+      // Rest are metrics
+      var metrics = []
       $.each(metricFunctionObj.args, function(i, arg) {
-        if (typeof(arg) === 'string') {
-            primitiveMetrics.push(arg.replace(/'/g, ""))
-        } else {
-            derivedMetrics.push(arg)
-        }
+          metrics.push(arg.replace(/'/g, ""))
       })
 
-      // Rest can be assumed to be plain args or derived metrics
       $(".sidenav-metric").each(function(i, checkbox) {
         var checkboxObj = $(checkbox)
-        if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
+        if ($.inArray(checkboxObj.val(), metrics) >= 0) {
           checkboxObj.attr("checked", "checked")
         }
-      })
-
-      // Add derived metrics
-      $.each(derivedMetrics, function(i, derivedMetric) {
-        addDerivedMetric() // appends a new element to list
-        var metricElements = $("#sidenav-derived-metrics-list .uk-form-row")
-        var metricElement = $(metricElements[metricElements.length - 1])
-        metricElement.find(".derived-metric-type").val(derivedMetric.name)
-        $.each(derivedMetric.args, function(j, arg) {
-            metricElement.find('#' + derivedMetric.name + '-arg' + j).val(arg.replace(/'/g, ""))
-        })
       })
     }
 
@@ -235,16 +131,6 @@ $(document).ready(function() {
             if (checkboxObj.is(':checked')) {
                 metrics.push("'" + checkboxObj.val() + "'")
             }
-        });
-
-        // Derived metric(s)
-        $("#sidenav-derived-metrics-list").find(".uk-form-row").each(function(i, row) {
-            var type = $(row).find(".derived-metric-type").find(":selected").val()
-            var args = []
-            $(row).find(".derived-metric-arg").each(function(j, arg) {
-                args.push("'" + $(arg).find(":selected").val() + "'")
-            })
-            metrics.push(type + '(' + args.join(',') + ')')
         });
 
         // Funnels

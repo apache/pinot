@@ -87,20 +87,6 @@ li {
     display: none;
 }
 
-#sidenav-derived-metrics {
-    margin-top: 2%;
-}
-
-#sidenav-derived-metrics-list {
-    margin-left: -5%;
-    margin-right: 5%;
-    margin-top: 2%;
-}
-
-#sidenav-derived-metrics-list select {
-    margin-top: 1%;
-}
-
 #sidenav-metadata {
     margin-left: 5%;
 }

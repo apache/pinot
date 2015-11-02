@@ -1,6 +1,6 @@
 <div class="title-box uk-clearfix">
 <!-- Filters Applied revamped -->
-<ul class="filters-applied" style="display: inline-block;">Filters Applied:
+<ul class="filters-applied" style="display: inline-block;max-width: 150px; margin-right: 15px;">Filters Applied:
     <#list dimensions as dimensionName>
         <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
         <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
@@ -33,7 +33,7 @@
 </div>
 <!-- Metric selection dropdown -->
 <#elseif (dimensionView.type == "HEAT_MAP")>
-<div class="uk-display-inline-block uk-margin-medium">Metric:<br>
+<div id="view-metric-selector" class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
     <div  class="uk-button uk-form-select" data-uk-form-select>
         <span>Metric</span>
         <i class="uk-icon-caret-down"></i>
@@ -108,7 +108,7 @@
 
             </div>
         </div>
-        <div class="uk-display-inline-block hidden" style="position: relative;">
+        <div class="uk-display-inline-block" style="position: relative;">
             <button id="time-input-metrics" type="button" class="uk-button hidden" style="width: 200px;">Select Metrics <i class="uk-icon-caret-down"></i> </button>
             <div id="time-input-metrics-panel" class="hidden" style="position:absolute; top:30px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
                 <ul style="list-style-type: none; padding-left:0; width:250px;">
@@ -120,18 +120,6 @@
                 </ul>
             </div>
         </div>
-
-    <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "MULTI_TIME_SERIES")>
-        <div class="uk-display-inline-block">
-            <label class="uk-form-label">
-                Start Date
-            </label>
-            <div class="uk-form-icon">
-                <i class="uk-icon-calendar"></i>
-                <input id="time-input-form-baseline-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
-            </div>
-        </div>
-    </#if>
 
         <div class="uk-display-inline-block">
             <label class="uk-form-label">
@@ -153,7 +141,6 @@
             </div>
         </div>
 
-    <#if dimensionView.type == "TABULAR">
         <div class="uk-form-label uk-display-inline-block">Compare to:<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Compare:</span>
@@ -161,11 +148,11 @@
                 <select id="time-input-comparison-size">
                     <option class="uk-button" unit="WoW" value="7">WoW</option>
                     <option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>
+                    <option class="uk-button" unit="Wo3W" value="21" >Wo3W</option>
                     <option class="uk-button" unit="Wo4W" value="28">Wo4W</option>
                 </select>
             </div>
         </div>
-    </#if>
 
         <div class="uk-display-inline-block uk-margin-right">
             <button type="submit" class="time-input-form-submit uk-button uk-button-small uk-button-primary ">Go</button>
