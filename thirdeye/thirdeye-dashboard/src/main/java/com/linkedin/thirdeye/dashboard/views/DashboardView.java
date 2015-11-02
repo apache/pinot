@@ -24,7 +24,6 @@ public class DashboardView extends View {
   private final MultivaluedMap<String, String> selectedDimensions;
   private final DateTime baselineTime;
   private final DateTime currentTime;
-  private final MetricView metricView;
   private final DimensionView dimensionView;
   private final DateTime earliestDataTime;
   private final DateTime latestDataTime;
@@ -34,9 +33,9 @@ public class DashboardView extends View {
 
   public DashboardView(String collection, CollectionSchema collectionSchema,
       MultivaluedMap<String, String> selectedDimensions, DateTime baselineTime,
-      DateTime currentTime, MetricView metricView, DimensionView dimensionView,
-      DateTime earliestDataTime, DateTime latestDataTime, List<String> customDashboardNames,
-      String feedbackEmailAddress, List<String> allFunnelNames) {
+      DateTime currentTime, DimensionView dimensionView, DateTime earliestDataTime,
+      DateTime latestDataTime, List<String> customDashboardNames, String feedbackEmailAddress,
+      List<String> allFunnelNames) {
     super("dashboard.ftl");
     this.collection = collection;
     this.selectedDimensions = selectedDimensions;
@@ -44,7 +43,6 @@ public class DashboardView extends View {
     this.collectionSchema = collectionSchema;
     this.baselineTime = baselineTime;
     this.currentTime = currentTime;
-    this.metricView = metricView;
     this.dimensionView = dimensionView;
     this.earliestDataTime = earliestDataTime;
     this.latestDataTime = latestDataTime;
@@ -102,10 +100,6 @@ public class DashboardView extends View {
 
   public DateTime getCurrentTime() {
     return currentTime;
-  }
-
-  public MetricView getMetricView() {
-    return metricView;
   }
 
   public DimensionView getDimensionView() {

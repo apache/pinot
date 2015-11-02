@@ -30,6 +30,11 @@
                         <#include "dimension/heat-map.ftl">
                     <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
                         <#include "dimension/breakdown.ftl">
+                        <#-- depends on metric names from template, UI should derive this from URL metricFunction. -->
+                        <#-- Note that the overall metric series will not appear until this is fixed. -->
+                        <#-- include "metric/time-series.ftl"> -->
+                        
+                        <#-- include "dimension/multi-time-series.ftl" -->
                     <#elseif (dimensionView.type == "TABULAR")>
                         <div id="dashboard-funnels-view">
                             <#include "funnel-heatmap.ftl">

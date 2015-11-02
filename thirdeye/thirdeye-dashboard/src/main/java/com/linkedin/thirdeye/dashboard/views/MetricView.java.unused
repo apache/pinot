@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.dashboard.views;
 
 import com.linkedin.thirdeye.dashboard.api.MetricViewType;
+
 import io.dropwizard.views.View;
 
 public class MetricView {
+  // TODO UNUSED
   private final View view;
   private final MetricViewType type;
 

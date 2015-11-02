@@ -45,7 +45,6 @@ import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.DashboardStartView;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.DimensionView;
@@ -55,9 +54,6 @@ import com.linkedin.thirdeye.dashboard.views.DimensionViewMultiTimeSeries;
 import com.linkedin.thirdeye.dashboard.views.ExceptionView;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 import com.linkedin.thirdeye.dashboard.views.LandingView;
-import com.linkedin.thirdeye.dashboard.views.MetricView;
-import com.linkedin.thirdeye.dashboard.views.MetricViewTabular;
-import com.linkedin.thirdeye.dashboard.views.MetricViewTimeSeries;
 import com.sun.jersey.api.NotFoundException;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 
@@ -287,14 +283,6 @@ public class DashboardResource {
     }
 
     try {
-      View metricView = null;
-      if (dimensionViewType == DimensionViewType.MULTI_TIME_SERIES) {
-        // TODO Follow up on multi-time-series.ftl, which is the only user of the metric view in the
-        // intra_day dashboard.
-        metricView = getMetricView(collection, metricFunction, metricViewType, baselineMillis,
-            currentMillis, uriInfo);
-      }
-
       View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
           baselineMillis, currentMillis, selectedDimensions, selectedFunnels, uriInfo);
 
@@ -303,7 +291,6 @@ public class DashboardResource {
 
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
           selectedDimensions, new DateTime(baselineMillis), new DateTime(currentMillis),
-          new MetricView(metricView, metricViewType),
           new DimensionView(dimensionView, dimensionViewType, dimensionValueOptions),
           earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress,
           funnelNames);
@@ -315,47 +302,6 @@ public class DashboardResource {
       // TODO: Better message, but at least this propagates it to client
       LOGGER.error("Error processing request {}", uriInfo.getRequestUri(), e);
       return new ExceptionView(e);
-    }
-  }
-
-  @GET
-  @Path("/metric/{collection}/{metricFunction}/{metricViewType}/{baselineMillis}/{currentMillis}")
-  public View getMetricView(@PathParam("collection") String collection,
-      @PathParam("metricFunction") String metricFunction,
-      @PathParam("metricViewType") MetricViewType metricViewType,
-      @PathParam("baselineMillis") Long baselineMillis,
-      @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
-    MultivaluedMap<String, String> dimensionValues = uriInfo.getQueryParameters();
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    // TODO check if anything is using this endpoint. Right now metricViewType is always INTRA_DAY
-    // and is only useful when viewing the multi-time-series.
-    // Metric view
-    switch (metricViewType) {
-    case INTRA_DAY:
-      long intraPeriod = getIntraPeriod(metricFunction);
-
-      // Dimension groups
-      Map<String, Map<String, List<String>>> dimensionGroups = null;
-      DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
-      if (dimensionGroupSpec != null) {
-        dimensionGroups = dimensionGroupSpec.getReverseMapping();
-      }
-      String sql =
-          SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - intraPeriod),
-              new DateTime(currentMillis), dimensionValues, dimensionGroups);
-      LOGGER.info("Generated SQL for intraday metric {}: {}", uriInfo.getRequestUri(), sql);
-      QueryResult result = queryCache.getQueryResult(serverUri, sql);
-
-      return new MetricViewTabular(schema, objectMapper, result, currentMillis,
-          currentMillis - baselineMillis, intraPeriod);
-
-    case TIME_SERIES_FULL:
-    case TIME_SERIES_OVERLAY:
-    case FUNNEL:
-      // n.b. will query /flot resource async
-      return new MetricViewTimeSeries(schema, ViewUtils.flattenDisjunctions(dimensionValues));
-    default:
-      throw new NotFoundException("No metric view implementation for " + metricViewType);
     }
   }
 

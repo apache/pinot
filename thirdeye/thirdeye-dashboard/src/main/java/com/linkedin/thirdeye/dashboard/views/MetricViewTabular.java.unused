@@ -17,6 +17,7 @@ import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import io.dropwizard.views.View;
 
 public class MetricViewTabular extends View {
+  // TODO UNUSED
   private static final TypeReference<List<String>> STRING_LIST_REF =
       new TypeReference<List<String>>() {
       };
