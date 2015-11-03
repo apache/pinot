@@ -26,21 +26,18 @@
 
 
 <#if (dimensionView.type == "TABULAR")>
-<div class="uk-display-inline-block uk-margin-small">
+<div class="uk-display-inline-block uk-margin-small" style="vertical-align:  top;">
     <div data-uk-button-checkbox>
         <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
     </div>
 </div>
-<!-- Metric selection dropdown -->
-<#elseif (dimensionView.type == "HEAT_MAP")>
-<div id="view-metric-selector" class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
+
+<#elseif (dimensionView.type == "HEAT_MAP" )>
+<div class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
     <div  class="uk-button uk-form-select" data-uk-form-select>
         <span>Metric</span>
         <i class="uk-icon-caret-down"></i>
         <select id="view-metric-selector" class="metric-section-selector">
-            <#list dimensionView.view.metricNames as metric>
-                <option value="${metric}">${metric}</option>
-            </#list>
         </select>
     </div>
 </div>
@@ -54,6 +51,21 @@
                 <option value="${dimension}">${dimension}</option>
             </#list>
         </select>
+    </div>
+</div>
+
+<div class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
+    <div  class="uk-button uk-form-select" data-uk-form-select>
+        <span>Metric</span>
+        <i class="uk-icon-caret-down"></i>
+        <select id="view-metric-selector" class="metric-section-selector">
+        </select>
+    </div>
+</div>
+
+<div class="uk-display-inline-block uk-margin-small" style="vertical-align:middle;">
+    <div data-uk-button-checkbox>
+        <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
     </div>
 </div>
 </#if>
@@ -141,7 +153,9 @@
             </div>
         </div>
 
-        <div class="uk-form-label uk-display-inline-block">Compare to:<br>
+        <div class="uk-display-inline-block uk-margin-right">
+            <label class="uk-form-label">Compare to
+            </label>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Compare:</span>
                 <i class="uk-icon-caret-down"></i>
@@ -154,14 +168,14 @@
             </div>
         </div>
 
-        <div class="uk-display-inline-block uk-margin-right">
-            <button type="submit" class="time-input-form-submit uk-button uk-button-small uk-button-primary ">Go</button>
+        <div class="uk-margin-right uk-margin-small-top">
+            <button type="submit" id="time-input-form-submit" class="uk-button uk-button-primary" disabled style="width: 100%">Go</button>
         </div>
     </div>
 </form>
 
 
-<div id="current-view-settings" class="uk-clearfix" style="padding-right:20px;">
+<div id="current-view-settings" class="uk-clearfix" style="padding-right:20px; margin-top:  10px;">
 
 <#if (dimensionView.type == "HEAT_MAP")>
     <ul class="heatmap-tabs uk-tab" data-uk-tab>

@@ -1,26 +1,13 @@
 $(document).ready(function() {
+
+    /* --- Headnav related event listeners --- */
+
+
     //Highlight active tab on navbar
     var view = parsePath(window.location.pathname).dimensionViewType == null ? "TABULAR" : parsePath(window.location.pathname).dimensionViewType
     $("#dashboard-output-nav a[view='" + view + "' ]").closest("li").addClass("uk-active")
 
-    //Allow user to switch dimension displayed on the dropdown
-    $("#view-dimension-selector .section-selector").on("change", function(){
-        $(".section-wrapper").hide()
-        $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show()
-    })
-
-    //Allow user to switch metric displayed on the dropdown
-    $("#view-metric-selector .metric-section-selector").on("change", function(){
-        $(".metric-section-wrapper").hide()
-        $(".metric-section-wrapper[rel = '" +  $(".metric-section-selector").val() + "' ]").show()
-    })
-
-    //Cumulative checkbox
-    $("#funnel-cumulative").click(function() {
-        $(".hourly-values").toggleClass("hidden")
-        $(".cumulative-values").toggleClass("hidden")
-    })
-
+    /* --- Configform related event listeners  --- */
 
 
     //If filters applied link is clicked remove it's value/s from the URI
@@ -51,7 +38,33 @@ $(document).ready(function() {
         })
     })
 
-    $(".time-input-form-submit").click(function(event) {
+    //Allow user to switch dimension displayed on the dropdown
+    $("#view-dimension-selector .section-selector").on("change", function(){
+        $(".section-wrapper").hide()
+        $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show()
+    })
+
+    //Allow user to switch metric displayed on the dropdown
+    $("#view-metric-selector.metric-section-selector").on("change", function(){
+        $(".metric-section-wrapper").hide()
+        $(".metric-section-wrapper[rel = '" +  $(".metric-section-selector").val() + "' ]").show()
+    })
+
+    //Cumulative checkbox
+    $("#funnel-cumulative").click(function() {
+        $(".hourly-values").toggleClass("hidden")
+        $(".cumulative-values").toggleClass("hidden")
+    })
+
+
+    $('.panel-dimension-option , #time-input-comparison-size , #time-input-form-current-date').change(enableFormSubmit)
+
+    function enableFormSubmit(){
+        document.getElementById('time-input-form-submit').disabled = false
+    }
+
+
+    $("#time-input-form-submit").click(function(event) {
 
         event.preventDefault()
 
@@ -152,6 +165,9 @@ $(document).ready(function() {
     });
 
 
+    /* --- Load values from the URI --- */
+
+
     //Load existing date selection
     var path = parsePath(window.location.pathname)
     var currentDateTime = moment(parseInt(path.currentMillis))
@@ -169,6 +185,8 @@ $(document).ready(function() {
 
             $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").trigger("click")
         }
+
+        $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit)
 
         // May have applied moving average as well
         /*var firstArg = metricFunctionObj.args[0]
@@ -190,11 +208,16 @@ $(document).ready(function() {
         $.each(metricFunctionObj.args, function(i, arg) {
              metrics.push(arg.replace(/'/g, ""))
         })
+
+        var optionsHTML = []
         for(var i= 0, len = metrics.length; i< len; i++){
 
             $(".panel-metric[ value = " + metrics[i] + "]").attr("checked", "checked")
+            optionsHTML.push("<option value='" + metrics[i] + "'>" + metrics[i] + "</option>") 
         }
-
+        if($("#view-metric-selector").length > 0){
+            document.getElementById("view-metric-selector").innerHTML = optionsHTML.join('')
+        }
         //Set the comparison size to WoW / Wo2W / Wo4W based on the URI currentmillis - baselinemillis
         if($("#time-input-comparison-size").length > 0 ){
             var path = parsePath(window.location.pathname)
@@ -209,7 +232,7 @@ $(document).ready(function() {
         }
     }
 
-    //Set selected dimesnion query selectors
+    //Set selected dimension query selectors
     var queryParams = parseDimensionValuesAry(window.location.search)
   
     if(queryParams.length > 0) {
@@ -247,7 +270,6 @@ $(document).ready(function() {
         $("#time-input-metrics-panel").toggleClass("hidden")
     })
 
-
     //Set default dimension view on Timeseries and the default metric view on Heatmap
     window.onload = load
     function load() {
@@ -256,4 +278,8 @@ $(document).ready(function() {
         window.setTimeout(function(){$(".metric-section-selector").trigger("change")}, 2000)
         window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
     }
+
+
+
+
 })
