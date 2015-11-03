@@ -15,17 +15,14 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import java.io.File;
-
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.helix.manager.zk.ZkClient;
-import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
+import java.io.File;
+import org.apache.commons.configuration.ConfigurationException;
+import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,10 +48,6 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
-  @Option(name = "-tenantIsolation", required = false, metaVar = "<String>",
-      usage = "Set this to false if you want to create tenants and allow tenant based isolation")
-  private boolean _tenantIsolation = false;
-
   @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
       usage = "Controller Starter config file",
       forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
@@ -63,6 +56,9 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
   private boolean _help = false;
+
+  // This can be set via the set method, or via config file input.
+  private boolean _tenantIsolation = true;
 
   @Override
   public boolean getHelp() {
