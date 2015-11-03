@@ -3,41 +3,53 @@
     <#list dimensionView.view.dimensions as dimension>
         <#assign dimTable=dimensionView.view.dimensionTables[dimension]>
         <#list dimensionView.view.metrics as metric>
-            <div class="metric-section-wrapper" rel="totalFlows">
-                <table id='contributors-view-metric_0' class="contributors-table" cell-spacing="0" width="100%">
+            <div class="metric-section-wrapper" rel="${metric}">
+                <table id='contributors-view-${metric}' class="contributors-table" cell-spacing="0" width="100%">
     
                     <thead>
                     </thead>
                     <tbody>
-                    <!-- First time row-->
-                    <@timeRow cells=dimTableTotalRow.rows/>
+                        <!-- First time row-->
+                        <@timeRow cells=dimTableTotalRow.rows/>
 
-                    <@tableRowTotal cells=dimTableTotalRow.rows metric_index=metric_index class=""/>
-                    <@tableRowTotal cells=dimTableTotalRow.cumulativeRows metric_index=metric_index class="cumulative hidden"/>
-                    <!-- Divider row -->
-                    <tr class="divider-row">
-                        <td>${metric}</td>
-                        <td></td>
-                        <td></td>
-                        <#list 0..(dimTableTotalRow.rows?size) as x>
+                        <@tableRowTotal cells=dimTableTotalRow.rows metric_index=metric_index class=""/>
+                        <@tableRowTotal cells=dimTableTotalRow.cumulativeRows metric_index=metric_index class="cumulative hidden"/>
+                        <!-- Divider row -->
+                        <tr class="divider-row">
+                            <td>${metric}</td>
                             <td></td>
+                            <td></td>
+                            <#list 0..(dimTableTotalRow.rows?size) as x>
+                                <td></td>
+                            </#list>
+                        </tr>
+
+                        <!-- Second time row -->
+                        <@timeRow cells=dimTableTotalRow.rows/>
+
+                        <#list dimTable?keys as dimensionValue>
+                            <#assign dimensionDisplay = dimensionAliases[dimension]!dimension>
+                            
+                            <!-- hourly values -->
+                            <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=dimTable[dimensionValue].rows metric_index=metric_index class="hourly-values"/>
+                            
+                            <#-- normal + cumulative rows are currently interweaved. If they need to be separated, add a second list loop-->
+                            <!-- cumulative values -->
+                            <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=dimTable[dimensionValue].cumulativeRows metric_index=metric_index class="cumulative-values hidden"/>
                         </#list>
-                    </tr>
-
-                    <!-- Second time row -->
-                    <@timeRow cells=dimTableTotalRow.rows/>
-
-                    <#list dimTable?keys as dimensionValue>
-                        <#assign dimensionDisplay = dimensionAliases[dimension]!dimension>
-                        
-                        <!-- hourly values -->
-                        <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=dimTable[dimensionValue].rows metric_index=metric_index class="hourly-values"/>
-                        
-                        <#-- normal + cumulative rows are currently interweaved. If they need to be separated, add a second list loop-->
-                        <!-- cumulative values -->
-                        <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=dimTable[dimensionValue].cumulativeRows metric_index=metric_index class="cumulative-values hidden"/>
-                    </#list>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th>Total:</th>
+                            <th></th>
+                            <th></th>
+                            <#list 0..(dimTableTotalRow.rows?size) as columnIndex>
+                                <th></th>
+                            </#list>
+                        </tr>
+                    </tfoot>
                 </table>
+
             </div>
             <br/>
         </#list>
