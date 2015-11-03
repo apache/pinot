@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.dashboard.resources.CollectionConfigResource;
+import com.linkedin.thirdeye.dashboard.resources.ContributorDataProvider;
 import com.linkedin.thirdeye.dashboard.resources.CustomDashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
@@ -86,10 +87,14 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
         config.getServerUri(), dataCache, queryCache, environment.getObjectMapper());
     environment.jersey().register(dashboardConfigResource);
 
+    ContributorDataProvider contributorResource = new ContributorDataProvider(config.getServerUri(),
+        queryCache, environment.getObjectMapper());
+    environment.jersey().register(contributorResource);
+
     environment.jersey()
         .register(new DashboardResource(config.getServerUri(), dataCache,
             config.getFeedbackEmailAddress(), queryCache, environment.getObjectMapper(),
-            customDashboardResource, configCache, funnelsResource));
+            customDashboardResource, configCache, funnelsResource, contributorResource));
 
     environment.jersey().register(new FlotTimeSeriesResource(config.getServerUri(), dataCache,
         queryCache, environment.getObjectMapper(), configCache, config.getAnomalyDatabaseConfig()));

@@ -12,7 +12,6 @@ import javax.ws.rs.core.MultivaluedMap;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,21 +125,12 @@ public class FunnelsDataProvider {
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
     // them
 
-    // get current start and end time
-    DateTime currentInput = new DateTime(currentMillis, DateTimeZone.UTC);
-
     // TODO hardcoded to PDT. This should convert to the client's timezone.
-    currentInput = currentInput.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
-    DateTime currentStart = new DateTime(currentInput.getYear(), currentInput.getMonthOfYear(),
-        currentInput.getDayOfMonth(), 0, 0);
+    DateTime currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
     DateTime currentEnd = currentStart.plus(intraPeriod);
 
     // get baseline start and end
-    DateTime baselineInput = new DateTime(baselineMillis, DateTimeZone.UTC);
-    // TODO hardcoded to PDT. This should convert to the client's timezone.
-    currentInput = currentInput.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
-    DateTime baselineStart = new DateTime(baselineInput.getYear(), baselineInput.getMonthOfYear(),
-        baselineInput.getDayOfMonth(), 0, 0);
+    DateTime baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
     DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
     List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
@@ -175,7 +165,7 @@ public class FunnelsDataProvider {
     long baselineOffsetMillis = currentEnd.getMillis() - baselineEnd.getMillis();
     // Compose result
     List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
-        currentEnd.getMillis(), baselineOffsetMillis, intraPeriod);
+        currentStart.getMillis(), baselineOffsetMillis, intraPeriod);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();
@@ -224,8 +214,9 @@ public class FunnelsDataProvider {
     List<MetricDataRow> filteredCumulativeTable =
         ViewUtils.computeCumulativeRows(filteredTable, metricCount);
 
-    return new FunnelTable(spec, filteredTable, filteredCumulativeTable, currentInput,
-        baselineInput);
+    // dates rendered on view still assume UTC return times.
+    return new FunnelTable(spec, filteredTable, filteredCumulativeTable, currentStart,
+        baselineStart);
   }
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out

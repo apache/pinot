@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import javax.ws.rs.GET;
@@ -45,12 +44,12 @@ import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.DashboardStartView;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.DimensionView;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewFunnel;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewHeatMap;
-import com.linkedin.thirdeye.dashboard.views.DimensionViewMultiTimeSeries;
 import com.linkedin.thirdeye.dashboard.views.ExceptionView;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 import com.linkedin.thirdeye.dashboard.views.LandingView;
@@ -63,11 +62,7 @@ import io.dropwizard.views.View;
 @Produces(MediaType.TEXT_HTML)
 public class DashboardResource {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
-  private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
-  private static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
-  private static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
-
+  static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
   private static final String DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION = "AGGREGATE_1_HOURS(%s)";
   private static final double DIMENSION_VALUES_OPTIONS_THRESHOLD = 0.01;
   private static final int DIMENSION_VALUES_LIMIT = 25;
@@ -83,13 +78,14 @@ public class DashboardResource {
   private final ObjectMapper objectMapper;
   private final CustomDashboardResource customDashboardResource;
   private final FunnelsDataProvider funnelResource;
+  private final ContributorDataProvider contributorResource;
 
   private final ConfigCache configCache;
 
   public DashboardResource(String serverUri, DataCache dataCache, String feedbackEmailAddress,
       QueryCache queryCache, ObjectMapper objectMapper,
       CustomDashboardResource customDashboardResource, ConfigCache configCache,
-      FunnelsDataProvider funnelResource) {
+      FunnelsDataProvider funnelResource, ContributorDataProvider contributorResource) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
@@ -98,6 +94,7 @@ public class DashboardResource {
     this.feedbackEmailAddress = feedbackEmailAddress;
     this.configCache = configCache;
     this.funnelResource = funnelResource;
+    this.contributorResource = contributorResource;
   }
 
   @GET
@@ -334,10 +331,11 @@ public class DashboardResource {
 
     // Dimension view
     switch (dimensionViewType) {
+    case CONTRIBUTOR:
     case MULTI_TIME_SERIES:
-      // determine time series dimensions to asynchronously query.
-      // note: this order isn't sorted alphabetically...
-      return new DimensionViewMultiTimeSeries(schema.getDimensions());
+      return contributorResource.generateDimensionContributorView(collection, metricFunction,
+          selectedDimensions, uriInfo, schema, baseline, current, reverseDimensionGroups);
+
     case HEAT_MAP:
 
       Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
@@ -375,31 +373,12 @@ public class DashboardResource {
     case TABULAR:
       List<FunnelTable> funnelTables =
           funnelResource.computeFunnelViews(collection, metricFunction, funnels, baselineMillis,
-              currentMillis, getIntraPeriod(metricFunction), selectedDimensions);
+              currentMillis, ViewUtils.getIntraPeriod(metricFunction), selectedDimensions);
       return new DimensionViewFunnel(funnelTables);
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }
 
-  }
-
-  /**
-   * Determines intra period (day/week/month) based on outermost metric function.
-   * @param metricFunction
-   * @return
-   * @throws NumberFormatException
-   */
-  private long getIntraPeriod(String metricFunction) throws NumberFormatException {
-    String timeUnit = metricFunction.split("_")[2];
-    int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
-
-    long intraPeriod = INTRA_DAY_PERIOD;
-    if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
-      intraPeriod = INTRA_WEEK_PERIOD;
-    } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
-      intraPeriod = INTRA_MONTH_PERIOD;
-    }
-    return intraPeriod;
   }
 
   /**

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import javax.ws.rs.core.MultivaluedMap;
@@ -31,6 +32,10 @@ public class ViewUtils {
       new TypeReference<List<String>>() {
       };
   private static final Logger LOGGER = LoggerFactory.getLogger(ViewUtils.class);
+
+  private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
+  private static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+  private static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
 
   public static Map<String, String> fillDimensionValues(CollectionSchema schema,
       Map<String, String> dimensionValues) {
@@ -134,10 +139,10 @@ public class ViewUtils {
    * @param intraPeriod - difference between start and end of current time window.
    */
   public static List<MetricDataRow> extractMetricDataRows(Map<Long, Number[]> baselineData,
-      Map<Long, Number[]> currentData, long currentEndMillis, long baselineOffsetMillis,
+      Map<Long, Number[]> currentData, long currentStartMillis, long baselineOffsetMillis,
       long intraPeriod) {
 
-    long currentStartMillis = currentEndMillis - intraPeriod;
+    long currentEndMillis = currentStartMillis + intraPeriod;
 
     List<Long> sortedTimes = new ArrayList<>(currentData.keySet());
     // Reverse sorting in case currentData contains baselineData as well.
@@ -257,5 +262,35 @@ public class ViewUtils {
       }
     }
     return new ArrayList<>(path);
+  }
+
+  /**
+   * Determines intra period (day/week/month) based on outermost metric function.
+   * @param metricFunction
+   * @return
+   * @throws NumberFormatException
+   */
+  public static long getIntraPeriod(String metricFunction) throws NumberFormatException {
+    String timeUnit = metricFunction.split("_")[2];
+    int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
+
+    long intraPeriod = INTRA_DAY_PERIOD;
+    if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
+      intraPeriod = INTRA_WEEK_PERIOD;
+    } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
+      intraPeriod = INTRA_MONTH_PERIOD;
+    }
+    return intraPeriod;
+  }
+
+  /** Converts the input UTC time to start of day in Pacific Time */
+  public static DateTime standardizeToStartOfDayPT(DateTime input) {
+    input = input.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0);
+  }
+
+  /** Converts the input UTC time to start of day in Pacific Time */
+  public static DateTime standardizeToStartOfDayPT(long inputMillis) {
+    return standardizeToStartOfDayPT(new DateTime(inputMillis, DateTimeZone.UTC));
   }
 }

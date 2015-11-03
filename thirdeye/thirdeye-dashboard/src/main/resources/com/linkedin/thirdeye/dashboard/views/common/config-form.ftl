@@ -6,7 +6,7 @@
     <ul class="filters-applied" style="display: inline-block;max-width: 150px; margin-right: 15px; padding-left: 0px;">Filters Applied:
         <#list dimensions as dimensionName>
             <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
-            <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
+            <#assign dimensionValue = (selectedDimensions[dimensionName]!"*")?html>
                 <#if dimensionValue == "*">
                 <#--<span>${dimensionDisplay}:</span><br> ALL-->
                 <#elseif dimensionValue == "?">

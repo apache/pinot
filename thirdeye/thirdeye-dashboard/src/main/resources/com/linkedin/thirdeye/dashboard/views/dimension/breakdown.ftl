@@ -1,6 +1,111 @@
 <div id="dimension-contributor-area">
+    <#assign dimTableTotalRow=dimensionView.view.metricTotalTable>
+    <#list dimensionView.view.dimensions as dimension>
+        <#assign dimTable=dimensionView.view.dimensionTables[dimension]>
+        <#list dimensionView.view.metrics as metric>
+            <div class="metric-section-wrapper" rel="totalFlows">
+                <table id='contributors-view-metric_0' class="contributors-table" cell-spacing="0" width="100%">
+    
+                    <thead>
+                    </thead>
+                    <tbody>
+                    <!-- First time row-->
+                    <@timeRow cells=dimTableTotalRow.rows/>
 
-        <div class="metric-section-wrapper" rel="totalFlows">
+                    <@tableRowTotal cells=dimTableTotalRow.rows metric_index=metric_index class=""/>
+                    <@tableRowTotal cells=dimTableTotalRow.cumulativeRows metric_index=metric_index class="cumulative hidden"/>
+                    <!-- Divider row -->
+                    <tr class="divider-row">
+                        <td>${metric}</td>
+                        <td></td>
+                        <td></td>
+                        <#list 0..(dimTableTotalRow.rows?size) as x>
+                            <td></td>
+                        </#list>
+                    </tr>
+
+                    <!-- Second time row -->
+                    <@timeRow cells=dimTableTotalRow.rows/>
+
+                    <#list dimTable?keys as dimensionValue>
+                        <#assign dimensionDisplay = dimensionAliases[dimension]!dimension>
+                        
+                        <!-- hourly values -->
+                        <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=dimTable[dimensionValue].rows metric_index=metric_index class="hourly-values"/>
+                        
+                        <#-- normal + cumulative rows are currently interweaved. If they need to be separated, add a second list loop-->
+                        <!-- cumulative values -->
+                        <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=dimTable[dimensionValue].cumulativeRows metric_index=metric_index class="cumulative-values hidden"/>
+                    </#list>
+                </table>
+            </div>
+            <br/>
+        </#list>
+    </#list>
+    <#macro timeRow cells>
+       <tr>
+            <td class=""></td>
+            <td class=""></td>
+            <td class=""></td>
+            <#list cells as cell>
+            <#-- TODO properly display time in timezone-->
+                <td colspan="3">${cell.currentTime}</td>
+            </#list>
+        </tr>
+    </#macro>
+
+    <#macro tableRowTotal cells metric_index class>
+        <tr class="${class}">
+            <td class="checkbox"></td>
+            <td class="dimension"></td>
+            <td class="dimension-value"></td>
+            <#list cells as cell>
+                <@timeBucketCell cell=cell metric_index=metric_index/>
+            </#list>
+        </tr>
+    </#macro>
+    <#macro tableRow dimension dimensionValue cells metric_index class>
+        <tr class="${class}">
+            <td><input value="1" type="checkbox"></td>
+            <td class="dimension">${dimension}</td>
+            <#assign dimensionValueDisplay=dimensionValue?html>
+            <#if dimensionValue=="">
+                <#assign dimensionValueDisplay="UNKNOWN">
+            <#elseif dimensionValue=="?">
+                <#assign dimensionValueDisplay="OTHER">
+            </#if>
+            <td class="dimension-value">${dimensionValueDisplay}</td>
+            <#list cells as cell>
+                <@timeBucketCell cell=cell metric_index=metric_index/>
+            </#list>
+        </tr>
+    </#macro>
+
+    <#macro timeBucketCell cell metric_index>
+        <td>
+            <#if cell.baseline?? && cell.baseline[metric_index]??>
+                ${cell.baseline[metric_index]}
+            <#else>
+                N/A
+            </#if>
+        </td>
+        <td>
+            <#if cell.current?? && cell.current[metric_index]??>
+                ${cell.current[metric_index]}
+            <#else>
+                N/A
+            </#if>
+        </td>
+        <td>
+            <#if cell.ratio?? && cell.ratio[metric_index]??>
+                ${(cell.ratio[metric_index] * 100)?string["0.0"]}%
+            <#else>
+                N/A
+            </#if>
+        </td>
+    </#macro>
+        <#-- preserved for reference, feel free to delete if no longer needed -->
+        <div class="metric-section-wrapper hidden" rel="totalFlows">
             <table id='contributors-view-metric_0' class="contributors-table" cell-spacing="0" width="100%">
 
                 <thead>
@@ -86,8 +191,8 @@
                     <td>-5.4%</td>
                 </tr>
 
-                <!-- Devider row-->
-                <tr class="devider-row">
+                <!-- Divider row-->
+                <tr class="divider-row">
                     <!-- Metric name -->
                     <td>totalFlows</td>
                     <td></td>
