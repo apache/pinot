@@ -1,75 +1,89 @@
 <div class="title-box uk-clearfix">
-<!-- Filters Applied revamped -->
-<ul class="filters-applied" style="display: inline-block;max-width: 150px; margin-right: 15px;">Filters Applied:
-    <#list dimensions as dimensionName>
-        <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
-        <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
-            <#if dimensionValue == "*">
-            <#--<span>${dimensionDisplay}:</span><br> ALL-->
-            <#elseif dimensionValue == "?">
-                <li>
-                    <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> OTHER</a>
-                </li>
-            <#elseif dimensionValue == "">
-                <li>
-                    <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> UNKNOWN</a>
-                </li>
-            <#else>
-                <li>
-                    <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value="${dimensionValue}"><span>${dimensionDisplay}:</span> ${dimensionValue}</a>
-                </li>
-            </#if>
 
-    </#list>
-</ul>
+<ul id="current-view-settings" class="uk-display-inline-block">
+   <li>
+    <!-- Filters Applied revamped -->
+    <ul class="filters-applied" style="display: inline-block;max-width: 150px; margin-right: 15px;">Filters Applied:
+        <#list dimensions as dimensionName>
+            <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
+            <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
+                <#if dimensionValue == "*">
+                <#--<span>${dimensionDisplay}:</span><br> ALL-->
+                <#elseif dimensionValue == "?">
+                    <li>
+                        <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> OTHER</a>
+                    </li>
+                <#elseif dimensionValue == "">
+                    <li>
+                        <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> UNKNOWN</a>
+                    </li>
+                <#else>
+                    <li>
+                        <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value="${dimensionValue}"><span>${dimensionDisplay}:</span> ${dimensionValue}</a>
+                    </li>
+                </#if>
 
-
+        </#list>
+    </ul>
+   </li>
 
 <#if (dimensionView.type == "TABULAR")>
-<div class="uk-display-inline-block uk-margin-small" style="vertical-align:  top;">
-    <div data-uk-button-checkbox>
-        <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
-    </div>
-</div>
+    <li>
+        <div class="uk-display-inline-block uk-margin-small">
+            <div data-uk-button-checkbox>
+                <br>
+                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
+            </div>
+        </div>
+    </li>
 
 <#elseif (dimensionView.type == "HEAT_MAP" )>
-<div class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
-    <div  class="uk-button uk-form-select" data-uk-form-select>
-        <span>Metric</span>
-        <i class="uk-icon-caret-down"></i>
-        <select id="view-metric-selector" class="metric-section-selector">
-        </select>
-    </div>
-</div>
+    <li>
+        <div class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Metric</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-metric-selector" class="metric-section-selector">
+                </select>
+            </div>
+        </div>
+    </li>
 <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
-<div class="uk-display-inline-block uk-margin-medium">Dimension:<br>
-    <div  class="uk-button uk-form-select" data-uk-form-select>
-        <span>Dimension</span>
-        <i class="uk-icon-caret-down"></i>
-        <select id="view-dimension-selector" class="section-selector">
-            <#list dimensionView.view.dimensions as dimension>
-                <option value="${dimension}">${dimension}</option>
-            </#list>
-        </select>
-    </div>
-</div>
+    <li>
+        <div class="uk-display-inline-block uk-margin-medium">Dimension:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Dimension</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-dimension-selector" class="section-selector">
+                    <#list dimensionView.view.dimensions as dimension>
+                        <option value="${dimension}">${dimension}</option>
+                    </#list>
+                </select>
+            </div>
+        </div>
+    </li>
 
-<div class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
-    <div  class="uk-button uk-form-select" data-uk-form-select>
-        <span>Metric</span>
-        <i class="uk-icon-caret-down"></i>
-        <select id="view-metric-selector" class="metric-section-selector">
-        </select>
-    </div>
-</div>
+    <li>
+        <div class="uk-display-inline-block uk-margin-medium">Metric:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Metric</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-metric-selector" class="metric-section-selector">
+                </select>
+            </div>
+        </div>
+    </li>
 
-<div class="uk-display-inline-block uk-margin-small" style="vertical-align:middle;">
-    <div data-uk-button-checkbox>
-        <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
-    </div>
-</div>
+    <li>
+        <div class="uk-display-inline-block uk-margin-small">
+            <div data-uk-button-checkbox>
+                <br>
+                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
+            </div>
+        </div>
+    </li>
 </#if>
-
+</ul>
 
 <form class="time-input-form uk-form uk-float-right uk-form-stacked uk-clearfix">
 

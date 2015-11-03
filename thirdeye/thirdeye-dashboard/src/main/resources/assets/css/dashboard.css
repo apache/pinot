@@ -104,6 +104,12 @@ li {
     padding: 8px;
 }
 
+/* Config Form */
+#current-view-settings > li{
+    display: inline-block;
+    margin-right:10px;
+}
+
 
 
 /* Funnel Heatmap */
