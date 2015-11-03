@@ -16,6 +16,9 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -34,6 +37,8 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.restlet.data.MediaType;
@@ -85,12 +90,13 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+      final String active = getReference().getQueryAsForm().getValues("active");
 
       if ((tableName == null) && (segmentName == null)) {
         return getAllSegments();
 
       } else if ((tableName != null) && (segmentName == null)) {
-        return getSegmentsForTable(tableName);
+        return getSegmentsForTable(tableName, !"false".equalsIgnoreCase(active));
       }
 
       presentation = getSegmentFile(tableName, segmentName);
@@ -133,21 +139,36 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
   })
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
-      String tableName) {
+      String tableName,
+      @Parameter(name = "active", in = "query", description = "true = show active segments (in Helix), false = all segments (on filesystem)", required = false)
+      boolean activeOnly
+      ) {
     Representation presentation;
     final JSONArray ret = new JSONArray();
-    File tableDir = new File(baseDataDir, tableName);
 
-    if (tableDir.exists()) {
-      for (final File file : tableDir.listFiles()) {
-        final String url =
-            "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
-                + tableName + "/" + file.getName();
-        ret.put(url);
+    if(activeOnly) {
+      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+
+      for (String segmentName : segmentList) {
+        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
+        ret.put(offlineSegmentZKMetadata.getDownloadUrl());
       }
     } else {
-      LOGGER.error("Error: Table {} not found.", tableName);
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      File tableDir = new File(baseDataDir, tableName);
+
+      if (tableDir.exists()) {
+        for (final File file : tableDir.listFiles()) {
+          final String url = "http://" + StringUtil
+              .join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/" + tableName + "/" + file.getName();
+          ret.put(url);
+        }
+      } else {
+        LOGGER.error("Error: Table {} not found.", tableName);
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      }
     }
 
     presentation = new StringRepresentation(ret.toString());
@@ -165,9 +186,14 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     Representation presentation;
     final JSONArray ret = new JSONArray();
     for (final File file : baseDataDir.listFiles()) {
+      final String fileName = file.getName();
+      if (fileName.equalsIgnoreCase("fileUploadTemp") || fileName.equalsIgnoreCase("schemasTemp")) {
+        continue;
+      }
+
       final String url =
           "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
-              + file.getName();
+              + fileName;
       ret.put(url);
     }
     presentation = new StringRepresentation(ret.toString());
