@@ -57,8 +57,18 @@ $(document).ready(function() {
     })
 
 
-    $('.panel-dimension-option , #time-input-comparison-size , #time-input-form-current-date').change(enableFormSubmit)
+    //Toggle Time inputfield based on hourly / daily granularity
+    $("#time-input-form-gran-hours").click(function(){
+        $("label, input, div",'#config-form-time-picker-box').animate({
+        'width':'184px'}, 200, function(){$("label, input, i, div",'#config-form-time-picker-box').show()})
+    })
+    $("#time-input-form-gran-days").click(function(){
+        $("label, input, div",'#config-form-time-picker-box').animate({
+            'display': 'none'},500, function(){$("label, input, i, div",'#config-form-time-picker-box').hide()})
+    })
 
+    //When any form field has changed enable Go (submit) button
+    $('.panel-dimension-option , #time-input-comparison-size , #time-input-form-current-date, #time-input-form-current-time' ).change(enableFormSubmit)
     function enableFormSubmit(){
         document.getElementById('time-input-form-submit').disabled = false
     }
@@ -87,10 +97,13 @@ $(document).ready(function() {
         // Date input field validation
         var date = $("#time-input-form-current-date").val()
         if (!date) {
-            errorMessage.html("Must provide current date")
+            errorMessage.html("Must provide end date")
             errorAlert.fadeIn(100)
             return
         }
+
+        // Time - if time inputfield present take it's value or send error message if no time selected  otherwise
+         var time = ($("#time-input-form-current-time").css('display') == 'none') ?  "00:00" : $("#time-input-form-current-time").val()
 
         //Baseline aggregate checkbox validation
         if ($(".baseline-aggregate.uk-active").length == 0 ) {
@@ -107,11 +120,22 @@ $(document).ready(function() {
         var aggregateUnit = $(".baseline-aggregate.uk-active").attr("unit")
 
         // Date
-        var current = moment.tz(date, timezone)
+        var current = moment.tz(date + " " + time, timezone)
         //Baseline is the user selected baseline or 1 week prior to current
         var baseline =  moment(current.valueOf() - $("#time-input-comparison-size").val() * 86400000)
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
+
+
+        // Derived metric(s) todo: take the derived metrics from the URI instead of the sidenav
+        $("#sidenav-derived-metrics-list").find(".uk-form-row").each(function(i, row) {
+            var type = $(row).find(".derived-metric-type").find(":selected").val()
+            var args = []
+            $(row).find(".derived-metric-arg").each(function(j, arg) {
+                args.push("'" + $(arg).find(":selected").val() + "'")
+            })
+            metrics.push(type + '(' + args.join(',') + ')')
+        });
 
         // Moving average
         /*if ($("#time-input-moving-average-size").length > 0 && $("#time-input-moving-average-size").val() != "") {
@@ -168,11 +192,20 @@ $(document).ready(function() {
     /* --- Load values from the URI --- */
 
 
-    //Load existing date selection
+    // Load existing date / time
+    var path = parsePath(window.location.pathname)
+    if (path.currentMillis) {
+        var currentDateTime = moment(parseInt(path.currentMillis))
+        var dateString = currentDateTime.format("YYYY-MM-DD")
+        var timeString = currentDateTime.format("HH:mm")
+        $("#time-input-form-current-date").val(dateString)
+        $("#time-input-form-current-time").val(timeString)
+    }
+   /* //Load existing date selection
     var path = parsePath(window.location.pathname)
     var currentDateTime = moment(parseInt(path.currentMillis))
     var currentDateString = currentDateTime.format("YYYY-MM-DD")
-    $("#time-input-form-current-date").val(currentDateString)
+    $("#time-input-form-current-date").val(currentDateString)*/
 
     // Load existing metrics selection / function
     if (path.metricFunction) {
@@ -180,12 +213,10 @@ $(document).ready(function() {
 
         // Always start at AGGREGATE
         var tokens = metricFunctionObj.name.split("_")
-
         if($(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").length > 0){
-
             $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").trigger("click")
         }
-
+        //When baseline-aggregate after the initial change on load enable Go (submit) button
         $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit)
 
         // May have applied moving average as well
@@ -202,18 +233,24 @@ $(document).ready(function() {
             }
         }*/
 
-        // Rest are metrics
-        var metrics = []
+        // Rest are metrics (primitive and derived)
+        var primitiveMetrics = []
+        var derivedMetrics = []
 
         $.each(metricFunctionObj.args, function(i, arg) {
-             metrics.push(arg.replace(/'/g, ""))
+            if (typeof(arg) === 'string') {
+               primitiveMetrics.push(arg.replace(/'/g, ""))
+           }else{
+               derivedMetrics.push(arg)
+           }
         })
 
+        // Rest can be assumed to be plain args or derived metrics
         var optionsHTML = []
-        for(var i= 0, len = metrics.length; i< len; i++){
+        for(var i= 0, len = primitiveMetrics.length; i< len; i++){
 
-            $(".panel-metric[ value = " + metrics[i] + "]").attr("checked", "checked")
-            optionsHTML.push("<option value='" + metrics[i] + "'>" + metrics[i] + "</option>") 
+            $(".panel-metric[ value = " + primitiveMetrics[i] + "]").attr("checked", "checked")
+            optionsHTML.push("<option value='" + primitiveMetrics[i] + "'>" + primitiveMetrics[i] + "</option>")
         }
         if($("#view-metric-selector").length > 0){
             document.getElementById("view-metric-selector").innerHTML = optionsHTML.join('')

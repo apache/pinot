@@ -3,7 +3,7 @@
 <ul id="current-view-settings" class="uk-display-inline-block">
    <li>
     <!-- Filters Applied revamped -->
-    <ul class="filters-applied" style="display: inline-block;max-width: 150px; margin-right: 15px;">Filters Applied:
+    <ul class="filters-applied" style="display: inline-block;max-width: 150px; margin-right: 15px; padding-left: 0px;">Filters Applied:
         <#list dimensions as dimensionName>
             <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
             <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
@@ -156,14 +156,22 @@
                 <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
             </div>
         </div>
-
+        <div id="config-form-time-picker-box" class="uk-display-inline-block">
+            <label class="uk-form-label">
+                End Time
+            </label>
+            <div class="uk-form-icon" >
+                <i class="uk-icon-clock-o"></i>
+                <input id="time-input-form-current-time" type="text" data-uk-timepicker>
+            </div>
+        </div>
         <div class="uk-display-inline-block">
             <label class="uk-form-label">
                 Granularity
             </label>
             <div  class="uk-button-group" data-uk-button-radio>
-                <button type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >HOUR</button>
-                <button type="button" class="baseline-aggregate uk-button uk-active" unit="DAYS" value="86400000" >DAY</button>
+                <button id="time-input-form-gran-hours" type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >HOUR</button>
+                <button id="time-input-form-gran-days" type="button" class="baseline-aggregate uk-button uk-active" unit="DAYS" value="86400000" >DAY</button>
             </div>
         </div>
 
