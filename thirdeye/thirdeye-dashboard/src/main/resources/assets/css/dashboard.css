@@ -105,6 +105,10 @@ li {
 }
 
 /* Config Form */
+#current-view-settings{
+   padding-left: 0px;
+}
+
 #current-view-settings > li{
     display: inline-block;
     margin-right:10px;

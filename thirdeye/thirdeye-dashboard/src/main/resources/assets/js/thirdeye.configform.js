@@ -64,7 +64,7 @@ $(document).ready(function() {
     })
     $("#time-input-form-gran-days").click(function(){
         $("label, input, div",'#config-form-time-picker-box').animate({
-            'display': 'none'},500, function(){$("label, input, i, div",'#config-form-time-picker-box').hide()})
+            'display': 'none'},200, function(){$("label, input, i, div",'#config-form-time-picker-box').hide()})
     })
 
     //When any form field has changed enable Go (submit) button

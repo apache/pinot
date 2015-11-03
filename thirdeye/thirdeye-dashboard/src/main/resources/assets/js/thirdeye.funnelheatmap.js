@@ -59,37 +59,39 @@ $(document).ready(function() {
     })
 
 
-    //Create funnel table header tooltip displaying the base metrics of the derived metric
-    var path = parsePath(window.location.pathname)
-
     //Clicking the time cell will set current time in the URI to the selected time
     //$(".funnel-table-time").each(renderTimeCell)
 
-    //Clicking heat-map-cell should fix the related metrics in the URI and set the current time to the related hour
+    //Clicking heat-map-cell should fix the related metrics and the derived metric of them in the URI and set the current time to the related hour
     $("#custom-funnel-section").on("click", " .heat-map-cell", function(){
         var  columnIndex = $(this).parent().children().index($(this)) /3 + 1 ;
         var currentUTC = $("td:first-child", $(this).closest("tr")).attr("currentUTC")
-
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
         var baseMetrics = $("tr:first-child th:nth-child(" + columnIndex + ")", $(this).closest("table")).attr("title")
         var metrics = []
+        //If the metric is a derived metric ie. ratio of 2 primitive metrics the metricfunction should contain the 2 metrics and the ratio
         if(baseMetrics.indexOf("RATIO") >= 0){
-            var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
+           var ratioToURI = []
+           var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
            for(var i = 0, len = metricNames.length; i < len;i++){
                var metric = metricNames[i]
                metrics.push("'" + metric + "'")
+               ratioToURI.push("'" + metric + "'")
            }
+            ratioToURI = "RATIO(" + ratioToURI + ")"
+            metrics.push( ratioToURI )
         }else{
             metrics.push("'" + baseMetrics + "'")
         }
-
 
 
         // Metric function
         var metricFunction = metrics.join(",")
         var path = parsePath(window.location.pathname)
         var firstindex = path.metricFunction.indexOf("'");
-        var lastindex = path.metricFunction.lastIndexOf("'");
+        //If the previous metric function contained RATIO we assume, that is in the last place in the metric list and will cut out the closing ")" of the RATIO() from the path
+        var lastindex = path.metricFunction.indexOf("RATIO")? path.metricFunction.lastIndexOf("'") + 1 : path.metricFunction.lastIndexOf("'");
+        //Change the metric names in the metric function
         var previousMetricFunction = path.metricFunction
         var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
 
@@ -127,12 +129,17 @@ $(document).ready(function() {
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
         var baseMetrics = $(this).attr("title")
         var metrics = []
+        //If the metric is a derived metric ie. ratio of 2 primitive metrics the metricfunction should contain the 2 metrics and the ratio
         if(baseMetrics.indexOf("RATIO") >= 0){
+            var ratioToURI = []
             var metricNames = (baseMetrics.substring(6, baseMetrics.length - 1).split(","))
             for(var i = 0, len = metricNames.length; i < len;i++){
                 var metric = metricNames[i]
                 metrics.push("'" + metric + "'")
+                ratioToURI.push("'" + metric + "'")
             }
+            ratioToURI = "RATIO(" + ratioToURI + ")"
+            metrics.push( ratioToURI )
         }else{
             metrics.push("'" + baseMetrics + "'")
         }
@@ -141,7 +148,8 @@ $(document).ready(function() {
         var path = parsePath(window.location.pathname)
 
         var firstindex = path.metricFunction.indexOf("'");
-        var lastindex = path.metricFunction.lastIndexOf("'");
+        //If the previous metric fnction contained RATIO we assume, that was the last element and will cut out the closing ")" of that from the path
+        var lastindex = path.metricFunction.indexOf("RATIO")? path.metricFunction.lastIndexOf("'") + 1 : path.metricFunction.lastIndexOf("'");
         var previousMetricFunction = path.metricFunction
         var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
         path.metricFunction = newMetricFunction
@@ -167,8 +175,5 @@ $(document).ready(function() {
         }
         window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
     })
-
-
-
 
 });
