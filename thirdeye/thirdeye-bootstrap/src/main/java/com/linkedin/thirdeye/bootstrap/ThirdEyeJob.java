@@ -303,18 +303,13 @@ public class ThirdEyeJob {
           throws Exception {
         Properties config = new Properties();
 
-        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_SCHEMA_PATH.toString(),
-            getSchemaPath(root, collection));
-
         config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_CONFIG_PATH.toString(),
             getConfigPath(root, collection));
 
-        boolean skipMissing = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SKIP_MISSING.getName(), DEFAULT_SKIP_MISSING));
-        if (skipMissing) {
-          inputPaths = getFilteredInputPaths(inputPaths);
-        }
+        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_INPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+            + AGGREGATION.getName());
 
-        config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_INPUT_PATH.toString(), inputPaths);
         config.setProperty(TopKRollupPhaseOneConstants.TOPK_ROLLUP_PHASE1_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + TOPK_ROLLUP_PHASE1.getName());

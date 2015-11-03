@@ -103,11 +103,13 @@ public class TopKRollupPhaseTwoJob extends Configured {
       phase1KeyWrapper = TopKRollupPhaseOneMapOutputKey.fromBytes(key.getBytes());
       String dimensionName = phase1KeyWrapper.getDimensionName();
       String dimensionValue = phase1KeyWrapper.getDimensionValue();
+      LOGGER.info("Dim name {} value {}", dimensionName, dimensionValue);
 
       MetricTimeSeries series = MetricTimeSeries.fromBytes(value.getBytes(), metricSchema);
       TopKRollupPhaseTwoMapOutputValue valueWrapper = new TopKRollupPhaseTwoMapOutputValue(dimensionValue, series);
 
-      byte[] keyBytes = dimensionName.getBytes();
+      TopKRollupPhaseTwoMapOutputKey phase2Key = new TopKRollupPhaseTwoMapOutputKey(dimensionName);
+      byte[] keyBytes = phase2Key.toBytes();
       keyWritable.set(keyBytes, 0, keyBytes.length);
 
       byte[] valueBytes = valueWrapper.toBytes();

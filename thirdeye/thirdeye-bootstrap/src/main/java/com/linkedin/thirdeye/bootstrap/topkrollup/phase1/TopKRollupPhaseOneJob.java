@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 import org.apache.avro.Schema;
@@ -28,6 +29,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
@@ -75,7 +77,7 @@ public class TopKRollupPhaseOneJob extends Configured {
 
 
   public static class TopKRollupPhaseOneMapper extends
-    Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+    Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private TopKRollupPhaseOneConfig config;
     StarTreeConfig starTreeConfig;
     private List<String> dimensionNames;
@@ -107,13 +109,11 @@ public class TopKRollupPhaseOneJob extends Configured {
     }
 
     @Override
-    public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
+    public void map(BytesWritable dimensionKeyBytes, BytesWritable aggSeries, Context context)
         throws IOException, InterruptedException {
 
-      StarTreeRecord starTreeRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
-      DimensionKey dimensionKey = starTreeRecord.getDimensionKey();
+      DimensionKey dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
       String[] dimensionValues = dimensionKey.getDimensionValues();
-      MetricTimeSeries series = starTreeRecord.getMetricTimeSeries();
 
       for (String dimensionName : config.getDimensionNames()) {
 
@@ -124,9 +124,7 @@ public class TopKRollupPhaseOneJob extends Configured {
         byte[] keyBytes = keyWrapper.toBytes();
         keyWritable.set(keyBytes, 0, keyBytes.length);
 
-        valWritable.set(series.toBytes(), 0, series.toBytes().length);
-
-        context.write(keyWritable, valWritable);
+        context.write(keyWritable, aggSeries);
       }
     }
 
@@ -182,7 +180,7 @@ public class TopKRollupPhaseOneJob extends Configured {
         Context context) throws IOException, InterruptedException {
 
       TopKRollupPhaseOneMapOutputKey wrapper = TopKRollupPhaseOneMapOutputKey.fromBytes(topkRollupKey.getBytes());
-      LOGGER.info("DimensionName {} DimensionValue {}", wrapper.dimensionName, wrapper.dimensionValue);
+      LOGGER.info("DimensionName {} DimensionValue {}", wrapper.getDimensionName(), wrapper.getDimensionValue());
 
       MetricTimeSeries aggregateSeries = new MetricTimeSeries(metricSchema);
       for (BytesWritable writable : timeSeriesIterable) {
@@ -219,9 +217,8 @@ public class TopKRollupPhaseOneJob extends Configured {
 
       if (aboveThreshold) {
         LOGGER.info("Passed threshold");
-        keyWritable.set(topkRollupKey);
         valWritable.set(aggregateSeries.toBytes(), 0, aggregateSeries.toBytes().length);
-        context.write(keyWritable, valWritable);
+        context.write(topkRollupKey, valWritable);
       }
     }
 
@@ -236,17 +233,9 @@ public class TopKRollupPhaseOneJob extends Configured {
     job.setJobName(name);
     job.setJarByClass(TopKRollupPhaseOneJob.class);
 
-    FileSystem fs = FileSystem.get(getConf());
-    // Avro schema
-    Schema schema =
-        new Schema.Parser().parse(fs.open(new Path(
-            getAndCheck(TOPK_ROLLUP_PHASE1_SCHEMA_PATH.toString()))));
-    LOGGER.info("{}", schema);
-
     // Map config
     job.setMapperClass(TopKRollupPhaseOneMapper.class);
-    AvroJob.setInputKeySchema(job, schema);
-    job.setInputFormatClass(AvroKeyInputFormat.class);
+    job.setInputFormatClass(SequenceFileInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
 
