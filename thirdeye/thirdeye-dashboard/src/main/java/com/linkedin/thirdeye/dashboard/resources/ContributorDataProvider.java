@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -216,6 +217,9 @@ public class ContributorDataProvider {
    */
   private Map<Long, Number[]> convertTimestamps(Map<String, Number[]> values)
       throws NumberFormatException {
+    if (values == null) {
+      return Collections.emptyMap();
+    }
     Map<Long, Number[]> convertedBaselineRows = new HashMap<>();
     for (Entry<String, Number[]> timeEntry : values.entrySet()) {
       String timestamp = timeEntry.getKey();
