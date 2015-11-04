@@ -79,13 +79,15 @@ public class DashboardResource {
   private final CustomDashboardResource customDashboardResource;
   private final FunnelsDataProvider funnelResource;
   private final ContributorDataProvider contributorResource;
+  private final DashboardConfigResource dashboardConfigResource;
 
   private final ConfigCache configCache;
 
   public DashboardResource(String serverUri, DataCache dataCache, String feedbackEmailAddress,
       QueryCache queryCache, ObjectMapper objectMapper,
       CustomDashboardResource customDashboardResource, ConfigCache configCache,
-      FunnelsDataProvider funnelResource, ContributorDataProvider contributorResource) {
+      FunnelsDataProvider funnelResource, ContributorDataProvider contributorResource,
+      DashboardConfigResource dashboardConfigResource) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
@@ -95,6 +97,7 @@ public class DashboardResource {
     this.configCache = configCache;
     this.funnelResource = funnelResource;
     this.contributorResource = contributorResource;
+    this.dashboardConfigResource = dashboardConfigResource;
   }
 
   @GET
@@ -284,7 +287,7 @@ public class DashboardResource {
           baselineMillis, currentMillis, selectedDimensions, selectedFunnels, uriInfo);
 
       Map<String, Collection<String>> dimensionValueOptions =
-          retrieveDimensionValues(collection, baselineMillis, currentMillis);
+          dashboardConfigResource.getDimensionValues(collection, baselineMillis, currentMillis);
 
       return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
           selectedDimensions, new DateTime(baselineMillis), new DateTime(currentMillis),
@@ -379,93 +382,5 @@ public class DashboardResource {
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);
     }
 
-  }
-
-  /**
-   * Returns a map of dimensions -> list of observed dimension values in the given time
-   * window, sorted in decreasing order of overall contribution. Any items not meeting a
-   * contribution threshold of {@value #DIMENSION_VALUES_OPTIONS_THRESHOLD} are omitted, and a
-   * maximum of {@value #DIMENSION_VALUES_LIMIT} results are returned for any given dimension.
-   */
-  @Deprecated
-  private Map<String, Collection<String>> retrieveDimensionValues(String collection,
-      long baselineMillis, long currentMillis) throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    DateTime baseline = new DateTime(baselineMillis);
-    DateTime current = new DateTime(currentMillis);
-
-    String firstMetric = schema.getMetrics().get(0);
-    String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION, firstMetric);
-    // query w/ group by for each dimension.
-    List<String> dimensions = schema.getDimensions();
-    MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
-    Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
-    for (String dimension : schema.getDimensions()) {
-      // Generate SQL
-      dimensionValues.put(dimension, Arrays.asList("!"));
-      String sql =
-          SqlUtils.getSql(dummyFunction, collection, baseline, current, dimensionValues, null);
-      LOGGER.info("Generated SQL for dimension retrieval {}: {}", serverUri, sql);
-      dimensionValues.remove(dimension);
-
-      // Query (in parallel)
-      resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
-    }
-
-    Map<String, Collection<String>> collectedDimensionValues = new HashMap<>();
-    // Wait for all queries and generate the ordered list from the result.
-    for (int i = 0; i < dimensions.size(); i++) {
-      String dimension = dimensions.get(i);
-      QueryResult queryResult = resultFutures.get(dimension).get();
-
-      // Sum up hourly data over entire dataset for each dimension combination
-      double total = 0.0;
-      Map<String, Number> summedValues = new HashMap<>();
-
-      for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
-        double sum = 0.0;
-        for (Map.Entry<String, Number[]> hourlyEntry : entry.getValue().entrySet()) {
-          double value = hourlyEntry.getValue()[0].doubleValue();
-          sum += value;
-        }
-        summedValues.put(entry.getKey(), sum);
-        total += sum;
-      }
-
-      // compare by value ascending (want poll to remove smallest element)
-      PriorityQueue<Pair<String, Double>> topNValues =
-          new PriorityQueue<>(DIMENSION_VALUES_LIMIT, new Comparator<Pair<String, Double>>() {
-            @Override
-            public int compare(Pair<String, Double> a, Pair<String, Double> b) {
-              return Double.compare(a.getValue().doubleValue(), b.getValue().doubleValue());
-            }
-          });
-
-      double threshold = total * DIMENSION_VALUES_OPTIONS_THRESHOLD;
-
-      // For each dimension value, add it only if it meets the threshold and drop the smallest from
-      // the priority queue if over the limit.
-      for (Map.Entry<String, Number> entry : summedValues.entrySet()) {
-        List<String> combination = objectMapper.readValue(entry.getKey(), LIST_TYPE_REF);
-        String dimensionValue = combination.get(i);
-        double dimensionValueContribution = entry.getValue().doubleValue();
-        if (dimensionValueContribution >= threshold) {
-          topNValues.add(new Pair<>(dimensionValue, dimensionValueContribution));
-          if (topNValues.size() > DIMENSION_VALUES_LIMIT) {
-            Pair<String, Double> removed = topNValues.poll();
-          }
-        }
-      }
-
-      // Poll returns the elements in order of ascending contribution, so poll and reverse the
-      // order.
-      List<String> sortedValues = new LinkedList<>();
-      while (!topNValues.isEmpty()) {
-        Pair<String, Double> pair = topNValues.poll();
-        sortedValues.add(0, pair.getKey());
-      }
-      collectedDimensionValues.put(dimension, sortedValues);
-    }
-    return collectedDimensionValues;
   }
 }

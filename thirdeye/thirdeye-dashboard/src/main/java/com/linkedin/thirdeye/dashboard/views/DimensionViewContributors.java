@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.dashboard.views;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.commons.math3.util.Pair;
 
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
 
@@ -12,23 +15,26 @@ public class DimensionViewContributors extends View {
 
   private final List<String> metrics;
   private final List<String> dimensions;
-  private final MetricTable metricTotalTable;
-  private final Map<String, Map<String, MetricTable>> dimensionTables;
+  private final Map<String, MetricTable> metricTotalTable;
+  private final Map<Pair<String, String>, Map<String, MetricTable>> dimensionValueTables;
 
-  public DimensionViewContributors(List<String> metrics, MetricTable metricTotalTable,
-      Map<String, Map<String, MetricTable>> tables) {
+  public DimensionViewContributors(List<String> metrics, List<String> dimensions,
+      Map<String, MetricTable> metricTotalTable,
+      Map<Pair<String, String>, Map<String, MetricTable>> tables) {
     super("dimensions/breakdown.ftl");
-    this.metrics = metrics;
+    this.metrics = new ArrayList<>(metrics);
+    Collections.sort(this.metrics);
     this.metricTotalTable = metricTotalTable;
-    this.dimensions = new ArrayList<>(tables.keySet());
-    this.dimensionTables = tables;
+    this.dimensions = new ArrayList<>(dimensions);
+    Collections.sort(this.dimensions);
+    this.dimensionValueTables = tables;
   }
 
   public List<String> getMetrics() {
     return metrics;
   }
 
-  public MetricTable getMetricTotalTable() {
+  public Map<String, MetricTable> getMetricTotalTable() {
     return metricTotalTable;
   }
 
@@ -36,8 +42,16 @@ public class DimensionViewContributors extends View {
     return dimensions;
   }
 
-  public Map<String, Map<String, MetricTable>> getDimensionTables() {
-    return dimensionTables;
+  /*
+   * Recommended not to use this. Key = (metric, dimension)
+   */
+  public Map<Pair<String, String>, Map<String, MetricTable>> getDimensionValueTables() {
+    return dimensionValueTables;
+  }
+
+  public Map<String, MetricTable> getDimensionValueTable(String metric, String dimension) {
+    // return (Map<String, MetricTable>) dimensionValueTables.get(metric, dimension);
+    return dimensionValueTables.get(new Pair<String, String>(metric, dimension));
   }
 
 }

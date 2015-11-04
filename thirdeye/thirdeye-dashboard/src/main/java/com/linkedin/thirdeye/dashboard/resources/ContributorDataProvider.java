@@ -3,8 +3,10 @@ package com.linkedin.thirdeye.dashboard.resources;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.concurrent.Future;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +49,8 @@ public class ContributorDataProvider {
   private static final TypeReference<List<String>> LIST_TYPE_REF =
       new TypeReference<List<String>>() {
       };
+
+  private static final double MINIMUM_DIMENSION_VALUE_THRESHOLD = 0.01;
 
   private final String serverUri;
   private final QueryCache queryCache;
@@ -123,17 +128,18 @@ public class ContributorDataProvider {
       dimensionCurrentResults.put(entry.getKey(), entry.getValue().get());
     }
 
-    MetricTable totalRow = generateMetricTotalTable(baselineTotalResult, currentTotalResult,
-        baselineStart.getMillis(), currentStart.getMillis(), intraPeriod);
-
-    Map<String, Map<String, MetricTable>> tables =
-        generateDimensionTables(totalRow, dimensionBaselineResults, dimensionCurrentResults,
-            baselineStart.getMillis(), currentStart.getMillis(), intraPeriod);
-    return new DimensionViewContributors(currentTotalResult.getMetrics(), totalRow, tables);
+    Map<String, MetricTable> totalRow = generateMetricTotalTable(baselineTotalResult,
+        currentTotalResult, baselineStart.getMillis(), currentStart.getMillis(), intraPeriod);
+    List<String> metrics = currentTotalResult.getMetrics();
+    Map<Pair<String, String>, Map<String, MetricTable>> tables = generateDimensionTables(metrics,
+        totalRow, dimensionBaselineResults, dimensionCurrentResults, baselineStart.getMillis(),
+        currentStart.getMillis(), intraPeriod);
+    return new DimensionViewContributors(metrics, currentTotalResult.getDimensions(), totalRow,
+        tables);
   }
 
   /** Retrieves a single MetricTable from the provided metric total result. */
-  private MetricTable generateMetricTotalTable(QueryResult totalBaselineResult,
+  private Map<String, MetricTable> generateMetricTotalTable(QueryResult totalBaselineResult,
       QueryResult totalCurrentResult, long baselineStart, long currentStart, long intraPeriod) {
     if (totalBaselineResult.getData().size() != 1 || totalCurrentResult.getData().size() != 1) {
       LOGGER.error("Must have exactly one dimension key present for total result!");
@@ -152,48 +158,98 @@ public class ContributorDataProvider {
     MetricTable totalRow = generateTableRow(totalCurrentResult.getMetrics().size(), baselineStart,
         currentStart, intraPeriod, baselineValues, currentValues);
 
-    return totalRow;
+    return expandMetrics(totalRow, totalCurrentResult.getMetrics());
 
   }
 
   /**
-   * Generates MetricTables for each dimension+value combination, using <tt>totalRow</tt> as a
-   * reference for filling in missing time buckets.
+   * Generates MetricTables for each metric+dimension+dimensionValue combination, using
+   * <tt>totalRow</tt> as a
+   * reference for filling in missing time buckets. The key of the returned table is (metric,
+   * dimension).
    */
-  private Map<String, Map<String, MetricTable>> generateDimensionTables(MetricTable totalRow,
+  private Map<Pair<String, String>, Map<String, MetricTable>> generateDimensionTables(
+      List<String> metrics, Map<String, MetricTable> totalRow,
       Map<String, QueryResult> dimensionBaselineResults,
       Map<String, QueryResult> dimensionCurrentResults, long baselineStart, long currentStart,
       long intraPeriod) throws JsonParseException, JsonMappingException, IOException {
+    Map<Pair<String, String>, Map<String, MetricTable>> table = new HashMap<>(); // key=(metric,dimension),
+    List<MetricDataRow> referenceRows = null; // used for filling in missing time buckets
+    Map<String, Double> totalCounts = new HashMap<>();
+    // initialize metric-dimension tables, generate total counts for each metric, and retrieve a
+    // reference row for time buckets.
+    for (String metric : metrics) {
+      if (referenceRows == null) {
+        referenceRows = totalRow.get(metric).getRows();
+      }
+      totalCounts.put(metric, getContributionCount(totalRow.get(metric)));
+    }
 
-    Map<String, Map<String, MetricTable>> tables = new TreeMap<>();
-    /*
-     * MetricTables consist of metrics over a time range, which now compose a single row in the
-     * contributor table.
-     */
-
+    // Due to the way that data is retrieved from server, loop (dimension, dimensionValue, metric).
     for (String dimension : dimensionCurrentResults.keySet()) {
-
-      Map<String, MetricTable> rows = new TreeMap<>(); // dimValue mapping
-
+      Map<String, Map<Pair<String, Double>, MetricTable>> weightsByMetric = new HashMap<>();
+      for (String metric : metrics) {
+        Map<Pair<String, Double>, MetricTable> valuesByContribution =
+            new TreeMap<>(new Comparator<Pair<String, Double>>() {
+              // descending order by Double value.
+              @Override
+              public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
+                return -o1.getValue().compareTo(o2.getValue());
+              }
+            });
+        weightsByMetric.put(metric, valuesByContribution);
+      }
       QueryResult queryBaselineResult = dimensionBaselineResults.get(dimension);
       QueryResult queryCurrentResult = dimensionCurrentResults.get(dimension);
       int dimensionValueIndex = queryCurrentResult.getDimensions().indexOf(dimension);
       // If we need to limit the number of dimension values returned, that can be done here.
-      for (String dimensionKey : queryCurrentResult.getData().keySet()) {
+      for (String dimensionValuesKey : queryCurrentResult.getData().keySet()) {
         List<String> dimensionValues =
-            objectMapper.readValue(dimensionKey.getBytes(), LIST_TYPE_REF);
+            objectMapper.readValue(dimensionValuesKey.getBytes(), LIST_TYPE_REF);
         String dimensionValue = dimensionValues.get(dimensionValueIndex);
 
-        Map<String, Number[]> currentValues = queryCurrentResult.getData().get(dimensionKey);
-        Map<String, Number[]> baselineValues = queryBaselineResult.getData().get(dimensionKey);
+        Map<String, Number[]> currentValues = queryCurrentResult.getData().get(dimensionValuesKey);
+        Map<String, Number[]> baselineValues =
+            queryBaselineResult.getData().get(dimensionValuesKey);
 
+        // fill in missing time buckets if needed.
         MetricTable row = generateTableRowWithReference(queryBaselineResult, baselineStart,
-            currentStart, intraPeriod, baselineValues, currentValues, totalRow.getRows());
-        rows.put(dimensionValue, row);
+            currentStart, intraPeriod, baselineValues, currentValues, referenceRows);
+        Map<String, MetricTable> metricRows = expandMetrics(row, metrics);
+
+        // Filter on contribution.
+        for (String metric : metrics) {
+          MetricTable metricRow = metricRows.get(metric);
+          double contributionCount = getContributionCount(metricRow);
+          double totalCount = totalCounts.get(metric);
+          double contribution = (contributionCount / totalCount);
+          LOGGER.debug("Meets threshold? {} : {} / {} for {} {} {}",
+              contribution >= MINIMUM_DIMENSION_VALUE_THRESHOLD, contributionCount, totalCount,
+              metric, dimension, dimensionValue);
+          if (contribution >= MINIMUM_DIMENSION_VALUE_THRESHOLD) {
+            weightsByMetric.get(metric).put(new Pair<String, Double>(dimensionValue, contribution),
+                metricRow);
+          }
+
+        }
       }
-      tables.put(dimension, rows);
+
+      // Extract data by descending contribution and add it to result map.
+      for (String metric : metrics) {
+        LinkedHashMap<String, MetricTable> dimensionValueTable =
+            new LinkedHashMap<String, MetricTable>();
+        table.put(new Pair<String, String>(metric, dimension), dimensionValueTable);
+
+        Map<Pair<String, Double>, MetricTable> weights = weightsByMetric.get(metric);
+        // go through entries ordered by descending contribution
+        for (Entry<Pair<String, Double>, MetricTable> entry : weights.entrySet()) {
+          String dimensionValue = entry.getKey().getFirst();
+          MetricTable metricRow = entry.getValue();
+          dimensionValueTable.put(dimensionValue, metricRow);
+        }
+      }
     }
-    return tables;
+    return table;
   }
 
   /**
@@ -277,6 +333,56 @@ public class ContributorDataProvider {
     List<MetricDataRow> updatedCumulativeRows =
         ViewUtils.computeCumulativeRows(updatedRows, metricCount);
     return new MetricTable(updatedRows, updatedCumulativeRows);
+  }
+
+  private Map<String, MetricTable> expandMetrics(MetricTable table, List<String> metrics) {
+    HashMap<String, MetricTable> result = new HashMap<>();
+    for (int i = 0; i < metrics.size(); i++) {
+      String metric = metrics.get(i);
+      List<MetricDataRow> metricRows = new LinkedList<>();
+      for (MetricDataRow row : table.getRows()) {
+        MetricDataRow metricRow = extractMetric(row, i);
+        metricRows.add(metricRow);
+      }
+      List<MetricDataRow> cumulativeMetricRows = new LinkedList<>();
+      for (MetricDataRow cumulativeRow : table.getCumulativeRows()) {
+        MetricDataRow cumulativeMetricRow = extractMetric(cumulativeRow, i);
+        cumulativeMetricRows.add(cumulativeMetricRow);
+      }
+
+      result.put(metric, new MetricTable(metricRows, cumulativeMetricRows));
+    }
+    return result;
+  }
+
+  private MetricDataRow extractMetric(MetricDataRow row, int metricIndex) {
+    Number[] baselineValue = retrieveSingleValue(row.getBaseline(), metricIndex);
+    Number[] currentValue = retrieveSingleValue(row.getCurrent(), metricIndex);
+    MetricDataRow metricRow =
+        new MetricDataRow(row.getBaselineTime(), baselineValue, row.getCurrentTime(), currentValue);
+    return metricRow;
+  }
+
+  private Number[] retrieveSingleValue(Number[] values, int index) {
+    if (values == null) {
+      return null;
+    } else {
+      return new Number[] {
+          values[index]
+      };
+    }
+
+  }
+
+  /** Returns final value for last cumulative row's first metric. */
+  private double getContributionCount(MetricTable table) {
+    List<MetricDataRow> cumulativeRows = table.getCumulativeRows();
+    MetricDataRow finalRow = cumulativeRows.get(cumulativeRows.size() - 1);
+    if (finalRow.getCurrent() != null) {
+      return finalRow.getCurrent()[0].doubleValue();
+    } else {
+      return 0;
+    }
   }
 
 }

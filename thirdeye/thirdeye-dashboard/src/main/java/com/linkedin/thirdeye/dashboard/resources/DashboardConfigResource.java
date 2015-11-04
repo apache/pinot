@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
@@ -48,6 +49,7 @@ public class DashboardConfigResource {
   private static final TypeReference<List<String>> LIST_TYPE_REF =
       new TypeReference<List<String>>() {
       };
+  private static final Joiner METRIC_FUNCTION_JOINER = Joiner.on(",");
 
   private final String serverUri;
   private final DataCache dataCache;
@@ -102,6 +104,13 @@ public class DashboardConfigResource {
         dimensionValuesLimit);
   }
 
+  public Map<String, Collection<String>> getDimensionValues(String collection, long baselineMillis,
+      long currentMillis) throws NumberFormatException, Exception {
+    return getDimensionValues(collection, baselineMillis, currentMillis,
+        Double.valueOf(DIMENSION_VALUES_OPTIONS_THRESHOLD),
+        Integer.valueOf(DIMENSION_VALUES_LIMIT));
+  }
+
   /** Return a list of metrics for the provided collection. */
   @GET
   @Path("/metrics/{collection}")
@@ -129,8 +138,9 @@ public class DashboardConfigResource {
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
 
-    String firstMetric = getMetrics(collection).get(0);
-    String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION, firstMetric);
+    List<String> metrics = getMetrics(collection);
+    String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION,
+        METRIC_FUNCTION_JOINER.join(metrics));
 
     MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
     Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
@@ -160,6 +170,7 @@ public class DashboardConfigResource {
       for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
         double sum = 0.0;
         for (Map.Entry<String, Number[]> hourlyEntry : entry.getValue().entrySet()) {
+          // TODO still assuming first metric.
           double value = hourlyEntry.getValue()[0].doubleValue();
           sum += value;
         }
