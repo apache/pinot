@@ -90,7 +90,11 @@ $(document).ready(function() {
         var path = parsePath(window.location.pathname)
         var firstindex = path.metricFunction.indexOf("'");
         //If the previous metric function contained RATIO we assume, that is in the last place in the metric list and will cut out the closing ")" of the RATIO() from the path
-        var lastindex = path.metricFunction.indexOf("RATIO")? path.metricFunction.lastIndexOf("'") + 1 : path.metricFunction.lastIndexOf("'");
+        console.log('path.metricFunction.indexOf(ratio)>=0')
+        console.log((path.metricFunction.indexOf("RATIO") >= 0))
+        console.log(!path.metricFunction.indexOf("RATIO"))
+        var lastindex = (path.metricFunction.indexOf("RATIO") >= 0) ? path.metricFunction.indexOf(")") : path.metricFunction.lastIndexOf("'")  ;
+
         //Change the metric names in the metric function
         var previousMetricFunction = path.metricFunction
         var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
@@ -119,7 +123,7 @@ $(document).ready(function() {
         if(timezone !== getLocalTimeZone().split(' ')[1]) {
             params.timezone = timezone.split('/').join('-')
         }
-
+        console.log(dashboardPath )
        window.location = dashboardPath + encodeDimensionValues(queryParams) + encodeHashParameters(params)
     })
 
@@ -149,7 +153,7 @@ $(document).ready(function() {
 
         var firstindex = path.metricFunction.indexOf("'");
         //If the previous metric fnction contained RATIO we assume, that was the last element and will cut out the closing ")" of that from the path
-        var lastindex = path.metricFunction.indexOf("RATIO")? path.metricFunction.lastIndexOf("'") + 1 : path.metricFunction.lastIndexOf("'");
+        var lastindex = (path.metricFunction.indexOf("RATIO") >= 0) ? path.metricFunction.indexOf(")") : path.metricFunction.lastIndexOf("'");
         var previousMetricFunction = path.metricFunction
         var newMetricFunction = previousMetricFunction.substr(0, firstindex ) + metrics +  previousMetricFunction.substr( lastindex + 1, previousMetricFunction.length )
         path.metricFunction = newMetricFunction
