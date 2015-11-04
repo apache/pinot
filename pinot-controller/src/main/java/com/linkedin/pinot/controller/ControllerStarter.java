@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
@@ -105,6 +106,11 @@ public class ControllerStarter {
 
     MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
+    controllerMetrics.addCallbackGauge(
+        "helix.connected", () -> helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L);
+    controllerMetrics.addCallbackGauge(
+        "helix.leader", () -> helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L);
   }
 
   public void stop() {

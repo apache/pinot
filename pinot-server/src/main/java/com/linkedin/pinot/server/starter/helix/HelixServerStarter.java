@@ -105,6 +105,9 @@ public class HelixServerStarter {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
     setShuttingDownStatus(false);
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {

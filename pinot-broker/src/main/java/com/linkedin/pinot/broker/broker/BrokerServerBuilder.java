@@ -255,4 +255,7 @@ public class BrokerServerBuilder {
     return _routingTable;
   }
 
+  public BrokerMetrics getBrokerMetrics() {
+    return _brokerMetrics;
+  }
 }

@@ -21,7 +21,9 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 
@@ -47,15 +49,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public interface QueryPhase {
-    public String getQueryPhaseName();
+    String getQueryPhaseName();
   }
 
   public interface Meter {
-    public String getMeterName();
+    String getMeterName();
 
-    public String getUnit();
+    String getUnit();
 
-    public boolean isGlobal();
+    boolean isGlobal();
   }
 
   /**
@@ -139,6 +141,27 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         addMeteredValue(null, meter, 0);
       }
     }
+  }
+
+  /**
+   * Adds a new gauge whose values are retrieved from a callback function.
+   *
+   * @param metricName The name of the metric
+   * @param valueCallback The callback function used to retrieve the value of the gauge
+   */
+  public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
+    MetricsHelper.newGauge(_metricsRegistry, new MetricName(_clazz, _metricPrefix + metricName), new Gauge<Long>() {
+      @Override
+      public Long value() {
+        try {
+          return valueCallback.call();
+        } catch (Exception e) {
+          LOGGER.error("Caught exception", e);
+          Utils.rethrowException(e);
+          throw new AssertionError("Should not reach this");
+        }
+      }
+    });
   }
 
   protected abstract QP[] getQueryPhases();

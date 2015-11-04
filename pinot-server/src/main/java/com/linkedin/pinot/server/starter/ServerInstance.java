@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.transport.netty.NettyServer;
@@ -43,6 +44,7 @@ public class ServerInstance {
   private QueryExecutor _queryExecutor;
   private RequestHandlerFactory _requestHandlerFactory;
   private NettyServer _nettyServer;
+  private ServerMetrics _serverMetrics;
 
   private Thread _serverThread;
 
@@ -75,6 +77,7 @@ public class ServerInstance {
     _nettyServer = serverBuilder.buildNettyServer(_serverConf.getNettyConfig(), _requestHandlerFactory);
     setServerThread(new Thread(_nettyServer));
     LOGGER.info("ServerInstance Initialization is Done!");
+    _serverMetrics = serverBuilder.getServerMetrics();
   }
 
   /**
@@ -178,5 +181,9 @@ public class ServerInstance {
    */
   public void setNettyServer(NettyServer nettyServer) {
     this._nettyServer = nettyServer;
+  }
+
+  public ServerMetrics getServerMetrics() {
+    return _serverMetrics;
   }
 }

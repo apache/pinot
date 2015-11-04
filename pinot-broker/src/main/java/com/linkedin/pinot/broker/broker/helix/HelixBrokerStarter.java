@@ -127,6 +127,8 @@ public class HelixBrokerStarter {
     _helixManager.addInstanceConfigChangeListener(_helixBrokerRoutingTable);
     _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
 
+    _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
+        "helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {

@@ -95,7 +95,7 @@ public class ValidationMetrics {
   }
 
   private interface GaugeFactory<T> {
-    public Gauge<T> buildGauge(final String key);
+    Gauge<T> buildGauge(final String key);
   }
 
   private class StoredValueGaugeFactory implements GaugeFactory<Long> {

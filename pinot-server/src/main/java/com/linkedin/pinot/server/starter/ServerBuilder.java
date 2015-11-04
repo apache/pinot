@@ -182,4 +182,8 @@ public class ServerBuilder {
     _serverMetrics = new ServerMetrics(metricsRegistry);
     _serverMetrics.initializeGlobalMeters();
   }
+
+  public ServerMetrics getServerMetrics() {
+    return _serverMetrics;
+  }
 }
