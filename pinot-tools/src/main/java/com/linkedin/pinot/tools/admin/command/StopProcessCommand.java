@@ -15,10 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FilenameFilter;
-import java.io.IOException;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -212,11 +209,11 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
 
   private boolean stopProcess(String fileName) throws IOException {
     File file = new File(fileName);
-    FileReader reader = new FileReader(file);
-    int pid = reader.read();
+    BufferedReader in =new BufferedReader(new FileReader(fileName));
+    String pid = in.readLine();
 
     Runtime.getRuntime().exec("kill " + pid);
-    reader.close();
+    in.close();
 
     file.delete();
     return true;

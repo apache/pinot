@@ -89,7 +89,7 @@ public class AbstractBaseCommand {
 
   protected void savePID(String fileName) throws IOException {
     FileWriter pidFile = new FileWriter(fileName);
-    pidFile.write(getPID());
+    pidFile.write(Integer.toString(getPID()));
     pidFile.close();
   }
 
