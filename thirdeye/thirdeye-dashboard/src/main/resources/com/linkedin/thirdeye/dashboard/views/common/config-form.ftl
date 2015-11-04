@@ -134,18 +134,6 @@
 
             </div>
         </div>
-        <div class="uk-display-inline-block" style="position: relative;">
-            <button id="time-input-metrics" type="button" class="uk-button hidden" style="width: 200px;">Select Metrics <i class="uk-icon-caret-down"></i> </button>
-            <div id="time-input-metrics-panel" class="hidden" style="position:absolute; top:30px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
-                <ul style="list-style-type: none; padding-left:0; width:250px;">
-                <#list collectionSchema.metrics as metric>
-                    <li style="overflow:hidden;">
-                        <input class="panel-metric" type="checkbox" value="${metric}"/>${collectionSchema.metricAliases[metric_index]!metric}
-                    </li>
-                </#list>
-                </ul>
-            </div>
-        </div>
 
         <div class="uk-display-inline-block">
             <label class="uk-form-label">
@@ -156,13 +144,13 @@
                 <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
             </div>
         </div>
-        <div id="config-form-time-picker-box" class="uk-display-inline-block">
-            <label class="uk-form-label">
+        <div id="config-form-time-picker-box" class="uk-display-inline-block hidden">
+            <label class="uk-form-label hidden">
                 End Time
             </label>
-            <div class="uk-form-icon" >
-                <i class="uk-icon-clock-o"></i>
-                <input id="time-input-form-current-time" type="text" data-uk-timepicker>
+            <div class="uk-form-icon hidden" >
+                <i class="uk-icon-clock-o hidden"></i>
+                <input id="time-input-form-current-time" class="hidden" type="text" data-uk-timepicker>
             </div>
         </div>
         <div class="uk-display-inline-block">

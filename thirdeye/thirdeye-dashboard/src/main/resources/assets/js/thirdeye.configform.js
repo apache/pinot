@@ -56,17 +56,24 @@ $(document).ready(function() {
         $(".cumulative-values").toggleClass("hidden")
     })
 
+    //Only display time selection option on Heat map till the backend will support time selection on funnel_heatmap.ftl and breakdown.ftl
+    var path = parsePath(window.location.pathname)
+    if(path.dimensionViewType  == "HEAT_MAP") {
+        //Toggle Time inputfield based on hourly / daily granularity
+        $("#time-input-form-gran-hours").click(function () {
+            $("label, input, div", '#config-form-time-picker-box').animate({
+                'width': '184px'}, 200, function () {
+                $("label, input, i, div", '#config-form-time-picker-box').show()
+            })
+        })
 
-    //Toggle Time inputfield based on hourly / daily granularity
-    $("#time-input-form-gran-hours").click(function(){
-        $("label, input, div",'#config-form-time-picker-box').animate({
-        'width':'184px'}, 200, function(){$("label, input, i, div",'#config-form-time-picker-box').show()})
-    })
-    $("#time-input-form-gran-days").click(function(){
-        $("label, input, div",'#config-form-time-picker-box').animate({
-            'display': 'none'},200, function(){$("label, input, i, div",'#config-form-time-picker-box').hide()})
-    })
-
+        $("#time-input-form-gran-days").click(function () {
+            $("label, input, div", '#config-form-time-picker-box').animate({
+                'display': 'none'}, 200, function () {
+                $("label, input, i, div", '#config-form-time-picker-box').hide()
+            })
+        })
+    }
     //When any form field has changed enable Go (submit) button
     $('.panel-dimension-option , #time-input-comparison-size , #time-input-form-current-date, #time-input-form-current-time' ).change(enableFormSubmit)
     function enableFormSubmit(){
@@ -74,6 +81,8 @@ $(document).ready(function() {
     }
 
 
+
+    //Form Submit
     $("#time-input-form-submit").click(function(event) {
 
         event.preventDefault()
@@ -85,15 +94,15 @@ $(document).ready(function() {
 
         // Metric(s)
         var metrics = []
-        $(".panel-metric").each(function(i, checkbox) {
-            var checkboxObj = $(checkbox)
-            if (checkboxObj.is(':checked')) {
-                metrics.push("'" + checkboxObj.val() + "'")
-            }
-        });
+        var path = parsePath(window.location.pathname)
+        //The metriclist in the metric function starts and ends with "'" except when ratio is present in the metric list, that ends with ")"
+        var firstindex = path.metricFunction.indexOf("'");
 
         // Metric function
-        var metricFunction = metrics.join(",")
+        var metricFunction = path.metricFunction.substr(firstindex)
+        var lastindex = (path.metricFunction.indexOf("RATIO") >= 0) ? metricFunction.indexOf(")") : metricFunction.lastIndexOf("'") ;
+        metricFunction = metricFunction.substr(0, lastindex + 1)
+
         // Date input field validation
         var date = $("#time-input-form-current-date").val()
         if (!date) {
@@ -208,63 +217,63 @@ $(document).ready(function() {
     $("#time-input-form-current-date").val(currentDateString)*/
 
     // Load existing metrics selection / function
-    if (path.metricFunction) {
-        var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
+    var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
 
-        // Always start at AGGREGATE
-        var tokens = metricFunctionObj.name.split("_")
-        if($(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").length > 0){
-            $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").trigger("click")
-        }
-        //When baseline-aggregate after the initial change on load enable Go (submit) button
-        $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit)
+    // Always start at AGGREGATE
+    var tokens = metricFunctionObj.name.split("_")
+    if($(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").length > 0){
+        $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").trigger("click")
+    }
+    //When baseline-aggregate after the initial change on load enable Go (submit) button
+    $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit)
 
-        // May have applied moving average as well
-        /*var firstArg = metricFunctionObj.args[0]
-        if (typeof(firstArg) === 'object') {
-            if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
-                metricFunctionObj = firstArg
-                var tokens = metricFunctionObj.name.split("_")
+    // May have applied moving average as well
+    /*var firstArg = metricFunctionObj.args[0]
+    if (typeof(firstArg) === 'object') {
+        if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
+            metricFunctionObj = firstArg
+            var tokens = metricFunctionObj.name.split("_")
 
-                if($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0){
-                    $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
-                    $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
-                }
+            if($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").length > 0){
+                $("#time-input-moving-average-size").val(tokens[tokens.length - 2])
+                $("#time-input-form-moving-average span").html($("#time-input-moving-average-size option[value='" + tokens[tokens.length - 2] + "']").html())
             }
-        }*/
+        }
+    }*/
 
-        // Rest are metrics (primitive and derived)
-        var primitiveMetrics = []
-        var derivedMetrics = []
+    //If metric selector dropdown is present on the configform in the current view add it's options
+    if($("#view-metric-selector").length > 0){
+
+        // Metrics (primitive and derived)
+        var metrics = []
 
         $.each(metricFunctionObj.args, function(i, arg) {
             if (typeof(arg) === 'string') {
-               primitiveMetrics.push(arg.replace(/'/g, ""))
+               metrics.push(arg.replace(/'/g, ""))
            }else{
-               derivedMetrics.push(arg)
+               metrics.push(arg.name + "(" + arg.args[0].replace(/'/g, "") + "," + arg.args[1].replace(/'/g, "") + ")")
            }
         })
 
-        // Rest can be assumed to be plain args or derived metrics
+        // plain args or derived metrics
         var optionsHTML = []
-        for(var i= 0, len = primitiveMetrics.length; i< len; i++){
+        for(var i= 0, len = metrics.length; i< len; i++){
+            optionsHTML.push("<option value='" + metrics[i] + "'>" + metrics[i] + "</option>")
+        }
 
-            $(".panel-metric[ value = " + primitiveMetrics[i] + "]").attr("checked", "checked")
-            optionsHTML.push("<option value='" + primitiveMetrics[i] + "'>" + primitiveMetrics[i] + "</option>")
-        }
-        if($("#view-metric-selector").length > 0){
-            document.getElementById("view-metric-selector").innerHTML = optionsHTML.join('')
-        }
-        //Set the comparison size to WoW / Wo2W / Wo4W based on the URI currentmillis - baselinemillis
+        document.getElementById("view-metric-selector").innerHTML = optionsHTML.join('')
+
+
+        //Set the comparison size to WoW / Wo2W / Wo4W d on the URI currentmillis - baselinemillis
         if($("#time-input-comparison-size").length > 0 ){
             var path = parsePath(window.location.pathname)
             var baselineDiff = path.currentMillis - path.baselineMillis
-            var hasWoWProfile = [7,14,21,28].indexOf(baselineDiff / 86400000 ) > -1
+            var hasWoWProfile = [7,14,21,28].indexOf(baselineDiff / 86400000 -1)
 
             if(hasWoWProfile){
                 var baselineDiffDays = (baselineDiff / 86400000 )
                 $("#time-input-comparison-size").val(baselineDiffDays)
-                $("span", $("#time-input-comparison-size").parent()).html($("#time-input-comparison-size option[value='" + baselineDiffDays + "']").html())
+                $("span", $("#time-input-comparison-size").parent()).html($("#time-input-comparison-size option[e='" + baselineDiffDays + "']").html())
             }
         }
     }
@@ -303,10 +312,6 @@ $(document).ready(function() {
         $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();
     })
 
-    $("#time-input-metrics").click(function(){
-        $("#time-input-metrics-panel").toggleClass("hidden")
-    })
-
     //Set default dimension view on Timeseries and the default metric view on Heatmap
     window.onload = load
     function load() {
@@ -315,8 +320,5 @@ $(document).ready(function() {
         window.setTimeout(function(){$(".metric-section-selector").trigger("change")}, 2000)
         window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
     }
-
-
-
 
 })

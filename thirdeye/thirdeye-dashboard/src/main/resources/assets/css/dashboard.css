@@ -114,6 +114,9 @@ li {
     margin-right:10px;
 }
 
+#config-form-time-picker-box .hidden{
+    display: none;
+}
 
 
 /* Funnel Heatmap */
