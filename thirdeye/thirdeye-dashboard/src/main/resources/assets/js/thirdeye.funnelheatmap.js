@@ -12,26 +12,15 @@ $(document).ready(function() {
         $(this).addClass("uk-panel-box")
     })
 
+    $(".heat-map-cell").each(function(i, cell){
+        calcHeatMapCellBackground(cell)
+    })
 
-    //Assign background color value to each cells
-    $(".heat-map-cell").each(function(i, cell) {
-        var cellObj = $(cell)
-        var value = parseFloat(cellObj.attr('value'))
-        var absValue = Math.abs(value)
 
-        if (value < 0) {
-            cellObj.css('background-color', 'rgba(255,0,0,' + absValue + ')') // red
-        } else {
-            cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
-        }
-    });
 
+    /* Transform UTC time into user selected or browser's timezone */
     $(".funnel-table-time").each(function(i, cell){
-        var cellObj = $(cell)
-        var currentTime = moment(cellObj.attr('currentUTC'))
-        cellObj.html(currentTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
-        var baselineTime = moment(cellObj.attr('title'))
-        cellObj.attr('title', baselineTime.tz(tz).format('YYYY-MM-DD HH:mm z'))
+        transformUTCToTZTime(cell)
     })
 
     $(".funnel .metric-list[currentUTC]").each(function(i, label){
@@ -46,14 +35,17 @@ $(document).ready(function() {
 
         //Toggle Sunmmary and Details tabs,
     $(".funnel-tabs li").on("click", function(){
-        if(!$(this).hasClass("uk-active")) {
 
-            $(".details-cell").toggleClass("hidden")
-            $("#custom-funnel-section .subheader").toggleClass("hidden")
+            if(!$(this).hasClass("uk-active")) {
 
-            $('#custom-funnel-section .metric-label,#funnel-thumbnails  .metric-label').attr('colspan', function(index, attr){
-                return attr == 3 ? null : 3;
-            });
+                $(".details-cell").toggleClass("hidden")
+                $(".subheader").toggleClass("hidden")
+
+                $('.metric-label').attr('colspan', function(index, attr){
+                    return attr == 3 ? null : 3;
+                });
+
+
             $("#custom-funnel-section .funnel-table-time").css("width","110px")
         }
     })

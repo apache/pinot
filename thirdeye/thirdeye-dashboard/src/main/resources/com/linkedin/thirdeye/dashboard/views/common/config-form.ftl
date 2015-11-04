@@ -1,5 +1,5 @@
-<div class="title-box uk-clearfix">
-
+<div class="title-box">
+<div class="uk-clearfix">
 <ul id="current-view-settings" class="uk-display-inline-block">
    <li>
     <!-- Filters Applied revamped -->
@@ -39,7 +39,7 @@
 
 <#elseif (dimensionView.type == "HEAT_MAP" )>
     <li>
-        <div class="uk-display-inline-block uk-margin-medium" style="vertical-align: top;">Metric:<br>
+        <div class="uk-margin-medium" style="vertical-align: top;">Metric:<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Metric</span>
                 <i class="uk-icon-caret-down"></i>
@@ -49,8 +49,30 @@
         </div>
     </li>
 <#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
+
+
     <li>
-        <div class="uk-display-inline-block uk-margin-medium">Dimension:<br>
+        <div class="uk-margin-medium">Metric:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Metric</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-metric-selector" class="metric-section-selector">
+                </select>
+            </div>
+        </div>
+    </li>
+
+    <li>
+        <div class="uk-margin-small">
+            <div data-uk-button-checkbox>
+                <br>
+                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
+            </div>
+        </div>
+    </li>
+
+    <li>
+        <div class="uk-margin-medium">Dimension:<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Dimension</span>
                 <i class="uk-icon-caret-down"></i>
@@ -63,25 +85,7 @@
         </div>
     </li>
 
-    <li>
-        <div class="uk-display-inline-block uk-margin-medium">Metric:<br>
-            <div  class="uk-button uk-form-select" data-uk-form-select>
-                <span>Metric</span>
-                <i class="uk-icon-caret-down"></i>
-                <select id="view-metric-selector" class="metric-section-selector">
-                </select>
-            </div>
-        </div>
-    </li>
 
-    <li>
-        <div class="uk-display-inline-block uk-margin-small">
-            <div data-uk-button-checkbox>
-                <br>
-                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
-            </div>
-        </div>
-    </li>
 </#if>
 </ul>
 
@@ -183,7 +187,7 @@
         </div>
     </div>
 </form>
-
+</div>
 
 <div id="current-view-settings" class="uk-clearfix" style="padding-right:20px; margin-top:  10px;">
 
@@ -196,7 +200,7 @@
             <a href="#">Datatable</a>
         </li>
     </ul>
-<#elseif (dimensionView.type == "TABULAR")>
+<#elseif (dimensionView.type == "TABULAR" || dimensionView.type == "MULTI_TIME_SERIES" )>
     <ul class="uk-tab funnel-tabs" data-uk-tab>
         <li class="uk-active">
             <a href="#">Summary</a>

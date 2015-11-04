@@ -820,6 +820,9 @@ function updateTableOrder(tableContainer, orderContainer) {
   window.location.hash = encodeHashParameters(hashParams)
 }
 
+
+/** Render tables **/
+
 /**
  * Sets the html of the provided cell to the time provided 
  * in its 'currentUTC' attribute, using the selected timezone.
@@ -853,3 +856,38 @@ function renderTimeCell(index, cell) {
       window.location.pathname = getDashboardPath(path)
     })
 }
+
+/** Assign background color value to each heat-map-cell **/
+function  calcHeatMapCellBackground(cell){
+    var cellObj = $(cell)
+    var value = parseFloat(cellObj.attr('value'))
+    var absValue = Math.abs(value)
+
+    if (value < 0) {
+        cellObj.css('background-color', 'rgba(255,0,0,' + absValue + ')') // red
+    } else {
+        cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
+    }
+};
+
+
+/** Transform UTC time into user selected or browser's timezone and display the date value **/
+function transformUTCToTZDate(cell){
+    var cellObj = $(cell);
+    var currentTime = moment(cellObj.attr('currentUTC'));
+    cellObj.html(currentTime.tz(tz).format('YY-MM-DD z'));
+    var baselineTime = moment(cellObj.attr('title'));
+    cellObj.attr('title', baselineTime.tz(tz).format('MM-DD HH:mm z'));
+};
+
+/** Transform UTC time into user selected or browser's timezone and display the time value **/
+function transformUTCToTZTime(cell){
+    var cellObj = $(cell);
+    var currentTime = moment(cellObj.attr('currentUTC'));
+    cellObj.html(currentTime.tz(tz).format('HH:mm'));
+    var baselineTime = moment(cellObj.attr('title'));
+    cellObj.attr('title', baselineTime.tz(tz).format('MM-DD HH:mm'));
+};
+
+
+

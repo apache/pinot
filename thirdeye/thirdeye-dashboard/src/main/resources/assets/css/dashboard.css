@@ -119,10 +119,12 @@ li {
 }
 
 
-/* Funnel Heatmap */
+/* Funnel Heatmap = Overview Tab*/
 
 #custom-funnel-section{
     min-height: 300px;
+    width: 100%;
+    overflow-x: scroll;
 }
 
 #custom-funnel-section table,
@@ -139,10 +141,7 @@ li {
     text-decoration: underline;
 }
 
-#custom-funnel-section{
-    width: 100%;
-    overflow-x: scroll;
-}
+
 
 
 #custom-funnel-section td:hover{
@@ -225,6 +224,48 @@ li {
     background-color: #fff;
 }
 
+
+/* Contributors */
+#dimension-contributor-area{
+    width: 100%;
+}
+
+#dimension-contributor-area table{
+    line-height: 8px;
+    font-size: 10px;
+    padding: 6px;
+    font-family: Arial, sans-serif;
+    color: #898989;
+    width: 100%;
+    border: 1px solid #ddd;
+    vertical-align: middle;
+    text-align: center;
+}
+
+#dimension-contributor-area td:hover{
+    color: #898989;
+}
+
+#dimension-contributor-area .divider-row td{
+    line-height: 8px;
+    height: 12px;
+    border: none;
+    font-weight: 800;
+}
+
+#dimension-contributor-area .contributors-table-time,
+#dimension-contributor-area .contributors-table-date{
+    font-weight: 600;
+}
+
+
+
+.contributors-table td,
+.contributors-table th{
+    border: 1px solid #ddd;
+    vertical-align: middle;
+    text-align: center;
+}
 
 
 /* Metric */
@@ -571,25 +612,6 @@ td[dimension-val] {
 }
 
 
-/* Contributors */
-.contributors-table{
-   width: 100%;
-   border: 1px solid #ddd;
-   vertical-align: middle;
-   text-align: center;
-}
-
-.contributors-table td,
-.contributors-table th{
-    border: 1px solid #ddd;
-    vertical-align: middle;
-    text-align: center;
-}
-
-.contributors-table .divider-row td{
-    border: none;
-    height: 45px;
-}
 
 
 
