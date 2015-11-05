@@ -10,8 +10,8 @@ import java.util.concurrent.Future;
 
 import javax.ws.rs.core.MultivaluedMap;
 
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +23,7 @@ import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
+import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.api.funnel.CustomFunnelSpec;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
@@ -30,7 +31,7 @@ import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
-import com.linkedin.thirdeye.dashboard.views.FunnelHeatMapView;
+import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 
 public class FunnelsDataProvider {
   private static final String DEFAULT_FUNNEL_NAME = "Primary Metric View";
@@ -72,10 +73,10 @@ public class FunnelsDataProvider {
    * provided, start of day is defined as 12AM in America/Los_Angeles.
    * dimensionValuesMap specifies fixed dimension values for the query.
    */
-  public List<FunnelHeatMapView> computeFunnelViews(String collection, String metricFunction,
+  public List<FunnelTable> computeFunnelViews(String collection, String metricFunction,
       String selectedFunnels, long baselineMillis, long currentMillis, long intraPeriod,
       MultivaluedMap<String, String> dimensionValues) throws Exception {
-    List<FunnelHeatMapView> funnelViews = new ArrayList<FunnelHeatMapView>();
+    List<FunnelTable> funnelViews = new ArrayList<FunnelTable>();
 
     if (selectedFunnels != null && selectedFunnels.length() > 0) {
       String[] funnels = selectedFunnels.split(",");
@@ -118,36 +119,25 @@ public class FunnelsDataProvider {
    * provided, start of day is defined as 12AM in America/Los_Angeles.
    * dimensionValuesMap specifies fixed dimension values for the query.
    */
-  public FunnelHeatMapView getFunnelDataFor(String collection, String urlMetricFunction,
-      FunnelSpec spec, long baselineMillis, long currentMillis, long intraPeriod,
+  public FunnelTable getFunnelDataFor(String collection, String urlMetricFunction, FunnelSpec spec,
+      long baselineMillis, long currentMillis, long intraPeriod,
       MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
     // them
 
-    // get current start and end time
-    DateTime currentInput = new DateTime(currentMillis, DateTimeZone.UTC);
-
     // TODO hardcoded to PDT. This should convert to the client's timezone.
-    currentInput = currentInput.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
-    DateTime currentStart = new DateTime(currentInput.getYear(), currentInput.getMonthOfYear(),
-        currentInput.getDayOfMonth(), 0, 0);
+    DateTime currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
     DateTime currentEnd = currentStart.plus(intraPeriod);
 
     // get baseline start and end
-    DateTime baselineInput = new DateTime(baselineMillis, DateTimeZone.UTC);
-    // TODO hardcoded to PDT. This should convert to the client's timezone.
-    currentInput = currentInput.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
-    DateTime baselineStart = new DateTime(baselineInput.getYear(), baselineInput.getMonthOfYear(),
-        baselineInput.getDayOfMonth(), 0, 0);
+    DateTime baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
     DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
-    String metricFunctionPrefix =
-        urlMetricFunction.substring(0, urlMetricFunction.lastIndexOf('('));
-    String metricFunctionSuffix = urlMetricFunction.substring(urlMetricFunction.indexOf(')') + 1);
-
-    String metricFunction = String.format("%s(%s)%s", metricFunctionPrefix,
-        METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()), metricFunctionSuffix);
+    List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
+    String metricFunction = StringUtils.join(metricFunctionLevels, "(")
+        + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
+        + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
@@ -160,8 +150,8 @@ public class FunnelsDataProvider {
         dimensionValuesMap, dimensionGroups);
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
-    LOG.info("Generated SQL: {}", baselineSql);
-    LOG.info("Generated SQL: {}", currentSql);
+    LOG.info("Generated SQL for funnel baseline: {}", baselineSql);
+    LOG.info("Generated SQL for funnel current: {}", currentSql);
 
     // Query
     Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);
@@ -176,7 +166,7 @@ public class FunnelsDataProvider {
     long baselineOffsetMillis = currentEnd.getMillis() - baselineEnd.getMillis();
     // Compose result
     List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
-        currentEnd.getMillis(), baselineOffsetMillis, intraPeriod);
+        currentStart.getMillis(), baselineOffsetMillis, intraPeriod);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();
@@ -222,11 +212,9 @@ public class FunnelsDataProvider {
       filteredTable.add(filteredRow);
     }
 
-    List<MetricDataRow> filteredCumulativeTable =
-        ViewUtils.computeCumulativeRows(filteredTable, metricCount);
-
-    return new FunnelHeatMapView(spec, filteredTable, filteredCumulativeTable, currentInput,
-        baselineInput);
+    // dates rendered on view still assume UTC return times.
+    return new FunnelTable(spec, new MetricTable(filteredTable, metricCount), currentStart,
+        baselineStart);
   }
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out

@@ -31,9 +31,9 @@
 
                     <div id="sidenav-derived-metrics">
                         <label class="uk-form-label">Derived Metric(s)
-                          <button id="sidenav-derived-metrics-add" class="uk-button uk-button-mini">
-                              <i class="uk-icon-plus-circle"></i>
-                          </button>
+                            <button id="sidenav-derived-metrics-add" class="uk-button uk-button-mini">
+                                <i class="uk-icon-plus-circle"></i>
+                            </button>
                         </label>
                         <div id="sidenav-derived-metrics-list"></div>
                     </div>

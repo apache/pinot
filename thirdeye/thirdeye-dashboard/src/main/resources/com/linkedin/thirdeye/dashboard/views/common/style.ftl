@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="/assets/css/reset.css"/>
 <link rel="stylesheet" href="/assets/css/uikit/uikit.almost-flat.min.css"/>
 <link rel="stylesheet" href="/assets/css/uikit/components/sticky.almost-flat.min.css"/>
 <link rel="stylesheet" href="/assets/css/uikit/components/sortable.almost-flat.min.css"/>

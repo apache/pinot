@@ -1,63 +1,92 @@
-<div class="title-box uk-clearfix">
-<!-- Filters Applied -->
-<#list (metricView.view.metricTables)!metricTables as metricTable>
-    <#assign dimensions = metricTable.dimensionValues>
-    <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-<ul class="filters-applied" style="display: inline-block;">Filters Applied:
-    <#list dimensions?keys as dimensionName>
-        <#assign dimensionValue = dimensions[dimensionName]>
-        <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
+<div class="title-box">
+<div class="uk-clearfix">
+<ul id="current-view-settings" class="uk-display-inline-block">
+   <li>
+    <!-- Filters Applied revamped -->
+    <ul class="filters-applied" style="display: inline-block;max-width: 200px; margin-right: 15px; padding-left: 0px;">Filters Applied:
+        <#list dimensions as dimensionName>
+            <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
+            <#assign dimensionValue = (selectedDimensions[dimensionName]!"*")?html>
+                <#if dimensionValue == "*">
+                <#--<span>${dimensionDisplay}:</span><br> ALL-->
+                <#elseif dimensionValue == "?">
+                    <li>
+                        <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> OTHER</a>
+                    </li>
+                <#elseif dimensionValue == "">
+                    <li>
+                        <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> UNKNOWN</a>
+                    </li>
+                <#else>
+                    <li>
+                        <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value="${dimensionValue}"><span>${dimensionDisplay}:</span> ${dimensionValue}</a>
+                    </li>
+                </#if>
 
-        <#if dimensionValue == "*">
-        <#--<span>${dimensionDisplay}:</span><br> ALL-->
-        <#elseif dimensionValue == "?">
-            <li>
-                <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value=""><span>${dimensionDisplay}:</span> OTHER</a>
-            </li>
-        <#else>
-            <li>
-                <a href="#" class="dimension-link" dimension="${dimensionName}" dimension-value="${dimensions[dimensionName]}"><span>${dimensionDisplay}:</span> ${dimensions[dimensionName]}</a>
-            </li>
-        </#if>
-
-    </#list>
-</ul>
-</#list>
-
+        </#list>
+    </ul>
+   </li>
 
 <#if (dimensionView.type == "TABULAR")>
-<div class="uk-display-inline-block uk-margin-small">
-    <div data-uk-button-checkbox>
-        <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
-    </div>
-</div>
-<!-- Metric selection dropdown -->
-<#elseif (dimensionView.type == "HEAT_MAP")>
-<div class="uk-display-inline-block uk-margin-medium">Metric:<br>
-    <div  class="uk-button uk-form-select" data-uk-form-select>
-        <span>Metric</span>
-        <i class="uk-icon-caret-down"></i>
-        <select id="view-metric-selector" class="metric-section-selector">
-            <#list dimensionView.view.metricNames as metric>
-                <option value="${metric}">${metric}</option>
-            </#list>
-        </select>
-    </div>
-</div>
-<#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
-<div class="uk-display-inline-block uk-margin-medium">Dimension:<br>
-    <div  class="uk-button uk-form-select" data-uk-form-select>
-        <span>Dimension</span>
-        <i class="uk-icon-caret-down"></i>
-        <select id="view-dimension-selector" class="section-selector">
-            <#list dimensionView.view.dimensions as dimension>
-                <option value="${dimension}">${dimension}</option>
-            </#list>
-        </select>
-    </div>
-</div>
-</#if>
+    <li>
+        <div class="uk-display-inline-block uk-margin-small">
+            <div data-uk-button-checkbox>
+                <br>
+                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
+            </div>
+        </div>
+    </li>
 
+<#elseif (dimensionView.type == "HEAT_MAP" )>
+    <li>
+        <div class="uk-margin-medium" style="vertical-align: top;">Metric:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Metric</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-metric-selector" class="metric-section-selector">
+                </select>
+            </div>
+        </div>
+    </li>
+<#elseif (dimensionView.type == "MULTI_TIME_SERIES")>
+
+
+    <li>
+        <div class="uk-margin-medium">Metric:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Metric</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-metric-selector" class="metric-section-selector">
+                </select>
+            </div>
+        </div>
+    </li>
+
+    <li>
+        <div class="uk-margin-medium">Dimension:<br>
+            <div  class="uk-button uk-form-select" data-uk-form-select>
+                <span>Dimension</span>
+                <i class="uk-icon-caret-down"></i>
+                <select id="view-dimension-selector" class="section-selector">
+                    <#list dimensionView.view.dimensions as dimension>
+                        <option value="${dimension}">${dimension}</option>
+                    </#list>
+                </select>
+            </div>
+        </div>
+    </li>
+
+    <li>
+        <div class="uk-margin-small">
+            <div data-uk-button-checkbox>
+                <br>
+                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
+            </div>
+        </div>
+    </li>
+
+</#if>
+</ul>
 
 <form class="time-input-form uk-form uk-float-right uk-form-stacked uk-clearfix">
 
@@ -76,13 +105,9 @@
                 <br>
                 <table>
                     <tr>
-                        <td>Select Filters: </td>
-                    <#list (metricView.view.metricTables)!metricTables as metricTable>
-                        <#assign dimensions = metricTable.dimensionValues>
-                        <#assign dimensionAliases = (metricView.view.dimensionAliases)!dimensionAliases>
-                        <#list dimensions?keys as dimensionName>
-                            <#assign dimensionValue = dimensions[dimensionName]>
+                        <#list dimensions as dimensionName>
                             <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
+                            <#assign dimensionValue = selectedDimensions[dimensionName]!"*">
                             <td style="position:relative;">
                                 <span>${dimensionDisplay}:</span><br>
 
@@ -106,35 +131,11 @@
 
                             </td>
                         </#list>
-                    </#list>
                     </tr>
                 </table>
-            </div>
-        </div>
-        <div class="uk-display-inline-block hidden" style="position: relative;">
-            <button id="time-input-metrics" type="button" class="uk-button hidden" style="width: 200px;">Select Metrics <i class="uk-icon-caret-down"></i> </button>
-            <div id="time-input-metrics-panel" class="hidden" style="position:absolute; top:30px; left:0px; z-index:100; background-color: #f5f5f5; border: 1px solid #ccc; padding:5px;">
-                <ul style="list-style-type: none; padding-left:0; width:250px;">
-                <#list collectionSchema.metrics as metric>
-                    <li style="overflow:hidden;">
-                        <input class="panel-metric" type="checkbox" value="${metric}"/>${collectionSchema.metricAliases[metric_index]!metric}
-                    </li>
-                </#list>
-                </ul>
-            </div>
-        </div>
 
-    <#if (dimensionView.type == "HEAT_MAP" || dimensionView.type == "MULTI_TIME_SERIES")>
-        <div class="uk-display-inline-block">
-            <label class="uk-form-label">
-                Start Date
-            </label>
-            <div class="uk-form-icon">
-                <i class="uk-icon-calendar"></i>
-                <input id="time-input-form-baseline-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
             </div>
         </div>
-    </#if>
 
         <div class="uk-display-inline-block">
             <label class="uk-form-label">
@@ -145,39 +146,48 @@
                 <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
             </div>
         </div>
-
+        <div id="config-form-time-picker-box" class="uk-display-inline-block hidden">
+            <label class="uk-form-label hidden">
+                End Time
+            </label>
+            <div class="uk-form-icon hidden" >
+                <i class="uk-icon-clock-o hidden"></i>
+                <input id="time-input-form-current-time" class="hidden" type="text" data-uk-timepicker>
+            </div>
+        </div>
         <div class="uk-display-inline-block">
             <label class="uk-form-label">
                 Granularity
             </label>
             <div  class="uk-button-group" data-uk-button-radio>
-                <button type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >HOUR</button>
-                <button type="button" class="baseline-aggregate uk-button uk-active" unit="DAYS" value="86400000" >DAY</button>
+                <button id="time-input-form-gran-hours" type="button" class="baseline-aggregate uk-button" unit="HOURS" value="3600000" >HOUR</button>
+                <button id="time-input-form-gran-days" type="button" class="baseline-aggregate uk-button uk-active" unit="DAYS" value="86400000" >DAY</button>
             </div>
         </div>
 
-    <#if dimensionView.type == "TABULAR">
-        <div class="uk-form-label uk-display-inline-block">Compare to:<br>
+        <div class="uk-display-inline-block uk-margin-right">
+            <label class="uk-form-label">Compare to
+            </label>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Compare:</span>
                 <i class="uk-icon-caret-down"></i>
                 <select id="time-input-comparison-size">
                     <option class="uk-button" unit="WoW" value="7">WoW</option>
                     <option class="uk-button" unit="Wo2W" value="14" >Wo2W</option>
+                    <option class="uk-button" unit="Wo3W" value="21" >Wo3W</option>
                     <option class="uk-button" unit="Wo4W" value="28">Wo4W</option>
                 </select>
             </div>
         </div>
-    </#if>
 
-        <div class="uk-display-inline-block uk-margin-right">
-            <button type="submit" class="time-input-form-submit uk-button uk-button-small uk-button-primary ">Go</button>
+        <div class="uk-margin-right uk-margin-small-top">
+            <button type="submit" id="time-input-form-submit" class="uk-button uk-button-primary" disabled style="width: 100%">Go</button>
         </div>
     </div>
 </form>
+</div>
 
-
-<div id="current-view-settings" class="uk-clearfix" style="padding-right:20px;">
+<div id="current-view-settings" class="uk-clearfix" style="padding-right:20px; margin-top:  10px;">
 
 <#if (dimensionView.type == "HEAT_MAP")>
     <ul class="heatmap-tabs uk-tab" data-uk-tab>
@@ -188,7 +198,7 @@
             <a href="#">Datatable</a>
         </li>
     </ul>
-<#elseif (dimensionView.type == "TABULAR")>
+<#elseif (dimensionView.type == "TABULAR" || dimensionView.type == "MULTI_TIME_SERIES" )>
     <ul class="uk-tab funnel-tabs" data-uk-tab>
         <li class="uk-active">
             <a href="#">Summary</a>

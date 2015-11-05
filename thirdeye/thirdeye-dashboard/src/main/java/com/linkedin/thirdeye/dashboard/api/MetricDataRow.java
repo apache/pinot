@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.dashboard.api;
 
-import org.joda.time.DateTime;
+import java.util.Arrays;
 
+import org.joda.time.DateTime;
 
 public class MetricDataRow {
   private final DateTime baselineTime;
@@ -10,7 +11,8 @@ public class MetricDataRow {
   private final Number[] current;
   private final Number[] ratio;
 
-  public MetricDataRow(DateTime baselineTime, Number[] baseline, DateTime currentTime, Number[] current) {
+  public MetricDataRow(DateTime baselineTime, Number[] baseline, DateTime currentTime,
+      Number[] current) {
     this.baselineTime = baselineTime;
     this.baseline = baseline;
     this.currentTime = currentTime;
@@ -26,7 +28,8 @@ public class MetricDataRow {
         } else if (current[i] == null) {
           ratio[i] = 0;
         } else {
-          ratio[i] = (current[i].doubleValue() - baseline[i].doubleValue()) / baseline[i].doubleValue();
+          ratio[i] =
+              (current[i].doubleValue() - baseline[i].doubleValue()) / baseline[i].doubleValue();
         }
       }
     }
@@ -54,5 +57,11 @@ public class MetricDataRow {
 
   public Number[] getRatio() {
     return ratio;
+  }
+
+  // Debugging only: will print current values
+  @Override
+  public String toString() {
+    return Arrays.toString(current);
   }
 }
