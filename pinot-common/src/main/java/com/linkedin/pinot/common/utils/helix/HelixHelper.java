@@ -214,7 +214,7 @@ public class HelixHelper {
     return accessor.getProperty(builder.idealStates(resourceName));
   }
 
-  public static ExternalView getExternalViewForResouce(HelixAdmin admin, String clusterName, String resourceName) {
+  public static ExternalView getExternalViewForResource(HelixAdmin admin, String clusterName, String resourceName) {
     return admin.getResourceExternalView(clusterName, resourceName);
   }
 

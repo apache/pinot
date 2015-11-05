@@ -81,7 +81,7 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener, Inst
             + externalView);
         _helixExternalViewBasedRouting.markDataResourceOnline(
             resourceName,
-            HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(),
+            HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
                 _helixManager.getClusterName(), resourceName), instanceConfigList);
       }
     }
