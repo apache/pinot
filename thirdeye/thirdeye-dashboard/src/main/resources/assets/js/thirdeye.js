@@ -884,10 +884,9 @@ function transformUTCToTZDate(cell){
 function transformUTCToTZTime(cell){
     var cellObj = $(cell);
     var currentTime = moment(cellObj.attr('currentUTC'));
-    cellObj.html(currentTime.tz(tz).format('HH:mm'));
+    cellObj.html(currentTime.tz(tz).format('MM-DD HH:mm'));
     var baselineTime = moment(cellObj.attr('title'));
     cellObj.attr('title', baselineTime.tz(tz).format('MM-DD HH:mm'));
 };
-
 
 
