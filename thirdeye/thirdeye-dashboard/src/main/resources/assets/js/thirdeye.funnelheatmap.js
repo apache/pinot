@@ -117,7 +117,7 @@ $(document).ready(function() {
     })
 
     //Clicking a cell in the header should fix the related metrics in the query
-    $("#custom-funnel-section .metric-label").click(function(){
+    $("#custom-funnel-section").on("click", " .metric-label", function(){
         //Find the related metrics
         var funnelName = $("#custom-funnel-section h3:first-child").html().trim()
         var baseMetrics = $(this).attr("title")
