@@ -6,21 +6,20 @@ import java.util.Map;
 import org.joda.time.DateTime;
 
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
+import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
 
 public class FunnelTable {
   private final String name;
 
   private final Map<String, String> aliasToActualMap;
-  private final List<MetricDataRow> table;
-  private final List<MetricDataRow> cumulativeTable;
+  private final MetricTable metricTable;
   private final String current;
   private final String baseline;
 
-  public FunnelTable(FunnelSpec spec, List<MetricDataRow> table,
-      List<MetricDataRow> cumulativeTable, DateTime current, DateTime baseline) {
-    this.table = table;
-    this.cumulativeTable = cumulativeTable;
+  public FunnelTable(FunnelSpec spec, MetricTable metricTable, DateTime current,
+      DateTime baseline) {
+    this.metricTable = metricTable;
     this.name = spec.getName();
     aliasToActualMap = spec.getAliasToActualMetrics();
     this.current = current.toLocalDate().toString();
@@ -44,10 +43,10 @@ public class FunnelTable {
   }
 
   public List<MetricDataRow> getTable() {
-    return table;
+    return metricTable.getRows();
   }
 
   public List<MetricDataRow> getCumulativeTable() {
-    return cumulativeTable;
+    return metricTable.getCumulativeRows();
   }
 }

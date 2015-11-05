@@ -170,51 +170,6 @@ public class ViewUtils {
   }
 
   /**
-   * Computes cumulative values for the input rows. <tt>metricCount</tt> should be
-   * the number of values in each baseline/current dataset for each row.
-   */
-  public static List<MetricDataRow> computeCumulativeRows(List<MetricDataRow> rows,
-      int metricCount) {
-
-    if (rows.isEmpty()) {
-      return Collections.emptyList();
-    }
-    List<MetricDataRow> cumulativeRows = new LinkedList<>();
-    Number[] cumulativeBaselineValues = new Number[metricCount];
-    Arrays.fill(cumulativeBaselineValues, 0.0);
-    Number[] cumulativeCurrentValues = new Number[metricCount];
-    Arrays.fill(cumulativeCurrentValues, 0.0);
-
-    for (MetricDataRow row : rows) {
-      Number[] baselineValues = row.getBaseline();
-      if (baselineValues != null) {
-        for (int i = 0; i < baselineValues.length; i++) {
-          cumulativeBaselineValues[i] = cumulativeBaselineValues[i].doubleValue()
-              + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
-        }
-      }
-
-      Number[] currentValues = row.getCurrent();
-      if (currentValues != null) {
-        for (int i = 0; i < currentValues.length; i++) {
-          cumulativeCurrentValues[i] = cumulativeCurrentValues[i].doubleValue()
-              + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
-        }
-      }
-
-      Number[] cumulativeBaselineValuesCopy =
-          Arrays.copyOf(cumulativeBaselineValues, cumulativeBaselineValues.length);
-      Number[] cumulativeCurrentValuesCopy =
-          Arrays.copyOf(cumulativeCurrentValues, cumulativeCurrentValues.length);
-
-      MetricDataRow cumulativeRow = new MetricDataRow(row.getBaselineTime(),
-          cumulativeBaselineValuesCopy, row.getCurrentTime(), cumulativeCurrentValuesCopy);
-      cumulativeRows.add(cumulativeRow);
-    }
-    return cumulativeRows;
-  }
-
-  /**
    * Returns a path to the shallowest nested metric function that takes in multiple arguments:
    * <ul>
    * <li>A(B(C)) --> A,B</li>

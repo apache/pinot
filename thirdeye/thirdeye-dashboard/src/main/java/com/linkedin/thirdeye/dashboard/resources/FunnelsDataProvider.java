@@ -23,6 +23,7 @@ import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
+import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.api.funnel.CustomFunnelSpec;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
@@ -211,11 +212,8 @@ public class FunnelsDataProvider {
       filteredTable.add(filteredRow);
     }
 
-    List<MetricDataRow> filteredCumulativeTable =
-        ViewUtils.computeCumulativeRows(filteredTable, metricCount);
-
     // dates rendered on view still assume UTC return times.
-    return new FunnelTable(spec, filteredTable, filteredCumulativeTable, currentStart,
+    return new FunnelTable(spec, new MetricTable(filteredTable, metricCount), currentStart,
         baselineStart);
   }
 

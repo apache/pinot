@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -11,7 +12,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -27,6 +27,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
@@ -44,6 +45,8 @@ import io.dropwizard.views.View;
  * @author jteoh
  */
 public class ContributorDataProvider {
+  public static final String OTHER_DIMENSION_VALUE = StarTreeConstants.OTHER;
+  public static final String OTHER_DIMENSION_VALUE_MATCH_STR = "other";
   private static final Logger LOGGER = LoggerFactory.getLogger(ContributorDataProvider.class);
 
   private static final TypeReference<List<String>> LIST_TYPE_REF =
@@ -166,7 +169,9 @@ public class ContributorDataProvider {
    * Generates MetricTables for each metric+dimension+dimensionValue combination, using
    * <tt>totalRow</tt> as a
    * reference for filling in missing time buckets. The key of the returned table is (metric,
-   * dimension).
+   * dimension).<br/>
+   * Any dimension values matching "?" or "other" (ignored case) are grouped into the "?" category.
+   * The same applies for dimension values that do not meet the required threshold.
    */
   private Map<Pair<String, String>, Map<String, MetricTable>> generateDimensionTables(
       List<String> metrics, Map<String, MetricTable> totalRow,
@@ -187,22 +192,18 @@ public class ContributorDataProvider {
 
     // Due to the way that data is retrieved from server, loop (dimension, dimensionValue, metric).
     for (String dimension : dimensionCurrentResults.keySet()) {
-      Map<String, Map<Pair<String, Double>, MetricTable>> weightsByMetric = new HashMap<>();
+      // set up tracking maps
+      Map<String, Map<String, Double>> weightsByMetric = new HashMap<>();
+      Map<String, Map<String, MetricTable>> tablesByMetric = new HashMap<>();
       for (String metric : metrics) {
-        Map<Pair<String, Double>, MetricTable> valuesByContribution =
-            new TreeMap<>(new Comparator<Pair<String, Double>>() {
-              // descending order by Double value.
-              @Override
-              public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                return -o1.getValue().compareTo(o2.getValue());
-              }
-            });
-        weightsByMetric.put(metric, valuesByContribution);
+        weightsByMetric.put(metric, new HashMap<String, Double>());
+        tablesByMetric.put(metric, new HashMap<String, MetricTable>());
       }
+
       QueryResult queryBaselineResult = dimensionBaselineResults.get(dimension);
       QueryResult queryCurrentResult = dimensionCurrentResults.get(dimension);
       int dimensionValueIndex = queryCurrentResult.getDimensions().indexOf(dimension);
-      // If we need to limit the number of dimension values returned, that can be done here.
+
       for (String dimensionValuesKey : queryCurrentResult.getData().keySet()) {
         List<String> dimensionValues =
             objectMapper.readValue(dimensionValuesKey.getBytes(), LIST_TYPE_REF);
@@ -219,18 +220,36 @@ public class ContributorDataProvider {
 
         // Filter on contribution.
         for (String metric : metrics) {
+
           MetricTable metricRow = metricRows.get(metric);
+
+          Map<String, MetricTable> tables = tablesByMetric.get(metric);
+          Map<String, Double> weights = weightsByMetric.get(metric);
+
           double contributionCount = getContributionCount(metricRow);
           double totalCount = totalCounts.get(metric);
           double contribution = (contributionCount / totalCount);
           LOGGER.debug("Meets threshold? {} : {} / {} for {} {} {}",
               contribution >= MINIMUM_DIMENSION_VALUE_THRESHOLD, contributionCount, totalCount,
               metric, dimension, dimensionValue);
-          if (contribution >= MINIMUM_DIMENSION_VALUE_THRESHOLD) {
-            weightsByMetric.get(metric).put(new Pair<String, Double>(dimensionValue, contribution),
-                metricRow);
-          }
 
+          if (OTHER_DIMENSION_VALUE.equals(dimensionValue)
+              || OTHER_DIMENSION_VALUE_MATCH_STR.equalsIgnoreCase(dimensionValue)
+              || contribution < MINIMUM_DIMENSION_VALUE_THRESHOLD) {
+            // group into OTHER (?)
+            MetricTable otherRow = tables.get(OTHER_DIMENSION_VALUE);
+            if (otherRow != null) {
+              LOGGER.debug("Adding {} ({}) to OTHER ({})", dimensionValue, contributionCount,
+                  getContributionCount(otherRow));
+              metricRow = mergeTables(metricRow, otherRow, 1);
+            }
+            dimensionValue = OTHER_DIMENSION_VALUE;
+            // recompute contribution
+            contributionCount = getContributionCount(metricRow);
+            contribution = (contributionCount / totalCount);
+          }
+          weights.put(dimensionValue, contribution);
+          tables.put(dimensionValue, metricRow);
         }
       }
 
@@ -240,16 +259,34 @@ public class ContributorDataProvider {
             new LinkedHashMap<String, MetricTable>();
         table.put(new Pair<String, String>(metric, dimension), dimensionValueTable);
 
-        Map<Pair<String, Double>, MetricTable> weights = weightsByMetric.get(metric);
+        Map<String, Double> weights = weightsByMetric.get(metric);
+        Map<String, MetricTable> tables = tablesByMetric.get(metric);
+
+        // Sort by descending contribution
+        List<Entry<String, Double>> sortedEntries = sortedEntriesByValue(weights);
+        Collections.reverse(sortedEntries);
         // go through entries ordered by descending contribution
-        for (Entry<Pair<String, Double>, MetricTable> entry : weights.entrySet()) {
-          String dimensionValue = entry.getKey().getFirst();
-          MetricTable metricRow = entry.getValue();
+        for (Entry<String, Double> entry : sortedEntries) {
+          String dimensionValue = entry.getKey();
+          MetricTable metricRow = tables.get(dimensionValue);
           dimensionValueTable.put(dimensionValue, metricRow);
         }
       }
     }
     return table;
+
+  }
+
+  private <K, V extends Comparable<V>> List<Entry<K, V>> sortedEntriesByValue(Map<K, V> unsorted) {
+    List<Entry<K, V>> entries = new ArrayList<>(unsorted.entrySet());
+    Collections.sort(entries, new Comparator<Entry<K, V>>() {
+
+      @Override
+      public int compare(Entry<K, V> o1, Entry<K, V> o2) {
+        return o1.getValue().compareTo(o2.getValue());
+      }
+    });
+    return entries;
   }
 
   /**
@@ -264,8 +301,7 @@ public class ContributorDataProvider {
     Map<Long, Number[]> convertedCurrentValues = convertTimestamps(currentValues);
     List<MetricDataRow> entries = ViewUtils.extractMetricDataRows(convertedBaselineValues,
         convertedCurrentValues, currentStart, currentStart - baselineStart, intraPeriod);
-    List<MetricDataRow> cumulativeEntries = ViewUtils.computeCumulativeRows(entries, metricCount);
-    return new MetricTable(entries, cumulativeEntries);
+    return new MetricTable(entries, metricCount);
   }
 
   /**
@@ -330,9 +366,7 @@ public class ContributorDataProvider {
       }
       updatedRows.add(updatedRow);
     }
-    List<MetricDataRow> updatedCumulativeRows =
-        ViewUtils.computeCumulativeRows(updatedRows, metricCount);
-    return new MetricTable(updatedRows, updatedCumulativeRows);
+    return new MetricTable(updatedRows, metricCount);
   }
 
   private Map<String, MetricTable> expandMetrics(MetricTable table, List<String> metrics) {
@@ -344,13 +378,7 @@ public class ContributorDataProvider {
         MetricDataRow metricRow = extractMetric(row, i);
         metricRows.add(metricRow);
       }
-      List<MetricDataRow> cumulativeMetricRows = new LinkedList<>();
-      for (MetricDataRow cumulativeRow : table.getCumulativeRows()) {
-        MetricDataRow cumulativeMetricRow = extractMetric(cumulativeRow, i);
-        cumulativeMetricRows.add(cumulativeMetricRow);
-      }
-
-      result.put(metric, new MetricTable(metricRows, cumulativeMetricRows));
+      result.put(metric, new MetricTable(metricRows, 1));
     }
     return result;
   }
@@ -383,6 +411,40 @@ public class ContributorDataProvider {
     } else {
       return 0;
     }
+  }
+
+  private MetricTable mergeTables(MetricTable metricRow, MetricTable otherRow, int metricCount) {
+    if (metricRow == null) {
+      return otherRow;
+    } else if (otherRow == null) {
+      return metricRow;
+    }
+    Iterator<MetricDataRow> metricRowIter = metricRow.getRows().iterator();
+    Iterator<MetricDataRow> otherRowIter = otherRow.getRows().iterator();
+    List<MetricDataRow> resultRows = new LinkedList<>();
+    while (metricRowIter.hasNext()) {
+      MetricDataRow metric = metricRowIter.next();
+      MetricDataRow other = otherRowIter.next();
+      Number[] baseline = addValues(metric.getBaseline(), other.getBaseline());
+      Number[] current = addValues(metric.getCurrent(), other.getCurrent());
+      MetricDataRow resultRow =
+          new MetricDataRow(other.getBaselineTime(), baseline, other.getCurrentTime(), current);
+      resultRows.add(resultRow);
+    }
+    return new MetricTable(resultRows, metricCount);
+  }
+
+  private Number[] addValues(Number[] a, Number[] b) {
+    if (a == null) {
+      return b;
+    } else if (b == null) {
+      return a;
+    }
+    Number[] result = new Number[a.length];
+    for (int i = 0; i < a.length; i++) {
+      result[i] = a[i].doubleValue() + b[i].doubleValue();
+    }
+    return result;
   }
 
 }
