@@ -405,6 +405,9 @@ public class ContributorDataProvider {
   /** Returns final value for last cumulative row's first metric. */
   private double getContributionCount(MetricTable table) {
     List<MetricDataRow> cumulativeRows = table.getCumulativeRows();
+    if (cumulativeRows == null || cumulativeRows.isEmpty()) {
+      return 0;
+    }
     MetricDataRow finalRow = cumulativeRows.get(cumulativeRows.size() - 1);
     if (finalRow.getCurrent() != null) {
       return finalRow.getCurrent()[0].doubleValue();

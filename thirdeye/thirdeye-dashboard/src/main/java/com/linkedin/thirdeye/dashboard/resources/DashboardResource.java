@@ -4,13 +4,10 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
@@ -25,13 +22,11 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
@@ -54,7 +49,6 @@ import com.linkedin.thirdeye.dashboard.views.ExceptionView;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 import com.linkedin.thirdeye.dashboard.views.LandingView;
 import com.sun.jersey.api.NotFoundException;
-import com.sun.jersey.core.util.MultivaluedMapImpl;
 
 import io.dropwizard.views.View;
 
@@ -63,12 +57,7 @@ import io.dropwizard.views.View;
 public class DashboardResource {
 
   static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
-  private static final String DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION = "AGGREGATE_1_HOURS(%s)";
-  private static final double DIMENSION_VALUES_OPTIONS_THRESHOLD = 0.01;
-  private static final int DIMENSION_VALUES_LIMIT = 25;
-  private static final TypeReference<List<String>> LIST_TYPE_REF =
-      new TypeReference<List<String>>() {
-      };
+
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
   private final String serverUri;
