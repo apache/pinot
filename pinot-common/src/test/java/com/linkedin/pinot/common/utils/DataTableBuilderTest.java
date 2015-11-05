@@ -15,25 +15,18 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-
 import junit.framework.Assert;
-
-import org.apache.commons.io.IOUtils;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 
 
 public class DataTableBuilderTest {
@@ -473,6 +466,40 @@ public class DataTableBuilderTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testDataSchemaEquality() {
+    DataSchema ds = new DataSchema(null, null);
+    Assert.assertFalse(ds.equals(null));
+    Object rhs = new String("blah blah");
+    Assert.assertFalse(ds.equals(rhs));
+
+    rhs = new DataSchema(null, null);
+    Assert.assertTrue(ds.equals(rhs));
+
+    ds = new DataSchema(new String[] { "a", "b"}, new DataType[]{DataType.DOUBLE, DataType.STRING_ARRAY });
+    Assert.assertFalse(ds.equals(rhs));
+
+    rhs = new DataSchema(new String[] { "a", "b"}, new DataType[]{DataType.DOUBLE, DataType.STRING_ARRAY });
+    Assert.assertTrue(ds.equals(rhs));
+
+    // extra columns
+    rhs = new DataSchema(new String[] { "a", "b", "c"}, new DataType[]{DataType.DOUBLE, DataType.STRING_ARRAY, DataType.LONG});
+    Assert.assertFalse(ds.equals(rhs));
+
+    // same columns but type mismatch
+    rhs = new DataSchema(new String[] { "a", "b"}, new DataType[]{DataType.DOUBLE, DataType.STRING});
+    Assert.assertFalse(ds.equals(rhs));
+
+    rhs = new DataSchema(new String[] { "A", "c"}, new DataType[]{DataType.DOUBLE, DataType.STRING_ARRAY});
+    Assert.assertFalse(ds.equals(rhs));
+
+    ds = new DataSchema(new String[] { null }, new DataType[] { null});
+    Assert.assertFalse(ds.equals(rhs));
+
+    rhs = new DataSchema(new String[] { null}, new DataType[]{null});
+    Assert.assertTrue(ds.equals(rhs));
   }
 
   public static class A implements Serializable {

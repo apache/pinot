@@ -15,20 +15,19 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
@@ -49,6 +48,18 @@ public class CombineService {
       mergedBlock = blockToMerge;
       return;
     }
+
+    // [pinot 2315] For select * queries we let every segment determine schema and then
+    // combine results here. If the schemas differ combine may fail or return wrong results.
+    // Data schema can be null if the filter query does not return results
+    DataTableBuilder.DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
+    DataTableBuilder.DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
+    if (mergedBlockSchema != null && ! mergedBlockSchema.equals(blockToMergeSchema)) {
+      LOGGER.warn("Schema inconsistency. merged block schema: {}, block to merge schema: {}. Dropping block to merge",
+          mergedBlockSchema, blockToMergeSchema);
+      return;
+    }
+
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
     // Combine TotalDocs

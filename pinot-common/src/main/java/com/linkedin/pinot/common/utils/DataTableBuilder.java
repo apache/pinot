@@ -16,7 +16,7 @@
 package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
-
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -25,14 +25,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -644,6 +641,24 @@ public class DataTableBuilder {
       }
       sb.append("]");
       return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object rhs) {
+      if (this == rhs) {
+        return true;
+      }
+      if (rhs == null || getClass() != rhs.getClass()) {
+        return false;
+      }
+
+      DataSchema that = (DataSchema) rhs;
+
+      if (! Arrays.equals(this.columnNames, that.columnNames)) {
+        return false;
+      }
+
+      return Arrays.equals(this.columnTypes, that.columnTypes);
     }
   }
 
