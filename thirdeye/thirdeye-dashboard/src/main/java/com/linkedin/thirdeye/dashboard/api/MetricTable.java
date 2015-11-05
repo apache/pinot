@@ -28,7 +28,7 @@ public class MetricTable {
 
   public List<MetricDataRow> getCumulativeRows() {
     if (cumulativeRows == null) {
-      cumulativeRows = computeCumulativeRows(cumulativeRows, metricCount);
+      cumulativeRows = computeCumulativeRows(rows, metricCount);
     }
     return cumulativeRows;
   }
