@@ -63,15 +63,6 @@
     </li>
 
     <li>
-        <div class="uk-margin-small">
-            <div data-uk-button-checkbox>
-                <br>
-                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
-            </div>
-        </div>
-    </li>
-
-    <li>
         <div class="uk-margin-medium">Dimension:<br>
             <div  class="uk-button uk-form-select" data-uk-form-select>
                 <span>Dimension</span>
@@ -85,6 +76,14 @@
         </div>
     </li>
 
+    <li>
+        <div class="uk-margin-small">
+            <div data-uk-button-checkbox>
+                <br>
+                <button type="button" id="funnel-cumulative" class="uk-button">Cumulative</button>
+            </div>
+        </div>
+    </li>
 
 </#if>
 </ul>
@@ -106,7 +105,6 @@
                 <br>
                 <table>
                     <tr>
-                        <td>Select Filters: </td>
                         <#list dimensions as dimensionName>
                             <#assign dimensionDisplay = dimensionAliases[dimensionName]!dimensionName>
                             <#assign dimensionValue = selectedDimensions[dimensionName]!"*">

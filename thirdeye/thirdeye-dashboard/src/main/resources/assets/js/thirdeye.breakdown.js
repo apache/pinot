@@ -20,8 +20,7 @@ $(document).ready(function() {
         if(!$(this).hasClass("uk-active")) {
 
             $(".details-cell").toggleClass("hidden")
-            //$(".subheader").toggleClass("hidden")
-
+            $(".subheader").toggleClass("hidden")
             $('.contributors-table-time:not(.full-date)').attr('colspan', function(index, attr){
                 return attr == 3 ? null : 3;
             });

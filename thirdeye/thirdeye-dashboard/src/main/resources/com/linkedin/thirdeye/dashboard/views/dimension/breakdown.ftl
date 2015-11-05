@@ -5,8 +5,11 @@
     <#list dimensionView.view.dimensions as dimension>
         <#assign dimTable=dimensionView.view.dimensionTables[dimension]>
         <#list dimensionView.view.metrics as metric>
-            <div class="metric-section-wrapper" rel="${metric}">
+
+                <div class="metric-section-wrapper" rel="${metric}">
+
                 <div class="section-wrapper" rel="${dimension}">
+                    <h2>${metric}</h2>
                     <table id='contributors-view-${metric}' class="uk-table contributors-table" cell-spacing="0" width="100%">
 
                         <thead>
@@ -14,12 +17,12 @@
                         <tbody>
                             <!-- First time row-->
                             <@timeRow cells=dimTableTotalRow.rows/>
-
                             <@tableRowTotal cells=dimTableTotalRow.rows metric_index=metric_index class=""/>
                             <@tableRowTotal cells=dimTableTotalRow.cumulativeRows metric_index=metric_index class="cumulative hidden"/>
                             <!-- Divider row -->
                             <tr class="divider-row">
-                                <td colspan="3">${metric}</td>
+                                <td colspan="2" style="width:150px; word-wrap: break-word;"><h3>${dimension}</h3>
+                                </td>
                                 <#list 0..(dimTableTotalRow.rows?size) as x>
                                     <td></td>
                                 </#list>
@@ -58,7 +61,7 @@
     <#macro timeRow cells>
        <tr>
 
-            <td class="contributors-table-date" colspan="3" currentUTC="${cells[0].currentTime}">${cells[0].currentTime}</td>
+            <td class="contributors-table-date" colspan="2" currentUTC="${cells[0].currentTime}">${cells[0].currentTime}</td>
             <#list cells as cell>
             <#-- TODO properly display time in timezone-->
                 <td class="contributors-table-time" currentUTC="${cell.currentTime}" <#--title="${cell.baselineTime}-->  >${cell.currentTime}</td>
@@ -68,7 +71,7 @@
 
     <#macro tableRowTotal cells metric_index class>
         <tr class="${class}">
-            <td colspan="3"></td>
+            <td colspan="2" class="divider-cell"></td>
             <#list cells as cell>
                 <@timeBucketCell cell=cell metric_index=metric_index/>
             </#list>
@@ -76,15 +79,15 @@
     </#macro>
     <#macro tableRow dimension dimensionValue cells metric_index class>
         <tr class="${class}">
-            <td><input value="1" type="checkbox"></td>
-            <td class="dimension">${dimension}</td>
+            <td class="checkbox-cell"><input value="1" type="checkbox"></td>
+            <td class="dimension dimension-cell hidden">${dimension}</td>
             <#assign dimensionValueDisplay=dimensionValue?html>
             <#if dimensionValue=="">
                 <#assign dimensionValueDisplay="UNKNOWN">
             <#elseif dimensionValue=="?">
                 <#assign dimensionValueDisplay="OTHER">
             </#if>
-            <td class="dimension-value">${dimensionValueDisplay}</td>
+            <td class="dimension-value-cell">${dimensionValueDisplay}</td>
             <#list cells as cell>
                 <@timeBucketCell cell=cell metric_index=metric_index/>
             </#list>
@@ -109,7 +112,7 @@
         <td class="heat-map-cell"
                 value="
                 <#if cell.ratio?? && cell.ratio[metric_index]??>
-                ${cell.ratio[metric_index]?string["0.0"]}%
+                ${cell.ratio[metric_index]}
             <#else>
                 N/A
             </#if>

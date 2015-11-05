@@ -44,7 +44,7 @@ li {
     position: absolute;
     top:111px;
     left: 30px;
-    width: 95%;
+    width: 90%;
     background-color: #f5f5f5;
     z-index:100;
 }
@@ -230,6 +230,10 @@ li {
     width: 100%;
 }
 
+#dimension-contributor-area .section-wrapper{
+    margin-top: 0px;
+}
+
 #dimension-contributor-area table{
     line-height: 8px;
     font-size: 10px;
@@ -237,34 +241,54 @@ li {
     font-family: Arial, sans-serif;
     color: #898989;
     width: 100%;
-    border: 1px solid #ddd;
     vertical-align: middle;
     text-align: center;
+}
+
+#dimension-contributor-area table tr td:first-child {
+    word-wrap: break-word;
 }
 
 #dimension-contributor-area td:hover{
     color: #898989;
 }
 
-#dimension-contributor-area .divider-row td{
+#dimension-contributor-area .divider-cell{
+    border-left: 1px solid #ddd;
+    border-top:none;
+    border-right: 1px solid #ddd;
+
+}
+#dimension-contributor-area .divider-row td,
+#dimension-contributor-area .divider-row h3{
     line-height: 8px;
     height: 12px;
     border: none;
-    font-weight: 800;
+    margin: 0;
 }
 
-#dimension-contributor-area .contributors-table-time,
-#dimension-contributor-area .contributors-table-date{
+#dimension-contributor-area .contributors-table-date,
+#dimension-contributor-area .contributors-table-time{
     font-weight: 600;
 }
+#dimension-contributor-area .heat-map-cell{
+   border-right: 1px solid #ddd;
+}
 
 
-
-.contributors-table td,
-.contributors-table th{
+#dimension-contributor-area .dimension-value-cell{
     border: 1px solid #ddd;
-    vertical-align: middle;
-    text-align: center;
+    width: 100px;
+}
+
+#dimension-contributor-area .contributors-table-date,
+#dimension-contributor-area .contributors-table-time{
+    border: 1px solid #ddd;
+}
+
+#dimension-contributor-area .checkbox-cell{
+   width:30px;
+    border: 1px solid #ddd;
 }
 
 
@@ -668,7 +692,9 @@ td[dimension-val] {
     display: none;
 }
 
-.section-wrapper{margin-top: 15px;}
+.section-wrapper{
+    margin-top: 15px;
+}
 
 /* overwriting UIkit css */
 
