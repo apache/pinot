@@ -46,7 +46,7 @@ import com.linkedin.thirdeye.bootstrap.aggregation.MetricSums;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
 /**
- * Map Input = Record
+ * Map Input = Input from aggregation Key:(serialized dimension key), value:(serialized metricTimeSeires)
  *
  * Map Output = Key:(dimensionName, dimensionValue) Value:(metricTimeSeries)
  *
