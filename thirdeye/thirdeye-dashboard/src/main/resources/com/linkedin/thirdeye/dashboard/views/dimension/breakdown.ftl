@@ -79,7 +79,7 @@
     </#macro>
     <#macro tableRow dimension dimensionValue cells metric_index class>
         <tr class="${class}">
-            <td class="checkbox-cell"><input value="1" type="checkbox"></td>
+            <td class="checkbox-cell" style="width:15px;"><input value="1" type="checkbox"></td>
             <td class="dimension dimension-cell hidden">${dimension}</td>
             <#assign dimensionValueDisplay=dimensionValue?html>
             <#if dimensionValue=="">
@@ -87,7 +87,7 @@
             <#elseif dimensionValue=="?">
                 <#assign dimensionValueDisplay="OTHER">
             </#if>
-            <td class="dimension-value-cell">${dimensionValueDisplay}</td>
+            <td class="dimension-value-cell" style="width:100px; word-wrap: break-word;">${dimensionValueDisplay}</td>
             <#list cells as cell>
                 <@timeBucketCell cell=cell metric_index=metric_index/>
             </#list>

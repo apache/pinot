@@ -234,10 +234,10 @@ li {
     margin-top: 0px;
 }
 
-#dimension-contributor-area table{
+#dimension-contributor-area table td{
     line-height: 8px;
     font-size: 10px;
-    padding: 6px;
+    padding: 6px 5px 6px 6px;
     font-family: Arial, sans-serif;
     color: #898989;
     width: 100%;
@@ -287,8 +287,9 @@ li {
 }
 
 #dimension-contributor-area .checkbox-cell{
-   width:30px;
+   width:15px;
     border: 1px solid #ddd;
+    padding: 0px;
 }
 
 
