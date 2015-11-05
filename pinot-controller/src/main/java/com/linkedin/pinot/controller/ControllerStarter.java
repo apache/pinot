@@ -157,6 +157,7 @@ public class ControllerStarter {
     }
 
     conf.setControllerVipHost("localhost");
+    conf.setControllerVipProtocol("http");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setTenantIsolationEnabled(true);

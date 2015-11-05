@@ -322,7 +322,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           tempSegmentFile =
               new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + tableName + "/temp_" + segmentId
                   + "_" + System.currentTimeMillis());
-          if (uri.startsWith("http:")) {
+          if (uri.startsWith("http:") || uri.startsWith("https:")) {
             tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
             final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
             LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: "

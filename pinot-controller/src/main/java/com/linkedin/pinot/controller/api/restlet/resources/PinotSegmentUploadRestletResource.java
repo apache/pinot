@@ -80,7 +80,8 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     if (!tempUntarredPath.exists()) {
       tempUntarredPath.mkdirs();
     }
-    vip = StringUtil.join("://", "http", StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
+
+    vip = StringUtil.join("://", _controllerConf.getControllerVipProtocol(), StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
     LOGGER.info("controller download url base is : " + vip);
   }
 

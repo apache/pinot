@@ -28,6 +28,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
+  private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
@@ -71,6 +72,10 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setControllerVipHost(String vipHost) {
     setProperty(CONTROLLER_VIP_HOST, vipHost);
+  }
+
+  public void setControllerVipProtocol(String vipProtocol) {
+    setProperty(CONTROLLER_VIP_PROTOCOL, vipProtocol);
   }
 
   public void setControllerPort(String port) {
@@ -125,6 +130,13 @@ public class ControllerConf extends PropertiesConfiguration {
       return (String) getProperty(CONTROLLER_VIP_HOST);
     }
     return (String) getProperty(CONTROLLER_HOST);
+  }
+
+  public String getControllerVipProtocol() {
+    if (containsKey(CONTROLLER_VIP_PROTOCOL) && ((String) getProperty(CONTROLLER_VIP_PROTOCOL)).equals("https")) {
+      return "https";
+    }
+    return "http";
   }
 
   public int getRetentionControllerFrequencyInSeconds() {

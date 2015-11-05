@@ -36,6 +36,7 @@ public class ControllerTestUtils {
     conf.setControllerPort(DEFAULT_CONTROLLER_API_PORT);
     conf.setDataDir(DEFAULT_DATA_DIR);
     conf.setControllerVipHost("localhost");
+    conf.setControllerVipProtocol("http");
 
     return conf;
   }
