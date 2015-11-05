@@ -30,10 +30,10 @@ public interface PredicateEvaluator {
    * @return
    */
   public boolean apply(int[] dictionaryIds);
-
   /**
-   *
+   * 
    * @return
    */
-  public int[] getDictionaryIds();
+  public int[] getMatchingDictionaryIds();
+
 }

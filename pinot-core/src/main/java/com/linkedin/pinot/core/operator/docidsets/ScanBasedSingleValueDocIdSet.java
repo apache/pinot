@@ -21,8 +21,8 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+
 
 
 public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
@@ -30,10 +30,10 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   private BlockValSetBasedDocIdIterator blockValSetBlockDocIdIterator;
   private BlockMetadata blockMetadata;
 
-  public ScanBasedSingleValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, int... dictIds) {
+  public ScanBasedSingleValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator = new BlockValSetBasedDocIdIterator(blockValSet, blockMetadata, dictIds);
+    blockValSetBlockDocIdIterator = new BlockValSetBasedDocIdIterator(blockValSet, blockMetadata, evaluator);
   }
 
   public int getMinDocId() {
@@ -68,18 +68,17 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   public static class BlockValSetBasedDocIdIterator implements BlockDocIdIterator {
     int currentDocId = -1;
     BlockSingleValIterator valueIterator;
-    private IntSet dictIdSet;
     private int startDocId;
     private int endDocId;
+    private PredicateEvaluator evaluator;
 
-    public BlockValSetBasedDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      if (dictIds.length < 1) {
-        this.dictIdSet = null;
+    public BlockValSetBasedDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+      this.evaluator = evaluator;
+      if (evaluator.getMatchingDictionaryIds().length == 0) {
         currentDocId = Constants.EOF;
         setStartDocId(Constants.EOF);
         setEndDocId(Constants.EOF);
       } else {
-        this.dictIdSet = new IntOpenHashSet(dictIds);
         setStartDocId(blockMetadata.getStartDocId());
         setEndDocId(blockMetadata.getEndDocId());
       }
@@ -129,7 +128,8 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
       while (valueIterator.hasNext() && currentDocId <= endDocId) {
         currentDocId = currentDocId + 1;
         int dictIdForCurrentDoc = valueIterator.nextIntVal();
-        if (dictIdSet.contains(dictIdForCurrentDoc)) {
+        if (evaluator.apply(dictIdForCurrentDoc)) {
+          //System.out.println("Returning deom " + this +"doc Id:"+ currentDocId  + " dictId:"+ dictIdForCurrentDoc);
           return currentDocId;
         }
       }

@@ -16,13 +16,20 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
-public class RangeRealtimeDictionaryPredicateEvaluator extends AbstractPredicateEvaluator {
+
+public class RangeRealtimeDictionaryPredicateEvaluator implements PredicateEvaluator {
+
+  private int[] matchingIds;
+  private IntSet dictIdSet;
 
   public RangeRealtimeDictionaryPredicateEvaluator(RangePredicate predicate, MutableDictionaryReader dictionary) {
     List<Integer> ids = new ArrayList<Integer>();
@@ -57,8 +64,30 @@ public class RangeRealtimeDictionaryPredicateEvaluator extends AbstractPredicate
       }
     }
     matchingIds = new int[ids.size()];
+    dictIdSet = new IntOpenHashSet(ids.size());
     for (int i = 0; i < matchingIds.length; i++) {
       matchingIds[i] = ids.get(i);
     }
   }
+
+  @Override
+  public boolean apply(int dictionaryId) {
+    return dictIdSet.contains(dictionaryId);
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds) {
+    for (int dictId : dictionaryIds) {
+      if (dictIdSet.contains(dictId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public int[] getMatchingDictionaryIds() {
+    return matchingIds;
+  }
+
 }

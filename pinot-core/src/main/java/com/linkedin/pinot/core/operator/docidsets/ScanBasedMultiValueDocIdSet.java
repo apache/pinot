@@ -21,6 +21,8 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
@@ -31,10 +33,11 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private BlockMetadata blockMetadata;
   private BlockValSetBlockDocIdIterator blockValSetBlockDocIdIterator;
 
-  public ScanBasedMultiValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, int... dictIds) {
+  public ScanBasedMultiValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata,
+      PredicateEvaluator evaluator) {
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator = new BlockValSetBlockDocIdIterator(blockValSet, blockMetadata, dictIds);
+    blockValSetBlockDocIdIterator = new BlockValSetBlockDocIdIterator(blockValSet, blockMetadata, evaluator);
   }
 
   @Override
@@ -71,24 +74,24 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   public static class BlockValSetBlockDocIdIterator implements BlockDocIdIterator {
     BlockMultiValIterator valueIterator;
     int currentDocId = -1;
-    private IntSet dictIdSet;
     final int[] intArray;
     private int startDocId;
     private int endDocId;
+    private PredicateEvaluator evaluator;
 
-    public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      if (dictIds.length > 0) {
-        this.dictIdSet = new IntOpenHashSet(dictIds);
-        this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
-        Arrays.fill(intArray, 0);
-        setStartDocId(blockMetadata.getStartDocId());
-        setEndDocId(blockMetadata.getEndDocId());
-      } else {
-        this.dictIdSet = null;
+    public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata,
+        PredicateEvaluator evaluator) {
+      this.evaluator = evaluator;
+      if (evaluator.getMatchingDictionaryIds().length == 0) {
         this.intArray = new int[0];
         setStartDocId(Constants.EOF);
         setEndDocId(Constants.EOF);
         currentDocId = Constants.EOF;
+      } else {
+        this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
+        Arrays.fill(intArray, 0);
+        setStartDocId(blockMetadata.getStartDocId());
+        setEndDocId(blockMetadata.getEndDocId());
       }
       valueIterator = (BlockMultiValIterator) blockValSet.iterator();
     }
@@ -136,14 +139,7 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
       while (valueIterator.hasNext() && currentDocId <= endDocId) {
         currentDocId = currentDocId + 1;
         int length = valueIterator.nextIntVal(intArray);
-        boolean found = false;
-        for (int i = 0; i < length; i++) {
-          if (dictIdSet.contains(intArray[i])) {
-            found = true;
-            break;
-          }
-        }
-        if (found) {
+        if (evaluator.apply(Arrays.copyOf(intArray, length))) {
           return currentDocId;
         }
       }

@@ -69,9 +69,9 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     BlockMetadata blockMetadata = nextBlock.getMetadata();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     if (dataSourceMetadata.isSingleValue()) {
-      docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
+      docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, evaluator);
     } else {
-      docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
+      docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, evaluator);
     }
 
     if (startDocId != null) {

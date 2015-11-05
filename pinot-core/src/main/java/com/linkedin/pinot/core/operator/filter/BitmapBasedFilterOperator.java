@@ -57,7 +57,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     Block dataSourceBlock = dataSource.nextBlock();
     Dictionary dictionary = dataSource.getDictionary();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
-    int[] dictionaryIds = evaluator.getDictionaryIds();
+    int[] dictionaryIds = evaluator.getMatchingDictionaryIds();
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[dictionaryIds.length];
     for (int i = 0; i < dictionaryIds.length; i++) {
       bitmaps[i] = invertedIndex.getImmutable(dictionaryIds[i]);

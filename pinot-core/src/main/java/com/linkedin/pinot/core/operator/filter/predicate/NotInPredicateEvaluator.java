@@ -15,30 +15,64 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
-public class NotInPredicateEvaluator extends AbstractPredicateEvaluator {
+
+public class NotInPredicateEvaluator implements PredicateEvaluator {
+
+  private int[] matchingIds;
+  private Dictionary dictionary;
+  private IntSet nonMatchingDictIdSet;
 
   public NotInPredicateEvaluator(NotInPredicate predicate, Dictionary dictionary) {
-    List<Integer> dictIds = new ArrayList<Integer>();
+    this.dictionary = dictionary;
     final String[] notInValues = predicate.getNotInRange();
-    final List<Integer> notInIds = new ArrayList<Integer>();
-    for (final String notInValue : notInValues) {
-      notInIds.add(new Integer(dictionary.indexOf(notInValue)));
-    }
-    for (int i = 0; i < dictionary.length(); i++) {
-      if (!notInIds.contains(new Integer(i))) {
-        dictIds.add(i);
+    nonMatchingDictIdSet = new IntOpenHashSet(notInValues.length);
+    for (int i = 0; i < notInValues.length; i++) {
+      final String notInValue = notInValues[i];
+      int dictId = dictionary.indexOf(notInValue);
+      if(dictId>=0){
+        nonMatchingDictIdSet.add(dictId);
       }
     }
-    matchingIds = new int[dictIds.size()];
-    for (int i = 0; i < matchingIds.length; i++) {
-      matchingIds[i] = dictIds.get(i);
+  }
+
+  @Override
+  public boolean apply(int dictionaryId) {
+    return (!nonMatchingDictIdSet.contains(dictionaryId));
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds) {
+    for (int dictId : dictionaryIds) {
+      if (nonMatchingDictIdSet.contains(dictId)) {
+        return false;
+      }
     }
+    return true;
+  }
+
+  @Override
+  public int[] getMatchingDictionaryIds() {
+    //This is expensive for NOT IN predicate, some operators need this for now. Eventually we should remove the need for exposing matching dict ids
+    if (matchingIds == null) {
+      int count = 0;
+      matchingIds = new int[dictionary.length() - nonMatchingDictIdSet.size()];
+      for (int i = 0; i < dictionary.length(); i++) {
+        if (!nonMatchingDictIdSet.contains(i)) {
+          matchingIds[count] = i;
+          count = count + 1;
+        }
+      }
+    }
+    return matchingIds;
   }
 }

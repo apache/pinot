@@ -64,7 +64,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Dictionary dictionary = dataSource.getDictionary();
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
-    int[] dictionaryIds = evaluator.getDictionaryIds();
+    int[] dictionaryIds = evaluator.getMatchingDictionaryIds();
     Arrays.sort(dictionaryIds);
     for (int i = 0; i < dictionaryIds.length; i++) {
       int[] minMax = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);

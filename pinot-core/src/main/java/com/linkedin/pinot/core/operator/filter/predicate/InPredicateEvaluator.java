@@ -15,27 +15,54 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
+import java.util.Arrays;
+
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
 
-public class InPredicateEvaluator extends AbstractPredicateEvaluator {
+public class InPredicateEvaluator implements PredicateEvaluator {
+
+  private int[] matchingIds;
+  private IntSet dictIdSet;
 
   public InPredicateEvaluator(InPredicate predicate, Dictionary dictionary) {
-    IntSet dictIds = new IntOpenHashSet();
+    
+    dictIdSet = new IntOpenHashSet();
     final String[] inValues = predicate.getInRange();
     for (final String value : inValues) {
       final int index = dictionary.indexOf(value);
       if (index >= 0) {
-        dictIds.add(index);
+        dictIdSet.add(index);
       }
     }
-    matchingIds = new int[dictIds.size()];
+    matchingIds = new int[dictIdSet.size()];
     int i = 0;
-    for (int dictId : dictIds) {
+    for (int dictId : dictIdSet) {
       matchingIds[i++] = dictId;
     }
+    Arrays.sort(matchingIds);
+  }
+
+  @Override
+  public boolean apply(int dictionaryId) {
+    return dictIdSet.contains(dictionaryId);
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds) {
+    for (int dictId : dictionaryIds) {
+      if (dictIdSet.contains(dictId) ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public int[] getMatchingDictionaryIds() {
+    return matchingIds;
   }
 }
