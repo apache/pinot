@@ -15,38 +15,6 @@
  */
 package com.linkedin.pinot.perf;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLConnection;
-import java.sql.Timestamp;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.tools.ClusterStateVerifier;
-import org.apache.helix.tools.ClusterStateVerifier.Verifier;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
-
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.Tenant;
@@ -61,6 +29,30 @@ import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.tools.ClusterStateVerifier;
+import org.apache.helix.tools.ClusterStateVerifier.Verifier;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 
 public class PerfBenchmarkDriver {
@@ -244,6 +236,7 @@ public class PerfBenchmarkDriver {
     conf.setControllerHost(controllerHost);
     conf.setControllerPort(String.valueOf(controllerPort));
     conf.setDataDir(controllerDataDir);
+    conf.setTenantIsolationEnabled(false);
     conf.setControllerVipHost("localhost");
     return conf;
   }
@@ -262,8 +255,8 @@ public class PerfBenchmarkDriver {
     int numInstances = 1;
     int numReplicas = 1;
     String segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
-    String brokerTenantName = "testBrokerTenant";
-    String serverTenantName = "testServerTenant";
+    String brokerTenantName = "DefaultTenant";
+    String serverTenantName = "DefaultTenant";
     // create broker tenant
     Tenant brokerTenant =
         new TenantBuilder(brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(numInstances).build();
