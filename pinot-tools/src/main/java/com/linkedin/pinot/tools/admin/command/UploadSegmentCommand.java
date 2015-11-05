@@ -100,18 +100,23 @@ public class UploadSegmentCommand extends AbstractBaseCommand implements Command
     File[] files = dir.listFiles();
 
     for (File file : files) {
-      if (!file.isDirectory()) {
-        continue;
+      File tgzFile = file;
+      boolean cleanTmpFile = false;
+
+      if (file.isDirectory()) {
+        String srcDir = file.getAbsolutePath();
+        String tgzFileName = TarGzCompressionUtils.createTarGzOfDirectory(srcDir);
+        tgzFile = new File(tgzFileName);
+        cleanTmpFile = true;
       }
 
-      String srcDir = file.getAbsolutePath();
-
-      String outFile = TarGzCompressionUtils.createTarGzOfDirectory(srcDir);
-      File tgzFile = new File(outFile);
       FileUploadUtils.sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(),
           new FileInputStream(tgzFile), tgzFile.length());
 
-      FileUtils.deleteQuietly(tgzFile);
+      // Clean the file if we created it.
+      if (cleanTmpFile) {
+        FileUtils.deleteQuietly(tgzFile);
+      }
     }
 
     return true;
