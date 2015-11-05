@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
@@ -129,6 +130,9 @@ public class HelixBrokerStarter {
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
         "helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+
+    _helixManager.addPreConnectCallback(() -> _brokerServerBuilder.getBrokerMetrics()
+        .addMeteredValue(null, BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {

@@ -29,7 +29,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
   REQUEST_FETCH_EXCEPTIONS("exceptions", false),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", false),
-  DOCUMENTS_SCANNED("documents", false);
+  DOCUMENTS_SCANNED("documents", false),
+  HELIX_ZOOKEEPER_RECONNECTS("reconnects", true);
 
   private final String brokerMeterName;
   private final String unit;

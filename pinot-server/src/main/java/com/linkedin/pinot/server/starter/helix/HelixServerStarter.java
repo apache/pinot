@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
@@ -108,6 +109,9 @@ public class HelixServerStarter {
 
     _serverInstance.getServerMetrics().addCallbackGauge(
         "helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+
+    _helixManager.addPreConnectCallback(() ->
+        _serverInstance.getServerMetrics().addMeteredValue(null, ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {
