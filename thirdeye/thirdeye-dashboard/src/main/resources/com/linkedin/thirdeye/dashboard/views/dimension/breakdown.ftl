@@ -1,6 +1,6 @@
 <script src="/assets/js/thirdeye.breakdown.js"></script>
 
-<div id="dimension-contributor-area">
+<div id="dimension-contributor-area" width="100%">
     <#list dimensionView.view.metrics as metric>
         <#list dimensionView.view.dimensions as dimension>
             <#assign dimTableTotalRow=dimensionView.view.metricTotalTable[metric]>
@@ -11,7 +11,7 @@
                 <div class="section-wrapper" rel="${dimension}">
 
                     <h2>${metric}</h2>
-                    <table id='contributors-view-${metric}' class="uk-table contributors-table" cell-spacing="0" width="100%">
+                    <table id='contributors-view-${metric}' class="uk-table contributors-table fixed-table-layout" cell-spacing="0" width="100%">
 
                         <thead>
                         </thead>
@@ -22,11 +22,11 @@
                             <@tableRowTotal cells=dimTableTotalRow.cumulativeRows class="cumulative-values hidden"/>
                             <!-- Divider row -->
                             <tr class="divider-row">
-                                <td colspan="2" style="width:150px; word-wrap: break-word;"><h3>${dimension}</h3>
+                                <td colspan="5"><h3>${dimension}</h3>
                                 </td>
-                                <#list 0..(dimTableTotalRow.rows?size) as x>
+                                <#--<#list 0..(dimTableTotalRow.rows?size) as x>
                                     <td></td>
-                                </#list>
+                                </#list>-->
                             </tr>
 
                             <!-- Second time row -->

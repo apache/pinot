@@ -13,7 +13,8 @@ $(document).ready(function() {
 
     /* Transform UTC time into user selected or browser's timezone and display time */
     $(".contributors-table-time").each(function(i, cell){
-        transformUTCToTZTime(cell);
+        var dateTimeFormat = 'HH:mm'
+        transformUTCToTZTime(cell, dateTimeFormat);
     });
 
     $(".funnel-tabs li").on("click", function(){
@@ -21,9 +22,11 @@ $(document).ready(function() {
 
             $(".details-cell").toggleClass("hidden")
             $(".subheader").toggleClass("hidden")
-            $('.contributors-table-time:not(.full-date)').attr('colspan', function(index, attr){
+            $('.contributors-table-time').attr('colspan', function(index, attr){
                 return attr == 3 ? null : 3;
             });
+            $("#dimension-contributor-area table").toggleClass("fixed-table-layout")
+
 
         }
     })

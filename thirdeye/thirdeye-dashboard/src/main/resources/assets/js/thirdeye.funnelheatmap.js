@@ -20,7 +20,8 @@ $(document).ready(function() {
 
     /* Transform UTC time into user selected or browser's timezone */
     $(".funnel-table-time").each(function(i, cell){
-        transformUTCToTZTime(cell)
+        var dateTimeFormat = 'MM-DD HH:mm'
+        transformUTCToTZTime(cell, dateTimeFormat )
     })
 
     $(".funnel .metric-list[currentUTC]").each(function(i, label){

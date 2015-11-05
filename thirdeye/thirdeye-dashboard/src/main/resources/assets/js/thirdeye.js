@@ -881,10 +881,11 @@ function transformUTCToTZDate(cell){
 };
 
 /** Transform UTC time into user selected or browser's timezone and display the time value **/
-function transformUTCToTZTime(cell){
+function transformUTCToTZTime(cell, format){
+
     var cellObj = $(cell);
     var currentTime = moment(cellObj.attr('currentUTC'));
-    cellObj.html(currentTime.tz(tz).format('MM-DD HH:mm'));
+    cellObj.html(currentTime.tz(tz).format(format));
     var baselineTime = moment(cellObj.attr('title'));
     cellObj.attr('title', baselineTime.tz(tz).format('MM-DD HH:mm'));
 };
