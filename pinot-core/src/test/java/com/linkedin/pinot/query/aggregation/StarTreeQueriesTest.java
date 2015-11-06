@@ -467,7 +467,7 @@ public class StarTreeQueriesTest {
       }
     }
 
-    return ImmutableMap.of("M0", m0Aggregate, "M1", m1Aggregate);
+    return ImmutableMap.of("M0", (Number) m0Aggregate, "M1", (Number) m1Aggregate);
   }
 
   private static Map<List<String>, Long> computeAggregateGroupByFromRawData(File avroFile, Map<String, String> fixedValues, List<String> groupByColumns) throws Exception {

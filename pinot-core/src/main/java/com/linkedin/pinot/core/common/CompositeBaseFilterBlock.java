@@ -29,7 +29,7 @@ public class CompositeBaseFilterBlock extends BaseFilterBlock {
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
     Integer minDocId = null;
     Integer maxDocId = null;
-    List<FilterBlockDocIdSet> filterBlocks = new ArrayList<>(blocks.size());
+    final List<FilterBlockDocIdSet> filterBlocks = new ArrayList<>(blocks.size());
     for (BaseFilterBlock block : blocks) {
       FilterBlockDocIdSet filterBlock = block.getFilteredBlockDocIdSet();
       if (minDocId == null || filterBlock.getMinDocId() < minDocId) {
