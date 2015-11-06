@@ -52,13 +52,19 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   public NettyClientConnection create(ServerInstance key) {
     NettyClientConnection conn = new PooledClientConnection(_pool, key, _eventLoop, _timer, _metrics);
     conn.connect();
+    // At this point, we have already waited for a connection to complete. Whether it succeeds or fails,
+    // we should return the object to the pool. It is possible to return null if the connection attempt
+    // fails (i.e. we get back a false return above), but then the pool starts to initiate new connections
+    // to the host to maintain the minimum pool size. We don't want to DOS the server continuously
+    // trying to create new connections. A connection is always validated before the pool returns it
+    // from the idle list to the user.
     return conn;
   }
 
   @Override
   public boolean destroy(ServerInstance key, boolean isBad, NettyClientConnection resource) {
 
-    LOGGER.info("Destroying client connection to server :" + key);
+    LOGGER.info("Destroying client connection to server :" + key + " isBad:"+ isBad);
     boolean closed = false;
     try {
       resource.close();

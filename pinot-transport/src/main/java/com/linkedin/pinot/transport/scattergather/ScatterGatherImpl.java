@@ -340,6 +340,7 @@ public class ScatterGatherImpl implements ScatterGather {
    *
    */
   public static class SingleRequestHandler implements Runnable {
+    private final static int MAX_CONN_RETRIES = 3;  // Max retries for getting a connection
     // Scatter Request
     private final ScatterGatherRequest _request;
     // List Of Partitions to be queried on the server
@@ -360,8 +361,10 @@ public class ScatterGatherImpl implements ScatterGather {
     // Cancel dispatching request
     private final AtomicBoolean _isCancelled = new AtomicBoolean(false);
 
-    // Timeout MS
+    // Remaining time budget to connect and process the request.
     private final long _timeoutMS;
+
+    private final long _startTime;
 
     public SingleRequestHandler(KeyedPool<ServerInstance, NettyClientConnection> connPool, ServerInstance server,
         ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch) {
@@ -371,6 +374,7 @@ public class ScatterGatherImpl implements ScatterGather {
       _segmentIds = segmentIds;
       _requestDispatchLatch = latch;
       _timeoutMS = timeoutMS;
+      _startTime = System.currentTimeMillis();
     }
 
     @Override
@@ -388,15 +392,44 @@ public class ScatterGatherImpl implements ScatterGather {
         KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(_server);
 
         byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
-        conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
-        while (!conn.validate()) {
-          LOGGER.warn("Checked out invalid connection, destroying it and checking out new one");
-          _connPool.destroyObject(_server, conn);
+        long timeRemaining = _timeoutMS - (System.currentTimeMillis() - _startTime);
+        int ntries = 0;
+        // Try a maximum of pool size objects.
+        while (true) {
+          if (timeRemaining <= 0) {
+            c.cancel(true);
+            throw new TimeoutException("Timed out trying to connect to " + _server + "(timeout=" + _timeoutMS + "ms,ntries=" + ntries + ")");
+          }
+          conn = c.getOne(timeRemaining, TimeUnit.MILLISECONDS);
+          // conn may be null if we cannot get any connection from the pool. This condition can happen either
+          // due to a timeout (server host is switched off, or cable disconnected), or due to immediate connection refusal
+          // (host is up, but server JVM is not running, or not up yet). It will also get a null when the AsyncPoolImpl.create()
+          // is not able to create a connection, and this one was a waiting request.
+          // In either case, there is no point in retrying  this request
+          if (conn != null && conn.validate()) {
+            break;
+          }
+          // If we get a null error map, then it is most likely a case of "Connection Refused" from remote.
+          // The connect errors are obtained from two different objects -- 'conn' and 'c'.
+          // We pick the error from 'c' here, if we find it. Unfortunately there is not a way (now) to pass the
+          // error from 'c' to 'conn' (need to do it via AsyncPoolImpl)
+          Map<ServerInstance, Throwable> errorMap = c.getError();
+          String errStr = "";
+          if (errorMap != null && errorMap.containsKey(_server)) {
+            errStr = errorMap.get(_server).getMessage();
+          }
+          LOGGER.warn("Destroying invalid conn {}:", conn, errStr);
+          if (conn != null) {
+            _connPool.destroyObject(_server, conn);
+          }
+          if (++ntries == MAX_CONN_RETRIES-1) {
+            throw new RuntimeException("Could not connect to " + _server + " after " + ntries + "attempts(timeRemaining=" + timeRemaining + "ms)");
+          }
           c = _connPool.checkoutObject(_server);
-          conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
+          timeRemaining = _timeoutMS - (System.currentTimeMillis() - _startTime);
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
-        _responseFuture = conn.sendRequest(req, _request.getRequestId(), _timeoutMS);
+        _responseFuture = conn.sendRequest(req, _request.getRequestId(), timeRemaining);
         _isSent.set(true);
         LOGGER.debug("Response Future is : {}", _responseFuture);
       } catch (TimeoutException e1) {

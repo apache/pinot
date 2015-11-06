@@ -67,6 +67,11 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
   }
 
   @Override
+  public boolean validate(T obj) {
+    return _resourceManager.validate(_key, obj);
+  }
+
+  @Override
   public boolean validateGet(T obj) {
     return _resourceManager.validate(_key, obj);
   }

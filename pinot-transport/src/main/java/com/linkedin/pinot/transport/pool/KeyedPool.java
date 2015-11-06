@@ -63,6 +63,16 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
   public KeyedFuture<K, T> checkoutObject(K key);
 
   /**
+   * Validates all object in the pool with key.
+   * Invokes validate on every object in the pool and destroys invalid objects
+   *
+   * @param key
+   * @param recreate recreates invalid objects
+   * @return
+   */
+  public boolean validatePool(K key, boolean recreate);
+
+  /**
    * Return a previously checked out object to the pool.  It is an error to return an object to
    * the pool that is not currently checked out from the pool.
    *

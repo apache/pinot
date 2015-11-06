@@ -15,11 +15,14 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -33,16 +36,11 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
-
+import java.net.ConnectException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 
 
 /**
@@ -140,7 +138,12 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
     } catch (Exception ie) {
-      LOGGER.error("Got exception when connecting to server :" + _server, ie);
+      if (ie instanceof ConnectException && ie.getMessage() != null && ie.getMessage().startsWith("Connection refused")) {
+        // Most common case when a server is down. Don't print the entire stack and fill the logs.
+        LOGGER.error("Could not connect to server " + _server + ":" + ie.getMessage());
+      } else {
+        LOGGER.error("Got exception when connecting to server :" + _server, ie);
+      }
     }
     return false;
   }
@@ -236,6 +239,12 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       _lastRequestTimeout.cancel(); //If task is already executed, no side-effect
       _lastRequestTimeout = null;
     }
+  }
+
+  // Having a toString method here is useful when logging stuff from AsyncPoolImpl
+  @Override
+  public String toString() {
+    return "Server:" + _server + ",State:" + _connState;
   }
 
   /**

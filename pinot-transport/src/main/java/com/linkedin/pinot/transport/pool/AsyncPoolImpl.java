@@ -15,21 +15,6 @@
  */
 package com.linkedin.pinot.transport.pool;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.transport.common.Callback;
@@ -41,6 +26,20 @@ import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -327,8 +326,8 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     }
     if (reject) {
       // This is a recoverable exception. User can simply retry the failed get() operation.
-      callbackWithTracking.onError(new SizeLimitExceededException("AsyncPool " + _poolName
-          + " reached maximum waiter size: " + _maxWaiters));
+      callbackWithTracking.onError(
+          new SizeLimitExceededException("AsyncPool " + _poolName + " reached maximum waiter size: " + _maxWaiters));
       return null;
     }
     trc("enqueued a waiter");
@@ -607,8 +606,8 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       }
     }
     if ((state == State.SHUTTING_DOWN) && (done == null)) {
-      LOGGER.info("{}: {} waiters and {} objects outstanding before shutdown", new Object[] { _poolName, waiters, poolSize
-          - idle });
+      LOGGER.info("{}: {} waiters and {} objects outstanding before shutdown",
+          new Object[] { _poolName, waiters, poolSize - idle });
     }
     return done;
   }
@@ -686,5 +685,27 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
 
   public Throwable getLastCreateError() {
     return _lastCreateError;
+  }
+
+  @Override
+  public boolean validate(boolean recreate) {
+    if (recreate) {
+      throw new UnsupportedOperationException("Recreate=true is not yet supported");
+    }
+    synchronized (_lock) {
+      Iterator<TimedObject<T>> it = _idle.iterator();
+      while (it.hasNext()) {
+        TimedObject<T> obj = it.next();
+        T rawObj = obj.get();
+        if (!_lifecycle.validate(rawObj)) {
+          it.remove();
+          destroy(rawObj, true);
+          LOGGER.info("Destroyed invalid object " + rawObj);
+        } else {
+          LOGGER.info("Keeping valid object " + rawObj);
+        }
+      }
+    }
+    return true;
   }
 }
