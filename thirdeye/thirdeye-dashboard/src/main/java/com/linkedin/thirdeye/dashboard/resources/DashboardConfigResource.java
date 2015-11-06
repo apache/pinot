@@ -1,10 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -87,10 +88,12 @@ public class DashboardConfigResource {
   /**
    * Returns a map of dimensions -> list of observed dimension values in the given time
    * window, sorted in decreasing order of overall contribution. Any items not meeting a
-   * contribution threshold of {@value #DIMENSION_VALUES_OPTIONS_THRESHOLD} are omitted, and a
-   * maximum of {@value #DIMENSION_VALUES_LIMIT} results are returned for any given dimension.
+   * contribution threshold of {@value #DIMENSION_VALUES_OPTIONS_THRESHOLD} for at least one metric
+   * are omitted, and a
+   * maximum of {@value #DIMENSION_VALUES_LIMIT} results are returned for each metric and any given
+   * dimension.
    * </br>
-   * Baseline/current are provided to limit the range in which to search for queries.
+   * Baseline/current are provided to limit the range in which to search for dimension values.
    */
   @GET
   @Path("/dimensionValues/{collection}/{baseline}/{current}")
@@ -164,52 +167,78 @@ public class DashboardConfigResource {
       QueryResult queryResult = resultFutures.get(dimension).get();
 
       // Sum up hourly data over entire dataset for each dimension combination
-      double total = 0.0;
-      Map<String, Number> summedValues = new HashMap<>();
+      int metricCount = metrics.size();
+      double[] total = new double[metricCount];
+      Map<String, double[]> summedValues = new HashMap<>();
 
       for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
-        double sum = 0.0;
+        double[] sum = new double[metricCount];
         for (Map.Entry<String, Number[]> hourlyEntry : entry.getValue().entrySet()) {
-          // TODO still assuming first metric.
-          double value = hourlyEntry.getValue()[0].doubleValue();
-          sum += value;
+          for (int j = 0; j < metricCount; j++) {
+            double value = hourlyEntry.getValue()[j].doubleValue();
+            sum[j] += value;
+          }
         }
         summedValues.put(entry.getKey(), sum);
-        total += sum;
+        // update total w/ sums for each dimension value.
+        for (int j = 0; j < metricCount; j++) {
+          total[j] += sum[j];
+        }
+
       }
 
       // compare by value ascending (want poll to remove smallest element)
-      PriorityQueue<Pair<String, Double>> topNValues =
-          new PriorityQueue<>(dimensionValuesLimit, new Comparator<Pair<String, Double>>() {
-            @Override
-            public int compare(Pair<String, Double> a, Pair<String, Double> b) {
-              return Double.compare(a.getValue().doubleValue(), b.getValue().doubleValue());
-            }
-          });
-
-      double threshold = total * contributionThreshold;
+      List<PriorityQueue<Pair<String, Double>>> topNValuesByMetric =
+          new ArrayList<PriorityQueue<Pair<String, Double>>>(metricCount);
+      double[] threshold = new double[metricCount];
+      Comparator<Pair<String, Double>> valueComparator = new Comparator<Pair<String, Double>>() {
+        @Override
+        public int compare(Pair<String, Double> a, Pair<String, Double> b) {
+          return Double.compare(a.getValue().doubleValue(), b.getValue().doubleValue());
+        }
+      };
+      for (int j = 0; j < metricCount; j++) {
+        threshold[j] = total[j] * contributionThreshold;
+        topNValuesByMetric.add(new PriorityQueue<>(dimensionValuesLimit, valueComparator));
+      }
 
       // For each dimension value, add it only if it meets the threshold and drop an element from
       // the priority queue if over the limit.
-      for (Map.Entry<String, Number> entry : summedValues.entrySet()) {
+      for (Map.Entry<String, double[]> entry : summedValues.entrySet()) {
         List<String> combination = objectMapper.readValue(entry.getKey(), LIST_TYPE_REF);
         String dimensionValue = combination.get(i);
-        double dimensionValueContribution = entry.getValue().doubleValue();
-        if (dimensionValueContribution >= threshold) {
-          topNValues.add(new Pair<>(dimensionValue, dimensionValueContribution));
-          if (topNValues.size() > dimensionValuesLimit) {
-            topNValues.poll();
+        for (int j = 0; j < metricCount; j++) { // metricCount == entry.getValue().length
+          double dimensionValueContribution = entry.getValue()[j];
+          if (dimensionValueContribution >= threshold[j]) {
+            PriorityQueue<Pair<String, Double>> topNValues = topNValuesByMetric.get(j);
+            topNValues.add(new Pair<>(dimensionValue, dimensionValueContribution));
+            if (topNValues.size() > dimensionValuesLimit) {
+              topNValues.poll();
+            }
           }
         }
       }
 
       // Poll returns the elements in order of ascending contribution, so poll and reverse the
       // order.
-      List<String> sortedValues = new LinkedList<>();
-      while (!topNValues.isEmpty()) {
-        Pair<String, Double> pair = topNValues.poll();
-        sortedValues.add(0, pair.getKey());
+
+      // not LinkedHashSet because we need to reverse insertion order with metrics.
+      List<String> sortedValues = new ArrayList<>();
+      HashSet<String> sortedValuesSet = new HashSet<>();
+
+      for (int j = 0; j < metricCount; j++) {
+        PriorityQueue<Pair<String, Double>> topNValues = topNValuesByMetric.get(j);
+        int startIndex = sortedValues.size();
+        while (!topNValues.isEmpty()) {
+          Pair<String, Double> pair = topNValues.poll();
+          String dimensionValue = pair.getKey();
+          if (!sortedValuesSet.contains(dimensionValue)) {
+            sortedValues.add(startIndex, dimensionValue);
+            sortedValuesSet.add(dimensionValue);
+          }
+        }
       }
+
       collectedDimensionValues.put(dimension, sortedValues);
     }
     return collectedDimensionValues;
