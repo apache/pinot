@@ -27,6 +27,11 @@ import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 
 public class ViewUtils {
+  public enum Granularity {
+    DAYS,
+    HOURS
+  };
+
   private static final Joiner OR_JOINER = Joiner.on(" OR ");
   private static final TypeReference<List<String>> LIST_TYPE_REFERENCE =
       new TypeReference<List<String>>() {
@@ -139,8 +144,8 @@ public class ViewUtils {
    * @param intraPeriod - difference between start and end of current time window.
    */
   public static List<MetricDataRow> extractMetricDataRows(Map<Long, Number[]> baselineData,
-      Map<Long, Number[]> currentData, long currentStartMillis, long baselineOffsetMillis,
-      long intraPeriod) {
+      Map<Long, Number[]> currentData, long currentStartMillis, long intraPeriod,
+      long baselineOffsetMillis) {
 
     long currentEndMillis = currentStartMillis + intraPeriod;
 
@@ -161,8 +166,9 @@ public class ViewUtils {
       Number[] baselineValues = baselineData.get(baseline);
       Number[] currentValues = currentData.get(current);
 
-      MetricDataRow row = new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC),
-          baselineValues, new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
+      MetricDataRow row =
+          new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineValues,
+              new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(0, row);
     }
 
@@ -226,23 +232,40 @@ public class ViewUtils {
    * @throws NumberFormatException
    */
   public static long getIntraPeriod(String metricFunction) throws NumberFormatException {
-    String timeUnit = metricFunction.split("_")[2];
+    Granularity granularity = getGranularity(metricFunction);
     int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
 
-    long intraPeriod = INTRA_DAY_PERIOD;
-    if (timeUnit.startsWith(TimeUnit.DAYS.toString()) && aggregationWindow == 1) {
+    long intraPeriod;
+    if (granularity.equals(Granularity.HOURS)) {
+      intraPeriod = INTRA_DAY_PERIOD;
+    } else if (granularity.equals(Granularity.DAYS) && aggregationWindow == 1) {
       intraPeriod = INTRA_WEEK_PERIOD;
-    } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
+    } else if (granularity.equals(Granularity.DAYS)) {
       intraPeriod = INTRA_MONTH_PERIOD;
+    } else {
+      throw new IllegalArgumentException("Unknown granularity: " + granularity);
     }
     return intraPeriod;
+  }
+
+  /** Derives hourly/daily granularity from metric function. */
+  public static Granularity getGranularity(String metricFunction) {
+    String timeUnit = metricFunction.split("_")[2];
+    if (timeUnit.startsWith(TimeUnit.HOURS.toString())) {
+      return Granularity.HOURS;
+    } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
+      return Granularity.DAYS;
+    } else {
+      throw new IllegalArgumentException("Unknown granularity: " + timeUnit);
+    }
   }
 
   /** Converts the input UTC time to start of day in Pacific Time */
   public static DateTime standardizeToStartOfDayPT(DateTime input) {
     DateTimeZone pstTimeZone = DateTimeZone.forID("America/Los_Angeles");
-	input = input.toDateTime(pstTimeZone);
-    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0, pstTimeZone);
+    input = input.toDateTime(pstTimeZone);
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0,
+        pstTimeZone);
   }
 
   /** Converts the input UTC time to start of day in Pacific Time */
@@ -251,7 +274,37 @@ public class ViewUtils {
   }
 
   public static DateTime standardizeToStartOfDayUTC(long inputMillis) {
-	DateTime input = new DateTime(inputMillis, DateTimeZone.UTC);
-    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0, DateTimeZone.UTC);
+    DateTime input = new DateTime(inputMillis, DateTimeZone.UTC);
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0,
+        DateTimeZone.UTC);
   }
+
+  /**
+   * Calculates the current vs baseline offset. In most cases the difference between both pairs of
+   * input times is identical. The rare exceptions are cases such as Daylight Savings.
+   * @param current value provided in url (not fixed to selected timezone)
+   * @param baseline value provided in url (not fixed to selected timezone).
+   * @param currentWithTimezone is <tt>current</tt> fixed to the date boundary in the selected
+   *          timezone.
+   * @param baselineWithTimezone is <tt>baseline</tt> fixed to the date boundary in the selected
+   *          timezone.
+   */
+  @Deprecated
+  // no longer relevant
+  public static long getOffset(long currentWithTimezone, long baselineWithTimezone, long current,
+      long baseline, String metricFunction) {
+    ViewUtils.Granularity granularity = ViewUtils.getGranularity(metricFunction);
+    long baselineOffsetMillis;
+    if (granularity == ViewUtils.Granularity.HOURS) {
+      // take into account time zones in case of DST
+      baselineOffsetMillis = currentWithTimezone - baselineWithTimezone;
+    } else if (granularity == ViewUtils.Granularity.DAYS) {
+      // server returns day aggregations independent of time zone, so rely on url offset.
+      baselineOffsetMillis = current - baseline;
+    } else {
+      throw new RuntimeException("Unhandled time granularity: " + granularity);
+    }
+    return baselineOffsetMillis;
+  }
+
 }

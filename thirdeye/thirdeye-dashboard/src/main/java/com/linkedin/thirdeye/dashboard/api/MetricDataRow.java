@@ -62,6 +62,6 @@ public class MetricDataRow {
   // Debugging only: will print current values
   @Override
   public String toString() {
-    return Arrays.toString(current);
+    return Arrays.toString(ratio);
   }
 }

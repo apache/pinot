@@ -128,37 +128,40 @@ public class FunnelsDataProvider {
 
     // TODO hardcoded to PDT. This should convert to the client's timezone.
     DateTime currentStart;
-	if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
-		currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
-	} else {
-		currentStart = ViewUtils.standardizeToStartOfDayUTC(currentMillis);
-	}
-	
+    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+      currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
+    } else {
+      currentStart = ViewUtils.standardizeToStartOfDayUTC(currentMillis);
+    }
+
     DateTime currentEnd = currentStart.plus(intraPeriod);
 
     // get baseline start and end
     DateTime baselineStart;
-	if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
-		baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
-	} else {
-		baselineStart = ViewUtils.standardizeToStartOfDayUTC(baselineMillis);
-	}
+    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+      baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
+    } else {
+      baselineStart = ViewUtils.standardizeToStartOfDayUTC(baselineMillis);
+    }
     DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
     List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
-    String metricFunction = StringUtils.join(metricFunctionLevels, "(")
-        + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
-        + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
+    String metricFunction =
+        StringUtils.join(metricFunctionLevels, "(")
+            + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
+            + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
     Map<String, Map<String, List<String>>> dimensionGroups =
         DimensionGroupSpec.emptySpec(collection).getReverseMapping();
 
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd,
-        dimensionValuesMap, dimensionGroups);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd,
-        dimensionValuesMap, dimensionGroups);
+    String baselineSql =
+        SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, dimensionValuesMap,
+            dimensionGroups);
+    String currentSql =
+        SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, dimensionValuesMap,
+            dimensionGroups);
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
     LOG.info("Generated SQL for funnel baseline: {}", baselineSql);
@@ -174,10 +177,14 @@ public class FunnelsDataProvider {
     Map<Long, Number[]> currentData =
         CustomDashboardResource.extractFunnelData(currentResult.get());
 
-    long baselineOffsetMillis = currentEnd.getMillis() - baselineEnd.getMillis();
+    long baselineOffsetMillis =
+        ViewUtils.getOffset(currentStart.getMillis(), baselineStart.getMillis(), currentMillis,
+            baselineMillis, metricFunction);
+
     // Compose result
-    List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
-        currentStart.getMillis(), baselineOffsetMillis, intraPeriod);
+    List<MetricDataRow> table =
+        ViewUtils.extractMetricDataRows(baselineData, currentData, currentStart.getMillis(),
+            intraPeriod, baselineOffsetMillis);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();
@@ -218,8 +225,9 @@ public class FunnelsDataProvider {
         filteredCurrent[i] = currentValue;
       }
 
-      MetricDataRow filteredRow = new MetricDataRow(row.getBaselineTime(), filteredBaseline,
-          row.getCurrentTime(), filteredCurrent);
+      MetricDataRow filteredRow =
+          new MetricDataRow(row.getBaselineTime(), filteredBaseline, row.getCurrentTime(),
+              filteredCurrent);
       filteredTable.add(filteredRow);
     }
 
