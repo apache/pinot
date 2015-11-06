@@ -44,11 +44,15 @@ public class ThirdEyeAvroUtils {
     for (int i = 0; i < fieldNames.length - 1; i++) {
       String name = fieldNames[i];
       current = (GenericRecord) current.get(name);
+      if (current == null) {
+        return NULL_VALUE;
+      }
     }
 
     // Get the terminal field value
     String terminalField = fieldNames[fieldNames.length - 1];
     Object dimensionObj = current.get(terminalField);
+
     if (dimensionObj == null) {
       return NULL_VALUE;
     }
