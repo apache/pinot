@@ -61,10 +61,6 @@ li {
     font-weight: 400;
 }
 
-.dimension-combination td:first-child {
-    width: 110px;
-}
-
 .uk-panel-title a:hover {
     text-decoration: none;
 }
@@ -140,9 +136,6 @@ li {
 #custom-funnel-section .metric-label:hover{
     text-decoration: underline;
 }
-
-
-
 
 #custom-funnel-section td:hover{
     color: #898989;
@@ -234,11 +227,17 @@ li {
     margin-top: 0px;
 }
 
+#dimension-contributor-area table{
+    width: 100%;
+    overflow-x: scroll;
+}
+
 #dimension-contributor-area table.fixed-table-layout{
     table-layout: fixed;
 }
 
-#dimension-contributor-area table td{
+#dimension-contributor-area table td,
+#dimension-contributor-area table th{
     line-height: 8px;
     font-size: 10px;
     padding: 6px;
@@ -701,10 +700,6 @@ td[dimension-val] {
 
 .hidden {
     display: none;
-}
-
-.section-wrapper{
-    margin-top: 15px;
 }
 
 /* overwriting UIkit css */
