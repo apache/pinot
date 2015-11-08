@@ -25,8 +25,6 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.linkedin.pinot.tools.scan.query.Utils.getNextMultiValue;
-import static com.linkedin.pinot.tools.scan.query.Utils.getNextSingleValue;
 
 public class Projection {
   private final IndexSegmentImpl _indexSegment;
@@ -52,6 +50,12 @@ public class Projection {
     ResultTable resultTable = new ResultTable(columnMetadatas, _filteredDocIds.size());
 
     for (String column : _columns) {
+      // Short circuit count(*)
+      if (column.equals(("*"))) {
+          continue;
+      }
+
+      ColumnMetadata columnMetadata = _metadata.getColumnMetadataFor(column);
       FieldSpec.DataType dataType = _metadata.getColumnMetadataFor(column).getDataType();
       Dictionary dictionaryReader = _indexSegment.getDictionaryFor(column);
 
@@ -62,8 +66,7 @@ public class Projection {
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
           bvIter.skipTo(docId);
-          Object value = getNextSingleValue(bvIter, dataType, dictionaryReader);
-          resultTable.add(rowId++, value);
+          resultTable.add(rowId++, bvIter.nextIntVal());
         }
       } else {
         BlockMultiValIterator bvIter =
@@ -72,9 +75,10 @@ public class Projection {
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
           bvIter.skipTo(docId);
-          int maxNumMultiValue = _metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
-          Object[] value = getNextMultiValue(bvIter, dataType, dictionaryReader, maxNumMultiValue);
-          resultTable.add(rowId++, value);
+          int maxNumMultiValues = _metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
+          int[] dictIds = new int[maxNumMultiValues];
+          int numMVValues = bvIter.nextIntVal(dictIds);
+          resultTable.add(rowId++, dictIds);
         }
       }
     }

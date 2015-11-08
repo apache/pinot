@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -32,9 +31,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static com.linkedin.pinot.tools.scan.query.Utils.getNextMultiValue;
-import static com.linkedin.pinot.tools.scan.query.Utils.getNextSingleValue;
 
 
 class SegmentQueryProcessor {
@@ -56,32 +52,23 @@ class SegmentQueryProcessor {
 
     ResultTable result = null;
     if (_brokerRequest.isSetAggregationsInfo()) {
+      // Aggregation only
       if (!_brokerRequest.isSetGroupBy()) {
-        // Only Aggregation
-        List<String> projColumns = null;
-        Projection projection = new Projection(indexSegment, metadata, filteredDocIds, projColumns);
-        ResultTable projectionResult = projection.run();
-        String[] aggColumns = null;
-        String[] aggFunctions = null;
-        result.aggregate(projectionResult, _brokerRequest.getAggregationsInfo());
-      } else {
-        // Aggregation GroupBy
-        List<String> projColumns = null;
-        Projection projection = new Projection(indexSegment, metadata, filteredDocIds, projColumns);
-        ResultTable projectionResult = projection.run();
-        String[] groupByColumns = null;
-        String[] aggColumns = null;
-        String[] aggFunctions = null;
-
-        result.groupByAggregation(projectionResult, groupByColumns, aggColumns, aggFunctions);
+        Aggregation aggregation =
+            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo());
+        return aggregation.run();
+      } else { // Aggregation GroupBy
+        AggregationGroupBy aggregationGroupBy =
+            new AggregationGroupBy(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo());
+        return aggregationGroupBy.run();
       }
     }
 
     // Only Selection
     if (_brokerRequest.isSetSelections()) {
-      Projection projection =
-          new Projection(indexSegment, metadata, filteredDocIds, _brokerRequest.getSelections().getSelectionColumns());
-      result = projection.run();
+      Selection selection =
+          new Selection(indexSegment, metadata, filteredDocIds, _brokerRequest.getSelections().getSelectionColumns());
+      result = selection.run();
     }
 
     return result;
@@ -102,7 +89,7 @@ class SegmentQueryProcessor {
       FilterOperator filterType = filterQueryTree.getOperator();
       String column = filterQueryTree.getColumn();
       final List<String> value = filterQueryTree.getValue();
-      return evaluatePredicate(indexSegment, metadata, filterType, column, value);
+      return getMatchingDocIds(indexSegment, metadata, filterType, column, value);
     }
 
     List<Integer> result = new ArrayList<>();
@@ -140,55 +127,63 @@ class SegmentQueryProcessor {
     return result;
   }
 
-  List<Integer> evaluatePredicate(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
+  List<Integer> getMatchingDocIds(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
       FilterOperator filterType, String column, List<String> value) {
+    Dictionary dictionaryReader = indexSegment.getDictionaryFor(column);
+    PredicateFilter predicateFilter = null;
+
     switch (filterType) {
       case EQUALITY:
-        return getEquals(indexSegment, metadata, column, value);
+        predicateFilter = new EqualsPredicateFilter(dictionaryReader, value.get(0));
+        break;
+
+      case NOT:
+        predicateFilter = new NotPredicateFilter(dictionaryReader, value.get(0));
+        break;
+
+      case IN:
+        predicateFilter = new InPredicateFilter(dictionaryReader, value);
+        break;
+
+      case NOT_IN:
+        predicateFilter = new NotInPredicateFilter(dictionaryReader, value);
+        break;
 
       case RANGE:
       case REGEX:
-      case NOT:
-      case NOT_IN:
-      case IN:
       default:
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
     }
+
+    return evaluatePredicate(column, indexSegment, metadata, predicateFilter);
   }
 
-  private List<Integer> getEquals(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, String column,
-      List<String> eqValue) {
-    FieldSpec.DataType dataType = metadata.getColumnMetadataFor(column).getDataType();
-
-    int docId = 0;
+  private List<Integer> evaluatePredicate(String column, IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
+      PredicateFilter predicateFilter) {
     List<Integer> result = new ArrayList<>();
-    Dictionary dictionaryReader = indexSegment.getDictionaryFor(column);
-
     if (metadata.getColumnMetadataFor(column).isSingleValue()) {
       BlockSingleValIterator bvIter =
           (BlockSingleValIterator) indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
 
+      int docId = 0;
       while (bvIter.hasNext()) {
-        Object value = getNextSingleValue(bvIter, dataType, dictionaryReader);
-
-        if (value.equals(eqValue.get(0))) {
+        if (predicateFilter.apply(bvIter.nextIntVal())) {
           result.add(docId);
         }
         ++docId;
       }
     } else {
+      int maxNumMultiValues = metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
       BlockMultiValIterator bvIter =
           (BlockMultiValIterator) indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
 
+      int docId = 0;
       while (bvIter.hasNext()) {
-        int maxNumMultiValue = metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
-        Object[] value = getNextMultiValue(bvIter, dataType, dictionaryReader, maxNumMultiValue);
+        int[] dictIds = new int[maxNumMultiValues];
+        int numMVValues = bvIter.nextIntVal(dictIds);
 
-        for (int i = 0; i < value.length; ++i) {
-          if (value.equals(eqValue.get(0))) {
-            result.add(docId);
-            break;
-          }
+        if (predicateFilter.apply(dictIds)) {
+          result.add(docId);
         }
         ++docId;
       }

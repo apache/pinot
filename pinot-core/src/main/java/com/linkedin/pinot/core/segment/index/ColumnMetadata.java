@@ -74,6 +74,10 @@ public class ColumnMetadata {
     this.totalNumberOfEntries = totalNumberOfEntries;
   }
 
+  public String getColumnName() {
+    return columnName;
+  }
+
   public int getTotalNumberOfEntries() {
     return totalNumberOfEntries;
   }
