@@ -23,7 +23,7 @@ $(document).ready(function() {
 
     /* Transform UTC time into user selected or browser's timezone and display time */
     $(".contributors-table-time").each(function(i, cell){
-        var dateTimeFormat = 'HH:mm'
+        var dateTimeFormat = 'MM:DD HH:mm'
         transformUTCToTZTime(cell, dateTimeFormat);
     });
 
