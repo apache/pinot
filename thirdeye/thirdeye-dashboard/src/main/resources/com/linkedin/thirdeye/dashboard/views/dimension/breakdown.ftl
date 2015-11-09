@@ -46,12 +46,9 @@
                                 <@tableRow dimension=dimensionDisplay dimensionValue=dimensionValue cells=cumulativeRows class="cumulative-values heat-map-row hidden"/>
                             </#list>
                         </tbody>
-                        <tfoot>
-                        </tfoot>
                     </table>
                 </div>  <!-- end of dimension wrapper -->
             </div>  <!-- end of metric wrapper -->
-            <br/>
         </#list>
     </#list>
     <#macro timeRow cells>

@@ -35,7 +35,7 @@ $(document).ready(function() {
        //format font in th
     */
 
-    $("#dimension-contributor-area table").on("click", $("input[checkbox]"), function(e) {
+    $("#dimension-contributor-area table").on("click", $("input[checkbox]"), function() {
         var checkbox = event.target
         if ($(checkbox).is(':checked')) {
             $(checkbox).attr('checked', 'checked')

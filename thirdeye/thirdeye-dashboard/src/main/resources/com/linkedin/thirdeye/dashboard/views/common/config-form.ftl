@@ -187,7 +187,7 @@
 </form>
 </div>
 
-<div id="current-view-settings" class="uk-clearfix" style="padding-right:20px; margin-top:  10px;">
+<div id="current-view-settings" class="uk-clearfix" style="padding-right:20px;">
 
 <#if (dimensionView.type == "HEAT_MAP")>
     <ul class="heatmap-tabs uk-tab" data-uk-tab>

@@ -223,10 +223,6 @@ li {
     width: 100%;
 }
 
-#dimension-contributor-area .section-wrapper{
-    margin-top: 0px;
-}
-
 #dimension-contributor-area table{
     width: 100%;
     overflow-x: scroll;
