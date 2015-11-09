@@ -77,8 +77,17 @@ public class ContributorDataProvider {
     long intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
     // Since the total view is based off the funnel view, set times to be consistent (ie start of
     // day, PT)
-    currentStart = ViewUtils.standardizeToStartOfDayPT(currentStart);
-    baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineStart);
+	if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+		baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineStart.getMillis());
+	} else{
+		baselineStart = ViewUtils.standardizeToStartOfDayUTC(baselineStart.getMillis());
+	}
+
+	if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+		currentStart = ViewUtils.standardizeToStartOfDayPT(currentStart.getMillis());
+	} else{
+		currentStart = ViewUtils.standardizeToStartOfDayUTC(currentStart.getMillis());
+	}
 
     String baselineTotalSql = SqlUtils.getSql(metricFunction, collection, baselineStart,
         baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);

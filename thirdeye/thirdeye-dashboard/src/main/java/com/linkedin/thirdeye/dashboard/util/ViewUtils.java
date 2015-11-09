@@ -33,9 +33,9 @@ public class ViewUtils {
       };
   private static final Logger LOGGER = LoggerFactory.getLogger(ViewUtils.class);
 
-  private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
-  private static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
-  private static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
+  public static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
+  public static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+  public static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
 
   public static Map<String, String> fillDimensionValues(CollectionSchema schema,
       Map<String, String> dimensionValues) {
@@ -240,12 +240,18 @@ public class ViewUtils {
 
   /** Converts the input UTC time to start of day in Pacific Time */
   public static DateTime standardizeToStartOfDayPT(DateTime input) {
-    input = input.toDateTime(DateTimeZone.forID("America/Los_Angeles"));
-    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0);
+    DateTimeZone pstTimeZone = DateTimeZone.forID("America/Los_Angeles");
+	input = input.toDateTime(pstTimeZone);
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0, pstTimeZone);
   }
 
   /** Converts the input UTC time to start of day in Pacific Time */
   public static DateTime standardizeToStartOfDayPT(long inputMillis) {
     return standardizeToStartOfDayPT(new DateTime(inputMillis, DateTimeZone.UTC));
+  }
+
+  public static DateTime standardizeToStartOfDayUTC(long inputMillis) {
+	DateTime input = new DateTime(inputMillis, DateTimeZone.UTC);
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0, DateTimeZone.UTC);
   }
 }

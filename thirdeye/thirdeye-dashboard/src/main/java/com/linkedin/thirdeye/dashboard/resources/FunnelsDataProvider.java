@@ -127,11 +127,22 @@ public class FunnelsDataProvider {
     // them
 
     // TODO hardcoded to PDT. This should convert to the client's timezone.
-    DateTime currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
+    DateTime currentStart;
+	if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+		currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
+	} else {
+		currentStart = ViewUtils.standardizeToStartOfDayUTC(currentMillis);
+	}
+	
     DateTime currentEnd = currentStart.plus(intraPeriod);
 
     // get baseline start and end
-    DateTime baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
+    DateTime baselineStart;
+	if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+		baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
+	} else {
+		baselineStart = ViewUtils.standardizeToStartOfDayUTC(baselineMillis);
+	}
     DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
     List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
