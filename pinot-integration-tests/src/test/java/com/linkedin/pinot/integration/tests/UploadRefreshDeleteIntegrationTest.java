@@ -125,7 +125,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     FileUtils.deleteQuietly(segmentTarDir);
   }
 
-  @Test
+  @Test(enabled = false)
   public void testUploadRefreshDelete() throws Exception {
     final int THREAD_COUNT = 1;
     final int SEGMENT_COUNT = 5;
