@@ -47,7 +47,7 @@ public class SwaggerResource extends ServerResource {
 
       // Paths
       JSONObject paths = new JSONObject();
-      Router router = ControllerRestApplication.router;
+      Router router = ControllerRestApplication.getRouter();
       RouteList routeList = router.getRoutes();
 
       for (Route route : routeList) {

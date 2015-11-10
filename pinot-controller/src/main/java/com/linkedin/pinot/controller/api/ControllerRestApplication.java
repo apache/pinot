@@ -72,7 +72,8 @@ public class ControllerRestApplication extends Application {
   private static final String ONE_HOUR_IN_MILLIS = Long.toString(3600L * 1000L);
 
   private static String CONSOLE_WEBAPP_ROOT_PATH;
-  public static Router router;
+
+  private static Router router;
 
   public ControllerRestApplication(String queryConsolePath) {
     super();
@@ -191,5 +192,9 @@ public class ControllerRestApplication extends Application {
       PinotRestletResourceBase.addExtraHeaders(response);
       return Filter.CONTINUE;
     }
+  }
+
+  public static Router getRouter() {
+    return router;
   }
 }
