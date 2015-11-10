@@ -20,11 +20,14 @@ import java.util.HashSet;
 import java.util.List;
 
 public class NotInPredicateFilter implements PredicateFilter {
+  private static final String SEPARATOR = "\t\t";
   HashSet<Integer> _notInSet = new HashSet<>();
 
   public NotInPredicateFilter(Dictionary dictionaryReader, List<String> predicateValue) {
-    for (String value : predicateValue) {
-      _notInSet.add(dictionaryReader.indexOf(predicateValue));
+    for (String values : predicateValue) {
+      for (String value : values.split(SEPARATOR)) {
+        _notInSet.add(dictionaryReader.indexOf(predicateValue));
+      }
     }
   }
 

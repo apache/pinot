@@ -28,15 +28,12 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   List<Row> _rows;
   private final List<ColumnMetadata> _columnMetadatas;
   private final Map<String, Integer> _columnMap;
-  private final int _numRows;
-  private static int numRows;
 
   ResultTable(List<ColumnMetadata> columns, int numRows) {
     _columnMetadatas = columns;
-    _numRows = numRows;
-    _rows = new ArrayList<>(_numRows);
+    _rows = new ArrayList<>(numRows);
 
-    for (int i = 0; i < _numRows; ++i) {
+    for (int i = 0; i < numRows; ++i) {
       _rows.add(i, new Row());
     }
 
@@ -48,10 +45,6 @@ public class ResultTable implements Iterable<ResultTable.Row> {
       }
       ++index;
     }
-  }
-
-  public static int getNumRows() {
-    return numRows;
   }
 
   public void add(int rowId, Object value) {
@@ -73,8 +66,11 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   public ColumnMetadata getColumnMetadata(String column) {
-    int index = _columnMap.get(column);
-    return _columnMetadatas.get(index);
+    if (_columnMap.containsKey(column)) {
+      int index = _columnMap.get(column);
+      return _columnMetadatas.get(index);
+    }
+    return null;
   }
 
   public Object get(int rowId, int colId) {
@@ -119,7 +115,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   public int size() {
-    return _numRows;
+    return _rows.size();
   }
 
   public void print() {

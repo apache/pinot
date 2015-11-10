@@ -21,11 +21,14 @@ import java.util.List;
 
 
 public class InPredicateFilter implements PredicateFilter {
+  private static final String SEPARATOR = "\t\t";
   HashSet<Integer> inSet = new HashSet<>();
 
   public InPredicateFilter(Dictionary dictionaryReader, List<String> predicateValue) {
-    for (String value : predicateValue) {
-      inSet.add(dictionaryReader.indexOf(value));
+    for (String values : predicateValue) {
+      for (String value : values.split(SEPARATOR)) {
+        inSet.add(dictionaryReader.indexOf(value));
+      }
     }
   }
 

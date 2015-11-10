@@ -16,15 +16,12 @@
 package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.common.client.request.RequestConverter;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +69,7 @@ public class ScanBasedQueryProcessor {
     BufferedReader bufferedReader = new BufferedReader(new FileReader(queryFile));
 
     while ((query = bufferedReader.readLine()) != null) {
+      LOGGER.info("Processing Query: {}", query);
       ResultTable resultTable = scanBasedQueryProcessor.processQuery(query);
       resultTable.print();
     }

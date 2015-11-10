@@ -77,7 +77,6 @@ public class Projection {
           bvIter.skipTo(docId);
           int maxNumMultiValues = _metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
           int[] dictIds = new int[maxNumMultiValues];
-          int numMVValues = bvIter.nextIntVal(dictIds);
           resultTable.add(rowId++, dictIds);
         }
       }
