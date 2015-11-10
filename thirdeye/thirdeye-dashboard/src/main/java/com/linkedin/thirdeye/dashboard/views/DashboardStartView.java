@@ -1,14 +1,13 @@
 package com.linkedin.thirdeye.dashboard.views;
 
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-
-import io.dropwizard.views.View;
-
-import org.joda.time.DateTime;
-
 import java.util.ArrayList;
 import java.util.List;
 
+import org.joda.time.DateTime;
+
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+
+import io.dropwizard.views.View;
 
 public class DashboardStartView extends View {
   private final String collection;
@@ -18,8 +17,8 @@ public class DashboardStartView extends View {
   private final List<String> customDashboardNames;
   private final List<String> funnelNames;
 
-  public DashboardStartView(String collection, CollectionSchema collectionSchema, DateTime earliestDataTime,
-      DateTime latestDataTime, List<String> customDashboardNames) {
+  public DashboardStartView(String collection, CollectionSchema collectionSchema,
+      DateTime earliestDataTime, DateTime latestDataTime, List<String> customDashboardNames) {
     super("dashboard-start.ftl");
     this.collection = collection;
     this.collectionSchema = collectionSchema;
@@ -29,8 +28,9 @@ public class DashboardStartView extends View {
     this.funnelNames = new ArrayList<String>();
   }
 
-  public DashboardStartView(String collection, CollectionSchema collectionSchema, DateTime earliestDataTime,
-      DateTime latestDataTime, List<String> customDashboardNames, List<String> funnelNames) {
+  public DashboardStartView(String collection, CollectionSchema collectionSchema,
+      DateTime earliestDataTime, DateTime latestDataTime, List<String> customDashboardNames,
+      List<String> funnelNames) {
     super("dashboard-start.ftl");
     this.collection = collection;
     this.collectionSchema = collectionSchema;
@@ -48,8 +48,12 @@ public class DashboardStartView extends View {
     return funnelNames;
   }
 
-  public CollectionSchema getCollectionSchema() {
-    return collectionSchema;
+  public List<String> getMetrics() {
+    return collectionSchema.getMetrics();
+  }
+
+  public List<String> getMetricAliases() {
+    return collectionSchema.getMetricAliases();
   }
 
   public DateTime getEarliestDataTime() {

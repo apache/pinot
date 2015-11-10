@@ -278,11 +278,11 @@ public class DashboardResource {
       Map<String, Collection<String>> dimensionValueOptions =
           dashboardConfigResource.getDimensionValues(collection, baselineMillis, currentMillis);
 
-      return new DashboardView(collection, dataCache.getCollectionSchema(serverUri, collection),
-          selectedDimensions, new DateTime(baselineMillis), new DateTime(currentMillis),
+      return new DashboardView(collection, selectedDimensions, new DateTime(baselineMillis),
+          new DateTime(currentMillis),
           new DimensionView(dimensionView, dimensionViewType, dimensionValueOptions),
-          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress,
-          funnelNames);
+          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress, funnelNames,
+          dashboardConfigResource);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e; // sends appropriate HTTP response

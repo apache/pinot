@@ -39,6 +39,7 @@ public class DimensionViewContributors extends View {
   }
 
   public List<String> getDimensions() {
+    // TODO equivalent to unselectedDimensions in DashboardView/DashboardConfigResource.
     return dimensions;
   }
 

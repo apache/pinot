@@ -3,15 +3,16 @@ package com.linkedin.thirdeye.dashboard.resources;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Future;
 
 import javax.ws.rs.DefaultValue;
@@ -71,56 +72,54 @@ public class DashboardConfigResource {
     this.objectMapper = objectMapper;
   }
 
-  /** Return a list of dimensions for the provided collection. */
+  public List<String> getAllDimensions(String collection) throws Exception {
+    MultivaluedMap<String, String> nul = null;
+    return getDimensions(collection, nul);
+  }
+
+  /** Return a sorted list of dimensions for the provided collection. */
   @GET
   @Path("/dimensions/{collection}")
   public List<String> getDimensions(@PathParam("collection") String collection,
       @Context UriInfo uriInfo) throws Exception {
+    return getDimensions(collection, uriInfo.getQueryParameters());
+  }
+
+  public List<String> getDimensions(String collection,
+      MultivaluedMap<String, String> selectedDimensionValues) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    Set<String> selectedDimensions = retrieveSelectedDimensions(uriInfo);
+    Set<String> selectedDimensions =
+        (selectedDimensionValues == null ? null : selectedDimensionValues.keySet());
     if (CollectionUtils.isEmpty(selectedDimensions)) {
       return schema.getDimensions();
     }
     List<String> filteredDimensions =
         new ArrayList<>(CollectionUtils.subtract(schema.getDimensions(), selectedDimensions));
+    Collections.sort(filteredDimensions);
     return filteredDimensions;
   }
 
   /**
-   * Return a list of dimension aliases for the provided collection. If no alias exists, 'null' will
-   * be returned in the JSON response.
+   * Return a sorted map of dimension -> aliases for the provided collection. If no alias exists,
+   * 'null' will be returned in the JSON response. This method does not filter out pre-selected
+   * dimensions.
    */
+
   @GET
   @Path("/dimensionAliases/{collection}")
-  public List<String> getDimensionAliases(@PathParam("collection") String collection,
-      @Context UriInfo uriInfo) throws Exception {
+  public Map<String, String> getDimensionAliases(@PathParam("collection") String collection)
+      throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    Set<String> selectedDimensions = retrieveSelectedDimensions(uriInfo);
-    if (CollectionUtils.isEmpty(selectedDimensions)) {
-      return schema.getDimensionAliases();
-    }
     Iterator<String> dimensionsIter = schema.getDimensions().iterator();
     Iterator<String> dimensionAliasesIter = schema.getDimensionAliases().iterator();
-    List<String> filteredAliases = new LinkedList<>();
+    Map<String, String> filteredAliases = new TreeMap<>();
     while (dimensionsIter.hasNext()) {
       String dimension = dimensionsIter.next();
       String dimensionAlias = dimensionAliasesIter.next();
-      if (!selectedDimensions.contains(dimension)) {
-        filteredAliases.add(dimensionAlias);
-      }
+      filteredAliases.put(dimension, dimensionAlias);
     }
     return filteredAliases;
 
-  }
-
-  /** Returns null if the info object is null. */
-  private MultivaluedMap<String, String> retrieveSelectedDimensionValues(UriInfo uriInfo) {
-    return (uriInfo == null ? null : uriInfo.getQueryParameters());
-  }
-
-  private Set<String> retrieveSelectedDimensions(UriInfo uriInfo) {
-    MultivaluedMap<String, String> map = retrieveSelectedDimensionValues(uriInfo);
-    return (map == null ? null : map.keySet());
   }
 
   /**
@@ -174,10 +173,11 @@ public class DashboardConfigResource {
     return schema.getMetricAliases();
   }
 
+  // Ignored already selected dimensions
   private Map<String, Collection<String>> retrieveDimensionValues(String collection,
       long baselineMillis, long currentMillis, double contributionThreshold,
       int dimensionValuesLimit) throws Exception {
-    List<String> dimensions = getDimensions(collection, null);
+    List<String> dimensions = getAllDimensions(collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
 

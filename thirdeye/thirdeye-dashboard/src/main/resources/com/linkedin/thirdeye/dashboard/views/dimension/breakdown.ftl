@@ -2,7 +2,7 @@
 
 <div id="dimension-contributor-area" width="100%">
     <#list dimensionView.view.metrics as metric>
-        <#list dimensionView.view.dimensions as dimension>
+        <#list unselectedDimensions as dimension>
             <#assign dimTableTotalRow=dimensionView.view.metricTotalTable[metric]>
             <#assign dimTable=dimensionView.view.getDimensionValueTable(metric,dimension)>
             <#assign dimensionDisplay = dimensionAliases[dimension]!dimension>

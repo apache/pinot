@@ -21,10 +21,10 @@
 
                 <div class="uk-form-row">
                     <label class="uk-form-label">Metric(s)</label>
-                    <#list collectionSchema.metrics as metric>
+                    <#list metrics as metric>
                         <label>
                             <input class="sidenav-metric" type="checkbox" value="${metric}"/>
-                            ${collectionSchema.metricAliases[metric_index]!metric}
+                            ${metricAliases[metric_index]!metric}
                         </label>
                         <br/>
                     </#list>

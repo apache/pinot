@@ -8,6 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.apache.commons.lang.StringUtils;
@@ -33,6 +38,8 @@ import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 
+@Path("/funnels")
+@Produces(MediaType.APPLICATION_JSON)
 public class FunnelsDataProvider {
   private static final String DEFAULT_FUNNEL_NAME = "Primary Metric View";
 
@@ -97,7 +104,9 @@ public class FunnelsDataProvider {
     return funnelViews;
   }
 
-  public List<String> getFunnelNamesFor(String collection) {
+  @GET
+  @Path("/names/{collection}")
+  public List<String> getFunnelNamesFor(@PathParam("collection") String collection) {
     List<String> funnelNames = new ArrayList<String>();
 
     if (!funnelSpecsMap.containsKey(collection)) {

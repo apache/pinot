@@ -44,8 +44,8 @@ public class TestDashboardConfigResource {
   }
 
   @Test
-  public void testGetDimensions() throws Exception {
-    testDashboardConfigResource.getDimensions(COLLECTION, null);
+  public void testGetAllDimensions() throws Exception {
+    testDashboardConfigResource.getAllDimensions(COLLECTION);
     verify(mockCollectionSchema).getDimensions();
   }
 
@@ -61,22 +61,9 @@ public class TestDashboardConfigResource {
   }
 
   @Test
-  public void testGetDimensionAliases() throws Exception {
-    testDashboardConfigResource.getDimensionAliases(COLLECTION, null);
+  public void testGetAllDimensionAliases() throws Exception {
+    testDashboardConfigResource.getDimensionAliases(COLLECTION);
     verify(mockCollectionSchema).getDimensionAliases();
-  }
-
-  @Test
-  public void testGetDimensionAliasesWithSelection() throws Exception {
-    UriInfo mockUriInfo = mock(UriInfo.class);
-    MultivaluedMap<String, String> queryParams = new MultivaluedMapImpl();
-    queryParams.put("b", Arrays.asList("x", "y", "z"));
-    when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
-    when(mockCollectionSchema.getDimensions()).thenReturn(Arrays.asList("a", "b", "c"));
-    when(mockCollectionSchema.getDimensionAliases())
-        .thenReturn(Arrays.asList(null, "SHOULD BE FILTERED", "c_alias"));
-    Assert.assertEquals(testDashboardConfigResource.getDimensionAliases(COLLECTION, mockUriInfo),
-        Arrays.asList(null, "c_alias"));
   }
 
   @Test
