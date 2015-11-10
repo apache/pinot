@@ -166,9 +166,8 @@ public class ViewUtils {
       Number[] baselineValues = baselineData.get(baseline);
       Number[] currentValues = currentData.get(current);
 
-      MetricDataRow row =
-          new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineValues,
-              new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
+      MetricDataRow row = new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC),
+          baselineValues, new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(0, row);
     }
 
@@ -260,51 +259,20 @@ public class ViewUtils {
     }
   }
 
-  /** Converts the input UTC time to start of day in Pacific Time */
-  public static DateTime standardizeToStartOfDayPT(DateTime input) {
-    DateTimeZone pstTimeZone = DateTimeZone.forID("America/Los_Angeles");
-    input = input.toDateTime(pstTimeZone);
-    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0,
-        pstTimeZone);
+  public static DateTime standardizeDate(long inputMillis, long intraPeriod) {
+    return standardizeDate(new DateTime(inputMillis, DateTimeZone.UTC), intraPeriod);
   }
 
-  /** Converts the input UTC time to start of day in Pacific Time */
-  public static DateTime standardizeToStartOfDayPT(long inputMillis) {
-    return standardizeToStartOfDayPT(new DateTime(inputMillis, DateTimeZone.UTC));
-  }
-
-  public static DateTime standardizeToStartOfDayUTC(long inputMillis) {
-    DateTime input = new DateTime(inputMillis, DateTimeZone.UTC);
-    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0,
-        DateTimeZone.UTC);
-  }
-
-  /**
-   * Calculates the current vs baseline offset. In most cases the difference between both pairs of
-   * input times is identical. The rare exceptions are cases such as Daylight Savings.
-   * @param current value provided in url (not fixed to selected timezone)
-   * @param baseline value provided in url (not fixed to selected timezone).
-   * @param currentWithTimezone is <tt>current</tt> fixed to the date boundary in the selected
-   *          timezone.
-   * @param baselineWithTimezone is <tt>baseline</tt> fixed to the date boundary in the selected
-   *          timezone.
-   */
-  @Deprecated
-  // no longer relevant
-  public static long getOffset(long currentWithTimezone, long baselineWithTimezone, long current,
-      long baseline, String metricFunction) {
-    ViewUtils.Granularity granularity = ViewUtils.getGranularity(metricFunction);
-    long baselineOffsetMillis;
-    if (granularity == ViewUtils.Granularity.HOURS) {
-      // take into account time zones in case of DST
-      baselineOffsetMillis = currentWithTimezone - baselineWithTimezone;
-    } else if (granularity == ViewUtils.Granularity.DAYS) {
-      // server returns day aggregations independent of time zone, so rely on url offset.
-      baselineOffsetMillis = current - baseline;
+  // TODO configure to accept user input timezone for hourly data.
+  public static DateTime standardizeDate(DateTime input, long intraPeriod) {
+    DateTimeZone dateTZ;
+    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+      dateTZ = DateTimeZone.forID("America/Los_Angeles");
     } else {
-      throw new RuntimeException("Unhandled time granularity: " + granularity);
+      dateTZ = DateTimeZone.UTC;
     }
-    return baselineOffsetMillis;
+    input = input.toDateTime(dateTZ);
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0,
+        dateTZ);
   }
-
 }

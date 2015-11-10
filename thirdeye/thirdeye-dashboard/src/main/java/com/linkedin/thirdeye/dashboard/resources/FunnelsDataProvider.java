@@ -126,42 +126,26 @@ public class FunnelsDataProvider {
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
     // them
 
-    // TODO hardcoded to PDT. This should convert to the client's timezone.
-    DateTime currentStart;
-    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
-      currentStart = ViewUtils.standardizeToStartOfDayPT(currentMillis);
-    } else {
-      currentStart = ViewUtils.standardizeToStartOfDayUTC(currentMillis);
-    }
+    DateTime baselineStart = ViewUtils.standardizeDate(baselineMillis, intraPeriod);
+    DateTime currentStart = ViewUtils.standardizeDate(currentMillis, intraPeriod);
 
     DateTime currentEnd = currentStart.plus(intraPeriod);
-
-    // get baseline start and end
-    DateTime baselineStart;
-    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
-      baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineMillis);
-    } else {
-      baselineStart = ViewUtils.standardizeToStartOfDayUTC(baselineMillis);
-    }
     DateTime baselineEnd = baselineStart.plus(intraPeriod);
 
     List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
-    String metricFunction =
-        StringUtils.join(metricFunctionLevels, "(")
-            + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
-            + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
+    String metricFunction = StringUtils.join(metricFunctionLevels, "(")
+        + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
+        + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
 
     DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
 
     Map<String, Map<String, List<String>>> dimensionGroups =
         DimensionGroupSpec.emptySpec(collection).getReverseMapping();
 
-    String baselineSql =
-        SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, dimensionValuesMap,
-            dimensionGroups);
-    String currentSql =
-        SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, dimensionValuesMap,
-            dimensionGroups);
+    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd,
+        dimensionValuesMap, dimensionGroups);
+    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd,
+        dimensionValuesMap, dimensionGroups);
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
     LOG.info("Generated SQL for funnel baseline: {}", baselineSql);
@@ -177,14 +161,11 @@ public class FunnelsDataProvider {
     Map<Long, Number[]> currentData =
         CustomDashboardResource.extractFunnelData(currentResult.get());
 
-    long baselineOffsetMillis =
-        ViewUtils.getOffset(currentStart.getMillis(), baselineStart.getMillis(), currentMillis,
-            baselineMillis, metricFunction);
+    long baselineOffsetMillis = currentStart.getMillis() - baselineStart.getMillis();
 
     // Compose result
-    List<MetricDataRow> table =
-        ViewUtils.extractMetricDataRows(baselineData, currentData, currentStart.getMillis(),
-            intraPeriod, baselineOffsetMillis);
+    List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
+        currentStart.getMillis(), intraPeriod, baselineOffsetMillis);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();
@@ -225,9 +206,8 @@ public class FunnelsDataProvider {
         filteredCurrent[i] = currentValue;
       }
 
-      MetricDataRow filteredRow =
-          new MetricDataRow(row.getBaselineTime(), filteredBaseline, row.getCurrentTime(),
-              filteredCurrent);
+      MetricDataRow filteredRow = new MetricDataRow(row.getBaselineTime(), filteredBaseline,
+          row.getCurrentTime(), filteredCurrent);
       filteredTable.add(filteredRow);
     }
 

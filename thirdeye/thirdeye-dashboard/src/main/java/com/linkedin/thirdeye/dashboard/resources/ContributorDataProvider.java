@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import io.dropwizard.views.View;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +37,8 @@ import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewContributors;
 
+import io.dropwizard.views.View;
+
 /**
  * Provides data for Contributor View. This primarily involves data for metric totals as well as
  * dimensional splits for each metric + dimension.
@@ -59,7 +59,8 @@ public class ContributorDataProvider {
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
 
-  public ContributorDataProvider(String serverUri, QueryCache queryCache, ObjectMapper objectMapper) {
+  public ContributorDataProvider(String serverUri, QueryCache queryCache,
+      ObjectMapper objectMapper) {
     this.serverUri = serverUri;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
@@ -71,30 +72,20 @@ public class ContributorDataProvider {
   public View generateDimensionContributorView(String collection, String metricFunction,
       MultivaluedMap<String, String> selectedDimensions, UriInfo uriInfo, CollectionSchema schema,
       DateTime baselineStart, DateTime currentStart,
-      Map<String, Map<String, List<String>>> reverseDimensionGroups) throws Exception,
-      InterruptedException, ExecutionException {
+      Map<String, Map<String, List<String>>> reverseDimensionGroups)
+          throws Exception, InterruptedException, ExecutionException {
     long intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
     // Since the total view is based off the funnel view, set times to be consistent (ie start of
     // day, PT)
-    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
-      baselineStart = ViewUtils.standardizeToStartOfDayPT(baselineStart.getMillis());
-    } else {
-      baselineStart = ViewUtils.standardizeToStartOfDayUTC(baselineStart.getMillis());
-    }
+    baselineStart = ViewUtils.standardizeDate(baselineStart, intraPeriod);
+    currentStart = ViewUtils.standardizeDate(currentStart, intraPeriod);
 
-    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
-      currentStart = ViewUtils.standardizeToStartOfDayPT(currentStart.getMillis());
-    } else {
-      currentStart = ViewUtils.standardizeToStartOfDayUTC(currentStart.getMillis());
-    }
     long baselineOffset = currentStart.getMillis() - baselineStart.getMillis();
 
-    String baselineTotalSql =
-        SqlUtils.getSql(metricFunction, collection, baselineStart, baselineStart.plus(intraPeriod),
-            selectedDimensions, reverseDimensionGroups);
-    String currentTotalSql =
-        SqlUtils.getSql(metricFunction, collection, currentStart, currentStart.plus(intraPeriod),
-            selectedDimensions, reverseDimensionGroups);
+    String baselineTotalSql = SqlUtils.getSql(metricFunction, collection, baselineStart,
+        baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+    String currentTotalSql = SqlUtils.getSql(metricFunction, collection, currentStart,
+        currentStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
 
     LOGGER.info("Generated SQL for contributor baseline total {}: {}", uriInfo.getRequestUri(),
         baselineTotalSql);
@@ -111,12 +102,10 @@ public class ContributorDataProvider {
       if (!selectedDimensions.containsKey(dimension)) {
         // Generate SQL
         selectedDimensions.put(dimension, Arrays.asList("!"));
-        String baselineGroupBySql =
-            SqlUtils.getSql(metricFunction, collection, baselineStart,
-                baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
-        String currentGroupBySql =
-            SqlUtils.getSql(metricFunction, collection, currentStart,
-                currentStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+        String baselineGroupBySql = SqlUtils.getSql(metricFunction, collection, baselineStart,
+            baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+        String currentGroupBySql = SqlUtils.getSql(metricFunction, collection, currentStart,
+            currentStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
         LOGGER.info("Generated SQL for contributor baseline {}: {}", uriInfo.getRequestUri(),
             baselineGroupBySql);
         LOGGER.info("Generated SQL for contributor current {}: {}", uriInfo.getRequestUri(),
@@ -145,13 +134,12 @@ public class ContributorDataProvider {
     }
 
     Map<String, MetricTable> totalRow =
-        generateMetricTotalTable(baselineTotalResult, currentTotalResult,
-            baselineStart.getMillis(), currentStart.getMillis(), intraPeriod, baselineOffset);
+        generateMetricTotalTable(baselineTotalResult, currentTotalResult, baselineStart.getMillis(),
+            currentStart.getMillis(), intraPeriod, baselineOffset);
     List<String> metrics = currentTotalResult.getMetrics();
-    Map<Pair<String, String>, Map<String, MetricTable>> tables =
-        generateDimensionTables(metrics, totalRow, dimensionBaselineResults,
-            dimensionCurrentResults, baselineStart.getMillis(), currentStart.getMillis(),
-            intraPeriod, baselineOffset);
+    Map<Pair<String, String>, Map<String, MetricTable>> tables = generateDimensionTables(metrics,
+        totalRow, dimensionBaselineResults, dimensionCurrentResults, baselineStart.getMillis(),
+        currentStart.getMillis(), intraPeriod, baselineOffset);
     return new DimensionViewContributors(metrics, currentTotalResult.getDimensions(), totalRow,
         tables);
   }
@@ -174,9 +162,8 @@ public class ContributorDataProvider {
       currentValues = dimensionEntry.getValue();
     }
 
-    MetricTable totalRow =
-        generateTableRow(totalCurrentResult.getMetrics().size(), baselineStart, currentStart,
-            intraPeriod, baselineOffset, baselineValues, currentValues);
+    MetricTable totalRow = generateTableRow(totalCurrentResult.getMetrics().size(), baselineStart,
+        currentStart, intraPeriod, baselineOffset, baselineValues, currentValues);
 
     return expandMetrics(totalRow, totalCurrentResult.getMetrics());
 
@@ -194,8 +181,8 @@ public class ContributorDataProvider {
       List<String> metrics, Map<String, MetricTable> totalRow,
       Map<String, QueryResult> dimensionBaselineResults,
       Map<String, QueryResult> dimensionCurrentResults, long baselineStart, long currentStart,
-      long intraPeriod, long baselineOffset) throws JsonParseException, JsonMappingException,
-      IOException {
+      long intraPeriod, long baselineOffset)
+          throws JsonParseException, JsonMappingException, IOException {
     Map<Pair<String, String>, Map<String, MetricTable>> table = new HashMap<>(); // key=(metric,dimension),
     List<MetricDataRow> referenceRows = null; // used for filling in missing time buckets
     Map<String, Double> totalCounts = new HashMap<>();
@@ -318,9 +305,8 @@ public class ContributorDataProvider {
 
     Map<Long, Number[]> convertedBaselineValues = convertTimestamps(baselineValues);
     Map<Long, Number[]> convertedCurrentValues = convertTimestamps(currentValues);
-    List<MetricDataRow> entries =
-        ViewUtils.extractMetricDataRows(convertedBaselineValues, convertedCurrentValues,
-            currentStart, baselineOffset, intraPeriod);
+    List<MetricDataRow> entries = ViewUtils.extractMetricDataRows(convertedBaselineValues,
+        convertedCurrentValues, currentStart, baselineOffset, intraPeriod);
     return new MetricTable(entries, metricCount);
   }
 
@@ -348,11 +334,10 @@ public class ContributorDataProvider {
   private MetricTable generateTableRowWithReference(QueryResult totalResult, long baseline,
       long current, long intraPeriod, long baselineOffset, Map<String, Number[]> baselineValues,
       Map<String, Number[]> currentValues, List<MetricDataRow> referenceRows)
-      throws NumberFormatException {
+          throws NumberFormatException {
     int metricCount = totalResult.getMetrics().size();
-    MetricTable orig =
-        generateTableRow(metricCount, baseline, current, intraPeriod, baselineOffset,
-            baselineValues, currentValues);
+    MetricTable orig = generateTableRow(metricCount, baseline, current, intraPeriod, baselineOffset,
+        baselineValues, currentValues);
 
     Iterator<MetricDataRow> iter = orig.getRows().iterator();
     MetricDataRow origRow = (iter.hasNext() ? iter.next() : null);
@@ -375,17 +360,15 @@ public class ContributorDataProvider {
       MetricDataRow updatedRow = null;
       if (origRow == null) {
         // End of list - use dummy row use dummy row to fill in gap.
-        updatedRow =
-            new MetricDataRow(referenceRow.getBaselineTime(), null, referenceRow.getCurrentTime(),
-                null);
+        updatedRow = new MetricDataRow(referenceRow.getBaselineTime(), null,
+            referenceRow.getCurrentTime(), null);
       } else if (origRow.getCurrentTime().equals(refTime)) {
         // no changes required.
         updatedRow = origRow;
       } else {
         // No matching time bucket - use dummy row to fill in gap.
-        updatedRow =
-            new MetricDataRow(referenceRow.getBaselineTime(), null, referenceRow.getCurrentTime(),
-                null);
+        updatedRow = new MetricDataRow(referenceRow.getBaselineTime(), null,
+            referenceRow.getCurrentTime(), null);
       }
       updatedRows.add(updatedRow);
     }
@@ -419,7 +402,7 @@ public class ContributorDataProvider {
       return null;
     } else {
       return new Number[] {
-        values[index]
+          values[index]
       };
     }
 
