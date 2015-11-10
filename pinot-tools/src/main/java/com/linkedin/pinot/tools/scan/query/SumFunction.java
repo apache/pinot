@@ -22,16 +22,15 @@ import java.util.List;
 
 
 public class SumFunction extends AggregationFunc {
-  SumFunction(ResultTable rows, String column, Dictionary dictionaryReader) {
-    super(rows, column, dictionaryReader);
+  SumFunction(ResultTable rows, String column) {
+    super(rows, column);
   }
 
   public ResultTable run() {
     Double sum = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      int dictId = (int) row.get(_column);
-      sum += _dictionaryReader.getDoubleValue(dictId);
+      sum += new Double((row.get(_column)).toString());
     }
 
     List<ColumnMetadata> columnMetadatas = new ArrayList<ColumnMetadata>();

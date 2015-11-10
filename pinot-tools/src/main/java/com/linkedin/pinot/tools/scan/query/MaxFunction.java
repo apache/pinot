@@ -22,16 +22,15 @@ import java.util.List;
 
 
 public class MaxFunction extends AggregationFunc {
-  MaxFunction(ResultTable rows, String column, Dictionary dictionaryReader) {
-    super(rows, column, dictionaryReader);
+  MaxFunction(ResultTable rows, String column) {
+    super(rows, column);
   }
 
   public ResultTable run() {
     Double max = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      int dictId = (int) row.get(_column);
-      max = Math.max(max, _dictionaryReader.getDoubleValue(dictId));
+      max = Math.max(max, new Double(row.get(_column).toString()));
     }
 
     List<ColumnMetadata> columnMetadatas = new ArrayList<ColumnMetadata>();

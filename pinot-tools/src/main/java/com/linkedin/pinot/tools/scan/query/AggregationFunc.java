@@ -23,25 +23,15 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 public abstract class AggregationFunc {
   protected ResultTable _rows;
   protected String _column;
-  protected Dictionary _dictionaryReader;
   protected ColumnMetadata _columnMetadata;
   protected FieldSpec.DataType _dataType;
-
-  AggregationFunc(ResultTable rows, String column, Dictionary dictionaryReader) {
-    _rows = rows;
-    _column = column;
-    _dictionaryReader = dictionaryReader;
-
-    _columnMetadata = rows.getColumnMetadata(column);
-    _dataType = _columnMetadata.getDataType();
-  }
 
   AggregationFunc(ResultTable rows, String column) {
     _rows = rows;
     _column = column;
-    _dictionaryReader = null;
-    _columnMetadata = null;
-    _dataType = null;
+
+    _columnMetadata = rows.getColumnMetadata(column);
+    _dataType = _columnMetadata.getDataType();
   }
 
   public ResultTable run() {

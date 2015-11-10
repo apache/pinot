@@ -23,8 +23,8 @@ import java.util.List;
 
 public class AvgFunction extends AggregationFunc {
 
-  AvgFunction(ResultTable rows, String column, Dictionary dictionaryReader) {
-    super(rows, column, dictionaryReader);
+  AvgFunction(ResultTable rows, String column) {
+    super(rows, column);
   }
 
   public ResultTable run() {
@@ -32,8 +32,7 @@ public class AvgFunction extends AggregationFunc {
     int numRows = 0;
 
     for (ResultTable.Row row : _rows) {
-      int dictId = (int) row.get(_column);
-      average += _dictionaryReader.getDoubleValue(dictId);
+      average += new Double(row.get(_column).toString());
       ++numRows;
     }
 

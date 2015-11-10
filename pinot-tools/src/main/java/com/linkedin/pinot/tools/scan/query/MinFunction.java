@@ -22,8 +22,8 @@ import java.util.List;
 
 
 public class MinFunction extends AggregationFunc {
-  MinFunction(ResultTable rows, String column, Dictionary dictionaryReader) {
-    super(rows, column, dictionaryReader);
+  MinFunction(ResultTable rows, String column) {
+    super(rows, column);
   }
 
   public ResultTable run() {
@@ -31,7 +31,7 @@ public class MinFunction extends AggregationFunc {
 
     for (ResultTable.Row row : _rows) {
       int dictId = (int) row.get(_column);
-      min = Math.min(min, _dictionaryReader.getDoubleValue(dictId));
+      min = Math.max(min, new Double(row.get(_column).toString()));
     }
 
     List<ColumnMetadata> columnMetadatas = new ArrayList<ColumnMetadata>();

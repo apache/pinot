@@ -92,11 +92,10 @@ class SegmentQueryProcessor {
       return getMatchingDocIds(indexSegment, metadata, filterType, column, value);
     }
 
-    List<Integer> result = new ArrayList<>();
-    for (FilterQueryTree childFilter : childFilters) {
-      result = combine(result, doFilter(childFilter, indexSegment, metadata), filterQueryTree.getOperator());
+    List<Integer> result = doFilter(childFilters.get(0), indexSegment, metadata);
+    for (int i = 1; i < childFilters.size(); ++i) {
+      result = combine(result, doFilter(childFilters.get(i), indexSegment, metadata), filterQueryTree.getOperator());
     }
-
     return result;
   }
 

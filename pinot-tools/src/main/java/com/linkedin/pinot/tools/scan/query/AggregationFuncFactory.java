@@ -26,23 +26,22 @@ public class AggregationFuncFactory {
   private static final String SUM = "SUM";
   private static final String AVG = "AVG";
 
-  public static AggregationFunc getAggregationFunc(ResultTable rows, String column, String functionName,
-      Dictionary dictionaryReader) {
+  public static AggregationFunc getAggregationFunc(ResultTable rows, String column, String functionName) {
     switch (functionName.toUpperCase()) {
       case COUNT:
         return new CountFunction(rows, column);
 
       case MIN:
-        return new MinFunction(rows, column, dictionaryReader);
+        return new MinFunction(rows, column);
 
       case MAX:
-        return new MaxFunction(rows, column, dictionaryReader);
+        return new MaxFunction(rows, column);
 
       case SUM:
-        return new SumFunction(rows, column, dictionaryReader);
+        return new SumFunction(rows, column);
 
       case AVG:
-        return new AvgFunction(rows, column, dictionaryReader);
+        return new AvgFunction(rows, column);
 
       default:
         throw new RuntimeException("Unsupported aggregation function " + functionName);

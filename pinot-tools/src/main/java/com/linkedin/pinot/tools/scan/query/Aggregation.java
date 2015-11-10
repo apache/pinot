@@ -26,12 +26,26 @@ import java.util.Map;
 
 
 public class Aggregation {
-  private final IndexSegmentImpl _indexSegment;
-  private final SegmentMetadataImpl _metadata;
-  private final List<Integer> _filteredDocIds;
-  private final List<AggregationInfo> _aggregationsInfo;
-  private final List<String> _aggregationColumns;
-  private final Map<String, String> _columnAggregationFuncMap;
+  private IndexSegmentImpl _indexSegment;
+  private SegmentMetadataImpl _metadata;
+  private List<Integer> _filteredDocIds;
+  private List<AggregationInfo> _aggregationsInfo;
+  private List<String> _aggregationColumns;
+  private Map<String, String> _columnAggregationFuncMap;
+
+  public Aggregation(List<AggregationInfo> aggregationsInfo) {
+    _aggregationsInfo = aggregationsInfo;
+    _aggregationColumns = new ArrayList<>();
+    _columnAggregationFuncMap = new HashMap<>();
+
+    for (AggregationInfo aggregationInfo : _aggregationsInfo) {
+      Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
+      for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
+        _columnAggregationFuncMap.put(entry.getValue(), aggregationInfo.getAggregationType());
+      }
+      _aggregationColumns.addAll(aggregationParams.values());
+    }
+  }
 
   public Aggregation(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
       List<AggregationInfo> aggregationsInfo) {
@@ -56,14 +70,23 @@ public class Aggregation {
   public ResultTable run() {
     Projection projection = new Projection(_indexSegment, _metadata, _filteredDocIds, _aggregationColumns);
     ResultTable projectionResult = projection.run();
+
+    Map<String, Dictionary> dictionaryMap = new HashMap<>();
+    for (String column : _aggregationColumns) {
+      dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
+    }
+
+    ResultTable results = aggregate(projectionResult.values(dictionaryMap));
+    return results;
+  }
+
+  public ResultTable aggregate(ResultTable projectionResult) {
     ResultTable results = new ResultTable(projectionResult.getColumnMetadatas(), 1);
 
     for (Map.Entry<String, String> entry : _columnAggregationFuncMap.entrySet()) {
       String column = entry.getKey();
-      Dictionary dictionaryReader = (column.equals("*")) ? null : _indexSegment.getDictionaryFor(column);
-
       AggregationFunc aggregationFunc =
-          AggregationFuncFactory.getAggregationFunc(projectionResult, column, entry.getValue(), dictionaryReader);
+          AggregationFuncFactory.getAggregationFunc(projectionResult, column, entry.getValue());
       ResultTable aggregationResult = aggregationFunc.run();
 
       results.add(0, aggregationResult.get(0, 0));
