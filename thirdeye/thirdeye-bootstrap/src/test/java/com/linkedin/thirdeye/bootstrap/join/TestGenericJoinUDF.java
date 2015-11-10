@@ -99,7 +99,8 @@ public class TestGenericJoinUDF {
     Map<String, List<GenericRecord>> joinInput = new HashMap<String, List<GenericRecord>>();
     joinInput.put(input1SourceName, Lists.newArrayList(record1));
     joinInput.put(input2SourceName, Lists.newArrayList(record2));
-    GenericRecord joinOutputRecord = udf.performJoin(joinKeyVal, joinInput);
+    List<GenericRecord> joinOutputRecords = udf.performJoin(joinKeyVal, joinInput);
+    GenericRecord joinOutputRecord = joinOutputRecords.get(0);
     System.out.println(joinOutputRecord);
 
     for (String dim : outputDimensions) {
@@ -120,6 +121,6 @@ public class TestGenericJoinUDF {
 
   }
 
-  
+
 
 }
