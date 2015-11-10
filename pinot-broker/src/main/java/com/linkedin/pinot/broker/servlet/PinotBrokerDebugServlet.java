@@ -48,7 +48,6 @@ public class PinotBrokerDebugServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      System.out.println("********************************* : debug");
       resp.setContentType("application/json");
       resp.getOutputStream().print(broker.getDebugInfo());
       resp.getOutputStream().flush();
