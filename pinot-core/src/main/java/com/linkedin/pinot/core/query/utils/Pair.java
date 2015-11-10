@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.query.utils;
 import java.io.Serializable;
 
 
-public class Pair<T1, T2> implements Serializable {
+public class Pair<T1 extends Serializable, T2 extends Serializable> implements Serializable {
 
   private T1 _first;
   private T2 _second;

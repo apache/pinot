@@ -217,7 +217,7 @@ public class AggregationGroupByOperatorService {
     return null;
   }
 
-  class customPriorityQueue<T extends Comparable> {
+  class customPriorityQueue<T extends Comparable & Serializable> {
     private PriorityQueue getGroupedValuePairPriorityQueue(T object, boolean isMinPriorityQueue) {
       if (isMinPriorityQueue) {
         return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
