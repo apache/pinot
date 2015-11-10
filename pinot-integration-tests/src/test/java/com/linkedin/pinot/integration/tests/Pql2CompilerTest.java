@@ -99,6 +99,7 @@ public class Pql2CompilerTest {
     Pql2Compiler pql2Compiler = new Pql2Compiler();
 
     testQuery(pql1Compiler, pql2Compiler, "select count(*) from foo where x not in (1,2,3)");
+    testQuery(pql1Compiler, pql2Compiler, "SELECT LongestAddGTime, DepDelayMinutes FROM whatever  WHERE TotalAddGTime NOT IN ('13', '32', '60', '8', '4', '54', '13', '58') AND DestAirportSeqID NOT IN ('1014002', '1163805', '1387102', '1467903', '1349503', '1143302')  LIMIT 26");
   }
   
   @Test
@@ -343,7 +344,8 @@ public class Pql2CompilerTest {
             valuesAreEqual;
 
         // Compare sets if the op is IN
-        if (operatorsAreEqual && columnsAreEqual && leftQuery.getOperator() == FilterOperator.IN) {
+        if (operatorsAreEqual && columnsAreEqual &&
+            (leftQuery.getOperator() == FilterOperator.IN || leftQuery.getOperator() == FilterOperator.NOT_IN)) {
           Set<String> leftValues = new HashSet<>(Arrays.asList(leftQuery.getValue().get(0).split("\t\t")));
           Set<String> rightValues = new HashSet<>(Arrays.asList(rightQuery.getValue().get(0).split("\t\t")));
           fieldsAreEqual = leftValues.equals(rightValues);
