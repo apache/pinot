@@ -50,8 +50,9 @@ public class DimensionViewContributors extends View {
   }
 
   public Map<String, MetricTable> getDimensionValueTable(String metric, String dimension) {
-    // return (Map<String, MetricTable>) dimensionValueTables.get(metric, dimension);
-    return dimensionValueTables.get(new Pair<String, String>(metric, dimension));
+    Map<String, MetricTable> result =
+        dimensionValueTables.get(new Pair<String, String>(metric, dimension));
+    return (result == null ? Collections.<String, MetricTable> emptyMap() : result);
   }
 
 }
