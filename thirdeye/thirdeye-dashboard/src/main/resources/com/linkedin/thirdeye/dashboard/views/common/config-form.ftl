@@ -143,7 +143,7 @@
             </label>
             <div class="uk-form-icon">
                 <i class="uk-icon-calendar"></i>
-                <input id="time-input-form-current-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}">
+                <input id="time-input-form-current-date" type="text" data-uk-datepicker="{weekstart:0,format:'YYYY-MM-DD'}">
             </div>
         </div>
         <div id="config-form-time-picker-box" class="uk-display-inline-block hidden">

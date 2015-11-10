@@ -258,8 +258,7 @@ li {
     border-right: 1px solid #ddd;
 
 }
-#dimension-contributor-area .divider-row td,
-#dimension-contributor-area .divider-row h3{
+#dimension-contributor-area .divider-row td{
     line-height: 8px;
     height: 12px;
     border: none;

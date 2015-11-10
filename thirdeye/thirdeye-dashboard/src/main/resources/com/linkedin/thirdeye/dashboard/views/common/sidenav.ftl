@@ -69,7 +69,7 @@
                 <div class="uk-form-row">
                     <div class="uk-form-icon">
                         <i class="uk-icon-calendar"></i>
-                        <input id="sidenav-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}" />
+                        <input id="sidenav-date" type="text" data-uk-datepicker="{weekstart:0,format:'YYYY-MM-DD'}" />
                     </div>
                 </div>
 

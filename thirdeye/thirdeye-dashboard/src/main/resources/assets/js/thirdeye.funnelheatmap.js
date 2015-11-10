@@ -24,6 +24,7 @@ $(document).ready(function() {
         transformUTCToTZTime(cell, dateTimeFormat )
     })
 
+    //Translate the UTC time of the title to local / user selected timezone
     $(".funnel .metric-list[currentUTC]").each(function(i, label){
         var labelObj = $(label)
         var currentTime = moment(labelObj.attr('currentUTC'))
