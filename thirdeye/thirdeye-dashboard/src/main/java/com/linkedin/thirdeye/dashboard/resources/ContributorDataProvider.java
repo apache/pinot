@@ -106,10 +106,10 @@ public class ContributorDataProvider {
             baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
         String currentGroupBySql = SqlUtils.getSql(metricFunction, collection, currentStart,
             currentStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
-        LOGGER.info("Generated SQL for contributor baseline {}: {}", uriInfo.getRequestUri(),
-            baselineGroupBySql);
-        LOGGER.info("Generated SQL for contributor current {}: {}", uriInfo.getRequestUri(),
-            currentGroupBySql);
+        LOGGER.info("Generated SQL for contributor baseline {} {}: {}", dimension,
+            uriInfo.getRequestUri(), baselineGroupBySql);
+        LOGGER.info("Generated SQL for contributor current {} {}: {}", dimension,
+            uriInfo.getRequestUri(), currentGroupBySql);
         selectedDimensions.remove(dimension);
 
         // Query (in parallel)
@@ -118,8 +118,7 @@ public class ContributorDataProvider {
         currentResultFutures.put(dimension,
             queryCache.getQueryResultAsync(serverUri, currentGroupBySql));
 
-      }
-      {
+      } else {
         LOGGER.warn(
             "Found overlap between dimensions to query and pre-selected dimensions: ({}:{})",
             dimension, selectedDimensions.get(dimension));
