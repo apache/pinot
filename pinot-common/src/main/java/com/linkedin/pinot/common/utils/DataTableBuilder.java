@@ -644,21 +644,26 @@ public class DataTableBuilder {
     }
 
     @Override
-    public boolean equals(Object rhs) {
-      if (this == rhs) {
+    public boolean equals(Object right) {
+      if (EqualityUtils.isSameReference(this, right)) {
         return true;
       }
-      if (rhs == null || getClass() != rhs.getClass()) {
+
+      if (EqualityUtils.isNullOrNotSameClass(this, right)) {
         return false;
       }
 
-      DataSchema that = (DataSchema) rhs;
+      DataSchema that = (DataSchema) right;
 
-      if (! Arrays.equals(this.columnNames, that.columnNames)) {
-        return false;
-      }
+      return EqualityUtils.isEqual(this.columnNames, that.columnNames) &&
+          EqualityUtils.isEqual(this.columnTypes, that.columnTypes);
+    }
 
-      return Arrays.equals(this.columnTypes, that.columnTypes);
+    @Override
+    public int hashCode() {
+      int hashCode = EqualityUtils.hashCodeOf(columnNames);
+      hashCode = EqualityUtils.hashCodeOf(hashCode, columnTypes);
+      return hashCode;
     }
   }
 
