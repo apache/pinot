@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.common.utils.primitive;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.Serializable;
+import java.util.Objects;
 
 
 /**
@@ -72,5 +74,24 @@ public class MutableLongValue extends Number implements Serializable, Comparable
   @Override
   public int compareTo(MutableLongValue o) {
     return Long.compare(value, o.value);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    MutableLongValue that = (MutableLongValue) o;
+    return EqualityUtils.isEqual(value, that.value);
+  }
+
+  @Override
+  public int hashCode() {
+    return EqualityUtils.hashCodeOf(value);
   }
 }
