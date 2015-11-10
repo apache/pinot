@@ -124,11 +124,11 @@ public final class CustomBitSet implements Closeable {
     } else {
       int bytePosition = (int) (startBitIndex >>> 3);
       int startBitOffset = (int) (startBitIndex & 7);
-      long sum = startBitOffset + bitLength;
-      int endBitOffset = (int) ((8 - (sum & 7)) & 7);
+      int sum = startBitOffset + bitLength;
+      int endBitOffset = (8 - (sum & 7)) & 7;
 
       // int numberOfBytesUsed = (sum >>> 3) + ((sum & 7) != 0 ? 1 : 0);
-      int numberOfBytesUsed = (int) ((sum + 7) >>> 3);
+      int numberOfBytesUsed = (sum + 7) >>> 3;
       int i = -1;
 
       long number = 0;
@@ -201,7 +201,7 @@ public final class CustomBitSet implements Closeable {
       numberOfBitsOnInCurrentByte = bitCountArray[currentByte];
     }
 
-    long currentBitPosition = nextSetBit(bytePosition * 8);
+    long currentBitPosition = nextSetBit(bytePosition * 8L);
     while (0 < numberOfBitsToSkip && currentBitPosition != -1) {
       currentBitPosition = nextSetBit(currentBitPosition + 1);
       numberOfBitsToSkip--;
@@ -247,7 +247,7 @@ public final class CustomBitSet implements Closeable {
 
     int zerosCount = Integer.numberOfLeadingZeros(currentByte) - IGNORED_ZEROS_COUNT;
 
-    return zerosCount + (bytePosition + bytesSkipped) * 8;
+    return zerosCount + (bytePosition + bytesSkipped) * 8L;
   }
 
   /**
