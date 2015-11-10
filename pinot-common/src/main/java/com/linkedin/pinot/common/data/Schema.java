@@ -124,11 +124,13 @@ public class Schema {
   public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     this.timeFieldSpec = timeFieldSpec;
   }
-
+  
+  @JsonIgnore(true)
   public StarTreeIndexSpec getStarTreeIndexSpec() {
     return starTreeIndexSpec;
   }
-
+  
+  @JsonIgnore(true)
   public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
     this.starTreeIndexSpec = starTreeIndexSpec;
   }
