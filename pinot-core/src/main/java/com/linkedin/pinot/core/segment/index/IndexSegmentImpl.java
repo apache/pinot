@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.File;
 import java.util.Map;
 
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

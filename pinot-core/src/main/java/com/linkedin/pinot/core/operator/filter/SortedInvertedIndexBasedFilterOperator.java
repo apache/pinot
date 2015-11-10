@@ -30,13 +30,12 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 

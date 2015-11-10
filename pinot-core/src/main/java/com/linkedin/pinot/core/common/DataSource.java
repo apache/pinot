@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public abstract class DataSource extends BaseOperator {
