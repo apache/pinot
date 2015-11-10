@@ -26,6 +26,7 @@ public class SumFunction extends AggregationFunc {
     super(rows, column);
   }
 
+  @Override
   public ResultTable run() {
     Double sum = 0.0;
 

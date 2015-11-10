@@ -80,22 +80,27 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
     }
   }
 
+  @Override
   public Configuration getConfig() {
     return _instanceDataManagerConfiguration;
   }
 
+  @Override
   public String getInstanceId() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_ID);
   }
 
+  @Override
   public String getInstanceDataDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_DATA_DIR);
   }
 
+  @Override
   public String getInstanceSegmentTarDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_TAR_DIR);
   }
 
+  @Override
   public String getInstanceBootstrapSegmentDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
   }
@@ -109,6 +114,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
     return _tableDataManagerConfigMap.get(tableName);
   }
 
+  @Override
   public String getSegmentMetadataLoaderClass() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_METADATA_LOADER_CLASS);
   }
@@ -124,6 +130,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
 
   }
 
+  @Override
   public String toString() {
     String configString = "";
     configString += "Instance Id: " + getInstanceId();

@@ -36,6 +36,7 @@ public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
     queryPhaseName = Utils.toCamelCase(name().toLowerCase());
   }
 
+  @Override
   public String getQueryPhaseName() {
     return queryPhaseName;
   }

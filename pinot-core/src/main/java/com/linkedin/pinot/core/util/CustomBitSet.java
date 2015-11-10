@@ -153,6 +153,7 @@ public final class CustomBitSet implements Closeable {
     return dst;
   }
 
+  @Override
   public String toString() {
     byte[] array = toByteArray();
     StringBuilder sb = new StringBuilder();

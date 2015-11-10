@@ -50,6 +50,7 @@ public class NumberGenerator implements Generator {
     random = new Random(System.currentTimeMillis());
   }
 
+  @Override
   public void init() {
     final Random rand = new Random(System.currentTimeMillis());
 
@@ -100,6 +101,7 @@ public class NumberGenerator implements Generator {
     }
   }
 
+  @Override
   public Object next() {
     switch (columnType) {
       case INT:

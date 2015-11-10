@@ -77,6 +77,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
    * After setting the startDocId, next calls will always return from &gt;=startDocId
    * @param startDocId
    */
+  @Override
   public void setStartDocId(int startDocId) {
     bitmapBasedBlockIdSetIterator.setStartDocId(startDocId);
   }
@@ -85,6 +86,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
    * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
    * @param endDocId
    */
+  @Override
   public void setEndDocId(int endDocId) {
     bitmapBasedBlockIdSetIterator.setEndDocId(endDocId);
   }

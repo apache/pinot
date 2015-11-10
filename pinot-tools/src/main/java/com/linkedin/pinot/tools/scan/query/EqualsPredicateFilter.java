@@ -24,10 +24,12 @@ public class EqualsPredicateFilter implements PredicateFilter {
     _equalsDictId = dictionary.indexOf(value);
   }
 
+  @Override
   public boolean apply(int dictId) {
     return (dictId == _equalsDictId);
   }
 
+  @Override
   public boolean apply(int[] dictIds) {
     for (int dictId : dictIds) {
       if (dictId == _equalsDictId) {

@@ -34,10 +34,12 @@ public class MatchEntireSegmentDocIdSetBlock extends DocIdSetBlock {
     _totalDocs = totalDocs;
   }
 
+  @Override
   public int[] getDocIdSet() {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public int getSearchableLength() {
     return _totalDocs;
   }

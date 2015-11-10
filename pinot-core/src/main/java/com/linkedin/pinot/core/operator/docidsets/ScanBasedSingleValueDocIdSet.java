@@ -36,10 +36,12 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
     blockValSetBlockDocIdIterator = new BlockValSetBasedDocIdIterator(blockValSet, blockMetadata, evaluator);
   }
 
+  @Override
   public int getMinDocId() {
     return blockMetadata.getStartDocId();
   }
 
+  @Override
   public int getMaxDocId() {
     return blockMetadata.getEndDocId();
   }
@@ -48,6 +50,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
    * After setting the startDocId, next calls will always return from &gt;=startDocId
    * @param startDocId
    */
+  @Override
   public void setStartDocId(int startDocId) {
     blockValSetBlockDocIdIterator.setStartDocId(startDocId);
   }
@@ -56,6 +59,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
    * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
    * @param endDocId
    */
+  @Override
   public void setEndDocId(int endDocId) {
     blockValSetBlockDocIdIterator.setEndDocId(endDocId);
   }

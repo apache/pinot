@@ -71,6 +71,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
   boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }

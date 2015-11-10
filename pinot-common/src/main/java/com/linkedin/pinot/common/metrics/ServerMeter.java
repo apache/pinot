@@ -39,10 +39,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
     this.meterName = Utils.toCamelCase(name().toLowerCase());
   }
 
+  @Override
   public String getMeterName() {
     return meterName;
   }
 
+  @Override
   public String getUnit() {
     return unit;
   }
@@ -52,6 +54,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    *
    * @return true if the metric is global
    */
+  @Override
   public boolean isGlobal() {
     return global;
   }

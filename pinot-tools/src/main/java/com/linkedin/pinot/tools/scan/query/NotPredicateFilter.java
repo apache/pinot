@@ -24,10 +24,12 @@ public class NotPredicateFilter implements PredicateFilter {
     _notEqualsDictId = dictionaryReader.indexOf(predicateValue);
   }
 
+  @Override
   public boolean apply(int dictId) {
     return (dictId != _notEqualsDictId);
   }
 
+  @Override
   public boolean apply(int [] dictIds) {
     for (int dictId : dictIds) {
       if (dictId == _notEqualsDictId) {

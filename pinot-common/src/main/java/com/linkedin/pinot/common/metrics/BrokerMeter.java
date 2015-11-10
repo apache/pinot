@@ -42,10 +42,12 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
     this.brokerMeterName = Utils.toCamelCase(name().toLowerCase());
   }
 
+  @Override
   public String getMeterName() {
     return brokerMeterName;
   }
 
+  @Override
   public String getUnit() {
     return unit;
   }
@@ -55,6 +57,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    *
    * @return true if the metric is global
    */
+  @Override
   public boolean isGlobal() {
     return global;
   }

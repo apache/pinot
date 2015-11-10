@@ -162,6 +162,7 @@ public class FixedByteSkipListSCMVReader implements SingleColumnMultiValueReader
     return (int)(rowOffSetStart);
   }
 
+  @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
     chunkOffsetsBuffer = null;

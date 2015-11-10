@@ -26,6 +26,7 @@ public class MinFunction extends AggregationFunc {
     super(rows, column);
   }
 
+  @Override
   public ResultTable run() {
     Double min = 0.0;
 

@@ -25,6 +25,7 @@ public class CountFunction extends AggregationFunc {
     super(rows, column);
   }
 
+  @Override
   public ResultTable run() {
     int count = _rows.size();
     List<ColumnMetadata> columnMetadatas = new ArrayList<ColumnMetadata>();

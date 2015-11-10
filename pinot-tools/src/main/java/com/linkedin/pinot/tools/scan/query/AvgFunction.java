@@ -27,6 +27,7 @@ public class AvgFunction extends AggregationFunc {
     super(rows, column);
   }
 
+  @Override
   public ResultTable run() {
     Double average = 0.0;
     int numRows = 0;

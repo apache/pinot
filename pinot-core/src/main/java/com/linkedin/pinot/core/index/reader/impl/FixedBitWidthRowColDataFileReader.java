@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.index.reader.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.util.CustomBitSet;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -41,7 +42,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class FixedBitWidthRowColDataFileReader {
+public class FixedBitWidthRowColDataFileReader implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthRowColDataFileReader.class);
 
   RandomAccessFile file;
@@ -280,6 +281,7 @@ public class FixedBitWidthRowColDataFileReader {
     return colSizesInBits;
   }
 
+  @Override
   public void close() throws IOException {
     if (ownsByteBuffer) {
       MmapUtils.unloadByteBuffer(byteBuffer);

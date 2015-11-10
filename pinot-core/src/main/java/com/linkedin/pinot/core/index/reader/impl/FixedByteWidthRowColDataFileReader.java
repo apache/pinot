@@ -270,6 +270,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     return columnSizes;
   }
 
+  @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(byteBuffer);
     byteBuffer = null;

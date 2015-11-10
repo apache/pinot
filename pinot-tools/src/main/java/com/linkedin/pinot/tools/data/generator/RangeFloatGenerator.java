@@ -31,9 +31,11 @@ public class RangeFloatGenerator implements Generator {
     _delta = _end - _start;
   }
 
+  @Override
   public void init() {
   }
 
+  @Override
   public Object next() {
     return (_start + (_delta * _randGen.nextFloat()));
   }

@@ -26,6 +26,7 @@ public class MaxFunction extends AggregationFunc {
     super(rows, column);
   }
 
+  @Override
   public ResultTable run() {
     Double max = 0.0;
 

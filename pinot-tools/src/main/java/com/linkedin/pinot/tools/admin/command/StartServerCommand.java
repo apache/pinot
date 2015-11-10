@@ -62,6 +62,7 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
       usage = "Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }

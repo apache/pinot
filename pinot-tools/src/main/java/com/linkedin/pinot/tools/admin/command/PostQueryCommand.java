@@ -47,6 +47,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
       usage = "Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }
@@ -110,6 +111,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     return sb.toString();
   }
 
+  @Override
   public boolean execute() throws Exception {
     String result = run();
     LOGGER.info("Result: " + result);

@@ -36,6 +36,7 @@ public enum BrokerQueryPhase implements AbstractMetrics.QueryPhase {
     queryPhaseName = Utils.toCamelCase(name().toLowerCase());
   }
 
+  @Override
   public String getQueryPhaseName() {
     return queryPhaseName;
   }
