@@ -17,8 +17,8 @@ public interface JoinUDF {
    * @param joinInput Mapping from sourceName to GenericRecord(s)
    * @return
    */
-  GenericRecord performJoin(Object joinKeyVal,
+  List<GenericRecord> performJoin(Object joinKeyVal,
       Map<String, List<GenericRecord>> joinInput);
-  
-  
+
+
 }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.join;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -35,9 +36,10 @@ public class GenericJoinUDF implements JoinUDF {
    * same in source and output.
    */
   @Override
-  public GenericRecord performJoin(Object joinKeyVal,
+  public List<GenericRecord> performJoin(Object joinKeyVal,
       Map<String, List<GenericRecord>> joinInput) {
 
+    List<GenericRecord> outputRecords = new ArrayList<GenericRecord>();
     GenericRecord outputRecord = new GenericData.Record(outputSchema);
     for (Field field : fields) {
       Object value = null;
@@ -61,7 +63,8 @@ public class GenericJoinUDF implements JoinUDF {
         outputRecord.put(field.name, value);
       }
     }
-    return outputRecord;
+    outputRecords.add(outputRecord);
+    return outputRecords;
   }
 
 }

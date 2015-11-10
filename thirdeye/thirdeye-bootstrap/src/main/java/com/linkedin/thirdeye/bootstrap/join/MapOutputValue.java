@@ -58,11 +58,9 @@ public class MapOutputValue {
     // write the serialized bytes
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(out);
-    System.out.println("schema name:" + schemaName + "  length:"+ schemaName.getBytes().length);
     dos.writeInt(schema.getName().getBytes().length);
     dos.write(schema.getName().getBytes());
     byte[] dataBytes = dataStream.toByteArray();
-    System.out.println("Data Buffer length:" + dataBytes.length);
 
     dos.writeInt(dataBytes.length);
     dos.write(dataBytes);

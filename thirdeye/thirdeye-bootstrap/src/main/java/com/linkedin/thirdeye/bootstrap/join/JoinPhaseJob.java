@@ -210,10 +210,12 @@ public class JoinPhaseJob extends Configured {
       }
       countersMap.get(counterName).incrementAndGet();
       // invoke the udf and pass in the join data
-      GenericRecord output =
+      List<GenericRecord> outputRecords =
           joinUDF.performJoin(new String(joinKeyWritable.copyBytes()), joinInput);
-      if (output != null) {
-        context.write(new AvroKey<GenericRecord>(output), NullWritable.get());
+      if (outputRecords != null) {
+        for (GenericRecord outputRecord : outputRecords) {
+          context.write(new AvroKey<GenericRecord>(outputRecord), NullWritable.get());
+        }
       }
     }
 
