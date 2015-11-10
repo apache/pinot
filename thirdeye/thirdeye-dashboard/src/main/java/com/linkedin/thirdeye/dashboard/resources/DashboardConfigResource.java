@@ -6,9 +6,12 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 import javax.ws.rs.DefaultValue;
@@ -17,9 +20,12 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.UriInfo;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -68,9 +74,16 @@ public class DashboardConfigResource {
   /** Return a list of dimensions for the provided collection. */
   @GET
   @Path("/dimensions/{collection}")
-  public List<String> getDimensions(@PathParam("collection") String collection) throws Exception {
+  public List<String> getDimensions(@PathParam("collection") String collection,
+      @Context UriInfo uriInfo) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    return schema.getDimensions();
+    Set<String> selectedDimensions = retrieveSelectedDimensions(uriInfo);
+    if (CollectionUtils.isEmpty(selectedDimensions)) {
+      return schema.getDimensions();
+    }
+    List<String> filteredDimensions =
+        new ArrayList<>(CollectionUtils.subtract(schema.getDimensions(), selectedDimensions));
+    return filteredDimensions;
   }
 
   /**
@@ -79,10 +92,35 @@ public class DashboardConfigResource {
    */
   @GET
   @Path("/dimensionAliases/{collection}")
-  public List<String> getDimensionAliases(@PathParam("collection") String collection)
-      throws Exception {
+  public List<String> getDimensionAliases(@PathParam("collection") String collection,
+      @Context UriInfo uriInfo) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    return schema.getDimensionAliases();
+    Set<String> selectedDimensions = retrieveSelectedDimensions(uriInfo);
+    if (CollectionUtils.isEmpty(selectedDimensions)) {
+      return schema.getDimensionAliases();
+    }
+    Iterator<String> dimensionsIter = schema.getDimensions().iterator();
+    Iterator<String> dimensionAliasesIter = schema.getDimensionAliases().iterator();
+    List<String> filteredAliases = new LinkedList<>();
+    while (dimensionsIter.hasNext()) {
+      String dimension = dimensionsIter.next();
+      String dimensionAlias = dimensionAliasesIter.next();
+      if (!selectedDimensions.contains(dimension)) {
+        filteredAliases.add(dimensionAlias);
+      }
+    }
+    return filteredAliases;
+
+  }
+
+  /** Returns null if the info object is null. */
+  private MultivaluedMap<String, String> retrieveSelectedDimensionValues(UriInfo uriInfo) {
+    return (uriInfo == null ? null : uriInfo.getQueryParameters());
+  }
+
+  private Set<String> retrieveSelectedDimensions(UriInfo uriInfo) {
+    MultivaluedMap<String, String> map = retrieveSelectedDimensionValues(uriInfo);
+    return (map == null ? null : map.keySet());
   }
 
   /**
@@ -94,6 +132,8 @@ public class DashboardConfigResource {
    * dimension.
    * </br>
    * Baseline/current are provided to limit the range in which to search for dimension values.
+   * </br>
+   * This method currently does not take into account already selected dimensions.
    */
   @GET
   @Path("/dimensionValues/{collection}/{baseline}/{current}")
@@ -137,7 +177,7 @@ public class DashboardConfigResource {
   private Map<String, Collection<String>> retrieveDimensionValues(String collection,
       long baselineMillis, long currentMillis, double contributionThreshold,
       int dimensionValuesLimit) throws Exception {
-    List<String> dimensions = getDimensions(collection);
+    List<String> dimensions = getDimensions(collection, null);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
 

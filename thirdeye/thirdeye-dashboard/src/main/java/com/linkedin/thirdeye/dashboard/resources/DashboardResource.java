@@ -325,8 +325,9 @@ public class DashboardResource {
     switch (dimensionViewType) {
     case CONTRIBUTOR:
     case MULTI_TIME_SERIES:
+      List<String> viewDimensions = dashboardConfigResource.getDimensions(collection, uriInfo);
       return contributorResource.generateDimensionContributorView(collection, metricFunction,
-          selectedDimensions, uriInfo, schema, baseline, current, reverseDimensionGroups);
+          selectedDimensions, uriInfo, viewDimensions, baseline, current, reverseDimensionGroups);
 
     case HEAT_MAP:
 

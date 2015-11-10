@@ -4,6 +4,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.UriInfo;
+
+import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -11,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
+import com.sun.jersey.core.util.MultivaluedMapImpl;
 
 public class TestDashboardConfigResource {
   private static final String SERVER_URI = "ignored";
@@ -38,14 +45,38 @@ public class TestDashboardConfigResource {
 
   @Test
   public void testGetDimensions() throws Exception {
-    testDashboardConfigResource.getDimensions(COLLECTION);
+    testDashboardConfigResource.getDimensions(COLLECTION, null);
     verify(mockCollectionSchema).getDimensions();
   }
 
   @Test
+  public void testGetDimensionsWithSelection() throws Exception {
+    UriInfo mockUriInfo = mock(UriInfo.class);
+    MultivaluedMap<String, String> queryParams = new MultivaluedMapImpl();
+    queryParams.put("b", Arrays.asList("x", "y", "z"));
+    when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
+    when(mockCollectionSchema.getDimensions()).thenReturn(Arrays.asList("a", "b", "c"));
+    Assert.assertEquals(testDashboardConfigResource.getDimensions(COLLECTION, mockUriInfo),
+        Arrays.asList("a", "c"));
+  }
+
+  @Test
   public void testGetDimensionAliases() throws Exception {
-    testDashboardConfigResource.getDimensionAliases(COLLECTION);
+    testDashboardConfigResource.getDimensionAliases(COLLECTION, null);
     verify(mockCollectionSchema).getDimensionAliases();
+  }
+
+  @Test
+  public void testGetDimensionAliasesWithSelection() throws Exception {
+    UriInfo mockUriInfo = mock(UriInfo.class);
+    MultivaluedMap<String, String> queryParams = new MultivaluedMapImpl();
+    queryParams.put("b", Arrays.asList("x", "y", "z"));
+    when(mockUriInfo.getQueryParameters()).thenReturn(queryParams);
+    when(mockCollectionSchema.getDimensions()).thenReturn(Arrays.asList("a", "b", "c"));
+    when(mockCollectionSchema.getDimensionAliases())
+        .thenReturn(Arrays.asList(null, "SHOULD BE FILTERED", "c_alias"));
+    Assert.assertEquals(testDashboardConfigResource.getDimensionAliases(COLLECTION, mockUriInfo),
+        Arrays.asList(null, "c_alias"));
   }
 
   @Test

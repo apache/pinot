@@ -28,7 +28,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
@@ -70,7 +69,7 @@ public class ContributorDataProvider {
    * Sends the appropriate queries and uses the response to create contributor tables.
    */
   public View generateDimensionContributorView(String collection, String metricFunction,
-      MultivaluedMap<String, String> selectedDimensions, UriInfo uriInfo, CollectionSchema schema,
+      MultivaluedMap<String, String> selectedDimensions, UriInfo uriInfo, List<String> dimensions,
       DateTime baselineStart, DateTime currentStart,
       Map<String, Map<String, List<String>>> reverseDimensionGroups)
           throws Exception, InterruptedException, ExecutionException {
@@ -98,7 +97,8 @@ public class ContributorDataProvider {
 
     Map<String, Future<QueryResult>> baselineResultFutures = new HashMap<>();
     Map<String, Future<QueryResult>> currentResultFutures = new HashMap<>();
-    for (String dimension : schema.getDimensions()) {
+    for (String dimension : dimensions) {
+      // Dimensions should be filtered already, but there's an additional check here.
       if (!selectedDimensions.containsKey(dimension)) {
         // Generate SQL
         selectedDimensions.put(dimension, Arrays.asList("!"));
@@ -118,6 +118,11 @@ public class ContributorDataProvider {
         currentResultFutures.put(dimension,
             queryCache.getQueryResultAsync(serverUri, currentGroupBySql));
 
+      }
+      {
+        LOGGER.warn(
+            "Found overlap between dimensions to query and pre-selected dimensions: ({}:{})",
+            dimension, selectedDimensions.get(dimension));
       }
     }
 
@@ -140,8 +145,7 @@ public class ContributorDataProvider {
     Map<Pair<String, String>, Map<String, MetricTable>> tables = generateDimensionTables(metrics,
         totalRow, dimensionBaselineResults, dimensionCurrentResults, baselineStart.getMillis(),
         currentStart.getMillis(), intraPeriod, baselineOffset);
-    return new DimensionViewContributors(metrics, currentTotalResult.getDimensions(), totalRow,
-        tables);
+    return new DimensionViewContributors(metrics, dimensions, totalRow, tables);
   }
 
   /** Retrieves a single MetricTable from the provided metric total result. */
