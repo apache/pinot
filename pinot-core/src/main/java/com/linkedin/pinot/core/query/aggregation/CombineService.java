@@ -24,6 +24,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -49,16 +50,6 @@ public class CombineService {
       return;
     }
 
-    // [pinot 2315] For select * queries we let every segment determine schema and then
-    // combine results here. If the schemas differ combine may fail or return wrong results.
-    // Data schema can be null if the filter query does not return results
-    DataTableBuilder.DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
-    DataTableBuilder.DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
-    if (mergedBlockSchema != null && ! mergedBlockSchema.equals(blockToMergeSchema)) {
-      LOGGER.warn("Schema inconsistency. merged block schema: {}, block to merge schema: {}. Dropping block to merge",
-          mergedBlockSchema, blockToMergeSchema);
-      return;
-    }
 
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
@@ -85,15 +76,40 @@ public class CombineService {
             blockToMerge.getAggregationResult()));
       }
     } else {
+
+      DataTableBuilder.DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
+      DataTableBuilder.DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
+      Collection<Serializable[]> mergedResultSet = mergedBlock.getSelectionResult();
+      Collection<Serializable[]> toMergeResultSet = blockToMerge.getSelectionResult();
+
+      // [pinot 2315] For select * queries we let every segment determine schema and then
+      // combine results here. Combine can fail or silently give wrong results if the
+      // schemas are different. Here, we select the schema that returns atleast one
+      // row. If both mergedBlock and blockToMerge have result sets but different schema
+      // then the results are random.
+      // Data schema can be null if the filter query does not return results
+      if (mergedBlockSchema != null && ! mergedBlockSchema.equals(blockToMergeSchema)) {
+        if (mergedResultSet.size() == 0 && toMergeResultSet.size() > 0) {
+          // select the schema that has returned atleast one row
+          mergedBlock.setSelectionDataSchema(blockToMergeSchema);
+          // fall to the logic below which correctly handles null results sets
+        } else {
+          LOGGER
+              .warn("Schema inconsistency. merged block schema: {}, block to merge schema: {}. Dropping block to merge",
+                  mergedBlockSchema, blockToMergeSchema);
+          return;
+        }
+      }
+
       // Combine Selections
       if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
         SelectionOperatorService selectionService =
-            new SelectionOperatorService(brokerRequest.getSelections(), mergedBlock.getSelectionDataSchema());
-        mergedBlock.setSelectionResult(selectionService.merge(mergedBlock.getSelectionResult(),
-            blockToMerge.getSelectionResult()));
+            new SelectionOperatorService(brokerRequest.getSelections(), mergedBlockSchema);
+        mergedBlock.setSelectionResult(selectionService.merge(mergedResultSet, toMergeResultSet));
       } else {
-        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedBlock.getSelectionResult(),
-            blockToMerge.getSelectionResult(), brokerRequest.getSelections().getSize()));
+        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedResultSet,
+            toMergeResultSet,
+            brokerRequest.getSelections().getSize()));
       }
     }
   }
