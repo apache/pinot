@@ -343,26 +343,27 @@ public class Pql2CompilerTest {
             operatorsAreEqual &&
             valuesAreEqual;
 
-        // Compare sets if the op is IN
-        if (operatorsAreEqual && columnsAreEqual &&
-            (leftQuery.getOperator() == FilterOperator.IN || leftQuery.getOperator() == FilterOperator.NOT_IN)) {
-          Set<String> leftValues = new HashSet<>(Arrays.asList(leftQuery.getValue().get(0).split("\t\t")));
-          Set<String> rightValues = new HashSet<>(Arrays.asList(rightQuery.getValue().get(0).split("\t\t")));
-          fieldsAreEqual = leftValues.equals(rightValues);
-          if (!fieldsAreEqual) {
-            System.out.println("in clause not the same?");
-            System.out.println("leftValues = " + leftValues);
-            System.out.println("rightValues = " + rightValues);
-          }
-        }
-
         // NOT_IN and NOT are equivalent
-        if (!operatorsAreEqual && columnsAreEqual && valuesAreEqual) {
+        if (!operatorsAreEqual && columnsAreEqual) {
           if (
               (leftQuery.getOperator() == FilterOperator.NOT || leftQuery.getOperator() == FilterOperator.NOT_IN) &&
                   (rightQuery.getOperator() == FilterOperator.NOT || rightQuery.getOperator() == FilterOperator.NOT_IN)
               ) {
-            fieldsAreEqual = true;
+            operatorsAreEqual = true;
+          }
+        }
+
+        // Compare sets if the op is IN/NOT IN/NOT
+        if (operatorsAreEqual && columnsAreEqual &&
+            (leftQuery.getOperator() == FilterOperator.IN || leftQuery.getOperator() == FilterOperator.NOT_IN ||
+                leftQuery.getOperator() == FilterOperator.NOT)) {
+          Set<String> leftValues = new HashSet<>(Arrays.asList(leftQuery.getValue().get(0).split("\t\t")));
+          Set<String> rightValues = new HashSet<>(Arrays.asList(rightQuery.getValue().get(0).split("\t\t")));
+          fieldsAreEqual = leftValues.equals(rightValues);
+          if (!fieldsAreEqual) {
+            System.out.println("in/not in clause not the same?");
+            System.out.println("leftValues = " + leftValues);
+            System.out.println("rightValues = " + rightValues);
           }
         }
 
