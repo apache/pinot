@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,11 +25,11 @@ import java.util.Map;
 
 public class ResultTable implements Iterable<ResultTable.Row> {
   List<Row> _rows;
-  private final List<ColumnMetadata> _columnMetadatas;
-  private final Map<String, Integer> _columnMap;
+  private List<String> _columnList;
+  private Map<String, Integer> _columnMap;
 
-  ResultTable(List<ColumnMetadata> columns, int numRows) {
-    _columnMetadatas = columns;
+  ResultTable(List<String> columns, int numRows) {
+    _columnList = columns;
     _rows = new ArrayList<>(numRows);
 
     for (int i = 0; i < numRows; ++i) {
@@ -39,10 +38,8 @@ public class ResultTable implements Iterable<ResultTable.Row> {
 
     int index = 0;
     _columnMap = new HashMap<>();
-    for (ColumnMetadata metadata : columns) {
-      if (metadata != null) {
-        _columnMap.put(metadata.getColumnName(), index);
-      }
+    for (String column : columns) {
+      _columnMap.put(column, index);
       ++index;
     }
   }
@@ -61,16 +58,8 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     return _rows;
   }
 
-  public List<ColumnMetadata> getColumnMetadatas() {
-    return _columnMetadatas;
-  }
-
-  public ColumnMetadata getColumnMetadata(String column) {
-    if (_columnMap.containsKey(column)) {
-      int index = _columnMap.get(column);
-      return _columnMetadatas.get(index);
-    }
-    return null;
+  public List<String> getColumnList() {
+    return _columnList;
   }
 
   public Object get(int rowId, int colId) {
@@ -82,14 +71,14 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     return this;
   }
 
-  public ResultTable values(Map<String, Dictionary> dictionaryMap) {
-    ResultTable results = new ResultTable(_columnMetadatas, 0);
+  public ResultTable values(Map<String, Dictionary> dictionaryMap, boolean addCountStar) {
+    ResultTable results = new ResultTable(_columnList, 0);
 
     for (Row row : _rows) {
       Row valuesRow = new Row();
 
       for (int colId = 0; colId < row.size(); ++colId) {
-        String column = _columnMetadatas.get(colId).getColumnName();
+        String column = _columnList.get(colId);
         Dictionary dictionary = dictionaryMap.get(column);
 
         Object object = row.get(colId);
@@ -108,10 +97,23 @@ public class ResultTable implements Iterable<ResultTable.Row> {
         }
       }
 
+      if (addCountStar) {
+        valuesRow.add(1);
+      }
       results._rows.add(valuesRow);
     }
 
+    if (addCountStar) {
+      results.addCountStarColumn();
+    }
     return results;
+  }
+
+  private void addCountStarColumn() {
+    // Assumes count(*) column is to be added at the end.
+    int index = _rows.get(0).size() - 1;
+    _columnMap.put("*", index);
+    _columnList.add("*");
   }
 
   public int size() {
@@ -122,6 +124,10 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     for (Row row : _rows) {
       row.print();
     }
+  }
+
+  public int getColumnIndex(String column) {
+    return _columnMap.get(column);
   }
 
   class Row {

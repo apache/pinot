@@ -42,23 +42,9 @@ public class Projection {
   }
 
   public ResultTable run() {
-    List<ColumnMetadata> columnMetadatas = new ArrayList<>();
-    for (String column : _columns) {
-      columnMetadatas.add(_metadata.getColumnMetadataFor(column));
-    }
-
-    ResultTable resultTable = new ResultTable(columnMetadatas, _filteredDocIds.size());
+    ResultTable resultTable = new ResultTable(_columns, _filteredDocIds.size());
 
     for (String column : _columns) {
-      // Short circuit count(*)
-      if (column.equals(("*"))) {
-          continue;
-      }
-
-      ColumnMetadata columnMetadata = _metadata.getColumnMetadataFor(column);
-      FieldSpec.DataType dataType = _metadata.getColumnMetadataFor(column).getDataType();
-      Dictionary dictionaryReader = _indexSegment.getDictionaryFor(column);
-
       if (_metadata.getColumnMetadataFor(column).isSingleValue()) {
         BlockSingleValIterator bvIter =
             (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();

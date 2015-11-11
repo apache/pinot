@@ -30,58 +30,62 @@ public class Aggregation {
   private SegmentMetadataImpl _metadata;
   private List<Integer> _filteredDocIds;
   private List<AggregationInfo> _aggregationsInfo;
-  private List<String> _aggregationColumns;
   private Map<String, String> _columnAggregationFuncMap;
+  private HashMap<String, Dictionary> _dictionaryMap;
 
-  public Aggregation(List<AggregationInfo> aggregationsInfo) {
-    _aggregationsInfo = aggregationsInfo;
-    _aggregationColumns = new ArrayList<>();
+  private void init() {
     _columnAggregationFuncMap = new HashMap<>();
-
     for (AggregationInfo aggregationInfo : _aggregationsInfo) {
       Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
       for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
         _columnAggregationFuncMap.put(entry.getValue(), aggregationInfo.getAggregationType());
       }
-      _aggregationColumns.addAll(aggregationParams.values());
     }
+  }
+
+  public Aggregation(List<AggregationInfo> aggregationsInfo) {
+    _aggregationsInfo = aggregationsInfo;
+    init();
   }
 
   public Aggregation(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
       List<AggregationInfo> aggregationsInfo) {
-
     _indexSegment = indexSegment;
     _metadata = metadata;
+    _dictionaryMap = new HashMap<>();
+
     _filteredDocIds = filteredDocIds;
     _aggregationsInfo = aggregationsInfo;
+    init();
 
-    _aggregationColumns = new ArrayList<>();
-    _columnAggregationFuncMap = new HashMap<>();
-
-    for (AggregationInfo aggregationInfo : _aggregationsInfo) {
-      Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
-      for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
-        _columnAggregationFuncMap.put(entry.getValue(), aggregationInfo.getAggregationType());
+    for (String column : _columnAggregationFuncMap.keySet()) {
+      if (!column.equals("*")) {
+        _dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
       }
-      _aggregationColumns.addAll(aggregationParams.values());
     }
+
   }
 
   public ResultTable run() {
-    Projection projection = new Projection(_indexSegment, _metadata, _filteredDocIds, _aggregationColumns);
-    ResultTable projectionResult = projection.run();
-
-    Map<String, Dictionary> dictionaryMap = new HashMap<>();
-    for (String column : _aggregationColumns) {
-      dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
+    boolean addCountStar = false;
+    List<String> aggregationColumns = new ArrayList<String>();
+    for (String column : _columnAggregationFuncMap.keySet()) {
+      if (!column.equals("*")) {
+        aggregationColumns.add(column);
+      } else {
+        addCountStar = true;
+      }
     }
 
-    ResultTable results = aggregate(projectionResult.values(dictionaryMap));
+    Projection projection = new Projection(_indexSegment, _metadata, _filteredDocIds, aggregationColumns);
+    ResultTable projectionResult = projection.run();
+
+    ResultTable results = aggregate(projectionResult.values(_dictionaryMap, addCountStar));
     return results;
   }
 
   public ResultTable aggregate(ResultTable projectionResult) {
-    ResultTable results = new ResultTable(projectionResult.getColumnMetadatas(), 1);
+    ResultTable results = new ResultTable(projectionResult.getColumnList(), 1);
 
     for (Map.Entry<String, String> entry : _columnAggregationFuncMap.entrySet()) {
       String column = entry.getKey();

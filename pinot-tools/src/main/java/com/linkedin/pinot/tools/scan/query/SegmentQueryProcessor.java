@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -181,6 +182,7 @@ class SegmentQueryProcessor {
         int[] dictIds = new int[maxNumMultiValues];
         int numMVValues = bvIter.nextIntVal(dictIds);
 
+        dictIds = Arrays.copyOf(dictIds, numMVValues);
         if (predicateFilter.apply(dictIds)) {
           result.add(docId);
         }

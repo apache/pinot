@@ -38,10 +38,10 @@ public class AvgFunction extends AggregationFunc {
     }
 
     average = average / numRows;
-    List<ColumnMetadata> columnMetadatas = new ArrayList<ColumnMetadata>();
-    columnMetadatas.add(_columnMetadata);
+    List<String> columns = new ArrayList<>();
+    columns.add(_column);
 
-    ResultTable resultTable = new ResultTable(columnMetadatas, 1);
+    ResultTable resultTable = new ResultTable(columns, 1);
     resultTable.add(0, average);
 
     return resultTable;

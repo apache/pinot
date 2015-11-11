@@ -45,9 +45,13 @@ public class Selection {
     ResultTable projectionResults = projection.run();
     Map<String, Dictionary> dictionaryMap = new HashMap<>();
 
+    boolean addCountStar = false;
     for (String column : _selectionColumns) {
+      if (column.equals("*")) {
+        addCountStar = true;
+      }
       dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
     }
-    return projectionResults.values(dictionaryMap);
+    return projectionResults.values(dictionaryMap, addCountStar);
   }
 }

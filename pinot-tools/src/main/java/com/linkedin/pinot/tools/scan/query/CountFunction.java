@@ -27,11 +27,16 @@ public class CountFunction extends AggregationFunc {
 
   @Override
   public ResultTable run() {
-    int count = _rows.size();
-    List<ColumnMetadata> columnMetadatas = new ArrayList<ColumnMetadata>();
-    columnMetadatas.add(_columnMetadata);
+    Long count = 0l;
+    int colIndex = _rows.getColumnIndex(_column);
+    for (ResultTable.Row row : _rows) {
+      count += new Long((row.get(colIndex)).toString());
+    }
 
-    ResultTable resultTable = new ResultTable(columnMetadatas, 1);
+    List<String> columns = new ArrayList<>();
+    columns.add(_column);
+
+    ResultTable resultTable = new ResultTable(columns, 1);
     resultTable.add(0, count);
 
     return resultTable;
