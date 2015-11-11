@@ -226,6 +226,7 @@ public class PerfBenchmarkDriver {
     }
     ControllerConf conf = getControllerConf();
     controllerStarter = new ControllerStarter(conf);
+    LOGGER.info("Starting controller at port: " + conf.getControllerPort());
     controllerStarter.start();
   }
 
