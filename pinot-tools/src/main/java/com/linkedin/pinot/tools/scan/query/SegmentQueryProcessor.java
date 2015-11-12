@@ -71,6 +71,7 @@ class SegmentQueryProcessor {
     }
 
     result.setNumDocsScanned(filteredDocIds.size());
+    result.setTotalDocs(metadata.getTotalDocs());
     return result;
   }
 

@@ -92,6 +92,17 @@
               </jvmSettings>
             </program>
             <program>
+              <mainClass>com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
+              <name>scan-query</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
               <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
               <name>start-controller</name>
               <commandLineArguments>

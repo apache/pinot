@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-
-
 public abstract class AggregationFunc {
   protected ResultTable _rows;
   protected String _column;

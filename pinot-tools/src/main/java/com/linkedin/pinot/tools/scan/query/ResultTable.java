@@ -33,6 +33,8 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   private List<String> _columnList;
   private Map<String, Integer> _columnMap;
   int _numDocsScanned;
+  private long _processingTime;
+  private int _totalDocs;
 
   ResultTable(List<String> columns, int numRows) {
     _columnList = columns;
@@ -128,10 +130,12 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   public void print() {
-    LOGGER.info("Docs scanned: " + _numDocsScanned);
     for (Row row : _rows) {
       row.print();
     }
+    LOGGER.info("Docs scanned: " + _numDocsScanned);
+    LOGGER.info("Total Docs  : " + _totalDocs);
+    LOGGER.info("timeUsedMs: " + _processingTime);
   }
 
   public int getColumnIndex(String column) {
@@ -144,6 +148,22 @@ public class ResultTable implements Iterable<ResultTable.Row> {
 
   public int getNumDocsScanned() {
     return _numDocsScanned;
+  }
+
+  public void setProcessingTime(long processingTime) {
+    _processingTime = processingTime;
+  }
+
+  public long getProcessingTime() {
+    return _processingTime;
+  }
+
+  public void setTotalDocs(int totalDocs) {
+    _totalDocs = totalDocs;
+  }
+
+  public int getTotalDocs() {
+    return _totalDocs;
   }
 
   class Row {

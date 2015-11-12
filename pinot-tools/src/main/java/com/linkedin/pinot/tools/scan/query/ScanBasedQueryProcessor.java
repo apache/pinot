@@ -39,6 +39,7 @@ public class ScanBasedQueryProcessor {
 
   ResultTable processQuery(String query)
       throws Exception {
+    long startTimeInMillis = System.currentTimeMillis();
     PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());
     JSONObject jsonObject = compiler.compile(query);
     BrokerRequest brokerRequest = RequestConverter.fromJSON(jsonObject);
@@ -53,10 +54,13 @@ public class ScanBasedQueryProcessor {
     }
 
     int numDocsScanned = 0;
+    int totalDocs = 0;
+
     for (File segmentDir : file.listFiles()) {
       SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segmentDir);
       ResultTable segmentResults = processor.process(query);
       numDocsScanned += segmentResults.getNumDocsScanned();
+      totalDocs += segmentResults.getTotalDocs();
       results = (results == null) ? segmentResults : results.append(segmentResults);
     }
 
@@ -65,6 +69,10 @@ public class ScanBasedQueryProcessor {
     }
 
     results.setNumDocsScanned(numDocsScanned);
+    results.setTotalDocs(totalDocs);
+    long totalUsedMs = System.currentTimeMillis() - startTimeInMillis;
+    results.setProcessingTime(totalUsedMs);
+
     return results;
   }
 

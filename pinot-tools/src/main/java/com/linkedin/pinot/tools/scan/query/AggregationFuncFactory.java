@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.util.List;
-
-
 public class AggregationFuncFactory {
   private static final String COUNT = "COUNT";
   private static final String MIN = "MIN";

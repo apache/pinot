@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import java.util.ArrayList;
 import java.util.List;
 
