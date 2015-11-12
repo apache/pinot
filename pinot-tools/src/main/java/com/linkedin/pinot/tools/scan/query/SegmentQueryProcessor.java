@@ -78,6 +78,17 @@ class SegmentQueryProcessor {
   private List<Integer> filterDocIds(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
       FilterQueryTree filterQueryTree)
       throws Exception {
+    // If there's no filter predicate, return all docsIds.
+    if (filterQueryTree == null) {
+      int totalDocs = indexSegment.getTotalDocs();
+
+      List<Integer> filteredDocIds = new ArrayList<>(indexSegment.getTotalDocs());
+      for (int i = 0; i < totalDocs; i++) {
+        filteredDocIds.add(i);
+      }
+      return filteredDocIds;
+    }
+
     return doFilter(filterQueryTree, indexSegment, metadata);
   }
 
