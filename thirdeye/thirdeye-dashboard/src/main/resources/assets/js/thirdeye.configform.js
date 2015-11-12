@@ -133,8 +133,10 @@ $(document).ready(function() {
 
         // Date
         var current = moment.tz(date + " " + time, timezone)
+
         //Baseline is the user selected baseline or 1 week prior to current
         var baseline =  moment(current.valueOf() - $("#time-input-comparison-size").val() * 86400000)
+
         var currentMillisUTC = current.utc().valueOf()
         var baselineMillisUTC = baseline.utc().valueOf()
 
@@ -197,6 +199,7 @@ $(document).ready(function() {
         }
 
         errorAlert.hide()
+
         window.location = dashboardPath + encodeDimensionValuesAry(queryParams) + encodeHashParameters(params)
     });
 
@@ -267,7 +270,7 @@ $(document).ready(function() {
         document.getElementById("view-metric-selector").innerHTML = optionsHTML.join('')
 
 
-        //Set the comparison size to WoW / Wo2W / Wo4W d on the URI currentmillis - baselinemillis
+        //Set the comparison size to WoW / Wo2W / Wo4W based on the URI currentmillis - baselinemillis
         if($("#time-input-comparison-size").length > 0 ){
             var path = parsePath(window.location.pathname)
             var baselineDiff = path.currentMillis - path.baselineMillis
@@ -275,9 +278,13 @@ $(document).ready(function() {
 
             if(hasWoWProfile){
                 var baselineDiffDays = (baselineDiff / 86400000 )
+
                 $("#time-input-comparison-size").val(baselineDiffDays)
-                $("span", $("#time-input-comparison-size").parent()).html($("#time-input-comparison-size option[e='" + baselineDiffDays + "']").html())
+                $("span", $("#time-input-comparison-size").parent()).html($("#time-input-comparison-size option[value='" + baselineDiffDays + "']").html())
+               
             }
+
+
         }
     }
 
