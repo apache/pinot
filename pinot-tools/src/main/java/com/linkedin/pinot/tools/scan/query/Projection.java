@@ -15,15 +15,13 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 
 
 public class Projection {
@@ -63,7 +61,11 @@ public class Projection {
           bvIter.skipTo(docId);
           int maxNumMultiValues = _metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
           int[] dictIds = new int[maxNumMultiValues];
-          resultTable.add(rowId++, dictIds);
+
+          int numMVValues = bvIter.nextIntVal(dictIds);
+          dictIds = Arrays.copyOf(dictIds, numMVValues);
+
+          resultTable.add(rowId++, ArrayUtils.toObject(dictIds));
         }
       }
     }

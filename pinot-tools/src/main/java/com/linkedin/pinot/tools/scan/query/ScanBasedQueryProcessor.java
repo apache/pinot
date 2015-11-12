@@ -16,12 +16,14 @@
 package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.common.client.request.RequestConverter;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
+import java.util.List;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +46,22 @@ public class ScanBasedQueryProcessor {
     ResultTable results = null;
     File file = new File(_segmentsDir);
 
-    Aggregation aggregation = new Aggregation(brokerRequest.getAggregationsInfo());
+    Aggregation aggregation = null;
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      aggregation = new Aggregation(brokerRequest.getAggregationsInfo());
+    }
+
     for (File segmentDir : file.listFiles()) {
       SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segmentDir);
       ResultTable segmentResults = processor.process(query);
       results = (results == null) ? segmentResults : results.append(segmentResults);
     }
-    return aggregation.aggregate(results);
+
+    if (aggregation != null) {
+      results = aggregation.aggregate(results);
+    }
+    return results;
   }
 
   public static void main(String[] args)
@@ -71,7 +82,9 @@ public class ScanBasedQueryProcessor {
     while ((query = bufferedReader.readLine()) != null) {
       LOGGER.info("Processing Query: {}", query);
       ResultTable resultTable = scanBasedQueryProcessor.processQuery(query);
-      resultTable.print();
+      if (resultTable != null) {
+        resultTable.print();
+      }
     }
     bufferedReader.close();
   }

@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -80,8 +81,8 @@ public class ResultTable implements Iterable<ResultTable.Row> {
       for (int colId = 0; colId < row.size(); ++colId) {
         String column = _columnList.get(colId);
         Dictionary dictionary = dictionaryMap.get(column);
-
         Object object = row.get(colId);
+
         if (object instanceof Object[]) {
           Object[] objArray = (Object[]) object;
           Object[] valArray = new Object[objArray.length];
@@ -165,7 +166,9 @@ public class ResultTable implements Iterable<ResultTable.Row> {
 
     public void print() {
       for (int i = 0; i < _cols.size(); ++i) {
-        System.out.println(_cols.get(i));
+        Object object = _cols.get(i);
+        String value = (object instanceof Object []) ? Arrays.toString((Object []) object) : object.toString();
+        System.out.println(_columnList.get(i) + " " + value);
       }
     }
   }
