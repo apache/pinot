@@ -57,21 +57,20 @@ class SegmentQueryProcessor {
       if (!_brokerRequest.isSetGroupBy()) {
         Aggregation aggregation =
             new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo());
-        return aggregation.run();
+        result =  aggregation.run();
       } else { // Aggregation GroupBy
         AggregationGroupBy aggregationGroupBy =
             new AggregationGroupBy(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo());
-        return aggregationGroupBy.run();
+        result = aggregationGroupBy.run();
+      }
+    } else {// Only Selection
+      if (_brokerRequest.isSetSelections()) {
+        Selection selection = new Selection(indexSegment, metadata, filteredDocIds, _brokerRequest.getSelections().getSelectionColumns());
+        result = selection.run();
       }
     }
 
-    // Only Selection
-    if (_brokerRequest.isSetSelections()) {
-      Selection selection =
-          new Selection(indexSegment, metadata, filteredDocIds, _brokerRequest.getSelections().getSelectionColumns());
-      result = selection.run();
-    }
-
+    result.setNumDocsScanned(filteredDocIds.size());
     return result;
   }
 

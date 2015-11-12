@@ -22,16 +22,22 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ResultTable implements Iterable<ResultTable.Row> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ResultTable.class);
+
   List<Row> _rows;
   private List<String> _columnList;
   private Map<String, Integer> _columnMap;
+  int _numDocsScanned;
 
   ResultTable(List<String> columns, int numRows) {
     _columnList = columns;
     _rows = new ArrayList<>(numRows);
+    _numDocsScanned = 0;
 
     for (int i = 0; i < numRows; ++i) {
       _rows.add(i, new Row());
@@ -122,6 +128,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   public void print() {
+    LOGGER.info("Docs scanned: " + _numDocsScanned);
     for (Row row : _rows) {
       row.print();
     }
@@ -129,6 +136,14 @@ public class ResultTable implements Iterable<ResultTable.Row> {
 
   public int getColumnIndex(String column) {
     return _columnMap.get(column);
+  }
+
+  public void setNumDocsScanned(int numDocsScanned) {
+    _numDocsScanned = numDocsScanned;
+  }
+
+  public int getNumDocsScanned() {
+    return _numDocsScanned;
   }
 
   class Row {
@@ -168,7 +183,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
       for (int i = 0; i < _cols.size(); ++i) {
         Object object = _cols.get(i);
         String value = (object instanceof Object []) ? Arrays.toString((Object []) object) : object.toString();
-        System.out.println(_columnList.get(i) + " " + value);
+        LOGGER.info(_columnList.get(i) + " " + value);
       }
     }
   }

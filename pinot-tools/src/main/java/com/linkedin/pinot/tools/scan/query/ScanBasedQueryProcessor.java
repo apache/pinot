@@ -52,15 +52,19 @@ public class ScanBasedQueryProcessor {
       aggregation = new Aggregation(brokerRequest.getAggregationsInfo());
     }
 
+    int numDocsScanned = 0;
     for (File segmentDir : file.listFiles()) {
       SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segmentDir);
       ResultTable segmentResults = processor.process(query);
+      numDocsScanned += segmentResults.getNumDocsScanned();
       results = (results == null) ? segmentResults : results.append(segmentResults);
     }
 
     if (aggregation != null) {
       results = aggregation.aggregate(results);
     }
+
+    results.setNumDocsScanned(numDocsScanned);
     return results;
   }
 
