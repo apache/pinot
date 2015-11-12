@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.avro.util.WeakIdentityHashMap;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ public class MmapUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapUtils.class);
   private static final AtomicLong DIRECT_BYTE_BUFFER_USAGE = new AtomicLong(0L);
   private static final AtomicLong MMAP_BUFFER_USAGE = new AtomicLong(0L);
+  private static final AtomicInteger MMAP_BUFFER_COUNT = new AtomicInteger(0);
   private static final long BYTES_IN_MEGABYTE = 1024L * 1024L;
   private static final Map<ByteBuffer, AllocationContext> BUFFER_TO_CONTEXT_MAP =
       Collections.synchronizedMap(new WeakIdentityHashMap<>());
@@ -109,6 +111,7 @@ public class MmapUtils {
               break;
             case MMAP:
               MMAP_BUFFER_USAGE.addAndGet(-bufferSize);
+              MMAP_BUFFER_COUNT.decrementAndGet();
               if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Unmapping byte buffer of size {} with context {}, allocation after operation {}", bufferSize,
                     bufferContext, getTrackedAllocationStatus());
@@ -193,6 +196,7 @@ public class MmapUtils {
 
     try {
       byteBuffer = randomAccessFile.getChannel().map(mode, position, size);
+      MMAP_BUFFER_COUNT.incrementAndGet();
     } catch (Exception e) {
       LOGGER.error("Failed to mmap file (size {}, context {})", size, context, e);
       LOGGER.error("Allocation status {}", getTrackedAllocationStatus());
@@ -207,9 +211,10 @@ public class MmapUtils {
   private static String getTrackedAllocationStatus() {
     long directByteBufferUsage = DIRECT_BYTE_BUFFER_USAGE.get();
     long mmapBufferUsage = MMAP_BUFFER_USAGE.get();
+    long mmapBufferCount = MMAP_BUFFER_COUNT.get();
 
     return "direct " + (directByteBufferUsage / BYTES_IN_MEGABYTE) + " MB, mmap " +
-        (mmapBufferUsage / BYTES_IN_MEGABYTE) + " MB, total " +
+        (mmapBufferUsage / BYTES_IN_MEGABYTE) + " MB (" + mmapBufferCount + " files), total " +
         ((directByteBufferUsage + mmapBufferUsage) / BYTES_IN_MEGABYTE) + " MB";
   }
 
@@ -225,5 +230,12 @@ public class MmapUtils {
    */
   public static long getMmapBufferUsage() {
     return MMAP_BUFFER_USAGE.get();
+  }
+
+  /**
+   * Returns the number of memory mapped files.
+   */
+  public static long getMmapBufferCount() {
+    return MMAP_BUFFER_COUNT.get();
   }
 }

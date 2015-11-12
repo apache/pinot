@@ -119,6 +119,9 @@ public class HelixServerStarter {
 
     _serverInstance.getServerMetrics().addCallbackGauge(
         "memory.mmapBufferUsage", MmapUtils::getMmapBufferUsage);
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.mmapBufferCount", MmapUtils::getMmapBufferCount);
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {
