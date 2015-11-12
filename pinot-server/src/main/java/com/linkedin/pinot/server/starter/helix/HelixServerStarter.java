@@ -16,6 +16,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +113,12 @@ public class HelixServerStarter {
 
     _helixManager.addPreConnectCallback(() ->
         _serverInstance.getServerMetrics().addMeteredValue(null, ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.directByteBufferUsage", MmapUtils::getDirectByteBufferUsage);
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.mmapBufferUsage", MmapUtils::getMmapBufferUsage);
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {

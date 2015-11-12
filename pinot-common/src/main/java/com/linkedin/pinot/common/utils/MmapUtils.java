@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -147,7 +148,15 @@ public class MmapUtils {
           getTrackedAllocationStatus());
     }
 
-    final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(capacity);
+    ByteBuffer byteBuffer = null;
+
+    try {
+      byteBuffer = ByteBuffer.allocateDirect(capacity);
+    } catch (OutOfMemoryError e) {
+      LOGGER.error("Ran out of direct memory while trying to allocate {} bytes (context {})", capacity, context, e);
+      LOGGER.error("Allocation status {}", getTrackedAllocationStatus());
+      Utils.rethrowException(e);
+    }
 
     BUFFER_TO_CONTEXT_MAP.put(byteBuffer, new AllocationContext(context, AllocationType.DIRECT_BYTE_BUFFER));
 
@@ -180,7 +189,15 @@ public class MmapUtils {
           getTrackedAllocationStatus());
     }
 
-    final MappedByteBuffer byteBuffer = randomAccessFile.getChannel().map(mode, position, size);
+    MappedByteBuffer byteBuffer = null;
+
+    try {
+      byteBuffer = randomAccessFile.getChannel().map(mode, position, size);
+    } catch (Exception e) {
+      LOGGER.error("Failed to mmap file (size {}, context {})", size, context, e);
+      LOGGER.error("Allocation status {}", getTrackedAllocationStatus());
+      Utils.rethrowException(e);
+    }
 
     BUFFER_TO_CONTEXT_MAP.put(byteBuffer, new AllocationContext(context, AllocationType.MMAP));
 
@@ -194,5 +211,19 @@ public class MmapUtils {
     return "direct " + (directByteBufferUsage / BYTES_IN_MEGABYTE) + " MB, mmap " +
         (mmapBufferUsage / BYTES_IN_MEGABYTE) + " MB, total " +
         ((directByteBufferUsage + mmapBufferUsage) / BYTES_IN_MEGABYTE) + " MB";
+  }
+
+  /**
+   * Returns the number of bytes of direct buffers allocated.
+   */
+  public static long getDirectByteBufferUsage() {
+    return DIRECT_BYTE_BUFFER_USAGE.get();
+  }
+
+  /**
+   * Returns the number of bytes of memory mapped files.
+   */
+  public static long getMmapBufferUsage() {
+    return MMAP_BUFFER_USAGE.get();
   }
 }
