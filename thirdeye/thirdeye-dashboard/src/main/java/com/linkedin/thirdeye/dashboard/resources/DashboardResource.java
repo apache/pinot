@@ -337,28 +337,34 @@ public class DashboardResource {
           selectedDimensions, uriInfo, viewDimensions, baseline, current, reverseDimensionGroups);
 
     case HEAT_MAP:
-      Map<String, Future<QueryResult>> resultCurrentFutures = new HashMap<>();
-      Map<String, Future<QueryResult>> resultBaselineFutures = new HashMap<>();
+      Map<String, Future<QueryResult>> resultActualFutures = new HashMap<>();
+      // Map<String, Future<QueryResult>> resultCurrentFutures = new HashMap<>();
+      // Map<String, Future<QueryResult>> resultBaselineFutures = new HashMap<>();
+
       for (String dimension : schema.getDimensions()) {
         if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
           selectedDimensions.put(dimension, Arrays.asList("!"));
-
-          String currentSql = SqlUtils.getSql(metricFunction, collection, current, current,
+          String actualSql = SqlUtils.getSql(metricFunction, collection, baseline, current,
               selectedDimensions, reverseDimensionGroups);
-          String baselineSql = SqlUtils.getSql(metricFunction, collection, baseline, baseline,
-              selectedDimensions, reverseDimensionGroups);
-          LOGGER.info("Generated current SQL for heat map {}: {}", uriInfo.getRequestUri(),
-              currentSql);
-          LOGGER.info("Generated baseline SQL for heat map {}: {}", uriInfo.getRequestUri(),
-              baselineSql);
+          // String currentSql = SqlUtils.getSql(metricFunction, collection, current, current,
+          // selectedDimensions, reverseDimensionGroups);
+          // String baselineSql = SqlUtils.getSql(metricFunction, collection, baseline, baseline,
+          // selectedDimensions, reverseDimensionGroups);
+          LOGGER.info("Generated actual SQL for heat map {}: {}", uriInfo.getRequestUri(),
+              actualSql);
+          // LOGGER.info("Generated current SQL for heat map {}: {}", uriInfo.getRequestUri(),
+          // currentSql);
+          // LOGGER.info("Generated baseline SQL for heat map {}: {}", uriInfo.getRequestUri(),
+          // baselineSql);
           selectedDimensions.remove(dimension);
 
           // Query (in parallel)
-          resultCurrentFutures.put(dimension,
-              queryCache.getQueryResultAsync(serverUri, currentSql));
-          resultBaselineFutures.put(dimension,
-              queryCache.getQueryResultAsync(serverUri, baselineSql));
+          resultActualFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, actualSql));
+          // resultCurrentFutures.put(dimension,
+          // queryCache.getQueryResultAsync(serverUri, currentSql));
+          // resultBaselineFutures.put(dimension,
+          // queryCache.getQueryResultAsync(serverUri, baselineSql));
         }
       }
 
@@ -372,12 +378,14 @@ public class DashboardResource {
       }
 
       // // Wait for all queries
-      Map<String, QueryResult> currentResults = QueryUtils.waitForQueries(resultCurrentFutures);
-      Map<String, QueryResult> baselineResults = QueryUtils.waitForQueries(resultBaselineFutures);
-      Map<String, QueryResult> mergedResults =
-          QueryUtils.mergeQueryMaps(currentResults, baselineResults);
+      Map<String, QueryResult> actualResults = QueryUtils.waitForQueries(resultActualFutures);
+      // Map<String, QueryResult> currentResults = QueryUtils.waitForQueries(resultCurrentFutures);
+      // Map<String, QueryResult> baselineResults =
+      // QueryUtils.waitForQueries(resultBaselineFutures);
+      // Map<String, QueryResult> mergedResults =
+      // QueryUtils.mergeQueryMaps(currentResults, baselineResults);
 
-      return new DimensionViewHeatMap(schema, objectMapper, mergedResults, dimensionGroups,
+      return new DimensionViewHeatMap(schema, objectMapper, actualResults, dimensionGroups,
           dimensionRegex);
     case TABULAR:
       List<FunnelTable> funnelTables = funnelResource.computeFunnelViews(collection, metricFunction,
