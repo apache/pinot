@@ -5,9 +5,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
@@ -22,13 +25,17 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.DimensionViewType;
@@ -38,8 +45,8 @@ import com.linkedin.thirdeye.dashboard.api.SegmentDescriptor;
 import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
+import com.linkedin.thirdeye.dashboard.util.QueryUtils;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.DashboardStartView;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.DimensionView;
@@ -330,19 +337,28 @@ public class DashboardResource {
           selectedDimensions, uriInfo, viewDimensions, baseline, current, reverseDimensionGroups);
 
     case HEAT_MAP:
-
-      Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
+      Map<String, Future<QueryResult>> resultCurrentFutures = new HashMap<>();
+      Map<String, Future<QueryResult>> resultBaselineFutures = new HashMap<>();
       for (String dimension : schema.getDimensions()) {
         if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
           selectedDimensions.put(dimension, Arrays.asList("!"));
-          String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
+
+          String currentSql = SqlUtils.getSql(metricFunction, collection, current, current,
               selectedDimensions, reverseDimensionGroups);
-          LOGGER.info("Generated SQL for heat map {}: {}", uriInfo.getRequestUri(), sql);
+          String baselineSql = SqlUtils.getSql(metricFunction, collection, baseline, baseline,
+              selectedDimensions, reverseDimensionGroups);
+          LOGGER.info("Generated current SQL for heat map {}: {}", uriInfo.getRequestUri(),
+              currentSql);
+          LOGGER.info("Generated baseline SQL for heat map {}: {}", uriInfo.getRequestUri(),
+              baselineSql);
           selectedDimensions.remove(dimension);
 
           // Query (in parallel)
-          resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
+          resultCurrentFutures.put(dimension,
+              queryCache.getQueryResultAsync(serverUri, currentSql));
+          resultBaselineFutures.put(dimension,
+              queryCache.getQueryResultAsync(serverUri, baselineSql));
         }
       }
 
@@ -355,18 +371,17 @@ public class DashboardResource {
         dimensionRegex = groupSpec.getRegexMapping();
       }
 
-      // Wait for all queries
-      Map<String, QueryResult> results = new HashMap<>(resultFutures.size());
-      for (Map.Entry<String, Future<QueryResult>> entry : resultFutures.entrySet()) {
-        results.put(entry.getKey(), entry.getValue().get());
-      }
+      // // Wait for all queries
+      Map<String, QueryResult> currentResults = QueryUtils.waitForQueries(resultCurrentFutures);
+      Map<String, QueryResult> baselineResults = QueryUtils.waitForQueries(resultBaselineFutures);
+      Map<String, QueryResult> mergedResults =
+          QueryUtils.mergeQueryMaps(currentResults, baselineResults);
 
-      return new DimensionViewHeatMap(schema, objectMapper, results, dimensionGroups,
+      return new DimensionViewHeatMap(schema, objectMapper, mergedResults, dimensionGroups,
           dimensionRegex);
     case TABULAR:
-      List<FunnelTable> funnelTables =
-          funnelResource.computeFunnelViews(collection, metricFunction, funnels, baselineMillis,
-              currentMillis, ViewUtils.getIntraPeriod(metricFunction), selectedDimensions);
+      List<FunnelTable> funnelTables = funnelResource.computeFunnelViews(collection, metricFunction,
+          funnels, baselineMillis, currentMillis, selectedDimensions);
       return new DimensionViewFunnel(funnelTables);
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);

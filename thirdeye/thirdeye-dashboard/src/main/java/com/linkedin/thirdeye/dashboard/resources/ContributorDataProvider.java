@@ -31,6 +31,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.util.IntraPeriod;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
@@ -73,7 +74,8 @@ public class ContributorDataProvider {
       DateTime baselineStart, DateTime currentStart,
       Map<String, Map<String, List<String>>> reverseDimensionGroups)
           throws Exception, InterruptedException, ExecutionException {
-    long intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
+    IntraPeriod intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
+    long intraPeriodMillis = intraPeriod.getMillis();
     // Since the total view is based off the funnel view, set times to be consistent (ie start of
     // day, PT)
     baselineStart = ViewUtils.standardizeDate(baselineStart, intraPeriod);
@@ -82,9 +84,9 @@ public class ContributorDataProvider {
     long baselineOffset = currentStart.getMillis() - baselineStart.getMillis();
 
     String baselineTotalSql = SqlUtils.getSql(metricFunction, collection, baselineStart,
-        baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+        baselineStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
     String currentTotalSql = SqlUtils.getSql(metricFunction, collection, currentStart,
-        currentStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+        currentStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
 
     LOGGER.info("Generated SQL for contributor baseline total {}: {}", uriInfo.getRequestUri(),
         baselineTotalSql);
@@ -103,9 +105,9 @@ public class ContributorDataProvider {
         // Generate SQL
         selectedDimensions.put(dimension, Arrays.asList("!"));
         String baselineGroupBySql = SqlUtils.getSql(metricFunction, collection, baselineStart,
-            baselineStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+            baselineStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
         String currentGroupBySql = SqlUtils.getSql(metricFunction, collection, currentStart,
-            currentStart.plus(intraPeriod), selectedDimensions, reverseDimensionGroups);
+            currentStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
         LOGGER.info("Generated SQL for contributor baseline {} {}: {}", dimension,
             uriInfo.getRequestUri(), baselineGroupBySql);
         LOGGER.info("Generated SQL for contributor current {} {}: {}", dimension,
@@ -139,11 +141,11 @@ public class ContributorDataProvider {
 
     Map<String, MetricTable> totalRow =
         generateMetricTotalTable(baselineTotalResult, currentTotalResult, baselineStart.getMillis(),
-            currentStart.getMillis(), intraPeriod, baselineOffset);
+            currentStart.getMillis(), intraPeriodMillis, baselineOffset);
     List<String> metrics = currentTotalResult.getMetrics();
     Map<Pair<String, String>, Map<String, MetricTable>> tables = generateDimensionTables(metrics,
         totalRow, dimensionBaselineResults, dimensionCurrentResults, baselineStart.getMillis(),
-        currentStart.getMillis(), intraPeriod, baselineOffset);
+        currentStart.getMillis(), intraPeriodMillis, baselineOffset);
     return new DimensionViewContributors(metrics, dimensions, totalRow, tables);
   }
 

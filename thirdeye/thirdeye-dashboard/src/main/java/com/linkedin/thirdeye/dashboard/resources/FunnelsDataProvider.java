@@ -33,6 +33,7 @@ import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.api.funnel.CustomFunnelSpec;
 import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
+import com.linkedin.thirdeye.dashboard.util.IntraPeriod;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
@@ -81,8 +82,10 @@ public class FunnelsDataProvider {
    * dimensionValuesMap specifies fixed dimension values for the query.
    */
   public List<FunnelTable> computeFunnelViews(String collection, String metricFunction,
-      String selectedFunnels, long baselineMillis, long currentMillis, long intraPeriod,
+      String selectedFunnels, long baselineMillis, long currentMillis,
       MultivaluedMap<String, String> dimensionValues) throws Exception {
+    IntraPeriod intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
+
     List<FunnelTable> funnelViews = new ArrayList<FunnelTable>();
 
     if (selectedFunnels != null && selectedFunnels.length() > 0) {
@@ -129,7 +132,7 @@ public class FunnelsDataProvider {
    * dimensionValuesMap specifies fixed dimension values for the query.
    */
   public FunnelTable getFunnelDataFor(String collection, String urlMetricFunction, FunnelSpec spec,
-      long baselineMillis, long currentMillis, long intraPeriod,
+      long baselineMillis, long currentMillis, IntraPeriod intraPeriod,
       MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
@@ -137,9 +140,10 @@ public class FunnelsDataProvider {
 
     DateTime baselineStart = ViewUtils.standardizeDate(baselineMillis, intraPeriod);
     DateTime currentStart = ViewUtils.standardizeDate(currentMillis, intraPeriod);
+    long intraPeriodMillis = intraPeriod.getMillis();
 
-    DateTime currentEnd = currentStart.plus(intraPeriod);
-    DateTime baselineEnd = baselineStart.plus(intraPeriod);
+    DateTime currentEnd = currentStart.plus(intraPeriodMillis);
+    DateTime baselineEnd = baselineStart.plus(intraPeriodMillis);
 
     List<String> metricFunctionLevels = ViewUtils.getMetricFunctionLevels(urlMetricFunction);
     String metricFunction = StringUtils.join(metricFunctionLevels, "(")
@@ -174,7 +178,7 @@ public class FunnelsDataProvider {
 
     // Compose result
     List<MetricDataRow> table = ViewUtils.extractMetricDataRows(baselineData, currentData,
-        currentStart.getMillis(), intraPeriod, baselineOffsetMillis);
+        currentStart.getMillis(), intraPeriodMillis, baselineOffsetMillis);
 
     // Get mapping of metric name to index
     Map<String, Integer> metricNameToIndex = new HashMap<>();

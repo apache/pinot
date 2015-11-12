@@ -27,20 +27,11 @@ import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 
 public class ViewUtils {
-  public enum Granularity {
-    DAYS,
-    HOURS
-  };
-
   private static final Joiner OR_JOINER = Joiner.on(" OR ");
   private static final TypeReference<List<String>> LIST_TYPE_REFERENCE =
       new TypeReference<List<String>>() {
       };
   private static final Logger LOGGER = LoggerFactory.getLogger(ViewUtils.class);
-
-  public static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
-  public static final long INTRA_WEEK_PERIOD = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
-  public static final long INTRA_MONTH_PERIOD = TimeUnit.MILLISECONDS.convert(30, TimeUnit.DAYS);
 
   public static Map<String, String> fillDimensionValues(CollectionSchema schema,
       Map<String, String> dimensionValues) {
@@ -141,13 +132,13 @@ public class ViewUtils {
    * @param currentEndMillis - end of the current time window. Note that this is not included in the
    *          result list.
    * @param baselineOffsetMillis - difference between baseline and current timestamps.
-   * @param intraPeriod - difference between start and end of current time window.
+   * @param timeWindowLength - difference between start and end of current time window in millis.
    */
   public static List<MetricDataRow> extractMetricDataRows(Map<Long, Number[]> baselineData,
-      Map<Long, Number[]> currentData, long currentStartMillis, long intraPeriod,
+      Map<Long, Number[]> currentData, long currentStartMillis, long timeWindowLength,
       long baselineOffsetMillis) {
 
-    long currentEndMillis = currentStartMillis + intraPeriod;
+    long currentEndMillis = currentStartMillis + timeWindowLength;
 
     List<Long> sortedTimes = new ArrayList<>(currentData.keySet());
     // Reverse sorting in case currentData contains baselineData as well.
@@ -230,17 +221,17 @@ public class ViewUtils {
    * @return
    * @throws NumberFormatException
    */
-  public static long getIntraPeriod(String metricFunction) throws NumberFormatException {
+  public static IntraPeriod getIntraPeriod(String metricFunction) throws NumberFormatException {
     Granularity granularity = getGranularity(metricFunction);
     int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
 
-    long intraPeriod;
-    if (granularity.equals(Granularity.HOURS)) {
-      intraPeriod = INTRA_DAY_PERIOD;
-    } else if (granularity.equals(Granularity.DAYS) && aggregationWindow == 1) {
-      intraPeriod = INTRA_WEEK_PERIOD;
-    } else if (granularity.equals(Granularity.DAYS)) {
-      intraPeriod = INTRA_MONTH_PERIOD;
+    IntraPeriod intraPeriod;
+    if (granularity == Granularity.HOURS) {
+      intraPeriod = IntraPeriod.DAY;
+    } else if (granularity == Granularity.DAYS && aggregationWindow == 1) {
+      intraPeriod = IntraPeriod.WEEK;
+    } else if (granularity == Granularity.DAYS) {
+      intraPeriod = IntraPeriod.MONTH;
     } else {
       throw new IllegalArgumentException("Unknown granularity: " + granularity);
     }
@@ -259,14 +250,14 @@ public class ViewUtils {
     }
   }
 
-  public static DateTime standardizeDate(long inputMillis, long intraPeriod) {
+  public static DateTime standardizeDate(long inputMillis, IntraPeriod intraPeriod) {
     return standardizeDate(new DateTime(inputMillis, DateTimeZone.UTC), intraPeriod);
   }
 
   // TODO configure to accept user input timezone for hourly data.
-  public static DateTime standardizeDate(DateTime input, long intraPeriod) {
+  public static DateTime standardizeDate(DateTime input, IntraPeriod intraPeriod) {
     DateTimeZone dateTZ;
-    if (ViewUtils.INTRA_DAY_PERIOD == intraPeriod) {
+    if (IntraPeriod.DAY == intraPeriod) {
       dateTZ = DateTimeZone.forID("America/Los_Angeles");
     } else {
       dateTZ = DateTimeZone.UTC;
