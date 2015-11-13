@@ -1316,6 +1316,7 @@ public class ThirdEyeJob {
           (Constructor<Configured>) phaseSpec.getKlazz().getConstructor(String.class,
               Properties.class);
       Configured instance = constructor.newInstance(phaseSpec.getName(), jobProperties);
+      setMapreduceConfig(instance.getConf());
 
       // Run the job
       Method runMethod = instance.getClass().getMethod("run");
@@ -1357,4 +1358,20 @@ public class ThirdEyeJob {
   private static String getCollectionDir(String root, String collection) {
     return root == null ? collection : root + File.separator + collection;
   }
+
+  private void setMapreduceConfig(Configuration configuration) {
+    String mapreduceConfig = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_MR_CONF.getName());
+    if (mapreduceConfig != null) {
+      String[] options = mapreduceConfig.split(",");
+      for (String option : options) {
+        String[] configs = option.split("=", 2);
+        if (configs.length == 2) {
+          LOGGER.info("Setting job configuration {} to {}", configs[0], configs[1]);
+          configuration.set(configs[0], configs[1]);
+        }
+      }
+    }
+  }
+
+
 }
