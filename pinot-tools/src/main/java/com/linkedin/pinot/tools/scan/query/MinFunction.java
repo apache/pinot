@@ -29,7 +29,6 @@ public class MinFunction extends AggregationFunc {
     Double min = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      int dictId = (int) row.get(_column);
       min = Math.max(min, new Double(row.get(_column).toString()));
     }
 

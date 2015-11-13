@@ -154,16 +154,16 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     _processingTime = processingTime;
   }
 
-  public long getProcessingTime() {
-    return _processingTime;
-  }
-
   public void setTotalDocs(int totalDocs) {
     _totalDocs = totalDocs;
   }
 
   public int getTotalDocs() {
     return _totalDocs;
+  }
+
+  public void append(Row row) {
+    _rows.add(row);
   }
 
   class Row {

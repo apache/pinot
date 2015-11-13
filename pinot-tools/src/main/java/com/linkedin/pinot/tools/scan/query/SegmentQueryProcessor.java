@@ -60,7 +60,8 @@ class SegmentQueryProcessor {
         result =  aggregation.run();
       } else { // Aggregation GroupBy
         AggregationGroupBy aggregationGroupBy =
-            new AggregationGroupBy(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo());
+            new AggregationGroupBy(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(),
+                _brokerRequest.getGroupBy().getColumns());
         result = aggregationGroupBy.run();
       }
     } else {// Only Selection
