@@ -130,19 +130,19 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("*********************************************************************");
 
       try {
-        createSegment(_inputFilePath, schema, lineSplits[2]);
+        createSegment(_inputFilePath, schema, lineSplits[2],_properties);
         LOGGER.info("finished segment creation job successfully");
       } catch (Exception e) {
         LOGGER.error("Got exceptions during creating segments!", e);
       }
 
       context.write(new LongWritable(Long.parseLong(lineSplits[2])),
-          new Text(FileSystem.get(new Configuration()).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+          new Text(FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
       LOGGER.info("finished the job successfully");
     }
 
-    private String createSegment(String dataFilePath, Schema schema, String seqId) throws Exception {
-      final FileSystem fs = FileSystem.get(new Configuration());
+    private String createSegment(String dataFilePath, Schema schema, String seqId, Configuration configuration) throws Exception {
+      final FileSystem fs = FileSystem.get(configuration);
       final Path hdfsDataPath = new Path(dataFilePath);
       final File dataPath = new File(_currentDiskWorkDir, "data");
       if (dataPath.exists()) {
