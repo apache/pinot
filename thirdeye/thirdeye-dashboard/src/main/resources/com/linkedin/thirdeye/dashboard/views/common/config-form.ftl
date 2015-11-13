@@ -139,7 +139,7 @@
 
         <div class="uk-display-inline-block">
             <label class="uk-form-label">
-                End Date
+                Date
             </label>
             <div class="uk-form-icon">
                 <i class="uk-icon-calendar"></i>
