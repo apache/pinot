@@ -24,6 +24,8 @@ import java.util.Objects;
  * Simple wrapper for a mutable long value.
  */
 public class MutableLongValue extends Number implements Serializable, Comparable<MutableLongValue> {
+  private static final long serialVersionUID = 5072151922348726313L;
+
   private long value;
 
   public MutableLongValue(long value) {
