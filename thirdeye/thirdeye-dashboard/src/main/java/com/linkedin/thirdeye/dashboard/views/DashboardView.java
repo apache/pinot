@@ -29,7 +29,6 @@ public class DashboardView extends View {
   private final List<String> customDashboardNames;
   private final String feedbackEmailAddress;
   private final List<String> funnelNames;
-  
 
   public DashboardView(String collection, MultivaluedMap<String, String> selectedDimensions,
       DateTime baselineTime, DateTime currentTime, DimensionView dimensionView,
@@ -53,7 +52,7 @@ public class DashboardView extends View {
     this.unselectedDimensions = dashboardConfig.getDimensions(collection, selectedDimensions);
     this.aliases = dashboardConfig.getDimensionAliases(collection);
     this.metrics = dashboardConfig.getMetrics(collection);
-    this.metricAliases = dashboardConfig.getMetricAliases(collection);
+    this.metricAliases = dashboardConfig.getMetricAliasesAsList(collection);
   }
 
   public List<String> getFunnelNames() {
@@ -88,7 +87,7 @@ public class DashboardView extends View {
   public Map<String, String> getDimensionAliases() {
     return aliases;
   }
-  
+
   public List<String> getMetrics() {
     return metrics;
   }
@@ -120,6 +119,5 @@ public class DashboardView extends View {
   public List<String> getCustomDashboardNames() {
     return customDashboardNames;
   }
-
 
 }

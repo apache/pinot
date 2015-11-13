@@ -112,13 +112,13 @@ public class DashboardConfigResource {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     Iterator<String> dimensionsIter = schema.getDimensions().iterator();
     Iterator<String> dimensionAliasesIter = schema.getDimensionAliases().iterator();
-    Map<String, String> filteredAliases = new TreeMap<>();
+    Map<String, String> aliasMap = new TreeMap<>();
     while (dimensionsIter.hasNext()) {
       String dimension = dimensionsIter.next();
       String dimensionAlias = dimensionAliasesIter.next();
-      filteredAliases.put(dimension, dimensionAlias);
+      aliasMap.put(dimension, dimensionAlias);
     }
-    return filteredAliases;
+    return aliasMap;
 
   }
 
@@ -167,8 +167,24 @@ public class DashboardConfigResource {
    */
   @GET
   @Path("/metricAliases/{collection}")
-  public List<String> getMetricAliases(@PathParam("collection") String collection)
+  public Map<String, String> getMetricAliases(@PathParam("collection") String collection)
       throws Exception {
+    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    List<String> metricAliases = schema.getMetricAliases();
+
+    Iterator<String> metricsIter = getMetrics(collection).iterator();
+    Iterator<String> metricAliasesIter = metricAliases.iterator();
+    Map<String, String> aliasMap = new TreeMap<>();
+    while (metricsIter.hasNext()) {
+      String metric = metricsIter.next();
+      String metricAlias = metricAliasesIter.next();
+      aliasMap.put(metric, metricAlias);
+    }
+
+    return aliasMap;
+  }
+
+  public List<String> getMetricAliasesAsList(String collection) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     return schema.getMetricAliases();
   }
@@ -282,6 +298,72 @@ public class DashboardConfigResource {
       collectedDimensionValues.put(dimension, sortedValues);
     }
     return collectedDimensionValues;
+  }
+
+  /**
+   * Returns a Map consisting of
+   * {@link #getDimensionInfo(String, UriInfo, long, long, double, int)} and
+   * {@link #getMetricInfo(String)} merged into a single JSON object.
+   * @throws Exception
+   */
+  @GET
+  @Path("/schema/{collection}/{baseline}/{current}")
+  public Map<String, Object> getSchemaInfo(@PathParam("collection") String collection,
+      @Context UriInfo uriInfo, @PathParam("baseline") long baselineMillis,
+      @PathParam("current") long currentMillis,
+      @DefaultValue(DIMENSION_VALUES_OPTIONS_THRESHOLD) @QueryParam("threshold") double contributionThreshold,
+      @DefaultValue(DIMENSION_VALUES_LIMIT) @QueryParam("limit") int dimensionValuesLimit)
+          throws Exception {
+    Map<String, Object> schemaInfo = new HashMap<>();
+    schemaInfo.putAll(getDimensionInfo(collection, uriInfo, baselineMillis, currentMillis,
+        contributionThreshold, dimensionValuesLimit));
+    schemaInfo.putAll(getMetricInfo(collection));
+    return schemaInfo;
+  }
+
+  /**
+   * Returns a Map consisting of:</br>
+   * <ul>
+   * <li>Dimensions ({@link #getDimensions(String, UriInfo)}}
+   * <li>Dimension Aliases ({@link #getDimensionAliases(String)}
+   * </li>Dimension Values ({@link #getDimensionValues(String, long, long)}
+   * </ul>
+   * These values are mapped to their lowerCamelCase keys in an associative array.
+   * @throws Exception
+   */
+  @GET
+  @Path("/dimensionInfo/{collection}/{baseline}/{current}")
+  public Map<String, Object> getDimensionInfo(@PathParam("collection") String collection,
+      @Context UriInfo uriInfo, @PathParam("baseline") long baselineMillis,
+      @PathParam("current") long currentMillis,
+      @DefaultValue(DIMENSION_VALUES_OPTIONS_THRESHOLD) @QueryParam("threshold") double contributionThreshold,
+      @DefaultValue(DIMENSION_VALUES_LIMIT) @QueryParam("limit") int dimensionValuesLimit)
+          throws Exception {
+    Map<String, Object> dimensionInfo = new HashMap<>();
+    dimensionInfo.put("dimensions", getDimensions(collection, uriInfo));
+    dimensionInfo.put("dimensionAliases", getDimensionAliases(collection));
+    dimensionInfo.put("dimensionValues", getDimensionValues(collection, baselineMillis,
+        currentMillis, contributionThreshold, dimensionValuesLimit));
+    return dimensionInfo;
+  }
+
+  /**
+   * Returns a Map consisting of:</br>
+   * <ul>
+   * <li>Metrics ({@link #getMetrics(String)})
+   * <li>Metric Aliases ({@link #getMetricAliasesAsList(String)})
+   * </ul>
+   * These values are mapped to their lowerCamelCase keys in an associative array.
+   * @throws Exception
+   */
+  @GET
+  @Path("/metricInfo/{collection}")
+  public Map<String, Object> getMetricInfo(@PathParam("collection") String collection)
+      throws Exception {
+    Map<String, Object> schemaInfo = new HashMap<>();
+    schemaInfo.put("metrics", getMetrics(collection));
+    schemaInfo.put("metricAliases", getMetricAliasesAsList(collection));
+    return schemaInfo;
   }
 
 }

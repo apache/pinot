@@ -78,8 +78,14 @@ public class TestDashboardConfigResource {
   }
 
   @Test
-  public void testGetMetricAliases() throws Exception {
+  public void testGetAllMetricAliases() throws Exception {
     testDashboardConfigResource.getMetricAliases(COLLECTION);
+    verify(mockCollectionSchema).getMetricAliases();
+  }
+
+  @Test
+  public void testGetMetricAliasesAsList() throws Exception {
+    testDashboardConfigResource.getMetricAliasesAsList(COLLECTION);
     verify(mockCollectionSchema).getMetricAliases();
   }
 
