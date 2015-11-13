@@ -49,6 +49,8 @@
                                                 title="Baseline Value: ${baselineValue} Current Value: ${currentValue}"
                                                 >${(ratioValue * 100)?string["0.0"]}%</td>
                                     <#else>
+                                        <td class="details-cell hidden">N/A</td>
+                                        <td class="details-cell hidden">N/A</td>
                                         <td class="not-available">N/A</td>
                                     </#if>
                                 </#list>
