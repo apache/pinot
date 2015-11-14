@@ -56,7 +56,8 @@ public class PinotAdministrator {
       @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
       @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
-      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class)
+      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
+      @SubCommand(name = "SegmentRebalancer", impl = SegmentRebalanceCommand.class)
   })
   Command _subCommand;
   // @formatter:on
