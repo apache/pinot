@@ -37,19 +37,19 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   private int _totalDocs;
 
   ResultTable(List<String> columns, int numRows) {
-    _columnList = columns;
+    _columnList = new ArrayList<>(columns);
     _rows = new ArrayList<>(numRows);
     _numDocsScanned = 0;
-
-    for (int i = 0; i < numRows; ++i) {
-      _rows.add(i, new Row());
-    }
 
     int index = 0;
     _columnMap = new HashMap<>();
     for (String column : columns) {
       _columnMap.put(column, index);
       ++index;
+    }
+
+    for (int i = 0; i < numRows; ++i) {
+      _rows.add(i, new Row(_columnMap));
     }
   }
 
@@ -67,10 +67,6 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     return _rows;
   }
 
-  public List<String> getColumnList() {
-    return _columnList;
-  }
-
   public Object get(int rowId, int colId) {
     return _rows.get(rowId).get(colId);
   }
@@ -84,7 +80,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     ResultTable results = new ResultTable(_columnList, 0);
 
     for (Row row : _rows) {
-      Row valuesRow = new Row();
+      Row valuesRow = new Row(_columnMap);
 
       for (int colId = 0; colId < row.size(); ++colId) {
         String column = _columnList.get(colId);
@@ -162,15 +158,27 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     return _totalDocs;
   }
 
+  public long getProcessingTime() {
+    return _processingTime;
+  }
+
   public void append(Row row) {
     _rows.add(row);
   }
 
-  class Row {
-    List<Object> _cols;
+  public Map<String, Integer> getColumnMap() {
+    return _columnMap;
+  }
 
-    public Row() {
+  class Row implements Iterable<Object> {
+    List<Object> _cols;
+    private Map<String, Integer> _columnMap;
+    private ArrayList<String> _columnList;
+
+    public Row(Map<String, Integer> columnMap) {
+      _columnMap = columnMap;
       _cols = new ArrayList<>();
+      _columnList = new ArrayList<>(_columnMap.keySet());
     }
 
     public void add(Object value) {
@@ -205,6 +213,11 @@ public class ResultTable implements Iterable<ResultTable.Row> {
         String value = (object instanceof Object []) ? Arrays.toString((Object []) object) : object.toString();
         LOGGER.info(_columnList.get(i) + " " + value);
       }
+    }
+
+    @Override
+    public Iterator<Object> iterator() {
+      return _cols.iterator();
     }
   }
 }

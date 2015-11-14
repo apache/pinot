@@ -22,8 +22,13 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,15 +53,19 @@ public class ScanBasedQueryProcessor {
     File file = new File(_segmentsDir);
 
     Aggregation aggregation = null;
+    List<String> groupByColumns = null;
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
     if (aggregationsInfo != null) {
-      aggregation = new Aggregation(brokerRequest.getAggregationsInfo());
+      groupByColumns = (brokerRequest.isSetGroupBy()) ? brokerRequest.getGroupBy().getColumns() : null;
+      aggregation = new Aggregation(brokerRequest.getAggregationsInfo(), groupByColumns);
     }
 
     int numDocsScanned = 0;
     int totalDocs = 0;
+    LOGGER.info("Processing Query: {}", query);
 
     for (File segmentDir : file.listFiles()) {
+      LOGGER.info("Processing segment: " + segmentDir.getName());
       SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segmentDir);
       ResultTable segmentResults = processor.process(query);
       numDocsScanned += segmentResults.getNumDocsScanned();
@@ -73,6 +82,7 @@ public class ScanBasedQueryProcessor {
     long totalUsedMs = System.currentTimeMillis() - startTimeInMillis;
     results.setProcessingTime(totalUsedMs);
 
+    printResult(results);
     return results;
   }
 
@@ -92,12 +102,55 @@ public class ScanBasedQueryProcessor {
     BufferedReader bufferedReader = new BufferedReader(new FileReader(queryFile));
 
     while ((query = bufferedReader.readLine()) != null) {
-      LOGGER.info("Processing Query: {}", query);
-      ResultTable resultTable = scanBasedQueryProcessor.processQuery(query);
-      if (resultTable != null) {
-        resultTable.print();
-      }
+      scanBasedQueryProcessor.processQuery(query);
     }
     bufferedReader.close();
+  }
+
+  private void printResult(ResultTable resultTable)
+      throws IOException {
+    List<String> values = new ArrayList<>();
+
+    for (ResultTable.Row row : resultTable) {
+      int columnId = 0;
+      for (Object value : row) {
+        values.add(row.get(columnId).toString());
+      }
+    }
+
+    Result result =
+        new Result(resultTable.getNumDocsScanned(), resultTable.getTotalDocs(), resultTable.getProcessingTime(), values);
+    ObjectMapper objectMapper = new ObjectMapper();
+    LOGGER.info(objectMapper.defaultPrettyPrintingWriter().writeValueAsString(result));
+  }
+
+  private class Result {
+    private int _numDocsScanned;
+    private int _totalDocs;
+    private long _timeUsedMs;
+    List<String> _aggregationResults;
+
+    Result(int numDocsScanned, int totalDocs, long timeUsedMs, List<String> aggregationResults) {
+      _numDocsScanned = numDocsScanned;
+      _totalDocs = totalDocs;
+      _timeUsedMs = timeUsedMs;
+      _aggregationResults = aggregationResults;
+    }
+
+    public int getNumDocsScanned() {
+      return _numDocsScanned;
+    }
+
+    public int getTotalDocs() {
+      return _totalDocs;
+    }
+
+    public long getTimeUsedMs() {
+      return _timeUsedMs;
+    }
+
+    List<String> getAggregationResults() {
+      return _aggregationResults;
+    }
   }
 }

@@ -56,13 +56,13 @@ class SegmentQueryProcessor {
       // Aggregation only
       if (!_brokerRequest.isSetGroupBy()) {
         Aggregation aggregation =
-            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo());
+            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(), null);
         result =  aggregation.run();
       } else { // Aggregation GroupBy
-        AggregationGroupBy aggregationGroupBy =
-            new AggregationGroupBy(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(),
+        Aggregation aggregation =
+            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(),
                 _brokerRequest.getGroupBy().getColumns());
-        result = aggregationGroupBy.run();
+        result = aggregation.run();
       }
     } else {// Only Selection
       if (_brokerRequest.isSetSelections()) {
