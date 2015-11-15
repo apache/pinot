@@ -15,8 +15,7 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 
 
 public class MaxFunction extends AggregationFunc {
@@ -32,10 +31,7 @@ public class MaxFunction extends AggregationFunc {
       max = Math.max(max, new Double(row.get(_column).toString()));
     }
 
-    List<String> columns = new ArrayList<>();
-    columns.add(_column);
-
-    ResultTable resultTable = new ResultTable(columns, 1);
+    ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
     resultTable.add(0, max);
 
     return resultTable;

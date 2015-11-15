@@ -24,10 +24,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -109,32 +108,32 @@ public class ScanBasedQueryProcessor {
 
   private void printResult(ResultTable resultTable)
       throws IOException {
-    List<String> values = new ArrayList<>();
-
-    for (ResultTable.Row row : resultTable) {
-      int columnId = 0;
-      for (Object value : row) {
-        values.add(row.get(columnId).toString());
-      }
-    }
-
-    Result result =
-        new Result(resultTable.getNumDocsScanned(), resultTable.getTotalDocs(), resultTable.getProcessingTime(), values);
+    Response response = new Response(resultTable);
     ObjectMapper objectMapper = new ObjectMapper();
-    LOGGER.info(objectMapper.defaultPrettyPrintingWriter().writeValueAsString(result));
+    LOGGER.info(objectMapper.defaultPrettyPrintingWriter().writeValueAsString(response));
   }
 
-  private class Result {
+  private class Response {
     private int _numDocsScanned;
     private int _totalDocs;
     private long _timeUsedMs;
-    List<String> _aggregationResults;
+    List<AggregationResult> _aggregationResults;
 
-    Result(int numDocsScanned, int totalDocs, long timeUsedMs, List<String> aggregationResults) {
-      _numDocsScanned = numDocsScanned;
-      _totalDocs = totalDocs;
-      _timeUsedMs = timeUsedMs;
-      _aggregationResults = aggregationResults;
+    Response(ResultTable resultTable) {
+      _numDocsScanned = resultTable.getNumDocsScanned();
+      _totalDocs = resultTable.getTotalDocs();
+      _timeUsedMs = resultTable.getProcessingTime();
+
+      _aggregationResults = new ArrayList<>();
+      for (ResultTable.Row row : resultTable) {
+        int columnId = 0;
+        for (Object value : row) {
+          AggregationResult aggregationResult =
+              new AggregationResult(resultTable.getFunction(columnId), value.toString());
+          _aggregationResults.add(aggregationResult);
+          ++columnId;
+        }
+      }
     }
 
     public int getNumDocsScanned() {
@@ -149,8 +148,27 @@ public class ScanBasedQueryProcessor {
       return _timeUsedMs;
     }
 
-    List<String> getAggregationResults() {
+    @JsonProperty("_aggregationResults")
+    List<AggregationResult> getAggregationResults() {
       return _aggregationResults;
+    }
+
+    class AggregationResult {
+      private String _value;
+      private String _function;
+
+      AggregationResult(String function, String value) {
+        _function = function;
+        _value = value;
+      }
+
+      public String getFunction() {
+        return _function;
+      }
+
+      public String getValue() {
+        return _value;
+      }
     }
   }
 }

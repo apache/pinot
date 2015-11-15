@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -23,7 +24,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 
 public class Aggregation {
@@ -33,47 +33,52 @@ public class Aggregation {
   private List<Integer> _filteredDocIds;
   private List<AggregationInfo> _aggregationsInfo;
   private List<String> _groupByColumns;
-  private Map<String, String> _columnAggregationFuncMap;
+  private List<Pair> _columnFunctionList;
   private Map<String, Dictionary> _dictionaryMap;
   private List<String> _projectionColumns;
-  private List<String> _allColumns;
+  private List<Pair> _allColumns;
 
-  private void init() {
-    _columnAggregationFuncMap = new TreeMap<>();
+  private void init(List<String> groupByColumns) {
+    _groupByColumns = groupByColumns;
+    _columnFunctionList = new ArrayList<>();
+
     for (AggregationInfo aggregationInfo : _aggregationsInfo) {
       Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
       for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
-        _columnAggregationFuncMap.put(entry.getValue(), aggregationInfo.getAggregationType());
+        _columnFunctionList.add(new Pair(entry.getValue(), aggregationInfo.getAggregationType()));
       }
     }
+
     _addCountStar = false;
     _projectionColumns = new ArrayList<>();
     _allColumns = new ArrayList<>();
 
     if (_groupByColumns != null) {
-      _projectionColumns.addAll(_groupByColumns);
-      _allColumns.addAll(_groupByColumns);
+      for (String column : _groupByColumns) {
+        _projectionColumns.add(column);
+        _allColumns.add(new Pair(column, null));
+      }
     }
 
-    for (String column : _columnAggregationFuncMap.keySet()) {
+    for (Pair pair : _columnFunctionList) {
+      String column = (String) pair.getFirst();
       if (column.equals("*")) {
         _addCountStar = true;
       } else {
         _projectionColumns.add(column);
-        _allColumns.add(column);
+        _allColumns.add(new Pair(column, pair.getSecond()));
       }
     }
 
     // This is always the last columns.
     if (_addCountStar) {
-      _allColumns.add("*");
+      _allColumns.add(new Pair("count", "star"));
     }
   }
 
   public Aggregation(List<AggregationInfo> aggregationsInfo, List<String> groupByColumns) {
     _aggregationsInfo = aggregationsInfo;
-    _groupByColumns = groupByColumns;
-    init();
+    init(groupByColumns);
   }
 
   public Aggregation(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
@@ -81,21 +86,21 @@ public class Aggregation {
     _indexSegment = indexSegment;
     _metadata = metadata;
     _dictionaryMap = new HashMap<>();
-    _groupByColumns = groupByColumns;
 
     _filteredDocIds = filteredDocIds;
     _aggregationsInfo = aggregationsInfo;
-    init();
+    init(groupByColumns);
 
+    // Aggregation columns have been renamed, group by columns have not.
     for (String column : _projectionColumns) {
       _dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
     }
   }
 
   public ResultTable run() {
-    Projection projection = new Projection(_indexSegment, _metadata, _filteredDocIds, _projectionColumns);
-    ResultTable projectionResult = projection.run();
-    return aggregate(projectionResult.values(_dictionaryMap, _addCountStar));
+    Projection projection = new Projection(_indexSegment, _metadata, _filteredDocIds, _projectionColumns,
+        _dictionaryMap, _addCountStar);
+    return aggregate(projection.run());
   }
 
   public ResultTable aggregate(ResultTable input) {
@@ -142,10 +147,12 @@ public class Aggregation {
   private ResultTable aggregateOne(ResultTable input) {
     ResultTable results = new ResultTable(_allColumns, 1);
 
-    for (Map.Entry<String, String> entry : _columnAggregationFuncMap.entrySet()) {
-      String column = entry.getKey();
+    for (Pair pair : _columnFunctionList) {
+      String column = (String) pair.getFirst();
+      String function = (String) pair.getSecond();
+
       AggregationFunc aggregationFunc =
-          AggregationFuncFactory.getAggregationFunc(input, column, entry.getValue());
+          AggregationFuncFactory.getAggregationFunc(input, column, function);
       ResultTable aggregationResult = aggregationFunc.run();
 
       results.add(0, aggregationResult.get(0, 0));

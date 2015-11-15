@@ -17,10 +17,14 @@ package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang.ArrayUtils;
 
 
@@ -28,21 +32,30 @@ public class Projection {
   private final IndexSegmentImpl _indexSegment;
   private final SegmentMetadataImpl _metadata;
   private final List<Integer> _filteredDocIds;
-  private final List<String> _columns;
+  private final List<Pair> _columnList;
+  private Map<String, Dictionary> _dictionaryMap;
+  private boolean _addCountStar;
 
   Projection(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
-      List<String> columns) {
+      List<String> columns, Map<String, Dictionary> dictionaryMap, boolean addCountStar) {
 
     _indexSegment = indexSegment;
     _metadata = metadata;
     _filteredDocIds = filteredDocIds;
-    _columns = columns;
+    _dictionaryMap = dictionaryMap;
+    _addCountStar = addCountStar;
+
+    _columnList = new ArrayList<>();
+    for (String column : columns) {
+      _columnList.add(new Pair(column, null));
+    }
   }
 
   public ResultTable run() {
-    ResultTable resultTable = new ResultTable(_columns, _filteredDocIds.size());
+    ResultTable resultTable = new ResultTable(_columnList, _filteredDocIds.size());
 
-    for (String column : _columns) {
+    for (Pair pair : _columnList) {
+      String column = (String) pair.getFirst();
       if (_metadata.getColumnMetadataFor(column).isSingleValue()) {
         BlockSingleValIterator bvIter =
             (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
@@ -68,6 +81,44 @@ public class Projection {
           resultTable.add(rowId++, ArrayUtils.toObject(dictIds));
         }
       }
+    }
+
+    return transformFromIdToValues(resultTable, _dictionaryMap, _addCountStar);
+  }
+
+  public ResultTable transformFromIdToValues(ResultTable resultTable, Map<String, Dictionary> dictionaryMap,
+      boolean addCountStar) {
+    List<Pair> columnList = resultTable.getColumnList();
+
+    for (ResultTable.Row row : resultTable) {
+      int colId = 0;
+      for (Object object : row) {
+        String column = (String) columnList.get(colId).getFirst();
+        Dictionary dictionary = dictionaryMap.get(column);
+
+        if (object instanceof Object[]) {
+          Object[] objArray = (Object[]) object;
+          Object[] valArray = new Object[objArray.length];
+
+          for (int i = 0; i < objArray.length; ++i) {
+            int dictId = (int) objArray[i];
+            valArray[i] = dictionary.get(dictId);
+          }
+          row.set(colId, valArray);
+        } else {
+          int dictId = (int) object;
+          row.set(colId, dictionary.get(dictId));
+        }
+
+        if (addCountStar) {
+          row.add(1);
+        }
+        ++colId;
+      }
+    }
+
+    if (addCountStar) {
+      resultTable.addCountStarColumn();
     }
 
     return resultTable;

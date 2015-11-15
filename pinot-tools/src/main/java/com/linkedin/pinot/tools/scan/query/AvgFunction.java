@@ -15,8 +15,7 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 
 
 public class AvgFunction extends AggregationFunc {
@@ -36,10 +35,7 @@ public class AvgFunction extends AggregationFunc {
     }
 
     average = average / numRows;
-    List<String> columns = new ArrayList<>();
-    columns.add(_column);
-
-    ResultTable resultTable = new ResultTable(columns, 1);
+    ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
     resultTable.add(0, average);
 
     return resultTable;

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,21 +30,21 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultTable.class);
 
   List<Row> _rows;
-  private List<String> _columnList;
+  private List<Pair> _columnList;
   private Map<String, Integer> _columnMap;
   int _numDocsScanned;
   private long _processingTime;
   private int _totalDocs;
 
-  ResultTable(List<String> columns, int numRows) {
+  ResultTable(List<Pair> columns, int numRows) {
     _columnList = new ArrayList<>(columns);
     _rows = new ArrayList<>(numRows);
     _numDocsScanned = 0;
 
     int index = 0;
     _columnMap = new HashMap<>();
-    for (String column : columns) {
-      _columnMap.put(column, index);
+    for (Pair pair : columns) {
+      _columnMap.put((String) pair.getFirst(), index);
       ++index;
     }
 
@@ -76,49 +76,22 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     return this;
   }
 
-  public ResultTable values(Map<String, Dictionary> dictionaryMap, boolean addCountStar) {
-    ResultTable results = new ResultTable(_columnList, 0);
-
-    for (Row row : _rows) {
-      Row valuesRow = new Row(_columnMap);
-
-      for (int colId = 0; colId < row.size(); ++colId) {
-        String column = _columnList.get(colId);
-        Dictionary dictionary = dictionaryMap.get(column);
-        Object object = row.get(colId);
-
-        if (object instanceof Object[]) {
-          Object[] objArray = (Object[]) object;
-          Object[] valArray = new Object[objArray.length];
-
-          for (int i = 0; i < objArray.length; ++i) {
-            int dictId = (int) objArray[i];
-            valArray[i] = dictionary.get(dictId);
-          }
-          valuesRow.add(valArray);
-        } else {
-          int dictId = (int) object;
-          valuesRow.add(dictionary.get(dictId));
-        }
-      }
-
-      if (addCountStar) {
-        valuesRow.add(1);
-      }
-      results._rows.add(valuesRow);
-    }
-
-    if (addCountStar) {
-      results.addCountStarColumn();
-    }
-    return results;
+  public String getColumn(int columnId) {
+    return (String) _columnList.get(columnId).getFirst();
   }
 
-  private void addCountStarColumn() {
+  public String getFunction(int columnId) {
+    Pair pair = _columnList.get(columnId);
+    String column = (String) pair.getFirst();
+    String function = (String) pair.getSecond();
+    return function + "_" + column;
+  }
+
+  void addCountStarColumn() {
     // Assumes count(*) column is to be added at the end.
     int index = _rows.get(0).size() - 1;
     _columnMap.put("*", index);
-    _columnList.add("*");
+    _columnList.add(new Pair("count", "star"));
   }
 
   public int size() {
@@ -170,6 +143,10 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     return _columnMap;
   }
 
+  public List<Pair> getColumnList() {
+    return _columnList;
+  }
+
   class Row implements Iterable<Object> {
     List<Object> _cols;
     private Map<String, Integer> _columnMap;
@@ -218,6 +195,10 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     @Override
     public Iterator<Object> iterator() {
       return _cols.iterator();
+    }
+
+    public void set(int colId, Object object) {
+      _cols.set(colId, object);
     }
   }
 }

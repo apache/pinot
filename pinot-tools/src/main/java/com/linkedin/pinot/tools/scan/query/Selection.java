@@ -39,19 +39,19 @@ public class Selection {
   }
 
   public ResultTable run() {
-    Projection projection =
-        new Projection(_indexSegment, _metadata, _filteredDocIds, _selectionColumns);
-
-    ResultTable projectionResults = projection.run();
+    boolean addCountStar = false;
     Map<String, Dictionary> dictionaryMap = new HashMap<>();
 
-    boolean addCountStar = false;
     for (String column : _selectionColumns) {
       if (column.equals("*")) {
         addCountStar = true;
       }
       dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
     }
-    return projectionResults.values(dictionaryMap, addCountStar);
+
+    Projection projection =
+        new Projection(_indexSegment, _metadata, _filteredDocIds, _selectionColumns, dictionaryMap, addCountStar);
+
+    return projection.run();
   }
 }

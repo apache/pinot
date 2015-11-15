@@ -15,13 +15,12 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 
 
 public class MinFunction extends AggregationFunc {
-  MinFunction(ResultTable rows, String column) {
-    super(rows, column);
+  MinFunction(ResultTable rows, String columnId) {
+    super(rows, columnId);
   }
 
   @Override
@@ -29,13 +28,10 @@ public class MinFunction extends AggregationFunc {
     Double min = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      min = Math.max(min, new Double(row.get(_column).toString()));
+      min = Math.min(min, new Double(row.get(_column).toString()));
     }
 
-    List<String> columns = new ArrayList<>();
-    columns.add(_column);
-
-    ResultTable resultTable = new ResultTable(columns, 1);
+    ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
     resultTable.add(0, min);
 
     return resultTable;
