@@ -163,9 +163,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public boolean index(GenericRow row) {
-    if (numDocsIndexed >= capacity) {
-      return false;
-    }
     // updating dictionary for dimensions only
     // its ok to insert this first
     // since filtering won't return back anything unless a new entry is made in the inverted index
@@ -259,7 +256,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     docIdSearchableOffset = docId;
     numDocsIndexed += 1;
     numSuccessIndexed += 1;
-    return true;
+
+    return numDocsIndexed < capacity;
   }
 
   @Override
