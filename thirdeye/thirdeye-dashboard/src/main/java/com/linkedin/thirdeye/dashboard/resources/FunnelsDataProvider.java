@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -121,6 +122,17 @@ public class FunnelsDataProvider {
     }
 
     return funnelNames;
+  }
+
+  @GET
+  @Path("/{collection}")
+  public Map<String, FunnelSpec> getFunnelsFor(@PathParam("collection") String collection) {
+    if (!funnelSpecsMap.containsKey(collection)) {
+      return Collections.emptyMap();
+    }
+    Map<String, FunnelSpec> funnels = funnelSpecsMap.get(collection).getFunnels();
+
+    return funnels;
   }
 
   // filter format will be dimName1:dimValue1;dimName2:dimValue2
