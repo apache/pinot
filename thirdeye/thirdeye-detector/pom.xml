@@ -25,6 +25,7 @@
     <quartz.version>2.2.1</quartz.version>
     <jblas.version>1.2.4</jblas.version>
     <commons.email.version>1.4</commons.email.version>
+    <jackson.version>2.4.3</jackson.version>
     <mainClass>com.linkedin.thirdeye.ThirdEyeDetectorApplication</mainClass>
   </properties>
 
@@ -102,6 +103,16 @@
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-views-freemarker</artifactId>
       <version>${dropwizard.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
     </dependency>
   </dependencies>
 
