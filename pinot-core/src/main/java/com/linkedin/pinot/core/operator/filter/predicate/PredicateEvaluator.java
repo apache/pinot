@@ -30,10 +30,25 @@ public interface PredicateEvaluator {
    * @return
    */
   public boolean apply(int[] dictionaryIds);
+
+  /**
+  *
+  * @param dictionaryIds
+  * @param length how many elements in the array should the predicate be evaluated against
+  * @return
+  */
+  public boolean apply(int[] dictionaryIds, int length);
+
   /**
    * 
    * @return
    */
   public int[] getMatchingDictionaryIds();
+
+  /**
+   * 
+   * @return
+   */
+  public int[] getNonMatchingDictionaryIds();
 
 }

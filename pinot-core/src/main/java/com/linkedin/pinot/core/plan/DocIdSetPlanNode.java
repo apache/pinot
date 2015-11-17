@@ -75,7 +75,7 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "DocIdSet Plan Node :");
+    LOGGER.debug(prefix + "DocIdSetPlanNode Plan Node :");
     LOGGER.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     if (_filterNode != null) {

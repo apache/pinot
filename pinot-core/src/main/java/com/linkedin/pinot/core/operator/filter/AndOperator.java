@@ -64,7 +64,7 @@ public class AndOperator extends BaseFilterOperator {
     for (Operator operator : operators) {
       operator.close();
     }
-    LOGGER.info("Time spent in AND operator:{} is {}", this, andBlock.andBlockDocIdSet.timeMeasure);
+    LOGGER.debug("Time spent in AND operator:{} is {}", this, andBlock.andBlockDocIdSet.timeMeasure);
     return true;
   }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.data.source.mv.block;
+package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -21,53 +21,34 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
-public class MultiValueBlock implements Block {
+/**
+ * Nov 15, 2014
+ */
 
-  private final FixedBitSkipListSCMVReader mVReader;
+public class SortedSingleValueBlock implements Block {
+
+  private final SortedForwardIndexReader sVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
-  private Predicate predicate;
 
-  public MultiValueBlock(BlockId id, FixedBitSkipListSCMVReader multiValueReader, ImmutableDictionaryReader dict,
-      ColumnMetadata metadata) {
-    mVReader = multiValueReader;
+  public SortedSingleValueBlock(BlockId id, SortedForwardIndexReader singleValueReader, ImmutableDictionaryReader dict,
+      ColumnMetadata columnMetadata) {
+    sVReader = singleValueReader;
     this.id = id;
     dictionary = dict;
-    columnMetadata = metadata;
-  }
-
-  public boolean hasDictionary() {
-    return true;
-  }
-
-  public boolean hasInvertedIndex() {
-    return columnMetadata.isHasInvertedIndex();
-  }
-
-  public boolean isSingleValued() {
-    return columnMetadata.isSingleValue();
-  }
-
-  public int getMaxNumberOfMultiValues() {
-    return columnMetadata.getMaxNumberOfMultiValues();
-  }
-
-  public ImmutableDictionaryReader getDictionary() {
-    return dictionary;
-  }
-
-  public DataType getDataType() {
-    return columnMetadata.getDataType();
+    this.columnMetadata = columnMetadata;
   }
 
   @Override
@@ -77,7 +58,7 @@ public class MultiValueBlock implements Block {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException("cannnot setPredicate on data source blocks");
+    throw new UnsupportedOperationException("cannnot set predicate on blocks");
   }
 
   @Override
@@ -87,32 +68,35 @@ public class MultiValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-
     return new BlockValSet() {
-
       @Override
       public BlockValIterator iterator() {
 
-        return new BlockMultiValIterator() {
+        return new BlockSingleValIterator() {
           private int counter = 0;
 
           @Override
-          public int nextIntVal(int[] intArray) {
-            return mVReader.getIntArray(counter++, intArray);
-          }
-
-          @Override
           public boolean skipTo(int docId) {
-            if (docId >= columnMetadata.getTotalDocs()) {
+            if (docId >= sVReader.getLength()) {
               return false;
             }
+
             counter = docId;
+
             return true;
           }
 
           @Override
           public int size() {
-            return columnMetadata.getTotalDocs();
+            return sVReader.getLength();
+          }
+
+          @Override
+          public int nextIntVal() {
+            if (counter >= sVReader.getLength()) {
+              return Constants.EOF;
+            }
+            return sVReader.getInt(counter++);
           }
 
           @Override
@@ -123,17 +107,19 @@ public class MultiValueBlock implements Block {
 
           @Override
           public boolean next() {
+            // TODO Auto-generated method stub
             return false;
           }
 
           @Override
           public boolean hasNext() {
-            return (counter < columnMetadata.getTotalDocs());
+            return (counter < sVReader.getLength());
           }
 
           @Override
           public DataType getValueType() {
-            return columnMetadata.getDataType();
+            // TODO Auto-generated method stub
+            return null;
           }
 
           @Override
@@ -145,7 +131,8 @@ public class MultiValueBlock implements Block {
 
       @Override
       public DataType getValueType() {
-        return columnMetadata.getDataType();
+        // TODO Auto-generated method stub
+        return null;
       }
     };
   }
@@ -160,11 +147,6 @@ public class MultiValueBlock implements Block {
     return new BlockMetadata() {
 
       @Override
-      public int getMaxNumberOfMultiValues() {
-        return columnMetadata.getMaxNumberOfMultiValues();
-      }
-
-      @Override
       public boolean isSparse() {
         return false;
       }
@@ -175,18 +157,8 @@ public class MultiValueBlock implements Block {
       }
 
       @Override
-      public boolean isSingleValue() {
-        return columnMetadata.isSingleValue();
-      }
-
-      @Override
       public boolean hasInvertedIndex() {
         return columnMetadata.isHasInvertedIndex();
-      }
-
-      @Override
-      public boolean hasDictionary() {
-        return true;
       }
 
       @Override
@@ -210,8 +182,23 @@ public class MultiValueBlock implements Block {
       }
 
       @Override
-      public ImmutableDictionaryReader getDictionary() {
+      public boolean hasDictionary() {
+        return true;
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return columnMetadata.isSingleValue();
+      }
+
+      @Override
+      public Dictionary getDictionary() {
         return dictionary;
+      }
+
+      @Override
+      public int getMaxNumberOfMultiValues() {
+        return columnMetadata.getMaxNumberOfMultiValues();
       }
 
       @Override

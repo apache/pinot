@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.Arrays;
-
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
@@ -28,8 +26,10 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
 
   private int[] matchingIds;
   private IntSet dictIdSet;
+  private RangePredicate predicate;
 
   public RangeOfflineDictionaryPredicateEvaluator(RangePredicate predicate, ImmutableDictionaryReader dictionary) {
+    this.predicate = predicate;
     int rangeStartIndex = 0;
     int rangeEndIndex = 0;
 
@@ -94,4 +94,20 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
   @Override
   public int[] getMatchingDictionaryIds() {
     return matchingIds;
+  }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictIdSet.contains(dictId)) {
+        return true;
+      }
+    }
+    return false;
   }}

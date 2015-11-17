@@ -29,17 +29,8 @@ import com.linkedin.pinot.core.operator.BaseOperator;
  */
 public abstract class BaseFilterOperator extends BaseOperator {
 
-  private FilterResultBlock resultBlock;
   private Predicate predicate;
   private int nextBlockCallCounter = 0;
-
-  public void setInputBlock(FilterResultBlock block) {
-    this.resultBlock = block;
-  }
-
-  public FilterResultBlock getResultBlock() {
-    return resultBlock;
-  }
 
   public void setPredicate(Predicate predicate) {
     this.predicate = predicate;

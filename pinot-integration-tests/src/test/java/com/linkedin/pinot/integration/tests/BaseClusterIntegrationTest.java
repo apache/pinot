@@ -287,6 +287,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
                       }
                     }
                   } else {
+                    if(!correctValues.containsKey(pinotKey)){
+                      LOGGER.error("actualValues from Pinot: " + actualValues);
+                      LOGGER.error("correct values from H2: " + correctValues);
+                    }
                     Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey
                         + "' returned by Pinot was not returned by H2 for query " + pqlQuery);
                     Assert.assertEquals(

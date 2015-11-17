@@ -31,7 +31,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 
-
 /**
  * Aug 10, 2014
  */
@@ -40,19 +39,23 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   final private int numberOfBitmaps;
-  private SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
+  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
 
   private RandomAccessFile _rndFile;
   private ByteBuffer buffer;
   public static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
 
+  private File file;
+
   /**
    * Constructs an inverted index with the specified size.
-   * @param cardinality the number of bitmaps in the inverted index, which should be the same as the number of values in
-   * the dictionary.
+   * @param cardinality the number of bitmaps in the inverted index, which should be the same as the
+   *          number of values in
+   *          the dictionary.
    * @throws IOException
    */
   public BitmapInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
+    this.file = file;
     numberOfBitmaps = cardinality;
     load(file, isMmap);
   }
@@ -64,7 +67,6 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   @Override
   public ImmutableRoaringBitmap getImmutable(int idx) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
-
     // Return the bitmap if it's still on heap
     if (bitmaps != null) {
       bitmapArrayReference = bitmaps.get();
@@ -84,13 +86,20 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
       bitmapArrayReference = new SoftReference[numberOfBitmaps];
       bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
     }
+    synchronized (this) {
+      ImmutableRoaringBitmap value;
+      if (bitmapArrayReference[idx] == null || bitmapArrayReference[idx].get() == null) {
+        value = buildRoaringBitmapForIndex(idx);
+        bitmapArrayReference[idx] = new SoftReference<ImmutableRoaringBitmap>(value);
+      } else {
+        value = bitmapArrayReference[idx].get();
+      }
+      return value;
+    }
 
-    ImmutableRoaringBitmap value = buildRoaringBitmapForIndex(idx);
-    bitmapArrayReference[idx] = new SoftReference<ImmutableRoaringBitmap>(value);
-    return value;
   }
 
-  private ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
+  private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
     final int currentOffset = getOffset(index);
     final int nextOffset = getOffset(index + 1);
     final int bufferLength = nextOffset - currentOffset;
@@ -100,7 +109,15 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
     final ByteBuffer bb = buffer.slice();
     bb.limit(bufferLength);
 
-    return new ImmutableRoaringBitmap(bb);
+    ImmutableRoaringBitmap immutableRoaringBitmap = null;
+    try {
+      immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
+    } catch (Exception e) {
+      LOGGER.error(
+          "Error creating immutableRoaringBitmap for dictionary id:{} currentOffset:{} bufferLength:{} slice position{} limit:{} file:{}",
+          index, currentOffset, bufferLength, bb.position(), bb.limit(), file.getAbsolutePath());
+    }
+    return immutableRoaringBitmap;
   }
 
   private int getOffset(final int index) {
@@ -108,7 +125,8 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   }
 
   private void load(File file, boolean isMmap) throws IOException {
-    final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+    final DataInputStream dis =
+        new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
 
     dis.skipBytes(numberOfBitmaps * INT_SIZE_IN_BYTES);
     final int lastOffset = dis.readInt();
@@ -119,7 +137,8 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
       buffer = MmapUtils.mmapFile(_rndFile, MapMode.READ_ONLY, 0, lastOffset, file,
           this.getClass().getSimpleName() + " buffer");
     } else {
-      buffer = MmapUtils.allocateDirectByteBuffer(lastOffset, file, this.getClass().getSimpleName() + " buffer");
+      buffer = MmapUtils.allocateDirectByteBuffer(lastOffset, file,
+          this.getClass().getSimpleName() + " buffer");
       _rndFile.getChannel().read(buffer);
     }
   }

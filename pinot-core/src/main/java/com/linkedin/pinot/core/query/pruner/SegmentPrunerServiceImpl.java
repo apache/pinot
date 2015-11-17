@@ -58,7 +58,7 @@ public class SegmentPrunerServiceImpl implements SegmentPrunerService {
     }
     for (SegmentPruner pruner : _segmentPrunerSet) {
       if (pruner.prune(segment, brokerRequest)) {
-        LOGGER.info(pruner + " pruned segment: " + segment.getSegmentName());
+        LOGGER.debug("pruned segment: {}", segment.getSegmentName());
         return true;
       }
     }

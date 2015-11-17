@@ -73,10 +73,18 @@ public class MCombineOperator extends BaseOperator {
   private long _timeOutMs;
   //Make this configurable
   //These two control the parallelism on a per query basis, depending on the number of segments to process
-  private static int MAX_THREADS_PER_QUERY = 5;
+  private static int MIN_THREADS_PER_QUERY = 10;
+  private static int MAX_THREADS_PER_QUERY = 10;
   private static int MIN_SEGMENTS_PER_THREAD = 10;
 
   private IntermediateResultsBlock _mergedBlock;
+  
+  static {
+    int numCores = Runtime.getRuntime().availableProcessors();
+    MIN_THREADS_PER_QUERY = Math.max(1, (int)(numCores * .5));
+    //Dont have more than 10 threads per query
+    MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int)(numCores * .5));
+  }
 
   public MCombineOperator(List<Operator> retOperators, BrokerRequest brokerRequest) {
     _operators = retOperators;
@@ -112,8 +120,9 @@ public class MCombineOperator extends BaseOperator {
     final long startTime = System.currentTimeMillis();
     if (_isParallel) {
       final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
-      int numGroups = Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD);
-
+      int numGroups = Math.max(MIN_THREADS_PER_QUERY,Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD));
+      //ensure that the number of groups is not more than the number of segments
+      numGroups = Math.min(_operators.size(), numGroups);
       final List<List<Operator>> operatorGroups = new ArrayList<List<Operator>>(numGroups);
       for (int i = 0; i < numGroups; i++) {
         operatorGroups.add(new ArrayList<Operator>());

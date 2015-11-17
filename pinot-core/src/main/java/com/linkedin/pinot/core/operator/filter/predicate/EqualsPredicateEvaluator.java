@@ -23,8 +23,10 @@ public class EqualsPredicateEvaluator implements PredicateEvaluator {
 
   private int[] matchingIds;
   private int equalsMatchDictId;
+  private EqPredicate predicate;
 
   public EqualsPredicateEvaluator(EqPredicate predicate, Dictionary dictionary) {
+    this.predicate = predicate;
     equalsMatchDictId = dictionary.indexOf(predicate.getEqualsValue());
     if (equalsMatchDictId >= 0) {
       matchingIds = new int[1];
@@ -58,4 +60,21 @@ public class EqualsPredicateEvaluator implements PredicateEvaluator {
   public int[] getMatchingDictionaryIds() {
     return matchingIds;
   }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictId == equalsMatchDictId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 }

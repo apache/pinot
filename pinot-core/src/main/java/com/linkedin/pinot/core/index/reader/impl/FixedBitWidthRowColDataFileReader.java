@@ -268,6 +268,20 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
     return ret;
 
   }
+  
+  /**
+  *
+  * @param row
+  * @param col
+  * @return
+  */
+ public void bulkGetInt(int[] rowIds, int col, int output[]) {
+   final long startBitOffset = computeBitOffset(rowIds[0], col);
+   final long endBitOffset = startBitOffset + colSizesInBits[col];
+   int ret = customBitSet.readInt(startBitOffset, endBitOffset);
+   ret = ret - offsets[col];
+
+ }
 
   public int getNumberOfRows() {
     return rows;

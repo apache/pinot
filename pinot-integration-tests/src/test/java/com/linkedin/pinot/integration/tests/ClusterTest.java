@@ -18,6 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -129,15 +130,18 @@ public abstract class ClusterTest extends ControllerTest {
     FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas", schemaName,
         new FileInputStream(schemaFile), schemaFile.length());
   }
-
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
+    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant, Collections.emptyList());
+  }
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
+      int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns) throws Exception {
     JSONObject request =
         ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName,
-            "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy");
+            "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
-
+  
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;

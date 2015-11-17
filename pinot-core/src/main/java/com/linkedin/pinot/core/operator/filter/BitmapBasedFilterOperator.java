@@ -21,14 +21,10 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
+import com.linkedin.pinot.core.operator.blocks.BitmapBlock;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -57,64 +53,35 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     Block dataSourceBlock = dataSource.nextBlock();
     Dictionary dictionary = dataSource.getDictionary();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
-    int[] dictionaryIds = evaluator.getMatchingDictionaryIds();
+    int[] dictionaryIds;
+    boolean exclusion = false;
+    switch (predicate.getType()) {
+      case EQ:
+      case IN:
+      case RANGE:
+        dictionaryIds = evaluator.getMatchingDictionaryIds();
+        break;
+
+      case NEQ:
+      case NOT_IN:
+        exclusion = true;
+        dictionaryIds = evaluator.getNonMatchingDictionaryIds();
+        break;
+      case REGEX:
+      default:
+        throw new UnsupportedOperationException("Regex is not supported");
+    }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[dictionaryIds.length];
     for (int i = 0; i < dictionaryIds.length; i++) {
       bitmaps[i] = invertedIndex.getImmutable(dictionaryIds[i]);
     }
-    bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(), bitmaps);
+    bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(), bitmaps, exclusion);
     return bitmapBlock;
   }
 
   @Override
   public boolean close() {
-    LOGGER.info("Time spent in BitmapBasedFilterOperator operator:{} is {}", this,
-        bitmapBlock.bitmapDocIdSet.timeMeasure);
     return true;
-  }
-
-  public static class BitmapBlock extends BaseFilterBlock {
-
-    private final ImmutableRoaringBitmap[] bitmaps;
-    private BitmapDocIdSet bitmapDocIdSet;
-    private BlockMetadata blockMetadata;
-
-    public BitmapBlock(BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps) {
-      this.blockMetadata = blockMetadata;
-      this.bitmaps = bitmaps;
-    }
-
-    @Override
-    public BlockId getId() {
-      return new BlockId(0);
-    }
-
-    @Override
-    public boolean applyPredicate(Predicate predicate) {
-      throw new UnsupportedOperationException("applypredicate not supported in " + this.getClass());
-    }
-
-    @Override
-    public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-      bitmapDocIdSet = new BitmapDocIdSet(blockMetadata, bitmaps);
-      return bitmapDocIdSet;
-    }
-
-    @Override
-    public BlockValSet getBlockValueSet() {
-      throw new UnsupportedOperationException("getBlockValueSet not supported in " + this.getClass());
-    }
-
-    @Override
-    public BlockDocIdValueSet getBlockDocIdValueSet() {
-      throw new UnsupportedOperationException("getBlockDocIdValueSet not supported in " + this.getClass());
-    }
-
-    @Override
-    public BlockMetadata getMetadata() {
-      throw new UnsupportedOperationException("getMetadata not supported in " + this.getClass());
-    }
-
   }
 
 }

@@ -44,6 +44,10 @@ public class FixedBitCompressedSVForwardIndexReader implements SingleColumnSingl
     this.rows = rows;
   }
 
+  public FixedBitWidthRowColDataFileReader getDataFileReader() {
+    return dataFileReader;
+  }
+
   public int getLength() {
     return rows;
   }

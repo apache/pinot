@@ -21,14 +21,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 
 
 public class SortedDocIdSet implements FilterBlockDocIdSet {
 
-  private final List<Pair<Integer, Integer>> pairs;
+  public final List<Pair<Integer, Integer>> pairs;
   public final AtomicLong timeMeasure = new AtomicLong(0);
   int startDocId;
   int endDocId;
@@ -78,70 +78,7 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
     if (pairs == null || pairs.isEmpty()) {
       return BlockUtils.emptyBlockDocIdSetIterator();
     }
-    return new BlockDocIdIterator() {
-      int pairPointer = 0;
-      int currentDocId = -1;
-
-      @Override
-      public int advance(int targetDocId) {
-        if (pairPointer == pairs.size() || targetDocId > pairs.get(pairs.size() - 1).getRight()) {
-          pairPointer = pairs.size();
-          return (currentDocId = Constants.EOF);
-        }
-        long start = System.nanoTime();
-
-        if (currentDocId >= targetDocId) {
-          return currentDocId;
-        }
-        // couter < targetDocId
-        while (pairPointer < pairs.size()) {
-          if (pairs.get(pairPointer).getLeft() > targetDocId) {
-            // targetDocId in the gap between two valid pairs.
-            currentDocId = pairs.get(pairPointer).getLeft();
-            break;
-          } else if (targetDocId >= pairs.get(pairPointer).getLeft() && targetDocId <= pairs.get(pairPointer).getRight()) {
-            // targetDocId in the future valid pair.
-            currentDocId = targetDocId;
-            break;
-          }
-          pairPointer++;
-        }
-        if (pairPointer == pairs.size()) {
-          currentDocId = Constants.EOF;
-        }
-        long end = System.nanoTime();
-        timeMeasure.addAndGet(end - start);
-        return currentDocId;
-      }
-
-      @Override
-      public int next() {
-        if (pairPointer == pairs.size() || currentDocId > pairs.get(pairs.size() - 1).getRight()) {
-          pairPointer = pairs.size();
-          return (currentDocId = Constants.EOF);
-        }
-        long start = System.nanoTime();
-        currentDocId = currentDocId + 1;
-        if (pairPointer < pairs.size() && currentDocId > pairs.get(pairPointer).getRight()) {
-          pairPointer++;
-          if (pairPointer == pairs.size()) {
-            currentDocId = Constants.EOF;
-          } else {
-            currentDocId = pairs.get(pairPointer).getLeft();
-          }
-        } else if (currentDocId < pairs.get(pairPointer).getLeft()) {
-          currentDocId = pairs.get(pairPointer).getLeft();
-        }
-        long end = System.nanoTime();
-        timeMeasure.addAndGet(end - start);
-        return currentDocId;
-      }
-
-      @Override
-      public int currentDocId() {
-        return currentDocId;
-      }
-    };
+    return new SortedDocIdIterator(this);
   }
 
   @SuppressWarnings("unchecked")

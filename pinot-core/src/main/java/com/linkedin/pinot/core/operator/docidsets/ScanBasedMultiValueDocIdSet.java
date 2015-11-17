@@ -17,27 +17,25 @@ package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.dociditerators.MVScanDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import java.util.Arrays;
 
 
 public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private BlockMetadata blockMetadata;
-  private BlockValSetBlockDocIdIterator blockValSetBlockDocIdIterator;
+  private MVScanDocIdIterator blockValSetBlockDocIdIterator;
 
   public ScanBasedMultiValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator = new BlockValSetBlockDocIdIterator(blockValSet, blockMetadata, evaluator);
+    blockValSetBlockDocIdIterator = new MVScanDocIdIterator(blockValSet, blockMetadata, evaluator);
   }
 
   @Override
@@ -72,88 +70,6 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   public BlockDocIdIterator iterator() {
     return blockValSetBlockDocIdIterator;
   }
-
-  public static class BlockValSetBlockDocIdIterator implements BlockDocIdIterator {
-    BlockMultiValIterator valueIterator;
-    int currentDocId = -1;
-    final int[] intArray;
-    private int startDocId;
-    private int endDocId;
-    private PredicateEvaluator evaluator;
-
-    public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata,
-        PredicateEvaluator evaluator) {
-      this.evaluator = evaluator;
-      if (evaluator.getMatchingDictionaryIds().length == 0) {
-        this.intArray = new int[0];
-        setStartDocId(Constants.EOF);
-        setEndDocId(Constants.EOF);
-        currentDocId = Constants.EOF;
-      } else {
-        this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
-        Arrays.fill(intArray, 0);
-        setStartDocId(blockMetadata.getStartDocId());
-        setEndDocId(blockMetadata.getEndDocId());
-      }
-      valueIterator = (BlockMultiValIterator) blockValSet.iterator();
-    }
-
-    /**
-     * After setting the startDocId, next calls will always return from &gt;=startDocId
-     * @param startDocId
-     */
-    public void setStartDocId(int startDocId) {
-      this.startDocId = startDocId;
-    }
-
-    /**
-     * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
-     * @param endDocId
-     */
-    public void setEndDocId(int endDocId) {
-      this.endDocId = endDocId;
-    }
-
-    @Override
-    public int advance(int targetDocId) {
-      if (currentDocId == Constants.EOF) {
-        return currentDocId;
-      }
-      if (targetDocId < startDocId) {
-        targetDocId = startDocId;
-      } else if (targetDocId > endDocId) {
-        currentDocId = Constants.EOF;
-      }
-      if (currentDocId >= targetDocId) {
-        return currentDocId;
-      } else {
-        currentDocId = targetDocId - 1;
-        valueIterator.skipTo(targetDocId);
-        return next();
-      }
-    }
-
-    @Override
-    public int next() {
-      if (currentDocId == Constants.EOF) {
-        return currentDocId;
-      }
-      while (valueIterator.hasNext() && currentDocId <= endDocId) {
-        currentDocId = currentDocId + 1;
-        int length = valueIterator.nextIntVal(intArray);
-        if (evaluator.apply(Arrays.copyOf(intArray, length))) {
-          return currentDocId;
-        }
-      }
-      currentDocId = Constants.EOF;
-      return Constants.EOF;
-    }
-
-    @Override
-    public int currentDocId() {
-      return currentDocId;
-    }
-  };
 
   @Override
   public <T> T getRaw() {

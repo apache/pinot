@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.data.source.sv.block;
+package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -50,6 +50,14 @@ public class UnSortedSingleValueBlock implements Block {
     this.id = id;
     dictionary = dict;
     this.columnMetadata = columnMetadata;
+  }
+
+  public FixedBitCompressedSVForwardIndexReader getSVReader() {
+    return sVReader;
+  }
+
+  public ImmutableDictionaryReader getDictionary() {
+    return dictionary;
   }
 
   @Override

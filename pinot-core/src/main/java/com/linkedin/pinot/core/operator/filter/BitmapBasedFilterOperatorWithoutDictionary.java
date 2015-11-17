@@ -188,7 +188,6 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
 
   @Override
   public boolean close() {
-    LOG.info("Time spent in BitmapBasedFilterOperator operator:{} is {}", this, bitmapBlock.bitmapDocIdSet.timeMeasure);
     return true;
   }
 

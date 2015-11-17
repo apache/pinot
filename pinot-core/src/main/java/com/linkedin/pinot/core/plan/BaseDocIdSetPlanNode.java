@@ -62,7 +62,7 @@ public abstract class BaseDocIdSetPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "DocIdSet Plan Node :");
+    LOGGER.debug(prefix + this.getClass().getName() + " Plan Node :");
     LOGGER.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + indexSegment.getSegmentName());
     if (filterNode != null) {

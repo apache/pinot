@@ -107,7 +107,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     try {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
-      LOGGER.info("Incoming query is : {}", brokerRequest);
+      LOGGER.debug("Incoming query is : {}", brokerRequest);
       long startPruningTime = System.nanoTime();
       getPrunedQueryableSegments(queryableSegmentDataManagerList, instanceRequest);
       long pruningTime = System.nanoTime() - startPruningTime;
@@ -170,7 +170,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private List<IndexSegment> getPrunedQueryableSegments(final List<IndexSegment> listOfQueryableSegments, final InstanceRequest instanceRequest) {
     LOGGER
-        .info("InstanceRequest request {} segments", instanceRequest.getSearchSegments().size());
+        .info("InstanceRequest contains {} segments", instanceRequest.getSearchSegments().size());
 
     final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
     final TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);

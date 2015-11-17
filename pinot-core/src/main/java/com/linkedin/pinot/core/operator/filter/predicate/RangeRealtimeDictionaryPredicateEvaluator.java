@@ -30,8 +30,10 @@ public class RangeRealtimeDictionaryPredicateEvaluator implements PredicateEvalu
 
   private int[] matchingIds;
   private IntSet dictIdSet;
+  private RangePredicate predicate;
 
   public RangeRealtimeDictionaryPredicateEvaluator(RangePredicate predicate, MutableDictionaryReader dictionary) {
+    this.predicate = predicate;
     List<Integer> ids = new ArrayList<Integer>();
     String rangeStart;
     String rangeEnd;
@@ -88,6 +90,22 @@ public class RangeRealtimeDictionaryPredicateEvaluator implements PredicateEvalu
   @Override
   public int[] getMatchingDictionaryIds() {
     return matchingIds;
+  }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictIdSet.contains(dictId)) {
+        return true;
+      }
+    }
+    return false;
   }
 
 }

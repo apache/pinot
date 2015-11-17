@@ -39,6 +39,7 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -253,6 +254,11 @@ public class PerfBenchmarkDriver {
   }
 
   public void configureTable(String tableName) throws Exception {
+    configureTable(tableName, Collections.emptyList());
+  }
+
+  public void configureTable(String tableName, List<String> invertedIndexColumns) throws Exception {
+
     //TODO:Get these from configuration
     int numInstances = 1;
     int numReplicas = 1;
@@ -266,19 +272,20 @@ public class PerfBenchmarkDriver {
     helixResourceManager.start();
     helixResourceManager.createBrokerTenant(brokerTenant);
     // create server tenant
-    Tenant serverTenant =
-        new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
-            .setOfflineInstances(numInstances).build();
+    Tenant serverTenant = new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
+        .setOfflineInstances(numInstances).build();
     helixResourceManager.createServerTenant(serverTenant);
     // upload schema
 
     // create table
-    String jsonString =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName,
-            numReplicas, segmentAssignmentStrategy).toString();
+    String jsonString = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName,
+        brokerTenantName, numReplicas, segmentAssignmentStrategy).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
     offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
+    if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
+      offlineTableConfig.getIndexingConfig().setInvertedIndexColumns(invertedIndexColumns);
+    }
     helixResourceManager.addTable(offlineTableConfig);
   }
 
@@ -297,8 +304,8 @@ public class PerfBenchmarkDriver {
     File[] listFiles = file.listFiles();
     for (File indexFile : listFiles) {
       LOGGER.info("Uploading index segment " + indexFile.getAbsolutePath());
-      FileUploadUtils.sendSegmentFile(controllerHost, "" + controllerPort, indexFile.getName(), new FileInputStream(
-          indexFile), indexFile.length());
+      FileUploadUtils.sendSegmentFile(controllerHost, "" + controllerPort, indexFile.getName(),
+          new FileInputStream(indexFile), indexFile.length());
     }
   }
 

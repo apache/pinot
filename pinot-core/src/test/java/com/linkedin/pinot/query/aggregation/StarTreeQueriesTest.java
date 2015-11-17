@@ -68,7 +68,6 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-
 public class StarTreeQueriesTest {
   private String testName;
   private File indexDir;
@@ -203,7 +202,7 @@ public class StarTreeQueriesTest {
     return combinations.toArray(new Object[][]{});
   }
 
-  @Test(dataProvider = "filterQueryDataProvider")
+  @Test(dataProvider = "filterQueryDataProvider", enabled=false)
   public void testPlanMaker(Map<String, String> filterQuery) throws Exception {
     // Build request
     final BrokerRequest brokerRequest = new BrokerRequest();
@@ -247,7 +246,7 @@ public class StarTreeQueriesTest {
     Assert.assertEquals(fromPinot.longValue(), fromRawData.get("M0").longValue() * 10 /* because 10 broker requests */);
   }
 
-  @Test(dataProvider = "instancePlanMakerDataProvider")
+  @Test(dataProvider = "instancePlanMakerDataProvider", enabled=false)
   public void testRawQuery(PlanMaker instancePlanMaker) throws Exception {
     // Build request
     final BrokerRequest brokerRequest = new BrokerRequest();
@@ -286,7 +285,7 @@ public class StarTreeQueriesTest {
     Assert.assertEquals(fromPinot.intValue(), numRecords * 10 /* because 10 broker requests */);
   }
 
-  @Test(dataProvider = "groupByDataProvider")
+  @Test(dataProvider = "groupByDataProvider", enabled=false)
   public void testGroupByQuery(Map<String, String> filterQuery, List<String> groupByDimensions) throws Exception {
     // Build request
     final BrokerRequest brokerRequest = new BrokerRequest();

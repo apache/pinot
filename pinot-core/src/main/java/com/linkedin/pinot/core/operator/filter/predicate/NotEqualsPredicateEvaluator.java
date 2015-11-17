@@ -26,10 +26,16 @@ public class NotEqualsPredicateEvaluator implements PredicateEvaluator {
   private int neqDictValue;
   private int[] matchingDictIds;
   private Dictionary dictionary;
+  private int[] nonMatchingDictIds;
 
   public NotEqualsPredicateEvaluator(NEqPredicate predicate, Dictionary dictionary) {
     this.dictionary = dictionary;
     neqDictValue = dictionary.indexOf(predicate.getNotEqualsValue());
+    if (neqDictValue > -1) {
+      nonMatchingDictIds = new int[] { neqDictValue };
+    } else {
+      nonMatchingDictIds = new int[0];
+    }
   }
 
   @Override
@@ -73,5 +79,25 @@ public class NotEqualsPredicateEvaluator implements PredicateEvaluator {
     }
     return matchingDictIds;
 
+  }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    return nonMatchingDictIds;
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    if (neqDictValue < 0) {
+      return true;
+    }
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictId == neqDictValue) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }

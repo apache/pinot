@@ -29,7 +29,7 @@ import org.apache.commons.configuration.Configuration;
  */
 public class IndexLoadingConfigMetadata {
 
-  private final static String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
+  public static final String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
 
   public IndexLoadingConfigMetadata(Configuration tableDataManagerConfig) {

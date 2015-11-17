@@ -16,7 +16,9 @@
 package com.linkedin.pinot.perf;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -58,7 +60,7 @@ public class PerfBenchmarkRunner {
    * The segments are already extracted into a directory
    * @throws Exception
    */
-  public static void startServerWithPreLoadedSegments(String directory, String offlineTableName) throws Exception {
+  public static void startServerWithPreLoadedSegments(String directory, String offlineTableName, List<String> invertedIndexColumns) throws Exception {
     LOGGER.info("Starting Server and uploading segments.");
     //create conf with default values
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
@@ -79,7 +81,7 @@ public class PerfBenchmarkRunner {
     for (File segmentDir : segments) {
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
       if (!tables.contains(segmentMetadata.getTableName())) {
-        driver.configureTable(segmentMetadata.getTableName());
+        driver.configureTable(segmentMetadata.getTableName(), invertedIndexColumns);
         tables.add(segmentMetadata.getTableName());
       }
       driver.addSegment(segmentMetadata);
@@ -95,7 +97,14 @@ public class PerfBenchmarkRunner {
       if (args[0].equalsIgnoreCase("startServerWithPreLoadedSegments") || args[0].equalsIgnoreCase("startAll")) {
         String offlineTableName = args[1];
         String indexRootDirectory = args[2];
-        startServerWithPreLoadedSegments(indexRootDirectory, offlineTableName);
+        List<String> invertedIndexColumns = new ArrayList<>();
+        if(args.length == 4){
+          String[] columns = args[3].split(",");
+          for (int i = 0; i < columns.length; i++) {
+            invertedIndexColumns.add(columns[i].trim());
+          }
+        }
+        startServerWithPreLoadedSegments(indexRootDirectory, offlineTableName, invertedIndexColumns);
       }
 
     } else {

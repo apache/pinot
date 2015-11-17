@@ -15,16 +15,26 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.roaringbitmap.FastAggregation;
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.BufferFastAggregation;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
+import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 
 
@@ -32,26 +42,16 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   /**
    * 
    */
-  private final BlockDocIdIterator[] docIdIterators;
-  private final int[] docIdPointers;
-  private static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
-  boolean reachedEnd = false;
-  int currentDocId = -1;
+  static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
   public final AtomicLong timeMeasure = new AtomicLong(0);
   private List<FilterBlockDocIdSet> blockDocIdSets;
   private int minDocId = Integer.MIN_VALUE;
   private int maxDocId = Integer.MAX_VALUE;
+  private IntIterator intIterator;
+  private BlockDocIdIterator[] docIdIterators;
 
   public AndBlockDocIdSet(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.blockDocIdSets = blockDocIdSets;
-    final int[] docIdPointers = new int[blockDocIdSets.size()];
-    final BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
-    for (int srcId = 0; srcId < blockDocIdSets.size(); srcId++) {
-      docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
-    }
-    Arrays.fill(docIdPointers, -1);
-    this.docIdIterators = docIdIterators;
-    this.docIdPointers = docIdPointers;
     updateMinMaxRange();
   }
 
@@ -68,68 +68,64 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
-    return new BlockDocIdIterator() {
-      int currentMax = -1;
-
-      @Override
-      public int advance(int targetDocId) {
-        if (currentDocId == Constants.EOF) {
-          return currentDocId;
-        }
-        if (currentDocId >= targetDocId) {
-          return currentDocId;
-        }
-        // next() method will always increment currentMax by 1.
-        currentMax = targetDocId - 1;
-        return next();
+    long start, end;
+    start = System.currentTimeMillis();
+    List<BlockDocIdIterator> rawIterators = new ArrayList<>();
+    boolean useBitmapBasedIntersection = false;
+    for (BlockDocIdSet docIdSet : blockDocIdSets) {
+      if (docIdSet instanceof BitmapDocIdSet) {
+        useBitmapBasedIntersection = true;
       }
-
-      @Override
-      public int next() {
-        long start = System.currentTimeMillis();
-        if (currentDocId == Constants.EOF) {
-          return currentDocId;
-        }
-        currentMax = currentMax + 1;
-        //always increment the pointer to current max, when this is called first time, every one will be set to start of posting list.
-        for (int i = 0; i < docIdIterators.length; i++) {
-          docIdPointers[i] = docIdIterators[i].advance(currentMax);
-          if (docIdPointers[i] == Constants.EOF) {
-            reachedEnd = true;
-            currentMax = Constants.EOF;
-            break;
+    }
+    if (useBitmapBasedIntersection) {
+      List<ImmutableRoaringBitmap> allBitmaps = new ArrayList<ImmutableRoaringBitmap>();
+      for (BlockDocIdSet docIdSet : blockDocIdSets) {
+        if (docIdSet instanceof SortedDocIdSet) {
+          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+          SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
+          List<Pair<Integer, Integer>> pairs = sortedDocIdSet.getRaw();
+          for (Pair<Integer, Integer> pair : pairs) {
+            bitmap.add(pair.getLeft(), pair.getRight() + 1); //add takes [start, end) i.e inclusive start, exclusive end.
           }
-          if (docIdPointers[i] > currentMax) {
-            currentMax = docIdPointers[i];
-            if (i > 0) {
-              i = -1;
-            }
-          } else if (docIdPointers[i] < currentMax) {
-            LOGGER.warn("Should never happen, {} returns docIdPointer : {} should always >= currentMax : {}", docIdIterators[i], docIdPointers[i], currentMax);
-            throw new IllegalStateException("Should never happen, docIdPointer should always >= currentMax");
-          }
+          allBitmaps.add(bitmap);
+        } else if (docIdSet instanceof BitmapDocIdSet) {
+          BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) docIdSet;
+          ImmutableRoaringBitmap childBitmap = bitmapDocIdSet.getRaw();
+          allBitmaps.add(childBitmap);
+        } else {
+          BlockDocIdIterator iterator = docIdSet.iterator();
+          rawIterators.add(iterator);
         }
-        currentDocId = currentMax;
-        long end = System.currentTimeMillis();
-        timeMeasure.addAndGet(end - start);
-        //Remove this after tracing is added
-//      if (currentDocId == Constants.EOF) {
-//        LOGGER.debug("AND operator took:" + timeMeasure.get());
-//      }
-        return currentDocId;
       }
-
-      @Override
-      public int currentDocId() {
-        return currentDocId;
+      MutableRoaringBitmap answer = (MutableRoaringBitmap) allBitmaps.get(0).clone();
+      for (int i = 1; i < allBitmaps.size(); i++) {
+        answer.and(allBitmaps.get(i));
       }
-    };
+      intIterator = answer.getIntIterator();
+      BitmapDocIdIterator singleBitmapBlockIdIterator = new BitmapDocIdIterator(intIterator);
+      singleBitmapBlockIdIterator.setStartDocId(minDocId);
+      singleBitmapBlockIdIterator.setEndDocId(maxDocId);
+      end = System.currentTimeMillis();
+      rawIterators.add(0,singleBitmapBlockIdIterator);
+      docIdIterators = new BlockDocIdIterator[rawIterators.size()];
+      rawIterators.toArray(docIdIterators);
+    } else {
+      docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
+      for (int srcId = 0; srcId < blockDocIdSets.size(); srcId++) {
+        docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
+      }
+    }
+    if (docIdIterators.length == 1) {
+      return docIdIterators[0];
+    } else {
+      return new AndDocIdIterator(docIdIterators);
+    }
   }
 
   @SuppressWarnings("unchecked")
   @Override
   public <T> T getRaw() {
-    return (T) this.blockDocIdSets;
+    return (T) intIterator;
   }
 
   @Override

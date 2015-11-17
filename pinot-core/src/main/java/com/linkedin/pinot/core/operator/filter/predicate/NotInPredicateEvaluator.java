@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -29,6 +25,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 public class NotInPredicateEvaluator implements PredicateEvaluator {
 
   private int[] matchingIds;
+  private int[] nonMatchingIds;
   private Dictionary dictionary;
   private IntSet nonMatchingDictIdSet;
 
@@ -39,9 +36,15 @@ public class NotInPredicateEvaluator implements PredicateEvaluator {
     for (int i = 0; i < notInValues.length; i++) {
       final String notInValue = notInValues[i];
       int dictId = dictionary.indexOf(notInValue);
-      if(dictId>=0){
+      if (dictId >= 0) {
         nonMatchingDictIdSet.add(dictId);
       }
+    }
+    nonMatchingIds = new int[nonMatchingDictIdSet.size()];
+    int index = 0;
+    for (int dictId : nonMatchingDictIdSet) {
+      nonMatchingIds[index] = dictId;
+      index = index + 1;
     }
   }
 
@@ -74,5 +77,21 @@ public class NotInPredicateEvaluator implements PredicateEvaluator {
       }
     }
     return matchingIds;
+  }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    return nonMatchingIds;
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (nonMatchingDictIdSet.contains(dictId)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

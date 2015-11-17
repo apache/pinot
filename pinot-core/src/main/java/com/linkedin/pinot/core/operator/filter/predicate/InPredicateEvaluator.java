@@ -27,9 +27,11 @@ public class InPredicateEvaluator implements PredicateEvaluator {
 
   private int[] matchingIds;
   private IntSet dictIdSet;
+  private InPredicate predicate;
 
   public InPredicateEvaluator(InPredicate predicate, Dictionary dictionary) {
     
+    this.predicate = predicate;
     dictIdSet = new IntOpenHashSet();
     final String[] inValues = predicate.getInRange();
     for (final String value : inValues) {
@@ -64,5 +66,21 @@ public class InPredicateEvaluator implements PredicateEvaluator {
   @Override
   public int[] getMatchingDictionaryIds() {
     return matchingIds;
+  }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictIdSet.contains(dictId) ) {
+        return true;
+      }
+    }
+    return false;
   }
 }

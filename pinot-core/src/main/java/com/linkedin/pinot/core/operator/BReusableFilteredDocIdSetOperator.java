@@ -138,7 +138,9 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
   @Override
   public boolean close() {
-    _filterOperators.close();
+    if(_filterOperators != null){
+      _filterOperators.close();
+    }
     return true;
   }
 

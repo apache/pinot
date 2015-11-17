@@ -209,7 +209,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void testGeneratedQueries() throws Exception {
     super.testGeneratedQueries();
   }
-
+  /**
+   * NOTE:
+   * If you are copying a failed query to test in isolation, you might have to do the following for group by queries
+   * -- remove limit, pinot sets default limit to 10, we get all values from H2 to ensure that pinot results valid results
+   * -- Add the group by column name in the select clause. Pinot does not care but H2 requires it. e.g select col1,sum(col2) from T group by col1
+   * If you forget this, you will see this test fail all the time and have no clue whats going on :)
+   * @throws Exception
+   */
   @Test
   public void testSingleQuery() throws Exception {
     String query;
