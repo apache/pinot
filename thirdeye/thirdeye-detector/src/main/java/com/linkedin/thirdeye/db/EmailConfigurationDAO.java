@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.db;
 
-import com.linkedin.thirdeye.api.EmailConfiguration;
-import io.dropwizard.hibernate.AbstractDAO;
+import java.util.List;
+
 import org.hibernate.SessionFactory;
 
-import java.util.List;
+import com.linkedin.thirdeye.api.EmailConfiguration;
+
+import io.dropwizard.hibernate.AbstractDAO;
 
 public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
   public EmailConfigurationDAO(SessionFactory sessionFactory) {
@@ -22,7 +24,7 @@ public class EmailConfigurationDAO extends AbstractDAO<EmailConfiguration> {
   public void delete(Long id) {
     EmailConfiguration anomalyResult = new EmailConfiguration();
     anomalyResult.setId(id);
-    currentSession().delete(id);
+    currentSession().delete(anomalyResult);
   }
 
   public List<EmailConfiguration> findAll() {

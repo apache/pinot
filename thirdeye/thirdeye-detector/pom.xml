@@ -25,7 +25,7 @@
     <quartz.version>2.2.1</quartz.version>
     <jblas.version>1.2.4</jblas.version>
     <commons.email.version>1.4</commons.email.version>
-    <jackson.version>2.4.3</jackson.version>
+    <jackson.version>2.5.1</jackson.version>
     <mainClass>com.linkedin.thirdeye.ThirdEyeDetectorApplication</mainClass>
   </properties>
 
