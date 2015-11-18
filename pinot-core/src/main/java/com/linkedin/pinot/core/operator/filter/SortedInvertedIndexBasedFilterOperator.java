@@ -76,8 +76,6 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public boolean close() {
-    LOGGER.info("Time spent in SortedInvertedIndexBasedFilterOperator operator:{} is {}", this,
-        sortedBlock.sortedDocIdSet.timeMeasure);
     return true;
   }
 

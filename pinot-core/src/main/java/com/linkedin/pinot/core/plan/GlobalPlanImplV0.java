@@ -53,16 +53,20 @@ public class GlobalPlanImplV0 extends Plan {
     long startTime = System.currentTimeMillis();
     PlanNode root = getRoot();
     UResultOperator operator = (UResultOperator) root.run();
-    long endTime1 = System.currentTimeMillis();
-    LOGGER.info("InstanceResponsePlanNode.run took:" + (endTime1 - startTime));
-    InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
-    long endTime2 = System.currentTimeMillis();
-    LOGGER.info("UResultOperator took :" + (endTime2 - endTime1));
-    _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
-    long endTime3 = System.currentTimeMillis();
-    LOGGER.info("Converting to InstanceResponseBlock to DataTable took :" + (endTime3 - endTime2));
-    long endTime = System.currentTimeMillis();
-    _instanceResponseDataTable.getMetadata().put("timeUsedMs", "" + (endTime - startTime));
+    try {
+      long endTime1 = System.currentTimeMillis();
+      LOGGER.info("InstanceResponsePlanNode.run took:" + (endTime1 - startTime));
+      InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
+      long endTime2 = System.currentTimeMillis();
+      LOGGER.info("UResultOperator took :" + (endTime2 - endTime1));
+      _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
+      long endTime3 = System.currentTimeMillis();
+      LOGGER.info("Converting to InstanceResponseBlock to DataTable took :" + (endTime3 - endTime2));
+      long endTime = System.currentTimeMillis();
+      _instanceResponseDataTable.getMetadata().put("timeUsedMs", "" + (endTime - startTime));
+    } finally {
+      operator.close();
+    }
   }
 
   @Override
