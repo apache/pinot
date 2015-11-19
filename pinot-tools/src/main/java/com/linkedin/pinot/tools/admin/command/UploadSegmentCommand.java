@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -101,29 +100,35 @@ public class UploadSegmentCommand extends AbstractBaseCommand implements Command
     File tmpDir = File.createTempFile(SEGMENT_UPLOADER, null, FileUtils.getTempDirectory());
     FileUtils.deleteQuietly(tmpDir);
     tmpDir.mkdir();
-    FileUtils.forceDeleteOnExit(tmpDir);
 
-    LOGGER.info("Executing command: " + toString());
-    File dir = new File(_segmentDir);
-    File[] files = dir.listFiles();
+    try {
+      LOGGER.info("Executing command: " + toString());
+      File dir = new File(_segmentDir);
+      File[] files = dir.listFiles();
 
-    for (File file : files) {
-      File tgzFile = file;
+      for (File file : files) {
+        File tgzFile = file;
 
-      if (file.isDirectory()) {
-        LOGGER.info("Compressing segment {}", file.getName());
+        if (file.isDirectory()) {
+          LOGGER.info("Compressing segment {}", file.getName());
 
-        String srcDir = file.getAbsolutePath();
-        String tgzFileName =
-            TarGzCompressionUtils.createTarGzOfDirectory(srcDir, tmpDir + File.separator + file.getName() + TAR_GZIP);
-        tgzFile = new File(tgzFileName);
+          String srcDir = file.getAbsolutePath();
+          String tgzFileName = TarGzCompressionUtils
+              .createTarGzOfDirectory(srcDir, tmpDir.getAbsolutePath() + File.separator + file.getName() + TAR_GZIP);
+          tgzFile = new File(tgzFileName);
+        }
+
+        LOGGER.info("Uploading segment {}", tgzFile.getName());
+        FileUploadUtils
+            .sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(), new FileInputStream(tgzFile),
+                tgzFile.length());
       }
-
-      LOGGER.info("Uploading segment {}", tgzFile.getName());
-      FileUploadUtils.sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(), new FileInputStream(tgzFile),
-          tgzFile.length());
+    } catch (Exception e) {
+      LOGGER.error("Exception caught while uploading segment {}", _segmentDir, e);
+    } finally {
+      // Delete the temporary working directory.
+      FileUtils.deleteQuietly(tmpDir);
     }
-
     return true;
   }
 }
