@@ -117,6 +117,7 @@ public class AggregatePhaseJob extends Configured {
 
         converterClassName = configuration.get(AGG_CONVERTER_CLASS.toString());
         converterClass = Class.forName(converterClassName);
+        LOGGER.info("Using converter class {}", converterClassName);
 
       } catch (Exception e) {
         throw new IOException(e);
@@ -129,18 +130,15 @@ public class AggregatePhaseJob extends Configured {
 
       StarTreeRecord starTreeRecord = null;
       try {
-        LOGGER.info("Using converter class {}", converterClassName);
         if (converterClassName.equals(DEFAULT_CONVERTER_CLASS)) {
 
           AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
           converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, GenericRecord.class);
-          LOGGER.info("Using converter method {}", converterMethod);
           starTreeRecord = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, avroKey.datum());
         } else {
 
           Text textValue = (Text) value;
           converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, Text.class);
-          LOGGER.info("Using converter method {}", converterMethod);
           starTreeRecord = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, textValue);
         }
       } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
@@ -283,6 +281,7 @@ public class AggregatePhaseJob extends Configured {
       LOGGER.info("{}", schema);
       AvroJob.setInputKeySchema(job, schema);
       job.setInputFormatClass(AvroKeyInputFormat.class);
+      LOGGER.info("Using default avro inpur format {}", aggConverterClass);
     } else {
       LOGGER.info("Setting text input format for {}", aggConverterClass);
       job.setInputFormatClass(TextInputFormat.class);

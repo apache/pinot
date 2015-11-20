@@ -39,7 +39,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
@@ -149,6 +148,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
 
         converterClassName = configuration.get(STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString());
         converterClass = Class.forName(converterClassName);
+        LOGGER.info("Using converter class {}", converterClassName);
 
         // how many can we store in 0.05GB, before clearing the cache
         maxTimeSeriesToCache =
@@ -246,7 +246,6 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
       MetricTimeSeries aggregationTimeSeries;
       StarTreeRecord record = null;
       try {
-        LOGGER.info("Usng converter class {}", converterClassName);
         if (compaction) {
 
           BytesWritable dimensionKeyBytes = (BytesWritable) key;
@@ -263,14 +262,12 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
 
           AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
           converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, GenericRecord.class);
-          LOGGER.info("Using converter method {}", converterMethod);
           record = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, avroKey.datum());
 
         } else {
 
           Text textValue = (Text) value;
           converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, Text.class);
-          LOGGER.info("Using converter method {}", converterMethod);
           record = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, textValue);
         }
       } catch (Exception e) {
@@ -503,6 +500,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
       LOGGER.info("{}", schema);
       AvroJob.setInputKeySchema(job, schema);
       job.setInputFormatClass(AvroKeyInputFormat.class);
+      LOGGER.info("Using default avro input format {}", bootstrapPhase1ConverterClass);
     } else {
       LOGGER.info("Setting text input format for {}", bootstrapPhase1ConverterClass);
       job.setInputFormatClass(TextInputFormat.class);
