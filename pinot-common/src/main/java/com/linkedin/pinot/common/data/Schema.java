@@ -45,7 +45,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 
-
 /**
  * Schema is defined for each column. To describe the details information of columns.
  * Three types of information are provided.
@@ -53,7 +52,6 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
  * 2. if this column is a single value column or a multi-value column.
  * 3. the real world business logic: dimensions, metrics and timeStamps.
  * Different indexing and query strategies are used for different data schema types.
- *
  */
 
 public class Schema {
@@ -73,21 +71,24 @@ public class Schema {
   @JsonIgnore(true)
   private String jsonSchema;
 
-  public static Schema fromFile(final File schemaFile) throws JsonParseException, JsonMappingException, IOException {
+  public static Schema fromFile(final File schemaFile)
+      throws JsonParseException, JsonMappingException, IOException {
     JsonNode node = new ObjectMapper().readTree(new FileInputStream(schemaFile));
     Schema schema = new ObjectMapper().readValue(node, Schema.class);
     schema.setJSONSchema(node.toString());
     return schema;
   }
 
-  public static Schema fromZNRecord(ZNRecord record) throws JsonParseException, JsonMappingException, IOException {
+  public static Schema fromZNRecord(ZNRecord record)
+      throws JsonParseException, JsonMappingException, IOException {
     String schemaJSON = record.getSimpleField("schemaJSON");
     Schema schema = new ObjectMapper().readValue(record.getSimpleField("schemaJSON"), Schema.class);
     schema.setJSONSchema(schemaJSON);
     return schema;
   }
 
-  public static ZNRecord toZNRecord(Schema schema) throws IllegalArgumentException, IllegalAccessException {
+  public static ZNRecord toZNRecord(Schema schema)
+      throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = new ZNRecord(schema.getSchemaName());
     record.setSimpleField("schemaJSON", schema.getJSONSchema());
     return record;
@@ -124,13 +125,11 @@ public class Schema {
   public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     this.timeFieldSpec = timeFieldSpec;
   }
-  
-  @JsonIgnore(true)
+
   public StarTreeIndexSpec getStarTreeIndexSpec() {
     return starTreeIndexSpec;
   }
-  
-  @JsonIgnore(true)
+
   public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
     this.starTreeIndexSpec = starTreeIndexSpec;
   }
@@ -268,14 +267,14 @@ public class Schema {
 
   @JsonIgnore(true)
   public TimeUnit getIncomingTimeUnit() {
-    return (timeFieldSpec != null && timeFieldSpec.getIncomingGranularitySpec() != null) ?
-        timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
+    return (timeFieldSpec != null && timeFieldSpec.getIncomingGranularitySpec() != null)
+        ? timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   @JsonIgnore(true)
   public TimeUnit getOutgoingTimeUnit() {
-    return (timeFieldSpec != null && timeFieldSpec.getOutgoingGranularitySpec() != null) ?
-        timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
+    return (timeFieldSpec != null && timeFieldSpec.getOutgoingGranularitySpec() != null)
+        ? timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   public TimeFieldSpec getTimeFieldSpec() {
@@ -335,7 +334,8 @@ public class Schema {
       return this;
     }
 
-    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, String delimiter) {
+    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType,
+        String delimiter) {
       FieldSpec spec = new DimensionFieldSpec();
       spec.setSingleValueField(false);
       spec.setDataType(dataType);
@@ -356,7 +356,8 @@ public class Schema {
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType) {
+    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity,
+        DataType incomingDataType) {
       TimeGranularitySpec incomingGranularitySpec =
           new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
 
@@ -364,11 +365,14 @@ public class Schema {
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType,
-        String outGoingColumnName, TimeUnit outgoingGranularity, DataType outgoingDataType) {
+    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity,
+        DataType incomingDataType, String outGoingColumnName, TimeUnit outgoingGranularity,
+        DataType outgoingDataType) {
 
-      TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
-      TimeGranularitySpec outgoing = new TimeGranularitySpec(outgoingDataType, outgoingGranularity, outGoingColumnName);
+      TimeGranularitySpec incoming =
+          new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
+      TimeGranularitySpec outgoing =
+          new TimeGranularitySpec(outgoingDataType, outgoingGranularity, outGoingColumnName);
       schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
       return this;
     }
@@ -393,7 +397,8 @@ public class Schema {
     return isEqual(dimensions, other.dimensions) && isEqual(timeFieldSpec, other.timeFieldSpec)
         && isEqual(metrics, other.metrics) && isEqual(schemaName, other.schemaName)
         && isEqual(starTreeIndexSpec, other.starTreeIndexSpec)
-        && isEqual(metricFieldSpecs, other.metricFieldSpecs) && isEqual(dimensionFieldSpecs, other.dimensionFieldSpecs);
+        && isEqual(metricFieldSpecs, other.metricFieldSpecs)
+        && isEqual(dimensionFieldSpecs, other.dimensionFieldSpecs);
   }
 
   @Override
