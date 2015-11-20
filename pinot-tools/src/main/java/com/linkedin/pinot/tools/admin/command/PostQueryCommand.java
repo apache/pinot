@@ -72,6 +72,11 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     return "Query the uploaded Pinot segments.";
   }
 
+  public PostQueryCommand setBrokerHost(String host) {
+    _brokerHost = host;
+    return this;
+  }
+  
   public PostQueryCommand setBrokerPort(String port) {
     _brokerPort = port;
     return this;
