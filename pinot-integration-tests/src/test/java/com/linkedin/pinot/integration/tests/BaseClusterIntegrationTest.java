@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
@@ -494,6 +495,133 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       } catch (Exception e) {
         e.printStackTrace();
         throw new RuntimeException(e);
+      }
+    }
+  }
+
+  public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic, int rowCount,
+      Random random) {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", kafkaBroker);
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    properties.put("request.required.acks", "1");
+
+    ProducerConfig producerConfig = new ProducerConfig(properties);
+    Producer<String, byte[]> producer = new Producer<String, byte[]>(producerConfig);
+    try {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536);
+      DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
+      BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
+      Schema avroSchema = reader.getSchema();
+      GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(avroSchema);
+      int recordCount = 0;
+
+      int rowsRemaining = rowCount;
+      int rowsPerBatch = 10000;
+      while (rowsRemaining > 0) {
+        int rowsInThisBatch = Math.min(rowsRemaining, rowsPerBatch);
+        List<KeyedMessage<String, byte[]>> messagesToWrite =
+            new ArrayList<KeyedMessage<String, byte[]>>(rowsInThisBatch);
+        GenericRecord genericRecord = new GenericData.Record(avroSchema);
+
+        for (int i = 0; i < rowsInThisBatch; ++i) {
+          generateRandomRecord(genericRecord, avroSchema, random);
+          outputStream.reset();
+          datumWriter.write(genericRecord, binaryEncoder);
+          binaryEncoder.flush();
+
+          byte[] bytes = outputStream.toByteArray();
+          KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(kafkaTopic, bytes);
+
+          if (BATCH_KAFKA_MESSAGES) {
+            messagesToWrite.add(data);
+          } else {
+            producer.send(data);
+          }
+          recordCount += 1;
+        }
+
+        if (BATCH_KAFKA_MESSAGES) {
+          producer.send(messagesToWrite);
+        }
+
+        System.out.println("rowsRemaining = " + rowsRemaining);
+        rowsRemaining -= rowsInThisBatch;
+      }
+
+      outputStream.close();
+      reader.close();
+      LOGGER.info("Finished writing " + recordCount + " records from " + avroFile.getName() + " into Kafka topic "
+          + kafkaTopic);
+      int totalRecordCount = totalAvroRecordWrittenCount.addAndGet(recordCount);
+      LOGGER.info("Total records written so far " + totalRecordCount);
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void generateRandomRecord(GenericRecord genericRecord, Schema avroSchema, Random random) {
+    for (Schema.Field field : avroSchema.getFields()) {
+      Schema.Type fieldType = field.schema().getType();
+
+      // Non-nullable single value?
+      if (fieldType != Schema.Type.ARRAY && fieldType != Schema.Type.UNION) {
+        switch(fieldType) {
+          case INT:
+            genericRecord.put(field.name(), random.nextInt(100000));
+            break;
+          case LONG:
+            genericRecord.put(field.name(), random.nextLong() % 1000000L);
+            break;
+          case STRING:
+            genericRecord.put(field.name(), "potato" + random.nextInt(1000));
+            break;
+          default:
+            throw new RuntimeException("Unimplemented random record generation for field " + field);
+        }
+      } else if (fieldType == Schema.Type.UNION) { // Nullable field?
+        // Use first type of union to determine actual data type
+        switch(field.schema().getTypes().get(0).getType()) {
+          case INT:
+            genericRecord.put(field.name(), random.nextInt(100000));
+            break;
+          case LONG:
+            genericRecord.put(field.name(), random.nextLong() % 1000000L);
+            break;
+          case STRING:
+            genericRecord.put(field.name(), "potato" + random.nextInt(1000));
+            break;
+          default:
+            throw new RuntimeException("Unimplemented random record generation for field " + field);
+        }
+      } else {
+        // Multivalue field
+        final int MAX_MULTIVALUES = 5;
+        int multivalueCount = random.nextInt(MAX_MULTIVALUES);
+        List<Object> values = new ArrayList<>(multivalueCount);
+
+        switch(field.schema().getElementType().getType()) {
+          case INT:
+            for (int i = 0; i < multivalueCount; i++) {
+              values.add(random.nextInt(100000));
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < multivalueCount; i++) {
+              values.add(random.nextLong() % 1000000L);
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < multivalueCount; i++) {
+              values.add("potato" + random.nextInt(1000));
+            }
+            break;
+          default:
+            throw new RuntimeException("Unimplemented random record generation for field " + field);
+        }
+
+        genericRecord.put(field.name(), values);
       }
     }
   }
