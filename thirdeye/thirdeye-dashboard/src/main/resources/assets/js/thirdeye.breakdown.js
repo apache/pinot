@@ -40,23 +40,12 @@ $(document).ready(function() {
         }
 
     })
- /* if($(this).is(':checked')){
-  console.log("checked")
-  $("#dimension-contributor-area table input[checkbox]").prop('checked', true)
-  }else{
-  console.log("Not checked")
-  console.log("length" , $("#dimension-contributor-area table input[checkbox]").length)
-  $("#dimension-contributor-area table input[checkbox]").prop('checked', false)
-
-
-
-  } */
 
     /* When a checkbox is clicked loop through each columns that's not displaying ratio values,
     take the total of the cells' value in the column (if the row of the cell is checked  and the value id not N/A) and place the total into the total row.
     Then calculate the sum row ratio column cell value based on the 2 previous column's value.
     */
-    $("#dimension-contributor-area table").on("click", $("input[checkbox]"), function() {
+    $("#dimension-contributor-area table").on("click", $("input[checkbox]"), function(event) {
         var checkbox = event.target
         if ($(checkbox).is(':checked')) {
             $(checkbox).attr('checked', 'checked')

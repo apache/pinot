@@ -244,6 +244,16 @@ li {
     text-align: center;
 }
 
+#dimension-contributor-area .select_all_cell,
+#dimension-contributor-area .row-title{
+    border: 1px solid #ddd;
+}
+
+#dimension-contributor-area .contributors-table-date{
+    font-weight: 600;
+    width: 150px;
+}
+
 #dimension-contributor-area table tr td:first-child {
     word-wrap: break-word;
 }
@@ -259,21 +269,28 @@ li {
 
 }
 
-#dimension-contributor-area .divider-row td{
+#dimension-contributor-area .divider-row{
     line-height: 8px;
     height: 10px;
-    border: none;
+    border-bottom: 1px solid #ddd;
     margin-bottom: 0;
     text-align: left;
 }
 
-#dimension-contributor-area .contributors-table-date{
-    font-weight: 600;
-    width: 150px;
+#dimension-contributor-area .data-row{
+    border-top: 1px solid #ddd;
 }
 
 #dimension-contributor-area .contributors-table-time{
     font-weight: 600;
+}
+
+#dimension-contributor-area .checkbox-cell{
+    width:15px;
+}
+#dimension-contributor-area .dimension-value-cell{
+    width:100px;
+    word-wrap: break-word;
 }
 
 #dimension-contributor-area .heat-map-cell{

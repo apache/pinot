@@ -14,28 +14,25 @@
                     <table id='contributors-view-${metric}' class="uk-table contributors-table fixed-table-layout" cell-spacing="0" width="100%">
 
                         <thead>
-                        </thead>
-                        <tbody>
+
                             <!-- First time row-->
-                            <@timeRow cells=dimTableTotalRow.rows/>
-                            <@tableRowTotal cells=dimTableTotalRow.rows class="hourly-values"/>
-                            <@tableRowTotal cells=dimTableTotalRow.cumulativeRows class="cumulative-values hidden"/>
-                            <@tableRowSum class="hourly-values sum-row"/>
-                            <@tableRowSum class="cumulative-values sum-row hidden"/>
-                            
+                                <@timeRow cells=dimTableTotalRow.rows/>
+                                <@tableRowTotal cells=dimTableTotalRow.rows class="hourly-values"/>
+                                <@tableRowTotal cells=dimTableTotalRow.cumulativeRows class="cumulative-values hidden"/>
+                                <@tableRowSum class="hourly-values sum-row"/>
+                                <@tableRowSum class="cumulative-values sum-row hidden"/>
+
                             <!-- Divider row -->
                             <tr class="divider-row">
                                 <td colspan="5"><h3>${dimension}</h3>
                                 </td>
-                                <#--<#list 0..(dimTableTotalRow.rows?size) as x>
-                                    <td></td>
-                                </#list>-->
+                            <#--<#list 0..(dimTableTotalRow.rows?size) as x>
+                                <td></td>
+                            </#list>-->
                             </tr>
-
-
-
-
-                            <#list dimTable?keys as dimensionValue>
+                        </thead>
+                        <tbody>
+                             <#list dimTable?keys as dimensionValue>
                                 <#assign rows=dimTable[dimensionValue].rows>
                                 <#assign cumulativeRows=dimTable[dimensionValue].cumulativeRows>
                                 <!-- hourly values -->
@@ -54,10 +51,10 @@
     <#macro timeRow cells>
        <tr>
 
-            <td class="contributors-table-date" colspan="2" currentUTC="${cells[0].currentTime}">${cells[0].currentTime}</td>
+            <th class="contributors-table-date" colspan="2" currentUTC="${cells[0].currentTime}">${cells[0].currentTime}</th>
             <#list cells as cell>
             <#-- TODO properly display time in timezone-->
-                <td class="contributors-table-time" currentUTC="${cell.currentTime}">${cell.currentTime}</td>
+                <th class="contributors-table-time" currentUTC="${cell.currentTime}">${cell.currentTime}</th>
             </#list>
         </tr>
     </#macro>
@@ -72,7 +69,7 @@
     </#macro>
     <#macro tableRow dimension dimensionValue cells class>
         <tr class="${class} data-row" dimension="${dimension}">
-            <td class="checkbox-cell" style="width:15px;"><input value="1" type="checkbox" checked></td>
+            <td class="checkbox-cell"><input value="1" type="checkbox" checked></td>
             <td class="dimension dimension-cell hidden">${dimension}</td>
             <#assign dimensionValueDisplay=dimensionValue?html>
             <#if dimensionValue=="">
@@ -80,7 +77,7 @@
             <#elseif dimensionValue=="?">
                 <#assign dimensionValueDisplay="OTHER">
             </#if>
-            <td class="dimension-value-cell" style="width:100px; word-wrap: break-word;" >${dimensionValueDisplay}</td>
+            <td class="dimension-value-cell" >${dimensionValueDisplay}</td>
             <#list cells as cell>
                 <@timeBucketCell cell=cell/>
             </#list>
@@ -122,9 +119,9 @@
 
     <#macro tableRowSum class>
         <tr class="${class}">
-            <th><input class="select_all_checkbox" value="1" type="checkbox" checked></th>
+            <th class="select_all_cell"><input class="select_all_checkbox" value="1" type="checkbox" checked></th>
             <th class="hidden"></th>
-            <th> Total of values:</th>
+            <th class="row-title"> Total:</th>
             <#list 1..(dimTableTotalRow.rows?size) as columnIndex>
                 <th class="details-cell hidden"></th>
                 <th class="details-cell hidden"></th>
