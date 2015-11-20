@@ -20,7 +20,9 @@
                             <@timeRow cells=dimTableTotalRow.rows/>
                             <@tableRowTotal cells=dimTableTotalRow.rows class="hourly-values"/>
                             <@tableRowTotal cells=dimTableTotalRow.cumulativeRows class="cumulative-values hidden"/>
-
+                            <@tableRowSum class="hourly-values sum-row"/>
+                            <@tableRowSum class="cumulative-values sum-row hidden"/>
+                            
                             <!-- Divider row -->
                             <tr class="divider-row">
                                 <td colspan="5"><h3>${dimension}</h3>
@@ -30,10 +32,8 @@
                                 </#list>-->
                             </tr>
 
-                            <!-- Second time row -->
-                            <@timeRow cells=dimTableTotalRow.rows/>
-                            <@tableRowSum class="hourly-values sum-row"/>
-                            <@tableRowSum class="cumulative-values sum-row hidden"/>
+
+
 
                             <#list dimTable?keys as dimensionValue>
                                 <#assign rows=dimTable[dimensionValue].rows>
@@ -122,7 +122,9 @@
 
     <#macro tableRowSum class>
         <tr class="${class}">
-            <th colspan="2">Total:</th>
+            <th><input class="select_all_checkbox" value="1" type="checkbox" checked></th>
+            <th class="hidden"></th>
+            <th> Total of values:</th>
             <#list 1..(dimTableTotalRow.rows?size) as columnIndex>
                 <th class="details-cell hidden"></th>
                 <th class="details-cell hidden"></th>

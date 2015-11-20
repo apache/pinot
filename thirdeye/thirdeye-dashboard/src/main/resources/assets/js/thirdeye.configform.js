@@ -54,6 +54,13 @@ $(document).ready(function() {
     $("#funnel-cumulative").click(function() {
         $(".hourly-values").toggleClass("hidden")
         $(".cumulative-values").toggleClass("hidden")
+        var path = parsePath(window.location.pathname)
+        if(path.dimensionViewType  == "MULTI_TIME_SERIES"){
+            var tableBodies = $("#dimension-contributor-area tbody")
+            for(var i = 0, len = tableBodies.length; i < len; i++){
+                sumColumn(tableBodies[i])
+            }
+        }
     })
 
     //Only display time selection option on Heat map till the backend will support time selection on funnel_heatmap.ftl and breakdown.ftl

@@ -258,11 +258,12 @@ li {
     border-right: 1px solid #ddd;
 
 }
+
 #dimension-contributor-area .divider-row td{
     line-height: 8px;
-    height: 12px;
+    height: 10px;
     border: none;
-    margin: 0;
+    margin-bottom: 0;
     text-align: left;
 }
 
