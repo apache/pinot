@@ -175,7 +175,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionDays, String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic,
-      String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
+      String schemaName, String serverTenant, String brokerTenant, File avroFile, int realtimeSegmentFlushSize) throws Exception {
     JSONObject metadata = new JSONObject();
     metadata.put("streamType", "kafka");
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
@@ -184,6 +184,7 @@ public abstract class ClusterTest extends ControllerTest {
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
+    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
 
     JSONObject request =
         ControllerRequestBuilder
@@ -202,7 +203,7 @@ public abstract class ClusterTest extends ControllerTest {
     String retentionTimeUnit = "Days";
     addRealtimeTable(tableName, timeColumnName, timeColumnType,
         retentionDays, retentionTimeUnit, kafkaZkUrl, kafkaTopic,
-        schemaName, serverTenant, brokerTenant, avroFile);
+        schemaName, serverTenant, brokerTenant, avroFile, 20000);
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant);
   }
 }
