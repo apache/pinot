@@ -51,6 +51,12 @@
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-integration-tests</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
