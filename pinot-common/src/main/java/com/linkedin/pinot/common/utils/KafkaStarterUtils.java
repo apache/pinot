@@ -55,16 +55,40 @@ public class KafkaStarterUtils {
     File logDir = new File("/tmp/kafka-" + Double.toHexString(Math.random()));
     logDir.mkdirs();
 
-    configuration.put("port", Integer.toString(port));
-    configuration.put("zookeeper.connect", zkStr);
-    configuration.put("broker.id", Integer.toString(brokerId));
-    configuration.put("log.dirs", logDir.getAbsolutePath());
+    configureKafkaPort(configuration, port);
+    configureZkConnectionString(configuration, zkStr);
+    configureBrokerId(configuration, brokerId);
+    configureKafkaLogDirectory(configuration, logDir);
     KafkaConfig config = new KafkaConfig(configuration);
 
     KafkaServerStartable serverStartable = new KafkaServerStartable(config);
     serverStartable.startup();
 
     return serverStartable;
+  }
+
+  public static void configureSegmentSizeBytes(Properties properties, int segmentSize) {
+    properties.put("log.segment.bytes", Integer.toString(segmentSize));
+  }
+
+  public static void configureLogRetentionSizeBytes(Properties properties, int logRetentionSizeBytes) {
+    properties.put("log.retention.bytes", Integer.toString(logRetentionSizeBytes));
+  }
+
+  public static void configureKafkaLogDirectory(Properties configuration, File logDir) {
+    configuration.put("log.dirs", logDir.getAbsolutePath());
+  }
+
+  public static void configureBrokerId(Properties configuration, int brokerId) {
+    configuration.put("broker.id", Integer.toString(brokerId));
+  }
+
+  public static void configureZkConnectionString(Properties configuration, String zkStr) {
+    configuration.put("zookeeper.connect", zkStr);
+  }
+
+  public static void configureKafkaPort(Properties configuration, int port) {
+    configuration.put("port", Integer.toString(port));
   }
 
   public static void stopServer(KafkaServerStartable serverStartable) {
