@@ -26,10 +26,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import junit.framework.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 
 public class DataTableBuilderTest {
+  private static Logger LOGGER = LoggerFactory.getLogger(DataTableBuilderTest.class);
 
   @Test
   public void testException() throws Exception {
@@ -139,7 +142,6 @@ public class DataTableBuilderTest {
     }
     builder.seal();
     final DataTable dataTable = builder.build();
-    //System.out.println(dataTable);
     validate(dataTable, NUM_ROWS, schema, boolArr, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr, oArr);
     final byte[] bytes = dataTable.toBytes();
 
@@ -171,7 +173,6 @@ public class DataTableBuilderTest {
     }
     builder.seal();
     DataTable dataTable = builder.build();
-    System.out.println(dataTable.toString());
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       validate(DataType.STRING_ARRAY, dataTable, oStringArray, rowId, 0);
     }
@@ -207,7 +208,6 @@ public class DataTableBuilderTest {
     }
     builder.seal();
     DataTable dataTable = builder.build();
-    System.out.println(dataTable.toString());
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       validate(DataType.INT_ARRAY, dataTable, oIntArr1, rowId, 0);
     }
@@ -340,7 +340,6 @@ public class DataTableBuilderTest {
     builder.startRow();
     builder.setColumn(0, "sum_count");
     Map<String, Double> map = new HashMap<String, Double>();
-    System.out.println(map.keySet().getClass());
     map.put("2358\tmember\t0", 4.0);
     map.put("2359\tmember\t0", 1.0);
     map.put("2358\tgroup\t6", 1.0);
@@ -415,14 +414,14 @@ public class DataTableBuilderTest {
       long start = System.nanoTime();
       byte[] buffer = dataTable.toBytes();
       long end = System.nanoTime();
-      System.out.println("ser time:\t\t" + (end - start));
+      LOGGER.trace("ser time:\t\t" + (end - start));
       size = buffer.length;
       start = System.nanoTime();
       new DataTable(buffer);
       end = System.nanoTime();
-      System.out.println("deser time:\t\t" + (end - start));
+      LOGGER.trace("deser time:\t\t" + (end - start));
     }
-    System.out.println("SIZE:" + size);
+    LOGGER.trace("SIZE:" + size);
   }
 
   private void validate(DataTable dataTable, int numRows, DataSchema schema, boolean[] boolArr, char[] cArr,

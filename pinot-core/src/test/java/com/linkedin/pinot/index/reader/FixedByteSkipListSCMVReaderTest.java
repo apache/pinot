@@ -19,6 +19,8 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -27,6 +29,7 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteSkipListSCMVWriter;
 
 
 public class FixedByteSkipListSCMVReaderTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSkipListSCMVReaderTest.class);
 
   @Test
   public void testSingleColMultiValue() throws Exception {
@@ -53,11 +56,11 @@ public class FixedByteSkipListSCMVReaderTest {
     }
 
     for (int i = 0; i < data.length; i++) {
-      System.out.print("(" + i + "," + startOffsets[i] + "," + lengths[i] + ")");
-      System.out.println(",");
+      LOGGER.trace("(" + i + "," + startOffsets[i] + "," + lengths[i] + ")");
+      LOGGER.trace(",");
     }
-    System.out.println(Arrays.toString(startOffsets));
-    System.out.println(Arrays.toString(lengths));
+    LOGGER.trace(Arrays.toString(startOffsets));
+    LOGGER.trace(Arrays.toString(lengths));
     FixedByteSkipListSCMVWriter writer = new FixedByteSkipListSCMVWriter(f, numDocs, totalNumValues, Integer.SIZE / 8);
 
     for (int i = 0; i < data.length; i++) {

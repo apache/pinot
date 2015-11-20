@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,11 +32,13 @@ import com.linkedin.pinot.core.util.CustomBitSet;
 
 
 public class FixedBitSkipListSCMVWriterTest {
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(FixedBitSkipListSCMVWriterTest.class);
+
   @Test
   public void testSingleColMultiValue() throws Exception {
     int maxBits = 2;
     while (maxBits < 32) {
-      System.out.println("START test maxBit:" + maxBits);
+      LOGGER.debug("START test maxBit:" + maxBits);
       File file = new File("test_single_col_multi_value_writer.dat");
       file.delete();
       int rows = 100;
@@ -76,7 +79,7 @@ public class FixedBitSkipListSCMVWriterTest {
         }
       }
       writer.close();
-      System.out.println("chunkOffsets:" + Arrays.toString(chunkOffsets));
+      LOGGER.trace("chunkOffsets: {}", Arrays.toString(chunkOffsets));
       //start validating the file
       RandomAccessFile raf = new RandomAccessFile(file, "r");
 
@@ -91,17 +94,19 @@ public class FixedBitSkipListSCMVWriterTest {
       dis.read(bitsetBytes);
       CustomBitSet customBit = CustomBitSet.withByteBuffer(numBytesForBitmap, ByteBuffer.wrap(bitsetBytes));
       offset = 0;
-      System.out.println(customBit);
+      LOGGER.trace(customBit.toString());
+
       for (int i = 0; i < rows; i++) {
         Assert.assertTrue(customBit.isBitSet(offset));
         offset += data[i].length;
       }
       byte[] byteArray = bitSet.toByteArray();
-      System.out.println("raf.length():" + raf.length());
-      System.out.println("getTotalSize:" + writer.getTotalSize());
-      System.out.println("getRawDataSize:" + writer.getRawDataSize());
-      System.out.println("getBitsetSize:" + writer.getBitsetSize());
-      System.out.println("getChunkOffsetHeaderSize:" + writer.getChunkOffsetHeaderSize());
+
+      LOGGER.trace("raf.length():" + raf.length());
+      LOGGER.trace("getTotalSize:" + writer.getTotalSize());
+      LOGGER.trace("getRawDataSize:" + writer.getRawDataSize());
+      LOGGER.trace("getBitsetSize:" + writer.getBitsetSize());
+      LOGGER.trace("getChunkOffsetHeaderSize:" + writer.getChunkOffsetHeaderSize());
 
       int dataLength = (int) (writer.getTotalSize() - writer.getChunkOffsetHeaderSize() - numBytesForBitmap);
       byte[] rawData = new byte[dataLength];
@@ -112,7 +117,7 @@ public class FixedBitSkipListSCMVWriterTest {
       raf.close();
       dis.close();
       file.delete();
-      System.out.println("END test maxBit:" + maxBits);
+      LOGGER.debug("END test maxBit:" + maxBits);
       maxBits = maxBits + 1;
       bitSet.close();
       customBit.close();

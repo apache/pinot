@@ -22,36 +22,36 @@ import com.linkedin.pinot.core.trace.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Any other Pinot Operators should extend BaseOperator
  */
 public abstract class BaseOperator implements Operator {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
-    @Override
-    public final Block nextBlock() {
-        long start = System.currentTimeMillis();
-        Block ret = getNextBlock();
-        long end = System.currentTimeMillis();
-        LOGGER.info("Time spent in {}: {}", getOperatorName(), (end - start));
-        TraceContext.logLatency(getOperatorName(), (end - start));
-        return ret;
-    }
+  @Override
+  public final Block nextBlock() {
+    long start = System.currentTimeMillis();
+    Block ret = getNextBlock();
+    long end = System.currentTimeMillis();
+    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
+    TraceContext.logLatency(getOperatorName(), (end - start));
+    return ret;
+  }
 
-    @Override
-    public final Block nextBlock(BlockId BlockId) {
-        long start = System.currentTimeMillis();
-        Block ret = getNextBlock(BlockId);
-        long end = System.currentTimeMillis();
-        LOGGER.info("Time spent in {}: {}", getOperatorName(), (end - start));
-        TraceContext.logLatency(getOperatorName(), (end - start));
-        return ret;
-    }
+  @Override
+  public final Block nextBlock(BlockId BlockId) {
+    long start = System.currentTimeMillis();
+    Block ret = getNextBlock(BlockId);
+    long end = System.currentTimeMillis();
+    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
+    TraceContext.logLatency(getOperatorName(), (end - start));
+    return ret;
+  }
 
-    public abstract Block getNextBlock();
+  public abstract Block getNextBlock();
 
-    public abstract Block getNextBlock(BlockId BlockId);
+  public abstract Block getNextBlock(BlockId BlockId);
 
-    public abstract String getOperatorName();
-
+  public abstract String getOperatorName();
 }

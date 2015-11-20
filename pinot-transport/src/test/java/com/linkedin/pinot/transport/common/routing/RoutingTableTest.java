@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.transport.common.routing;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
@@ -33,10 +23,19 @@ import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTabl
 import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.slf4j.Logger;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class RoutingTableTest {
-
+  private static Logger LOGGER = org.slf4j.LoggerFactory.getLogger(RoutingTableTest.class);
   @Test
   public void testHelixExternalViewBasedRoutingTable() {
     RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
@@ -83,16 +82,16 @@ public class RoutingTableTest {
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
-      System.out.println(serverInstance);
+      LOGGER.trace(serverInstance.toString());
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      System.out.println(segmentIdSet.toString());
+      LOGGER.trace(segmentIdSet.toString());
       selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
     Arrays.sort(selectedSegmentArray);
     Assert.assertEquals(selectedSegments.size(), expectedNumSegment);
     Assert.assertEquals(Arrays.toString(selectedSegmentArray), expectedSegmentList);
-    System.out.println("********************************");
+    LOGGER.trace("********************************");
   }
 
   @Test
@@ -181,9 +180,9 @@ public class RoutingTableTest {
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
-      System.out.println(serverInstance);
+      LOGGER.trace(serverInstance.toString());
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      System.out.println(segmentIdSet.toString());
+      LOGGER.trace(segmentIdSet.toString());
       selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
@@ -196,7 +195,7 @@ public class RoutingTableTest {
       }
     }
     Assert.assertTrue(matchedExpectedLists);
-    System.out.println("********************************");
+    LOGGER.trace("********************************");
   }
 
 }

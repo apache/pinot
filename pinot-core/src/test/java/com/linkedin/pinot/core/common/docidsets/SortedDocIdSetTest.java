@@ -15,18 +15,14 @@
  */
 package com.linkedin.pinot.core.common.docidsets;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class SortedDocIdSetTest {
@@ -54,7 +50,6 @@ public class SortedDocIdSetTest {
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    System.out.println(result);
     Assert.assertEquals(1, result.size());
   }
 
@@ -69,7 +64,6 @@ public class SortedDocIdSetTest {
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    System.out.println(result);
     Assert.assertEquals(10, result.size());
   }
 
@@ -86,7 +80,6 @@ public class SortedDocIdSetTest {
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    System.out.println(result);
     Assert.assertEquals(20, result.size());
   }
 
@@ -114,7 +107,6 @@ public class SortedDocIdSetTest {
   private void testCustomRange(String rangeString) {
     String trim =
         rangeString.replace('[', ' ').replace(']', ' ').replace('(', ' ').replace(')', ' ').replaceAll("[\\s]+", "");
-    System.out.println("'" + trim + "'");
     String[] splits = trim.split(",");
     Assert.assertTrue(splits.length % 2 == 0);
     List<Integer> expectedList = new ArrayList<Integer>();
@@ -137,6 +129,5 @@ public class SortedDocIdSetTest {
     }
     Assert.assertEquals(result.size(), expectedList.size());
     Assert.assertEquals(result, expectedList);
-    System.out.println(result.size());
   }
 }
