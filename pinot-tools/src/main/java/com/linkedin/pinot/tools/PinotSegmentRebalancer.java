@@ -1,11 +1,23 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.tools;
 
-import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +25,6 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
-import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
@@ -24,17 +35,12 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
-import org.testng.collections.Lists;
 
-import com.fasterxml.jackson.core.JsonGenerationException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 
 
 public class PinotSegmentRebalancer {
@@ -139,7 +145,7 @@ public class PinotSegmentRebalancer {
     Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     System.out.println("Current segment Assignment:");
     printSegmentAssignment(currentMapping);
-    System.out.println("Current segment Assignment:");
+    System.out.println("New segment Assignment:");
     printSegmentAssignment(newMapping);
     if (EqualityUtils.isEqual(newMapping, currentMapping)) {
       System.out.println("Skipping rebalancing for table:" + tableName + " since its already balanced");
@@ -149,12 +155,17 @@ public class PinotSegmentRebalancer {
       System.out.println("Updating the idealstate for table:" + tableName);
       helixAdmin.setResourceIdealState(clusterName, tableName, updatedIdealState);
       int diff = Integer.MAX_VALUE;
+      Thread.sleep(3000);
       do {
-        Thread.sleep(30000);
         diff = isStable(tableName);
+        if (diff == 0) {
+          break;
+        } else {
+          System.out.println(
+              "Waiting for externalView to match idealstate for table:" + tableName + " Num segments difference");
+          Thread.sleep(30000);
 
-        System.out.println(
-            "Waiting for externalView to match idealstate for table:" + tableName + " Num segments difference");
+        }
       } while (diff > 0);
       System.out.println("Successfully rebalanced table:" + tableName);
     }

@@ -57,7 +57,7 @@ public class PinotAdministrator {
       @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
       @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
-      @SubCommand(name = "SegmentRebalancer", impl = SegmentRebalanceCommand.class)
+      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class)
   })
   Command _subCommand;
   // @formatter:on
