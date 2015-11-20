@@ -76,8 +76,6 @@ public class ControllerTenantTest extends ControllerTest {
       LOGGER.trace(res);
       Assert
           .assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, brokerTag + "_BROKER").size(), 5);
-      LOGGER.trace(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME,
-          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE).size());
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
               .size(), 15 - i * 5);
