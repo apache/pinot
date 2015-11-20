@@ -21,7 +21,8 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_POLL_TIMEOUT("thirdeye.poll.timeout"),
   THIRDEYE_COMPACTION("thirdeye.compaction"),
   THIRDEYE_PRESERVE_TIME_COMPACTION("thirdeye.preserve.time.compaction"),
-  THIRDEYE_MR_CONF("thirdeye.mr.conf");
+  THIRDEYE_MR_CONF("thirdeye.mr.conf"),
+  THIRDEYE_INPUT_CONVERTER_CLASS("thirdeye.input.converter.class");
 
   private final String propertyName;
 

@@ -7,11 +7,14 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_DIMENSION_STATS_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_METRIC_SUMS_PATH;
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_CONVERTER_CLASS;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -32,13 +35,13 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
-import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
@@ -58,6 +61,8 @@ public class AggregatePhaseJob extends Configured {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
+
   private String name;
   private Properties props;
 
@@ -71,8 +76,8 @@ public class AggregatePhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class AggregationMapper extends
-      Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+  public static class AggregationMapper<K, V> extends
+      Mapper<K, V, BytesWritable, BytesWritable> {
     private StarTreeConfig starTreeConfig;
     private AggregationJobConfig config;
     private TimeUnit sourceTimeUnit;
@@ -84,6 +89,10 @@ public class AggregatePhaseJob extends Configured {
     private String[] dimensionValues;
     private RollupThresholdFunction rollupThresholdFunction;
     private boolean preserveTime;
+    private Class converterClass;
+    private Method converterMethod;
+    private String converterClassName;
+
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -105,26 +114,38 @@ public class AggregatePhaseJob extends Configured {
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
         rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
         preserveTime = Boolean.parseBoolean(configuration.get(AGG_PRESERVE_TIME_COMPACTION.toString()));
+
+        converterClassName = configuration.get(AGG_CONVERTER_CLASS.toString());
+        converterClass = Class.forName(converterClassName);
+
       } catch (Exception e) {
         throw new IOException(e);
       }
     }
 
     @Override
-    public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
+    public void map(K key, V value, Context context)
         throws IOException, InterruptedException {
 
-      for (int i = 0; i < dimensionNames.size(); i++) {
-        String dimensionName = dimensionNames.get(i);
-        String dimensionValue = "";
-        Object val = record.datum().get(dimensionName);
-        if (val != null) {
-          dimensionValue = val.toString();
-        }
-        dimensionValues[i] = dimensionValue;
-      }
+      StarTreeRecord starTreeRecord = null;
+      try {
+        LOGGER.info("Using converter class {}", converterClassName);
+        if (converterClassName.equals(DEFAULT_CONVERTER_CLASS)) {
 
-      StarTreeRecord starTreeRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
+          AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
+          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, GenericRecord.class);
+          LOGGER.info("Using converter method {}", converterMethod);
+          starTreeRecord = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, avroKey.datum());
+        } else {
+
+          Text textValue = (Text) value;
+          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, Text.class);
+          LOGGER.info("Using converter method {}", converterMethod);
+          starTreeRecord = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, textValue);
+        }
+      } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+        LOGGER.error("Exception in reading converter classes", e);
+      }
 
       // Create flattened series
       MetricTimeSeries originalSeries = starTreeRecord.getMetricTimeSeries();
@@ -231,10 +252,10 @@ public class AggregatePhaseJob extends Configured {
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
       // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks are used (gbrandt, 2015-08-27)
-      FSDataOutputStream dimensionStatsOutputStream =
-          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
-      dimensionStatsOutputStream.close();
+//      FSDataOutputStream dimensionStatsOutputStream =
+//          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+//      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
+//      dimensionStatsOutputStream.close();
 //
 //      FSDataOutputStream outputStream =
 //          fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
@@ -248,16 +269,24 @@ public class AggregatePhaseJob extends Configured {
     job.setJobName(name);
     job.setJarByClass(AggregatePhaseJob.class);
     FileSystem fs = FileSystem.get(getConf());
-    // Avro schema
-    Schema schema =
-        new Schema.Parser().parse(fs.open(new Path(
-            getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString()))));
-    LOGGER.info("{}", schema);
+
+    Configuration configuration = job.getConfiguration();
+    String aggConverterClass = getAndSetConfiguration(configuration, AGG_CONVERTER_CLASS);
 
     // Map config
     job.setMapperClass(AggregationMapper.class);
-    AvroJob.setInputKeySchema(job, schema);
-    job.setInputFormatClass(AvroKeyInputFormat.class);
+    if (aggConverterClass.equals(DEFAULT_CONVERTER_CLASS)) {
+      // Avro schema
+      Schema schema =
+          new Schema.Parser().parse(fs.open(new Path(
+              getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString()))));
+      LOGGER.info("{}", schema);
+      AvroJob.setInputKeySchema(job, schema);
+      job.setInputFormatClass(AvroKeyInputFormat.class);
+    } else {
+      LOGGER.info("Setting text input format for {}", aggConverterClass);
+      job.setInputFormatClass(TextInputFormat.class);
+    }
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
 
@@ -277,7 +306,6 @@ public class AggregatePhaseJob extends Configured {
     LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // aggregation phase config
-    Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, AGG_INPUT_PATH);
     getAndSetConfiguration(configuration, AGG_CONFIG_PATH);
     getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);

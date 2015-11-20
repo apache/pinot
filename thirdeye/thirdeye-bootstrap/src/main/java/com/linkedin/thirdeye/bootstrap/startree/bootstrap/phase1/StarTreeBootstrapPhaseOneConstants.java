@@ -6,7 +6,8 @@ public enum StarTreeBootstrapPhaseOneConstants {
   STAR_TREE_BOOTSTRAP_OUTPUT_PATH("startree.bootstrap.phase1.output.path"), //
   STAR_TREE_BOOTSTRAP_CONFIG_PATH("startree.bootstrap.phase1.config.path"),
   STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA("startree.bootstrap.phase1.input.avro.schema"),
-  STAR_TREE_BOOTSTRAP_COMPACTION("startree.bootstrap.phase1.compaction");//
+  STAR_TREE_BOOTSTRAP_COMPACTION("startree.bootstrap.phase1.compaction"),
+  STAR_TREE_BOOTSTRAP_CONVERTER_CLASS("startree.bootstrap.phase1.converter.class");;//
   String name;
 
   StarTreeBootstrapPhaseOneConstants(String name) {

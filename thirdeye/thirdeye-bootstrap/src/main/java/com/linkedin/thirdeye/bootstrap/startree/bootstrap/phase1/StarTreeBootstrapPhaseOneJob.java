@@ -6,10 +6,13 @@ import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTree
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.STAR_TREE_GENERATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_COMPACTION;
+import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONVERTER_CLASS;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -37,6 +40,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
@@ -45,6 +49,7 @@ import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.joda.time.format.DateTimeFormat;
@@ -68,6 +73,7 @@ import com.linkedin.thirdeye.impl.StarTreeUtils;
 public class StarTreeBootstrapPhaseOneJob extends Configured
 {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeBootstrapPhaseOneJob.class);
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
 
   private String name;
   private Properties props;
@@ -105,6 +111,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
     Map<UUID, List<int[]>> nodeIdToleafRecordsMap;
     boolean debug = false;
     private boolean compaction;
+    private Class converterClass;
+    private Method converterMethod;
+    private String converterClassName;
 
     private DateTimeFormatter dateTimeFormatter;
 
@@ -137,6 +146,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
         aggregationGranularitySize = config.getAggregationGranularitySize();
         dimensionValues = new String[dimensionNames.size()];
         compaction = Boolean.parseBoolean(configuration.get(STAR_TREE_BOOTSTRAP_COMPACTION.toString()));
+
+        converterClassName = configuration.get(STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString());
+        converterClass = Class.forName(converterClassName);
 
         // how many can we store in 0.05GB, before clearing the cache
         maxTimeSeriesToCache =
@@ -232,31 +244,46 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
 
       DimensionKey aggregationDimensionKey;
       MetricTimeSeries aggregationTimeSeries;
+      StarTreeRecord record = null;
+      try {
+        LOGGER.info("Usng converter class {}", converterClassName);
+        if (compaction) {
 
-      if (compaction) {
+          BytesWritable dimensionKeyBytes = (BytesWritable) key;
+          aggregationDimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("dimension key {}", aggregationDimensionKey);
+          }
+          BytesWritable metricTimeSeriesBytes = (BytesWritable) value;
+          byte[] bytes = metricTimeSeriesBytes.getBytes();
+          aggregationTimeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
+          record = new StarTreeRecordImpl(starTreeConfig, aggregationDimensionKey, aggregationTimeSeries);
 
-        BytesWritable dimensionKeyBytes = (BytesWritable) key;
-        aggregationDimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("dimension key {}", aggregationDimensionKey);
+        } else if (converterClassName.equals(DEFAULT_CONVERTER_CLASS)) {
+
+          AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
+          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, GenericRecord.class);
+          LOGGER.info("Using converter method {}", converterMethod);
+          record = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, avroKey.datum());
+
+        } else {
+
+          Text textValue = (Text) value;
+          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, Text.class);
+          LOGGER.info("Using converter method {}", converterMethod);
+          record = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, textValue);
         }
-        BytesWritable metricTimeSeriesBytes = (BytesWritable) value;
-        byte[] bytes = metricTimeSeriesBytes.getBytes();
-        aggregationTimeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
-
-      } else {
-        AvroKey<GenericRecord> record = (AvroKey<GenericRecord>) key;
-
-        StarTreeRecord parsedRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
-        if (parsedRecord == null)
-        {
-          context.getCounter(StarTreeBootstrapPhase1Counter.INVALID_TIME_RECORDS).increment(1);
-          return;
-        }
-        aggregationDimensionKey = parsedRecord.getDimensionKey();
-        aggregationTimeSeries = parsedRecord.getMetricTimeSeries();
+      } catch (Exception e) {
+        LOGGER.error("Exception in creating startree record from converter class", e);
       }
 
+      if (record == null)
+      {
+        context.getCounter(StarTreeBootstrapPhase1Counter.INVALID_TIME_RECORDS).increment(1);
+        return;
+      }
+      aggregationDimensionKey = record.getDimensionKey();
+      aggregationTimeSeries = record.getMetricTimeSeries();
 
       // Count metric values
       for (Long time : aggregationTimeSeries.getTimeWindowSet())
@@ -456,13 +483,11 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(StarTreeBootstrapPhaseOneJob.class);
-
-    // Avro schema
     FileSystem fs = FileSystem.get(getConf());
-    Schema schema =
-        new Schema.Parser().parse(fs.open(new Path(
-            getAndCheck(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString()))));
-    LOGGER.info("{}", schema);
+
+    Configuration configuration = job.getConfiguration();
+    String bootstrapPhase1ConverterClass = getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_CONVERTER_CLASS);
+
 
     boolean thirdeyeCompaction = Boolean.parseBoolean(getAndCheck(STAR_TREE_BOOTSTRAP_COMPACTION.toString()));
 
@@ -470,9 +495,17 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
     job.setMapperClass(BootstrapMapper.class);
     if (thirdeyeCompaction) {
       job.setInputFormatClass(SequenceFileInputFormat.class);
-    } else {
+    } else if (bootstrapPhase1ConverterClass.equals(DEFAULT_CONVERTER_CLASS)){
+      // Avro schema
+      Schema schema =
+          new Schema.Parser().parse(fs.open(new Path(
+              getAndCheck(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString()))));
+      LOGGER.info("{}", schema);
       AvroJob.setInputKeySchema(job, schema);
       job.setInputFormatClass(AvroKeyInputFormat.class);
+    } else {
+      LOGGER.info("Setting text input format for {}", bootstrapPhase1ConverterClass);
+      job.setInputFormatClass(TextInputFormat.class);
     }
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
@@ -496,7 +529,6 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
     LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // star tree bootstrap phase phase config
-    Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_INPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_GENERATION_OUTPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_CONFIG_PATH);

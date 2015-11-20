@@ -60,6 +60,7 @@ import com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeCon
 import com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeJob;
 import com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
@@ -149,6 +150,7 @@ public class ThirdEyeJob {
   private static final String INPUT_PATHS_JOINER = ",";
   private static final String DATA_FOLDER_JOINER = "_";
   private static final String TEMPORARY_FOLDER = "_temporary";
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
 
   protected enum FlowSpec {
     DIMENSION_INDEX,
@@ -283,6 +285,11 @@ public class ThirdEyeJob {
         config.setProperty(AggregationJobConstants.AGG_METRIC_SUMS_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
             + StarTreeConstants.METRIC_SUMS_FOLDER + File.separator + StarTreeConstants.METRIC_SUMS_FILE);
+
+        config.setProperty(AggregationJobConstants.AGG_CONVERTER_CLASS.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(), DEFAULT_CONVERTER_CLASS));
+
+
         return config;
       }
     },
@@ -591,6 +598,9 @@ public class ThirdEyeJob {
 
         config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_COMPACTION.toString(),
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_COMPACTION.getName(), DEFAULT_THIRDEYE_COMPACTION));
+
+        config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(), DEFAULT_CONVERTER_CLASS));
 
         return config;
       }

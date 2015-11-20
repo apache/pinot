@@ -31,6 +31,8 @@ public final class StarTreeConstants
   public static final String DIMENSION_STORE = "dimensionStore";
   public static final String DICT_STORE = "dictStore";
 
+  public static final String CONVERT_METHOD_NAME = "convert";
+
   public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 
   public enum Schedule {
