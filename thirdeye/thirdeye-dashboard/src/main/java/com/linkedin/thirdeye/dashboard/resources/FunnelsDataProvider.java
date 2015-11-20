@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -21,7 +22,6 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -60,7 +60,7 @@ public class FunnelsDataProvider {
   private final Map<String, CustomFunnelSpec> funnelSpecsMap;
 
   public FunnelsDataProvider(File funnelsRoot, String serverUri, QueryCache queryCache,
-      DataCache dataCache) throws JsonProcessingException {
+      DataCache dataCache) throws Exception {
     this.funnelsRoot = funnelsRoot;
     this.serverUri = serverUri;
     this.queryCache = queryCache;
@@ -88,7 +88,7 @@ public class FunnelsDataProvider {
     IntraPeriod intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
 
     List<FunnelTable> funnelViews = new ArrayList<FunnelTable>();
-
+    boolean defaultFunnelSelected = false;
     if (selectedFunnels != null && selectedFunnels.length() > 0) {
       String[] funnels = selectedFunnels.split(",");
       if (funnels.length == 0) {
@@ -96,15 +96,21 @@ public class FunnelsDataProvider {
       }
 
       for (String funnel : funnels) {
+        if (DEFAULT_FUNNEL_NAME.equals(funnel)) {
+          defaultFunnelSelected = true;
+        }
         LOG.info("adding funnel views for collection, {}, with funnel name {}", collection, funnel);
         FunnelSpec spec = funnelSpecsMap.get(collection).getFunnels().get(funnel);
         funnelViews.add(getFunnelDataFor(collection, metricFunction, spec, baselineMillis,
             currentMillis, intraPeriod, dimensionValues));
       }
     }
-    FunnelSpec defaultSpec = createDefaultFunnelSpec(collection);
-    funnelViews.add(getFunnelDataFor(collection, metricFunction, defaultSpec, baselineMillis,
-        currentMillis, intraPeriod, dimensionValues));
+    if (!defaultFunnelSelected) {
+      LOG.info("adding primary funnel views for collection, {}", collection);
+      FunnelSpec defaultSpec = funnelSpecsMap.get(collection).getFunnels().get(DEFAULT_FUNNEL_NAME);
+      funnelViews.add(getFunnelDataFor(collection, metricFunction, defaultSpec, baselineMillis,
+          currentMillis, intraPeriod, dimensionValues));
+    }
     return funnelViews;
   }
 
@@ -243,7 +249,7 @@ public class FunnelsDataProvider {
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out
   // late}
-  private void loadConfigs() {
+  private void loadConfigs() throws Exception {
     // looping through all the dirs, finding one funnels file and loading it up
     ObjectMapper ymlReader = new ObjectMapper(new YAMLFactory());
     for (File f : funnelsRoot.listFiles()) {
@@ -256,22 +262,42 @@ public class FunnelsDataProvider {
 
       try {
         CustomFunnelSpec spec = ymlReader.readValue(funnelsFile, CustomFunnelSpec.class);
-        this.funnelSpecsMap.put(spec.getCollection(), spec);
+        // add default funnel spec
+        String collection = spec.getCollection();
+        FunnelSpec defaultFunnelSpec = createDefaultFunnelSpec(collection);
+        spec.getFunnels().put(defaultFunnelSpec.getName(), defaultFunnelSpec);
+        this.funnelSpecsMap.put(collection, spec);
 
       } catch (Exception e) {
         LOG.error("error loading the configFile", e);
       }
     }
 
+    // add default for any collections that don't have an existing funnel spec file
+    for (String collection : dataCache.getCollections(serverUri)) {
+      if (this.funnelSpecsMap.containsKey(collection)) {
+        continue;
+      }
+      LOG.info("Creating default funnel config for collection: {}", collection);
+      CustomFunnelSpec spec = new CustomFunnelSpec();
+      spec.setCollection(collection);
+      spec.setFunnels(Arrays.asList(createDefaultFunnelSpec(collection)));
+      this.funnelSpecsMap.put(collection, spec);
+    }
+
   }
 
   /**
-   * Creates a default funnel spec consisting of all the collection metrics.
+   * Creates a default funnel spec consisting of all the collection metrics. If the collection
+   * doesn't exist, returns null.
    * @param collection
    * @throws Exception
    */
   private FunnelSpec createDefaultFunnelSpec(String collection) throws Exception {
     CollectionSchema collectionSchema = dataCache.getCollectionSchema(serverUri, collection);
+    if (collectionSchema == null) {
+      return null;
+    }
     FunnelSpec defaultSpec = new FunnelSpec();
     defaultSpec.setName(DEFAULT_FUNNEL_NAME);
     defaultSpec.setVisulizationType(DEFAULT_FUNNEL_VISUALIZATION_TYPE);
