@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -27,10 +28,10 @@ public class Selection {
   private final IndexSegmentImpl _indexSegment;
   private final SegmentMetadataImpl _metadata;
   private final List<Integer> _filteredDocIds;
-  private final List<String> _selectionColumns;
+  private final List<Pair> _selectionColumns;
 
   public Selection(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
-      List<String> selectionColumns) {
+      List<Pair> selectionColumns) {
 
     _indexSegment = indexSegment;
     _metadata = metadata;
@@ -42,7 +43,8 @@ public class Selection {
     boolean addCountStar = false;
     Map<String, Dictionary> dictionaryMap = new HashMap<>();
 
-    for (String column : _selectionColumns) {
+    for (Pair pair : _selectionColumns) {
+      String column = (String) pair.getFirst();
       if (column.equals("*")) {
         addCountStar = true;
       }

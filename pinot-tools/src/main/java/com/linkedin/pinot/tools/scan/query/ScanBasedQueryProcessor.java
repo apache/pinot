@@ -15,20 +15,21 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import org.codehaus.jackson.annotate.JsonProperty;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,43 +37,44 @@ import org.slf4j.LoggerFactory;
 public class ScanBasedQueryProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedQueryProcessor.class);
   private final String _segmentsDir;
+  private long _timeoutInSeconds = 1000;
 
   public ScanBasedQueryProcessor(String segmentsDir) {
     _segmentsDir = segmentsDir;
   }
 
-  ResultTable processQuery(String query)
+  public QueryResponse processQuery(String query)
       throws Exception {
     long startTimeInMillis = System.currentTimeMillis();
-    PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());
-    JSONObject jsonObject = compiler.compile(query);
-    BrokerRequest brokerRequest = RequestConverter.fromJSON(jsonObject);
-
+    Pql2Compiler pql2Compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest = pql2Compiler.compileToBrokerRequest(query);
     ResultTable results = null;
     File file = new File(_segmentsDir);
 
     Aggregation aggregation = null;
-    List<String> groupByColumns = null;
+    List<String> groupByColumns;
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
     if (aggregationsInfo != null) {
-      groupByColumns = (brokerRequest.isSetGroupBy()) ? brokerRequest.getGroupBy().getColumns() : null;
-      aggregation = new Aggregation(brokerRequest.getAggregationsInfo(), groupByColumns);
+      GroupBy groupBy = brokerRequest.getGroupBy();
+      groupByColumns = (brokerRequest.isSetGroupBy()) ? groupBy.getColumns() : null;
+      long topN = (groupByColumns != null) ? groupBy.getTopN() : 10;
+      aggregation = new Aggregation(brokerRequest.getAggregationsInfo(), groupByColumns, topN);
     }
 
     int numDocsScanned = 0;
     int totalDocs = 0;
+    int numSegments = 0;
     LOGGER.info("Processing Query: {}", query);
 
-    for (File segmentDir : file.listFiles()) {
-      LOGGER.info("Processing segment: " + segmentDir.getName());
-      SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segmentDir);
-      ResultTable segmentResults = processor.process(query);
+    List<ResultTable> resultTables = processSegments(query, brokerRequest, file);
+    for (ResultTable segmentResults : resultTables) {
       numDocsScanned += segmentResults.getNumDocsScanned();
       totalDocs += segmentResults.getTotalDocs();
+      ++numSegments;
       results = (results == null) ? segmentResults : results.append(segmentResults);
     }
 
-    if (aggregation != null) {
+    if (aggregation != null && numSegments > 1 && numDocsScanned > 0) {
       results = aggregation.aggregate(results);
     }
 
@@ -81,8 +83,38 @@ public class ScanBasedQueryProcessor {
     long totalUsedMs = System.currentTimeMillis() - startTimeInMillis;
     results.setProcessingTime(totalUsedMs);
 
-    printResult(results);
-    return results;
+    results.convertSumToAvgIfNeeded();
+    QueryResponse queryResponse = new QueryResponse(results);
+
+    return queryResponse;
+  }
+
+  private List<ResultTable> processSegments(final String query, final BrokerRequest brokerRequest, File segmentsDir)
+      throws InterruptedException {
+    ExecutorService executorService = Executors.newFixedThreadPool(8);
+    List<ResultTable> resultTables = Collections.synchronizedList(new ArrayList<ResultTable>());
+
+    for (final File segment : segmentsDir.listFiles()) {
+      executorService.execute(new Runnable() {
+        @Override
+        public void run() {
+          LOGGER.info("Processing segment: " + segment.getName());
+          SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segment);
+          try {
+            ResultTable resultTable = processor.process(query);
+            if (resultTable != null) {
+              resultTables.add(resultTable);
+            }
+          } catch (Exception e) {
+            LOGGER.error("Exception caught while processing segment.", e);
+            return;
+          }
+        }
+      });
+    }
+    executorService.shutdown();
+    executorService.awaitTermination(_timeoutInSeconds, TimeUnit.SECONDS);
+    return resultTables;
   }
 
   public static void main(String[] args)
@@ -101,74 +133,15 @@ public class ScanBasedQueryProcessor {
     BufferedReader bufferedReader = new BufferedReader(new FileReader(queryFile));
 
     while ((query = bufferedReader.readLine()) != null) {
-      scanBasedQueryProcessor.processQuery(query);
+      QueryResponse queryResponse = scanBasedQueryProcessor.processQuery(query);
+      printResult(queryResponse);
     }
     bufferedReader.close();
   }
 
-  private void printResult(ResultTable resultTable)
+  public static void printResult(QueryResponse queryResponse)
       throws IOException {
-    Response response = new Response(resultTable);
     ObjectMapper objectMapper = new ObjectMapper();
-    LOGGER.info(objectMapper.defaultPrettyPrintingWriter().writeValueAsString(response));
-  }
-
-  private class Response {
-    private int _numDocsScanned;
-    private int _totalDocs;
-    private long _timeUsedMs;
-    List<AggregationResult> _aggregationResults;
-
-    Response(ResultTable resultTable) {
-      _numDocsScanned = resultTable.getNumDocsScanned();
-      _totalDocs = resultTable.getTotalDocs();
-      _timeUsedMs = resultTable.getProcessingTime();
-
-      _aggregationResults = new ArrayList<>();
-      for (ResultTable.Row row : resultTable) {
-        int columnId = 0;
-        for (Object value : row) {
-          AggregationResult aggregationResult =
-              new AggregationResult(resultTable.getFunction(columnId), value.toString());
-          _aggregationResults.add(aggregationResult);
-          ++columnId;
-        }
-      }
-    }
-
-    public int getNumDocsScanned() {
-      return _numDocsScanned;
-    }
-
-    public int getTotalDocs() {
-      return _totalDocs;
-    }
-
-    public long getTimeUsedMs() {
-      return _timeUsedMs;
-    }
-
-    @JsonProperty("_aggregationResults")
-    List<AggregationResult> getAggregationResults() {
-      return _aggregationResults;
-    }
-
-    class AggregationResult {
-      private String _value;
-      private String _function;
-
-      AggregationResult(String function, String value) {
-        _function = function;
-        _value = value;
-      }
-
-      public String getFunction() {
-        return _function;
-      }
-
-      public String getValue() {
-        return _value;
-      }
-    }
+    LOGGER.info(objectMapper.defaultPrettyPrintingWriter().writeValueAsString(queryResponse));
   }
 }

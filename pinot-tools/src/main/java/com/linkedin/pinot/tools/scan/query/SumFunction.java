@@ -19,6 +19,7 @@ import java.util.Collections;
 
 
 public class SumFunction extends AggregationFunc {
+  private static final String _name = "sum";
   SumFunction(ResultTable rows, String column) {
     super(rows, column);
   }
@@ -28,7 +29,7 @@ public class SumFunction extends AggregationFunc {
     Double sum = 0.0;
 
     for (ResultTable.Row row : _rows) {
-      sum += new Double((row.get(_column)).toString());
+      sum += new Double((row.get(_column, _name)).toString());
     }
 
     ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);

@@ -22,7 +22,7 @@ import java.util.List;
 public class GroupByOperator {
   List<Object> _columns;
 
-  GroupByOperator(List<Object> columns) {
+  public GroupByOperator(List<Object> columns) {
     _columns = columns;
   }
 

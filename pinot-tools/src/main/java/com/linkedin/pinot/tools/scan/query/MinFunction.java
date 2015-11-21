@@ -19,16 +19,17 @@ import java.util.Collections;
 
 
 public class MinFunction extends AggregationFunc {
+  private static final String _name = "min";
   MinFunction(ResultTable rows, String columnId) {
     super(rows, columnId);
   }
 
   @Override
   public ResultTable run() {
-    Double min = 0.0;
+    Double min = Double.MAX_VALUE;
 
     for (ResultTable.Row row : _rows) {
-      min = Math.min(min, new Double(row.get(_column).toString()));
+      min = Math.min(min, new Double(row.get(_column, _name).toString()));
     }
 
     ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);

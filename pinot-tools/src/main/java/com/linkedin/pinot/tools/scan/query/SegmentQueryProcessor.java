@@ -17,11 +17,13 @@ package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -32,9 +34,13 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class SegmentQueryProcessor {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SegmentQueryProcessor.class);
+
   private BrokerRequest _brokerRequest;
   private File _segmentDir;
 
@@ -46,8 +52,12 @@ class SegmentQueryProcessor {
   public ResultTable process(String query)
       throws Exception {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDir);
-    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.heap);
+    if (!metadata.getTableName().equals(_brokerRequest.getQuerySource().getTableName())) {
+      LOGGER.info("Skipping segment {} from different table {}", _segmentDir.getName(), metadata.getTableName());
+      return null;
+    }
 
+    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.heap);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
     List<Integer> filteredDocIds = filterDocIds(indexSegment, metadata, filterQueryTree);
 
@@ -56,17 +66,32 @@ class SegmentQueryProcessor {
       // Aggregation only
       if (!_brokerRequest.isSetGroupBy()) {
         Aggregation aggregation =
-            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(), null);
+            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(), null, 10);
         result =  aggregation.run();
       } else { // Aggregation GroupBy
+        GroupBy groupBy = _brokerRequest.getGroupBy();
         Aggregation aggregation =
             new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(),
-                _brokerRequest.getGroupBy().getColumns());
+                groupBy.getColumns(), groupBy.getTopN());
         result = aggregation.run();
       }
     } else {// Only Selection
       if (_brokerRequest.isSetSelections()) {
-        Selection selection = new Selection(indexSegment, metadata, filteredDocIds, _brokerRequest.getSelections().getSelectionColumns());
+        List<String> columns = _brokerRequest.getSelections().getSelectionColumns();
+        if (columns.contains("*")) {
+          columns = Arrays.asList(indexSegment.getColumnNames());
+        }
+        List<Pair> selectionColumns = new ArrayList<>();
+        Set<String> columSet = new HashSet<>();
+
+        // Collect a unique list of columns, in case input has duplicates.
+        for (String column : columns) {
+          if (!columSet.contains(column)) {
+            selectionColumns.add(new Pair(column, null));
+            columSet.add(column);
+          }
+        }
+        Selection selection = new Selection(indexSegment, metadata, filteredDocIds, selectionColumns);
         result = selection.run();
       }
     }
@@ -162,6 +187,9 @@ class SegmentQueryProcessor {
         break;
 
       case RANGE:
+        predicateFilter = new RangePredicateFilter(dictionaryReader, value);
+        break;
+
       case REGEX:
       default:
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);

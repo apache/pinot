@@ -19,6 +19,7 @@ import java.util.Collections;
 
 
 public class AvgFunction extends AggregationFunc {
+  private static final String _name = "avg";
 
   AvgFunction(ResultTable rows, String column) {
     super(rows, column);
@@ -26,18 +27,27 @@ public class AvgFunction extends AggregationFunc {
 
   @Override
   public ResultTable run() {
-    Double average = 0.0;
-    int numRows = 0;
+    Double sum = 0.0;
+    int numEntries = 0;
 
     for (ResultTable.Row row : _rows) {
-      average += new Double(row.get(_column).toString());
-      ++numRows;
+      Object value = row.get(_column, _name);
+      if (value instanceof double []) {
+        double [] valArray = (double []) value;
+        sum += valArray[0];
+        numEntries += valArray[1];
+      } else {
+        sum += new Double(row.get(_column, _name).toString());
+        ++numEntries;
+      }
     }
 
-    average = average / numRows;
+    double[] average = new double[2];
+    average[0] = sum;
+    average[1] = numEntries;
+
     ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
     resultTable.add(0, average);
-
     return resultTable;
   }
 }

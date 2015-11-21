@@ -35,9 +35,10 @@ public class Projection {
   private final List<Pair> _columnList;
   private Map<String, Dictionary> _dictionaryMap;
   private boolean _addCountStar;
+  private int _limit = 10;
 
   Projection(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
-      List<String> columns, Map<String, Dictionary> dictionaryMap, boolean addCountStar) {
+      List<Pair> columns, Map<String, Dictionary> dictionaryMap, boolean addCountStar) {
 
     _indexSegment = indexSegment;
     _metadata = metadata;
@@ -46,13 +47,14 @@ public class Projection {
     _addCountStar = addCountStar;
 
     _columnList = new ArrayList<>();
-    for (String column : columns) {
-      _columnList.add(new Pair(column, null));
+    for (Pair pair : columns) {
+      _columnList.add(pair);
     }
   }
 
   public ResultTable run() {
     ResultTable resultTable = new ResultTable(_columnList, _filteredDocIds.size());
+    resultTable.setResultType(ResultTable.ResultType.Selection);
 
     for (Pair pair : _columnList) {
       String column = (String) pair.getFirst();
@@ -109,15 +111,15 @@ public class Projection {
           int dictId = (int) object;
           row.set(colId, dictionary.get(dictId));
         }
-
-        if (addCountStar) {
-          row.add(1);
-        }
         ++colId;
       }
     }
 
+    // Add additional column for count(*)
     if (addCountStar) {
+      for (ResultTable.Row row : resultTable) {
+        row.add(1);
+      }
       resultTable.addCountStarColumn();
     }
 

@@ -19,6 +19,7 @@ import java.util.Collections;
 
 
 public class CountFunction extends AggregationFunc {
+  private static final String _name = "count";
   CountFunction(ResultTable rows, String column) {
     super(rows, column);
   }
@@ -26,9 +27,8 @@ public class CountFunction extends AggregationFunc {
   @Override
   public ResultTable run() {
     Long count = 0l;
-    int colIndex = _rows.getColumnIndex(_column);
     for (ResultTable.Row row : _rows) {
-      count += new Long((row.get(colIndex)).toString());
+      count += new Long((row.get(_column, _name)).toString());
     }
 
     ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);

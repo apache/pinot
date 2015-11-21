@@ -28,6 +28,46 @@ import org.slf4j.LoggerFactory;
 
 public class ResultTable implements Iterable<ResultTable.Row> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultTable.class);
+  private static final String AVERAGE = "avg";
+
+  public void convertSumToAvgIfNeeded() {
+    if (isEmpty()) {
+      return;
+    }
+
+    List<Integer> averageColumns = new ArrayList<>();
+    int i = 0;
+    for (Pair pair : _columnList) {
+      String function = (String) pair.getSecond();
+      if (function != null && function.equalsIgnoreCase(AVERAGE)) {
+        averageColumns.add(i);
+      }
+      ++i;
+    }
+    // No average columns found.
+    if (averageColumns.isEmpty()) {
+      return;
+    }
+
+    for (Row row : _rows) {
+      for (int colId : averageColumns) {
+        double [] value = (double []) row.get(colId);
+        double average = (value[1] != 0) ? (value[0] / value[1]) : 0;
+        row.set(colId, average);
+      }
+    }
+  }
+
+  public boolean isEmpty() {
+    return _rows.isEmpty();
+  }
+
+  enum ResultType {
+    Selection,
+    Aggregation,
+    AggregationGroupBy,
+    Invalid
+  }
 
   List<Row> _rows;
   private List<Pair> _columnList;
@@ -35,6 +75,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   int _numDocsScanned;
   private long _processingTime;
   private int _totalDocs;
+  private ResultType _resultType = ResultType.Invalid;
 
   ResultTable(List<Pair> columns, int numRows) {
     _columnList = new ArrayList<>(columns);
@@ -44,7 +85,8 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     int index = 0;
     _columnMap = new HashMap<>();
     for (Pair pair : columns) {
-      _columnMap.put((String) pair.getFirst(), index);
+      String key = (String) pair.getFirst() + "_" + (String) pair.getSecond();
+      _columnMap.put(key, index);
       ++index;
     }
 
@@ -72,8 +114,14 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   public ResultTable append(ResultTable resultsToAppend) {
-    _rows.addAll(resultsToAppend._rows);
+    if (!resultsToAppend.isEmpty()) {
+      _rows.addAll(resultsToAppend._rows);
+    }
     return this;
+  }
+
+  public Row getRow(int i) {
+    return _rows.get(i);
   }
 
   public String getColumn(int columnId) {
@@ -88,10 +136,8 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   void addCountStarColumn() {
-    // Assumes count(*) column is to be added at the end.
-    int index = _rows.get(0).size() - 1;
-    _columnMap.put("*", index);
-    _columnList.add(new Pair("count", "star"));
+    _columnMap.put("*_count", _columnList.size());
+    _columnList.add(new Pair("*", "count"));
   }
 
   public int size() {
@@ -105,10 +151,6 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     LOGGER.info("Docs scanned: " + _numDocsScanned);
     LOGGER.info("Total Docs  : " + _totalDocs);
     LOGGER.info("timeUsedMs: " + _processingTime);
-  }
-
-  public int getColumnIndex(String column) {
-    return _columnMap.get(column);
   }
 
   public void setNumDocsScanned(int numDocsScanned) {
@@ -155,7 +197,14 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     public Row(Map<String, Integer> columnMap) {
       _columnMap = columnMap;
       _cols = new ArrayList<>();
+
+      // Make a copy as new column (count_star may be added to the passed in ref
       _columnList = new ArrayList<>(_columnMap.keySet());
+
+      // Need to maintain the order.
+      for (Map.Entry<String, Integer> entry : _columnMap.entrySet()) {
+        _columnList.set(entry.getValue(), entry.getKey());
+      }
     }
 
     public void add(Object value) {
@@ -166,8 +215,9 @@ public class ResultTable implements Iterable<ResultTable.Row> {
       return _cols.get(index);
     }
 
-    public Object get(String column) {
-      int index = _columnMap.get(column);
+    public Object get(String column, String function) {
+      String key = column + "_" + function;
+      int index = _columnMap.get(key);
       return get(index);
     }
 
@@ -200,5 +250,13 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     public void set(int colId, Object object) {
       _cols.set(colId, object);
     }
+  }
+
+  public void setResultType(ResultType resultType) {
+    _resultType = resultType;
+  }
+
+  public ResultType getResultType() {
+    return _resultType;
   }
 }

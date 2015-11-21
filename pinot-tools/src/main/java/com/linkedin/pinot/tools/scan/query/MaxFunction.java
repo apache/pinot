@@ -19,16 +19,18 @@ import java.util.Collections;
 
 
 public class MaxFunction extends AggregationFunc {
+  private static final String _name = "max";
+
   MaxFunction(ResultTable rows, String column) {
     super(rows, column);
   }
 
   @Override
   public ResultTable run() {
-    Double max = 0.0;
+    Double max = Double.MIN_VALUE;
 
     for (ResultTable.Row row : _rows) {
-      max = Math.max(max, new Double(row.get(_column).toString()));
+      max = Math.max(max, new Double(row.get(_column, _name).toString()));
     }
 
     ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);

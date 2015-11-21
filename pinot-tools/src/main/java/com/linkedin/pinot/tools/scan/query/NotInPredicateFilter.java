@@ -26,7 +26,7 @@ public class NotInPredicateFilter implements PredicateFilter {
   public NotInPredicateFilter(Dictionary dictionaryReader, List<String> predicateValue) {
     for (String values : predicateValue) {
       for (String value : values.split(SEPARATOR)) {
-        _notInSet.add(dictionaryReader.indexOf(predicateValue));
+        _notInSet.add(dictionaryReader.indexOf(value));
       }
     }
   }

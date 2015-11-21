@@ -35,64 +35,76 @@ public class Aggregation {
   private List<String> _groupByColumns;
   private List<Pair> _columnFunctionList;
   private Map<String, Dictionary> _dictionaryMap;
-  private List<String> _projectionColumns;
+  private List<Pair> _projectionColumns;
   private List<Pair> _allColumns;
+  private long _topN = 10;
 
   private void init(List<String> groupByColumns) {
     _groupByColumns = groupByColumns;
     _columnFunctionList = new ArrayList<>();
+    _addCountStar = false;
 
     for (AggregationInfo aggregationInfo : _aggregationsInfo) {
       Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
       for (Map.Entry<String, String> entry : aggregationParams.entrySet()) {
-        _columnFunctionList.add(new Pair(entry.getValue(), aggregationInfo.getAggregationType()));
+        String column = entry.getValue();
+        // Apparently in case of multiple group by's '*' is replaced by empty/null in brokerRequest.
+        if (column == null || column.isEmpty() || column.equals("*")) {
+          _addCountStar = true;
+          continue;
+        }
+        _columnFunctionList.add(new Pair(column, aggregationInfo.getAggregationType().toLowerCase()));
       }
     }
 
-    _addCountStar = false;
+    // Count star appended at the end in the result table.
+    if (_addCountStar) {
+      _columnFunctionList.add(new Pair("*", "count"));
+    }
+
     _projectionColumns = new ArrayList<>();
     _allColumns = new ArrayList<>();
 
     if (_groupByColumns != null) {
       for (String column : _groupByColumns) {
-        _projectionColumns.add(column);
+        _projectionColumns.add(new Pair(column, null));
         _allColumns.add(new Pair(column, null));
       }
     }
 
     for (Pair pair : _columnFunctionList) {
       String column = (String) pair.getFirst();
-      if (column.equals("*")) {
-        _addCountStar = true;
-      } else {
-        _projectionColumns.add(column);
-        _allColumns.add(new Pair(column, pair.getSecond()));
+      if (!column.equals("*")) {
+        _projectionColumns.add(pair);
+        _allColumns.add(pair);
       }
     }
 
     // This is always the last columns.
     if (_addCountStar) {
-      _allColumns.add(new Pair("count", "star"));
+      _allColumns.add(new Pair("*", "count"));
     }
   }
 
-  public Aggregation(List<AggregationInfo> aggregationsInfo, List<String> groupByColumns) {
+  public Aggregation(List<AggregationInfo> aggregationsInfo, List<String> groupByColumns, long topN) {
     _aggregationsInfo = aggregationsInfo;
+    _topN = topN;
     init(groupByColumns);
   }
 
   public Aggregation(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
-      List<AggregationInfo> aggregationsInfo, List<String> groupByColumns) {
+      List<AggregationInfo> aggregationsInfo, List<String> groupByColumns, long topN) {
     _indexSegment = indexSegment;
     _metadata = metadata;
     _dictionaryMap = new HashMap<>();
 
     _filteredDocIds = filteredDocIds;
     _aggregationsInfo = aggregationsInfo;
+    _topN = topN;
     init(groupByColumns);
 
-    // Aggregation columns have been renamed, group by columns have not.
-    for (String column : _projectionColumns) {
+    for (Pair pair : _projectionColumns) {
+      String column = (String) pair.getFirst();
       _dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
     }
   }
@@ -112,7 +124,7 @@ public class Aggregation {
     for (ResultTable.Row row : input) {
       List<Object> groupByValues = new ArrayList<>();
       for (String groupByColumn : _groupByColumns) {
-        groupByValues.add(row.get(groupByColumn));
+        groupByValues.add(row.get(groupByColumn, null));
       }
 
       GroupByOperator groupByOperator = new GroupByOperator(groupByValues);
@@ -137,15 +149,26 @@ public class Aggregation {
       for (Object groupByColumn : groupByOperator._getGroupBys()) {
         aggregationResult.add(0, groupByColumn);
       }
-      aggregationResult.add(0, aggregateOne(groupByTable).get(0, 0));
 
+      ResultTable.Row row = aggregateOne(groupByTable).getRow(0);
+      for (Object value : row) {
+        aggregationResult.add(0, value);
+      }
       results.append(aggregationResult);
     }
+
+    results.setResultType(ResultTable.ResultType.AggregationGroupBy);
     return results;
   }
 
   private ResultTable aggregateOne(ResultTable input) {
     ResultTable results = new ResultTable(_allColumns, 1);
+    results.setResultType(ResultTable.ResultType.Aggregation);
+
+    if (input.isEmpty()) {
+      results.add(0, 0.0);
+      return results;
+    }
 
     for (Pair pair : _columnFunctionList) {
       String column = (String) pair.getFirst();
@@ -154,9 +177,9 @@ public class Aggregation {
       AggregationFunc aggregationFunc =
           AggregationFuncFactory.getAggregationFunc(input, column, function);
       ResultTable aggregationResult = aggregationFunc.run();
-
       results.add(0, aggregationResult.get(0, 0));
     }
+
     return results;
   }
 }
