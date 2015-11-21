@@ -12,7 +12,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
+import com.linkedin.thirdeye.bootstrap.util.ThirdeyeConverter;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -106,13 +107,14 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
     int inputCount = 0;
     int outputCount = 0;
     long totalTime = 0;
+    long invalidTimeRecordsCounter = 0;
+    Map<String, Long> metricSumsCounter;
     Map<UUID, Map<String, Map<String, Integer>>> forwardIndexMap;
     Map<UUID, List<int[]>> nodeIdToleafRecordsMap;
     boolean debug = false;
     private boolean compaction;
-    private Class converterClass;
-    private Method converterMethod;
     private String converterClassName;
+    ThirdeyeConverter thirdeyeConverter;
 
     private DateTimeFormatter dateTimeFormatter;
 
@@ -146,9 +148,15 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
         dimensionValues = new String[dimensionNames.size()];
         compaction = Boolean.parseBoolean(configuration.get(STAR_TREE_BOOTSTRAP_COMPACTION.toString()));
 
+        metricSumsCounter = new HashMap<>();
+        for (String metricName : metricNames) {
+          metricSumsCounter.put(metricName, 0L);
+        }
+
         converterClassName = configuration.get(STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString());
-        converterClass = Class.forName(converterClassName);
         LOGGER.info("Using converter class {}", converterClassName);
+        Constructor<?> converterConstructor = Class.forName(converterClassName).getConstructor();
+        thirdeyeConverter = (ThirdeyeConverter) converterConstructor.newInstance();
 
         // how many can we store in 0.05GB, before clearing the cache
         maxTimeSeriesToCache =
@@ -261,14 +269,12 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
         } else if (converterClassName.equals(DEFAULT_CONVERTER_CLASS)) {
 
           AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
-          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, GenericRecord.class);
-          record = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, avroKey.datum());
+          record = thirdeyeConverter.convert(starTreeConfig, avroKey.datum());
 
         } else {
 
           Text textValue = (Text) value;
-          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, Text.class);
-          record = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, textValue);
+          record = thirdeyeConverter.convert(starTreeConfig, textValue);
         }
       } catch (Exception e) {
         LOGGER.error("Exception in creating startree record from converter class", e);
@@ -276,7 +282,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
 
       if (record == null)
       {
-        context.getCounter(StarTreeBootstrapPhase1Counter.INVALID_TIME_RECORDS).increment(1);
+        invalidTimeRecordsCounter ++;
         return;
       }
       aggregationDimensionKey = record.getDimensionKey();
@@ -285,11 +291,11 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
       // Count metric values
       for (Long time : aggregationTimeSeries.getTimeWindowSet())
       {
-        for (MetricSpec metricSpec : starTreeConfig.getMetrics())
+        for (String metricName : metricNames)
         {
-          Number metricValue = aggregationTimeSeries.get(time, metricSpec.getName());
-          context.getCounter(config.getCollectionName(), metricSpec.getName()).increment(
-              metricValue.longValue());
+          Number metricValue = aggregationTimeSeries.get(time, metricName);
+          metricSumsCounter.put(metricName,
+              metricSumsCounter.get(metricName) + metricValue.longValue());
         }
       }
 
@@ -382,6 +388,11 @@ public class StarTreeBootstrapPhaseOneJob extends Configured
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException
     {
+      context.getCounter(StarTreeBootstrapPhase1Counter.INVALID_TIME_RECORDS).increment(invalidTimeRecordsCounter);
+      for (String metricName : metricNames) {
+        context.getCounter(config.getCollectionName(), metricName).increment(
+            metricSumsCounter.get(metricName));
+      }
       flushCache(context);
       File f = new File(localStagingDir);
       FileUtils.deleteDirectory(f);

@@ -94,6 +94,7 @@ import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTree
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.*;
 
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 
 
@@ -122,6 +123,7 @@ public class ThirdeyeIntegrationTest {
   private static final String CONFIG_FILE = "config.yml";
   private static final String SCHEMA_FILE = "schema.avsc";
   private static final String PROPERTIES_FILE = "integrationTest.properties";
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
 
   private static Path inputFilePath;
   private static Path configFilePath;
@@ -437,7 +439,7 @@ public class ThirdeyeIntegrationTest {
     configuration.set(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(), configFilePath.toString());
     configuration.set(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString(), starTreeBootstrapPhase1Output.toString());
     configuration.set(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString(), schemaFilePath.toString());
-
+    configuration.set(STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString(), DEFAULT_CONVERTER_CLASS);
     // execute job
     FileInputFormat.addInputPath(job, new Path(configuration.get(STAR_TREE_BOOTSTRAP_INPUT_PATH.toString())));
     FileOutputFormat.setOutputPath(job, new Path(configuration.get(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
@@ -729,6 +731,7 @@ public class ThirdeyeIntegrationTest {
     configuration.set(AGG_OUTPUT_PATH.toString(), aggregationOutputPath.toString());
     configuration.set(AGG_INPUT_AVRO_SCHEMA.toString(), schemaFilePath.toString());
     configuration.set(AGG_DIMENSION_STATS_PATH.toString(), dimensionStatsPath.toString());
+    configuration.set(AGG_CONVERTER_CLASS.toString(), DEFAULT_CONVERTER_CLASS);
 
     // execute job
     FileInputFormat.addInputPath(job, new Path(configuration.get(AGG_INPUT_PATH.toString())));

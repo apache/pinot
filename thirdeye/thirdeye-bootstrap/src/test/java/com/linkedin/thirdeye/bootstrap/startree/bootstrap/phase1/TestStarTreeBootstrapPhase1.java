@@ -37,6 +37,7 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneJob.StarTreeBootstrapReducer;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob.StarTreeGenerationMapper;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
 /**
 *
@@ -54,6 +55,8 @@ public class TestStarTreeBootstrapPhase1
   private static ReduceDriver<BytesWritable, BytesWritable, BytesWritable, BytesWritable> reduceDriver;
   private static StarTreeBootstrapPhaseOneConfig starTreeBootstrapConfig;
   private static String thirdEyeRoot;
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
+
 
   private List<Pair<GenericRecord,NullWritable>> generateTestDataMapper() throws Exception
   {
@@ -164,11 +167,13 @@ public class TestStarTreeBootstrapPhase1
     starTreeBootstrapConfig = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
     thirdEyeRoot = System.getProperty("java.io.tmpdir") ;
     config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(), thirdEyeRoot + File.separator + "startree_generation");
+    config.set(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString(), DEFAULT_CONVERTER_CLASS);
 
     StarTreeBootstrapReducer reducer = new StarTreeBootstrapReducer();
     reduceDriver = ReduceDriver.newReduceDriver(reducer);
     config = reduceDriver.getConfiguration();
     config.set(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+
   }
 
   @AfterClass

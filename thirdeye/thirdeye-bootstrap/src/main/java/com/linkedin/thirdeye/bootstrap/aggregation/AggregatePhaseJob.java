@@ -13,8 +13,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -22,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
+import com.linkedin.thirdeye.bootstrap.util.ThirdeyeConverter;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -89,9 +88,8 @@ public class AggregatePhaseJob extends Configured {
     private String[] dimensionValues;
     private RollupThresholdFunction rollupThresholdFunction;
     private boolean preserveTime;
-    private Class converterClass;
-    private Method converterMethod;
     private String converterClassName;
+    private ThirdeyeConverter thirdeyeConverter;
 
 
     @Override
@@ -116,9 +114,9 @@ public class AggregatePhaseJob extends Configured {
         preserveTime = Boolean.parseBoolean(configuration.get(AGG_PRESERVE_TIME_COMPACTION.toString()));
 
         converterClassName = configuration.get(AGG_CONVERTER_CLASS.toString());
-        converterClass = Class.forName(converterClassName);
         LOGGER.info("Using converter class {}", converterClassName);
-
+        Constructor<?> converterConstructor = Class.forName(converterClassName).getConstructor();
+        thirdeyeConverter = (ThirdeyeConverter) converterConstructor.newInstance();
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -133,15 +131,14 @@ public class AggregatePhaseJob extends Configured {
         if (converterClassName.equals(DEFAULT_CONVERTER_CLASS)) {
 
           AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
-          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, GenericRecord.class);
-          starTreeRecord = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, avroKey.datum());
+          starTreeRecord = thirdeyeConverter.convert(starTreeConfig, avroKey.datum());
+
         } else {
 
           Text textValue = (Text) value;
-          converterMethod = converterClass.getDeclaredMethod(StarTreeConstants.CONVERT_METHOD_NAME, StarTreeConfig.class, Text.class);
-          starTreeRecord = (StarTreeRecord) converterMethod.invoke(null, starTreeConfig, textValue);
+          starTreeRecord = thirdeyeConverter.convert(starTreeConfig, textValue);
         }
-      } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+      } catch (Exception e) {
         LOGGER.error("Exception in reading converter classes", e);
       }
 

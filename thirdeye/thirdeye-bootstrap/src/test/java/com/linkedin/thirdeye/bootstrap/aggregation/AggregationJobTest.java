@@ -32,6 +32,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob.AggregationMapper;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob.AggregationReducer;
+import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
 public class AggregationJobTest {
 
@@ -40,6 +41,7 @@ public class AggregationJobTest {
   private static final String HADOOP_AVRO_VALUE_WRITER_SERIALIZATION = "avro.serialization.value.writer.schema";
   private static final String CONF_FILE = "config.yml";
   private static final String SCHEMA_FILE = "test.avsc";
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
   private String outputPath;
 
   private MetricSchema metricSchema;
@@ -99,6 +101,7 @@ public class AggregationJobTest {
     configuration.set("io.serializations","org.apache.hadoop.io.serializer.JavaSerialization,"
                     + "org.apache.hadoop.io.serializer.WritableSerialization");
     configuration.set(AggregationJobConstants.AGG_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+    configuration.set(AggregationJobConstants.AGG_CONVERTER_CLASS.toString(), DEFAULT_CONVERTER_CLASS);
     Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
     setUpAvroSerialization(mapDriver.getConfiguration(), schema);
     metricSchema = new MetricSchema(metricNames, metricTypes);
@@ -110,7 +113,8 @@ public class AggregationJobTest {
     TemporaryPath tmpPath = new TemporaryPath();
     outputPath = tmpPath.toString();
     configuration.set(AggregationJobConstants.AGG_OUTPUT_PATH.toString(), outputPath);
-   }
+
+  }
 
 
   @Test

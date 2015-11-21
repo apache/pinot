@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.bootstrap.util;
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.impl.NumberUtils;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+
 import org.apache.avro.generic.GenericRecord;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
@@ -21,12 +22,16 @@ import java.util.concurrent.TimeUnit;
  * with other transitive dependencies in the deployment framework at LinkedIn, refactoring the logic into
  * a common place will potentially cause trouble.
  */
-public class ThirdEyeAvroUtils {
+public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeAvroUtils.class);
   private static final String NAME_SEPARATOR = "\\.";
   private static final String NULL_VALUE = "";
   private static final String INVALID_DIMENSION_VALUE = "INVALID";
   private static final String AUTO_METRIC_COUNT = "__COUNT";
+
+  public ThirdEyeAvroUtils() {
+
+  }
 
   private enum TernaryOperators {
     EQ,
@@ -130,7 +135,7 @@ public class ThirdEyeAvroUtils {
     throw new IllegalStateException("Could not apply " + config + " to value " + dimensionValue);
   }
 
-  public static StarTreeRecord convert(StarTreeConfig config, GenericRecord record) {
+  public StarTreeRecord convert(StarTreeConfig config, GenericRecord record) {
     return convert(config, record, null);
   }
 
@@ -192,4 +197,6 @@ public class ThirdEyeAvroUtils {
 
     return new StarTreeRecordImpl(config, dimensionKey, timeSeries);
   }
+
+
 }
