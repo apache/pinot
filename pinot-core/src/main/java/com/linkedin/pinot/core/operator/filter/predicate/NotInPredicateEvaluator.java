@@ -94,4 +94,9 @@ public class NotInPredicateEvaluator implements PredicateEvaluator {
     }
     return true;
   }
+
+  @Override
+  public boolean alwaysFalse() {
+    return nonMatchingIds.length == dictionary.length();
+  }
 }

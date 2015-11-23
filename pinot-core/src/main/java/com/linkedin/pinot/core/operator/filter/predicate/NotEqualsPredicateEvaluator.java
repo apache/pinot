@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.Arrays;
-
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -27,7 +25,7 @@ public class NotEqualsPredicateEvaluator implements PredicateEvaluator {
   private int[] matchingDictIds;
   private Dictionary dictionary;
   private int[] nonMatchingDictIds;
-
+   
   public NotEqualsPredicateEvaluator(NEqPredicate predicate, Dictionary dictionary) {
     this.dictionary = dictionary;
     neqDictValue = dictionary.indexOf(predicate.getNotEqualsValue());
@@ -97,7 +95,11 @@ public class NotEqualsPredicateEvaluator implements PredicateEvaluator {
         return false;
       }
     }
-
     return true;
+  }
+
+  @Override
+  public boolean alwaysFalse() {
+    return nonMatchingDictIds.length == dictionary.length();
   }
 }

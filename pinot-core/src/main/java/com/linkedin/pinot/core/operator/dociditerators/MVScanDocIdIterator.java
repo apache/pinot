@@ -38,7 +38,7 @@ public class MVScanDocIdIterator implements BlockDocIdIterator {
   public MVScanDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
     this.evaluator = evaluator;
-    if (evaluator.getMatchingDictionaryIds().length == 0) {
+    if (evaluator.alwaysFalse()) {
       this.intArray = new int[0];
       setStartDocId(Constants.EOF);
       setEndDocId(Constants.EOF);

@@ -110,4 +110,9 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
       }
     }
     return false;
+  }
+
+  @Override
+  public boolean alwaysFalse() {
+    return matchingIds.length == 0 ;
   }}

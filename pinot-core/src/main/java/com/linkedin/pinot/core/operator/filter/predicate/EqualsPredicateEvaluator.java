@@ -77,4 +77,9 @@ public class EqualsPredicateEvaluator implements PredicateEvaluator {
     return false;
   }
 
+  @Override
+  public boolean alwaysFalse() {
+    return equalsMatchDictId < 0;
+  }
+
 }

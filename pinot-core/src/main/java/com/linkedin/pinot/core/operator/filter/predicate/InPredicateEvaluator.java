@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
-
 public class InPredicateEvaluator implements PredicateEvaluator {
 
   private int[] matchingIds;
@@ -30,7 +29,7 @@ public class InPredicateEvaluator implements PredicateEvaluator {
   private InPredicate predicate;
 
   public InPredicateEvaluator(InPredicate predicate, Dictionary dictionary) {
-    
+
     this.predicate = predicate;
     dictIdSet = new IntOpenHashSet();
     final String[] inValues = predicate.getInRange();
@@ -56,7 +55,7 @@ public class InPredicateEvaluator implements PredicateEvaluator {
   @Override
   public boolean apply(int[] dictionaryIds) {
     for (int dictId : dictionaryIds) {
-      if (dictIdSet.contains(dictId) ) {
+      if (dictIdSet.contains(dictId)) {
         return true;
       }
     }
@@ -70,17 +69,23 @@ public class InPredicateEvaluator implements PredicateEvaluator {
 
   @Override
   public int[] getNonMatchingDictionaryIds() {
-    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+    throw new UnsupportedOperationException(
+        "Returning non matching values is expensive for predicateType:" + predicate.getType());
   }
 
   @Override
   public boolean apply(int[] dictionaryIds, int length) {
     for (int i = 0; i < length; i++) {
       int dictId = dictionaryIds[i];
-      if (dictIdSet.contains(dictId) ) {
+      if (dictIdSet.contains(dictId)) {
         return true;
       }
     }
     return false;
+  }
+
+  @Override
+  public boolean alwaysFalse() {
+    return matchingIds == null || matchingIds.length == 0;
   }
 }

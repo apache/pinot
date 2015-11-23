@@ -108,4 +108,9 @@ public class RangeRealtimeDictionaryPredicateEvaluator implements PredicateEvalu
     return false;
   }
 
+  @Override
+  public boolean alwaysFalse() {
+    return matchingIds.length == 0;
+  }
+
 }

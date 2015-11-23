@@ -31,7 +31,7 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
 
   public SVScanDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
     this.evaluator = evaluator;
-    if (evaluator.getMatchingDictionaryIds().length == 0) {
+    if (evaluator.alwaysFalse()) {
       currentDocId = Constants.EOF;
       setStartDocId(Constants.EOF);
       setEndDocId(Constants.EOF);
