@@ -1,31 +1,51 @@
 package com.linkedin.thirdeye.function;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map.Entry;
+import java.util.Properties;
+
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.api.AnomalyFunctionSpec;
 
 public class AnomalyFunctionFactory {
-  private enum Type {
-    KALMAN_FILTER,
-    SCAN_STATISTICS,
-    USER_RULE
+  private static Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionFactory.class);
+  private final Properties props;
+
+  public AnomalyFunctionFactory(String functionConfigPath) {
+    props = new Properties();
+    InputStream input = null;
+    try {
+      input = new FileInputStream(functionConfigPath);
+      props.load(input);
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    } finally {
+      IOUtils.closeQuietly(input);
+    }
+
+    LOGGER.info("Found {} entries in anomaly function configuration file {}", props.size(),
+        functionConfigPath);
+    for (Entry<Object, Object> entry : props.entrySet()) {
+      LOGGER.info("{}: {}", entry.getKey(), entry.getValue());
+    }
   }
 
-  public static AnomalyFunction fromSpec(AnomalyFunctionSpec functionSpec) throws Exception {
+  public AnomalyFunction fromSpec(AnomalyFunctionSpec functionSpec) throws Exception {
     AnomalyFunction anomalyFunction = null;
-
-    Type type = Type.valueOf(functionSpec.getType().toUpperCase());
-    switch (type) {
-      case KALMAN_FILTER:
-        anomalyFunction = new KalmanFilterAnomalyFunction();
-        break;
-      case SCAN_STATISTICS:
-        anomalyFunction = new ScanStatisticsAnomalyFunction();
-        break;
-      case USER_RULE:
-        anomalyFunction = new UserRuleAnomalyFunction();
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported type " + type);
+    String type = functionSpec.getType();
+    if (!props.containsKey(type)) {
+      throw new IllegalArgumentException("Unsupported type " + type);
     }
+    String className = props.getProperty(type);
+    anomalyFunction = (AnomalyFunction) Class.forName(className).newInstance();
 
     anomalyFunction.init(functionSpec);
 

@@ -1,12 +1,12 @@
 package com.linkedin.thirdeye;
 
-import io.dropwizard.Configuration;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.dropwizard.db.DataSourceFactory;
-import org.hibernate.validator.constraints.*;
-
 import javax.validation.Valid;
-import javax.validation.constraints.*;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.dropwizard.Configuration;
+import io.dropwizard.db.DataSourceFactory;
 
 public class ThirdEyeDetectorConfiguration extends Configuration {
   @Valid
@@ -19,7 +19,11 @@ public class ThirdEyeDetectorConfiguration extends Configuration {
 
   @Valid
   @NotNull
-  private DataSourceFactory database = new DataSourceFactory();
+  private String functionConfigPath;
+
+  @Valid
+  @NotNull
+  private final DataSourceFactory database = new DataSourceFactory();
 
   @JsonProperty("database")
   public DataSourceFactory getDatabase() {
@@ -40,5 +44,13 @@ public class ThirdEyeDetectorConfiguration extends Configuration {
 
   public void setThirdEyeHost(String thirdEyeHost) {
     this.thirdEyeHost = thirdEyeHost;
+  }
+
+  public String getFunctionConfigPath() {
+    return functionConfigPath;
+  }
+
+  public void setFunctionConfigPath(String functionConfigPath) {
+    this.functionConfigPath = functionConfigPath;
   }
 }

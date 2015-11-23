@@ -1,5 +1,23 @@
 package com.linkedin.thirdeye.driver;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.hibernate.SessionFactory;
+import org.quartz.CronScheduleBuilder;
+import org.quartz.CronTrigger;
+import org.quartz.JobBuilder;
+import org.quartz.JobDetail;
+import org.quartz.JobKey;
+import org.quartz.Scheduler;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.codahale.metrics.MetricRegistry;
 import com.linkedin.thirdeye.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
@@ -8,20 +26,6 @@ import com.linkedin.thirdeye.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
 import com.linkedin.thirdeye.function.AnomalyFunction;
 import com.linkedin.thirdeye.function.AnomalyFunctionFactory;
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
-import org.hibernate.context.internal.ManagedSessionContext;
-import org.quartz.*;
-import org.quartz.impl.StdSchedulerFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class AnomalyDetectionJobManager {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJobManager.class);
@@ -34,14 +38,12 @@ public class AnomalyDetectionJobManager {
   private final Object sync;
   private final Map<Long, String> jobKeys;
   private final MetricRegistry metricRegistry;
+  private final AnomalyFunctionFactory anomalyFunctionFactory;
 
-  public AnomalyDetectionJobManager(Scheduler quartzScheduler,
-                                    ThirdEyeClient thirdEyeClient,
-                                    AnomalyFunctionSpecDAO specDAO,
-                                    AnomalyFunctionRelationDAO relationDAO,
-                                    AnomalyResultDAO resultDAO,
-                                    SessionFactory sessionFactory,
-                                    MetricRegistry metricRegistry) {
+  public AnomalyDetectionJobManager(Scheduler quartzScheduler, ThirdEyeClient thirdEyeClient,
+      AnomalyFunctionSpecDAO specDAO, AnomalyFunctionRelationDAO relationDAO,
+      AnomalyResultDAO resultDAO, SessionFactory sessionFactory, MetricRegistry metricRegistry,
+      AnomalyFunctionFactory anomalyFunctionFactory) {
     this.quartzScheduler = quartzScheduler;
     this.thirdEyeClient = thirdEyeClient;
     this.specDAO = specDAO;
@@ -51,6 +53,7 @@ public class AnomalyDetectionJobManager {
     this.metricRegistry = metricRegistry;
     this.sync = new Object();
     this.jobKeys = new HashMap<>();
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
   public List<Long> getActiveJobs() {
@@ -61,24 +64,20 @@ public class AnomalyDetectionJobManager {
     }
   }
 
-  public void runAdHoc(Long id, String windowStartIsoString, String windowEndIsoString) throws Exception {
+  public void runAdHoc(Long id, String windowStartIsoString, String windowEndIsoString)
+      throws Exception {
     synchronized (sync) {
       AnomalyFunctionSpec spec = specDAO.findById(id);
       if (spec == null) {
         throw new IllegalArgumentException("No function with id " + id);
       }
-      AnomalyFunction anomalyFunction = AnomalyFunctionFactory.fromSpec(spec);
+      AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
 
       String triggerKey = String.format("ad_hoc_anomaly_function_trigger_%d", spec.getId());
-      Trigger trigger = TriggerBuilder.newTrigger()
-          .withIdentity(triggerKey)
-          .startNow()
-          .build();
+      Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
       String jobKey = String.format("ad_hoc_anomaly_function_job_%d", spec.getId());
-      JobDetail job = JobBuilder.newJob(AnomalyDetectionJob.class)
-          .withIdentity(jobKey)
-          .build();
+      JobDetail job = JobBuilder.newJob(AnomalyDetectionJob.class).withIdentity(jobKey).build();
 
       job.getJobDataMap().put(AnomalyDetectionJob.FUNCTION, anomalyFunction);
       job.getJobDataMap().put(AnomalyDetectionJob.CLIENT, thirdEyeClient);
@@ -101,19 +100,15 @@ public class AnomalyDetectionJobManager {
       if (spec == null) {
         throw new IllegalArgumentException("No function with id " + id);
       }
-      AnomalyFunction anomalyFunction = AnomalyFunctionFactory.fromSpec(spec);
+      AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(spec);
 
       String triggerKey = String.format("scheduled_anomaly_function_trigger_%d", spec.getId());
-      CronTrigger trigger = TriggerBuilder.newTrigger()
-          .withIdentity(triggerKey)
-          .withSchedule(CronScheduleBuilder.cronSchedule(spec.getCron()))
-          .build();
+      CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
+          .withSchedule(CronScheduleBuilder.cronSchedule(spec.getCron())).build();
 
       String jobKey = String.format("scheduled_anomaly_function_job_%d", spec.getId());
       jobKeys.put(id, jobKey);
-      JobDetail job = JobBuilder.newJob(AnomalyDetectionJob.class)
-          .withIdentity(jobKey)
-          .build();
+      JobDetail job = JobBuilder.newJob(AnomalyDetectionJob.class).withIdentity(jobKey).build();
 
       job.getJobDataMap().put(AnomalyDetectionJob.FUNCTION, anomalyFunction);
       job.getJobDataMap().put(AnomalyDetectionJob.CLIENT, thirdEyeClient);
