@@ -19,6 +19,7 @@ package com.linkedin.pinot.tools.query.comparison;
 import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
 import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
@@ -112,11 +113,18 @@ public class ClusterStarter {
   }
 
   private void addTable()
-      throws JSONException, IOException {
-    String tableName = _config.getTableName();
+      throws Exception {
+    String tableConfigFile = _config.getTableConfigFile();
+    if (tableConfigFile != null) {
+      AddTableCommand addTableCommand =
+          new AddTableCommand().setControllerPort(_controllerPort).setFilePath(tableConfigFile).setExecute(true);
+      addTableCommand.execute();
+      return;
+    }
 
+    String tableName = _config.getTableName();
     if (tableName == null) {
-      LOGGER.error("Table name not specified in configuration");
+      LOGGER.error("Table info not specified in configuration, please specify either config file or table name");
       return;
     }
 

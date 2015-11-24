@@ -30,6 +30,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String BROKER_PORT = "broker.port";
   private static final String SERVER_PORT = "server.port";
   private static final String TABLE_NAME = "table.name";
+  private static final String TABLE_CONFIG_FILE = "table.config.file";
   private static final String SEGMENTS_DIR = "segments.dir";
   private static final String QUERY_FILE = "query.file";
   private static final String START_ZOOKEEPER = "start.zookeeper";
@@ -96,6 +97,10 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
 
   public String getTableName() {
     return (String) getProperty(TABLE_NAME);
+  }
+
+  public String getTableConfigFile() {
+    return (String) getProperty(TABLE_CONFIG_FILE);
   }
 
   public String getSegmentsDir() {

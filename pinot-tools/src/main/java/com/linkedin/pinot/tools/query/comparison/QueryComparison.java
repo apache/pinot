@@ -126,7 +126,7 @@ public class QueryComparison {
   private boolean compare(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     // If no records found, nothing to compare.
-    if (clusterJson.getInt(NUM_DOCS_SCANNED) == 0) {
+    if ((clusterJson.getInt(NUM_DOCS_SCANNED) == 0) && scanJson.getInt(NUM_DOCS_SCANNED) == 0) {
       return true;
     }
 
