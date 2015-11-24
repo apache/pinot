@@ -44,7 +44,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.tools.admin.command.AbstractBaseCommand.sendPostRequest;
+import static com.linkedin.pinot.tools.admin.command.AbstractBaseAdminCommand.sendPostRequest;
 
 
 public class ClusterStarter {

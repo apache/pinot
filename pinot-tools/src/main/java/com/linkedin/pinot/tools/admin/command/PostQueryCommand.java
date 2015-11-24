@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
@@ -31,7 +32,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 
 
-public class PostQueryCommand extends AbstractBaseCommand implements Command {
+public class PostQueryCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
   @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 import org.kohsuke.args4j.Option;
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Class for command to start Kafka.
  */
-public class StartKafkaCommand extends AbstractBaseCommand implements Command {
+public class StartKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartKafkaCommand.class);
   @Option(name="-port", required=false, metaVar="<int>", usage="Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 
@@ -33,7 +34,7 @@ import com.google.common.io.Files;
  *
  *
  */
-public class StartZookeeperCommand extends AbstractBaseCommand implements Command {
+public class StartZookeeperCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
 
   @Option(name="-zkPort", required=false, metaVar="<int>", usage="Port to start zookeeper server on.")

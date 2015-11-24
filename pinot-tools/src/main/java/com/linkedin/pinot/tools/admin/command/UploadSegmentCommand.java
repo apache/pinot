@@ -18,6 +18,7 @@ package com.linkedin.pinot.tools.admin.command;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FileInputStream;
 import org.apache.commons.io.FileUtils;
@@ -31,7 +32,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class UploadSegmentCommand extends AbstractBaseCommand implements Command {
+public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
   private static final String SEGMENT_UPLOADER = "segmentUploader";
   private static final String TAR_GZIP = ".tar.gz";

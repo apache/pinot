@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.AbstractBaseCommand;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -23,15 +24,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLConnection;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.kohsuke.args4j.Option;
 
 
 /**
@@ -39,47 +37,18 @@ import org.kohsuke.args4j.Option;
  * Implements the common printUsage method.
  *
  */
-public class AbstractBaseCommand {
-  static final String DEFAULT_ZK_ADDRESS = "localhost:2181";
+public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   static final String DEFAULT_CONTROLLER_PORT = "9000";
-  static final String DEFAULT_CLUSTER_NAME = "PinotCluster";
   static final String URI_TABLES_PATH = "/tables/";
 
   static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
 
-  public AbstractBaseCommand(boolean addShutdownHook) {
-    if (addShutdownHook) {
-      Runtime.getRuntime().addShutdownHook(new Thread() {
-        @Override
-        public void run() {
-          cleanup();
-        }
-      });
-    }
+  public AbstractBaseAdminCommand(boolean addShutdownHook) {
+    super(addShutdownHook);
   }
 
-  public AbstractBaseCommand() {
-    this(true);
-  }
-
-  public void cleanup() {
-  };
-
-  public String getName() {
-    return "BaseCommand";
-  }
-
-  public void printUsage() {
-    System.out.println("Usage: " + this.getName());
-
-    for (Field f : this.getClass().getDeclaredFields()) {
-      if (f.isAnnotationPresent(Option.class)) {
-        Option option = f.getAnnotation(Option.class);
-
-        System.out.println(String.format("\t%-25s %-30s: %s (required=%s)", option.name(), option.metaVar(),
-            option.usage(), option.required()));
-      }
-    }
+  public AbstractBaseAdminCommand() {
+    super(true);
   }
 
   public static int getPID() {

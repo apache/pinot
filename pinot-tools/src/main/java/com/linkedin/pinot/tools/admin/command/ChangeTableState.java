@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpURL;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -24,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ChangeTableState extends AbstractBaseCommand implements Command {
+public class ChangeTableState extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChangeTableState.class);
 
   @Option (name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller")

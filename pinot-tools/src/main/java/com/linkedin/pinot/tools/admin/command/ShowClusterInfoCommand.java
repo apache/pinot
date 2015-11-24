@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.dataformat.yaml.snakeyaml.Yaml;
+import com.linkedin.pinot.tools.Command;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.*;
@@ -30,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.StringWriter;
 import java.util.*;
 
-public class ShowClusterInfoCommand extends AbstractBaseCommand implements Command {
+public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ShowClusterInfoCommand.class.getName());
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")

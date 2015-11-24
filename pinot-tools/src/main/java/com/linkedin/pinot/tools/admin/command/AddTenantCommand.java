@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 
 
-public class AddTenantCommand extends AbstractBaseCommand implements Command {
+public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
@@ -114,8 +115,8 @@ public class AddTenantCommand extends AbstractBaseCommand implements Command {
             .setOfflineInstances(_offlineInstanceCount).setRealtimeInstances(_realtimeInstanceCount).build();
 
     String res =
-        AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            t.toString());
+        AbstractBaseAdminCommand
+            .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(), t.toString());
 
     LOGGER.info(res);
     System.out.print(res);

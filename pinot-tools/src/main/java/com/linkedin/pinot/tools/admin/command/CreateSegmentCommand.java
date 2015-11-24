@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -41,7 +42,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
  * Class to implement CreateSegment command.
  *
  */
-public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
+public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
   @Option(name = "-dataDir", required = true, metaVar = "<string>", usage = "Directory containing the data.")

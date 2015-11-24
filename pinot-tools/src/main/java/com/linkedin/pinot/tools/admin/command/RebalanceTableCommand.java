@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.tools.PinotSegmentRebalancer;
 
 
-public class RebalanceTableCommand extends AbstractBaseCommand implements Command {
+public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")

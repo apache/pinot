@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FilenameFilter;
@@ -22,7 +23,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class StopProcessCommand extends AbstractBaseCommand implements Command {
+public class StopProcessCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StopProcessCommand.class);
 
   @Option(name = "-controller", required = false, usage = "Stop the PinotController process.")

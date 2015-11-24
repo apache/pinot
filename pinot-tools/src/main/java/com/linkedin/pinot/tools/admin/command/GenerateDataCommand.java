@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -48,7 +49,7 @@ import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
  * Class to implement GenerateData command.
  *
  */
-public class GenerateDataCommand extends AbstractBaseCommand implements Command {
+public class GenerateDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenerateDataCommand.class);
 
   @Option(name = "-numRecords", required = true, metaVar = "<int>", usage = "Number of records to generate.")

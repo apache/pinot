@@ -18,6 +18,7 @@ package com.linkedin.pinot.tools.admin.command;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import org.apache.commons.configuration.ConfigurationException;
 import org.kohsuke.args4j.Option;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * Class to implement StartController command.
  *
  */
-public class StartControllerCommand extends AbstractBaseCommand implements Command {
+public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")

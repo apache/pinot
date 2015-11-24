@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -28,7 +29,7 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 
 
-public class AddSchemaCommand extends AbstractBaseCommand implements Command {
+public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")

@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.tools.admin;
+package com.linkedin.pinot.tools;
 
-import com.linkedin.pinot.tools.Command;
 import java.lang.reflect.Field;
 
-import com.linkedin.pinot.tools.admin.command.*;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -30,35 +28,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class to implement Pinot Administrator, that provides the following commands:
- *
- */
-public class PinotAdministrator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
+public class PinotToolLauncher {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotToolLauncher.class);
 
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
-      @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
-      @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
-      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
-      @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
-      @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class),
-      @SubCommand(name = "StartController", impl = StartControllerCommand.class),
-      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
-      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
-      @SubCommand(name = "AddTable", impl = AddTableCommand.class),
-      @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
-      @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
-      @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
-      @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
-      @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
-      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
-      @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
-      @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
-      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
-      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class)
+      @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
   })
   Command _subCommand;
   // @formatter:on
@@ -87,14 +63,14 @@ public class PinotAdministrator {
   }
 
   public static void main(String[] args) throws Exception {
-    new PinotAdministrator().execute(args);
+    new PinotToolLauncher().execute(args);
   }
 
   public void printUsage() {
-    LOGGER.info("Usage: pinot-admin.sh <subCommand>");
+    LOGGER.info("Usage: pinot-tools.sh <subCommand>");
     LOGGER.info("Valid subCommands are:");
 
-    Class<PinotAdministrator> obj = PinotAdministrator.class;
+    Class<PinotToolLauncher> obj = PinotToolLauncher.class;
 
     for (Field f : obj.getDeclaredFields()) {
       if (f.isAnnotationPresent(SubCommands.class)) {
@@ -113,6 +89,5 @@ public class PinotAdministrator {
         }
       }
     }
-    LOGGER.info("For other crud operations, please refer to ${ControllerAddress}/help.");
   }
 }
