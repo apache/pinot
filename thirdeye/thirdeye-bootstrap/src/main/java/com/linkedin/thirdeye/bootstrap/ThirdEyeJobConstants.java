@@ -22,7 +22,9 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_COMPACTION("thirdeye.compaction"),
   THIRDEYE_PRESERVE_TIME_COMPACTION("thirdeye.preserve.time.compaction"),
   THIRDEYE_MR_CONF("thirdeye.mr.conf"),
-  THIRDEYE_INPUT_CONVERTER_CLASS("thirdeye.input.converter.class");
+  THIRDEYE_INPUT_CONVERTER_CLASS("thirdeye.input.converter.class"),
+  THIRDEYE_TOPK("thirdeye.topk"),
+  THIRDEYE_NUM_PARTITIONS("thirdeye.num.partitions");
 
   private final String propertyName;
 

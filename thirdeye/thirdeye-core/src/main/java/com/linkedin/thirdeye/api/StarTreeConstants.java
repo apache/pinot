@@ -26,6 +26,8 @@ public final class StarTreeConstants
   public static final String INDEX_FILE_SUFFIX = ".idx";
   public static final String BUFFER_FILE_SUFFIX = ".buf";
   public static final String DICT_FILE_SUFFIX = ".dict";
+  public static final String PARTITION_FOLDER_PREFIX = "partition";
+
 
   public static final String METRIC_STORE = "metricStore";
   public static final String DIMENSION_STORE = "dimensionStore";

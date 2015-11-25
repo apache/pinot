@@ -37,6 +37,8 @@ import com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisJobConstants;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseJob;
 import com.linkedin.thirdeye.bootstrap.join.JoinPhaseJob;
+import com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseConstants;
+import com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants;
@@ -145,6 +147,8 @@ public class ThirdEyeJob {
   private static final String DEFAULT_THIRDEYE_PRESERVE_TIME_COMPACTION = "false";
   private static final String FOLDER_PERMISSION_REGEX = "0?[1-7]{3}";
   private static final String DEFAULT_POLL_ENABLE = "false";
+  private static final String DEFAULT_TOPK = "false";
+  private static final String DEFAULT_NUM_PARTITIONS = "1";
   private static final String DEFAULT_POLL_FREQUENCY = "60000";
   private static final String DEFAULT_POLL_TIMEOUT = "3600000";
   private static final String INPUT_PATHS_JOINER = ",";
@@ -525,6 +529,47 @@ public class ThirdEyeJob {
         return config;
       }
     },
+    PARTITION {
+      @Override
+      Class<?> getKlazz() {
+        return PartitionPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Partitions rollup output into configured number of partitions";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+          throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(PartitionPhaseConstants.PARTITION_PHASE_CONFIG_PATH.toString(),
+            getConfigPath(root, collection));
+
+        boolean isTopK = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TOPK.getName(), DEFAULT_TOPK));
+        if (isTopK) {
+          config.setProperty(PartitionPhaseConstants.PARTITION_PHASE_INPUT_PATH.toString(),
+              getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                  + TOPK_ROLLUP_PHASE3.getName());
+        } else {
+          config.setProperty(PartitionPhaseConstants.PARTITION_PHASE_INPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                + ROLLUP_PHASE4.getName());
+        }
+        config.setProperty(PartitionPhaseConstants.PARTITION_PHASE_OUTPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                + PARTITION.getName());
+
+        config.setProperty(PartitionPhaseConstants.PARTITION_PHASE_NUM_PARTITIONS.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_NUM_PARTITIONS.getName(), DEFAULT_NUM_PARTITIONS));
+
+
+        return config;
+      }
+    },
     STARTREE_GENERATION {
       @Override
       Class<?> getKlazz() {
@@ -544,9 +589,17 @@ public class ThirdEyeJob {
 
         config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH.toString(),
             getConfigPath(root, collection));
-        config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(),
+
+        boolean isTopK = Boolean.parseBoolean(inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TOPK.getName(), DEFAULT_TOPK));
+        if (isTopK) {
+          config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(),
+              getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
+                  + TOPK_ROLLUP_PHASE3.getName());
+        } else {
+          config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + ROLLUP_PHASE4.getName());
+        }
         config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + STARTREE_GENERATION.getName());
@@ -1097,6 +1150,7 @@ public class ThirdEyeJob {
     case ROLLUP_PHASE2:
     case ROLLUP_PHASE3:
     case ROLLUP_PHASE4:
+    case PARTITION:
     case STARTREE_GENERATION:
       flowSpec = FlowSpec.DIMENSION_INDEX;
       break;
