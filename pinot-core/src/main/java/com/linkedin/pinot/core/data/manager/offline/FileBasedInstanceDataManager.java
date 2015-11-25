@@ -238,12 +238,6 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception {
-    throw new UnsupportedOperationException(
-        "Not support addSegment(SegmentZKMetadata segmentZKMetadata) in FileBasedInstanceDataManager yet!");
-  }
-
-  @Override
   public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
     throw new UnsupportedOperationException("Not support addSegment(...) in FileBasedInstanceDataManager yet!");

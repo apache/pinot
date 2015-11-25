@@ -53,6 +53,7 @@ import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 
 
+// TODO Use the refcnt object inside SegmentDataManager
 public class RealtimeTableDataManager implements TableDataManager {
   private Logger LOGGER = LoggerFactory.getLogger(RealtimeTableDataManager.class);
 
@@ -157,11 +158,6 @@ public class RealtimeTableDataManager implements TableDataManager {
   @Override
   public boolean isStarted() {
     return _isStarted;
-  }
-
-  @Override
-  public void addSegment(SegmentZKMetadata segmentMetadata) throws Exception {
-    throw new UnsupportedOperationException("Cannot add realtime segment with just SegmentZKMetadata");
   }
 
   @Override
@@ -316,15 +312,6 @@ public class RealtimeTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void returnSegmentReaders(List<String> segmentList) {
-    synchronized (getGlobalLock()) {
-      for (String segmentId : segmentList) {
-        returnSegmentReader(segmentId);
-      }
-    }
-  }
-
-  @Override
   public ExecutorService getExecutorService() {
     return _queryExecutorService;
   }
@@ -334,7 +321,11 @@ public class RealtimeTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void returnSegmentReader(String segmentId) {
+  public void returnSegmentReader(SegmentDataManager segmentDataManager) {
+    // TODO Implement this
+  }
+
+  private void returnSegmentReader(String segmentId) {
     decrementCount(segmentId);
   }
 }

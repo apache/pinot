@@ -16,19 +16,15 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.collect.Lists;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
@@ -104,13 +100,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public DataTable processQuery(final InstanceRequest instanceRequest) {
     DataTable instanceResponse;
     long start = System.currentTimeMillis();
-    final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<>();
+    List<SegmentDataManager> queryableSegmentDataManagerList = null;
     try {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.debug("Incoming query is : {}", brokerRequest);
       long startPruningTime = System.nanoTime();
-      getPrunedQueryableSegments(queryableSegmentDataManagerList, instanceRequest);
+      queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
       long pruningTime = System.nanoTime() - startPruningTime;
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.SEGMENT_PRUNING, pruningTime);
       LOGGER.info("Matched {} segments! ", queryableSegmentDataManagerList.size());
@@ -119,8 +115,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
       long startPlanTime = System.nanoTime();
       final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(
-          queryableSegmentDataManagerList,
           brokerRequest,
+          queryableSegmentDataManagerList,
           _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName())
               .getExecutorService(),
           getResourceTimeOut(instanceRequest.getQuery()));
@@ -160,33 +156,35 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return instanceResponse;
     } finally {
       if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
-       for (IndexSegment segment : queryableSegmentDataManagerList) {
-         _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
-         .returnSegmentReader(segment.getSegmentName());
-       }
+        if (queryableSegmentDataManagerList != null) {
+          for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
+            _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
+                .returnSegmentReader(segmentDataManager);
+          }
+        }
       }
       TraceContext.unregister(instanceRequest);
     }
   }
 
-  private List<IndexSegment> getPrunedQueryableSegments(final List<IndexSegment> listOfQueryableSegments, final InstanceRequest instanceRequest) {
-    LOGGER
-        .info("InstanceRequest contains {} segments", instanceRequest.getSearchSegments().size());
+  private List<SegmentDataManager> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
+    LOGGER.info("InstanceRequest contains {} segments", instanceRequest.getSearchSegments().size());
 
     final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
     final TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
     if (tableDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
-      return new ArrayList<IndexSegment>();
+      return new ArrayList<SegmentDataManager>();
     }
-    final List<SegmentDataManager> matchedSegmentDataManagerFromServer = tableDataManager.getSegments(instanceRequest.getSearchSegments());
-    LOGGER.info("TableDataManager found {} segments before pruning", matchedSegmentDataManagerFromServer.size());
+    List<SegmentDataManager> listOfQueryableSegments = tableDataManager.getSegments(instanceRequest.getSearchSegments());
+    LOGGER.info("TableDataManager found {} segments before pruning", listOfQueryableSegments.size());
 
-    for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
+    Iterator<SegmentDataManager> it = listOfQueryableSegments.iterator();
+    while (it.hasNext()) {
+      SegmentDataManager segmentDataManager = it.next();
       final IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
-        listOfQueryableSegments.add(indexSegment);
-      } else {
-        tableDataManager.returnSegmentReader(indexSegment.getSegmentName());
+      if (_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
+        it.remove();
+        tableDataManager.returnSegmentReader(segmentDataManager);
       }
     }
     return listOfQueryableSegments;

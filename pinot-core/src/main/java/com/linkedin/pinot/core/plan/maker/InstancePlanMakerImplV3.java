@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
@@ -37,6 +38,12 @@ public class InstancePlanMakerImplV3 implements PlanMaker {
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
 
+    throw new UnsupportedOperationException("The query contains no aggregation or selection!");
+  }
+
+  @Override
+  public Plan makeInterSegmentPlan(BrokerRequest brokerRequest, List<SegmentDataManager> segmentDataManagers,
+      ExecutorService executorService, long timeOutMs) {
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
   }
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -26,9 +27,19 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public class OfflineSegmentDataManager implements SegmentDataManager {
 
   private final IndexSegment _indexSegment;
+  private final AtomicInteger _refcnt;  // Accessed via reflection in tests
 
   public OfflineSegmentDataManager(IndexSegment indexSegment) {
     _indexSegment = indexSegment;
+    _refcnt = new AtomicInteger(1);
+  }
+
+  public int incrementRefCnt() {
+    return _refcnt.incrementAndGet();
+  }
+
+  public int decrementRefCnt() {
+    return _refcnt.decrementAndGet();
   }
 
   @Override

@@ -19,14 +19,12 @@ import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -109,9 +107,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
 
     _isStarted = true;
-    LOGGER.info("InstanceDataManager is started! " + getServerInfo());
+//    LOGGER.info("InstanceDataManager is started! " + getServerInfo());
+    LOGGER.info("{} started!", this.getClass().getName());
   }
 
+  // TODO: Unused. Remove once we verify that it is not needed.
+  // WARNING: Calling this method marks any loaded segments as being in-use. When helix instance is started, no segments are loaded,
+  // so none of them are marked as being in-use
   private String getServerInfo() {
     StringBuilder sb = new StringBuilder();
     sb.append("\n[InstanceDataManager Info] : ");
@@ -163,6 +165,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
+  // Called for offline segments only
   @Override
   public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception {
     if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
@@ -185,34 +188,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     _tableDataManagerMap.get(tableName).addSegment(segmentMetadata);
-    LOGGER.info("Successfuly added a segment : " + segmentMetadata.getName() + " in HelixInstanceDataManager");
+    LOGGER.info("Successfully added a segment : " + segmentMetadata.getName() + " in HelixInstanceDataManager");
   }
 
-  @Override
-  public synchronized void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception {
-    if (segmentZKMetadata == null || segmentZKMetadata.getTableName() == null) {
-      throw new RuntimeException("Error: adding invalid SegmentMetadata!");
-    }
-    LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
-    LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
-    String tableName = segmentZKMetadata.getTableName();
-    if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    }
-    if (!_tableDataManagerMap.containsKey(tableName)) {
-      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
-      synchronized (_globalLock) {
-        if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(null, tableName);
-        }
-      }
-    }
-    _tableDataManagerMap.get(tableName).addSegment(segmentZKMetadata);
-    LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
-  }
-
+  // Called for real-time segments only
   @Override
   public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
@@ -237,7 +216,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     _tableDataManagerMap.get(tableName).addSegment(propertyStore, tableConfig, instanceZKMetadata,
         segmentZKMetadata);
-    LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
+    LOGGER.info("Successfully added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
 
   }
 
@@ -286,12 +265,21 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
-    if (_tableDataManagerMap.containsKey(table)) {
-      if (_tableDataManagerMap.get(table).getSegment(segmentName) != null) {
-        return _tableDataManagerMap.get(table).getSegment(segmentName).getSegment().getSegmentMetadata();
+    SegmentDataManager segmentDataManager = null;
+    TableDataManager tableDataManager = _tableDataManagerMap.get(table);
+    try {
+      if (tableDataManager != null) {
+        segmentDataManager = tableDataManager.getSegment(segmentName);
+        if (segmentDataManager != null) {
+          return segmentDataManager.getSegment().getSegmentMetadata();
+        }
+      }
+      return null;
+    } finally {
+      if (segmentDataManager != null) {
+        tableDataManager.returnSegmentReader(segmentDataManager);
       }
     }
-    return null;
   }
 
 }

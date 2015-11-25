@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.plan.maker;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByImplementationType;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode;
@@ -61,6 +61,18 @@ public class InstancePlanMakerImplV0 implements PlanMaker {
       return selectionPlanNode;
     }
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
+  }
+
+  @Override
+  public Plan makeInterSegmentPlan(BrokerRequest brokerRequest, List<SegmentDataManager> segmentDataManagers,
+      ExecutorService executorService, long timeOutMs) {
+    InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
+    CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
+    rootNode.setPlanNode(combinePlanNode);
+    for (SegmentDataManager segmentDataManager :segmentDataManagers) {
+      combinePlanNode.addPlanNode(makeInnerSegmentPlan(segmentDataManager.getSegment(), brokerRequest));
+    }
+    return new GlobalPlanImplV0(rootNode);
   }
 
   @Override

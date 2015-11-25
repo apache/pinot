@@ -119,7 +119,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+      LOGGER.info("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
       final TableType tableType =
           TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
       try {
@@ -177,10 +177,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         SegmentMetadata segmentMetadataFromServer =
             INSTANCE_DATA_MANAGER.getSegmentMetadata(tableName, segmentMetadataForCheck.getName());
         if (segmentMetadataFromServer == null) {
+          // We have not loaded the segment, but it could be on disk.
           final String localSegmentDir =
               new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), tableName),
                   segmentId).toString();
           if (new File(localSegmentDir).exists()) {
+            // Replace segmentMetadataFromServer with the one we have on disk.
             try {
               segmentMetadataFromServer =
                   SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
@@ -205,6 +207,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             }
           }
         }
+        // There is a very unlikely race condition that we may have gotten the metadata of a
+        // segment that was not dropped when we checked, but was dropped after the check above.
+        // That is possible only if we get two helix transitions (to drop, and to add back) the
+        // segment at the same, or very close to each other.If the race condition triggers, and the
+        // two segments are same in metadata, then we may end up NOT adding back the segment
+        // that is in the process of being dropped.
         if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
           if (segmentMetadataFromServer == null) {
             LOGGER
@@ -287,7 +295,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     // Still keep the data files in local.
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
-      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
+      LOGGER.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
       final String segmentId = message.getPartitionName();
       try {
         INSTANCE_DATA_MANAGER.removeSegment(segmentId);
@@ -300,13 +308,14 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     // Delete segment from local directory.
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
+      LOGGER.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
       final String segmentId = message.getPartitionName();
       final String tableName = message.getResourceName();
       try {
         final File segmentDir = new File(getSegmentLocalDirectory(tableName, segmentId));
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
+          LOGGER.info("Deleted segment directory {}", segmentDir);
         }
       } catch (final Exception e) {
         LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n"
@@ -317,7 +326,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
+      LOGGER.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
       try {
         onBecomeOfflineFromOnline(message, context);
         onBecomeDroppedFromOffline(message, context);

@@ -52,6 +52,7 @@ public interface TableDataManager {
 
   /**
    * Adding an IndexSegment into the TableDataManager.
+   * Used in testing only
    *
    * @param indexSegmentToAdd
    */
@@ -64,14 +65,6 @@ public interface TableDataManager {
    * @throws Exception
    */
   public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
-
-  /**
-   * Adding a Segment into the TableDataManager by given SegmentZKMetadata.
-   *
-   * @param indexSegmentToAdd
-   * @throws Exception
-   */
-  public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception;
 
   /**
    * Adding a Segment into the TableDataManager by given DataTableZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
@@ -93,33 +86,34 @@ public interface TableDataManager {
 
   /**
    *
+   * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
+   * using the {@link #returnSegmentReader(SegmentDataManager) returnSegmentReader} method
+   * @note Looks like this is called during start when we don't have any segments as yet.
    * @return all the segments in this TableDataManager.
    */
   public List<SegmentDataManager> getAllSegments();
 
   /**
    *
+   * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
+   * using the {@link #returnSegmentReader(SegmentDataManager) returnSegmentReader} method
    * @return segments by giving a list of segment names in this TableDataManager.
    */
   public List<SegmentDataManager> getSegments(List<String> segmentList);
 
   /**
    *
+   * @note This method gets a lock on the segment. It is the caller's responsibility to return the segment
+   * using the {@link #returnSegmentReader(SegmentDataManager) returnSegmentReader} method
    * @return a segment by giving the name of this segment in this TableDataManager.
    */
   public SegmentDataManager getSegment(String segmentName);
 
   /**
-   *
-   * give back segmentReaders, so the segment could be safely deleted.
-   */
-  public void returnSegmentReaders(List<String> segmentList);
-
-  /**
   *
   * give back segmentReader, so the segment could be safely deleted.
   */
-  public void returnSegmentReader(String segmentId);
+  public void returnSegmentReader(SegmentDataManager segmentDataManager);
   
   /**
    * @return ExecutorService for query.

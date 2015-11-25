@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
@@ -28,6 +29,10 @@ public interface PlanMaker {
 
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest);
 
+  @Deprecated // TODO Change tests to use the method that takes a list of SegmentDataManager
   public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest,
+      ExecutorService executorService, long timeOutMs);
+
+  public Plan makeInterSegmentPlan(BrokerRequest brokerRequest, List<SegmentDataManager> segmentDataManagers,
       ExecutorService executorService, long timeOutMs);
 }

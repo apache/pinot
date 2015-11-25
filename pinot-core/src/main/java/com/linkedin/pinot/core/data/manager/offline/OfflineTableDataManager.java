@@ -17,23 +17,20 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.commons.io.FileUtils;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -42,13 +39,12 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 
 
 /**
- * An implemenation of offline TableDataManager.
+ * An implementation of offline TableDataManager.
  * Provide add and remove segment functionality.
  *
  *
@@ -64,16 +60,15 @@ public class OfflineTableDataManager implements TableDataManager {
   private ExecutorService _queryExecutorService;
 
   private TableDataManagerConfig _tableDataManagerConfig;
-  private final ExecutorService _segmentAsyncExecutorService = Executors
-      .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private String _tableDataDir;
   private int _numberOfTableQueryExecutorThreads;
   private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
 
-  private final Map<String, OfflineSegmentDataManager> _segmentsMap = new ConcurrentHashMap<String, OfflineSegmentDataManager>();
+  // This read-write lock protects the _segmentsMap and OfflineSegmentDataManager.refCnt
+  private final ReadWriteLock _rwLock = new ReentrantReadWriteLock();
+  private final Map<String, OfflineSegmentDataManager> _segmentsMap = new HashMap<String, OfflineSegmentDataManager>(); // Accessed in test via reflection
   private final List<String> _activeSegments = new ArrayList<String>();
   private final List<String> _loadingSegments = new ArrayList<String>();
-  private Map<String, AtomicInteger> _referenceCounts = new ConcurrentHashMap<String, AtomicInteger>();
 
   private Counter _currentNumberOfSegments = Metrics.newCounter(OfflineTableDataManager.class,
       CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
@@ -143,7 +138,6 @@ public class OfflineTableDataManager implements TableDataManager {
     LOGGER.info("Trying to shutdown table : " + _tableName);
     if (_isStarted) {
       _queryExecutorService.shutdown();
-      _segmentAsyncExecutorService.shutdown();
       _tableDataManagerConfig = null;
       _isStarted = false;
     } else {
@@ -155,92 +149,80 @@ public class OfflineTableDataManager implements TableDataManager {
   public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     IndexSegment indexSegment =
         ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
-    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to table : " + _tableName);
     addSegment(indexSegment);
   }
 
-  @Override
+  // Add or a segment (or, replace it if it exists with the same name).
   public void addSegment(final IndexSegment indexSegmentToAdd) {
-    LOGGER.info("Trying to add a new segment to table : " + _tableName);
-
-    synchronized (getGlobalLock()) {
-      if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
-        LOGGER.info("Trying to add segment - " + indexSegmentToAdd.getSegmentName());
-        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
-        markSegmentAsLoaded(indexSegmentToAdd.getSegmentName());
-        _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
-      } else {
-        LOGGER.info("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
-        OfflineSegmentDataManager segment = _segmentsMap.get(indexSegmentToAdd.getSegmentName());
-        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
-        if (segment != null) {
-          _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
-          _currentNumberOfDocuments.inc(indexSegmentToAdd.getTotalDocs());
-          segment.getSegment().destroy();
-        }
+    final String segmentName = indexSegmentToAdd.getSegmentName();
+    LOGGER.info("Trying to add a new segment " + segmentName + " to table : " + _tableName);
+    OfflineSegmentDataManager newSegmentManager = new OfflineSegmentDataManager(indexSegmentToAdd);
+    final int newNumDocs = indexSegmentToAdd.getTotalDocs();
+    OfflineSegmentDataManager oldSegmentManager;
+    int refCnt = -1;
+    try {
+      _rwLock.writeLock().lock();
+      oldSegmentManager = _segmentsMap.put(segmentName, newSegmentManager);
+      if (oldSegmentManager != null) {
+        refCnt = oldSegmentManager.decrementRefCnt();
       }
+    } finally {
+      _rwLock.writeLock().unlock();
     }
-  }
-
-  @Override
-  public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception {
-    SegmentMetadata segmentMetadata = new SegmentMetadataImpl((OfflineSegmentZKMetadata) indexSegmentToAdd);
-    IndexSegment indexSegment =
-        ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
-    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to table : " + _tableName);
-    addSegment(indexSegment);
+    if (oldSegmentManager == null) {
+      LOGGER.info("Added new segment {} for table {}", segmentName, _tableName);
+    } else {
+      LOGGER.info("Replaced segment {}(refCnt {}) with new segment for table {}", segmentName, refCnt, _tableName);
+    }
+    if (refCnt == 0) {  // oldSegmentManager must be non-null.
+      closeSegment(oldSegmentManager);
+    }
+    _currentNumberOfDocuments.inc(newNumDocs);
+    _currentNumberOfSegments.inc();
   }
 
   @Override
   public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception {
-    addSegment(segmentZKMetadata);
+    // This call should never happen since it is called for realtime segments only
+//    addSegment(segmentZKMetadata);
+    throw new UnsupportedOperationException("Not supported for Offline segments");
   }
 
+  // Called when we get a helix transition to go to offline or dropped state.
+  // We need to remove it safely, keeping in mind that there may be queries that are
+  // using the segment,
   @Override
-  public void removeSegment(String indexSegmentToRemove) {
+  public void removeSegment(String segmentName) {
     if (!_isStarted) {
-      LOGGER.warn("Could not remove segment, as the tracker is already stopped");
+      LOGGER.warn("Could not remove segment {}, Tracker is stopped", segmentName);
       return;
     }
-    decrementCount(indexSegmentToRemove);
+
+    OfflineSegmentDataManager segmentDataManager;
+    int refCnt = -1;
+    try {
+      _rwLock.writeLock().lock();
+      segmentDataManager = _segmentsMap.remove(segmentName);
+      if (segmentDataManager != null) {
+        refCnt = segmentDataManager.decrementRefCnt();
+      }
+    } finally {
+      _rwLock.writeLock().unlock();
+    }
+    if (refCnt == 0) {  // segmentDataManager must be non-null.
+      closeSegment(segmentDataManager);
+    }
   }
 
-  public void decrementCount(final String segmentId) {
-    if (!_referenceCounts.containsKey(segmentId)) {
-      LOGGER.warn("Received command to delete unexisting segment - " + segmentId);
-      return;
-    }
-
-    AtomicInteger count = _referenceCounts.get(segmentId);
-
-    if (count.get() == 1) {
-      OfflineSegmentDataManager segment = null;
-      synchronized (getGlobalLock()) {
-        if (count.get() == 1) {
-          segment = _segmentsMap.remove(segmentId);
-          _activeSegments.remove(segmentId);
-          _referenceCounts.remove(segmentId);
-        }
-      }
-      if (segment != null) {
-        _currentNumberOfSegments.dec();
-        _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
-        _numDeletedSegments.inc();
-        segment.getSegment().destroy();
-      }
-      LOGGER.info("Segment " + segmentId + " has been deleted");
-      _segmentAsyncExecutorService.execute(new Runnable() {
-        @Override
-        public void run() {
-          FileUtils.deleteQuietly(new File(_tableDataDir, segmentId));
-          LOGGER.info("The index directory for the segment " + segmentId + " has been deleted");
-        }
-      });
-
-    } else {
-      count.decrementAndGet();
-    }
+  private void closeSegment(SegmentDataManager segmentDataManager) {
+    final String segmentName = segmentDataManager.getSegmentName();
+    LOGGER.info("Closing segment {} for table {}", segmentName, _tableName);
+    _currentNumberOfSegments.dec();
+    _numDeletedSegments.inc();
+    _currentNumberOfDocuments.dec(segmentDataManager.getSegment().getTotalDocs());
+    segmentDataManager.getSegment().destroy();
+    LOGGER.info("Segment {} for table {} has been closed", segmentName, _tableName);
   }
 
   @Override
@@ -248,43 +230,24 @@ public class OfflineTableDataManager implements TableDataManager {
     return _isStarted;
   }
 
-  public Object getGlobalLock() {
-    return _globalLock;
-  }
-
-  private void markSegmentAsLoaded(String segmentId) {
-    _currentNumberOfSegments.inc();
-    _currentNumberOfDocuments.inc(_segmentsMap.get(segmentId).getSegment().getTotalDocs());
-
-    if (!_activeSegments.contains(segmentId)) {
-      _activeSegments.add(segmentId);
-    }
-    _loadingSegments.remove(segmentId);
-    if (!_referenceCounts.containsKey(segmentId)) {
-      _referenceCounts.put(segmentId, new AtomicInteger(1));
-    }
-  }
-
-  public List<String> getActiveSegments() {
-    return _activeSegments;
-  }
-
-  public List<String> getLoadingSegments() {
-    return _loadingSegments;
-  }
-
   @Override
   public List<SegmentDataManager> getAllSegments() {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
-    for (OfflineSegmentDataManager segment : _segmentsMap.values()) {
-      incrementCount(segment.getSegmentName());
-      ret.add(segment);
+    try {
+      _rwLock.readLock().lock();
+      for (String segmentName : _segmentsMap.keySet()) {
+        OfflineSegmentDataManager segmentDataManager;
+        _rwLock.readLock().lock();
+        segmentDataManager = _segmentsMap.get(segmentName);
+        if (segmentDataManager != null) {
+          segmentDataManager.incrementRefCnt();
+          ret.add(segmentDataManager);
+        }
+      }
+    } finally {
+      _rwLock.readLock().unlock();
     }
     return ret;
-  }
-
-  public void incrementCount(final String segmentId) {
-    _referenceCounts.get(segmentId).incrementAndGet();
   }
 
   @Override
@@ -295,35 +258,46 @@ public class OfflineTableDataManager implements TableDataManager {
   @Override
   public List<SegmentDataManager> getSegments(List<String> segmentList) {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
-    for (String segmentName : segmentList) {
-      if (_segmentsMap.containsKey(segmentName)) {
-        incrementCount(segmentName);
-        ret.add(_segmentsMap.get(segmentName));
+    try {
+      _rwLock.readLock().lock();
+      for (String segName : segmentList) {
+        OfflineSegmentDataManager segmentDataManager;
+        segmentDataManager = _segmentsMap.get(segName);
+        if (segmentDataManager != null) {
+          segmentDataManager.incrementRefCnt();
+          ret.add(segmentDataManager);
+        }
       }
+    } finally {
+      _rwLock.readLock().unlock();
     }
     return ret;
   }
 
   @Override
   public OfflineSegmentDataManager getSegment(String segmentName) {
-    if (_segmentsMap.containsKey(segmentName)) {
-      incrementCount(segmentName);
-      return _segmentsMap.get(segmentName);
-    } else {
-      return null;
+    try {
+      _rwLock.readLock().lock();
+      OfflineSegmentDataManager segmentDataManager = _segmentsMap.get(segmentName);
+      if (segmentDataManager != null) {
+        segmentDataManager.incrementRefCnt();
+      }
+      return segmentDataManager;
+    } finally {
+      _rwLock.readLock().unlock();
     }
   }
 
   @Override
-  public void returnSegmentReaders(List<String> segmentList) {
-    for (String segmentId : segmentList) {
-      returnSegmentReader(segmentId);
+  public void returnSegmentReader(SegmentDataManager segmentDataManager) {
+    if (segmentDataManager == null) {
+      return;
+    }
+    int refCnt = ((OfflineSegmentDataManager)segmentDataManager).decrementRefCnt();
+    // Exactly one thread should find this to be zero, so we can safely drop it.
+    // We never remove it from the map here, so no need to synchronize.
+    if (refCnt == 0) {
+      closeSegment(segmentDataManager);
     }
   }
-
-  @Override
-  public void returnSegmentReader(String segmentId) {
-    decrementCount(segmentId);
-  }
-
 }
