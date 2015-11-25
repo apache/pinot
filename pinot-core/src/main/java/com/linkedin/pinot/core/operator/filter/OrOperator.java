@@ -64,7 +64,6 @@ public class OrOperator extends BaseFilterOperator {
     for (Operator operator : operators) {
       operator.close();
     }
-    LOGGER.info("Time spent in OrOperator operator:{} is {}", this, orBlock.orBlockDocIdSet.timeMeasure);
     return true;
   }
 }
