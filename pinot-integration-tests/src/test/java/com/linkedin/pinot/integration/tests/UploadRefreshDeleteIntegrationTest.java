@@ -82,10 +82,9 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
     addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null);
 
-    FileUtils.deleteDirectory(_tmpDir);
-    _tmpDir.mkdirs();
-    _segmentsDir.mkdirs();
-    _tarsDir.mkdirs();
+    ensureDirectoryExistsAndIsEmpty(_tmpDir);
+    ensureDirectoryExistsAndIsEmpty(_segmentsDir);
+    ensureDirectoryExistsAndIsEmpty(_tarsDir);
   }
 
   private void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
@@ -108,8 +107,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     int segmentIndex = Integer.parseInt(segmentName.split("_")[1]);
 
     File segmentTarDir = new File(_tarsDir, segmentName);
-    FileUtils.deleteQuietly(segmentTarDir);
-    segmentTarDir.mkdirs();
+    ensureDirectoryExistsAndIsEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.sameThreadExecutor();
     buildSegmentsFromAvro(Collections.singletonList(avroFile), executor, segmentIndex,
         new File(_segmentsDir, segmentName), segmentTarDir, "mytable");

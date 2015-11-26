@@ -91,12 +91,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
-    FileUtils.deleteDirectory(_tmpDir);
-    FileUtils.deleteDirectory(_segmentDir);
-    FileUtils.deleteDirectory(_tarDir);
-    _tmpDir.mkdirs();
-    _segmentDir.mkdirs();
-    _tarDir.mkdirs();
+    ensureDirectoryExistsAndIsEmpty(_tmpDir);
+    ensureDirectoryExistsAndIsEmpty(_segmentDir);
+    ensureDirectoryExistsAndIsEmpty(_tarDir);
 
     // Start Zk and Kafka
     startZk();
@@ -124,9 +121,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
 
-    File schemaFile =
-        new File(OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+    File schemaFile = getSchemaFile();
 
     // Create Pinot table
     setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
@@ -145,25 +140,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
-    Class.forName("org.h2.Driver");
-    _connection = DriverManager.getConnection("jdbc:h2:mem:");
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        createH2SchemaAndInsertAvroFiles(avroFiles, _connection);
-      }
-    });
+    setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
     buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable");
 
     // Initialize query generator
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
-      }
-    });
+    setupQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);

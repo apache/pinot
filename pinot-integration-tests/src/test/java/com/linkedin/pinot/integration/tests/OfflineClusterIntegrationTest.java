@@ -18,7 +18,6 @@ package com.linkedin.pinot.integration.tests;
 import java.io.File;
 import java.io.FileInputStream;
 import java.sql.DriverManager;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -70,9 +68,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void createTable() throws Exception {
-    File schemaFile =
-        new File(OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+    File schemaFile = getSchemaFile();
 
     // Create a table
     setUpTable(schemaFile, 1, 1);
@@ -86,51 +82,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
-    FileUtils.deleteDirectory(_tmpDir);
-    FileUtils.deleteDirectory(_segmentDir);
-    FileUtils.deleteDirectory(_tarDir);
-    _tmpDir.mkdirs();
-    _segmentDir.mkdirs();
-    _tarDir.mkdirs();
+    ensureDirectoryExistsAndIsEmpty(_tmpDir);
+    ensureDirectoryExistsAndIsEmpty(_segmentDir);
+    ensureDirectoryExistsAndIsEmpty(_tarDir);
 
     // Start the cluster
     startCluster();
 
     // Unpack the Avro files
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
-
-    _tmpDir.mkdirs();
-
-    final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
-    for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
-      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
-    }
+    final List<File> avroFiles = unpackAvroData(_tmpDir, SEGMENT_COUNT);
 
     createTable();
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
-    Class.forName("org.h2.Driver");
-    _connection = DriverManager.getConnection("jdbc:h2:mem:");
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        createH2SchemaAndInsertAvroFiles(avroFiles, _connection);
-      }
-    });
+    setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
     buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable");
 
     // Initialize query generator
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
-      }
-    });
+    setupQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);

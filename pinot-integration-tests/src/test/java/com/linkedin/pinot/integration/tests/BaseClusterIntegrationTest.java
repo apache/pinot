@@ -15,14 +15,17 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +38,7 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -53,6 +57,8 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -664,6 +670,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
+  public static void ensureDirectoryExistsAndIsEmpty(File tmpDir)
+      throws IOException {
+    FileUtils.deleteDirectory(tmpDir);
+    tmpDir.mkdirs();
+  }
+
   @Test
   public void testMultipleQueries() throws Exception {
     queriesFile =
@@ -687,6 +699,55 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         throw new RuntimeException(e.getMessage());
       }
     }
+  }
+
+  public List<File> unpackAvroData(File tmpDir, int segmentCount)
+      throws IOException, ArchiveException {
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+            RealtimeClusterIntegrationTest.class.getClassLoader()
+                .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), tmpDir);
+
+    tmpDir.mkdirs();
+    final List<File> avroFiles = new ArrayList<File>(segmentCount);
+    for (int segmentNumber = 1; segmentNumber <= segmentCount; ++segmentNumber) {
+      avroFiles.add(new File(tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  public void setupH2AndInsertAvro(final List<File> avroFiles, ExecutorService executor)
+      throws ClassNotFoundException, SQLException {
+    Class.forName("org.h2.Driver");
+    _connection = DriverManager.getConnection("jdbc:h2:mem:");
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        createH2SchemaAndInsertAvroFiles(avroFiles, _connection);
+      }
+    });
+  }
+
+  public void setupQueryGenerator(final List<File> avroFiles, ExecutorService executor) {
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
+      }
+    });
+  }
+
+  public void pushAvroIntoKafka(final List<File> avroFiles, ExecutorService executor, final String kafkaTopic) {
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic);
+      }
+    });
+  }
+
+  public File getSchemaFile() {
+    return new File(OfflineClusterIntegrationTest.class.getClassLoader()
+        .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
   }
 
   @Test
