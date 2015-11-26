@@ -95,9 +95,10 @@
               <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
               <name>pinot-admin</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <initialMemorySize>10G</initialMemorySize>
+                <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j.configuration=conf/pinot-admin-log4j.properties</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -107,8 +108,9 @@
               <name>scan-query</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
+                <maxMemorySize>20G</maxMemorySize>
                 <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
                 </extraArguments>
               </jvmSettings>
@@ -117,10 +119,10 @@
               <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
               <name>query-comparator</name>
               <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>10G</maxMemorySize>
+                <initialMemorySize>10G</initialMemorySize>
+                <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=24g</extraArgument>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
                 </extraArguments>
               </jvmSettings>

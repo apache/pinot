@@ -21,6 +21,7 @@ public class AggregationFuncFactory {
   private static final String MAX = "MAX";
   private static final String SUM = "SUM";
   private static final String AVG = "AVG";
+  private static final String DISTINCT_COUNT = "DISTINCTCOUNT";
 
   public static AggregationFunc getAggregationFunc(ResultTable rows, String column, String functionName) {
     switch (functionName.toUpperCase()) {
@@ -38,6 +39,9 @@ public class AggregationFuncFactory {
 
       case AVG:
         return new AvgFunction(rows, column);
+
+      case DISTINCT_COUNT:
+        return new DistinctCountFunction(rows, column);
 
       default:
         throw new RuntimeException("Unsupported aggregation function " + functionName);

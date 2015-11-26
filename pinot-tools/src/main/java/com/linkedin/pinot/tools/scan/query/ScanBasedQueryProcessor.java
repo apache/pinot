@@ -23,6 +23,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class ScanBasedQueryProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedQueryProcessor.class);
   private final String _segmentsDir;
-  private long _timeoutInSeconds = 1000;
+  private long _timeoutInSeconds = 10000;
 
   public ScanBasedQueryProcessor(String segmentsDir) {
     _segmentsDir = segmentsDir;
@@ -83,7 +84,7 @@ public class ScanBasedQueryProcessor {
     long totalUsedMs = System.currentTimeMillis() - startTimeInMillis;
     results.setProcessingTime(totalUsedMs);
 
-    results.convertSumToAvgIfNeeded();
+    results.seal();
     QueryResponse queryResponse = new QueryResponse(results);
 
     return queryResponse;
@@ -91,7 +92,7 @@ public class ScanBasedQueryProcessor {
 
   private List<ResultTable> processSegments(final String query, final BrokerRequest brokerRequest, File segmentsDir)
       throws InterruptedException {
-    ExecutorService executorService = Executors.newFixedThreadPool(8);
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
     List<ResultTable> resultTables = Collections.synchronizedList(new ArrayList<ResultTable>());
 
     for (final File segment : segmentsDir.listFiles()) {
@@ -119,29 +120,34 @@ public class ScanBasedQueryProcessor {
 
   public static void main(String[] args)
       throws Exception {
-    if (args.length != 2) {
+    if (args.length != 3) {
       LOGGER.error("Incorrect arguments");
-      LOGGER.info("Usage: <exec> <UntarredSegmentDir> <QueryFile");
+      LOGGER.info("Usage: <exec> <UntarredSegmentDir> <QueryFile> <outputFile>");
       System.exit(1);
     }
 
     String segDir = args[0];
     String queryFile = args[1];
+    String outputFile = args[2];
     String query;
 
     ScanBasedQueryProcessor scanBasedQueryProcessor = new ScanBasedQueryProcessor(segDir);
     BufferedReader bufferedReader = new BufferedReader(new FileReader(queryFile));
+    PrintWriter printWriter = new PrintWriter(outputFile);
 
     while ((query = bufferedReader.readLine()) != null) {
       QueryResponse queryResponse = scanBasedQueryProcessor.processQuery(query);
       printResult(queryResponse);
+      printWriter.println("Query: " + query);
+      printWriter.println("Result: " + new ObjectMapper().writeValueAsString(queryResponse));
     }
     bufferedReader.close();
+    printWriter.close();
   }
 
   public static void printResult(QueryResponse queryResponse)
       throws IOException {
     ObjectMapper objectMapper = new ObjectMapper();
-    LOGGER.info(objectMapper.defaultPrettyPrintingWriter().writeValueAsString(queryResponse));
+    LOGGER.info(objectMapper.writeValueAsString(queryResponse));
   }
 }

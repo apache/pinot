@@ -33,21 +33,22 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String TABLE_CONFIG_FILE = "table.config.file";
   private static final String SEGMENTS_DIR = "segments.dir";
   private static final String QUERY_FILE = "query.file";
+  private static final String RESULT_FILE = "result.file";
   private static final String START_ZOOKEEPER = "start.zookeeper";
   private static final String START_CLUSTER = "start.cluster";
   private static final String TIME_COLUMN_NAME = "time.column.name";
-  private static final String TIME_UNIT = "time.unit";
 
+  private static final String TIME_UNIT = "time.unit";
   private static final String DEFAULT_CLUSTER_NAME = "QueryComparisonCluster";
   private static final String DEFAULT_ZOOKEEPER_ADDRESS = "localhost:2181";
   private static final String DEFAULT_CONTROLLER_PORT = "9000";
   private static final String DEFAULT_BROKER_HOST = "localhost";
   private static final String DEFAULT_BROKER_PORT = String.valueOf(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+
   private static final String DEFAULT_SERVER_PORT = String.valueOf(CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
-
   private static final boolean DEFAULT_START_ZOOKEEPER = true;
-  private static final boolean DEFAULT_START_CLUSTER = true;
 
+  private static final boolean DEFAULT_START_CLUSTER = true;
   private static final String DEFAULT_TIME_COLUMN_NAME = "daysSinceEpoch";
   private static final String DEFAULT_TIME_UNIT = "DAYS";
 
@@ -109,6 +110,10 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
 
   public String getQueryFile() {
     return (String) getProperty(QUERY_FILE);
+  }
+
+  public String getResultFile() {
+    return (String) getProperty(RESULT_FILE);
   }
 
   public String getTimeColumnName() {

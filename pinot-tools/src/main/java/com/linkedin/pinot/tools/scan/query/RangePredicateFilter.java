@@ -22,8 +22,8 @@ import java.util.List;
 
 public class RangePredicateFilter implements PredicateFilter {
   private static final String SEPARATOR = "\t\t";
-  private static int _startIndex;
-  private static int _endIndex;
+  private int _startIndex;
+  private int _endIndex;
   private final Dictionary _dictionary;
   private final boolean _includeStart;
   private final boolean _includeEnd;
@@ -58,7 +58,7 @@ public class RangePredicateFilter implements PredicateFilter {
       _endIndex = _dictionary.indexOf(end);
     }
     if (_endIndex < 0) {
-      _endIndex = -(_endIndex + 1);
+      _endIndex = -(_endIndex + 1) - 1;
     }
     if (!_includeEnd) {
       --_endIndex;
@@ -67,21 +67,16 @@ public class RangePredicateFilter implements PredicateFilter {
 
   @Override
   public boolean apply(int dictId) {
-    boolean ret = ((dictId >= _startIndex) && (dictId <= _endIndex));
-
-    if (ret) {
-      return true;
-    }
-    return false;
+    return ((dictId >= _startIndex) && (dictId <= _endIndex));
   }
 
   @Override
   public boolean apply(int[] dictIds) {
     for (int dictId : dictIds) {
-      if (!apply(dictId)) {
-        return false;
+      if (apply(dictId)) {
+        return true;
       }
     }
-    return true;
+    return false;
   }
 }

@@ -166,8 +166,7 @@ public class Aggregation {
     results.setResultType(ResultTable.ResultType.Aggregation);
 
     if (input.isEmpty()) {
-      results.add(0, 0.0);
-      return results;
+      return new ResultTable(_allColumns, 0);
     }
 
     for (Pair pair : _columnFunctionList) {

@@ -52,6 +52,8 @@ public class QueryComparison {
 
   private File _segmentsDir;
   private File _queryFile;
+  private File _resultFile;
+
   private final QueryComparisonConfig _config;
   private ClusterStarter _clusterStarter;
 
@@ -59,6 +61,9 @@ public class QueryComparison {
     _config = config;
     _segmentsDir = new File(config.getSegmentsDir());
     _queryFile = new File(config.getQueryFile());
+
+    String results = config.getResultFile();
+    _resultFile = (results != null) ? new File(results) : null;
 
     if (!_segmentsDir.exists() || !_segmentsDir.isDirectory()) {
       LOGGER.error("Invalid segments directory: {}", _segmentsDir.getName());
@@ -77,18 +82,25 @@ public class QueryComparison {
 
     String query;
     ScanBasedQueryProcessor scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
-    BufferedReader bufferedReader = new BufferedReader(new FileReader(_queryFile));
+    BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile));
+    BufferedReader resultReader = (_resultFile != null) ? new BufferedReader(new FileReader(_resultFile)) : null;
 
     int passed = 0;
     int total = 0;
-    while ((query = bufferedReader.readLine()) != null) {
+    while ((query = queryReader.readLine()) != null) {
       if (query.isEmpty() || query.startsWith("#")) {
         continue;
       }
 
       try {
-        QueryResponse scanResponse = scanBasedQueryProcessor.processQuery(query);
-        JSONObject scanJson = new JSONObject(new ObjectMapper().writeValueAsString(scanResponse));
+        JSONObject scanJson;
+
+        if (resultReader != null) {
+          scanJson = new JSONObject(resultReader.readLine());
+        } else {
+          QueryResponse scanResponse = scanBasedQueryProcessor.processQuery(query);
+          scanJson = new JSONObject(new ObjectMapper().writeValueAsString(scanResponse));
+        }
 
         String clusterResponse = _clusterStarter.query(query);
         JSONObject clusterJson = new JSONObject(clusterResponse);
@@ -96,6 +108,7 @@ public class QueryComparison {
         if (compare(clusterJson, scanJson)) {
           ++passed;
           LOGGER.info("Comparison PASSED: {}", query);
+          LOGGER.info("Scan Result: {}", scanJson.toString());
         } else {
           LOGGER.error("Comparison FAILED: {}", query);
           LOGGER.info("Cluster Response: {}", clusterJson);
@@ -143,7 +156,8 @@ public class QueryComparison {
 
   private boolean compareAggregation(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
-    if ((clusterJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !scanJson.has(AGGREGATION_RESULTS)) {
+    if ((clusterJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !scanJson.has(AGGREGATION_RESULTS)
+        && !scanJson.has(AGGREGATION_GROUP_BY_RESULTS)) {
       return true;
     }
 
@@ -170,12 +184,12 @@ public class QueryComparison {
 
     for (int i = 0; i < scanAggregation.length(); ++i) {
       JSONObject object = scanAggregation.getJSONObject(i);
-      map.put(object.getString(FUNCTION), Double.valueOf(object.getString(VALUE)));
+      map.put(object.getString(FUNCTION).toLowerCase(), Double.valueOf(object.getString(VALUE)));
     }
 
     for (int i = 0; i < clusterAggregation.length(); ++i) {
       JSONObject object = clusterAggregation.getJSONObject(i);
-      String function = object.getString(FUNCTION);
+      String function = object.getString(FUNCTION).toLowerCase();
       String valueString = object.getString(VALUE);
 
       if (!isNumeric(valueString)) {
@@ -394,7 +408,6 @@ public class QueryComparison {
 
     if (clusterDocs != scanDocs) {
       LOGGER.error("Mis-match in number of docs scanned: Cluster: {} Scan: {}", clusterDocs, scanDocs);
-      return false;
     }
 
     return true;

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +30,9 @@ import org.slf4j.LoggerFactory;
 public class ResultTable implements Iterable<ResultTable.Row> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultTable.class);
   private static final String AVERAGE = "avg";
+  private static final String DISTINCT_COUNT = "distinctCount";
 
-  public void convertSumToAvgIfNeeded() {
+  private void convertSumToAvgIfNeeded() {
     if (isEmpty()) {
       return;
     }
@@ -58,8 +60,41 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     }
   }
 
+  private void computeDistinctCount() {
+    if (isEmpty()) {
+      return;
+    }
+
+    List<Integer> distinctCountColumns = new ArrayList<>();
+    int i = 0;
+    for (Pair pair : _columnList) {
+      String function = (String) pair.getSecond();
+      if (function != null && function.equalsIgnoreCase(DISTINCT_COUNT)) {
+        distinctCountColumns.add(i);
+      }
+      ++i;
+    }
+
+    // No distinctCount columns found.
+    if (distinctCountColumns.isEmpty()) {
+      return;
+    }
+
+    for (Row row : _rows) {
+      for (int colId : distinctCountColumns) {
+        Set<String> distinctCountSet = (Set<String>) row.get(colId);
+        row.set(colId, distinctCountSet.size());
+      }
+    }
+  }
+
   public boolean isEmpty() {
     return _rows.isEmpty();
+  }
+
+  public void seal() {
+    convertSumToAvgIfNeeded();
+    computeDistinctCount();
   }
 
   enum ResultType {
