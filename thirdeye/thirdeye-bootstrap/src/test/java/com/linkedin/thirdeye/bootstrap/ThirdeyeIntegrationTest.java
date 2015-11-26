@@ -69,6 +69,8 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.bootstrap.ThirdEyeJob.FlowSpec;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob.*;
+import com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseJob;
+import com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseJob.PartitionMapper;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob.*;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoJob;
@@ -77,6 +79,8 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob.*;
 import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob.*;
+import com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseJob;
+import com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseJob.*;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob.*;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneJob;
@@ -89,6 +93,7 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConsta
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.*;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.*;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.*;
+import static com.linkedin.thirdeye.bootstrap.partition.PartitionPhaseConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.*;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.*;
@@ -138,6 +143,7 @@ public class ThirdeyeIntegrationTest {
   Path rollupPhase2OutputPath;
   Path rollupPhase3OutputPath;
   Path rollupPhase4OutputPath;
+  Path partitionOutputPath;
   Path starTreeGenerationOutput;
   Path starTreeBootstrapPhase1Output;
   Path starTreeBootstrapPhase2Output;
@@ -217,6 +223,9 @@ public class ThirdeyeIntegrationTest {
 
     // RollupPhase4
     testRollupPhase4();
+
+    // Partition
+    testPartition();
 
     // StartreeGeneration
     testStartreeGeneration();
@@ -495,6 +504,61 @@ public class ThirdeyeIntegrationTest {
     assertTrue("dimensionStore.tar.gz not generated in startree_generation", fs.exists(new Path(starTreeGenerationOutput, "dimensionStore.tar.gz")));
 
     LOGGER.info("startree_generation job completed");
+  }
+
+  private void testPartition() throws IOException, ClassNotFoundException, InterruptedException {
+    LOGGER.info("Starting startree_generation job");
+
+    // Partition
+    Job job = Job.getInstance(conf);
+    job.setJobName("Partition");
+    job.setJarByClass(PartitionPhaseJob.class);
+
+    // Map config
+    job.setMapperClass(PartitionMapper.class);
+    job.setInputFormatClass(SequenceFileInputFormat.class);
+    job.setMapOutputKeyClass(BytesWritable.class);
+    job.setMapOutputValueClass(BytesWritable.class);
+
+    // Reduce config
+    job.setNumReduceTasks(0);
+    job.setOutputKeyClass(BytesWritable.class);
+    job.setOutputValueClass(BytesWritable.class);
+    job.setOutputFormatClass(SequenceFileOutputFormat.class);
+
+    // partition config
+    int numPartitions = 5;
+    Configuration configuration = job.getConfiguration();
+    configuration.set(PARTITION_PHASE_INPUT_PATH.toString(), rollupPhase4OutputPath.toString());
+    configuration.set(PARTITION_PHASE_CONFIG_PATH.toString(), configFilePath.toString());
+    configuration.set(PARTITION_PHASE_OUTPUT_PATH.toString(), partitionOutputPath.toString());
+    configuration.set(PARTITION_PHASE_NUM_PARTITIONS.toString(), "5");
+
+    FileInputFormat.addInputPath(job, new Path(configuration.get(PARTITION_PHASE_INPUT_PATH.toString())));
+    for (int i = 0 ; i < numPartitions; i ++) {
+      MultipleOutputs.addNamedOutput(job, "partition" + i,
+          SequenceFileOutputFormat.class, BytesWritable.class, BytesWritable.class);
+    }
+    FileOutputFormat.setOutputPath(job, new Path(configuration.get(PARTITION_PHASE_OUTPUT_PATH.toString())));
+    job.waitForCompletion(true);
+
+    // tests
+    assertTrue("partition job failed", job.isSuccessful());
+    assertTrue("partition folder not created", fs.exists(partitionOutputPath));
+    for (int i = 0; i < numPartitions; i++) {
+      Path partition = new Path(partitionOutputPath, "partition" + i);
+      assertTrue("partition folder " + i + "not created", fs.exists(partition));
+      FileStatus[] partitionStatus = fs.listStatus(partition, new PathFilter() {
+        @Override
+        public boolean accept(Path path) {
+          return path.getName().startsWith("part");
+        }
+      });
+      assertTrue("partition " + i + " data not generated", partitionStatus.length != 0);
+
+    }
+
+    LOGGER.info("partition job completed");
   }
 
   private void testRollupPhase4() throws ClassNotFoundException, IOException, InterruptedException {
@@ -818,6 +882,7 @@ public class ThirdeyeIntegrationTest {
     rollupPhase2OutputPath = new Path(dimensionIndexDir, "rollup_phase2");
     rollupPhase3OutputPath = new Path(dimensionIndexDir, "rollup_phase3");
     rollupPhase4OutputPath = new Path(dimensionIndexDir, "rollup_phase4");
+    partitionOutputPath = new Path(dimensionIndexDir, "partition");
     starTreeGenerationOutput = new Path(dimensionIndexDir, "startree_generation");
     Path metricIndexDir = new Path(outputDir, "METRIC_INDEX");
     metricIndexDir = new Path(metricIndexDir, DATA_DIR);
