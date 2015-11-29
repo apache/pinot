@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.segment.index.readers;
 import java.io.File;
 import java.io.IOException;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 
@@ -28,15 +28,15 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 public abstract class ImmutableDictionaryReader implements Dictionary {
 
-  protected final FixedByteWidthRowColDataFileReader dataFileReader;
+  protected final FixedByteSingleValueMultiColReader dataFileReader;
   private final ByteBufferBinarySearchUtil fileSearcher;
   private final int rows;
 
   protected ImmutableDictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
     if (isMmap) {
-      dataFileReader = FixedByteWidthRowColDataFileReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
+      dataFileReader = FixedByteSingleValueMultiColReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
     } else {
-      dataFileReader = FixedByteWidthRowColDataFileReader.forHeap(dictFile, rows, 1, new int[] { columnSize });
+      dataFileReader = FixedByteSingleValueMultiColReader.forHeap(dictFile, rows, 1, new int[] { columnSize });
     }
     this.rows = rows;
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);

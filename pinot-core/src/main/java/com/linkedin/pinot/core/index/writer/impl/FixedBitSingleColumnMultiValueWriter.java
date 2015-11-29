@@ -22,24 +22,23 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
 import org.apache.commons.io.IOUtils;
 
 
-public class FixedBitWidthSingleColumnMultiValueWriter implements
+public class FixedBitSingleColumnMultiValueWriter implements
     SingleColumnMultiValueWriter {
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
   private ByteBuffer headerBuffer;
   private ByteBuffer dataBuffer;
   private RandomAccessFile raf;
-  private FixedByteWidthRowColDataFileWriter headerWriter;
-  private FixedBitWidthRowColDataFileWriter dataWriter;
-  private FixedByteWidthRowColDataFileReader headerReader;
+  private FixedByteSingleValueMultiColWriter headerWriter;
+  private FixedBitSingleValueMultiColWriter dataWriter;
+  private FixedByteSingleValueMultiColReader headerReader;
 
-  public FixedBitWidthSingleColumnMultiValueWriter(File file, int numDocs,
+  public FixedBitSingleColumnMultiValueWriter(File file, int numDocs,
       int totalNumValues, int columnSizeInBits) throws Exception {
     // there will be two sections header and data
     // header will contain N lines, each line corresponding to the
@@ -51,20 +50,14 @@ public class FixedBitWidthSingleColumnMultiValueWriter implements
         headerSize, file, this.getClass().getSimpleName() + " headerBuffer");
     dataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE,
         headerSize, dataSize, file, this.getClass().getSimpleName() + " dataBuffer");
-    headerWriter = new FixedByteWidthRowColDataFileWriter(headerBuffer,
+    headerWriter = new FixedByteSingleValueMultiColWriter(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
-    headerReader = new FixedByteWidthRowColDataFileReader(headerBuffer,
+    headerReader = new FixedByteSingleValueMultiColReader(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
 
-    dataWriter = new FixedBitWidthRowColDataFileWriter(dataBuffer,
+    dataWriter = new FixedBitSingleValueMultiColWriter(dataBuffer,
         totalNumValues, 1, new int[] { columnSizeInBits });
 
-  }
-
-  @Override
-  public boolean setMetadata(DataFileMetadata metadata) {
-    // TODO Auto-generated method stub
-    return false;
   }
 
   @Override

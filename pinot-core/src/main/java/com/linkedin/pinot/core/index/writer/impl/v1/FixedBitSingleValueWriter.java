@@ -13,26 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.index.writer.impl;
+package com.linkedin.pinot.core.index.writer.impl.v1;
 
 import java.io.File;
 
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.writer.SingleColumnSingleValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWriter;
 
-public class FixedBitSingleColumnSingleValueWriter implements
+public class FixedBitSingleValueWriter implements
     SingleColumnSingleValueWriter {
-  private FixedBitWidthRowColDataFileWriter dataFileWriter;
+  private FixedBitSingleValueMultiColWriter dataFileWriter;
 
-  public FixedBitSingleColumnSingleValueWriter(File file, int rows,
+  public FixedBitSingleValueWriter(File file, int rows,
       int columnSizeInBits) throws Exception {
-    dataFileWriter = new FixedBitWidthRowColDataFileWriter(file, rows, 1,
+    dataFileWriter = new FixedBitSingleValueMultiColWriter(file, rows, 1,
         new int[] { columnSizeInBits });
-  }
-
-  @Override
-  public boolean setMetadata(DataFileMetadata metadata) {
-    return false;
   }
 
   @Override

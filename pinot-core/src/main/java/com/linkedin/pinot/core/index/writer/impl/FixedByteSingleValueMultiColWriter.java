@@ -27,7 +27,7 @@ import java.nio.charset.Charset;
 import org.apache.commons.io.IOUtils;
 
 
-public class FixedByteWidthRowColDataFileWriter {
+public class FixedByteSingleValueMultiColWriter {
   private File file;
   private int cols;
   private int[] columnOffsets;
@@ -37,7 +37,7 @@ public class FixedByteWidthRowColDataFileWriter {
   private int rowSizeInBytes;
   private final boolean ownsByteBuffer;
 
-  public FixedByteWidthRowColDataFileWriter(File file, int rows, int cols,
+  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols,
       int[] columnSizes) throws Exception {
     this.file = file;
     this.rows = rows;
@@ -56,7 +56,7 @@ public class FixedByteWidthRowColDataFileWriter {
     ownsByteBuffer = true;
   }
 
-  public FixedByteWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
+  public FixedByteSingleValueMultiColWriter(ByteBuffer byteBuffer, int rows,
       int cols, int[] columnSizes) throws IOException {
     this.rows = rows;
     this.cols = cols;

@@ -22,10 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.index.readerwriter.SingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
 
 
 /**
@@ -72,11 +71,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
 
   private ByteBuffer headerBuffer;
   private List<ByteBuffer> dataBuffers = new ArrayList<ByteBuffer>();
-  private FixedByteWidthRowColDataFileWriter headerWriter;
-  private FixedByteWidthRowColDataFileReader headerReader;
-  private List<FixedByteWidthRowColDataFileWriter> dataWriters = new ArrayList<FixedByteWidthRowColDataFileWriter>();
-  private List<FixedByteWidthRowColDataFileReader> dataReaders = new ArrayList<FixedByteWidthRowColDataFileReader>();
-  private FixedByteWidthRowColDataFileWriter currentDataWriter;
+  private FixedByteSingleValueMultiColWriter headerWriter;
+  private FixedByteSingleValueMultiColReader headerReader;
+  private List<FixedByteSingleValueMultiColWriter> dataWriters = new ArrayList<FixedByteSingleValueMultiColWriter>();
+  private List<FixedByteSingleValueMultiColReader> dataReaders = new ArrayList<FixedByteSingleValueMultiColReader>();
+  private FixedByteSingleValueMultiColWriter currentDataWriter;
   private int currentDataWriterIndex = -1;
   private int currentCapacity = 0;
   private int headerSize;
@@ -108,10 +107,10 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     headerBuffer.order(ByteOrder.nativeOrder());
     //dataBufferId, startIndex, length
     headerWriter =
-        new FixedByteWidthRowColDataFileWriter(headerBuffer, rows, 3,
+        new FixedByteSingleValueMultiColWriter(headerBuffer, rows, 3,
             new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
     headerReader =
-        new FixedByteWidthRowColDataFileReader(headerBuffer, rows, 3,
+        new FixedByteSingleValueMultiColReader(headerBuffer, rows, 3,
             new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
     //at least create space for million entries, which for INT translates into 4mb buffer
     this.incrementalCapacity = incrementalCapacity;
@@ -131,11 +130,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
       dataBuffer.order(ByteOrder.nativeOrder());
       dataBuffers.add(dataBuffer);
       currentDataWriter =
-          new FixedByteWidthRowColDataFileWriter(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
+          new FixedByteSingleValueMultiColWriter(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
       dataWriters.add(currentDataWriter);
 
-      FixedByteWidthRowColDataFileReader dataFileReader =
-          new FixedByteWidthRowColDataFileReader(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
+      FixedByteSingleValueMultiColReader dataFileReader =
+          new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
       dataReaders.add(dataFileReader);
       //update the capacity
       currentCapacity = rowCapacity;
@@ -144,11 +143,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
       throw new RuntimeException("Error while expanding the capacity by allocating additional buffer with capacity:"
           + rowCapacity, e);
     }
-  }
-
-  @Override
-  public boolean setMetadata(DataFileMetadata metadata) {
-    return false;
   }
 
   @Override
@@ -252,7 +246,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 1);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       charArray[i] = dataReader.getChar(startIndex + i, 0);
     }
@@ -264,7 +258,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 1);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       shortsArray[i] = dataReader.getShort(startIndex + i, 0);
     }
@@ -276,7 +270,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 0);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       intArray[i] = dataReader.getInt(startIndex + i, 0);
     }
@@ -288,7 +282,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 0);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       longArray[i] = dataReader.getLong(startIndex + i, 0);
     }
@@ -300,7 +294,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 1);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       floatArray[i] = dataReader.getFloat(startIndex + i, 0);
     }
@@ -312,7 +306,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 1);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       doubleArray[i] = dataReader.getDouble(startIndex + i, 0);
     }
@@ -324,7 +318,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 1);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       stringArray[i] = dataReader.getString(startIndex + i, 0);
     }
@@ -336,15 +330,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
     int bufferIndex = headerReader.getInt(row, 1);
     int startIndex = headerReader.getInt(row, 1);
     int length = headerReader.getInt(row, 2);
-    FixedByteWidthRowColDataFileReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       bytesArray[i] = dataReader.getBytes(startIndex + i, 0);
     }
     return length;
   }
 
-  @Override
-  public DataFileMetadata getMetadata() {
-    return null;
-  }
 }

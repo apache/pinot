@@ -16,10 +16,9 @@
 package com.linkedin.pinot.core.index.readerwriter.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.index.readerwriter.SingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -27,8 +26,8 @@ import java.nio.ByteOrder;
 
 public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColumnSingleValueReaderWriter {
 
-  FixedByteWidthRowColDataFileReader reader;
-  FixedByteWidthRowColDataFileWriter writer;
+  FixedByteSingleValueMultiColReader reader;
+  FixedByteSingleValueMultiColWriter writer;
   private int cols;
   private int[] colOffSets;
   private int rowSize;
@@ -53,13 +52,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
     final int totalSize = rowSize * rows;
     _buffer = MmapUtils.allocateDirectByteBuffer(totalSize, null, this.getClass().getSimpleName() + " buffer");
     _buffer.order(ByteOrder.nativeOrder());
-    reader = new FixedByteWidthRowColDataFileReader(_buffer, rows, cols, columnSizesInBytes);
-    writer = new FixedByteWidthRowColDataFileWriter(_buffer, rows, cols, columnSizesInBytes);
-  }
-
-  @Override
-  public DataFileMetadata getMetadata() {
-    return null;
+    reader = new FixedByteSingleValueMultiColReader(_buffer, rows, cols, columnSizesInBytes);
+    writer = new FixedByteSingleValueMultiColWriter(_buffer, rows, cols, columnSizesInBytes);
   }
 
   @Override
@@ -70,11 +64,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
     writer = null;
     MmapUtils.unloadByteBuffer(_buffer);
     _buffer = null;
-  }
-
-  @Override
-  public boolean setMetadata(DataFileMetadata metadata) {
-    return false;
   }
 
   @Override

@@ -13,48 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.readers;
+package com.linkedin.pinot.core.index.reader.impl.v1;
 
 import java.io.File;
 import java.io.IOException;
 
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedBitSingleValueMultiColReader;
 
 
 /**
  * Nov 13, 2014
  */
 
-public class FixedBitCompressedSVForwardIndexReader implements SingleColumnSingleValueReader {
+public class FixedBitSingleValueReader implements SingleColumnSingleValueReader {
 
   private final File indexFile;
-  private final FixedBitWidthRowColDataFileReader dataFileReader;
+  private final FixedBitSingleValueMultiColReader dataFileReader;
   private final int rows;
 
-  public FixedBitCompressedSVForwardIndexReader(File file, int rows, int columnSize, boolean isMMap, boolean hasNulls) throws IOException {
+  public FixedBitSingleValueReader(File file, int rows, int columnSize, boolean isMMap, boolean hasNulls) throws IOException {
     indexFile = file;
     if (isMMap) {
-      dataFileReader = FixedBitWidthRowColDataFileReader.forMmap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
+      dataFileReader = FixedBitSingleValueMultiColReader.forMmap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
     } else {
-      dataFileReader = FixedBitWidthRowColDataFileReader.forHeap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
+      dataFileReader = FixedBitSingleValueMultiColReader.forHeap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
     }
 
     this.rows = rows;
   }
 
-  public FixedBitWidthRowColDataFileReader getDataFileReader() {
+  public FixedBitSingleValueMultiColReader getDataFileReader() {
     return dataFileReader;
   }
 
   public int getLength() {
     return rows;
-  }
-
-  @Override
-  public DataFileMetadata getMetadata() {
-    return null;
   }
 
   @Override

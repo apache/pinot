@@ -21,7 +21,7 @@ import java.io.File;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
@@ -31,7 +31,7 @@ public class SingleValueUnsortedForwardIndexCreator implements Closeable, Single
   private final File forwardIndexFile;
   private final FieldSpec spec;
   private int maxNumberOfBits = 0;
-  private FixedBitWidthRowColDataFileWriter sVWriter;
+  private FixedBitSingleValueMultiColWriter sVWriter;
 
   public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
       int totalNumberOfValues, boolean hasNulls) throws Exception {
@@ -40,7 +40,7 @@ public class SingleValueUnsortedForwardIndexCreator implements Closeable, Single
     FileUtils.touch(forwardIndexFile);
     maxNumberOfBits = getNumOfBits(cardinality);
     sVWriter =
-        new FixedBitWidthRowColDataFileWriter(forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits },
+        new FixedBitSingleValueMultiColWriter(forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits },
             new boolean[] { hasNulls });
   }
 

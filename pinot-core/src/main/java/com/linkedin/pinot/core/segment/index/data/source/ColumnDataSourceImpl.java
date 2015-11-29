@@ -25,14 +25,14 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
 import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
 import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
@@ -80,12 +80,12 @@ public class ColumnDataSourceImpl extends DataSource {
       } else {
         b =
             new UnSortedSingleValueBlock(blockId,
-                (FixedBitCompressedSVForwardIndexReader) indexContainer.getForwardIndex(),
+                (FixedBitSingleValueReader) indexContainer.getForwardIndex(),
                 indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       }
     } else {
       b =
-          new MultiValueBlock(blockId, (FixedBitSkipListSCMVReader) indexContainer.getForwardIndex(),
+          new MultiValueBlock(blockId, (FixedBitMultiValueReader) indexContainer.getForwardIndex(),
               indexContainer.getDictionary(), indexContainer.getColumnMetadata());
     }
 

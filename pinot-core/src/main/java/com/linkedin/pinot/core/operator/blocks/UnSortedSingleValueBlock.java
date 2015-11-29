@@ -26,9 +26,9 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
@@ -38,13 +38,13 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 public class UnSortedSingleValueBlock implements Block {
 
-  private final FixedBitCompressedSVForwardIndexReader sVReader;
+  private final FixedBitSingleValueReader sVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
 
-  public UnSortedSingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
+  public UnSortedSingleValueBlock(BlockId id, FixedBitSingleValueReader singleValueReader,
       ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     sVReader = singleValueReader;
     this.id = id;
@@ -52,7 +52,7 @@ public class UnSortedSingleValueBlock implements Block {
     this.columnMetadata = columnMetadata;
   }
 
-  public FixedBitCompressedSVForwardIndexReader getSVReader() {
+  public FixedBitSingleValueReader getSVReader() {
     return sVReader;
   }
 

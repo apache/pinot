@@ -25,7 +25,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.writer.impl.FixedByteSkipListSCMVWriter;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedByteSkipListMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 
@@ -48,7 +48,7 @@ public class FixedByteSkipListSCMVWriterTest {
       totalNumValues += numValues;
     }
 
-    FixedByteSkipListSCMVWriter writer = new FixedByteSkipListSCMVWriter(file, rows, totalNumValues, 4);
+    FixedByteSkipListMultiValueWriter writer = new FixedByteSkipListMultiValueWriter(file, rows, totalNumValues, 4);
     int numChunks = writer.getNumChunks();
     int[] chunkOffsets = new int[numChunks];
     int chunkId = 0;

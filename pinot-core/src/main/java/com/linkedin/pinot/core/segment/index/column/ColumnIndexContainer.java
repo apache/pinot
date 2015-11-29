@@ -26,8 +26,9 @@ import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
@@ -35,7 +36,6 @@ import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
@@ -73,8 +73,8 @@ public abstract class ColumnIndexContainer {
       ImmutableDictionaryReader dictionary, ReadMode mode) throws IOException {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
 
-    FixedByteWidthRowColDataFileReader indexReader =
-        new FixedByteWidthRowColDataFileReader(fwdIndexFile, metadata.getCardinality(), 2, new int[] { 4, 4 },
+    FixedByteSingleValueMultiColReader indexReader =
+        new FixedByteSingleValueMultiColReader(fwdIndexFile, metadata.getCardinality(), 2, new int[] { 4, 4 },
             mode == ReadMode.mmap);
     return new SortedSVColumnIndexContainer(column, metadata, indexReader, dictionary);
   }
@@ -84,8 +84,8 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    FixedBitCompressedSVForwardIndexReader fwdIndexReader =
-        new FixedBitCompressedSVForwardIndexReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getBitsPerElement(),
+    FixedBitSingleValueReader fwdIndexReader =
+        new FixedBitSingleValueReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getBitsPerElement(),
             mode == ReadMode.mmap, metadata.hasNulls());
 
     BitmapInvertedIndexReader invertedIndex = null;
@@ -103,8 +103,8 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    FixedBitSkipListSCMVReader fwdIndexReader =
-        new FixedBitSkipListSCMVReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
+    FixedBitMultiValueReader fwdIndexReader =
+        new FixedBitMultiValueReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
             metadata.getBitsPerElement(), false, mode == ReadMode.mmap);
 
     BitmapInvertedIndexReader invertedIndex = null;
@@ -154,7 +154,7 @@ public abstract class ColumnIndexContainer {
         creator.add(i, dicIds);
       }
     } else {
-      FixedBitCompressedSVForwardIndexReader svFwdIndex = (FixedBitCompressedSVForwardIndexReader) fwdIndex;
+      FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
       for (int i = 0; i < metadata.getTotalDocs(); i++) {
         creator.add(i, svFwdIndex.getInt(i));
       }

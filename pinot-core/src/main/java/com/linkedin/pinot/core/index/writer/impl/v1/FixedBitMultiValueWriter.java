@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.index.writer.impl;
+package com.linkedin.pinot.core.index.writer.impl.v1;
 
 import java.io.File;
 import java.io.RandomAccessFile;
@@ -23,28 +23,33 @@ import java.nio.channels.FileChannel;
 import org.apache.commons.io.IOUtils;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Storage Layout
  * ==============
- * There will be three sections HEADER section, BITMAP and  RAW DATA
- * CHUNK OFFSET HEADER will contain one line per chunk, each line corresponding to the start offset and length of the chunk
- * BITMAP This will contain sequence of bits. The number of bits will be equal to the totalNumberOfValues.A bit is set to 1 if its start of a new docId. The number of bits set to 1 will be equal to the number of docs.
- * RAWDATA This simply has the actual multivalued data stored in sequence of int's. The number of ints is equal to the totalNumberOfValues
+ * There will be three sections HEADER section, BITMAP and RAW DATA
+ * CHUNK OFFSET HEADER will contain one line per chunk, each line corresponding to the start offset
+ * and length of the chunk
+ * BITMAP This will contain sequence of bits. The number of bits will be equal to the
+ * totalNumberOfValues.A bit is set to 1 if its start of a new docId. The number of bits set to 1
+ * will be equal to the number of docs.
+ * RAWDATA This simply has the actual multivalued data stored in sequence of int's. The number of
+ * ints is equal to the totalNumberOfValues
  * We divide all the documents into groups referred to as CHUNK. Each CHUNK will
  * - Have the same number of documents.
- * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up. 
- * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section 
- *
+ * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed
+ * the look up.
+ * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the
+ * bitmap to find the right offset in the raw data section
  */
-public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSkipListSCMVWriter.class);
+public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitMultiValueWriter.class);
 
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 1;
@@ -53,9 +58,9 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
   private ByteBuffer bitsetBuffer;
   private ByteBuffer rawDataBuffer;
   private RandomAccessFile raf;
-  private FixedByteWidthRowColDataFileWriter chunkOffsetsWriter;
+  private FixedByteSingleValueMultiColWriter chunkOffsetsWriter;
   private CustomBitSet customBitSet;
-  private FixedBitWidthRowColDataFileWriter rawDataWriter;
+  private FixedBitSingleValueMultiColWriter rawDataWriter;
   private int numChunks;
   int prevRowStartIndex = 0;
   int prevRowLength = 0;
@@ -66,7 +71,8 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
   private long totalSize;
   private int docsPerChunk;
 
-  public FixedBitSkipListSCMVWriter(File file, int numDocs, int totalNumValues, int columnSizeInBits) throws Exception {
+  public FixedBitMultiValueWriter(File file, int numDocs, int totalNumValues, int columnSizeInBits)
+      throws Exception {
     float averageValuesPerDoc = totalNumValues / numDocs;
     this.docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
     this.numChunks = (numDocs + docsPerChunk - 1) / docsPerChunk;
@@ -75,21 +81,24 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
     rawDataSize = ((long) totalNumValues * columnSizeInBits + 7) / 8;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     raf = new RandomAccessFile(file, "rw");
-    chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize, file,
-        this.getClass().getSimpleName() + " chunkOffsetsBuffer");
-    bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize, file,
-        this.getClass().getSimpleName() + " bitsetBuffer");
+    chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        chunkOffsetHeaderSize, file, this.getClass().getSimpleName() + " chunkOffsetsBuffer");
+    bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize,
+        bitsetSize, file, this.getClass().getSimpleName() + " bitsetBuffer");
     rawDataBuffer =
-        MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize, file,
-            this.getClass().getSimpleName() + " rawDataBuffer");
+        MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize,
+            rawDataSize, file, this.getClass().getSimpleName() + " rawDataBuffer");
 
-    chunkOffsetsWriter =
-        new FixedByteWidthRowColDataFileWriter(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER,
-            new int[] { SIZE_OF_INT });
+    chunkOffsetsWriter = new FixedByteSingleValueMultiColWriter(chunkOffsetsBuffer, numDocs,
+        NUM_COLS_IN_HEADER, new int[] {
+            SIZE_OF_INT
+    });
 
     customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
     rawDataWriter =
-        new FixedBitWidthRowColDataFileWriter(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBits });
+        new FixedBitSingleValueMultiColWriter(rawDataBuffer, totalNumValues, 1, new int[] {
+            columnSizeInBits
+    });
 
   }
 
@@ -127,11 +136,6 @@ public class FixedBitSkipListSCMVWriter implements SingleColumnMultiValueWriter 
 
   public int getRowsPerChunk() {
     return docsPerChunk;
-  }
-
-  @Override
-  public boolean setMetadata(DataFileMetadata metadata) {
-    return false;
   }
 
   @Override

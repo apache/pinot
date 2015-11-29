@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.indexsegment.utils;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 
 
 /**
@@ -24,9 +24,9 @@ import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileRea
 
 public class ByteBufferBinarySearchUtil {
 
-  private final FixedByteWidthRowColDataFileReader mmappedDataFile;
+  private final FixedByteSingleValueMultiColReader mmappedDataFile;
 
-  public ByteBufferBinarySearchUtil(FixedByteWidthRowColDataFileReader mmappedDataFile) {
+  public ByteBufferBinarySearchUtil(FixedByteSingleValueMultiColReader mmappedDataFile) {
     this.mmappedDataFile = mmappedDataFile;
   }
 

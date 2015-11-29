@@ -18,18 +18,17 @@ package com.linkedin.pinot.core.segment.index.readers;
 import java.io.IOException;
 
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 
 public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
-  private final FixedByteWidthRowColDataFileReader indexReader;
+  private final FixedByteSingleValueMultiColReader indexReader;
   private final ByteBufferBinarySearchUtil fileBinarySearcher;
   private final int numDocs;
 
-  public SortedForwardIndexReader(FixedByteWidthRowColDataFileReader rawFileReader, int numDocs) {
+  public SortedForwardIndexReader(FixedByteSingleValueMultiColReader rawFileReader, int numDocs) {
     indexReader = rawFileReader;
     fileBinarySearcher = new ByteBufferBinarySearchUtil(indexReader);
     this.numDocs = numDocs;
@@ -38,11 +37,6 @@ public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
   @Override
   public void close() throws IOException {
     // no need to close here , will be closed by parent container
-  }
-
-  @Override
-  public DataFileMetadata getMetadata() {
-    return null;
   }
 
   @Override

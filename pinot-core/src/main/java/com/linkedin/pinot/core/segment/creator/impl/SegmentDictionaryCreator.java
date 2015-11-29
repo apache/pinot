@@ -29,7 +29,7 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +69,8 @@ public class SegmentDictionaryCreator implements Closeable {
   public void build() throws Exception {
     switch (spec.getDataType()) {
       case INT:
-        final FixedByteWidthRowColDataFileWriter intDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter intDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
         intValueToIndexMap = new Int2IntOpenHashMap(rowCount);
         int[] sortedInts = (int[]) sortedList;
@@ -82,8 +82,8 @@ public class SegmentDictionaryCreator implements Closeable {
         intDictionaryWrite.close();
         break;
       case FLOAT:
-        final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter floatDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         floatValueToIndexMap = new Float2IntOpenHashMap(rowCount);
         float[] sortedFloats = (float[]) sortedList;
@@ -95,8 +95,8 @@ public class SegmentDictionaryCreator implements Closeable {
         floatDictionaryWrite.close();
         break;
       case LONG:
-        final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter longDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         longValueToIndexMap = new Long2IntOpenHashMap(rowCount);
         long[] sortedLongs = (long[]) sortedList;
@@ -108,8 +108,8 @@ public class SegmentDictionaryCreator implements Closeable {
         longDictionaryWrite.close();
         break;
       case DOUBLE:
-        final FixedByteWidthRowColDataFileWriter doubleDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter doubleDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         doubleValueToIndexMap = new Double2IntOpenHashMap(rowCount);
         double[] sortedDoubles = (double[]) sortedList;
@@ -131,8 +131,8 @@ public class SegmentDictionaryCreator implements Closeable {
           }
         }
 
-        final FixedByteWidthRowColDataFileWriter stringDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter stringDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 new int[] { stringColumnMaxLength });
 
         final String[] revised = new String[rowCount];

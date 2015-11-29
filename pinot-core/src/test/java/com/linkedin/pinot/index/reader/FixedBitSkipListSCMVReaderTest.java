@@ -23,8 +23,8 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
 
 
 public class FixedBitSkipListSCMVReaderTest {
@@ -56,7 +56,7 @@ public class FixedBitSkipListSCMVReaderTest {
       }
       System.out.println(Arrays.toString(startOffsets));
       System.out.println(Arrays.toString(lengths));
-      FixedBitSkipListSCMVWriter writer = new FixedBitSkipListSCMVWriter(f, numDocs, totalNumValues, maxBits);
+      FixedBitMultiValueWriter writer = new FixedBitMultiValueWriter(f, numDocs, totalNumValues, maxBits);
 
       for (int i = 0; i < data.length; i++) {
         writer.setIntArray(i, data[i]);
@@ -68,7 +68,7 @@ public class FixedBitSkipListSCMVReaderTest {
       raf.close();
 
       // Test heap mode
-      FixedBitSkipListSCMVReader heapReader = new FixedBitSkipListSCMVReader(f, numDocs, totalNumValues, maxBits, false, false);
+      FixedBitMultiValueReader heapReader = new FixedBitMultiValueReader(f, numDocs, totalNumValues, maxBits, false, false);
       final int[] readValues = new int[maxNumValues];
       for (int i = 0; i < data.length; i++) {
         final int numValues = heapReader.getIntArray(i, readValues);
@@ -82,7 +82,7 @@ public class FixedBitSkipListSCMVReaderTest {
       // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
       // Test mmap mode
-      FixedBitSkipListSCMVReader mmapReader = new FixedBitSkipListSCMVReader(f, numDocs, totalNumValues, maxBits, false, true);
+      FixedBitMultiValueReader mmapReader = new FixedBitMultiValueReader(f, numDocs, totalNumValues, maxBits, false, true);
       for (int i = 0; i < data.length; i++) {
         final int numValues = mmapReader.getIntArray(i, readValues);
         Assert.assertEquals(numValues, data[i].length);

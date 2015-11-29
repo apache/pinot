@@ -16,14 +16,10 @@
 package com.linkedin.pinot.core.index.reader;
 
 import java.io.Closeable;
-
+/**
+ * Marker interface to read any file in the segment directory
+ */
 public interface DataFileReader extends Closeable{
-
-  /**
-   * Provides the metadata about the data file
-   * @return
-   */
-  DataFileMetadata getMetadata();
 
  
 }

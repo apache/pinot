@@ -34,7 +34,7 @@ import org.apache.commons.io.IOUtils;
  *
  *
  */
-public class FixedBitWidthRowColDataFileWriter implements Closeable {
+public class FixedBitSingleValueMultiColWriter implements Closeable {
   private File file;
   private int[] columnOffsetsInBits;
 
@@ -49,27 +49,27 @@ public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private CustomBitSet bitSet;
   private int bytesRequired;
 
-  public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
+  public FixedBitSingleValueMultiColWriter(File file, int rows, int cols,
       int[] columnSizesInBits) throws Exception {
     init(file, rows, cols, columnSizesInBits);
     createBuffer(file);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
-  public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
+  public FixedBitSingleValueMultiColWriter(File file, int rows, int cols,
       int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);
     createBuffer(file);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
-  public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
+  public FixedBitSingleValueMultiColWriter(ByteBuffer byteBuffer, int rows,
       int cols, int[] columnSizesInBits) throws Exception {
     init(file, rows, cols, columnSizesInBits);
     bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
   }
 
-  public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
+  public FixedBitSingleValueMultiColWriter(ByteBuffer byteBuffer, int rows,
       int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
       throws Exception {
     init(file, rows, cols, columnSizesInBits, hasNegativeValues);

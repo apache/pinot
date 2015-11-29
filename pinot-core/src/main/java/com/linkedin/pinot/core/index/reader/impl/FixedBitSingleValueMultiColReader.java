@@ -42,8 +42,8 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class FixedBitWidthRowColDataFileReader implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthRowColDataFileReader.class);
+public class FixedBitSingleValueMultiColReader implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSingleValueMultiColReader.class);
 
   RandomAccessFile file;
   private int rows;
@@ -73,11 +73,11 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitWidthRowColDataFileReader forHeap(File file, int rows,
+  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows,
       int cols, int[] columnSizesInBits) throws IOException {
     boolean[] signed = new boolean[cols];
     Arrays.fill(signed, false);
-    return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+    return new FixedBitSingleValueMultiColReader(file, rows, cols,
         columnSizesInBits, signed, false);
   }
 
@@ -91,9 +91,9 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitWidthRowColDataFileReader forHeap(File file, int rows,
+  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows,
       int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+    return new FixedBitSingleValueMultiColReader(file, rows, cols,
         columnSizesInBits, signed, false);
   }
 
@@ -106,11 +106,11 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitWidthRowColDataFileReader forMmap(File file, int rows,
+  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows,
       int cols, int[] columnSizesInBits) throws IOException {
     boolean[] signed = new boolean[cols];
     Arrays.fill(signed, false);
-    return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+    return new FixedBitSingleValueMultiColReader(file, rows, cols,
         columnSizesInBits, signed, true);
   }
 
@@ -124,9 +124,9 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitWidthRowColDataFileReader forMmap(File file, int rows,
+  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows,
       int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+    return new FixedBitSingleValueMultiColReader(file, rows, cols,
         columnSizesInBits, signed, true);
   }
 
@@ -140,10 +140,10 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitWidthRowColDataFileReader forByteBuffer(
+  public static FixedBitSingleValueMultiColReader forByteBuffer(
       ByteBuffer dataBuffer, int rows, int cols, int[] columnSizesInBits,
       boolean[] signed) throws IOException {
-    return new FixedBitWidthRowColDataFileReader(dataBuffer, rows, cols,
+    return new FixedBitSingleValueMultiColReader(dataBuffer, rows, cols,
         columnSizesInBits, signed);
   }
 
@@ -160,7 +160,7 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    *          heap or mmmap
    * @throws IOException
    */
-  private FixedBitWidthRowColDataFileReader(File dataFile, int rows, int cols,
+  private FixedBitSingleValueMultiColReader(File dataFile, int rows, int cols,
       int[] columnSizesInBits, boolean[] signed, boolean isMmap)
       throws IOException {
     init(rows, cols, columnSizesInBits, signed);
@@ -190,7 +190,7 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    *          offset to each element to make it non negative
    * @throws IOException
    */
-  private FixedBitWidthRowColDataFileReader(ByteBuffer buffer, int rows,
+  private FixedBitSingleValueMultiColReader(ByteBuffer buffer, int rows,
       int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
     this.byteBuffer = buffer;
     ownsByteBuffer = false;
@@ -207,7 +207,7 @@ public class FixedBitWidthRowColDataFileReader implements Closeable {
    * @param columnSizes
    * @throws IOException
    */
-  private FixedBitWidthRowColDataFileReader(String fileName, int rows,
+  private FixedBitSingleValueMultiColReader(String fileName, int rows,
       int cols, int[] columnSizes, boolean[] signed) throws IOException {
     this(new File(fileName), rows, cols, columnSizes, signed, true);
   }

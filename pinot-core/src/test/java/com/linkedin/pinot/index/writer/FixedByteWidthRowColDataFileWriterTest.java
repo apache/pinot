@@ -25,8 +25,8 @@ import org.apache.commons.lang.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
@@ -40,7 +40,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     int rows = 100;
     int cols = 1;
     int[] columnSizes = new int[] { 4 };
-    FixedByteWidthRowColDataFileWriter writer = new FixedByteWidthRowColDataFileWriter(
+    FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(
         file, rows, cols, columnSizes);
     int[] data = new int[rows];
     Random r = new Random();
@@ -65,7 +65,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     int rows = 100;
     int cols = 2;
     int[] columnSizes = new int[] { 4, 4 };
-    FixedByteWidthRowColDataFileWriter writer = new FixedByteWidthRowColDataFileWriter(
+    FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(
         file, rows, cols, columnSizes);
     int[][] data = new int[rows][cols];
     Random r = new Random();
@@ -99,7 +99,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     System.out.println(Arrays.toString(bytes2));
     int stringColumnMaxLength = Math.max(testString1.getBytes().length, testString2.getBytes().length);
     int[] columnSizes = new int[] { stringColumnMaxLength };
-    FixedByteWidthRowColDataFileWriter writer = new FixedByteWidthRowColDataFileWriter(file, rows, cols, columnSizes);
+    FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);
     String[] data = new String[rows];
     for (int i = 0; i < rows; i++) {
       String toPut = (i % 2 == 0) ? testString1 : testString2;
@@ -114,7 +114,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
       writer.setString(i, 0, data[i]);
     }
     writer.close();
-    FixedByteWidthRowColDataFileReader dataFileReader = FixedByteWidthRowColDataFileReader.forMmap(file, rows, 1, new int[] { stringColumnMaxLength });
+    FixedByteSingleValueMultiColReader dataFileReader = FixedByteSingleValueMultiColReader.forMmap(file, rows, 1, new int[] { stringColumnMaxLength });
     for (int i = 0; i < rows; i++) {
       String stringInFile = dataFileReader.getString(i, 0);
       Assert.assertEquals(stringInFile, data[i]);

@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 
@@ -54,7 +54,7 @@ public class FixedBitSkipListSCMVWriterTest {
         }
         totalNumValues += numValues;
       }
-      FixedBitSkipListSCMVWriter writer = new FixedBitSkipListSCMVWriter(file, rows, totalNumValues, maxBits);
+      FixedBitMultiValueWriter writer = new FixedBitMultiValueWriter(file, rows, totalNumValues, maxBits);
       CustomBitSet bitSet = CustomBitSet.withBitLength(totalNumValues * maxBits);
       int numChunks = writer.getNumChunks();
       int[] chunkOffsets = new int[numChunks];

@@ -24,8 +24,8 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteSkipListSCMVReader;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteSkipListSCMVWriter;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedByteMultiValueReader;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedByteSkipListMultiValueWriter;
 
 
 public class FixedByteSkipListSCMVReaderTest {
@@ -61,7 +61,7 @@ public class FixedByteSkipListSCMVReaderTest {
     }
     LOGGER.trace(Arrays.toString(startOffsets));
     LOGGER.trace(Arrays.toString(lengths));
-    FixedByteSkipListSCMVWriter writer = new FixedByteSkipListSCMVWriter(f, numDocs, totalNumValues, Integer.SIZE / 8);
+    FixedByteSkipListMultiValueWriter writer = new FixedByteSkipListMultiValueWriter(f, numDocs, totalNumValues, Integer.SIZE / 8);
 
     for (int i = 0; i < data.length; i++) {
       writer.setIntArray(i, data[i]);
@@ -69,7 +69,7 @@ public class FixedByteSkipListSCMVReaderTest {
     writer.close();
 
     int[] readValues = new int[maxMultiValues];
-    FixedByteSkipListSCMVReader heapReader = new FixedByteSkipListSCMVReader(f, numDocs, totalNumValues, Integer.SIZE / 8, false);
+    FixedByteMultiValueReader heapReader = new FixedByteMultiValueReader(f, numDocs, totalNumValues, Integer.SIZE / 8, false);
     for (int i = 0; i < data.length; i++) {
       int numValues = heapReader.getIntArray(i, readValues);
       Assert.assertEquals(numValues, data[i].length);
@@ -81,7 +81,7 @@ public class FixedByteSkipListSCMVReaderTest {
     heapReader.close();
     // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
-    FixedByteSkipListSCMVReader mmapReader = new FixedByteSkipListSCMVReader(f, numDocs, totalNumValues, Integer.SIZE / 8, true);
+    FixedByteMultiValueReader mmapReader = new FixedByteMultiValueReader(f, numDocs, totalNumValues, Integer.SIZE / 8, true);
     for (int i = 0; i < data.length; i++) {
       int numValues = mmapReader.getIntArray(i, readValues);
       Assert.assertEquals(numValues, data[i].length);

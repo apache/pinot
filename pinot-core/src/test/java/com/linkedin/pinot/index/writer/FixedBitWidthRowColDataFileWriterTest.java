@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class FixedBitWidthRowColDataFileWriterTest {
@@ -42,7 +42,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
       final int rows = 100;
       final int cols = 1;
       final int[] columnSizesInBits = new int[] { maxBits };
-      final FixedBitWidthRowColDataFileWriter writer = new FixedBitWidthRowColDataFileWriter(
+      final FixedBitSingleValueMultiColWriter writer = new FixedBitSingleValueMultiColWriter(
           file, rows, cols, columnSizesInBits);
       final int[] data = new int[rows];
       final Random r = new Random();
@@ -98,7 +98,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
       final int rows = 100;
       final int cols = 1;
       final int[] columnSizesInBits = new int[] { maxBits };
-      final FixedBitWidthRowColDataFileWriter writer = new FixedBitWidthRowColDataFileWriter(
+      final FixedBitSingleValueMultiColWriter writer = new FixedBitSingleValueMultiColWriter(
           file, rows, cols, columnSizesInBits, new boolean[] { true });
       final int[] data = new int[rows];
       final Random r = new Random();

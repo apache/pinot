@@ -25,20 +25,20 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSkipListSCMVReader;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class MultiValueBlock implements Block {
 
-  private final FixedBitSkipListSCMVReader mVReader;
+  private final FixedBitMultiValueReader mVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
 
-  public MultiValueBlock(BlockId id, FixedBitSkipListSCMVReader multiValueReader, ImmutableDictionaryReader dict,
+  public MultiValueBlock(BlockId id, FixedBitMultiValueReader multiValueReader, ImmutableDictionaryReader dict,
       ColumnMetadata metadata) {
     mVReader = multiValueReader;
     this.id = id;

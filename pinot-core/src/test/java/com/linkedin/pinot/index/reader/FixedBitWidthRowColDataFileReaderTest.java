@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedBitSingleValueMultiColReader;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 
@@ -111,7 +111,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         fos.write(byteArray);
         fos.close();
 
-        FixedBitWidthRowColDataFileReader heapReader = FixedBitWidthRowColDataFileReader.forHeap(file, numElements,
+        FixedBitSingleValueMultiColReader heapReader = FixedBitSingleValueMultiColReader.forHeap(file, numElements,
             1, new int[] { maxBits });
         for (int i = 0; i < numElements; i++) {
           int readInt = heapReader.getInt(i, 0);
@@ -122,7 +122,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         heapReader.close();
         // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
 
-        FixedBitWidthRowColDataFileReader mmapReader = FixedBitWidthRowColDataFileReader.forMmap(file, numElements,
+        FixedBitSingleValueMultiColReader mmapReader = FixedBitSingleValueMultiColReader.forMmap(file, numElements,
             1, new int[] { maxBits });
         for (int i = 0; i < numElements; i++) {
           int readInt = mmapReader.getInt(i, 0);
@@ -182,7 +182,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         fos.write(byteArray);
         fos.close();
 
-        FixedBitWidthRowColDataFileReader heapReader = FixedBitWidthRowColDataFileReader.forHeap(file, numElements,
+        FixedBitSingleValueMultiColReader heapReader = FixedBitSingleValueMultiColReader.forHeap(file, numElements,
             1, new int[] { maxBits }, new boolean[] { true });
         for (int i = 0; i < numElements; i++) {
           int readInt = heapReader.getInt(i, 0);
@@ -193,7 +193,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         heapReader.close();
         // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
 
-        FixedBitWidthRowColDataFileReader mmapReader = FixedBitWidthRowColDataFileReader.forMmap(file, numElements,
+        FixedBitSingleValueMultiColReader mmapReader = FixedBitSingleValueMultiColReader.forMmap(file, numElements,
             1, new int[] { maxBits }, new boolean[] { true });
         for (int i = 0; i < numElements; i++) {
           int readInt = mmapReader.getInt(i, 0);

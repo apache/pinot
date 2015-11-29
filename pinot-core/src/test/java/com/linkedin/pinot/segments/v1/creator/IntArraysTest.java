@@ -17,6 +17,7 @@ package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
+
 import java.io.File;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -40,8 +41,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.util.TestUtils;
 
 

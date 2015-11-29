@@ -44,8 +44,8 @@ import com.linkedin.pinot.common.utils.MmapUtils;
  *
  *
  */
-public class FixedByteWidthRowColDataFileReader implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteWidthRowColDataFileReader.class);
+public class FixedByteSingleValueMultiColReader implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleValueMultiColReader.class);
 
   RandomAccessFile file;
   private final int rows;
@@ -65,9 +65,9 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedByteWidthRowColDataFileReader forHeap(File file,
+  public static FixedByteSingleValueMultiColReader forHeap(File file,
       int rows, int cols, int[] columnSizes) throws IOException {
-    return new FixedByteWidthRowColDataFileReader(file, rows, cols,
+    return new FixedByteSingleValueMultiColReader(file, rows, cols,
         columnSizes, false);
   }
 
@@ -80,9 +80,9 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedByteWidthRowColDataFileReader forMmap(File file,
+  public static FixedByteSingleValueMultiColReader forMmap(File file,
       int rows, int cols, int[] columnSizes) throws IOException {
-    return new FixedByteWidthRowColDataFileReader(file, rows, cols,
+    return new FixedByteSingleValueMultiColReader(file, rows, cols,
         columnSizes, true);
   }
 
@@ -95,7 +95,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
    *            in bytes
    * @throws IOException
    */
-  public FixedByteWidthRowColDataFileReader(File dataFile, int rows,
+  public FixedByteSingleValueMultiColReader(File dataFile, int rows,
       int cols, int[] columnSizes, boolean isMmap) throws IOException {
     this.rows = rows;
     this.cols = cols;
@@ -121,7 +121,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     }
   }
 
-  public FixedByteWidthRowColDataFileReader(ByteBuffer buffer, int rows,
+  public FixedByteSingleValueMultiColReader(ByteBuffer buffer, int rows,
       int cols, int[] columnSizes) throws IOException {
     this.rows = rows;
     this.cols = cols;
@@ -136,7 +136,7 @@ public class FixedByteWidthRowColDataFileReader implements Closeable {
     byteBuffer = buffer;
   }
 
-  public FixedByteWidthRowColDataFileReader(String fileName, int rows,
+  public FixedByteSingleValueMultiColReader(String fileName, int rows,
       int cols, int[] columnSizes) throws IOException {
     this(new File(fileName), rows, cols, columnSizes, true);
   }

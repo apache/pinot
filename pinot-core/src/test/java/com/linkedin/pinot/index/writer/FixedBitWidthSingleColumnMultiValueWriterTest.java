@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class FixedBitWidthSingleColumnMultiValueWriterTest {
@@ -49,7 +49,7 @@ public class FixedBitWidthSingleColumnMultiValueWriterTest {
         }
         totalNumValues += numValues;
       }
-      FixedBitWidthSingleColumnMultiValueWriter writer = new FixedBitWidthSingleColumnMultiValueWriter(
+      FixedBitSingleColumnMultiValueWriter writer = new FixedBitSingleColumnMultiValueWriter(
           file, rows, totalNumValues, maxBits);
       CustomBitSet bitSet = CustomBitSet
           .withBitLength(totalNumValues * maxBits);

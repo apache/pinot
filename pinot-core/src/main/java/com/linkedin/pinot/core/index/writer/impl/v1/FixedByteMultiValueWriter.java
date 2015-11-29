@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.index.writer.impl;
+package com.linkedin.pinot.core.index.writer.impl.v1;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.index.reader.DataFileMetadata;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -27,18 +28,18 @@ import java.nio.channels.FileChannel;
 import org.apache.commons.io.IOUtils;
 
 
-public class FixedByteWidthSingleColumnMultiValueWriter implements
+public class FixedByteMultiValueWriter implements
     SingleColumnMultiValueWriter {
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
   private ByteBuffer headerBuffer;
   private ByteBuffer dataBuffer;
   private RandomAccessFile raf;
-  private FixedByteWidthRowColDataFileWriter headerWriter;
-  private FixedByteWidthRowColDataFileWriter dataWriter;
-  private FixedByteWidthRowColDataFileReader headerReader;
+  private FixedByteSingleValueMultiColWriter headerWriter;
+  private FixedByteSingleValueMultiColWriter dataWriter;
+  private FixedByteSingleValueMultiColReader headerReader;
 
-  public FixedByteWidthSingleColumnMultiValueWriter(File file, int numDocs,
+  public FixedByteMultiValueWriter(File file, int numDocs,
       int totalNumValues, int columnSizeInBytes) throws Exception {
     // there will be two sections header and data
     // header will contain N lines, each line corresponding to the
@@ -50,20 +51,14 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
         headerSize, file, this.getClass().getSimpleName() + " headerBuffer");
     dataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE,
         headerSize, dataSize, file, this.getClass().getSimpleName() + " dataBuffer");
-    headerWriter = new FixedByteWidthRowColDataFileWriter(headerBuffer,
+    headerWriter = new FixedByteSingleValueMultiColWriter(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
-    headerReader = new FixedByteWidthRowColDataFileReader(headerBuffer,
+    headerReader = new FixedByteSingleValueMultiColReader(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
 
-    dataWriter = new FixedByteWidthRowColDataFileWriter(dataBuffer,
+    dataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer,
         totalNumValues, 1, new int[] { columnSizeInBytes });
 
-  }
-
-  @Override
-  public boolean setMetadata(DataFileMetadata metadata) {
-    // TODO Auto-generated method stub
-    return false;
   }
 
   @Override

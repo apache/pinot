@@ -19,19 +19,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.core.index.writer.impl.FixedBitSkipListSCMVWriter;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteSkipListSCMVWriter;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
 
 
 public class MultiValueReaderWriterBenchmark {
@@ -66,8 +60,8 @@ public class MultiValueReaderWriterBenchmark {
     int bitMapSize = 0;
     File outputFile = new File("output.mv.fwd");
 
-    FixedBitSkipListSCMVWriter fixedBitSkipListSCMVWriter =
-        new FixedBitSkipListSCMVWriter(outputFile, totalDocs, totalNumValues, maxBitsNeeded);
+    FixedBitMultiValueWriter fixedBitSkipListSCMVWriter =
+        new FixedBitMultiValueWriter(outputFile, totalDocs, totalNumValues, maxBitsNeeded);
 
     for (int i = 0; i < totalDocs; i++) {
       fixedBitSkipListSCMVWriter.setIntArray(i, data[i]);

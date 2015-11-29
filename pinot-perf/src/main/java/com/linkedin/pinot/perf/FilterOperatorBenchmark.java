@@ -47,6 +47,7 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.operator.docidsets.AndBlockDocIdSet;
@@ -54,7 +55,6 @@ import com.linkedin.pinot.core.plan.RawFilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 
@@ -220,7 +220,7 @@ public class FilterOperatorBenchmark {
           for (int i = 0; i < columns.length; i++) {
             String column = columns[i];
             UnSortedSingleValueBlock unSortedSingleValueBlock = unsortedSingleValueBlockMap.get(column);
-            FixedBitCompressedSVForwardIndexReader svReader = unSortedSingleValueBlock.getSVReader();
+            FixedBitSingleValueReader svReader = unSortedSingleValueBlock.getSVReader();
             for (int j = 0; j < idx; j++) {
               dictIds[j] = svReader.getDataFileReader().getInt(docIds[j], 0);
             }
