@@ -23,7 +23,9 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -34,9 +36,9 @@ import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.StreamProviderFactory;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelConsumerStreamProvider;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
@@ -55,7 +57,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private final File resourceDir;
   private final File resourceTmpDir;
   private final Object lock = new Object();
-  private IndexSegment realtimeSegment;
+  private RealtimeSegmentImpl realtimeSegment;
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
@@ -103,13 +105,13 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     }
     this.mode = mode;
     // create and init stream provider
-    this.kafkaStreamProvider = new KafkaHighLevelConsumerStreamProvider();
+    this.kafkaStreamProvider = StreamProviderFactory.buildStreamProvider();
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig);
     this.kafkaStreamProvider.start();
     // lets create a new realtime segment
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment());
-    ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentName(segmentMetadata.getSegmentName());
-    ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentMetadata(segmentMetadata, this.schema);
+    realtimeSegment.setSegmentName(segmentMetadata.getSegmentName());
+    realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeResourceManager;
 
     segmentStatusTask = new TimerTask() {
@@ -124,31 +126,52 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       @Override
       public void run() {
         // continue indexing until criteria is met
-        while (((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next()) && keepIndexing) {
-        }
+        boolean notFull = true;
+        long exceptionSleepMillis = 50L;
 
-        LOGGER.info("Indexing threshold reached, proceeding with index conversion");
-        // kill the timer first
-        segmentStatusTask.cancel();
-        LOGGER.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
-        LOGGER.info("Indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
-            + " raw events, current number of docs = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs());
-        File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+        do {
+          try {
+            GenericRow row = kafkaStreamProvider.next();
 
-        // lets convert the segment now
-        RealtimeSegmentConverter conveter =
-            new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(),
-                schema, segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn);
+            if (row != null) {
+              notFull = realtimeSegment.index(row);
+              exceptionSleepMillis = 50L;
+            }
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception while indexing row, sleeping for {} ms", exceptionSleepMillis, e);
+
+            // Sleep for a short time as to avoid filling the logs with exceptions too quickly
+            Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
+            exceptionSleepMillis = Math.min(60000L, exceptionSleepMillis * 2);
+          } catch (Error e) {
+            LOGGER.error("Caught error in indexing thread", e);
+            throw e;
+          }
+        } while (notFull && keepIndexing);
+
         try {
+          LOGGER.info("Indexing threshold reached, proceeding with index conversion");
+          // kill the timer first
+          segmentStatusTask.cancel();
+          LOGGER.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
+          LOGGER.info("Indexed " + realtimeSegment.getRawDocumentCount()
+              + " raw events, current number of docs = " + realtimeSegment.getTotalDocs());
+          File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+
+          // lets convert the segment now
+          RealtimeSegmentConverter converter =
+              new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(),
+                  schema, segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn);
+
           LOGGER.info("Trying to build segment!");
-          conveter.build();
+          converter.build();
           File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
           FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
 
           FileUtils.deleteQuietly(tempSegmentFolder);
-          long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
-          long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
+          long startTime = realtimeSegment.getMinTime();
+          long endTime = realtimeSegment.getMaxTime();
 
           TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
           swap();
@@ -198,18 +221,18 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   private void computeKeepIndexing() {
     if (keepIndexing) {
-      LOGGER.debug("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
-          + " raw events, success = " + ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount()
-          + " docs, total = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
+      LOGGER.debug("Current indexed " + realtimeSegment.getRawDocumentCount()
+          + " raw events, success = " + realtimeSegment.getSuccessIndexedCount()
+          + " docs, total = " + realtimeSegment.getTotalDocs() + " docs in realtime segment");
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
-          || ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
-        if (((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() == 0) {
+          || realtimeSegment.getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
+        if (realtimeSegment.getRawDocumentCount() == 0) {
           LOGGER.info("no new events coming in, extending the end time by another hour");
           segmentEndTimeThreshold = System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
           return;
         }
         LOGGER.info("Stopped indexing due to reaching segment limit: "
-            + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+            + realtimeSegment.getRawDocumentCount()
             + " raw documents indexed, segment is aged "
             + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
         keepIndexing = false;
