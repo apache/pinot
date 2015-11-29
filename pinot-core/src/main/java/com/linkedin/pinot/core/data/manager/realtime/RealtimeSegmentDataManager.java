@@ -58,6 +58,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private final File resourceTmpDir;
   private final Object lock = new Object();
   private RealtimeSegmentImpl realtimeSegment;
+  private IndexSegment indexSegment;
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
@@ -112,6 +113,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment());
     realtimeSegment.setSegmentName(segmentMetadata.getSegmentName());
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
+    indexSegment = realtimeSegment;
     notifier = realtimeResourceManager;
 
     segmentStatusTask = new TimerTask() {
@@ -205,13 +207,14 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   public void swap() throws Exception {
     IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode);
     synchronized (lock) {
-      this.realtimeSegment = segment;
+      indexSegment = segment;
+      realtimeSegment = null;
     }
   }
 
   @Override
   public IndexSegment getSegment() {
-    return realtimeSegment;
+    return indexSegment;
   }
 
   @Override
