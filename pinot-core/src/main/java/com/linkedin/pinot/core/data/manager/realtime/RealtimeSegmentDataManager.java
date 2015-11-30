@@ -190,6 +190,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
           kafkaStreamProvider.commit();
           kafkaStreamProvider.shutdown();
+
+          realtimeSegment = null;
         } catch (Exception e) {
           LOGGER.error("Caught exception in the realtime indexing thread", e);
         }
@@ -208,7 +210,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode);
     synchronized (lock) {
       indexSegment = segment;
-      realtimeSegment = null;
     }
   }
 
