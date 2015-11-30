@@ -46,15 +46,15 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 /**
  * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from Kafka.
  */
-public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentsManager.class);
+public class PinotRealtimeSegmentManager implements HelixPropertyListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentManager.class);
 
   private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN =
       "/SEGMENTS/.*_REALTIME|/SEGMENTS/.*_REALTIME/.*";
 
   private final PinotHelixResourceManager pinotClusterManager;
 
-  public PinotRealtimeSegmentsManager(PinotHelixResourceManager pinotManager) {
+  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager) {
     this.pinotClusterManager = pinotManager;
   }
 

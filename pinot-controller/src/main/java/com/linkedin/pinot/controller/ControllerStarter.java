@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentsManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -50,7 +50,7 @@ public class ControllerStarter {
   private final RetentionManager retentionManager;
   private final ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
-  private final PinotRealtimeSegmentsManager realtimeSegmentsManager;
+  private final PinotRealtimeSegmentManager realtimeSegmentsManager;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -61,7 +61,7 @@ public class ControllerStarter {
     _metricsRegistry = new MetricsRegistry();
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
     validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
-    realtimeSegmentsManager = new PinotRealtimeSegmentsManager(helixResourceManager);
+    realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
