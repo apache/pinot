@@ -26,9 +26,6 @@ import java.util.Set;
 
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +43,9 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 
 
+/**
+ * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from Kafka.
+ */
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentsManager.class);
 
@@ -59,19 +59,17 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   }
 
   public void start() {
-    LOGGER.info("starting realtime segments manager, adding a listener on the property store root");
+    LOGGER.info("Starting realtime segments manager, adding a listener on the property store root.");
     this.pinotClusterManager.getPropertyStore().subscribe("/", this);
   }
 
   public void stop() {
-    LOGGER.info("stopping realtime segments manager, stopping property store");
+    LOGGER.info("Stopping realtime segments manager, stopping property store.");
     this.pinotClusterManager.getPropertyStore().stop();
   }
 
-  private synchronized void eval() throws JsonParseException, JsonMappingException, JsonProcessingException,
-      JSONException, IOException {
-    // fetch current ideal state snapshot
-
+  private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary() throws JSONException, IOException {
+    // Fetch current ideal state snapshot
     Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
 
     for (String resource : pinotClusterManager.getAllRealtimeTables()) {
@@ -83,17 +81,19 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
     List<String> listOfSegmentsToAdd = new ArrayList<String>();
 
     for (String resource : idealStateMap.keySet()) {
-      // get ideal state from map
       IdealState state = idealStateMap.get(resource);
 
+      // Are there any partitions?
       if (state.getPartitionSet().size() == 0) {
-        // this is a brand new ideal state, which means we will add one new segment to every patition,replica
+        // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
         List<String> instancesInResource = new ArrayList<String>();
         try {
           instancesInResource.addAll(pinotClusterManager.getServerInstancesForTable(resource, TableType.REALTIME));
         } catch (Exception e) {
-          LOGGER.error("error fetching instances", e);
+          LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
         }
+
+        // Assign a new segment to all server instances
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
@@ -102,10 +102,12 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
               String.valueOf(System.currentTimeMillis())));
         }
       } else {
+        // Add all server instances to the list of instances for which to assign a realtime segment
         Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
         instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getServerInstancesForTable(resource,
             TableType.REALTIME));
 
+        // Remove server instances that are currently processing a segment
         for (String partition : state.getPartitionSet()) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
               ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
@@ -115,6 +117,8 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
             instancesToAssignRealtimeSegment.remove(instanceName);
           }
         }
+
+        // Assign a new segment to the server instances not currently processing this segment
         for (String instanceId : instancesToAssignRealtimeSegment) {
           InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
@@ -125,86 +129,70 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
       }
     }
 
-    LOGGER.info("computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAdd.toArray()));
+    LOGGER.info("Computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAdd.toArray()));
 
-    // new lets add the new segments
+    // Add the new segments to the server instances
     for (String segmentId : listOfSegmentsToAdd) {
       String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
       String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(segmentId);
+
+      // Does the ideal state already contain this segment?
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
-        // create realtime segment metadata
+        // No, add it
+        // Create the realtime segment metadata
         RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
         realtimeSegmentMetadataToAdd.setTableName(TableNameBuilder.extractRawTableName(resourceName));
         realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
         realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
-        // add to property store first
+
+        // Add the new metadata to the property store
         ZKMetadataProvider.setRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
             realtimeSegmentMetadataToAdd);
-        //update ideal state next
+
+        // Update the ideal state to add the new realtime segment
         IdealState s =
             PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, idealStateMap.get(resourceName),
                 instanceName);
+
         pinotClusterManager.getHelixAdmin().setResourceIdealState(pinotClusterManager.getHelixClusterName(),
             resourceName, PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, s, instanceName));
       }
     }
   }
 
-  private boolean canEval() {
+  private boolean isLeader() {
     return this.pinotClusterManager.isLeader();
   }
 
   @Override
   public synchronized void onDataChange(String path) {
-    try {
-      if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
-        if (canEval()) {
-          eval();
-        } else {
-          LOGGER.info("Ignoring change due to not being a cluster leader");
-        }
-      } else {
-        LOGGER.info("Not matched data change path, do nothing");
-      }
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing data change for path " + path, e);
-      Utils.rethrowException(e);
-    }
+    processPropertyStoreChange(path);
   }
 
   @Override
   public synchronized void onDataCreate(String path) {
-    try {
-      if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
-        if (canEval()) {
-          eval();
-        } else {
-          LOGGER.info("Ignoring change due to not being a cluster leader");
-        }
-      } else {
-        LOGGER.info("Not matched data create path, do nothing");
-      }
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing data create for path " + path, e);
-      Utils.rethrowException(e);
-    }
+    processPropertyStoreChange(path);
   }
 
   @Override
   public synchronized void onDataDelete(String path) {
+    processPropertyStoreChange(path);
+  }
+
+  private void processPropertyStoreChange(String path) {
     try {
       if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
-        if (canEval()) {
-          eval();
+        if (isLeader()) {
+          assignRealtimeSegmentsToServerInstancesIfNecessary();
         } else {
-          LOGGER.info("Ignoring change due to not being a cluster leader");
+          LOGGER.info("Not the leader of this cluster, ignoring realtime segment property store change.");
         }
       } else {
-        LOGGER.info("Not matched data delete path, do nothing");
+        LOGGER.info("Path {} does not match a realtime segment, ignoring.", path);
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while processing data delete for path " + path, e);
+      LOGGER.error("Caught exception while processing data change for path {}", path, e);
       Utils.rethrowException(e);
     }
   }
