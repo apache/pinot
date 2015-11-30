@@ -38,6 +38,8 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -151,12 +153,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener {
             realtimeSegmentMetadataToAdd);
 
         // Update the ideal state to add the new realtime segment
-        IdealState s =
-            PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, idealStateMap.get(resourceName),
-                instanceName);
-
-        pinotClusterManager.getHelixAdmin().setResourceIdealState(pinotClusterManager.getHelixClusterName(),
-            resourceName, PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, s, instanceName));
+        HelixHelper.updateIdealState(pinotClusterManager.getHelixZkManager(), resourceName,
+            idealState ->
+                PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName),
+            RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
       }
     }
   }
