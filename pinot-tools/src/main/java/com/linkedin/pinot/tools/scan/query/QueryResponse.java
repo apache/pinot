@@ -24,15 +24,19 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 
 public class QueryResponse {
-  private int _numDocsScanned;
-  private int _totalDocs;
-  private long _timeUsedMs;
+  private int _numDocsScanned = 0;
+  private int _totalDocs = 0;
+  private long _timeUsedMs = 0;
 
   SelectionResults _selectionResults;
   List<AggregationResult> _aggregationResults;
   List<AggregationGroupByResult> _aggregationGroupByResults;
 
   QueryResponse(ResultTable resultTable) {
+    if (resultTable == null) {
+      return;
+    }
+
     _numDocsScanned = resultTable.getNumDocsScanned();
     _totalDocs = resultTable.getTotalDocs();
     _timeUsedMs = resultTable.getProcessingTime();

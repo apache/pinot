@@ -87,12 +87,14 @@ public class ScanBasedQueryProcessor {
       results = aggregation.aggregate(results);
     }
 
-    results.setNumDocsScanned(numDocsScanned);
-    results.setTotalDocs(totalDocs);
-    long totalUsedMs = System.currentTimeMillis() - startTimeInMillis;
-    results.setProcessingTime(totalUsedMs);
+    if (results != null) {
+      results.setNumDocsScanned(numDocsScanned);
+      results.setTotalDocs(totalDocs);
+      long totalUsedMs = System.currentTimeMillis() - startTimeInMillis;
+      results.setProcessingTime(totalUsedMs);
+      results.seal();
+    }
 
-    results.seal();
     QueryResponse queryResponse = new QueryResponse(results);
 
     return queryResponse;
@@ -113,7 +115,7 @@ public class ScanBasedQueryProcessor {
               resultTables.add(resultTable);
             }
           } catch (Exception e) {
-            LOGGER.error("Exception caught while processing segment.", e);
+            LOGGER.error("Exception caught while processing segment '{}'.", segmentQueryProcessor.getSegmentName(), e);
             return;
           }
         }
