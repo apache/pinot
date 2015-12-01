@@ -253,8 +253,17 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     final int length = getColumnSizes()[col];
     final byte[] dst = new byte[length];
     final int offset = computeOffset(row, col);
-    byteBuffer.position(offset);
-    byteBuffer.get(dst, 0, length);
+    // [PINOT-2381] duplicate buffer for thread-safety before setting position
+    // duplicate() and absolute get() methods themselves are not guaranteed
+    // to be thread-safe but those are "fairly"/practically safe.
+    // Thread-locals are one way to guarantee thread-safety
+    // of bytebuffer but that can be costly.
+    // TODO/atumbde: we are investigating the performance impact of
+    // thread-locals before introducing those. This fix is temporary
+    // fix to get correctness in query comparisons for migration
+    ByteBuffer bufferCopy = byteBuffer.duplicate();
+    bufferCopy.position(offset);
+    bufferCopy.get(dst, 0, length);
     return dst;
   }
 
