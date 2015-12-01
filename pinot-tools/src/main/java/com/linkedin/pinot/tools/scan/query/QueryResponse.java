@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -50,7 +51,7 @@ public class QueryResponse {
         break;
 
       default:
-        throw new RuntimeException("Invalid result type");
+        // Nothing to do here.
     }
   }
 
@@ -113,7 +114,14 @@ public class QueryResponse {
         if (columnList.get(colId).getSecond() != null) {
           break;
         }
-        group.add(value.toString());
+        if (value instanceof  Object []) {
+          Object[] array = (Object[]) value;
+          for (Object obj : array) {
+            group.add(obj.toString());
+          }
+        } else {
+          group.add(value.toString());
+        }
         ++colId;
       }
       groupValues.add(group);
@@ -215,10 +223,12 @@ public class QueryResponse {
       _group = group;
     }
 
+    @JsonProperty("value")
     public String getValue() {
       return _value;
     }
 
+    @JsonProperty("group")
     public List<String> getGroup() {
       return _group;
     }

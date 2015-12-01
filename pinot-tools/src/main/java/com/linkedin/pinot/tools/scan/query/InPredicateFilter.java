@@ -38,9 +38,10 @@ public class InPredicateFilter implements PredicateFilter {
   }
 
   @Override
-  public boolean apply(int[] dictIds) {
-    for (int dictId : dictIds) {
-      if (inSet.contains(dictId)) {
+  public boolean apply(int[] dictIds, int length) {
+    // length <= dictIds.length
+    for (int i = 0; i < length; ++i) {
+      if (inSet.contains(dictIds[i])) {
         return true;
       }
     }

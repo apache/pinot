@@ -18,5 +18,5 @@ package com.linkedin.pinot.tools.scan.query;
 public interface PredicateFilter {
 
   boolean apply(int dictId);
-  boolean apply(int [] dictIds);
+  boolean apply(int [] dictIds, int length);
 }

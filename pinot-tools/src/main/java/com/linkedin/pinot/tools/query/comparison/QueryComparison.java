@@ -49,6 +49,7 @@ public class QueryComparison {
   private static final String GROUP_BY_COLUMNS = "groupByColumns";
   private static final String GROUP_BY_RESULT = "groupByResult";
   private static final String GROUP = "group";
+  private static final String TIME_USED_MS = "timeUsedMs";
 
   private File _segmentsDir;
   private File _queryFile;
@@ -107,8 +108,8 @@ public class QueryComparison {
 
         if (compare(clusterJson, scanJson)) {
           ++passed;
-          LOGGER.info("Comparison PASSED: {}", query);
-          LOGGER.info("Scan Result: {}", scanJson.toString());
+          LOGGER.info("Comparison PASSED: Scan Time: {} ms Query: {}", scanJson.get(TIME_USED_MS), query);
+          LOGGER.info("Cluster Result: {}", clusterJson);
         } else {
           LOGGER.error("Comparison FAILED: {}", query);
           LOGGER.info("Cluster Response: {}", clusterJson);
@@ -226,13 +227,13 @@ public class QueryComparison {
     Map<String, Integer> functionMap = new HashMap<>();
     for (int i = 0; i < numScanGroupBy; ++i) {
       JSONObject scanAggr = scanGroupByResults.getJSONObject(i);
-      String scanFunction = scanAggr.getString(FUNCTION);
+      String scanFunction = scanAggr.getString(FUNCTION).toLowerCase();
       functionMap.put(scanFunction, i);
     }
 
     for (int i = 0; i < numClusterGroupBy; ++i) {
       JSONObject clusterAggr = clusterGroupByResults.getJSONObject(i);
-      String clusterFunction = clusterAggr.getString(FUNCTION);
+      String clusterFunction = clusterAggr.getString(FUNCTION).toLowerCase();
 
       if (!functionMap.containsKey(clusterFunction)) {
         LOGGER.error("Missing group by function in scan: {}", clusterFunction);
@@ -414,7 +415,20 @@ public class QueryComparison {
   }
 
   private static boolean fuzzyEqual(double d1, double d2) {
-    return (Math.abs(d1 - d2) < EPSILON);
+    if (d1 == d2) {
+      return true;
+    }
+
+    if (Math.abs(d1 - d2) < EPSILON) {
+      return true;
+    }
+
+    // For really large numbers, use relative error.
+    if (d1 > 0 && ((Math.abs(d1 - d2)) / d1) < EPSILON) {
+      return true;
+    }
+
+    return false;
   }
 
   public static void main(String[] args) {

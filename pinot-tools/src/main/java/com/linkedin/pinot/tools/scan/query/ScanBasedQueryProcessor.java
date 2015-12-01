@@ -26,7 +26,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -37,11 +39,18 @@ import org.slf4j.LoggerFactory;
 
 public class ScanBasedQueryProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedQueryProcessor.class);
-  private final String _segmentsDir;
+
+  Map<File, SegmentQueryProcessor> _segmentQueryProcessorMap;
   private long _timeoutInSeconds = 10000;
 
-  public ScanBasedQueryProcessor(String segmentsDir) {
-    _segmentsDir = segmentsDir;
+  public ScanBasedQueryProcessor(String segmentsDirName)
+      throws Exception {
+    File segmentsDir = new File(segmentsDirName);
+    _segmentQueryProcessorMap = new HashMap<>();
+
+    for (File segmentFile : segmentsDir.listFiles()) {
+      _segmentQueryProcessorMap.put(segmentFile, new SegmentQueryProcessor(segmentFile));
+    }
   }
 
   public QueryResponse processQuery(String query)
@@ -50,7 +59,6 @@ public class ScanBasedQueryProcessor {
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest brokerRequest = pql2Compiler.compileToBrokerRequest(query);
     ResultTable results = null;
-    File file = new File(_segmentsDir);
 
     Aggregation aggregation = null;
     List<String> groupByColumns;
@@ -67,7 +75,7 @@ public class ScanBasedQueryProcessor {
     int numSegments = 0;
     LOGGER.info("Processing Query: {}", query);
 
-    List<ResultTable> resultTables = processSegments(query, brokerRequest, file);
+    List<ResultTable> resultTables = processSegments(query, brokerRequest);
     for (ResultTable segmentResults : resultTables) {
       numDocsScanned += segmentResults.getNumDocsScanned();
       totalDocs += segmentResults.getTotalDocs();
@@ -90,19 +98,17 @@ public class ScanBasedQueryProcessor {
     return queryResponse;
   }
 
-  private List<ResultTable> processSegments(final String query, final BrokerRequest brokerRequest, File segmentsDir)
+  private List<ResultTable> processSegments(final String query, final BrokerRequest brokerRequest)
       throws InterruptedException {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     List<ResultTable> resultTables = Collections.synchronizedList(new ArrayList<ResultTable>());
 
-    for (final File segment : segmentsDir.listFiles()) {
+    for (final SegmentQueryProcessor segmentQueryProcessor : _segmentQueryProcessorMap.values()) {
       executorService.execute(new Runnable() {
         @Override
         public void run() {
-          LOGGER.info("Processing segment: " + segment.getName());
-          SegmentQueryProcessor processor = new SegmentQueryProcessor(brokerRequest, segment);
           try {
-            ResultTable resultTable = processor.process(query);
+            ResultTable resultTable = segmentQueryProcessor.process(brokerRequest);
             if (resultTable != null) {
               resultTables.add(resultTable);
             }

@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -31,55 +32,83 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 class SegmentQueryProcessor {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SegmentQueryProcessor.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentQueryProcessor.class);
 
-  private BrokerRequest _brokerRequest;
   private File _segmentDir;
+  private Set<String> _mvColumns;
+  private Map<String, int[]> _mvColumnArrayMap;
 
-  SegmentQueryProcessor(BrokerRequest brokerRequest, File segmentDir) {
-    _brokerRequest = brokerRequest;
+  private final SegmentMetadataImpl _metadata;
+  private final IndexSegmentImpl _indexSegment;
+
+  private final String _tableName;
+  private final String _segmentName;
+  private final int _totalDocs;
+
+  SegmentQueryProcessor(File segmentDir)
+      throws Exception {
     _segmentDir = segmentDir;
+
+    _indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.heap);
+    _metadata = new SegmentMetadataImpl(_segmentDir);
+    _tableName = _metadata.getTableName();
+    _segmentName = _metadata.getName();
+
+    _totalDocs = _metadata.getTotalDocs();
+
+    _mvColumns = new HashSet<>();
+    _mvColumnArrayMap = new HashMap<>();
+
+    for (ColumnMetadata columnMetadata : _metadata.getColumnMetadataMap().values()) {
+      String column = columnMetadata.getColumnName();
+
+      if (!columnMetadata.isSingleValue()) {
+        _mvColumns.add(column);
+      }
+      _mvColumnArrayMap.put(column, new int[columnMetadata.getMaxNumberOfMultiValues()]);
+    }
   }
 
-  public ResultTable process(String query)
+  public ResultTable process(BrokerRequest brokerRequest)
       throws Exception {
-    SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDir);
-    if (!metadata.getTableName().equals(_brokerRequest.getQuerySource().getTableName())) {
-      LOGGER.info("Skipping segment {} from different table {}", _segmentDir.getName(), metadata.getTableName());
+    if (!_tableName.equals(brokerRequest.getQuerySource().getTableName())) {
+      LOGGER.info("Skipping segment {} from different table {}", _segmentName, _tableName);
       return null;
     }
 
-    IndexSegmentImpl indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.heap);
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    List<Integer> filteredDocIds = filterDocIds(indexSegment, metadata, filterQueryTree);
+    LOGGER.info("Processing segment: {}", _segmentName);
+    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+    List<Integer> filteredDocIds = filterDocIds(filterQueryTree, null);
 
     ResultTable result = null;
-    if (_brokerRequest.isSetAggregationsInfo()) {
+    if (brokerRequest.isSetAggregationsInfo()) {
       // Aggregation only
-      if (!_brokerRequest.isSetGroupBy()) {
+      if (!brokerRequest.isSetGroupBy()) {
         Aggregation aggregation =
-            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(), null, 10);
-        result =  aggregation.run();
+            new Aggregation(_indexSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(), null, 10);
+        result = aggregation.run();
       } else { // Aggregation GroupBy
-        GroupBy groupBy = _brokerRequest.getGroupBy();
+        GroupBy groupBy = brokerRequest.getGroupBy();
         Aggregation aggregation =
-            new Aggregation(indexSegment, metadata, filteredDocIds, _brokerRequest.getAggregationsInfo(),
+            new Aggregation(_indexSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(),
                 groupBy.getColumns(), groupBy.getTopN());
         result = aggregation.run();
       }
     } else {// Only Selection
-      if (_brokerRequest.isSetSelections()) {
-        List<String> columns = _brokerRequest.getSelections().getSelectionColumns();
+      if (brokerRequest.isSetSelections()) {
+        List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {
-          columns = Arrays.asList(indexSegment.getColumnNames());
+          columns = Arrays.asList(_indexSegment.getColumnNames());
         }
         List<Pair> selectionColumns = new ArrayList<>();
         Set<String> columSet = new HashSet<>();
@@ -91,35 +120,26 @@ class SegmentQueryProcessor {
             columSet.add(column);
           }
         }
-        Selection selection = new Selection(indexSegment, metadata, filteredDocIds, selectionColumns);
+        Selection selection = new Selection(_indexSegment, _metadata, filteredDocIds, selectionColumns);
         result = selection.run();
       }
     }
 
     result.setNumDocsScanned(filteredDocIds.size());
-    result.setTotalDocs(metadata.getTotalDocs());
+    result.setTotalDocs(_totalDocs);
     return result;
   }
 
-  private List<Integer> filterDocIds(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
-      FilterQueryTree filterQueryTree)
-      throws Exception {
-    // If there's no filter predicate, return all docsIds.
+  private List<Integer> filterDocIds(FilterQueryTree filterQueryTree, List<Integer> inputDocIds) {
+    // If no filter predicate, return the input without filtering.
     if (filterQueryTree == null) {
-      int totalDocs = indexSegment.getTotalDocs();
-
-      List<Integer> filteredDocIds = new ArrayList<>(indexSegment.getTotalDocs());
-      for (int i = 0; i < totalDocs; i++) {
-        filteredDocIds.add(i);
+      List<Integer> allDocs = new ArrayList<>(_totalDocs);
+      for (int i = 0; i < _totalDocs; ++i) {
+        allDocs.add(i);
       }
-      return filteredDocIds;
+      return allDocs;
     }
 
-    return doFilter(filterQueryTree, indexSegment, metadata);
-  }
-
-  private List<Integer> doFilter(FilterQueryTree filterQueryTree, IndexSegmentImpl indexSegment,
-      SegmentMetadataImpl metadata) {
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
     final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
 
@@ -127,12 +147,15 @@ class SegmentQueryProcessor {
       FilterOperator filterType = filterQueryTree.getOperator();
       String column = filterQueryTree.getColumn();
       final List<String> value = filterQueryTree.getValue();
-      return getMatchingDocIds(indexSegment, metadata, filterType, column, value);
+      return getMatchingDocIds(inputDocIds, filterType, column, value);
     }
 
-    List<Integer> result = doFilter(childFilters.get(0), indexSegment, metadata);
+    List<Integer> result = filterDocIds(childFilters.get(0), inputDocIds);
     for (int i = 1; i < childFilters.size(); ++i) {
-      result = combine(result, doFilter(childFilters.get(i), indexSegment, metadata), filterQueryTree.getOperator());
+      FilterOperator operator = filterQueryTree.getOperator();
+      List<Integer> childResult = operator.equals(FilterOperator.AND) ? filterDocIds(childFilters.get(i), result)
+          : filterDocIds(childFilters.get(i), inputDocIds);
+      result = combine(result, childResult, operator);
     }
     return result;
   }
@@ -164,10 +187,10 @@ class SegmentQueryProcessor {
     return result;
   }
 
-  List<Integer> getMatchingDocIds(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
-      FilterOperator filterType, String column, List<String> value) {
-    Dictionary dictionaryReader = indexSegment.getDictionaryFor(column);
-    PredicateFilter predicateFilter = null;
+  List<Integer> getMatchingDocIds(List<Integer> inputDocIds, FilterOperator filterType, String column,
+      List<String> value) {
+    Dictionary dictionaryReader = _indexSegment.getDictionaryFor(column);
+    PredicateFilter predicateFilter;
 
     switch (filterType) {
       case EQUALITY:
@@ -195,41 +218,40 @@ class SegmentQueryProcessor {
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
     }
 
-    return evaluatePredicate(column, indexSegment, metadata, predicateFilter);
+    return evaluatePredicate(inputDocIds, column, predicateFilter);
   }
 
-  private List<Integer> evaluatePredicate(String column, IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata,
-      PredicateFilter predicateFilter) {
+  private List<Integer> evaluatePredicate(List<Integer> inputDocIds, String column, PredicateFilter predicateFilter) {
     List<Integer> result = new ArrayList<>();
-    if (metadata.getColumnMetadataFor(column).isSingleValue()) {
+    if (!_mvColumns.contains(column)) {
       BlockSingleValIterator bvIter =
-          (BlockSingleValIterator) indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+          (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
 
-      int docId = 0;
-      while (bvIter.hasNext()) {
+      int i = 0;
+      while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {
+        int docId = (inputDocIds != null) ? inputDocIds.get(i++) : i++;
+        bvIter.skipTo(docId);
         if (predicateFilter.apply(bvIter.nextIntVal())) {
           result.add(docId);
         }
-        ++docId;
       }
     } else {
-      int maxNumMultiValues = metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
       BlockMultiValIterator bvIter =
-          (BlockMultiValIterator) indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+          (BlockMultiValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
 
-      int docId = 0;
-      while (bvIter.hasNext()) {
-        int[] dictIds = new int[maxNumMultiValues];
+      int i = 0;
+      while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {
+        int docId = (inputDocIds != null) ? inputDocIds.get(i++) : i++;
+        bvIter.skipTo(docId);
+
+        int[] dictIds = _mvColumnArrayMap.get(column);
         int numMVValues = bvIter.nextIntVal(dictIds);
 
-        dictIds = Arrays.copyOf(dictIds, numMVValues);
-        if (predicateFilter.apply(dictIds)) {
+        if (predicateFilter.apply(dictIds, numMVValues)) {
           result.add(docId);
         }
-        ++docId;
       }
     }
-
     return result;
   }
 }

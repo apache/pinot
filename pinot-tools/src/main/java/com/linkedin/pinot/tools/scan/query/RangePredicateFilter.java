@@ -47,8 +47,7 @@ public class RangePredicateFilter implements PredicateFilter {
     }
     if (_startIndex < 0) {
       _startIndex = -(_startIndex + 1);
-    }
-    if (!_includeStart) {
+    } else if (!_includeStart) {
       _startIndex++;
     }
 
@@ -59,8 +58,7 @@ public class RangePredicateFilter implements PredicateFilter {
     }
     if (_endIndex < 0) {
       _endIndex = -(_endIndex + 1) - 1;
-    }
-    if (!_includeEnd) {
+    } else if (!_includeEnd) {
       --_endIndex;
     }
   }
@@ -71,9 +69,10 @@ public class RangePredicateFilter implements PredicateFilter {
   }
 
   @Override
-  public boolean apply(int[] dictIds) {
-    for (int dictId : dictIds) {
-      if (apply(dictId)) {
+  public boolean apply(int[] dictIds, int length) {
+    // length <= dictIds.length
+    for (int i = 0; i < length; ++i) {
+      if (apply(dictIds[i])) {
         return true;
       }
     }

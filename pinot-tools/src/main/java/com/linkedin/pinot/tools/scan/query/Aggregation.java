@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,21 +123,20 @@ public class Aggregation {
 
     Map<GroupByOperator, ResultTable> resultsMap = new HashMap<>();
     for (ResultTable.Row row : input) {
-      List<Object> groupByValues = new ArrayList<>();
-      for (String groupByColumn : _groupByColumns) {
-        groupByValues.add(row.get(groupByColumn, null));
-      }
+      // For MV Columns we enumerate each value as a separate group, instead of all values of the column in one group.
+      for (List<Object> groupByValues : enumerateGroups(row)) {
+        GroupByOperator groupByOperator = new GroupByOperator(groupByValues);
+        ResultTable resultTable;
 
-      GroupByOperator groupByOperator = new GroupByOperator(groupByValues);
-      ResultTable resultTable;
-      if (resultsMap.containsKey(groupByOperator)) {
-        resultTable = resultsMap.get(groupByOperator);
-      } else {
-        resultTable = new ResultTable(_allColumns, 0);
-        resultsMap.put(groupByOperator, resultTable);
-      }
+        if (resultsMap.containsKey(groupByOperator)) {
+          resultTable = resultsMap.get(groupByOperator);
+        } else {
+          resultTable = new ResultTable(_allColumns, 0);
+          resultsMap.put(groupByOperator, resultTable);
+        }
 
-      resultTable.append(row);
+        resultTable.append(row);
+      }
     }
 
     ResultTable results = new ResultTable(_allColumns, 0);
@@ -159,6 +159,20 @@ public class Aggregation {
 
     results.setResultType(ResultTable.ResultType.AggregationGroupBy);
     return results;
+  }
+
+  private List<List<Object>> enumerateGroups(ResultTable.Row row) {
+    List<List<Object>> groups = new ArrayList<>();
+
+    for (String groupByColumn : _groupByColumns) {
+      Object value = row.get(groupByColumn, null);
+      if (value instanceof Object[]) {
+        groups.add(Arrays.asList((Object[]) value));
+      } else {
+        groups.add(Arrays.asList(value));
+      }
+    }
+    return Utils.cartesianProduct(groups);
   }
 
   private ResultTable aggregateOne(ResultTable input) {

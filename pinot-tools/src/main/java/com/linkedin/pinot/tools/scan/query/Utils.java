@@ -15,92 +15,44 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Utils {
 
-  public static Object getNextSingleValue(BlockSingleValIterator bvIter, FieldSpec.DataType dataType,
-      Dictionary dictionaryReader) {
-    Object value;
-    int dictId = bvIter.nextIntVal();
-
-    switch (dataType) {
-      case INT:
-        value = (Integer) ((IntDictionary) dictionaryReader).get(dictId);
-        break;
-      case FLOAT:
-        value = (Float) ((FloatDictionary) dictionaryReader).get(dictId);
-        break;
-      case LONG:
-        value = (Long) ((LongDictionary) dictionaryReader).get(dictId);
-        break;
-      case DOUBLE:
-        value = (Double) ((DoubleDictionary) dictionaryReader).get(dictId);
-        break;
-      case STRING:
-        value = (String) ((StringDictionary) dictionaryReader).get(dictId);
-        break;
-      default:
-        throw new RuntimeException("Unsupported data type.");
+  public static List<List<Object>> cartesianProduct(List<List<Object>> lists) {
+    int numElements = 1;
+    for (int i = 0; i < lists.size(); i++) {
+      numElements *= lists.get(i).size();
     }
-    return value;
+
+    List<List<Object>> result = new ArrayList<>();
+    for (int i = 0; i < numElements; i++) {
+      int j = 1;
+
+      List<Object> oneSet = new ArrayList<>();
+      for (List<Object> list : lists) {
+        int index = (i / j) % list.size();
+        oneSet.add(list.get(index));
+        j *= list.size();
+      }
+      result.add(oneSet);
+    }
+    return result;
   }
 
-  public static Object[] getNextMultiValue(BlockMultiValIterator bvIter, FieldSpec.DataType dataType,
-      Dictionary dictionaryReader, int maxNumMultiValues) {
+  public static void main(String[] args) {
+    List<List<Object>> test = new ArrayList<>();
+    test.add(Arrays.asList(1, 2, 3));
+    test.add(Arrays.asList(9));
+    test.add(Arrays.asList(4, 5));
 
-    Object[] value;
-    int[] dictIds = new int[maxNumMultiValues];
-    int numMVValues = bvIter.nextIntVal(dictIds);
-
-    switch (dataType) {
-      case INT_ARRAY:
-        value = new Integer[numMVValues];
-        for (int i = 0; i < numMVValues; ++i) {
-          value[i] = ((IntDictionary) dictionaryReader).get(dictIds[i]);
-        }
-        break;
-
-      case FLOAT_ARRAY:
-        value = new Float[numMVValues];
-        for (int dictId = 0; dictId < numMVValues; ++dictId) {
-          value[dictId] = ((FloatDictionary) dictionaryReader).get(dictIds[dictId]);
-        }
-        break;
-
-      case LONG_ARRAY:
-        value = new Long[numMVValues];
-        for (int dictId = 0; dictId < numMVValues; ++dictId) {
-          value[dictId] = ((LongDictionary) dictionaryReader).get(dictIds[dictId]);
-        }
-        break;
-
-      case DOUBLE_ARRAY:
-        value = new Double[numMVValues];
-        for (int dictId = 0; dictId < numMVValues; ++dictId) {
-          value[dictId] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictId]);
-        }
-        break;
-
-      case STRING_ARRAY:
-        value = new String[numMVValues];
-        for (int dictId = 0; dictId < numMVValues; ++dictId) {
-          value[dictId] = ((StringDictionary) dictionaryReader).get(dictIds[dictId]);
-        }
-        break;
-
-      default:
-        throw new RuntimeException("Unsupported data type.");
+    for (List<Object> list : cartesianProduct(test)) {
+      for (Object object : list) {
+        System.out.print(object + " ");
+      }
+      System.out.println();
     }
-
-    return value;
   }
 }

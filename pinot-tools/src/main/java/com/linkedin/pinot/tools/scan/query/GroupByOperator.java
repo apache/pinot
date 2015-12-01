@@ -40,8 +40,22 @@ public class GroupByOperator {
     }
 
     GroupByOperator that = (GroupByOperator) o;
+    if (_columns == null && that._columns == null) {
+      return true;
+    } else if (_columns == null || that._columns == null) {
+      return false;
+    } else if (_columns.size() != that._columns.size()) {
+      return false;
+    }
 
-    return !(_columns != null ? !_columns.equals(that._columns) : that._columns != null);
+    int i = 0;
+    for (Object object : _columns) {
+      Object otherObject = that._columns.get(i++);
+      if (!object.toString().equals(otherObject.toString())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override

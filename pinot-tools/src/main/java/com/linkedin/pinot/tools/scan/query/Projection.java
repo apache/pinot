@@ -18,13 +18,17 @@ package com.linkedin.pinot.tools.scan.query;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
 
 
@@ -33,6 +37,8 @@ public class Projection {
   private final SegmentMetadataImpl _metadata;
   private final List<Integer> _filteredDocIds;
   private final List<Pair> _columnList;
+  private final Set<String> _mvColumns;
+  private final Map<String, int[]> _mvColumnArrayMap;
   private Map<String, Dictionary> _dictionaryMap;
   private boolean _addCountStar;
   private int _limit = 10;
@@ -50,6 +56,18 @@ public class Projection {
     for (Pair pair : columns) {
       _columnList.add(pair);
     }
+
+    _mvColumns = new HashSet<>();
+    _mvColumnArrayMap = new HashMap<>();
+
+    for (ColumnMetadata columnMetadata : _metadata.getColumnMetadataMap().values()) {
+      String column = columnMetadata.getColumnName();
+
+      if (!columnMetadata.isSingleValue()) {
+        _mvColumns.add(column);
+      }
+      _mvColumnArrayMap.put(column, new int[columnMetadata.getMaxNumberOfMultiValues()]);
+    }
   }
 
   public ResultTable run() {
@@ -58,7 +76,7 @@ public class Projection {
 
     for (Pair pair : _columnList) {
       String column = (String) pair.getFirst();
-      if (_metadata.getColumnMetadataFor(column).isSingleValue()) {
+      if (!_mvColumns.contains(column)) {
         BlockSingleValIterator bvIter =
             (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
 
@@ -74,12 +92,10 @@ public class Projection {
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
           bvIter.skipTo(docId);
-          int maxNumMultiValues = _metadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues();
-          int[] dictIds = new int[maxNumMultiValues];
-
+          int[] dictIds = _mvColumnArrayMap.get(column);
           int numMVValues = bvIter.nextIntVal(dictIds);
-          dictIds = Arrays.copyOf(dictIds, numMVValues);
 
+          dictIds = Arrays.copyOf(dictIds, numMVValues);
           resultTable.add(rowId++, ArrayUtils.toObject(dictIds));
         }
       }
