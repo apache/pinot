@@ -17,31 +17,35 @@ package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.index.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWriter;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
-
-public class SingleValueUnsortedForwardIndexCreator implements Closeable, SingleValueForwardIndexCreator {
+public class SingleValueUnsortedForwardIndexCreator
+    implements Closeable, SingleValueForwardIndexCreator {
 
   private final File forwardIndexFile;
   private final FieldSpec spec;
   private int maxNumberOfBits = 0;
-  private FixedBitSingleValueMultiColWriter sVWriter;
+  private SingleColumnSingleValueWriter sVWriter;
 
-  public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
-      int totalNumberOfValues, boolean hasNulls) throws Exception {
-    forwardIndexFile = new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
+  public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality,
+      int numDocs, int totalNumberOfValues, boolean hasNulls) throws Exception {
+    forwardIndexFile = new File(baseIndexDir,
+        spec.getName() + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
     maxNumberOfBits = getNumOfBits(cardinality);
-    sVWriter =
-        new FixedBitSingleValueMultiColWriter(forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits },
-            new boolean[] { hasNulls });
+    sVWriter = new FixedBitSingleValueWriter(forwardIndexFile, numDocs, maxNumberOfBits);
   }
 
   public static int getNumOfBits(int dictionarySize) {
@@ -57,11 +61,11 @@ public class SingleValueUnsortedForwardIndexCreator implements Closeable, Single
 
   @Override
   public void index(int docId, int dictionaryIndex) {
-    sVWriter.setInt(docId, 0, dictionaryIndex);
+    sVWriter.setInt(docId, dictionaryIndex);
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     sVWriter.close();
   }
 }

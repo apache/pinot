@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -27,17 +28,17 @@ public class UnSortedMVColumnIndexContainer extends ColumnIndexContainer {
 
   private final String column;
   private final ColumnMetadata columnMetadata;
-  private final FixedBitMultiValueReader indexReader;
+  private final SingleColumnMultiValueReader indexReader;
   private final ImmutableDictionaryReader dictionary;
   private final BitmapInvertedIndexReader invertedIndexReader;
 
   public UnSortedMVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedBitMultiValueReader indexReader, ImmutableDictionaryReader dictionary) {
+      SingleColumnMultiValueReader indexReader, ImmutableDictionaryReader dictionary) {
     this(column, columnMetadata, indexReader, dictionary, null);
   }
 
   public UnSortedMVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedBitMultiValueReader indexReader, ImmutableDictionaryReader dictionary,
+      SingleColumnMultiValueReader indexReader, ImmutableDictionaryReader dictionary,
       BitmapInvertedIndexReader invertedIndex) {
     this.column = column;
     this.columnMetadata = columnMetadata;

@@ -13,9 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.core.segment.index.converter;
 
-public enum SegmentVersion {
-  v1,
-  v2;//Changed the forward index format to use bitpacking library instead of custombitset format.
+import java.io.File;
+
+/**
+ * Converts a segment from format to another.
+ * This can be useful in upgrading our index formats etc automatically.
+ */
+public interface SegmentFormatConverter {
+
+  void convert(File indexSegmentDir) throws Exception;
+
 }

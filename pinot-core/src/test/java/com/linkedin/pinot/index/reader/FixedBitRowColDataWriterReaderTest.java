@@ -26,55 +26,7 @@ import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWrit
 
 
 public class FixedBitRowColDataWriterReaderTest {
-  @Test
-  public void testSiingleColUnsigned() throws Exception {
-    int maxBits = 1;
-    while (maxBits < 32) {
-      System.out.println("START test maxBits:" + maxBits);
-      final String fileName = getClass().getName() + "_single_col_fixed_bit_"
-          + maxBits + ".dat";
-      final File file = new File(fileName);
-      file.delete();
-      final int rows = 100;
-      final int cols = 1;
-      final int[] columnSizesInBits = new int[] { maxBits };
-      final FixedBitSingleValueMultiColWriter writer = new FixedBitSingleValueMultiColWriter(
-          file, rows, cols, columnSizesInBits);
-      final int[] data = new int[rows];
-      final Random r = new Random();
-      writer.open();
-      final int maxValue = (int) Math.pow(2, maxBits);
-      for (int i = 0; i < rows; i++) {
-        data[i] = r.nextInt(maxValue);
-        writer.setInt(i, 0, data[i]);
-      }
-      writer.close();
-
-      // Test heap mode
-      FixedBitSingleValueMultiColReader heapReader = FixedBitSingleValueMultiColReader
-          .forHeap(file, rows, cols, columnSizesInBits);
-      for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
-      }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
-      heapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
-
-      // Test mmap mode
-      FixedBitSingleValueMultiColReader mmapReader = FixedBitSingleValueMultiColReader
-          .forMmap(file, rows, cols, columnSizesInBits);
-      for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
-      }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 2);
-      mmapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
-
-      maxBits = maxBits + 1;
-      file.delete();
-    }
-  }
-
+ 
   @Test
   public void testSingleColUnsigned() throws Exception {
     int maxBits = 1;

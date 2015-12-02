@@ -27,11 +27,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
 
-
-public class MultiValueReaderWriterBenchmark {
-
-  public static void main(String[] args) throws Exception {
-    List<String> lines = IOUtils.readLines(new FileReader(new File(args[0])));
+public class ForwardIndexWriterBenchmark {
+  public void convertRawToForwardIndex(File rawFile) throws Exception {
+    List<String> lines = IOUtils.readLines(new FileReader(rawFile));
     int totalDocs = lines.size();
     int max = Integer.MIN_VALUE;
     int maxNumberOfMultiValues = Integer.MIN_VALUE;
@@ -71,7 +69,7 @@ public class MultiValueReaderWriterBenchmark {
         DataOutputStream dos = new DataOutputStream(bos);
         rr1.serialize(dos);
         dos.close();
-        //System.out.println("Chunk " + i / size + " bitmap size:" + bos.size());
+        // System.out.println("Chunk " + i / size + " bitmap size:" + bos.size());
         bitMapSize += bos.size();
       } else if (i == totalDocs - 1) {
         MutableRoaringBitmap rr1 = MutableRoaringBitmap.bitmapOf(Arrays.copyOf(offsets, i % size));
@@ -79,7 +77,7 @@ public class MultiValueReaderWriterBenchmark {
         DataOutputStream dos = new DataOutputStream(bos);
         rr1.serialize(dos);
         dos.close();
-        //System.out.println("Chunk " + i / size + " bitmap size:" + bos.size());
+        // System.out.println("Chunk " + i / size + " bitmap size:" + bos.size());
         bitMapSize += bos.size();
       }
     }
@@ -101,12 +99,12 @@ public class MultiValueReaderWriterBenchmark {
     System.out.println("size (offset only)\t\t\t:" + ((totalDocs * (4)) + dataSizeinBytes));
     System.out.println();
     System.out.println("bitMapSize\t\t\t\t:" + bitMapSize);
-    System.out.println("size (with bitmap)\t\t\t:" + (bitMapSize + (numChunks * 4) + dataSizeinBytes));
+    System.out
+        .println("size (with bitmap)\t\t\t:" + (bitMapSize + (numChunks * 4) + dataSizeinBytes));
 
     System.out.println();
     System.out.println("Custom Bitset\t\t\t\t:" + (totalNumValues + 7) / 8);
     System.out.println("size (with custom bitset)\t\t\t:"
         + (((totalNumValues + 7) / 8) + (numChunks * 4) + dataSizeinBytes));
-
   }
 }

@@ -166,4 +166,22 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   public boolean hasStarTree() {
     return _schema.getStarTreeIndexSpec() != null;
   }
+
+  @Override
+  public String getForwardIndexFileName(String column, String segmentVersion) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getDictionaryFileName(String column, String segmentVersion) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

@@ -26,9 +26,10 @@ import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.index.reader.impl.v2.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.index.reader.impl.v2.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
@@ -84,7 +85,7 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    FixedBitSingleValueReader fwdIndexReader =
+    SingleColumnSingleValueReader fwdIndexReader =
         new FixedBitSingleValueReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getBitsPerElement(),
             mode == ReadMode.mmap, metadata.hasNulls());
 
@@ -103,7 +104,7 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    FixedBitMultiValueReader fwdIndexReader =
+    SingleColumnMultiValueReader fwdIndexReader =
         new FixedBitMultiValueReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
             metadata.getBitsPerElement(), false, mode == ReadMode.mmap);
 

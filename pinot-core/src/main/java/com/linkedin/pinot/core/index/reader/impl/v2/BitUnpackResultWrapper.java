@@ -13,9 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.core.index.reader.impl.v2;
 
-public enum SegmentVersion {
-  v1,
-  v2;//Changed the forward index format to use bitpacking library instead of custombitset format.
+public class BitUnpackResultWrapper extends ThreadLocal<BitUnpackResult> {
+
+  private BitUnpackResult readResultInitialValue;
+  private int compressedSize;
+  private int uncompressedSize;
+
+  BitUnpackResultWrapper(int compressedSize, int uncompressedSize) {
+    this.compressedSize = compressedSize;
+    this.uncompressedSize = uncompressedSize;
+    
+  }
+
+  @Override
+  protected BitUnpackResult initialValue() {
+    readResultInitialValue = new BitUnpackResult(-1, new int[compressedSize], new int[uncompressedSize]);
+    return readResultInitialValue;
+  }
+
 }

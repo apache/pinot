@@ -13,9 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.core.util;
 
-public enum SegmentVersion {
-  v1,
-  v2;//Changed the forward index format to use bitpacking library instead of custombitset format.
+/**
+ * Util class to encapsulate all math required to compute storage space.
+ */
+public class SizeUtil {
+  public static int BIT_UNPACK_BATCH_SIZE = 32;
+
+  public static int computeBytesRequired(int numValues, int numBits, int entriesPerBatch) {
+    int bitsRequiredPerBatch = entriesPerBatch * numBits;
+    //Align to batch boundary to avoid if checks while reading
+    int totalBitsRounded = (int) (Math.ceil((numValues * numBits * 1.0) / bitsRequiredPerBatch)
+        * bitsRequiredPerBatch);
+    return totalBitsRounded / 8;
+  }
 }

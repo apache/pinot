@@ -13,9 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.core.segment.index.converter;
 
-public enum SegmentVersion {
-  v1,
-  v2;//Changed the forward index format to use bitpacking library instead of custombitset format.
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+
+public class SegmentFormatConverterFactory {
+
+  public static SegmentFormatConverter getConverter(SegmentVersion from, SegmentVersion to) {
+    if (from.equals(SegmentVersion.v1) && to.equals(SegmentVersion.v2) ) {
+      return new SegmentFormatConverterV1ToV2();
+    }
+    throw new UnsupportedOperationException(
+        "Unable to find a convertor to convert segment from:" + from + " to:" + to);
+  }
 }

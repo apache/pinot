@@ -34,7 +34,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   int currentMax = -1;
   private AtomicLong timeMeasure = new AtomicLong();
   private AtomicLong[] timeMeasures;
-
+  
   /**
    * @param andBlockDocIdSet
    */
@@ -100,7 +100,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
     timeMeasure.addAndGet(end - start);
     // Remove this after tracing is added
     if (currentDocId == Constants.EOF) {
-      LOGGER.info("AND operator took:{} time spent in child iterators:{}", timeMeasure.get(), Arrays.toString(timeMeasures));
+      LOGGER.info("AND operator took:{}. Break down by child iterators:{} times:{}", timeMeasure.get(), Arrays.toString(docIdIterators), Arrays.toString(timeMeasures));
     }
     return currentDocId;
   }

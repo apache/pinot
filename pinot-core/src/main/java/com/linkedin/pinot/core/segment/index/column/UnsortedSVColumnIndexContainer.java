@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -27,17 +28,17 @@ public class UnsortedSVColumnIndexContainer extends ColumnIndexContainer {
 
   private final String column;
   private final ColumnMetadata columnMetadata;
-  private final FixedBitSingleValueReader indexReader;
+  private final SingleColumnSingleValueReader indexReader;
   private final ImmutableDictionaryReader dictionary;
   private final BitmapInvertedIndexReader invertedIndexReader;
 
   public UnsortedSVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedBitSingleValueReader indexReader, ImmutableDictionaryReader dictionary) {
+      SingleColumnSingleValueReader indexReader, ImmutableDictionaryReader dictionary) {
     this(column, columnMetadata, indexReader, dictionary, null);
   }
 
   public UnsortedSVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedBitSingleValueReader indexReader, ImmutableDictionaryReader dictionary,
+      SingleColumnSingleValueReader indexReader, ImmutableDictionaryReader dictionary,
       BitmapInvertedIndexReader invertedIndex) {
     this.column = column;
     this.columnMetadata = columnMetadata;

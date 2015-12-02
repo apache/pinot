@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.segment;
 
+import java.io.File;
 import java.util.Map;
 
 import org.joda.time.Duration;
@@ -22,12 +23,9 @@ import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.data.Schema;
 
-
 /**
  * SegmentMetadata holds segment level management information and data
  * statistics.
- *
- *
  */
 public interface SegmentMetadata {
   /**
@@ -91,18 +89,19 @@ public interface SegmentMetadata {
   public String getName();
 
   /**
-   *
    * @return
    */
   public long getIndexCreationTime();
 
   /**
-   * Returns the last time that this segment was pushed or Long.MIN_VALUE if it has never been pushed.
+   * Returns the last time that this segment was pushed or Long.MIN_VALUE if it has never been
+   * pushed.
    */
   public long getPushTime();
 
   /**
-   * Returns the last time that this segment was refreshed or Long.MIN_VALUE if it has never been refreshed.
+   * Returns the last time that this segment was refreshed or Long.MIN_VALUE if it has never been
+   * refreshed.
    */
   public long getRefreshTime();
 
@@ -115,10 +114,31 @@ public interface SegmentMetadata {
   public boolean hasStarTree();
 
   /**
-   *
+   * returns the forward Index file name with appropriate extension for a given version
+   * @param column
+   * @return
+   */
+  String getForwardIndexFileName(String column, String segmentVersion);
+
+  /**
+   * returns the dictionary file name with appropriate extension for a given version
+   * @param column
+   * @return
+   */
+  String getDictionaryFileName(String column, String segmentVersion);
+
+  /**
+   * returns the bitmap inverted index file name with appropriate extension for a given version
+   * @param column
+   * @return
+   */
+  String getBitmapInvertedIndexFileName(String column, String segmentVersion);
+
+  /**
    * @return
    */
   public Map<String, String> toMap();
 
   public boolean close();
+
 }

@@ -25,8 +25,8 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
 import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
 import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
@@ -80,12 +80,12 @@ public class ColumnDataSourceImpl extends DataSource {
       } else {
         b =
             new UnSortedSingleValueBlock(blockId,
-                (FixedBitSingleValueReader) indexContainer.getForwardIndex(),
+                (SingleColumnSingleValueReader) indexContainer.getForwardIndex(),
                 indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       }
     } else {
       b =
-          new MultiValueBlock(blockId, (FixedBitMultiValueReader) indexContainer.getForwardIndex(),
+          new MultiValueBlock(blockId, (SingleColumnMultiValueReader) indexContainer.getForwardIndex(),
               indexContainer.getDictionary(), indexContainer.getColumnMetadata());
     }
 

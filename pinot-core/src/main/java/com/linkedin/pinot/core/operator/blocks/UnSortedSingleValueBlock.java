@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -38,13 +39,13 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 public class UnSortedSingleValueBlock implements Block {
 
-  private final FixedBitSingleValueReader sVReader;
+  private final SingleColumnSingleValueReader sVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
 
-  public UnSortedSingleValueBlock(BlockId id, FixedBitSingleValueReader singleValueReader,
+  public UnSortedSingleValueBlock(BlockId id, SingleColumnSingleValueReader singleValueReader,
       ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     sVReader = singleValueReader;
     this.id = id;
@@ -52,7 +53,7 @@ public class UnSortedSingleValueBlock implements Block {
     this.columnMetadata = columnMetadata;
   }
 
-  public FixedBitSingleValueReader getSVReader() {
+  public SingleColumnSingleValueReader getSVReader() {
     return sVReader;
   }
 
@@ -86,7 +87,7 @@ public class UnSortedSingleValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId >= sVReader.getLength()) {
+            if (docId >= columnMetadata.getTotalDocs()) {
               return false;
             }
 
@@ -97,12 +98,12 @@ public class UnSortedSingleValueBlock implements Block {
 
           @Override
           public int size() {
-            return sVReader.getLength();
+            return columnMetadata.getTotalDocs();
           }
 
           @Override
           public int nextIntVal() {
-            if (counter >= sVReader.getLength()) {
+            if (counter >= columnMetadata.getTotalDocs()) {
               return Constants.EOF;
             }
 
@@ -123,7 +124,7 @@ public class UnSortedSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter < sVReader.getLength());
+            return (counter < columnMetadata.getTotalDocs());
           }
 
           @Override

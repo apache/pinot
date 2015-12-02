@@ -22,10 +22,13 @@ import java.util.Map;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +49,18 @@ public class Loaders {
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
         IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
       SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+      if (!metadata.getVersion().equalsIgnoreCase(IndexSegmentImpl.EXPECTED_SEGMENT_VERSION.toString())) {
+
+        SegmentVersion from = SegmentVersion.valueOf(metadata.getVersion());
+        SegmentVersion to = SegmentVersion.valueOf(IndexSegmentImpl.EXPECTED_SEGMENT_VERSION.toString());
+        LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(),
+            from, to);
+        SegmentFormatConverter converter = SegmentFormatConverterFactory.getConverter(from, to);
+        LOGGER.info("Using converter:{} to up-convert the format", converter.getClass().getName());
+        converter.convert(indexDir);
+        LOGGER.info("Successfully up-converted segment:{} from :{} to {} version.",
+            indexDir.getName(), from, to);
+      }
 
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();
 
@@ -61,8 +76,12 @@ public class Loaders {
         LOGGER.debug("Loading star tree index file {}", starTreeFile);
         starTreeRoot = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
       }
-
       return new IndexSegmentImpl(indexDir, metadata, indexContainerMap, starTreeRoot);
     }
+  }
+  public static void main(String[] args) throws Exception {
+    File indexDir = new File("/home/kgopalak/pinot_perf/index_dir/scinPricing_OFFLINE/scinPricing_pricing_0");
+    ReadMode mode = ReadMode.heap;
+    Loaders.IndexSegment.load(indexDir, mode);
   }
 }

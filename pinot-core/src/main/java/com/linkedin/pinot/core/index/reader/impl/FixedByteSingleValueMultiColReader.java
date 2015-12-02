@@ -56,6 +56,8 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   private final int[] columnSizes;
   private final boolean isMMap;
 
+  private File dataFile;
+
   /**
    *
    * @param file
@@ -97,6 +99,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    */
   public FixedByteSingleValueMultiColReader(File dataFile, int rows,
       int cols, int[] columnSizes, boolean isMmap) throws IOException {
+    this.dataFile = dataFile;
     this.rows = rows;
     this.cols = cols;
     this.columnSizes = columnSizes;
@@ -151,8 +154,8 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   private int computeOffset(int row, int col) {
     if (row >= rows || col >= cols) {
       final String message = String.format(
-          "Input (%d,%d) is not with in expected range (%d,%d)", col,
-          row, col, rows);
+          "Input (%d,%d) is not with in expected range (%d,%d for column:%s)", row,
+          col, rows, cols,dataFile.getAbsolutePath());
       throw new IndexOutOfBoundsException(message);
     }
     final int offset = row * rowSize + colOffSets[col];

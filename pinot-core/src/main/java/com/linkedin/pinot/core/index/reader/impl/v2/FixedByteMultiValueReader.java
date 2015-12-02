@@ -13,9 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.core.index.reader.impl.v2;
 
-public enum SegmentVersion {
-  v1,
-  v2;//Changed the forward index format to use bitpacking library instead of custombitset format.
+import java.io.File;
+
+public class FixedByteMultiValueReader extends com.linkedin.pinot.core.index.reader.impl.v1.FixedByteMultiValueReader{
+
+  public FixedByteMultiValueReader(File file, int numDocs, int totalNumValues,
+      int columnSizeInBytes, boolean isMmap) throws Exception {
+    super(file, numDocs, totalNumValues, columnSizeInBytes, isMmap);
+  }
+
 }

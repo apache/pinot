@@ -357,5 +357,23 @@ public class ValidationManagerTest {
     public int getTotalAggregateDocs() {
       return 0;
     }
+
+    @Override
+    public String getForwardIndexFileName(String column, String segmentVersion) {
+      // TODO Auto-generated method stub
+      return null;
+    }
+
+    @Override
+    public String getDictionaryFileName(String column, String segmentVersion) {
+      // TODO Auto-generated method stub
+      return null;
+    }
+
+    @Override
+    public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
+      // TODO Auto-generated method stub
+      return null;
+    }
   }
 }

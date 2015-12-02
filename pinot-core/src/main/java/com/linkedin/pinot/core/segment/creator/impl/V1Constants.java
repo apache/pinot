@@ -26,7 +26,6 @@ public class V1Constants {
   public static final String QUERY_RHS_DELIMITER = "\t\t";
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String VERSIONS_FILE = "versions.vr";
-  public static final String VERSION = "segment,index.version";
   public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
   public static final String SEGMENT_PUSH_TIME = "segment.push.time";
   public static final String SEGMENT_REFRESH_TIME = "segment.refresh.time";
@@ -101,6 +100,7 @@ public class V1Constants {
 
     public static class Segment {
       public static final String SEGMENT_NAME = "segment.name";
+      public static final String SEGMENT_VERSION = "segment.index.version";
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";

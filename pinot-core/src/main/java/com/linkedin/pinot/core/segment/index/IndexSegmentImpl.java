@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -40,6 +41,8 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 public class IndexSegmentImpl implements IndexSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexSegmentImpl.class);
+
+  public static final SegmentVersion EXPECTED_SEGMENT_VERSION = SegmentVersion.v1;
 
   private final File indexDir;
   private final SegmentMetadataImpl segmentMetadata;

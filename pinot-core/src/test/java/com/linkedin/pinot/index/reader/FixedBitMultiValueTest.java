@@ -17,20 +17,41 @@ package com.linkedin.pinot.index.reader;
 
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
-import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
+import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
 
-
-public class FixedBitSkipListSCMVReaderTest {
-
+public class FixedBitMultiValueTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitMultiValueTest.class);
   @Test
   public void testSingleColMultiValue() throws Exception {
+    testSingleColMultiValue(
+        com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter.class,
+        com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader.class);
+    testSingleColMultiValue(
+        com.linkedin.pinot.core.index.writer.impl.v2.FixedBitMultiValueWriter.class,
+        com.linkedin.pinot.core.index.reader.impl.v2.FixedBitMultiValueReader.class);
+  }
+
+  public void testSingleColMultiValue(Class<? extends SingleColumnMultiValueWriter> writerClazz,
+      Class<? extends SingleColumnMultiValueReader> readerClazz) throws Exception {
+    LOGGER.info("Testing for writerClazz:{} readerClass:{}", writerClazz.getName(), readerClazz.getName());
+    Constructor<? extends SingleColumnMultiValueWriter> writerClazzConstructor =
+        writerClazz.getConstructor(new Class[] {
+            File.class, int.class, int.class, int.class
+    });
+    Constructor<? extends SingleColumnMultiValueReader> readerClazzConstructor =
+        readerClazz.getConstructor(new Class[] {
+            File.class, int.class, int.class, int.class, boolean.class, boolean.class
+    });
     int maxBits = 1;
     while (maxBits < 32) {
       final String fileName = getClass().getName() + "_test_single_col_mv_fixed_bit.dat";
@@ -54,9 +75,10 @@ public class FixedBitSkipListSCMVReaderTest {
         lengths[i] = numValues;
         totalNumValues = totalNumValues + numValues;
       }
-      System.out.println(Arrays.toString(startOffsets));
-      System.out.println(Arrays.toString(lengths));
-      FixedBitMultiValueWriter writer = new FixedBitMultiValueWriter(f, numDocs, totalNumValues, maxBits);
+
+      SingleColumnMultiValueWriter writer = writerClazzConstructor.newInstance(new Object[] {
+          f, numDocs, totalNumValues, maxBits
+      });
 
       for (int i = 0; i < data.length; i++) {
         writer.setIntArray(i, data[i]);
@@ -64,11 +86,13 @@ public class FixedBitSkipListSCMVReaderTest {
       writer.close();
 
       final RandomAccessFile raf = new RandomAccessFile(f, "rw");
-      System.out.println("file size: " + raf.getChannel().size());
       raf.close();
 
       // Test heap mode
-      FixedBitMultiValueReader heapReader = new FixedBitMultiValueReader(f, numDocs, totalNumValues, maxBits, false, false);
+
+      SingleColumnMultiValueReader heapReader = readerClazzConstructor.newInstance(new Object[] {
+          f, numDocs, totalNumValues, maxBits, false, false
+      });
       final int[] readValues = new int[maxNumValues];
       for (int i = 0; i < data.length; i++) {
         final int numValues = heapReader.getIntArray(i, readValues);
@@ -82,7 +106,9 @@ public class FixedBitSkipListSCMVReaderTest {
       // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
       // Test mmap mode
-      FixedBitMultiValueReader mmapReader = new FixedBitMultiValueReader(f, numDocs, totalNumValues, maxBits, false, true);
+      SingleColumnMultiValueReader mmapReader = readerClazzConstructor.newInstance(new Object[] {
+          f, numDocs, totalNumValues, maxBits, false, true
+      });
       for (int i = 0; i < data.length; i++) {
         final int numValues = mmapReader.getIntArray(i, readValues);
         Assert.assertEquals(numValues, data[i].length);
@@ -97,5 +123,6 @@ public class FixedBitSkipListSCMVReaderTest {
       f.delete();
       maxBits = maxBits + 1;
     }
+    LOGGER.info("DONE: Testing for writerClazz:{} readerClass:{}", writerClazz.getName(), readerClazz.getName());
   }
 }
