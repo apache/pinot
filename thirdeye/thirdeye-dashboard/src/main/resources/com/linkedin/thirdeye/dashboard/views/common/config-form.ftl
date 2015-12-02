@@ -165,7 +165,7 @@
             </div>
         </div>
 
-        <div class="uk-display-inline-block uk-margin-right">
+        <div class="uk-display-inline-block">
             <label class="uk-form-label">Compare to
             </label>
             <div  class="uk-button uk-form-select" data-uk-form-select>
@@ -180,7 +180,7 @@
             </div>
         </div>
 
-        <div class="uk-margin-right uk-margin-small-top">
+        <div class="uk-display-inline-block uk-margin-right">
             <button type="submit" id="time-input-form-submit" class="uk-button uk-button-primary" disabled style="width: 100%">Go</button>
         </div>
     </div>

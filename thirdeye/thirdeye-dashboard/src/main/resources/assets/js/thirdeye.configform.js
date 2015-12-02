@@ -234,8 +234,8 @@ $(document).ready(function() {
 
     // Always start at AGGREGATE
     var tokens = metricFunctionObj.name.split("_")
-    if($(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").length > 0){
-        $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"'").trigger("click")
+    if($(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"']").length > 0){
+        $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"']").trigger("click")
     }
     //When baseline-aggregate after the initial change on load enable Go (submit) button
     $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit)

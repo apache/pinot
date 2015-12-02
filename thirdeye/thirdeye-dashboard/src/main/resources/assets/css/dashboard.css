@@ -114,6 +114,10 @@ li {
     display: none;
 }
 
+#time-input-comparison-size option{
+    display: block;
+}
+
 
 /* Funnel Heatmap = Overview Tab*/
 
