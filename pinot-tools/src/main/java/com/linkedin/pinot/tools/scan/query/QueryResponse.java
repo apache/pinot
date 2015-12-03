@@ -17,7 +17,6 @@ package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -30,7 +29,6 @@ public class QueryResponse {
 
   SelectionResults _selectionResults;
   List<AggregationResult> _aggregationResults;
-  List<AggregationGroupByResult> _aggregationGroupByResults;
 
   QueryResponse(ResultTable resultTable) {
     if (resultTable == null) {
@@ -96,6 +94,7 @@ public class QueryResponse {
   private void buildAggregationGroupByResult(ResultTable resultTable) {
     List<Pair> columnList = resultTable.getColumnList();
     List<String> groupByColumns = new ArrayList<>();
+    _aggregationResults = new ArrayList<>();
 
     for (Pair pair : columnList) {
       if (pair.getSecond() == null) {
@@ -104,10 +103,7 @@ public class QueryResponse {
     }
 
     int numGroupByColumns = groupByColumns.size();
-    int numAggregationColumns = columnList.size() - numGroupByColumns;
-
-    _aggregationGroupByResults = new ArrayList<>(numAggregationColumns);
-    List<List<String>> groupValues = new ArrayList<>();
+    List<List<String>> groupValueStrings = new ArrayList<>();
 
     for (ResultTable.Row row : resultTable) {
       int colId = 0;
@@ -128,22 +124,26 @@ public class QueryResponse {
         }
         ++colId;
       }
-      groupValues.add(group);
+      groupValueStrings.add(group);
     }
 
     for (int colId = numGroupByColumns; colId < columnList.size(); ++colId) {
-      AggregationGroupByResult
-          groupByResult = new AggregationGroupByResult(resultTable.getFunction(colId), groupByColumns);
+      String function = resultTable.getFunction(colId);
+      if (function.equalsIgnoreCase("count_*")) {
+        function = "count_star";
+      }
 
       int rowId = 0;
+      List<GroupValue> groupValues = new ArrayList<>();
       for (ResultTable.Row row : resultTable) {
         String value = row.get(colId).toString();
-        GroupValue groupValue = new GroupValue(value, groupValues.get(rowId));
-        groupByResult.addGroupValue(groupValue);
+        GroupValue groupValue = new GroupValue(value, groupValueStrings.get(rowId));
+        groupValues.add(groupValue);
         ++rowId;
       }
 
-      _aggregationGroupByResults.add(groupByResult);
+      AggregationResult aggregationResult = new AggregationResult(groupValues, groupByColumns, function);
+      _aggregationResults.add(aggregationResult);
     }
   }
 
@@ -171,12 +171,6 @@ public class QueryResponse {
     return _aggregationResults;
   }
 
-  @JsonProperty("aggregationGroupByResults")
-  @JsonSerialize(include= JsonSerialize.Inclusion.NON_NULL)
-  List<AggregationGroupByResult> getAggregationGroupByResults() {
-    return _aggregationGroupByResults;
-  }
-
   class SelectionResults {
     private final List<String> _columnList;
     private final List<List<String>> _results;
@@ -200,6 +194,8 @@ public class QueryResponse {
   class AggregationResult {
     private String _value;
     private String _function;
+    List<GroupValue> _groupValues;
+    List<String> _groupByColumns;
 
     AggregationResult(String function, String value) {
       _function = function;
@@ -207,14 +203,37 @@ public class QueryResponse {
         _function = "count_star";
       }
       _value = value;
+      _groupValues = null;
     }
 
+    public AggregationResult(List<GroupValue> group, List<String> groupByColumns, String function) {
+      _groupValues = group;
+      _groupByColumns = groupByColumns;
+      _function = function;
+      _value = null;
+    }
+
+    @JsonProperty("function")
+    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
     public String getFunction() {
       return _function;
     }
 
+    @JsonProperty("value")
+    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
     public String getValue() {
       return _value;
+    }
+
+    @JsonProperty("groupByResult")
+    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+    public List<GroupValue> getGroupValues() {
+      return _groupValues;
+    }
+
+    @JsonProperty("groupByColumns")
+    public List<String> getGroupByColumns() {
+      return _groupByColumns;
     }
   }
 
@@ -235,40 +254,6 @@ public class QueryResponse {
     @JsonProperty("group")
     public List<String> getGroup() {
       return _group;
-    }
-  }
-
-  class AggregationGroupByResult {
-    String _function;
-    List<GroupValue> _groupValues;
-    List<String> _groupByColumns;
-
-    AggregationGroupByResult(String function, List<String> groupByColumns) {
-      _function = function;
-      if (_function.equalsIgnoreCase("count_*")) {
-        _function = "count_star";
-      }
-      _groupByColumns = groupByColumns;
-      _groupValues = new ArrayList<>();
-    }
-
-    public void addGroupValue(GroupValue groupValue) {
-      _groupValues.add(groupValue);
-    }
-
-    @JsonProperty("groupByResult")
-    public List<GroupValue> getGroupValues() {
-      return _groupValues;
-    }
-
-    @JsonProperty("function")
-    public String getFunction() {
-      return _function;
-    }
-
-    @JsonProperty("groupByColumns")
-    public List<String> getGroupByColumns() {
-      return _groupByColumns;
     }
   }
 }

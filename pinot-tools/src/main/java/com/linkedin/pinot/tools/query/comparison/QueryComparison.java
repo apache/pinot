@@ -41,7 +41,6 @@ public class QueryComparison {
   private static final String SELECTION_RESULTS = "selectionResults";
   private static final String AGGREGATION_RESULTS = "aggregationResults";
   private static final String NUM_DOCS_SCANNED = "numDocsScanned";
-  private static final String AGGREGATION_GROUP_BY_RESULTS = "aggregationGroupByResults";
   private static final String FUNCTION = "function";
   private static final String VALUE = "value";
   private static final String COLUMNS = "columns";
@@ -82,9 +81,15 @@ public class QueryComparison {
     startCluster();
 
     String query;
-    ScanBasedQueryProcessor scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
+    ScanBasedQueryProcessor scanBasedQueryProcessor = null;
+    BufferedReader resultReader = null;
     BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile));
-    BufferedReader resultReader = (_resultFile != null) ? new BufferedReader(new FileReader(_resultFile)) : null;
+
+    if (_resultFile == null) {
+      scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
+    } else {
+      resultReader = new BufferedReader(new FileReader(_resultFile));
+    }
 
     int passed = 0;
     int total = 0;
@@ -110,6 +115,7 @@ public class QueryComparison {
           ++passed;
           LOGGER.info("Comparison PASSED: Scan Time: {} ms Query: {}", scanJson.get(TIME_USED_MS), query);
           LOGGER.info("Cluster Result: {}", clusterJson);
+          LOGGER.info("Scan Result: {}", scanJson);
         } else {
           LOGGER.error("Comparison FAILED: {}", query);
           LOGGER.info("Cluster Response: {}", clusterJson);
@@ -157,8 +163,7 @@ public class QueryComparison {
 
   private boolean compareAggregation(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
-    if ((clusterJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !scanJson.has(AGGREGATION_RESULTS)
-        && !scanJson.has(AGGREGATION_GROUP_BY_RESULTS)) {
+    if ((clusterJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !scanJson.has(AGGREGATION_RESULTS)) {
       return true;
     }
 
@@ -166,13 +171,13 @@ public class QueryComparison {
       return false;
     }
 
-    if (scanJson.has(AGGREGATION_GROUP_BY_RESULTS)) {
-      return compareAggregationGroupBy(clusterJson, scanJson);
-    }
-
     JSONArray clusterAggregation = clusterJson.getJSONArray(AGGREGATION_RESULTS);
     if (clusterAggregation.length() == 0) {
       return true;
+    }
+
+    if (clusterAggregation.getJSONObject(0).has(GROUP_BY_RESULT)) {
+      return compareAggregationGroupBy(clusterJson, scanJson);
     }
 
     JSONArray scanAggregation = scanJson.getJSONArray(AGGREGATION_RESULTS);
@@ -218,7 +223,7 @@ public class QueryComparison {
   private boolean compareAggregationGroupBy(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     JSONArray clusterGroupByResults = clusterJson.getJSONArray(AGGREGATION_RESULTS);
-    JSONArray scanGroupByResults = scanJson.getJSONArray(AGGREGATION_GROUP_BY_RESULTS);
+    JSONArray scanGroupByResults = scanJson.getJSONArray(AGGREGATION_RESULTS);
 
     int numClusterGroupBy = clusterGroupByResults.length();
     int numScanGroupBy = scanGroupByResults.length();
@@ -409,6 +414,7 @@ public class QueryComparison {
 
     if (clusterDocs != scanDocs) {
       LOGGER.error("Mis-match in number of docs scanned: Cluster: {} Scan: {}", clusterDocs, scanDocs);
+      return false;
     }
 
     return true;

@@ -27,7 +27,7 @@ public class MaxFunction extends AggregationFunc {
 
   @Override
   public ResultTable run() {
-    Double max = Double.MIN_VALUE;
+    Double max = Double.NEGATIVE_INFINITY;
 
     for (ResultTable.Row row : _rows) {
       max = Math.max(max, new Double(row.get(_column, _name).toString()));
