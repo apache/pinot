@@ -179,7 +179,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             try {
               segmentMetadataFromServer = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
             } catch (Exception e) {
-              LOGGER.error("Failed to load segment metadata from local: " + localSegmentDir);
+              LOGGER.error("Failed to load segment metadata from local: " + localSegmentDir,e);
               FileUtils.deleteQuietly(new File(localSegmentDir));
               segmentMetadataFromServer = null;
             }
@@ -191,7 +191,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
                 return;
               }
             } catch (Exception e) {
-              LOGGER.error("Failed to load segment from local, will try to reload it from controller!");
+              LOGGER.error("Failed to load segment from local, will try to reload it from controller!",e);
               FileUtils.deleteQuietly(new File(localSegmentDir));
               segmentMetadataFromServer = null;
             }
