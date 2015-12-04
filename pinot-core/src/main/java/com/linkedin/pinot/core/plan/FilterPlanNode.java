@@ -167,7 +167,7 @@ public class FilterPlanNode implements PlanNode {
         priority = 0;
       } else if (operator instanceof AndOperator) {
         priority = 1;
-      } else if (operator instanceof InvertedIndexBasedFilterOperator) {
+      } else if (operator instanceof BitmapBasedFilterOperator) {
         priority = 2;
       } else if (operator instanceof ScanBasedFilterOperator) {
         priority = 3;

@@ -182,7 +182,7 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
     }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[bitmapList.size()];
     bitmapList.toArray(bitmaps);
-    bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(), bitmaps);
+    bitmapBlock = new BitmapBlock(dataSource.getOperatorName(),dataSourceBlock.getMetadata(), bitmaps);
     return bitmapBlock;
   }
 
@@ -196,8 +196,10 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
     private final ImmutableRoaringBitmap[] bitmaps;
     private BitmapDocIdSet bitmapDocIdSet;
     private BlockMetadata blockMetadata;
+    private String datasourceName;
 
-    public BitmapBlock(BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps) {
+    public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps) {
+      this.datasourceName = datasourceName;
       this.blockMetadata = blockMetadata;
       this.bitmaps = bitmaps;
     }
@@ -214,7 +216,7 @@ public class BitmapBasedFilterOperatorWithoutDictionary extends BaseFilterOperat
 
     @Override
     public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-      bitmapDocIdSet = new BitmapDocIdSet(blockMetadata, bitmaps);
+      bitmapDocIdSet = new BitmapDocIdSet(datasourceName, blockMetadata, bitmaps);
       return bitmapDocIdSet;
     }
 

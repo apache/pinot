@@ -35,8 +35,11 @@ public class MVScanDocIdIterator implements BlockDocIdIterator {
   private int endDocId;
   private PredicateEvaluator evaluator;
 
-  public MVScanDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata,
+  private String datasourceName;
+
+  public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
+    this.datasourceName = datasourceName;
     this.evaluator = evaluator;
     if (evaluator.alwaysFalse()) {
       this.intArray = new int[0];
@@ -108,5 +111,9 @@ public class MVScanDocIdIterator implements BlockDocIdIterator {
   @Override
   public int currentDocId() {
     return currentDocId;
+  }
+  @Override
+  public String toString() {
+    return MVScanDocIdIterator.class.getSimpleName()+ "[" + datasourceName +"]";
   }
 }

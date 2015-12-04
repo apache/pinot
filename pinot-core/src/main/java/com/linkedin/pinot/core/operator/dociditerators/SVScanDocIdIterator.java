@@ -28,8 +28,11 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
   private int startDocId;
   private int endDocId;
   private PredicateEvaluator evaluator;
+  private String datasourceName;
 
-  public SVScanDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+  public SVScanDocIdIterator(String datasourceName, BlockValSet blockValSet,
+      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+    this.datasourceName = datasourceName;
     this.evaluator = evaluator;
     if (evaluator.alwaysFalse()) {
       currentDocId = Constants.EOF;
@@ -51,7 +54,8 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
   }
 
   /**
-   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
+   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds
+   * endDocId
    * @param endDocId
    */
   public void setEndDocId(int endDocId) {
@@ -86,7 +90,8 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
       currentDocId = currentDocId + 1;
       int dictIdForCurrentDoc = valueIterator.nextIntVal();
       if (evaluator.apply(dictIdForCurrentDoc)) {
-        //System.out.println("Returning deom " + this +"doc Id:"+ currentDocId  + " dictId:"+ dictIdForCurrentDoc);
+        // System.out.println("Returning deom " + this +"doc Id:"+ currentDocId + " dictId:"+
+        // dictIdForCurrentDoc);
         return currentDocId;
       }
     }
@@ -97,5 +102,10 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
   @Override
   public int currentDocId() {
     return currentDocId;
+  }
+
+  @Override
+  public String toString() {
+    return SVScanDocIdIterator.class.getSimpleName() + "[" + datasourceName + "]";
   }
 }

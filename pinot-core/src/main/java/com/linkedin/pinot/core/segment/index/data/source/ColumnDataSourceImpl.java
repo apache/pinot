@@ -94,7 +94,7 @@ public class ColumnDataSourceImpl extends DataSource {
 
   @Override
   public String getOperatorName() {
-    return "ColumnDataSourceImpl";
+    return "ColumnDataSourceImpl [" + indexContainer.getColumnMetadata().getColumnName() +"]";
   }
 
   @Override

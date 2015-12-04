@@ -24,4 +24,5 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
   public void setStartDocId(int startDocId);
 
   public void setEndDocId(int endDocId);
+
 }

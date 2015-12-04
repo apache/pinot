@@ -29,7 +29,7 @@ public class SortedDocIdSetTest {
   @Test
   public void testEmpty() {
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -43,7 +43,7 @@ public class SortedDocIdSetTest {
   public void testPairWithSameStartAndEnd() {
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
     pairs.add(Pair.of(1, 1));
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol",pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -57,7 +57,7 @@ public class SortedDocIdSetTest {
   public void testOnePair() {
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
     pairs.add(Pair.of(0, 9));
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -73,7 +73,7 @@ public class SortedDocIdSetTest {
     pairs.add(Pair.of(90, 99));
     pairs.add(Pair.of(100, 109));
 
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol",pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -120,7 +120,7 @@ public class SortedDocIdSetTest {
       }
       pairs.add(Pair.of(start, end));
     }
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;

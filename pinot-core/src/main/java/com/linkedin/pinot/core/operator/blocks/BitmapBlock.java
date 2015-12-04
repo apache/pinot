@@ -32,12 +32,14 @@ public class BitmapBlock extends BaseFilterBlock {
   BitmapDocIdSet bitmapDocIdSet;
   private BlockMetadata blockMetadata;
   private boolean exclusion;
+  private String datasourceName;
 
-  public BitmapBlock(BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps) {
-    this(blockMetadata, bitmaps, false);
+  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps) {
+    this(datasourceName, blockMetadata, bitmaps, false);
   }
 
-  public BitmapBlock(BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
+  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
+    this.datasourceName = datasourceName;
     this.blockMetadata = blockMetadata;
     this.bitmaps = bitmaps;
     this.exclusion = exclusion;
@@ -55,7 +57,7 @@ public class BitmapBlock extends BaseFilterBlock {
 
   @Override
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    bitmapDocIdSet = new BitmapDocIdSet(blockMetadata, bitmaps, exclusion);
+    bitmapDocIdSet = new BitmapDocIdSet(datasourceName, blockMetadata, bitmaps, exclusion);
     return bitmapDocIdSet;
   }
 

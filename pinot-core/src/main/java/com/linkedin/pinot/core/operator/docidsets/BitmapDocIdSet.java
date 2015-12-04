@@ -25,7 +25,6 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 
-
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
 
   final private ImmutableRoaringBitmap[] bitmaps;
@@ -41,11 +40,13 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
 
   private MutableRoaringBitmap answer;
 
-  public BitmapDocIdSet(BlockMetadata blockMetadata, ImmutableRoaringBitmap... bitmaps) {
-    this(blockMetadata, bitmaps, false);
+  public BitmapDocIdSet(String datasourceName, BlockMetadata blockMetadata,
+      ImmutableRoaringBitmap... bitmaps) {
+    this(datasourceName, blockMetadata, bitmaps, false);
   }
 
-  public BitmapDocIdSet(BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
+  public BitmapDocIdSet(String datasourceName, BlockMetadata blockMetadata,
+      ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
     this.blockMetadata = blockMetadata;
     this.bitmaps = bitmaps;
     this.exclusion = exclusion;
@@ -77,7 +78,8 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   }
 
   /**
-   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
+   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds
+   * endDocId
    * @param endDocId
    */
   @Override

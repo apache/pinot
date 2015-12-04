@@ -143,7 +143,7 @@ public class BitmapDocIdSetTest {
         return null;
       }
     };
-    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet(blockMetadata, bitmaps);
+    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet("testColumn", blockMetadata, bitmaps);
     BlockDocIdIterator iterator = bitmapDocIdSet.iterator();
     int docId;
     TreeSet<Integer> result = new TreeSet<Integer>();

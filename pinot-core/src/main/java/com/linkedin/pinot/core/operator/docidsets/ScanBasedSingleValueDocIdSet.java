@@ -28,11 +28,13 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private SVScanDocIdIterator blockValSetBlockDocIdIterator;
   private BlockMetadata blockMetadata;
+  private String datasourceName;
 
-  public ScanBasedSingleValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+  public ScanBasedSingleValueDocIdSet(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+    this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator = new SVScanDocIdIterator(blockValSet, blockMetadata, evaluator);
+    blockValSetBlockDocIdIterator = new SVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
   }
 
   @Override

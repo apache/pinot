@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
+import java.util.List;
+
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
@@ -23,13 +27,15 @@ public final class SortedDocIdIterator implements BlockDocIdIterator {
   /**
    * 
    */
-  private final SortedDocIdSet sortedDocIdSet;
+  private List<Pair<Integer, Integer>> pairs;
+  private String datasourceName;
 
   /**
    * @param sortedDocIdSet
    */
-  public SortedDocIdIterator(SortedDocIdSet sortedDocIdSet) {
-    this.sortedDocIdSet = sortedDocIdSet;
+  public SortedDocIdIterator(String datasourceName, List<Pair<Integer, Integer>> pairs) {
+    this.datasourceName = datasourceName;
+    this.pairs = pairs;
   }
 
   int pairPointer = 0;
@@ -37,61 +43,60 @@ public final class SortedDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int advance(int targetDocId) {
-    if (pairPointer == this.sortedDocIdSet.pairs.size() || targetDocId > this.sortedDocIdSet.pairs.get(this.sortedDocIdSet.pairs.size() - 1).getRight()) {
-      pairPointer = this.sortedDocIdSet.pairs.size();
+    if (pairPointer == this.pairs.size() || targetDocId > pairs.get(pairs.size() - 1).getRight()) {
+      pairPointer = pairs.size();
       return (currentDocId = Constants.EOF);
     }
-    long start = System.nanoTime();
-
     if (currentDocId >= targetDocId) {
       return currentDocId;
     }
     // couter < targetDocId
-    while (pairPointer < this.sortedDocIdSet.pairs.size()) {
-      if (this.sortedDocIdSet.pairs.get(pairPointer).getLeft() > targetDocId) {
+    while (pairPointer < pairs.size()) {
+      if (pairs.get(pairPointer).getLeft() > targetDocId) {
         // targetDocId in the gap between two valid pairs.
-        currentDocId = this.sortedDocIdSet.pairs.get(pairPointer).getLeft();
+        currentDocId = pairs.get(pairPointer).getLeft();
         break;
-      } else if (targetDocId >= this.sortedDocIdSet.pairs.get(pairPointer).getLeft() && targetDocId <= this.sortedDocIdSet.pairs.get(pairPointer).getRight()) {
+      } else if (targetDocId >= pairs.get(pairPointer).getLeft()
+          && targetDocId <= pairs.get(pairPointer).getRight()) {
         // targetDocId in the future valid pair.
         currentDocId = targetDocId;
         break;
       }
       pairPointer++;
     }
-    if (pairPointer == this.sortedDocIdSet.pairs.size()) {
+    if (pairPointer == pairs.size()) {
       currentDocId = Constants.EOF;
     }
-    long end = System.nanoTime();
-    this.sortedDocIdSet.timeMeasure.addAndGet(end - start);
     return currentDocId;
   }
 
   @Override
   public int next() {
-    if (pairPointer == this.sortedDocIdSet.pairs.size() || currentDocId > this.sortedDocIdSet.pairs.get(this.sortedDocIdSet.pairs.size() - 1).getRight()) {
-      pairPointer = this.sortedDocIdSet.pairs.size();
+    if (pairPointer == pairs.size() || currentDocId > pairs.get(pairs.size() - 1).getRight()) {
+      pairPointer = pairs.size();
       return (currentDocId = Constants.EOF);
     }
-    long start = System.nanoTime();
     currentDocId = currentDocId + 1;
-    if (pairPointer < this.sortedDocIdSet.pairs.size() && currentDocId > this.sortedDocIdSet.pairs.get(pairPointer).getRight()) {
+    if (pairPointer < pairs.size() && currentDocId > pairs.get(pairPointer).getRight()) {
       pairPointer++;
-      if (pairPointer == this.sortedDocIdSet.pairs.size()) {
+      if (pairPointer == pairs.size()) {
         currentDocId = Constants.EOF;
       } else {
-        currentDocId = this.sortedDocIdSet.pairs.get(pairPointer).getLeft();
+        currentDocId = pairs.get(pairPointer).getLeft();
       }
-    } else if (currentDocId < this.sortedDocIdSet.pairs.get(pairPointer).getLeft()) {
-      currentDocId = this.sortedDocIdSet.pairs.get(pairPointer).getLeft();
+    } else if (currentDocId < pairs.get(pairPointer).getLeft()) {
+      currentDocId = pairs.get(pairPointer).getLeft();
     }
-    long end = System.nanoTime();
-    this.sortedDocIdSet.timeMeasure.addAndGet(end - start);
     return currentDocId;
   }
 
   @Override
   public int currentDocId() {
     return currentDocId;
+  }
+
+  @Override
+  public String toString() {
+    return SortedDocIdIterator.class.getSimpleName() + " [ " + datasourceName + "]";
   }
 }

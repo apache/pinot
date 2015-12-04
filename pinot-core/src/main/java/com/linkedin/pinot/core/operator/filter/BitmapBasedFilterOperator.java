@@ -75,7 +75,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     for (int i = 0; i < dictionaryIds.length; i++) {
       bitmaps[i] = invertedIndex.getImmutable(dictionaryIds[i]);
     }
-    bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(), bitmaps, exclusion);
+    bitmapBlock = new BitmapBlock(dataSource.getOperatorName(), dataSourceBlock.getMetadata(), bitmaps, exclusion);
     return bitmapBlock;
   }
 

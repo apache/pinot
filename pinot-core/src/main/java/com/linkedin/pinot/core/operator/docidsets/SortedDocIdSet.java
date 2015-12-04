@@ -32,8 +32,10 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
   public final AtomicLong timeMeasure = new AtomicLong(0);
   int startDocId;
   int endDocId;
+  private String datasourceName;
 
-  public SortedDocIdSet(List<Pair<Integer, Integer>> pairs) {
+  public SortedDocIdSet(String datasourceName,List<Pair<Integer, Integer>> pairs) {
+    this.datasourceName = datasourceName;
     this.pairs = pairs;
   }
 
@@ -78,7 +80,7 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
     if (pairs == null || pairs.isEmpty()) {
       return BlockUtils.emptyBlockDocIdSetIterator();
     }
-    return new SortedDocIdIterator(this);
+    return new SortedDocIdIterator(datasourceName, pairs);
   }
 
   @SuppressWarnings("unchecked")

@@ -34,13 +34,13 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
-
 public class ScanBasedFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
 
   private DataSource dataSource;
   private Integer startDocId;
   private Integer endDocId;
+  private String name;
 
   public ScanBasedFilterOperator(DataSource dataSource) {
     this(dataSource, null, null);
@@ -50,6 +50,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     this.dataSource = dataSource;
     this.startDocId = startDocId;
     this.endDocId = endDocId;
+    this.name = ScanBasedFilterOperator.class.getName() + "[" + dataSource.getOperatorName() + "]";
   }
 
   @Override
@@ -67,11 +68,14 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     Block nextBlock = dataSource.nextBlock();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
-    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
+    PredicateEvaluator evaluator =
+        PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     if (dataSourceMetadata.isSingleValue()) {
-      docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, evaluator);
+      docIdSet = new ScanBasedSingleValueDocIdSet(dataSource.getOperatorName(), blockValueSet,
+          blockMetadata, evaluator);
     } else {
-      docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, evaluator);
+      docIdSet = new ScanBasedMultiValueDocIdSet(dataSource.getOperatorName(), blockValueSet,
+          blockMetadata, evaluator);
     }
 
     if (startDocId != null) {
@@ -81,7 +85,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     if (endDocId != null) {
       docIdSet.setEndDocId(endDocId);
     }
-
     return new ScanBlock(docIdSet);
   }
 
@@ -109,16 +112,16 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
       throw new UnsupportedOperationException("applypredicate not supported in " + this.getClass());
     }
 
-
-
     @Override
     public BlockValSet getBlockValueSet() {
-      throw new UnsupportedOperationException("getBlockValueSet not supported in " + this.getClass());
+      throw new UnsupportedOperationException(
+          "getBlockValueSet not supported in " + this.getClass());
     }
 
     @Override
     public BlockDocIdValueSet getBlockDocIdValueSet() {
-      throw new UnsupportedOperationException("getBlockDocIdValueSet not supported in " + this.getClass());
+      throw new UnsupportedOperationException(
+          "getBlockDocIdValueSet not supported in " + this.getClass());
     }
 
     @Override
@@ -133,4 +136,8 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
 
   }
 
+  @Override
+  public String toString() {
+    return ScanBasedFilterOperator.class.getName() + "-" + name;
+  }
 }

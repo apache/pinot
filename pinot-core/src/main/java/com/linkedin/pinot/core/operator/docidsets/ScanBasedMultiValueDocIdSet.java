@@ -22,20 +22,19 @@ import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.MVScanDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
-
-
 public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private BlockMetadata blockMetadata;
   private MVScanDocIdIterator blockValSetBlockDocIdIterator;
+  private String datasourceName;
 
-  public ScanBasedMultiValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata,
-      PredicateEvaluator evaluator) {
+  public ScanBasedMultiValueDocIdSet(String datasourceName, BlockValSet blockValSet,
+      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+    this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator = new MVScanDocIdIterator(blockValSet, blockMetadata, evaluator);
+    blockValSetBlockDocIdIterator =
+        new MVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
   }
 
   @Override
@@ -58,7 +57,8 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   }
 
   /**
-   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
+   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds
+   * endDocId
    * @param endDocId
    */
   @Override

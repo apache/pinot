@@ -70,7 +70,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
     }
     LOGGER.debug("Creating a Sorted Block with pairs: {}", pairs);
-    sortedBlock = new SortedBlock(pairs);
+    sortedBlock = new SortedBlock(dataSource.getOperatorName(),pairs);
     return sortedBlock;
   }
 
@@ -83,8 +83,10 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
     private List<Pair<Integer, Integer>> pairs;
     private SortedDocIdSet sortedDocIdSet;
+    private String datasourceName;
 
-    public SortedBlock(List<Pair<Integer, Integer>> pairs) {
+    public SortedBlock(String datasourceName, List<Pair<Integer, Integer>> pairs) {
+      this.datasourceName = datasourceName;
       this.pairs = pairs;
     }
 
@@ -100,7 +102,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
     @Override
     public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-      sortedDocIdSet = new SortedDocIdSet(pairs);
+      sortedDocIdSet = new SortedDocIdSet(datasourceName, pairs);
       return sortedDocIdSet;
     }
 

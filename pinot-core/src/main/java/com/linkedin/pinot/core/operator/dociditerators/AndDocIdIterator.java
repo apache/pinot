@@ -100,7 +100,9 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
     timeMeasure.addAndGet(end - start);
     // Remove this after tracing is added
     if (currentDocId == Constants.EOF) {
-      LOGGER.info("AND operator took:{}. Break down by child iterators:{} times:{}", timeMeasure.get(), Arrays.toString(docIdIterators), Arrays.toString(timeMeasures));
+      if(LOGGER.isDebugEnabled()){
+        LOGGER.debug("AND operator took:{}. Break down by child iterators:{} times:{}", timeMeasure.get(), Arrays.toString(docIdIterators), Arrays.toString(timeMeasures));
+      }
     }
     return currentDocId;
   }
@@ -108,5 +110,9 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   @Override
   public int currentDocId() {
     return currentDocId;
+  }
+  
+  public String toString(){
+    return Arrays.toString(docIdIterators);
   }
 }

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.roaringbitmap.IntIterator;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -100,4 +98,9 @@ public final class BitmapDocIdIterator implements BlockDocIdIterator {
     long end = System.nanoTime();
     return currentDocId;
   }
+
+  public String toString() {
+    return BitmapDocIdIterator.class.getSimpleName();
+  }
+
 }
