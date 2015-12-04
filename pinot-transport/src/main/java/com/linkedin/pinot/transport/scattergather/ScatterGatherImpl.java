@@ -77,7 +77,7 @@ public class ScatterGatherImpl implements ScatterGather {
   }
 
   @Override
-  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest)
+  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest, final ScatterGatherStats scatterGatherStats)
       throws InterruptedException {
     ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterRequest);
 
@@ -89,7 +89,7 @@ public class ScatterGatherImpl implements ScatterGather {
     // do Selection for each segment-set/segmentId
     selectServices(ctxt);
 
-    return sendRequest(ctxt);
+    return sendRequest(ctxt, scatterGatherStats);
   }
 
   /**
@@ -97,10 +97,11 @@ public class ScatterGatherImpl implements ScatterGather {
    * Helper Function to send scatter-request. This method should be called after the servers are selected
    *
    * @param ctxt Scatter-Gather Request context with selected servers for each request.
+   * @param scatterGatherStats
    * @return a composite future representing the gather process.
    * @throws InterruptedException
    */
-  protected CompositeFuture<ServerInstance, ByteBuf> sendRequest(ScatterGatherRequestContext ctxt)
+  protected CompositeFuture<ServerInstance, ByteBuf> sendRequest(ScatterGatherRequestContext ctxt, final ScatterGatherStats scatterGatherStats)
       throws InterruptedException {
     TimerContext t = MetricsHelper.startTimer();
 
@@ -117,6 +118,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
     int i = 0;
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
+      scatterGatherStats.initServer(e.getKey().toString());
       SingleRequestHandler handler =
           new SingleRequestHandler(_connPool, e.getKey(), ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(),
               requestDispatchLatch);
@@ -138,6 +140,10 @@ public class ScatterGatherImpl implements ScatterGather {
           new ArrayList<KeyedFuture<ServerInstance, ByteBuf>>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
+        final String server = h.getServer().toString();
+        scatterGatherStats.setSendStartTimeMillis(server, h.getConnStartTimeMillis());
+        scatterGatherStats.setConnStartTimeMillis(server, h.getStartDelayMillis());
+        scatterGatherStats.setSendCompletionTimeMillis(server, h.getSendCompletionTimeMillis());
       }
       response.start(responseFutures);
     } else {
@@ -364,7 +370,9 @@ public class ScatterGatherImpl implements ScatterGather {
     // Remaining time budget to connect and process the request.
     private final long _timeoutMS;
 
-    private final long _startTime;
+    private final long _initTime;
+    private long _startTime;
+    private long _endTime;
 
     public SingleRequestHandler(KeyedPool<ServerInstance, NettyClientConnection> connPool, ServerInstance server,
         ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch) {
@@ -374,12 +382,33 @@ public class ScatterGatherImpl implements ScatterGather {
       _segmentIds = segmentIds;
       _requestDispatchLatch = latch;
       _timeoutMS = timeoutMS;
-      _startTime = System.currentTimeMillis();
+      _initTime = System.currentTimeMillis();
     }
 
     @Override
     public synchronized void run() {
+      try {
+        _startTime = System.currentTimeMillis();
+        runInternal();
+      } finally {
+        _endTime = System.currentTimeMillis();
+      }
+    }
 
+    public long getConnStartTimeMillis() {
+      return _startTime - _initTime;
+    }
+
+    public long getSendCompletionTimeMillis() {
+      return _endTime - _initTime;
+    }
+
+    // If the 'run' gets called more than 5ms after we created this object, something is wrong.
+    public long getStartDelayMillis() {
+      return _startTime - _initTime;
+    }
+
+    private void runInternal() {
       if (_isCancelled.get()) {
         LOGGER.error("Request {} to server {} cancelled even before request is sent !! Not sending request",
             _request.getRequestId(), _server);

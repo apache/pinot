@@ -54,6 +54,8 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
 
   private final String _name;
 
+  private long _durationMillis = -1;
+
   public SelectingFuture(String name) {
     _name = name;
     _futuresList = new ArrayList<KeyedFuture<K, T>>();
@@ -135,7 +137,13 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error) {
+  public long getDurationMillis() {
+    return _durationMillis;
+  }
+
+  @Override
+  protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error, long durationMillis) {
+    // Add an argument here to get the time of completion of the future.
     boolean done = false;
     if ((null != response)) {
       LOGGER.debug("Error got from {} is : {}", name, response);
@@ -147,6 +155,7 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
       LOGGER.debug("Error got from {} is : {}", name, error);
       _error = error;
     }
+    _durationMillis = durationMillis;
     return done;
   }
 

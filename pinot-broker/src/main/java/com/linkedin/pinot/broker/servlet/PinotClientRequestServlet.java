@@ -15,25 +15,6 @@
  */
 package com.linkedin.pinot.broker.servlet;
 
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.Callable;
-
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
@@ -42,9 +23,27 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotClientRequestServlet extends HttpServlet {
@@ -56,11 +55,13 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   private BrokerRequestHandler broker;
   private BrokerMetrics brokerMetrics;
+  private AtomicLong requestIdGenerator;
 
   @Override
   public void init(ServletConfig config) throws ServletException {
     broker = (BrokerRequestHandler) config.getServletContext().getAttribute(BrokerRequestHandler.class.toString());
     brokerMetrics = (BrokerMetrics) config.getServletContext().getAttribute(BrokerMetrics.class.toString());
+    requestIdGenerator = new AtomicLong(0);
   }
 
   @Override
@@ -97,7 +98,8 @@ public class PinotClientRequestServlet extends HttpServlet {
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
-    LOGGER.info("Broker received Query String is: {}", pql);
+    final long requestId = requestIdGenerator.incrementAndGet();
+    LOGGER.info("Query string for requestId {}: {}", requestId, pql);
     boolean isTraceEnabled = false;
 
     if (request.has("trace")) {
@@ -133,6 +135,7 @@ public class PinotClientRequestServlet extends HttpServlet {
     final long requestCompilationTime = System.nanoTime() - startTime;
     brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION,
             requestCompilationTime);
+    final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
 
     final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION,
             new Callable<BrokerResponse>() {
@@ -140,11 +143,13 @@ public class PinotClientRequestServlet extends HttpServlet {
               public BrokerResponse call()
                       throws Exception {
                 final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
-                return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
+                return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection,
+                    scatterGatherStats, requestId);
               }
             });
 
     LOGGER.info("Broker Response : {}", resp);
+    LOGGER.info("ResponseTimes for {} {}", requestId, scatterGatherStats);
     return resp;
   }
 

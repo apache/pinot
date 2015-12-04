@@ -45,6 +45,6 @@ public interface ScatterGather {
    * @return future containing response from all services queried. The response is in ByteBuf ( not the byte[] ).
    * Hence, the client is responsible for calling release() on the response.
    */
-  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest)
+  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest, final ScatterGatherStats scatterGatherStats)
       throws InterruptedException;
 }

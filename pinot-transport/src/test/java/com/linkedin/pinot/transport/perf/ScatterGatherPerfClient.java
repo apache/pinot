@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.perf;
 
+import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -198,11 +199,12 @@ public class ScatterGatherPerfClient implements Runnable {
           _numRequestsMeasured++;
         }
 
+        final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
         if (!_asyncRequestSubmit) {
-          sendRequestAndGetResponse(req);
+          sendRequestAndGetResponse(req, scatterGatherStats);
           _endLastResponseTime = System.currentTimeMillis();
         } else {
-          CompositeFuture<ServerInstance, ByteBuf> future = asyncSendRequestAndGetResponse(req);
+          CompositeFuture<ServerInstance, ByteBuf> future = asyncSendRequestAndGetResponse(req, scatterGatherStats);
           _queue
               .offer(new QueueEntry(false, i >= _numRequestsToSkipForMeasurement, System.currentTimeMillis(), future));
         }
@@ -311,9 +313,10 @@ public class ScatterGatherPerfClient implements Runnable {
    * @throws IOException
    * @throws ClassNotFoundException
    */
-  private String sendRequestAndGetResponse(SimpleScatterGatherRequest request) throws InterruptedException,
+  private String sendRequestAndGetResponse(SimpleScatterGatherRequest request,
+      final ScatterGatherStats scatterGatherStats) throws InterruptedException,
       ExecutionException, IOException, ClassNotFoundException {
-    CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request);
+    CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request, scatterGatherStats);
     ByteBuf b = future.getOne();
     String r = null;
     if (null != b) {
@@ -337,9 +340,10 @@ public class ScatterGatherPerfClient implements Runnable {
     }
   }
 
-  private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request)
+  private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request,
+      final ScatterGatherStats scatterGatherStats)
       throws InterruptedException {
-    return _scatterGather.scatterGather(request);
+    return _scatterGather.scatterGather(request, scatterGatherStats);
   }
 
   private static class QueueEntry {

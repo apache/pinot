@@ -251,7 +251,8 @@ public class ScatterGatherTest {
     pgMapStr.put(pg, request);
     ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
 
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
+    final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
     Map<ServerInstance, ByteBuf> v = fut.get();
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
@@ -335,7 +336,8 @@ public class ScatterGatherTest {
 
     ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
+    final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
     Map<ServerInstance, ByteBuf> v = fut.get();
     Assert.assertEquals(v.size(), 4);
 
@@ -439,7 +441,8 @@ public class ScatterGatherTest {
         new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
+    final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
@@ -555,7 +558,8 @@ public class ScatterGatherTest {
         new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
+    final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
