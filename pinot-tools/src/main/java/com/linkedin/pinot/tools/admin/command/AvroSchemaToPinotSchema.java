@@ -46,7 +46,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
       metaVar = "<String>", usage = "Path to avro schema file.")
   String _avroDataFileName;
 
-  @Option(name = "-pinotSchemaFileName", required = true, metaVar = "<string>", usage = "Path to pinot schema file.")
+  @Option(name = "-pinotSchemaFileName", required = false, metaVar = "<string>", usage = "Path to pinot schema file.")
   String _pinotSchemaFileName;
 
   @Option(name = "-dimensions", required = false, metaVar = "<string>", usage = "Comma seperated dimension columns.")
@@ -78,10 +78,24 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
       return false;
     }
 
-
     if (schema == null) {
       LOGGER.error("Error: Could not read avro schema from file.");
       return false;
+    }
+
+    String avroFileName = _avroSchemaFileName;
+    if (avroFileName == null) {
+      avroFileName = _avroDataFileName;
+    }
+
+    // Remove extension
+    String schemaName = avroFileName.replaceAll("\\..*", "");
+    schema.setSchemaName(schemaName);
+
+    if (_pinotSchemaFileName == null) {
+      _pinotSchemaFileName = schemaName + ".json";
+
+      LOGGER.info("Using {} as the Pinot schema file name", _pinotSchemaFileName);
     }
 
     ObjectMapper objectMapper = new ObjectMapper();
