@@ -63,7 +63,10 @@ public class ClusterStarter {
   ClusterStarter(QueryComparisonConfig config)
       throws SocketException, UnknownHostException {
     _config = config;
-    _segmentDir = new File(config.getSegmentsDir());
+
+    String segmentDir = config.getSegmentsDir();
+    _segmentDir = (segmentDir != null) ? new File(segmentDir) : null;
+
     _localhost = NetUtil.getHostAddress();
 
     _zkAddress = config.getZookeeperAddress();

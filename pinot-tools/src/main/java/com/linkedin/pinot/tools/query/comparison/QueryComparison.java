@@ -59,19 +59,26 @@ public class QueryComparison {
 
   public QueryComparison(QueryComparisonConfig config) {
     _config = config;
-    _segmentsDir = new File(config.getSegmentsDir());
     _queryFile = new File(config.getQueryFile());
-
-    String results = config.getResultFile();
-    _resultFile = (results != null) ? new File(results) : null;
-
-    if (!_segmentsDir.exists() || !_segmentsDir.isDirectory()) {
-      LOGGER.error("Invalid segments directory: {}", _segmentsDir.getName());
-      return;
-    }
 
     if (!_queryFile.exists() || !_queryFile.isFile()) {
       LOGGER.error("Invalid query file: {}", _queryFile.getName());
+      return;
+    }
+
+    String segmentDir = config.getSegmentsDir();
+    String results = config.getResultFile();
+
+    if (segmentDir == null && results == null) {
+      LOGGER.error("Neither segments directory nor reference results file specified");
+      return;
+    }
+
+    _segmentsDir = (segmentDir != null) ? new File(segmentDir) : null;
+    _resultFile = (results != null) ? new File(results) : null;
+
+    if (_segmentsDir != null && (!_segmentsDir.exists() || !_segmentsDir.isDirectory())) {
+      LOGGER.error("Invalid segments directory: {}", _segmentsDir.getName());
       return;
     }
   }
