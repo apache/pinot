@@ -158,7 +158,7 @@ public class ClusterStarter {
 
   public String query(String query)
       throws Exception {
-    LOGGER.info("Running query on Pinot Cluster");
+    LOGGER.debug("Running query on Pinot Cluster");
     PostQueryCommand queryRunner =
         new PostQueryCommand().setQuery(query).setBrokerHost(_brokerHost).setBrokerPort(_brokerPort);
     return queryRunner.run();

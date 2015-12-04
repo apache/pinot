@@ -120,17 +120,19 @@ public class QueryComparison {
 
         if (compare(clusterJson, scanJson)) {
           ++passed;
-          LOGGER.info("Comparison PASSED: Scan Time: {} ms Query: {}", scanJson.get(TIME_USED_MS), query);
-          LOGGER.info("Cluster Result: {}", clusterJson);
-          LOGGER.info("Scan Result: {}", scanJson);
+          LOGGER.info("Comparison PASSED: Id: {} Cluster Time: {} ms Scan Time: {} ms Docs Scanned: {}", total,
+              clusterJson.get(TIME_USED_MS), scanJson.get(TIME_USED_MS), clusterJson.get(NUM_DOCS_SCANNED));
+          LOGGER.debug("Cluster Result: {}", clusterJson);
+          LOGGER.debug("Scan Result: {}", scanJson);
         } else {
           LOGGER.error("Comparison FAILED: {}", query);
           LOGGER.info("Cluster Response: {}", clusterJson);
           LOGGER.info("Scan Response: {}", scanJson);
         }
-        ++total;
       } catch (Exception e) {
         LOGGER.error("Exception caught while processing query: '{}'", query, e);
+      } finally {
+        ++total;
       }
     }
 
@@ -371,11 +373,13 @@ public class QueryComparison {
   }
 
   private static boolean isNumeric(String str) {
-    if (str == null) return false;
+    if (str == null) {
+      return false;
+    }
 
     try {
       double d = Double.parseDouble(str);
-    } catch(NumberFormatException nfe) {
+    } catch (NumberFormatException nfe) {
       return false;
     }
     return true;

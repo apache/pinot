@@ -86,7 +86,7 @@ class SegmentQueryProcessor {
       return null;
     }
 
-    LOGGER.info("Processing segment: {}", _segmentName);
+    LOGGER.debug("Processing segment: {}", _segmentName);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     List<Integer> filteredDocIds = filterDocIds(filterQueryTree, null);
 
@@ -133,21 +133,19 @@ class SegmentQueryProcessor {
   private boolean pruneSegment(BrokerRequest brokerRequest) {
     // Check if segment belongs to the table being queried.
     if (!_tableName.equals(brokerRequest.getQuerySource().getTableName())) {
-      LOGGER.info("Skipping segment {} from different table {}", _segmentName, _tableName);
+      LOGGER.debug("Skipping segment {} from different table {}", _segmentName, _tableName);
       return true;
     }
 
     // Check if any column in the query does not exist in the segment.
-    List<String> queryColumns = new ArrayList<>();
     Set<String> allColumns = _metadata.getAllColumns();
-
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
         Map<String, String> aggregationParams = aggregationInfo.getAggregationParams();
 
         for (String column : aggregationParams.values()) {
           if (column != null && !column.isEmpty() && !column.equals("*") && !allColumns.contains(column)) {
-            LOGGER.info("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
+            LOGGER.debug("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
             return true;
           }
         }
@@ -156,7 +154,7 @@ class SegmentQueryProcessor {
         if (groupBy != null) {
           for (String column : groupBy.getColumns()) {
             if (!allColumns.contains(column)) {
-              LOGGER.info("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
+              LOGGER.debug("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
               return true;
             }
           }
@@ -166,7 +164,7 @@ class SegmentQueryProcessor {
       if (brokerRequest.isSetSelections()) {
         for (String column : brokerRequest.getSelections().getSelectionColumns()) {
           if (!allColumns.contains(column)) {
-            LOGGER.info("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
+            LOGGER.debug("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
             return true;
           }
         }
