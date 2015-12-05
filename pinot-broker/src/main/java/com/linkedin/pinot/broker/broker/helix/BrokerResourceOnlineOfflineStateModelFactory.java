@@ -124,5 +124,13 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         throw new AssertionError("Should not reach this");
       }
     }
+
+    @Transition(from = "ERROR", to = "OFFLINE")
+    public void onBecomeOfflineFromError(Message message, NotificationContext context) {
+      LOGGER.info("Resetting the state for broker resource:{} from ERROR to OFFLINE", message.getPartitionName());
+    }
+
   }
+  
+
 }

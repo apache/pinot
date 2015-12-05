@@ -327,6 +327,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       }
     }
 
+    @Transition(from = "ERROR", to = "OFFLINE")
+    public void onBecomeOfflineFromError(Message message, NotificationContext context) {
+      LOGGER.info("Resetting the state for segment:{} from ERROR to OFFLINE", message.getPartitionName());
+    }
+    
     private String downloadSegmentToLocal(String uri, String tableName, String segmentId)
         throws Exception {
       File tempSegmentFile = null;
