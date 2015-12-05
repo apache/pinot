@@ -38,8 +38,8 @@ public class StatsGenerator {
     BufferedReader dataReader = new BufferedReader(new FileReader(dataFileName));
 
     // First line is treated as header
-    String[] headers = dataReader.readLine().split("\\s+");
-    int numColumns = headers.length;
+    String[] columns = dataReader.readLine().split("\\s+");
+    int numColumns = columns.length;
 
     for (int i = 0; i < numColumns; ++i) {
       statisticsList.add(new DescriptiveStatistics());
@@ -60,7 +60,7 @@ public class StatsGenerator {
     }
 
     for (int i = 0; i < numColumns; i++) {
-      LOGGER.info("Stats: {}", statisticsList.get(i).toString().replace("\n", "\t"));
+      LOGGER.info("Stats: {}: {}", columns[i], statisticsList.get(i).toString().replace("\n", "\t"));
     }
   }
 
