@@ -202,7 +202,7 @@ public class StarTreeQueriesTest {
     return combinations.toArray(new Object[][]{});
   }
 
-  @Test(dataProvider = "filterQueryDataProvider", enabled=false)
+  @Test(dataProvider = "filterQueryDataProvider")
   public void testPlanMaker(Map<String, String> filterQuery) throws Exception {
     // Build request
     final BrokerRequest brokerRequest = new BrokerRequest();
@@ -246,7 +246,7 @@ public class StarTreeQueriesTest {
     Assert.assertEquals(fromPinot.longValue(), fromRawData.get("M0").longValue() * 10 /* because 10 broker requests */);
   }
 
-  @Test(dataProvider = "instancePlanMakerDataProvider", enabled=false)
+  @Test(dataProvider = "instancePlanMakerDataProvider")
   public void testRawQuery(PlanMaker instancePlanMaker) throws Exception {
     // Build request
     final BrokerRequest brokerRequest = new BrokerRequest();
@@ -285,7 +285,7 @@ public class StarTreeQueriesTest {
     Assert.assertEquals(fromPinot.intValue(), numRecords * 10 /* because 10 broker requests */);
   }
 
-  @Test(dataProvider = "groupByDataProvider", enabled=false)
+  @Test(dataProvider = "groupByDataProvider")
   public void testGroupByQuery(Map<String, String> filterQuery, List<String> groupByDimensions) throws Exception {
     // Build request
     final BrokerRequest brokerRequest = new BrokerRequest();

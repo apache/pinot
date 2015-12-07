@@ -115,14 +115,14 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
         docIdIterators[srcId] = docIdSets.get(srcId).iterator();
       }
     }
-    if (docIdIterators.length == 1) {
-      return docIdIterators[0];
-    } else {
+//    if (docIdIterators.length == 1) {
+//      return docIdIterators[0];
+//    } else {
       OrDocIdIterator orDocIdIterator = new OrDocIdIterator(docIdIterators);
       orDocIdIterator.setStartDocId(minDocId);
       orDocIdIterator.setEndDocId(maxDocId);
       return orDocIdIterator;
-    }
+//    }
   }
 
   @SuppressWarnings("unchecked")

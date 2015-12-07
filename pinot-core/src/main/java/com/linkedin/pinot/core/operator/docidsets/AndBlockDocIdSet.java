@@ -115,11 +115,11 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
       }
     }
-    if (docIdIterators.length == 1) {
-      return docIdIterators[0];
-    } else {
+//    if (docIdIterators.length == 1) {
+//      return docIdIterators[0];
+//    } else {
       return new AndDocIdIterator(docIdIterators);
-    }
+//    }
   }
 
   @SuppressWarnings("unchecked")
