@@ -21,10 +21,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -43,7 +41,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
-import com.linkedin.pinot.core.operator.filter.InvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
@@ -141,9 +138,11 @@ public class FilterPlanNode implements PlanNode {
         if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
           //if the column is sorted use sorted inverted index based implementation
           baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
-        } else {
+        } else if (!filterType.equals(FilterOperator.RANGE)) {
+          // range evaluation based on inv index is inefficient, so do this only if is NOT range.
           baseFilterOperator = new BitmapBasedFilterOperator(ds);
-          //baseFilterOperator = new ScanBasedFilterOperator(ds);
+        } else {
+          baseFilterOperator = new ScanBasedFilterOperator(ds);
         }
       } else {
         baseFilterOperator = new ScanBasedFilterOperator(ds);
