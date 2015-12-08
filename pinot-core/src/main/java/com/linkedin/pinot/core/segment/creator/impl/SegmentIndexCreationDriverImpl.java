@@ -15,34 +15,37 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import com.linkedin.pinot.common.data.*;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
-import com.linkedin.pinot.core.startree.StarTreeSegmentCreator;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import com.linkedin.pinot.core.startree.StarTreeSegmentCreator;
 import com.linkedin.pinot.core.util.CrcUtils;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -201,10 +204,21 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc);
+    Map<String, MutableLong> nullCountMap = recordReader.getNullCountMap();
+    if (nullCountMap != null) {
+      for (Map.Entry<String, MutableLong> entry : nullCountMap.entrySet()) {
+        AbstractColumnStatisticsCollector columnStatisticsCollector = statsCollector.getColumnProfileFor(entry.getKey());
+        columnStatisticsCollector.setNumInputNullValues(entry.getValue().intValue());
+      }
+    }
 
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
+  }
+
+  public ColumnStatistics getColumnStatisticsCollector(final String columnName)  throws Exception {
+    return statsCollector.getColumnProfileFor(columnName);
   }
 
   public void ovveriteSegmentName(String segmentName) {

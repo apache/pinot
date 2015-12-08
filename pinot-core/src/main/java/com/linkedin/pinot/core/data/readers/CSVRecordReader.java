@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import java.io.File;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.FileReader;
 import java.io.Reader;
 import java.text.ParseException;
@@ -24,22 +26,16 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
 
-
-public class CSVRecordReader implements RecordReader {
+public class CSVRecordReader extends BaseRecordReader {
   private static final Logger _logger = LoggerFactory.getLogger(CSVRecordReader.class);
 
   private String _delimiterString = ",";
@@ -51,6 +47,8 @@ public class CSVRecordReader implements RecordReader {
   CSVRecordReaderConfig _config = null;
 
   public CSVRecordReader(String dataFile, RecordReaderConfig recordReaderConfig, Schema schema) {
+    super();
+    super.initNullCounters(schema);
     _fileName = dataFile;
     _schema = schema;
 
@@ -92,6 +90,9 @@ public class CSVRecordReader implements RecordReader {
       String token = getValueForColumn(record, column);
 
       Object value = null;
+      if (token == null || token.isEmpty()) {
+        incrementNullCountFor(fieldSpec.getName());
+      }
       if (fieldSpec.isSingleValueField()) {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
       } else {

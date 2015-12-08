@@ -17,6 +17,8 @@ package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import java.util.Map;
+import org.apache.commons.lang.mutable.MutableLong;
 
 
 /**
@@ -61,6 +63,11 @@ public interface RecordReader {
    * @return
    */
   public GenericRow next();
+
+  /**
+   * Get the map of fields that have null values.
+   */
+  public Map<String, MutableLong> getNullCountMap();
 
   /**
    *

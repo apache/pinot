@@ -40,4 +40,13 @@ public interface SegmentIndexCreationDriver {
   public void build() throws Exception;
 
   public String getSegmentName() ;
+
+  /**
+   *  Get the stats collector for a column
+   *
+   * @param columnName
+   * @return AbstractColumnStatisticsCollector for the column.
+   * @throws Exception
+   */
+  public ColumnStatistics getColumnStatisticsCollector(final String columnName)  throws Exception;
 }

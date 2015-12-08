@@ -15,25 +15,21 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.FileReader;
-import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
 import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.map.ObjectMapper;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-
-public class JSONRecordReader implements RecordReader {
+public class JSONRecordReader extends BaseRecordReader {
   private final String _dataFile;
   private final Schema _schema;
 
@@ -41,6 +37,8 @@ public class JSONRecordReader implements RecordReader {
   Iterator<Map> _iterator;
 
   public JSONRecordReader(String dataFile, Schema schema) {
+    super();
+    super.initNullCounters(schema);
     _dataFile = dataFile;
     _schema = schema;
   }
@@ -81,6 +79,9 @@ public class JSONRecordReader implements RecordReader {
       Object value=null;
       if (fieldSpec.isSingleValueField()) {
         String token = (data != null) ? data.toString() : null;
+        if (token == null || token.isEmpty()) {
+          incrementNullCountFor(fieldSpec.getName());
+        }
         value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
       } else {
         value = convertToDataTypeArray(data, fieldSpec.getDataType());
