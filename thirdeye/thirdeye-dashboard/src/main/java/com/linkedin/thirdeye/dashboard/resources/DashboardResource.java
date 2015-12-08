@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import javax.ws.rs.GET;
@@ -22,6 +23,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.apache.http.client.utils.URIBuilder;
 import org.joda.time.DateTime;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -40,7 +42,6 @@ import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.QueryUtils;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.linkedin.thirdeye.dashboard.views.DashboardStartView;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.DimensionView;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewFunnel;
@@ -121,7 +122,7 @@ public class DashboardResource {
 
   @GET
   @Path("/dashboard/{collection}")
-  public DashboardStartView getDashboardStartView(@PathParam("collection") String collection)
+  public Response getDashboardCollectionStart(@PathParam("collection") String collection)
       throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
 
@@ -149,18 +150,24 @@ public class DashboardResource {
       throw new NotFoundException("No data loaded in server for " + collection);
     }
 
-    // Any custom dashboards that are defined
-    List<String> customDashboardNames = null;
-    if (customDashboardResource != null) {
-      customDashboardNames = customDashboardResource.getCustomDashboardNames(collection);
-    }
-
     List<String> funnelNames = Collections.emptyList();
     if (funnelResource != null) {
       funnelNames = funnelResource.getFunnelNamesFor(collection);
     }
-    return new DashboardStartView(collection, schema, earliestDataTime, latestDataTime,
-        customDashboardNames, funnelNames);
+
+    // Reflecting UI defaults: current time = latest - default bucket size (1 hour)
+    long currentTimeMillis =
+        latestDataTime.getMillis() - TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
+    // Default baseline = current - 1 week
+    long baselineTimeMillis = currentTimeMillis - TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+    String firstMetric = schema.getMetrics().get(0);
+    String metricFunction = String.format("AGGREGATE_1_HOURS('%s')", firstMetric);
+
+    String baseUrl = PATH_JOINER.join("/dashboard", collection, metricFunction,
+        MetricViewType.INTRA_DAY, DimensionViewType.TABULAR, baselineTimeMillis, currentTimeMillis);
+    String funnelsParam = Joiner.on(",").join(funnelNames);
+    URI uri = new URIBuilder(baseUrl).addParameter("funnels", funnelsParam).build();
+    return Response.seeOther(uri).build();
   }
 
   @GET

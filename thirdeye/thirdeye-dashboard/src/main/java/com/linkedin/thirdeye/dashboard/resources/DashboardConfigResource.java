@@ -366,4 +366,14 @@ public class DashboardConfigResource {
     return schemaInfo;
   }
 
+  /**
+   * Returns all collections for this dashboard instance
+   * @throws Exception
+   */
+  @GET
+  @Path("/collections/")
+  public List<String> getCollections() throws Exception {
+    return dataCache.getCollections(serverUri);
+  }
+
 }

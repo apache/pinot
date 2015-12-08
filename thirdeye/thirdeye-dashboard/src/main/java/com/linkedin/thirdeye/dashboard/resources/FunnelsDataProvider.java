@@ -43,7 +43,7 @@ import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 @Path("/funnels")
 @Produces(MediaType.APPLICATION_JSON)
 public class FunnelsDataProvider {
-  private static final String DEFAULT_FUNNEL_NAME = "Primary Metric View";
+  private static final String DEFAULT_FUNNEL_NAME = "Primary_Metric_View";
 
   private static final String DEFAULT_FUNNEL_VISUALIZATION_TYPE = "HEATMAP";
 
