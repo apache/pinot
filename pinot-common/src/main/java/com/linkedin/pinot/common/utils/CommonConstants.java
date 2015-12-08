@@ -105,6 +105,7 @@ public class CommonConstants {
           public static final String CONSUMER_TYPE = "kafka.consumer.type";
           public static final String DECODER_CLASS = "kafka.decoder.class.name";
           public static final String DECODER_PROPS_PREFIX = "kafka.decoder.prop";
+          public static final String KAFKA_CONSUMER_PROPS_PREFIX = "kafka.consumer.prop";
           public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
 
           public static String getDecoderPropertyKeyFor(String key) {
@@ -113,6 +114,10 @@ public class CommonConstants {
 
           public static String getDecoderPropertyKey(String incoming) {
             return incoming.split(DECODER_PROPS_PREFIX + ".")[1];
+          }
+
+          public static String getConsumerPropertyKey(String incoming) {
+            return incoming.split(KAFKA_CONSUMER_PROPS_PREFIX + ".")[1];
           }
 
           public static class HighLevelConsumer {

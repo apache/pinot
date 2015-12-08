@@ -83,10 +83,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     File schemaFile = getSchemaFile();
 
-    // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        schemaFile, avroFiles.get(0));
-
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
     setupH2AndInsertAvro(avroFiles, executor);
@@ -100,6 +96,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for data push, query generator initialization and H2 load to complete
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
+
+    // Create Pinot table
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+        schemaFile, avroFiles.get(0));
 
     // Wait until the Pinot event count matches with the number of events in the Avro files
     int pinotRecordCount, h2RecordCount;
