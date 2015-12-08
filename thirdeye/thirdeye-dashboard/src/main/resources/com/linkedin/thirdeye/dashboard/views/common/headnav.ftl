@@ -5,6 +5,7 @@
         <li><a type="DIMENSION" view="MULTI_TIME_SERIES">Contributors</a></li>
     </ul>
     <form class="uk-form uk-float-right uk-margin-large-right uk-margin-small-top">
+        <label><b>Dataset:</b></label>
         <div class="uk-button uk-form-select" data-uk-form-select>
             <span id="collection-name-display"></span>
             <i class="uk-icon-caret-down"></i>
