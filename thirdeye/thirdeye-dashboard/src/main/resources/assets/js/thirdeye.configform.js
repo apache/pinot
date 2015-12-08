@@ -28,14 +28,18 @@ $(document).ready(function() {
         /* Handelbars template for collections dropdown */
         var result_collections_template = collections_template(data);
         $("#landing-collection").html(result_collections_template);
+
+        //Display the selected collection name 
         var path = parsePath(window.location.pathname)
         $("#collection-name-display").html(path.collection)
+        $(".collection-option[value ='" + path.collection + "']").attr('selected', 'selected')
 
         //When user changed collectionname enable Go (#landing-submit) button
-        $("#landing-collection").change(enableCollectionChangeSubmit)
-        function enableCollectionChangeSubmit(){
+        $("#landing-collection").change(function(){
             document.getElementById('landing-submit').disabled = false
-        }
+        })
+
+
     })
 
     /* --- Headnav related event listeners --- */
