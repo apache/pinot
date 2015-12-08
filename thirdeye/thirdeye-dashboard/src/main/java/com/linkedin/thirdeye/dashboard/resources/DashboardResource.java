@@ -48,7 +48,6 @@ import com.linkedin.thirdeye.dashboard.views.DimensionViewFunnel;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewHeatMap;
 import com.linkedin.thirdeye.dashboard.views.ExceptionView;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
-import com.linkedin.thirdeye.dashboard.views.LandingView;
 import com.sun.jersey.api.NotFoundException;
 
 import io.dropwizard.views.View;
@@ -97,12 +96,12 @@ public class DashboardResource {
 
   @GET
   @Path("/dashboard")
-  public LandingView getLandingView() throws Exception {
+  public Response getLanding() throws Exception {
     List<String> collections = dataCache.getCollections(serverUri);
     if (collections.isEmpty()) {
       throw new NotFoundException("No collections loaded into " + serverUri);
     }
-    return new LandingView(collections);
+    return Response.seeOther(URI.create("/dashboard/" + collections.get(0))).build();
   }
 
   @GET
