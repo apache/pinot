@@ -1,5 +1,43 @@
 $(document).ready(function() {
 
+    /* --- Headnav related code --- */
+    var collectionsUrl =  "/dashboardConfig/collections"
+
+    //Handlebars compile template
+    var source_collections_template = $("#collections-template").html();
+    var collections_template = Handlebars.compile(source_collections_template);
+
+    $.ajax({
+        url: collectionsUrl,
+        method: 'GET',
+        statusCode: {
+            404: function() {
+                $("#time-input-form-error").empty()
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+                warning.append($('<p></p>', { html: 'No data available dashboardConfig/collections' }))
+                $("#time-input-form-error").append(warning)
+            },
+            500: function() {
+                $("#time-input-form-error").empty()
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+                error.append($('<p></p>', { html: 'Internal server error' }))
+                $("#time-input-form-error").append(error)
+            }
+        }
+    }).done(function(data){
+        /* Handelbars template for collections dropdown */
+        var result_collections_template = collections_template(data);
+        $("#landing-collection").html(result_collections_template);
+        var path = parsePath(window.location.pathname)
+        $("#collection-name-display").html(path.collection)
+
+        //When user changed collectionname enable Go (#landing-submit) button
+        $("#landing-collection").change(enableCollectionChangeSubmit)
+        function enableCollectionChangeSubmit(){
+            document.getElementById('landing-submit').disabled = false
+        }
+    })
+
     /* --- Headnav related event listeners --- */
 
 
@@ -7,14 +45,14 @@ $(document).ready(function() {
     var view = parsePath(window.location.pathname).dimensionViewType == null ? "TABULAR" : parsePath(window.location.pathname).dimensionViewType
     $("#dashboard-output-nav a[view='" + view + "' ]").closest("li").addClass("uk-active")
 
+    //On submit load the selected collection
     $("#landing-submit").click(function(event) {
         event.preventDefault()
         var collection = $("#landing-collection").val()
-        window.location.pathname = "/dashboard/" + collection
+        window.location  = "/dashboard/" + collection;
     })
 
     /* --- Configform related event listeners  --- */
-
 
     //If filters applied link is clicked remove it's value/s from the URI
     // so it won't be fixed in the query WHERE clause, reload the page with the new query
