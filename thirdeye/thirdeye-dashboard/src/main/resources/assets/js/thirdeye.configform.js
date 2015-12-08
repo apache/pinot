@@ -7,6 +7,12 @@ $(document).ready(function() {
     var view = parsePath(window.location.pathname).dimensionViewType == null ? "TABULAR" : parsePath(window.location.pathname).dimensionViewType
     $("#dashboard-output-nav a[view='" + view + "' ]").closest("li").addClass("uk-active")
 
+    $("#landing-submit").click(function(event) {
+        event.preventDefault()
+        var collection = $("#landing-collection").val()
+        window.location.pathname = "/dashboard/" + collection
+    })
+
     /* --- Configform related event listeners  --- */
 
 
