@@ -59,7 +59,11 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
   @Override
   public Block getNextBlock() {
-    if (_currentDoc == Constants.EOF) {
+
+    // [PINOT-2420] Handle limit 0 clause safely.
+    // For limit 0, _docIdArray will be zero sized
+    if (_currentDoc == Constants.EOF ||
+        _pos >= _maxSizeOfdocIdSet) {
       return null;
     }
     if (!inited) {
