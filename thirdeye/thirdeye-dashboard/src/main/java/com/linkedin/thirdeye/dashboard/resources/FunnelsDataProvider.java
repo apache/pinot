@@ -274,7 +274,7 @@ public class FunnelsDataProvider {
     }
 
     // add default for any collections that don't have an existing funnel spec file
-    for (String collection : dataCache.getCollections(serverUri)) {
+    for (String collection : getCollections()) {
       if (this.funnelSpecsMap.containsKey(collection)) {
         continue;
       }
@@ -294,7 +294,7 @@ public class FunnelsDataProvider {
    * @throws Exception
    */
   private FunnelSpec createDefaultFunnelSpec(String collection) throws Exception {
-    CollectionSchema collectionSchema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema collectionSchema = getCollectionSchema(collection);
     if (collectionSchema == null) {
       return null;
     }
@@ -316,4 +316,27 @@ public class FunnelsDataProvider {
     return defaultSpec;
   }
 
+  /* Returns empty list if server request fails. */
+  private List<String> getCollections() throws Exception {
+    List<String> collections;
+    try {
+      collections = dataCache.getCollections(serverUri);
+    } catch (Exception e) {
+      LOG.error("Unable to retrieve collections", e);
+      collections = Collections.emptyList();
+    }
+    return collections;
+  }
+
+  /* Returns null if server request fails. */
+  private CollectionSchema getCollectionSchema(String collection) throws Exception {
+    CollectionSchema result;
+    try {
+      result = dataCache.getCollectionSchema(serverUri, collection);
+    } catch (Exception e) {
+      LOG.error("Unable to retrieve collection schema", e);
+      result = null;
+    }
+    return result;
+  }
 }
