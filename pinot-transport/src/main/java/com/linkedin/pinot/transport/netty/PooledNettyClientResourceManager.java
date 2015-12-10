@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.Timer;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.PooledResourceManager;
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.Timer;
 
 
 public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, NettyClientConnection> {
@@ -111,7 +109,11 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
     @Override
     public void onError(Throwable arg0) {
-      LOGGER.error("Got error for the netty client connection. Destroying the connection", arg0);
+      if (isSelfClose()) {
+        LOGGER.info("Got notified on self-close to {}", _server );
+      } else {
+        LOGGER.error("Destroying connection {} due to error", _server, arg0);
+      }
       /**
        * We got error. Time to discard this connection.
        */
