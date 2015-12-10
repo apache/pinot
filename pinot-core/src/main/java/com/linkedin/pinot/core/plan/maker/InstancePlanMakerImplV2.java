@@ -22,8 +22,8 @@ import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.plan.AggregationGroupByImplementationType;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode;
-import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType;
 import com.linkedin.pinot.core.plan.AggregationPlanNode;
 import com.linkedin.pinot.core.plan.CombinePlanNode;
 import com.linkedin.pinot.core.plan.GlobalPlanImplV0;

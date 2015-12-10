@@ -50,7 +50,7 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
-import com.linkedin.pinot.core.plan.RawFilterPlanNode;
+import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -163,7 +163,7 @@ public class FilterOperatorBenchmark {
     public Void call() {
       long start, filterPhaseEnd, end;
       start = System.currentTimeMillis();
-      RawFilterPlanNode planNode = new RawFilterPlanNode(indexSegmentImpl, brokerRequest);
+      FilterPlanNode planNode = new FilterPlanNode(indexSegmentImpl, brokerRequest);
       Operator filterOperator = planNode.run();
       filterOperator.open();
       Block block = filterOperator.nextBlock();

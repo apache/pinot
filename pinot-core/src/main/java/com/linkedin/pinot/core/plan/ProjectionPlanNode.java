@@ -31,12 +31,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 /**
  * ProjectionPlanNode takes care of a map from column name to its corresponding
  * data source.
- *
- *
- * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
- * @see RawProjectionPlanNode
  */
-@Deprecated
 public class ProjectionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
 

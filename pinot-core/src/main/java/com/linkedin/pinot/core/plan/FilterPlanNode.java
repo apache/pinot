@@ -47,10 +47,7 @@ import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOpe
 
 
 /**
- * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
- * @see RawFilterPlanNode
  */
-@Deprecated
 public class FilterPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;

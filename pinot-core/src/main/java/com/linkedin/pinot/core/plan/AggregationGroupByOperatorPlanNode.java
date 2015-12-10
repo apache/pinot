@@ -32,14 +32,10 @@ import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 
-
 /**
  * AggregationGroupByOperatorPlanNode takes care of how to apply multiple aggregation
  * functions and groupBy query to an IndexSegment.
- *
- *
  */
-@Deprecated
 public class AggregationGroupByOperatorPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
@@ -55,13 +51,15 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
     _brokerRequest = query;
     _aggregationGroupByImplementationType = aggregationGroupByImplementationType;
     _projectionPlanNode =
-        new ProjectionPlanNode(_indexSegment, getAggregationGroupByRelatedColumns(), new DocIdSetPlanNode(
-            _indexSegment, _brokerRequest, 10000));
+        new ProjectionPlanNode(_indexSegment, getAggregationGroupByRelatedColumns(),
+            new DocIdSetPlanNode(_indexSegment, _brokerRequest, 10000));
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
       AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
-      boolean hasDictionary = AggregationFunctionUtils.isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
-      _aggregationFunctionGroupByPlanNodes.add(new AggregationFunctionGroupByPlanNode(aggregationInfo, _brokerRequest.getGroupBy(), _projectionPlanNode,
-          _aggregationGroupByImplementationType, hasDictionary));
+      boolean hasDictionary = AggregationFunctionUtils
+          .isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
+      _aggregationFunctionGroupByPlanNodes
+          .add(new AggregationFunctionGroupByPlanNode(aggregationInfo, _brokerRequest.getGroupBy(),
+              _projectionPlanNode, _aggregationGroupByImplementationType, hasDictionary));
     }
   }
 
@@ -102,9 +100,4 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
     }
   }
 
-  public enum AggregationGroupByImplementationType {
-    NoDictionary,
-    Dictionary,
-    DictionaryAndTrie
-  }
 }

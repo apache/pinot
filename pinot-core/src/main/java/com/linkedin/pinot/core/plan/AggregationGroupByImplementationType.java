@@ -15,15 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-
-public class RawProjectionPlanNode extends BaseProjectionPlanNode {
-  public RawProjectionPlanNode(IndexSegment indexSegment, String[] columns, BaseDocIdSetPlanNode docIdSetPlanNode) {
-    super(indexSegment, columns, docIdSetPlanNode);
-  }
-
-  @Override
-  protected BaseColumnarDataSourcePlanNode getColumnarDataSourcePlanNode(String column) {
-    return new RawColumnarDataSourcePlanNode(indexSegment, column);
-  }
+public enum AggregationGroupByImplementationType {
+  NoDictionary,
+  Dictionary,
+  DictionaryAndTrie
 }

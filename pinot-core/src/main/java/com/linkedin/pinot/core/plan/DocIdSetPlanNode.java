@@ -27,12 +27,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 /**
  * DocIdSetPlanNode takes care creating BDocIdSetOperator.
  * Configure filter query and max size of docId cache here.
- *
- *
- * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
- * @see RawDocIdSetPlanNode
  */
-@Deprecated
 public class DocIdSetPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
   private final IndexSegment _indexSegment;
