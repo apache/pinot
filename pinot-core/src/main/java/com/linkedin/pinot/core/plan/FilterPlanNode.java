@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -135,7 +136,8 @@ public class FilterPlanNode implements PlanNode {
         if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
           //if the column is sorted use sorted inverted index based implementation
           baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
-        } else if (!filterType.equals(FilterOperator.RANGE)) {
+        } else if (!filterType.equals(FilterOperator.RANGE) || _segment instanceof RealtimeSegment) {
+          // jfim: ScanBasedFilterOperator is broken for realtime segments for now
           // range evaluation based on inv index is inefficient, so do this only if is NOT range.
           baseFilterOperator = new BitmapBasedFilterOperator(ds);
         } else {
