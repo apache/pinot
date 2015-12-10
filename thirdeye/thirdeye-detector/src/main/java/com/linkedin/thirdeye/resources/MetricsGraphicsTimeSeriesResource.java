@@ -1,5 +1,29 @@
 package com.linkedin.thirdeye.resources;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.UriInfo;
+
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.ISODateTimeFormat;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
@@ -16,17 +40,8 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
-import io.dropwizard.hibernate.UnitOfWork;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.format.ISODateTimeFormat;
 
-import javax.ws.rs.*;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import io.dropwizard.hibernate.UnitOfWork;
 
 @Path("/time-series/metrics-graphics")
 public class MetricsGraphicsTimeSeriesResource {
@@ -34,7 +49,8 @@ public class MetricsGraphicsTimeSeriesResource {
   private final ThirdEyeClient thirdEyeClient;
   private final AnomalyResultDAO resultDAO;
 
-  public MetricsGraphicsTimeSeriesResource(ThirdEyeClient thirdEyeClient, AnomalyResultDAO resultDAO) {
+  public MetricsGraphicsTimeSeriesResource(ThirdEyeClient thirdEyeClient,
+      AnomalyResultDAO resultDAO) {
     this.thirdEyeClient = thirdEyeClient;
     this.resultDAO = resultDAO;
   }
@@ -43,29 +59,21 @@ public class MetricsGraphicsTimeSeriesResource {
   @Path("/{collection}/{metric}/{startTimeISO}/{endTimeISO}")
   @UnitOfWork
   @Produces(MediaType.APPLICATION_JSON)
-  public MetricsGraphicsTimeSeries getTimeSeries(
-      @PathParam("collection") String collection,
-      @PathParam("metric") String metric,
-      @PathParam("startTimeISO") String startTimeISO,
-      @PathParam("endTimeISO") String endTimeISO,
-      @QueryParam("timeZone") String timeZone,
-      @QueryParam("bucketSize") String bucketSize,
-      @QueryParam("groupBy") String groupBy,
+  public MetricsGraphicsTimeSeries getTimeSeries(@PathParam("collection") String collection,
+      @PathParam("metric") String metric, @PathParam("startTimeISO") String startTimeISO,
+      @PathParam("endTimeISO") String endTimeISO, @QueryParam("timeZone") String timeZone,
+      @QueryParam("bucketSize") String bucketSize, @QueryParam("groupBy") String groupBy,
       @QueryParam("topK") @DefaultValue("5") Integer topK,
-      @QueryParam("functionId") Long functionId,
-      @QueryParam("overlay") String overlay,
-      @Context UriInfo uriInfo) throws Exception {
+      @QueryParam("functionId") Long functionId, @QueryParam("anomalyIds") List<Long> anomalyIds,
+      @QueryParam("overlay") String overlay, @Context UriInfo uriInfo) throws Exception {
     DateTime startTime = parseDateTime(startTimeISO, timeZone);
     DateTime endTime = parseDateTime(endTimeISO, timeZone);
     Multimap<String, String> fixedValues = extractDimensionValues(uriInfo);
 
     // Get time series data
-    ThirdEyeRequest req = new ThirdEyeRequest()
-        .setCollection(collection)
-        .setMetricFunction(getMetricFunction(metric, bucketSize))
-        .setStartTime(startTime)
-        .setEndTime(endTime)
-        .setDimensionValues(fixedValues);
+    ThirdEyeRequest req = new ThirdEyeRequest().setCollection(collection)
+        .setMetricFunction(getMetricFunction(metric, bucketSize)).setStartTime(startTime)
+        .setEndTime(endTime).setDimensionValues(fixedValues);
 
     if (groupBy != null) {
       req.setGroupBy(groupBy);
@@ -78,7 +86,8 @@ public class MetricsGraphicsTimeSeriesResource {
 
     // Transform result
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : res.entrySet()) {
-      List<Map<String, Object>> series = convertSeries(entry.getKey(), entry.getValue(), metric, totalVolume);
+      List<Map<String, Object>> series =
+          convertSeries(entry.getKey(), entry.getValue(), metric, totalVolume);
       if (!series.isEmpty()) {
         dataByDimensionKey.put(entry.getKey(), series);
       }
@@ -145,16 +154,14 @@ public class MetricsGraphicsTimeSeriesResource {
 
       long shiftMillis = endTime.getMillis() - overlayEnd.getMillis();
 
-      ThirdEyeRequest overlayReq = new ThirdEyeRequest()
-          .setCollection(collection)
-          .setMetricFunction(getMetricFunction(metric, bucketSize))
-          .setStartTime(overlayStart)
-          .setEndTime(overlayEnd)
-          .setDimensionValues(fixedValues);
+      ThirdEyeRequest overlayReq = new ThirdEyeRequest().setCollection(collection)
+          .setMetricFunction(getMetricFunction(metric, bucketSize)).setStartTime(overlayStart)
+          .setEndTime(overlayEnd).setDimensionValues(fixedValues);
 
       Map<DimensionKey, MetricTimeSeries> overlayRes = thirdEyeClient.execute(overlayReq);
       for (Map.Entry<DimensionKey, MetricTimeSeries> entry : overlayRes.entrySet()) {
-        List<Map<String, Object>> overlaySeries = convertSeries(entry.getKey(), entry.getValue(), metric, null);
+        List<Map<String, Object>> overlaySeries =
+            convertSeries(entry.getKey(), entry.getValue(), metric, null);
         overlaySeries = shiftSeries(overlaySeries, shiftMillis);
         data.add(overlaySeries);
       }
@@ -169,10 +176,23 @@ public class MetricsGraphicsTimeSeriesResource {
 
     // Get any anomalies
     List<AnomalyResult> anomalies;
-    if (functionId == null) {
-      anomalies = resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
+    boolean isAnomalyIdsSpecified = (anomalyIds != null && !anomalyIds.isEmpty());
+    if (functionId != null && isAnomalyIdsSpecified) {
+      throw new BadRequestException("Cannot specify both functionId and anomalyIds");
+    } else if (functionId != null) {
+      anomalies = resultDAO.findAllByCollectionTimeFunctionIdAndMetric(collection, metric,
+          functionId, startTime, endTime);
+    } else if (isAnomalyIdsSpecified) {
+      anomalies = new ArrayList<>(anomalyIds.size());
+      for (Long anomalyId : anomalyIds) {
+        AnomalyResult anomaly = resultDAO.findById(anomalyId);
+        if (anomaly != null) {
+          anomalies.add(anomaly);
+        }
+      }
     } else {
-      anomalies = resultDAO.findAllByCollectionTimeFunctionIdAndMetric(collection, metric, functionId, startTime, endTime);
+      anomalies =
+          resultDAO.findAllByCollectionTimeAndMetric(collection, metric, startTime, endTime);
     }
 
     StarTreeConfig config = thirdEyeClient.getStarTreeConfig(collection);
@@ -188,7 +208,8 @@ public class MetricsGraphicsTimeSeriesResource {
           if (!fixedValues.containsKey(spec.getName()) && !"*".equals(dimensions[i])) {
             matches = false;
             break;
-          } else if (fixedValues.containsKey(spec.getName()) && !fixedValues.get(spec.getName()).contains(dimensions[i])) {
+          } else if (fixedValues.containsKey(spec.getName())
+              && !fixedValues.get(spec.getName()).contains(dimensions[i])) {
             matches = false;
             break;
           }
@@ -231,16 +252,22 @@ public class MetricsGraphicsTimeSeriesResource {
     for (AnomalyResult anomaly : anomalies) {
       if (anomaly.getEndTimeUtc() == null) {
         // Point
-        if (anomaly.getStartTimeUtc() >= startTime.getMillis() && anomaly.getStartTimeUtc() <= endTime.getMillis()) {
-          markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) anomaly.getId()));
+        if (anomaly.getStartTimeUtc() >= startTime.getMillis()
+            && anomaly.getStartTimeUtc() <= endTime.getMillis()) {
+          markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label",
+              (Object) anomaly.getId()));
         }
       } else {
         // Interval
-        if (anomaly.getStartTimeUtc() >= startTime.getMillis() && anomaly.getStartTimeUtc() <= endTime.getMillis()) {
-          markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label", (Object) ("START_" + anomaly.getId())));
+        if (anomaly.getStartTimeUtc() >= startTime.getMillis()
+            && anomaly.getStartTimeUtc() <= endTime.getMillis()) {
+          markers.add(ImmutableMap.of("time", anomaly.getStartTimeUtc(), "label",
+              (Object) ("START_" + anomaly.getId())));
         }
-        if (anomaly.getEndTimeUtc() >= startTime.getMillis() && anomaly.getEndTimeUtc() <= endTime.getMillis()) {
-          markers.add(ImmutableMap.of("time", anomaly.getEndTimeUtc(), "label", (Object) ("END_" + anomaly.getId())));
+        if (anomaly.getEndTimeUtc() >= startTime.getMillis()
+            && anomaly.getEndTimeUtc() <= endTime.getMillis()) {
+          markers.add(ImmutableMap.of("time", anomaly.getEndTimeUtc(), "label",
+              (Object) ("END_" + anomaly.getId())));
         }
       }
     }
@@ -261,10 +288,10 @@ public class MetricsGraphicsTimeSeriesResource {
   public MetricsGraphicsTimeSeries getDummyTimeSeries() throws Exception {
     ObjectMapper objectMapper = new ObjectMapper();
 
-    List<Map<String, Object>> data = objectMapper.readValue(
-        ClassLoader.getSystemResourceAsStream("dummy-time-series.json"),
-        new TypeReference<List<Map<String, Object>>>() {
-        });
+    List<Map<String, Object>> data =
+        objectMapper.readValue(ClassLoader.getSystemResourceAsStream("dummy-time-series.json"),
+            new TypeReference<List<Map<String, Object>>>() {
+            });
 
     Map<String, Object> marker = new HashMap<>();
     marker.put("year", 1964);
@@ -283,7 +310,8 @@ public class MetricsGraphicsTimeSeriesResource {
   }
 
   private static DateTime parseDateTime(String dateTimeString, String timeZone) {
-    DateTime dateTime = ISODateTimeFormat.dateTimeParser().withZoneUTC().parseDateTime(dateTimeString);
+    DateTime dateTime =
+        ISODateTimeFormat.dateTimeParser().withZoneUTC().parseDateTime(dateTimeString);
     if (timeZone != null) {
       dateTime = dateTime.toDateTime(DateTimeZone.forID(timeZone));
     }
@@ -308,15 +336,18 @@ public class MetricsGraphicsTimeSeriesResource {
     return values;
   }
 
-  private List<Map<String, Object>> shiftSeries(List<Map<String, Object>> series, long shiftMillis) {
+  private List<Map<String, Object>> shiftSeries(List<Map<String, Object>> series,
+      long shiftMillis) {
     List<Map<String, Object>> shifted = new ArrayList<>();
     for (Map<String, Object> point : series) {
-      shifted.add(ImmutableMap.of("time", (Long) point.get("time") + shiftMillis, "value", point.get("value")));
+      shifted.add(ImmutableMap.of("time", (Long) point.get("time") + shiftMillis, "value",
+          point.get("value")));
     }
     return shifted;
   }
 
-  private List<Map<String, Object>> convertSeries(DimensionKey dimensionKey, MetricTimeSeries timeSeries, String metric, Map<DimensionKey, Double> totalVolume) {
+  private List<Map<String, Object>> convertSeries(DimensionKey dimensionKey,
+      MetricTimeSeries timeSeries, String metric, Map<DimensionKey, Double> totalVolume) {
     List<Long> sortedTimes = new ArrayList<>(timeSeries.getTimeWindowSet());
     Collections.sort(sortedTimes);
 
@@ -332,7 +363,8 @@ public class MetricsGraphicsTimeSeriesResource {
       }
 
       // Fill in any missing spots with zero
-      for (long time = sortedTimes.get(0); time <= sortedTimes.get(sortedTimes.size() - 1); time += minDiff) {
+      for (long time = sortedTimes.get(0); time <= sortedTimes.get(sortedTimes.size() - 1); time +=
+          minDiff) {
         timeSet.add(time);
       }
     } else {

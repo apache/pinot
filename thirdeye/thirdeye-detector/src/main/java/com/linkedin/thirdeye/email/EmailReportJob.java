@@ -81,6 +81,7 @@ public class EmailReportJob implements Job {
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
+    String idLink = visualizerLink + "&anomalyIds=";
 
     // Render template
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -93,7 +94,8 @@ public class EmailReportJob implements Job {
           "anomalyResults", (Object) results,
           "startTime", then,
           "endTime", now,
-          "visualizerLink", visualizerLink
+          "visualizerLink", visualizerLink,
+          "idLink", idLink
       );
       Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
       template.process(templateData, out);

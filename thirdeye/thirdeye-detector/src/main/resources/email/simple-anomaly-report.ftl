@@ -8,7 +8,7 @@
         <table>
             <tr>
                 <th style="text-align: left">id</th>
-                <td>${r.id}</td>
+                <td>${r.id} <a href="${idLink}${r.id}">(link)</a></td>
             </tr>
             <tr>
                 <th style="text-align: left">function_id</th>
