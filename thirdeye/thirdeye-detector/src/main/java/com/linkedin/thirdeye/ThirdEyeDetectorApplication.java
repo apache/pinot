@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.eclipse.jetty.server.AbstractNetworkConnector;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -42,9 +43,14 @@ import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
+import io.dropwizard.jetty.ConnectorFactory;
+import io.dropwizard.jetty.HttpConnectorFactory;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.lifecycle.ServerLifecycleListener;
 import io.dropwizard.migrations.MigrationsBundle;
+import io.dropwizard.server.DefaultServerFactory;
+import io.dropwizard.server.ServerFactory;
+import io.dropwizard.server.SimpleServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
@@ -169,14 +175,34 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     final AtomicInteger applicationPort = new AtomicInteger(-1);
     final EmailReportJobManager emailReportJobManager = new EmailReportJobManager(quartzScheduler,
         emailConfigurationDAO, anomalyResultDAO, hibernate.getSessionFactory(), applicationPort);
+
     environment.lifecycle().addServerLifecycleListener(new ServerLifecycleListener() {
       @Override
       public void serverStarted(Server server) {
+        LOG.info("{} server connectors found", server.getConnectors().length);
         for (Connector connector : server.getConnectors()) {
+          LOG.info("Connector: {}", connector.getName());
           if (connector instanceof ServerConnector) {
             ServerConnector serverConnector = (ServerConnector) connector;
-            applicationPort.set(serverConnector.getLocalPort());
+            int localPort = serverConnector.getLocalPort();
+            applicationPort.set(localPort);
+            LOG.info("application port set to {} from server connector", localPort);
+            break;
+          } else if (connector instanceof AbstractNetworkConnector) {
+            AbstractNetworkConnector networkConnector = (AbstractNetworkConnector) connector;
+            int localPort = networkConnector.getLocalPort();
+            applicationPort.set(localPort);
+            LOG.info("application port set to {} from network connector", localPort);
+            break;
           }
+        }
+        LOG.info("Port from jetty server: {}", applicationPort.get());
+
+        // TODO this prevents people from using 0 for a random port in dropwizard.
+        int dropwizardConfigPort = getApplicationPortNumber(config);
+        LOG.info("Dropwizard config port: {}", dropwizardConfigPort);
+        if (dropwizardConfigPort > 0) {
+          applicationPort.set(dropwizardConfigPort);
         }
 
         if (applicationPort.get() == -1) {
@@ -215,5 +241,32 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
     // Tasks
     environment.admin().addTask(
         new EmailReportJobManagerTask(emailReportJobManager, hibernate.getSessionFactory()));
+  }
+
+  public static int getApplicationPortNumber(ThirdEyeDetectorConfiguration config) {
+    int httpPort = 0;
+    try {
+      // https://github.com/dropwizard/dropwizard/issues/745
+      ServerFactory serverFactory = config.getServerFactory();
+      if (serverFactory instanceof DefaultServerFactory) {
+        DefaultServerFactory defaultFactory = (DefaultServerFactory) config.getServerFactory();
+        for (ConnectorFactory connectorFactory : defaultFactory.getApplicationConnectors()) {
+          if (connectorFactory.getClass().isAssignableFrom(HttpConnectorFactory.class)) {
+            httpPort = ((HttpConnectorFactory) connectorFactory).getPort();
+            break;
+          }
+        }
+      } else if (serverFactory instanceof SimpleServerFactory) {
+        SimpleServerFactory simpleFactory = (SimpleServerFactory) serverFactory;
+        HttpConnectorFactory connector = (HttpConnectorFactory) simpleFactory.getConnector();
+        if (connector.getClass().isAssignableFrom(HttpConnectorFactory.class)) {
+          httpPort = connector.getPort();
+        }
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to retrieve app port number from dropwizard server factory", e);
+    }
+
+    return httpPort;
   }
 }

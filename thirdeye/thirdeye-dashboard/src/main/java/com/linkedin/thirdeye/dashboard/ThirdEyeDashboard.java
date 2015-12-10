@@ -28,7 +28,7 @@ import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
 
 public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguration> {
-  private static final Logger LOG = LoggerFactory.getLogger(CustomDashboardResource.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboard.class);
 
   @Override
   public String getName() {
@@ -46,7 +46,7 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
   @Override
   public void run(ThirdEyeDashboardConfiguration config, Environment environment) throws Exception {
 
-    LOG.error("running the Dashboard application with configs, {}", config.toString());
+    LOG.info("running the Dashboard application with configs, {}", config.toString());
 
     final HttpClient httpClient =
         new HttpClientBuilder(environment).using(config.getHttpClient()).build(getName());
