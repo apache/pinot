@@ -18,20 +18,17 @@ package com.linkedin.pinot.core.operator.filter.predicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
-
 
 public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvaluator {
 
   private int[] matchingIds;
-  private IntSet dictIdSet;
   private RangePredicate predicate;
+  private int rangeStartIndex = 0;
+  private int rangeEndIndex = 0;
+  int matchingSize;
 
   public RangeOfflineDictionaryPredicateEvaluator(RangePredicate predicate, ImmutableDictionaryReader dictionary) {
     this.predicate = predicate;
-    int rangeStartIndex = 0;
-    int rangeEndIndex = 0;
 
     final boolean incLower = predicate.includeLowerBoundary();
     final boolean incUpper = predicate.includeUpperBoundary();
@@ -61,30 +58,24 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
       rangeEndIndex -= 1;
     }
 
-    int size = (rangeEndIndex - rangeStartIndex) + 1;
-    if (size < 0) {
-      size = 0;
+    matchingSize = (rangeEndIndex - rangeStartIndex) + 1;
+    if (matchingSize < 0) {
+      matchingSize = 0;
     }
-
-    matchingIds = new int[size];
-    dictIdSet = new IntOpenHashSet(size);
-    int counter = 0;
-    for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-      matchingIds[counter++] = i;
-      dictIdSet.add(i);
-    }
-
   }
 
   @Override
   public boolean apply(int dictionaryId) {
-    return dictIdSet.contains(dictionaryId);
+    if (dictionaryId >=  rangeStartIndex && dictionaryId <= rangeEndIndex) {
+      return true;
+    }
+    return false;
   }
 
   @Override
   public boolean apply(int[] dictionaryIds) {
     for (int dictId : dictionaryIds) {
-      if (dictIdSet.contains(dictId)) {
+      if (dictId >= rangeStartIndex && dictId <= rangeEndIndex) {
         return true;
       }
     }
@@ -93,6 +84,13 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
 
   @Override
   public int[] getMatchingDictionaryIds() {
+    if (matchingIds == null) {
+      matchingIds = new int[matchingSize];
+      int counter = 0;
+      for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+        matchingIds[counter++] = i;
+      }
+    }
     return matchingIds;
   }
 
@@ -105,7 +103,7 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
   public boolean apply(int[] dictionaryIds, int length) {
     for (int i = 0; i < length; i++) {
       int dictId = dictionaryIds[i];
-      if (dictIdSet.contains(dictId)) {
+      if (dictId >= rangeStartIndex && dictId <= rangeEndIndex) {
         return true;
       }
     }
@@ -114,5 +112,6 @@ public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvalua
 
   @Override
   public boolean alwaysFalse() {
-    return matchingIds.length == 0 ;
-  }}
+    return ((rangeEndIndex - rangeStartIndex) + 1) <= 0;
+  }
+}
