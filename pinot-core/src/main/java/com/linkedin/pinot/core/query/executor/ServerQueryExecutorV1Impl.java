@@ -64,7 +64,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private Timer _queryExecutorTimer = null;
   private volatile boolean _isStarted = false;
   private long _defaultTimeOutMs = 15000;
-  private boolean _printQueryPlan = true;
+  private boolean _printQueryPlan = false;
   private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<String, Long>();
   private ServerMetrics _serverMetrics;
 
