@@ -202,9 +202,19 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
     int retentionDays = 900;
     String retentionTimeUnit = "Days";
-    addRealtimeTable(tableName, timeColumnName, timeColumnType,
-        retentionDays, retentionTimeUnit, kafkaZkUrl, kafkaTopic,
-        schemaName, serverTenant, brokerTenant, avroFile, 20000);
+    addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
+        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000);
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant);
+  }
+
+  protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
+    JSONObject request = ControllerRequestBuilder.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(), request.toString());
+  }
+
+  protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount) throws Exception {
+    JSONObject request = ControllerRequestBuilder.buildServerTenantCreateRequestJSON(tenantName,
+        offlineServerCount + realtimeServerCount, offlineServerCount, realtimeServerCount);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forServerTenantCreate(), request.toString());
   }
 }

@@ -84,8 +84,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
-    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(), null,
-        null, avroFile);
+    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+        "TestTenant", "TestTenant", avroFile);
   }
 
   @BeforeClass
@@ -105,9 +105,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
 
     // Start the Pinot cluster
-    startController();
+    startController(true);
     startBroker();
     startServers(2);
+
+    // Create tenants
+    createBrokerTenant("TestTenant", 1);
+    createServerTenant("TestTenant", 1, 1);
 
     // Unpack the Avro files
     TarGzCompressionUtils.unTar(

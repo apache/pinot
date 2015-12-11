@@ -112,9 +112,10 @@ public abstract class ControllerTest {
   /**
    * Starts a controller instance.
    */
-  protected void startController() {
+  protected void startController(boolean useTenantIsolation) {
     assert _controllerStarter == null;
     ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
+    config.setTenantIsolationEnabled(!useTenantIsolation);
 
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     if (_zkClient.exists("/" + getHelixClusterName())) {
@@ -123,6 +124,10 @@ public abstract class ControllerTest {
     _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, config);
     _helixAdmin = _controllerStarter.getHelixResourceManager().getHelixAdmin();
     _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
+  }
+
+  protected void startController() {
+    startController(false);
   }
 
   /**
