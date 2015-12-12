@@ -21,12 +21,12 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.AndBlock;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 
 public class AndOperator extends BaseFilterOperator {

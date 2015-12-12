@@ -25,7 +25,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.writer.impl.v1.FixedByteSkipListMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteSkipListMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 

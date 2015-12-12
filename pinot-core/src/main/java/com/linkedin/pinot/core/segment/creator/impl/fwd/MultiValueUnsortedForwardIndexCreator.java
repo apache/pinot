@@ -23,8 +23,8 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 

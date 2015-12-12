@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.index.column;
 
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;

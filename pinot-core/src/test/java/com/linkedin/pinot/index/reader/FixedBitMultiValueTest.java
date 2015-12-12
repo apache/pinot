@@ -26,19 +26,19 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 
 public class FixedBitMultiValueTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitMultiValueTest.class);
   @Test
   public void testSingleColMultiValue() throws Exception {
     testSingleColMultiValue(
-        com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter.class,
-        com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader.class);
+        com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter.class,
+        com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader.class);
     testSingleColMultiValue(
-        com.linkedin.pinot.core.index.writer.impl.v2.FixedBitMultiValueWriter.class,
-        com.linkedin.pinot.core.index.reader.impl.v2.FixedBitMultiValueReader.class);
+        com.linkedin.pinot.core.io.writer.impl.v2.FixedBitMultiValueWriter.class,
+        com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader.class);
   }
 
   public void testSingleColMultiValue(Class<? extends SingleColumnMultiValueWriter> writerClazz,

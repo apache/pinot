@@ -25,7 +25,7 @@ import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.core.index.writer.impl.v1.FixedBitMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 
 public class ForwardIndexWriterBenchmark {
   public void convertRawToForwardIndex(File rawFile) throws Exception {

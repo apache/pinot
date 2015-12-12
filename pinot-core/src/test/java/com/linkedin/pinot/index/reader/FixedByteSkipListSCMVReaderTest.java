@@ -24,8 +24,8 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedByteMultiValueReader;
-import com.linkedin.pinot.core.index.writer.impl.v1.FixedByteSkipListMultiValueWriter;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteMultiValueReader;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteSkipListMultiValueWriter;
 
 
 public class FixedByteSkipListSCMVReaderTest {

@@ -24,7 +24,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 
 
 @Test

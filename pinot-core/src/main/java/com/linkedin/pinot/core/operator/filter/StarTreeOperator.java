@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.StarTreeFilterBlock;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
+import com.linkedin.pinot.core.operator.blocks.StarTreeFilterBlock;
 
 public class StarTreeOperator extends BaseFilterOperator {
   private final int minDocId;

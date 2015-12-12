@@ -18,10 +18,10 @@ package com.linkedin.pinot.core.operator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
 
 
 /**

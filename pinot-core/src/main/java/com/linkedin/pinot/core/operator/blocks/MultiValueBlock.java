@@ -21,22 +21,21 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.operator.docvalsets.MultiValueSet;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class MultiValueBlock implements Block {
 
-  private final SingleColumnMultiValueReader mVReader;
+  final SingleColumnMultiValueReader mVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
-  private final ColumnMetadata columnMetadata;
+  final ColumnMetadata columnMetadata;
   private Predicate predicate;
 
   public MultiValueBlock(BlockId id, SingleColumnMultiValueReader multiValueReader, ImmutableDictionaryReader dict,
@@ -89,66 +88,7 @@ public class MultiValueBlock implements Block {
   @Override
   public BlockValSet getBlockValueSet() {
 
-    return new BlockValSet() {
-
-      @Override
-      public BlockValIterator iterator() {
-
-        return new BlockMultiValIterator() {
-          private int counter = 0;
-
-          @Override
-          public int nextIntVal(int[] intArray) {
-            return mVReader.getIntArray(counter++, intArray);
-          }
-
-          @Override
-          public boolean skipTo(int docId) {
-            if (docId >= columnMetadata.getTotalDocs()) {
-              return false;
-            }
-            counter = docId;
-            return true;
-          }
-
-          @Override
-          public int size() {
-            return columnMetadata.getTotalDocs();
-          }
-
-          @Override
-          public boolean reset() {
-            counter = 0;
-            return true;
-          }
-
-          @Override
-          public boolean next() {
-            return false;
-          }
-
-          @Override
-          public boolean hasNext() {
-            return (counter < columnMetadata.getTotalDocs());
-          }
-
-          @Override
-          public DataType getValueType() {
-            return columnMetadata.getDataType();
-          }
-
-          @Override
-          public int currentDocId() {
-            return counter;
-          }
-        };
-      }
-
-      @Override
-      public DataType getValueType() {
-        return columnMetadata.getDataType();
-      }
-    };
+    return new MultiValueSet(mVReader, columnMetadata);
   }
 
   @Override

@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.docidsets;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.MVScanDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 

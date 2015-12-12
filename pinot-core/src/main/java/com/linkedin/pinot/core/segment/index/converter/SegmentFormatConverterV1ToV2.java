@@ -25,11 +25,11 @@ import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.IOUtils;
 
-import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.index.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -57,13 +57,13 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
         // index
         boolean signed = false;
         SingleColumnSingleValueReader v1Reader =
-            new com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader(fwdIndexFile,
+            new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(fwdIndexFile,
                 segmentMetadataImpl.getTotalDocs(), columnMetadata.getBitsPerElement(), true,
                 false);
         File convertedFwdIndexFile = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION + ".tmp");
          SingleColumnSingleValueWriter v2Writer =
-            new com.linkedin.pinot.core.index.writer.impl.v2.FixedBitSingleValueWriter(convertedFwdIndexFile, segmentMetadataImpl.getTotalDocs(),
+            new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitSingleValueWriter(convertedFwdIndexFile, segmentMetadataImpl.getTotalDocs(),
                 columnMetadata.getBitsPerElement());
         for (int row = 0; row < segmentMetadataImpl.getTotalDocs(); row++) {
           int value = v1Reader.getInt(row);
@@ -92,12 +92,12 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
         // since we use dictionary to encode values, we wont have any negative values in forward
         // index
         boolean signed = false;
-        SingleColumnMultiValueReader v1Reader = new com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader(fwdIndexFile,
+        SingleColumnMultiValueReader v1Reader = new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(fwdIndexFile,
             segmentMetadataImpl.getTotalDocs(), columnMetadata.getTotalNumberOfEntries(),
             columnMetadata.getBitsPerElement(), signed, false);
         File convertedFwdIndexFile = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION + ".tmp");
-        SingleColumnMultiValueWriter v2Writer = new com.linkedin.pinot.core.index.writer.impl.v2.FixedBitMultiValueWriter(convertedFwdIndexFile,
+        SingleColumnMultiValueWriter v2Writer = new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitMultiValueWriter(convertedFwdIndexFile,
             segmentMetadataImpl.getTotalDocs(), columnMetadata.getTotalNumberOfEntries(),
             columnMetadata.getBitsPerElement());
         int[] values = new int[columnMetadata.getMaxNumberOfMultiValues()];

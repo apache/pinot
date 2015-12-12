@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 

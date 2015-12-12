@@ -27,14 +27,15 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.blocks.ArrayBasedFilterBlock;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 
@@ -159,85 +160,7 @@ public class OrOperatorTest {
           return null;
         }
         alreadyInvoked = true;
-
-        return new BaseFilterBlock() {
-
-          @Override
-          public BlockId getId() {
-            // TODO Auto-generated method stub
-            return null;
-          }
-
-          @Override
-          public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-            return new FilterBlockDocIdSet() {
-
-              @Override
-              public BlockDocIdIterator iterator() {
-
-                return new BlockDocIdIterator() {
-                  int counter = 0;
-
-                  @Override
-                  public int advance(int targetDocId) {
-                    int ret = Constants.EOF;
-                    while (counter < list.length) {
-                      if (list[counter] >= targetDocId) {
-                        ret = list[counter];
-                        break;
-                      }
-                      counter = counter + 1;
-                    }
-                    return ret;
-                  }
-
-                  @Override
-                  public int next() {
-                    if (counter == list.length) {
-                      return Constants.EOF;
-                    }
-                    int ret = list[counter];
-                    counter = counter + 1;
-                    return ret;
-                  }
-
-                  @Override
-                  public int currentDocId() {
-                    return 0;
-                  }
-                };
-              }
-
-              @Override
-              public <T> T getRaw() {
-                // TODO Auto-generated method stub
-                return null;
-              }
-
-              @Override
-              public void setStartDocId(int startDocId) {
-                // TODO Auto-generated method stub
-
-              }
-
-              @Override
-              public void setEndDocId(int endDocId) {
-                // TODO Auto-generated method stub
-
-              }
-
-              @Override
-              public int getMinDocId() {
-                return list[0];
-              }
-
-              @Override
-              public int getMaxDocId() {
-                return list[list.length - 1];
-              }
-            };
-          }
-        };
+        return new ArrayBasedFilterBlock(list);
       }
     };
   }

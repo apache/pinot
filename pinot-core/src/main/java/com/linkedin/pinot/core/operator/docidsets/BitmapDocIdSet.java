@@ -22,7 +22,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {

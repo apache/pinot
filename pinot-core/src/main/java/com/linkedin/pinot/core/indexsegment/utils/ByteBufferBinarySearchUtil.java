@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.indexsegment.utils;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 
 
 /**

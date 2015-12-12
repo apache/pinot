@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.segment.index.readers;
 import java.io.IOException;
 
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 
 
 public class SortedForwardIndexReader implements SingleColumnSingleValueReader {

@@ -21,11 +21,9 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.docvalsets.SortedSingleValueSet;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -38,7 +36,7 @@ import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 public class SortedSingleValueBlock implements Block {
 
-  private final SortedForwardIndexReader sVReader;
+  final SortedForwardIndexReader sVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
@@ -68,73 +66,7 @@ public class SortedSingleValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    return new BlockValSet() {
-      @Override
-      public BlockValIterator iterator() {
-
-        return new BlockSingleValIterator() {
-          private int counter = 0;
-
-          @Override
-          public boolean skipTo(int docId) {
-            if (docId >= sVReader.getLength()) {
-              return false;
-            }
-
-            counter = docId;
-
-            return true;
-          }
-
-          @Override
-          public int size() {
-            return sVReader.getLength();
-          }
-
-          @Override
-          public int nextIntVal() {
-            if (counter >= sVReader.getLength()) {
-              return Constants.EOF;
-            }
-            return sVReader.getInt(counter++);
-          }
-
-          @Override
-          public boolean reset() {
-            counter = 0;
-            return true;
-          }
-
-          @Override
-          public boolean next() {
-            // TODO Auto-generated method stub
-            return false;
-          }
-
-          @Override
-          public boolean hasNext() {
-            return (counter < sVReader.getLength());
-          }
-
-          @Override
-          public DataType getValueType() {
-            // TODO Auto-generated method stub
-            return null;
-          }
-
-          @Override
-          public int currentDocId() {
-            return counter;
-          }
-        };
-      }
-
-      @Override
-      public DataType getValueType() {
-        // TODO Auto-generated method stub
-        return null;
-      }
-    };
+    return new SortedSingleValueSet(sVReader);
   }
 
   @Override

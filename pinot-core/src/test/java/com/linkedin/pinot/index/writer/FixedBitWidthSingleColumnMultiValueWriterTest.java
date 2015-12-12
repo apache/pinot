@@ -24,7 +24,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleColumnMultiValueWriter;
+
+import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class FixedBitWidthSingleColumnMultiValueWriterTest {

@@ -22,8 +22,8 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.v2.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.index.writer.impl.v2.FixedBitSingleValueWriter;
+import com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.writer.impl.v2.FixedBitSingleValueWriter;
 
 public class FixedBitSingleValueTest {
 

@@ -35,7 +35,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 
 
 @State(Scope.Benchmark)

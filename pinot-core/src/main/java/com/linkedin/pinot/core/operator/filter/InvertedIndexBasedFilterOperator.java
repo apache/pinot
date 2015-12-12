@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 
 public class InvertedIndexBasedFilterOperator extends BaseFilterOperator{
 

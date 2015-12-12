@@ -20,6 +20,8 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
+import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
 
 
 /**

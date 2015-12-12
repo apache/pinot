@@ -18,7 +18,8 @@ package com.linkedin.pinot.core.operator;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.trace.TraceContext;
+import com.linkedin.pinot.core.util.trace.TraceContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

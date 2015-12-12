@@ -17,14 +17,13 @@ package com.linkedin.pinot.core.operator.blocks;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public class BitmapBlock extends BaseFilterBlock {
 

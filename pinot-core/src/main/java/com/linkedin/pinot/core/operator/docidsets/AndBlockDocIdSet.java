@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;

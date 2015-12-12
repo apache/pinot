@@ -21,8 +21,8 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedBitSingleValueMultiColReader;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitSingleValueMultiColWriter;
+import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
 
 
 public class FixedBitRowColDataWriterReaderTest {

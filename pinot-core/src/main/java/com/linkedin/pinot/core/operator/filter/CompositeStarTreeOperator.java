@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.*;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
+import com.linkedin.pinot.core.operator.blocks.CompositeBaseFilterBlock;
 
 import java.util.ArrayList;
 import java.util.List;

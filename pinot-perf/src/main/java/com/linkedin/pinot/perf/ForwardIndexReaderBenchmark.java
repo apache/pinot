@@ -25,9 +25,9 @@ import java.util.Set;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
@@ -44,7 +44,7 @@ public class ForwardIndexReaderBenchmark {
     boolean signed = false;
     boolean isMmap = false;
     SingleColumnSingleValueReader reader =
-        new com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader(file, numDocs,
+        new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(file, numDocs,
             columnSizeInBits, signed, isMmap);
     // sequential read
     long start, end;
@@ -73,8 +73,8 @@ public class ForwardIndexReaderBenchmark {
 
     boolean batchRead = true;
     boolean singleRead = true;
-    com.linkedin.pinot.core.index.reader.impl.v2.FixedBitSingleValueReader reader =
-        new com.linkedin.pinot.core.index.reader.impl.v2.FixedBitSingleValueReader(file, numDocs,
+    com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader reader =
+        new com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader(file, numDocs,
             numBits, signed, isMmap);
 
     if (fullScan) {
@@ -150,7 +150,7 @@ public class ForwardIndexReaderBenchmark {
     boolean signed = false;
     boolean isMmap = false;
     SingleColumnMultiValueReader reader =
-        new com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader(file, numDocs,
+        new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(file, numDocs,
             totalNumValues, columnSizeInBits, signed, isMmap);
     int[] intArray = new int[maxEntriesPerDoc];
     // sequential read
@@ -179,8 +179,8 @@ public class ForwardIndexReaderBenchmark {
     boolean fullscan = true;
     boolean readOneEachTime = true;
 
-    com.linkedin.pinot.core.index.reader.impl.v2.FixedBitMultiValueReader reader =
-        new com.linkedin.pinot.core.index.reader.impl.v2.FixedBitMultiValueReader(file, numDocs,
+    com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader reader =
+        new com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader(file, numDocs,
             totalNumValues, columnSizeInBits, signed, isMmap);
 
     int[] intArray = new int[maxEntriesPerDoc];

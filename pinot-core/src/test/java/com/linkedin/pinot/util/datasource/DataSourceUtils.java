@@ -53,7 +53,7 @@ public class DataSourceUtils {
 
       @Override
       public Block getNextBlock(BlockId BlockId) {
-        return new SingleValueBlock(dictionary, values);
+        return new ArrayBasedSingleValueBlock(dictionary, values);
       }
 
       @Override

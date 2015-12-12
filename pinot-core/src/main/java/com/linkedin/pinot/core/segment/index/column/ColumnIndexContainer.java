@@ -24,12 +24,12 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.index.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.index.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;

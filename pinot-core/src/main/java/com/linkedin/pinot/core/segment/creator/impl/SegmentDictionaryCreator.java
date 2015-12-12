@@ -29,7 +29,8 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteSingleValueMultiColWriter;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
