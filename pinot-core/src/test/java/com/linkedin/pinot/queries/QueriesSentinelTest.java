@@ -361,7 +361,9 @@ public class QueriesSentinelTest {
 
   @Test
   public void testSingleQuery() throws RecognitionException, Exception {
-    String query = "select count(*) from testTable where column1='186154188'";
+    String query;
+    query = "select count(*) from testTable where column5='kCMyNVGCASKYDdQbftOPaqVMWc'";
+    //query= "select sum('count') from testTable where column1='660156454'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));

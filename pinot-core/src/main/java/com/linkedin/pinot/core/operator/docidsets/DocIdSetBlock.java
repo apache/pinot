@@ -64,7 +64,7 @@ public class DocIdSetBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    return new ArrayBasedBlocDocIdSet(_docIdArray, _searchableLength);
+    return new ArrayBasedDocIdSet(_docIdArray, _searchableLength);
   }
 
   @Override

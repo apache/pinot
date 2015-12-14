@@ -19,13 +19,16 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 
-public final class ArrayBasedBlocDocIdSet implements FilterBlockDocIdSet {
+public final class ArrayBasedDocIdSet implements FilterBlockDocIdSet {
   final int[] _docIdArray;
   final int _searchableLength;
-
-  public ArrayBasedBlocDocIdSet(int[] docIdArray, int searchableLength) {
+  int _minDocId;
+  int _maxDocId;
+  public ArrayBasedDocIdSet(int[] docIdArray, int searchableLength) {
     _docIdArray = docIdArray;
     _searchableLength = searchableLength;
+    _minDocId = 0;
+    _maxDocId  = searchableLength - 1;
   }
 
   @Override
@@ -40,21 +43,21 @@ public final class ArrayBasedBlocDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public int getMinDocId() {
-    throw new UnsupportedOperationException();
+    return _docIdArray[0]; 
   }
 
   @Override
   public int getMaxDocId() {
-    throw new UnsupportedOperationException();
+    return _docIdArray[_searchableLength - 1]; 
   }
 
   @Override
   public void setStartDocId(int startDocId) {
-    throw new UnsupportedOperationException();
+    _minDocId  = Math.max(startDocId, _minDocId);
   }
 
   @Override
   public void setEndDocId(int endDocId) {
-    throw new UnsupportedOperationException();
+    _maxDocId  = Math.min(endDocId, _maxDocId);
   }
 }

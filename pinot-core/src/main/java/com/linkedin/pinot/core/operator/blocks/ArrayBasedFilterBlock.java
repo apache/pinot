@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.operator.docidsets.ArrayBasedBlocDocIdSet;
+import com.linkedin.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public final class ArrayBasedFilterBlock extends BaseFilterBlock {
@@ -33,6 +33,6 @@ public final class ArrayBasedFilterBlock extends BaseFilterBlock {
 
   @Override
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    return new ArrayBasedBlocDocIdSet(docIdArray, docIdArray.length);
+    return new ArrayBasedDocIdSet(docIdArray, docIdArray.length);
   }
 }

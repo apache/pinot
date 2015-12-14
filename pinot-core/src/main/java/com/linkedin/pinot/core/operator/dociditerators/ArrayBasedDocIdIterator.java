@@ -20,34 +20,42 @@ import com.linkedin.pinot.core.common.Constants;
 
 public final class ArrayBasedDocIdIterator implements BlockDocIdIterator {
 
-  
-  int _pos = -1;
-  private int[] _docIdArray;
-  private int _searchableLength;
+  int counter = 0;
+  private int[] list;
+  private int searchableLength;
 
   public ArrayBasedDocIdIterator(int[] _docIdArray, int _searchableLength) {
     super();
-    this._docIdArray = _docIdArray;
-    this._searchableLength = _searchableLength;
+    this.list = _docIdArray;
+    this.searchableLength = _searchableLength;
   }
 
   @Override
   public int advance(int targetDocId) {
-    throw new UnsupportedOperationException("Not support advance in ArrayBasedDocIdIterator()");
+    int ret = Constants.EOF;
+    while (counter < list.length) {
+      if (list[counter] >= targetDocId) {
+        ret = list[counter];
+        break;
+      }
+      counter = counter + 1;
+    }
+    return ret;
+
   }
 
   @Override
   public int next() {
-    _pos++;
-    if (_pos == _searchableLength) {
+    if (counter == searchableLength) {
       return Constants.EOF;
     }
-    return _docIdArray[_pos];
+    int ret = list[counter];
+    counter = counter + 1;
+    return ret;
   }
-
 
   @Override
   public int currentDocId() {
-    return _docIdArray[_pos];
+    return list[counter];
   }
 }

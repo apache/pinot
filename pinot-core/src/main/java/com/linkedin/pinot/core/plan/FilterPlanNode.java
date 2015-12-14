@@ -65,7 +65,7 @@ public class FilterPlanNode implements PlanNode {
     Operator constructPhysicalOperator =
         constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
     long end = System.currentTimeMillis();
-    LOGGER.debug("FilterPlanNode.run took:" + (end - start));
+    LOGGER.debug("FilterPlanNode.run took:{}", (end - start));
     return constructPhysicalOperator;
   }
 

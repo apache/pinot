@@ -64,8 +64,7 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
     // [PINOT-2420] Handle limit 0 clause safely.
     // For limit 0, _docIdArray will be zero sized
-    if (_currentDoc == Constants.EOF ||
-        _pos >= _maxSizeOfdocIdSet) {
+    if (_currentDoc == Constants.EOF ) {
       return null;
     }
     if (!inited) {
