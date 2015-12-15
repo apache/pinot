@@ -121,7 +121,7 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
           if (metricType == null) { // could be derived
             metricType = MetricType.DOUBLE;
           }
-          projectionTypes.add(metricTypes.get(metricName));
+          projectionTypes.add(metricType);
         }
 
         return rawResponse.convert(projectionTypes);
