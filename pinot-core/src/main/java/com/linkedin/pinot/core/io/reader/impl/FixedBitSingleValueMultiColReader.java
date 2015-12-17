@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.io.reader.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.util.CustomBitSet;
 import java.io.Closeable;
 import java.io.File;
@@ -27,9 +28,7 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
- *
  * Generic utility class to read data from file. The data file consists of rows
  * and columns. The number of columns are fixed. Each column can have either
  * single value or multiple values. There are two basic types of methods to read
@@ -39,11 +38,10 @@ import org.slf4j.LoggerFactory;
  * and initialize the array. The implementation will fill up the array. The
  * caller is responsible to ensure that the array is big enough to fit all the
  * values. The return value tells the number of values.<br>
- *
- *
  */
 public class FixedBitSingleValueMultiColReader implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSingleValueMultiColReader.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(FixedBitSingleValueMultiColReader.class);
 
   RandomAccessFile file;
   private int rows;
@@ -65,7 +63,6 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
   private boolean isMmap;
 
   /**
-   *
    * @param file
    * @param rows
    * @param cols
@@ -73,16 +70,15 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows,
-      int cols, int[] columnSizesInBits) throws IOException {
+  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows, int cols,
+      int[] columnSizesInBits) throws IOException {
     boolean[] signed = new boolean[cols];
     Arrays.fill(signed, false);
-    return new FixedBitSingleValueMultiColReader(file, rows, cols,
-        columnSizesInBits, signed, false);
+    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed,
+        false);
   }
 
   /**
-   *
    * @param file
    * @param rows
    * @param cols
@@ -91,14 +87,13 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows,
-      int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitSingleValueMultiColReader(file, rows, cols,
-        columnSizesInBits, signed, false);
+  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows, int cols,
+      int[] columnSizesInBits, boolean[] signed) throws IOException {
+    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed,
+        false);
   }
 
   /**
-   *
    * @param file
    * @param rows
    * @param cols
@@ -106,16 +101,14 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows,
-      int cols, int[] columnSizesInBits) throws IOException {
+  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows, int cols,
+      int[] columnSizesInBits) throws IOException {
     boolean[] signed = new boolean[cols];
     Arrays.fill(signed, false);
-    return new FixedBitSingleValueMultiColReader(file, rows, cols,
-        columnSizesInBits, signed, true);
+    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed, true);
   }
 
   /**
-   *
    * @param file
    * @param rows
    * @param cols
@@ -124,14 +117,12 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows,
-      int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitSingleValueMultiColReader(file, rows, cols,
-        columnSizesInBits, signed, true);
+  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows, int cols,
+      int[] columnSizesInBits, boolean[] signed) throws IOException {
+    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed, true);
   }
 
   /**
-   *
    * @param dataBuffer
    * @param rows
    * @param cols
@@ -140,15 +131,12 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @return
    * @throws IOException
    */
-  public static FixedBitSingleValueMultiColReader forByteBuffer(
-      ByteBuffer dataBuffer, int rows, int cols, int[] columnSizesInBits,
-      boolean[] signed) throws IOException {
-    return new FixedBitSingleValueMultiColReader(dataBuffer, rows, cols,
-        columnSizesInBits, signed);
+  public static FixedBitSingleValueMultiColReader forByteBuffer(ByteBuffer dataBuffer, int rows,
+      int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
+    return new FixedBitSingleValueMultiColReader(dataBuffer, rows, cols, columnSizesInBits, signed);
   }
 
   /**
-   *
    * @param dataFile
    * @param rows
    * @param cols
@@ -161,14 +149,13 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @throws IOException
    */
   private FixedBitSingleValueMultiColReader(File dataFile, int rows, int cols,
-      int[] columnSizesInBits, boolean[] signed, boolean isMmap)
-      throws IOException {
+      int[] columnSizesInBits, boolean[] signed, boolean isMmap) throws IOException {
     init(rows, cols, columnSizesInBits, signed);
     file = new RandomAccessFile(dataFile, "rw");
     this.isMmap = isMmap;
     if (isMmap) {
-      byteBuffer = MmapUtils.mmapFile(file, FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes, dataFile,
-          this.getClass().getSimpleName() + " byteBuffer");
+      byteBuffer = MmapUtils.mmapFile(file, FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes,
+          dataFile, this.getClass().getSimpleName() + " byteBuffer");
     } else {
       byteBuffer = MmapUtils.allocateDirectByteBuffer(totalSizeInBytes, dataFile,
           this.getClass().getSimpleName() + " byteBuffer");
@@ -180,7 +167,6 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
   }
 
   /**
-   *
    * @param buffer
    * @param rows
    * @param cols
@@ -190,8 +176,8 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    *          offset to each element to make it non negative
    * @throws IOException
    */
-  private FixedBitSingleValueMultiColReader(ByteBuffer buffer, int rows,
-      int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
+  private FixedBitSingleValueMultiColReader(ByteBuffer buffer, int rows, int cols,
+      int[] columnSizesInBits, boolean[] signed) throws IOException {
     this.byteBuffer = buffer;
     ownsByteBuffer = false;
     this.isMmap = false;
@@ -200,20 +186,18 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
   }
 
   /**
-   *
    * @param fileName
    * @param rows
    * @param cols
    * @param columnSizes
    * @throws IOException
    */
-  private FixedBitSingleValueMultiColReader(String fileName, int rows,
-      int cols, int[] columnSizes, boolean[] signed) throws IOException {
+  private FixedBitSingleValueMultiColReader(String fileName, int rows, int cols, int[] columnSizes,
+      boolean[] signed) throws IOException {
     this(new File(fileName), rows, cols, columnSizes, signed, true);
   }
 
-  private void init(int rows, int cols, int[] columnSizesInBits,
-      boolean[] signed) {
+  private void init(int rows, int cols, int[] columnSizesInBits, boolean[] signed) {
 
     this.rows = rows;
     this.cols = cols;
@@ -232,22 +216,20 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
       colSizesInBits[i] = colSize;
       rowSizeInBits += colSize;
     }
-    totalSizeInBytes = (int)(((((long) rowSizeInBits) * rows) + 7) / 8);
+    totalSizeInBytes = (int) (((((long) rowSizeInBits) * rows) + 7) / 8);
 
   }
 
   /**
    * Computes the bit offset where the actual column data can be read
-   *
    * @param row
    * @param col
    * @return
    */
   private long computeBitOffset(int row, int col) {
     if (row >= rows || col >= cols) {
-      final String message = String.format(
-          "Input (%d,%d) is not with in expected range (%d,%d)", row, col,
-          rows, cols);
+      final String message = String.format("Input (%d,%d) is not with in expected range (%d,%d)",
+          row, col, rows, cols);
       throw new IndexOutOfBoundsException(message);
     }
     final long offset = ((long) row) * rowSizeInBits + colBitOffSets[col];
@@ -255,7 +237,6 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
   }
 
   /**
-   *
    * @param row
    * @param col
    * @return
@@ -266,22 +247,36 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
     int ret = customBitSet.readInt(startBitOffset, endBitOffset);
     ret = ret - offsets[col];
     return ret;
-
   }
-  
-  /**
-  *
-  * @param row
-  * @param col
-  * @return
-  */
- public void bulkGetInt(int[] rowIds, int col, int output[]) {
-   final long startBitOffset = computeBitOffset(rowIds[0], col);
-   final long endBitOffset = startBitOffset + colSizesInBits[col];
-   int ret = customBitSet.readInt(startBitOffset, endBitOffset);
-   ret = ret - offsets[col];
 
- }
+  /**
+   * @param row
+   * @param col
+   * @return
+   */
+  public void getInt(int startRow, int length, int col, int[] output) {
+    long startBitOffset = computeBitOffset(startRow, col);
+    long endBitOffset;
+    for (int i = 0; i < length; i++) {
+      endBitOffset = startBitOffset + colSizesInBits[col];
+      output[i] = customBitSet.readInt(startBitOffset, endBitOffset) - offsets[col];
+      startBitOffset = endBitOffset;
+    }
+  }
+
+  /**
+   * @param row
+   * @param col
+   * @param context to store the state of previous read
+   * @return
+   */
+  public int getInt(int row, int col, ReaderContext context) {
+    final long startBitOffset = computeBitOffset(row, col);
+    final long endBitOffset = startBitOffset + colSizesInBits[col];
+    int ret = customBitSet.readInt(startBitOffset, endBitOffset);
+    ret = ret - offsets[col];
+    return ret;
+  }
 
   public int getNumberOfRows() {
     return rows;

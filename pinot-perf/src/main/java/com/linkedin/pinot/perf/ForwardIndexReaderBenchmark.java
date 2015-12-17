@@ -16,34 +16,38 @@
 package com.linkedin.pinot.perf;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.MultiValueReaderContext;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 import me.lemire.integercompression.BitPacking;
+
 /**
- * Given a pinot segment directory, it benchmarks forward index scan speed 
- *
+ * Given a pinot segment directory, it benchmarks forward index scan speed
  */
 public class ForwardIndexReaderBenchmark {
-  static int MAX_RUNS = 5;
+  static int MAX_RUNS = 10;
 
   public static void singleValuedReadBenchMarkV1(File file, int numDocs, int columnSizeInBits)
       throws Exception {
     boolean signed = false;
     boolean isMmap = false;
-    SingleColumnSingleValueReader reader =
+    BaseSingleColumnSingleValueReader reader =
         new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(file, numDocs,
             columnSizeInBits, signed, isMmap);
     // sequential read
@@ -147,28 +151,93 @@ public class ForwardIndexReaderBenchmark {
 
   public static void multiValuedReadBenchMarkV1(File file, int numDocs, int totalNumValues,
       int maxEntriesPerDoc, int columnSizeInBits) throws Exception {
+    System.out.println("******************************************************************");
+    System.out.println(
+        "Analyzing " + file.getName() + " numDocs:" + numDocs + ", totalNumValues:" + totalNumValues
+            + ", maxEntriesPerDoc:" + maxEntriesPerDoc + ", numBits:" + columnSizeInBits);
+    long start, end;
+    boolean readFile = true;
+    boolean randomRead = true;
+    boolean contextualRead = true;
     boolean signed = false;
     boolean isMmap = false;
-    SingleColumnMultiValueReader reader =
+    BaseSingleColumnMultiValueReader reader =
         new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(file, numDocs,
             totalNumValues, columnSizeInBits, signed, isMmap);
-    int[] intArray = new int[maxEntriesPerDoc];
-    // sequential read
-    long start, end;
-    DescriptiveStatistics stats = new DescriptiveStatistics();
 
-    for (int run = 0; run < MAX_RUNS; run++) {
-      start = System.currentTimeMillis();
-      for (int i = 0; i < numDocs; i++) {
-        int length = reader.getIntArray(i, intArray);
+    int[] intArray = new int[maxEntriesPerDoc];
+    File outfile = new File("/tmp/" + file.getName() + ".raw");
+    FileWriter fw = new FileWriter(outfile);
+    for (int i = 0; i < numDocs; i++) {
+      int length = reader.getIntArray(i, intArray);
+      StringBuilder sb = new StringBuilder();
+      String delim = "";
+      for (int j = 0; j < length; j++) {
+        sb.append(delim);
+        sb.append(intArray[j]);
+        delim = ",";
       }
-      end = System.currentTimeMillis();
-      stats.addValue((end - start));
+      fw.write(sb.toString());
+      fw.write("\n");
     }
-    System.out.println("v1 multi value sequential read one stats for " + file.getName());
-    System.out.println(
-        stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
+    fw.close();
+
+    // sequential read
+    if (readFile) {
+      DescriptiveStatistics stats = new DescriptiveStatistics();
+      RandomAccessFile raf = new RandomAccessFile(file, "rw");
+      ByteBuffer buffer = ByteBuffer.allocateDirect((int) file.length());
+      raf.getChannel().read(buffer);
+      for (int run = 0; run < MAX_RUNS; run++) {
+        long length = file.length();
+        start = System.currentTimeMillis();
+        for (int i = 0; i < length; i++) {
+          byte b = buffer.get(i);
+        }
+        end = System.currentTimeMillis();
+        stats.addValue((end - start));
+      }
+      System.out.println("v1 multi value read bytes stats for " + file.getName());
+      System.out.println(
+          stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
+
+      raf.close();
+    }
+    if (randomRead) {
+      DescriptiveStatistics stats = new DescriptiveStatistics();
+      for (int run = 0; run < MAX_RUNS; run++) {
+        start = System.currentTimeMillis();
+        for (int i = 0; i < numDocs; i++) {
+          int length = reader.getIntArray(i, intArray);
+        }
+        end = System.currentTimeMillis();
+        stats.addValue((end - start));
+      }
+      System.out.println("v1 multi value sequential read one stats for " + file.getName());
+      System.out.println(
+          stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
+    }
+
+    if (contextualRead) {
+      DescriptiveStatistics stats = new DescriptiveStatistics();
+      for (int run = 0; run < MAX_RUNS; run++) {
+        MultiValueReaderContext context = (MultiValueReaderContext) reader.createContext();
+        start = System.currentTimeMillis();
+        for (int i = 0; i < numDocs; i++) {
+          int length = reader.getIntArray(i, intArray, context);
+        }
+        end = System.currentTimeMillis();
+        // System.out.println("RUN:" + run + "Time:" + (end-start));
+        stats.addValue((end - start));
+      }
+      System.out
+          .println("v1 multi value sequential read one with context stats for " + file.getName());
+      System.out.println(
+          stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
+
+    }
     reader.close();
+    System.out.println("******************************************************************");
 
   }
 
@@ -176,7 +245,6 @@ public class ForwardIndexReaderBenchmark {
       int maxEntriesPerDoc, int columnSizeInBits) throws Exception {
     boolean signed = false;
     boolean isMmap = false;
-    boolean fullscan = true;
     boolean readOneEachTime = true;
 
     com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader reader =
@@ -184,21 +252,8 @@ public class ForwardIndexReaderBenchmark {
             totalNumValues, columnSizeInBits, signed, isMmap);
 
     int[] intArray = new int[maxEntriesPerDoc];
-    // sequential read
     long start, end;
-    if (fullscan) {
-      DescriptiveStatistics stats = new DescriptiveStatistics();
 
-      for (int run = 0; run < MAX_RUNS; run++) {
-        start = System.currentTimeMillis();
-        reader.doFullScan();
-        end = System.currentTimeMillis();
-        stats.addValue((end - start));
-      }
-      System.out.println("v2 multi value full scan stats for " + file.getName());
-      System.out.println(
-          stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
-    }
     // read one entry at a time
     if (readOneEachTime) {
       DescriptiveStatistics stats = new DescriptiveStatistics();
@@ -234,7 +289,11 @@ public class ForwardIndexReaderBenchmark {
           continue;
         }
       }
+
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+      if (columnMetadata.isSingleValue()) {
+        continue;
+      }
       if (!columnMetadata.isSingleValue()) {
 
         String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column, segmentVersion);
@@ -272,20 +331,19 @@ public class ForwardIndexReaderBenchmark {
     }
   }
 
-
-/**
- * USAGE 
- * @param args
- * @throws Exception
- */
+  /**
+   * USAGE ForwardIndexReaderBenchmark <indexDir> <comma delimited column_names(optional)>
+   * @param args
+   * @throws Exception
+   */
   public static void main(String[] args) throws Exception {
-    String v1IndexDir =
-        "/home/kgopalak/backup_folder_13_12_2012/scinPricing_OFFLINE/scinPricing_pricing_0";
-    benchmarkForwardIndex(v1IndexDir, Lists.newArrayList("dimension_skills", "metric_nus_company_impressions"));
-    String v2IndexDir =
-        "/home/kgopalak/pinot_perf/index_dir/scinPricing_OFFLINE/scinPricing_pricing_0";
-    benchmarkForwardIndex(v2IndexDir,  Lists.newArrayList("dimension_skills", "metric_nus_company_impressions"));
-
+    String indexDir = args[0];
+    if (args.length == 1) {
+      benchmarkForwardIndex(indexDir);
+    }
+    if (args.length == 2) {
+      benchmarkForwardIndex(indexDir, Lists.newArrayList(args[1].trim().split(",")));
+    }
   }
 
 }

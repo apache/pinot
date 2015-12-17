@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.util.SizeUtil;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader;
@@ -50,7 +51,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the
  * bitmap to find the right offset in the raw data section
  */
-public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
+public class FixedBitMultiValueReader extends BaseSingleColumnMultiValueReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitMultiValueReader.class);
 
   private static int SIZE_OF_INT = 4;
@@ -227,22 +228,6 @@ public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
       intArray[i] = rawDataReader.getInt(startOffset + i);
     }
     return length;
-  }
-
-  public void doFullScan() {
-    long prevOffset = 0;
-    long length;
-    int[] intArray = new int[10000];
-    for (int rowId = 1; rowId < numDocs; rowId++) {
-      long offset = customBitSet.findNthBitSetAfter(prevOffset, 1);
-      length = offset - prevOffset;
-      if (length < 10000) {
-        for (int i = 0; i < length; i++) {
-          intArray[i] = rawDataReader.getInt((int) (prevOffset + i));
-        }
-      }
-      prevOffset = offset;
-    }
   }
 
   @Override

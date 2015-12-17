@@ -36,7 +36,6 @@ import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 
-
 public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   /**
    * 
@@ -84,7 +83,8 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
           SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
           List<Pair<Integer, Integer>> pairs = sortedDocIdSet.getRaw();
           for (Pair<Integer, Integer> pair : pairs) {
-            bitmap.add(pair.getLeft(), pair.getRight() + 1); //add takes [start, end) i.e inclusive start, exclusive end.
+            bitmap.add(pair.getLeft(), pair.getRight() + 1); // add takes [start, end) i.e inclusive
+                                                             // start, exclusive end.
           }
           allBitmaps.add(bitmap);
         } else if (docIdSet instanceof BitmapDocIdSet) {
@@ -96,16 +96,21 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
           rawIterators.add(iterator);
         }
       }
-      MutableRoaringBitmap answer = (MutableRoaringBitmap) allBitmaps.get(0).clone();
-      for (int i = 1; i < allBitmaps.size(); i++) {
-        answer.and(allBitmaps.get(i));
+      if (allBitmaps.size() > 1) {
+        MutableRoaringBitmap answer = (MutableRoaringBitmap) allBitmaps.get(0).clone();
+        for (int i = 1; i < allBitmaps.size(); i++) {
+          answer.and(allBitmaps.get(i));
+        }
+        intIterator = answer.getIntIterator();
+      } else {
+        intIterator = allBitmaps.get(0).getIntIterator();
       }
-      intIterator = answer.getIntIterator();
+
       BitmapDocIdIterator singleBitmapBlockIdIterator = new BitmapDocIdIterator(intIterator);
       singleBitmapBlockIdIterator.setStartDocId(minDocId);
       singleBitmapBlockIdIterator.setEndDocId(maxDocId);
       end = System.currentTimeMillis();
-      rawIterators.add(0,singleBitmapBlockIdIterator);
+      rawIterators.add(0, singleBitmapBlockIdIterator);
       docIdIterators = new BlockDocIdIterator[rawIterators.size()];
       rawIterators.toArray(docIdIterators);
     } else {
@@ -114,11 +119,11 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
       }
     }
-//    if (docIdIterators.length == 1) {
-//      return docIdIterators[0];
-//    } else {
-      return new AndDocIdIterator(docIdIterators);
-//    }
+    // if (docIdIterators.length == 1) {
+    // return docIdIterators[0];
+    // } else {
+    return new AndDocIdIterator(docIdIterators);
+    // }
   }
 
   @SuppressWarnings("unchecked")

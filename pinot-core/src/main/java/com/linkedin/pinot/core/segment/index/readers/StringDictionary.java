@@ -17,13 +17,11 @@ package com.linkedin.pinot.core.segment.index.readers;
 
 import java.io.File;
 import java.io.IOException;
-
-import org.apache.commons.lang.StringUtils;
+import java.nio.charset.Charset;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str.STRING_PAD_CHAR;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-
 
 /**
  * Nov 14, 2014
@@ -31,9 +29,12 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 public class StringDictionary extends ImmutableDictionaryReader {
   private final int lengthofMaxEntry;
+  private static Charset UTF_8 = Charset.forName("UTF-8");
 
-  public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode) throws IOException {
-    super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(), mode == ReadMode.mmap);
+  public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode)
+      throws IOException {
+    super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(),
+        mode == ReadMode.mmap);
     lengthofMaxEntry = metadata.getStringColumnMaxLength();
   }
 
@@ -44,7 +45,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
     final StringBuilder bld = new StringBuilder();
     bld.append(lookup);
     for (int i = 0; i < differenceInLength; i++) {
-      bld.append(V1Constants.Str.STRING_PAD_CHAR);
+      bld.append(STRING_PAD_CHAR);
     }
     return stringIndexOf(bld.toString());
   }
@@ -54,7 +55,14 @@ public class StringDictionary extends ImmutableDictionaryReader {
     if ((dictionaryId == -1) || (dictionaryId >= length())) {
       return "null";
     }
-    return StringUtils.remove(getString(dictionaryId), String.valueOf(V1Constants.Str.STRING_PAD_CHAR));
+    String val = getString(dictionaryId);
+    byte[] bytes = val.getBytes(UTF_8);
+    for (int i = 0; i < lengthofMaxEntry; i++) {
+      if (bytes[i] == STRING_PAD_CHAR) {
+        return new String(bytes, 0, i);
+      }
+    }
+    return val;
   }
 
   @Override

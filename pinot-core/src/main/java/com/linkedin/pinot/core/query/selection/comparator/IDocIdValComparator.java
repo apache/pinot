@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.reader;
+package com.linkedin.pinot.core.query.selection.comparator;
 
-import java.io.Closeable;
+public interface IDocIdValComparator {
 
-/**
- * Marker interface to read any file in the segment directory
- */
-public interface DataFileReader extends Closeable {
-
+  int compare(int docId1, int docId2);
 }

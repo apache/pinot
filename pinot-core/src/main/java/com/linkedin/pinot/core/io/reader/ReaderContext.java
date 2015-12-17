@@ -15,11 +15,7 @@
  */
 package com.linkedin.pinot.core.io.reader;
 
-import java.io.Closeable;
+public interface ReaderContext {
 
-/**
- * Marker interface to read any file in the segment directory
- */
-public interface DataFileReader extends Closeable {
 
 }

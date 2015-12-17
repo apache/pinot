@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -26,7 +25,6 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.docvalsets.UnSortedSingleValueSet;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
@@ -34,16 +32,18 @@ public class UnSortedSingleValueBlock implements Block {
 
   final SingleColumnSingleValueReader sVReader;
   private final BlockId id;
-  private final ImmutableDictionaryReader dictionary;
+  final ImmutableDictionaryReader dictionary;
   final ColumnMetadata columnMetadata;
+  final BlockMetadata blockMetadata;
   private Predicate predicate;
 
   public UnSortedSingleValueBlock(BlockId id, SingleColumnSingleValueReader singleValueReader,
-      ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
+      ImmutableDictionaryReader dictionaryReader, ColumnMetadata columnMetadata) {
     sVReader = singleValueReader;
     this.id = id;
-    dictionary = dict;
+    dictionary = dictionaryReader;
     this.columnMetadata = columnMetadata;
+    this.blockMetadata = new BlockMetadataImpl(columnMetadata, dictionaryReader);
   }
 
   public SingleColumnSingleValueReader getSVReader() {
@@ -81,67 +81,6 @@ public class UnSortedSingleValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    return new BlockMetadata() {
-
-      @Override
-      public boolean isSparse() {
-        return false;
-      }
-
-      @Override
-      public boolean isSorted() {
-        return columnMetadata.isSorted();
-      }
-
-      @Override
-      public boolean hasInvertedIndex() {
-        return columnMetadata.isHasInvertedIndex();
-      }
-
-      @Override
-      public int getStartDocId() {
-        return 0;
-      }
-
-      @Override
-      public int getSize() {
-        return columnMetadata.getTotalDocs();
-      }
-
-      @Override
-      public int getLength() {
-        return columnMetadata.getTotalDocs();
-      }
-
-      @Override
-      public int getEndDocId() {
-        return columnMetadata.getTotalDocs() - 1;
-      }
-
-      @Override
-      public boolean hasDictionary() {
-        return true;
-      }
-
-      @Override
-      public boolean isSingleValue() {
-        return columnMetadata.isSingleValue();
-      }
-
-      @Override
-      public Dictionary getDictionary() {
-        return dictionary;
-      }
-
-      @Override
-      public int getMaxNumberOfMultiValues() {
-        return columnMetadata.getMaxNumberOfMultiValues();
-      }
-
-      @Override
-      public DataType getDataType() {
-        return columnMetadata.getDataType();
-      }
-    };
+    return blockMetadata;
   }
 }

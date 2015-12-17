@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.io.reader;
 
-public interface SingleColumnMultiValueReader extends DataFileReader {
+public interface SingleColumnMultiValueReader<T extends ReaderContext> extends DataFileReader {
 
   /**
    * Read the multiple values for a column at a specific row.
-   *
    * @param row
    * @param charArray
    * @return returns the number of chars read
@@ -27,7 +26,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getCharArray(int row, char[] charArray);
 
   /**
-   *
    * @param row
    * @param shortsArray
    * @return return the number of shorts read
@@ -35,7 +33,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getShortArray(int row, short[] shortsArray);
 
   /**
-   *
    * @param row
    * @param intArray
    * @return
@@ -43,7 +40,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getIntArray(int row, int[] intArray);
 
   /**
-   *
    * @param row
    * @param longArray
    * @return
@@ -51,7 +47,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getLongArray(int row, long[] longArray);
 
   /**
-   *
    * @param row
    * @param floatArray
    * @return
@@ -59,7 +54,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getFloatArray(int row, float[] floatArray);
 
   /**
-   *
    * @param row
    * @param doubleArray
    * @return
@@ -67,7 +61,6 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getDoubleArray(int row, double[] doubleArray);
 
   /**
-   *
    * @param row
    * @param stringArray
    * @return
@@ -75,10 +68,14 @@ public interface SingleColumnMultiValueReader extends DataFileReader {
   int getStringArray(int row, String[] stringArray);
 
   /**
-   *
    * @param row
    * @param bytesArray
    * @return
    */
   int getBytesArray(int row, byte[][] bytesArray);
+
+  T createContext();
+
+  int getIntArray(int row, int[] intArray, T readerContext);
+
 }

@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
@@ -104,7 +105,7 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    SingleColumnMultiValueReader fwdIndexReader =
+    SingleColumnMultiValueReader<? extends ReaderContext> fwdIndexReader =
         new FixedBitMultiValueReader(fwdIndexFile, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
             metadata.getBitsPerElement(), false, mode == ReadMode.mmap);
 

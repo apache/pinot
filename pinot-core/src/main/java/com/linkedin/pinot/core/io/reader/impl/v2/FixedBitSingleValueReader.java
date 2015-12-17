@@ -24,6 +24,7 @@ import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.util.SizeUtil;
 
@@ -36,7 +37,7 @@ import me.lemire.integercompression.BitPacking;
  * This may seem over kill because in order to read 1 value, we uncompress 32 values.
  * But in reality the cost get amortized when we read a range of values.
  */
-public class FixedBitSingleValueReader implements SingleColumnSingleValueReader {
+public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSingleValueReader.class);
   private int compressedSize;
   private int uncompressedSize;
@@ -185,6 +186,30 @@ public class FixedBitSingleValueReader implements SingleColumnSingleValueReader 
     bitUnpackWrapper = new BitUnpackResultWrapper(compressedSize, uncompressedSize);
   }
 
+  /**
+   * @param rowIds assumes rowIds are sorted
+   * @param values
+   * @param length
+   */
+  public void getIntBatch(int startRow, int length, int[] values) {
+    int counter = 0;
+    BitUnpackResult tempResult = bitUnpackWrapper.get();
+    while (counter < length) {
+      int batchPosition = (startRow + counter) / uncompressedSize;
+      if (tempResult.position != batchPosition) {
+        int startIndex = batchPosition * numBits * 4;
+        for (int i = 0; i < numBits; i++) {
+          tempResult.compressed[i] = byteBuffer.getInt(startIndex + i * 4);
+        }
+        BitPacking.fastunpack(tempResult.compressed, 0, tempResult.uncompressed, 0, numBits);
+      }
+      int endRowId = (batchPosition + 1) * uncompressedSize;
+      while (counter < length && (startRow + counter) < endRowId) {
+        values[counter] = tempResult.uncompressed[(startRow + counter) % uncompressedSize];
+        counter = counter + 1;
+      }
+    }
+  }
 
   /**
    * @param rowIds assumes rowIds are sorted

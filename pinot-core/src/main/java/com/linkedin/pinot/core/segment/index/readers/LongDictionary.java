@@ -50,12 +50,12 @@ public class LongDictionary extends ImmutableDictionaryReader {
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return new Long(getLong(dictionaryId)).longValue();
+    return getLong(dictionaryId);
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(getLong(dictionaryId));
+    return getLong(dictionaryId);
   }
 
   @Override

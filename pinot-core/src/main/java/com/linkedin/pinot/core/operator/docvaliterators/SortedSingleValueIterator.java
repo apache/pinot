@@ -18,15 +18,18 @@ package com.linkedin.pinot.core.operator.docvaliterators;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
+import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.SortedValueReaderContext;
 
 public final class SortedSingleValueIterator extends BlockSingleValIterator {
 
   private int counter = 0;
   private SortedForwardIndexReader sVReader;
-
+  SortedValueReaderContext context;
   public SortedSingleValueIterator(SortedForwardIndexReader sVReader) {
     this.sVReader = sVReader;
+    this.context = sVReader.createContext();
   }
 
   @Override
@@ -50,7 +53,7 @@ public final class SortedSingleValueIterator extends BlockSingleValIterator {
     if (counter >= sVReader.getLength()) {
       return Constants.EOF;
     }
-    return sVReader.getInt(counter++);
+    return sVReader.getInt(counter++, context);
   }
 
   @Override

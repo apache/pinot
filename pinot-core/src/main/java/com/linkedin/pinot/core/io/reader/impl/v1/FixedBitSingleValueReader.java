@@ -18,15 +18,13 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 import java.io.File;
 import java.io.IOException;
 
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
 
 
-/**
- * Nov 13, 2014
- */
 
-public class FixedBitSingleValueReader implements SingleColumnSingleValueReader {
+public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
 
   private final File indexFile;
   private final FixedBitSingleValueMultiColReader dataFileReader;
@@ -39,7 +37,6 @@ public class FixedBitSingleValueReader implements SingleColumnSingleValueReader 
     } else {
       dataFileReader = FixedBitSingleValueMultiColReader.forHeap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
     }
-
     this.rows = rows;
   }
 
@@ -57,43 +54,8 @@ public class FixedBitSingleValueReader implements SingleColumnSingleValueReader 
   }
 
   @Override
-  public char getChar(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public short getShort(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public int getInt(int row) {
     return dataFileReader.getInt(row, 0);
-  }
-
-  @Override
-  public long getLong(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloat(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDouble(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getString(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public byte[] getBytes(int row) {
-    throw new UnsupportedOperationException();
   }
 
 }

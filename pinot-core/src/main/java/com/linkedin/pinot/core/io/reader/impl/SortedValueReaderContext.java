@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.reader;
+package com.linkedin.pinot.core.io.reader.impl;
 
-import java.io.Closeable;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 
-/**
- * Marker interface to read any file in the segment directory
- */
-public interface DataFileReader extends Closeable {
+public class SortedValueReaderContext implements ReaderContext {
+
+  int value = -1;
+  int docIdStart = -1;
+  int docIdEnd = -1;
 
 }

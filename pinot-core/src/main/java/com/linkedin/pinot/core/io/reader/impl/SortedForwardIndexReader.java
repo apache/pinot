@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.readers;
+package com.linkedin.pinot.core.io.reader.impl;
 
 import java.io.IOException;
 
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 
-
-public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
+public class SortedForwardIndexReader
+    extends BaseSingleColumnSingleValueReader<SortedValueReaderContext> {
   private final FixedByteSingleValueMultiColReader indexReader;
   private final ByteBufferBinarySearchUtil fileBinarySearcher;
   private final int numDocs;
@@ -50,6 +49,22 @@ public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
   }
 
   @Override
+  public int getInt(int docId, SortedValueReaderContext context) {
+    if (docId >= context.docIdStart && docId <= context.docIdEnd) {
+      return context.value;
+    } else {
+      int value = getInt(docId);
+      if (value != Constants.EOF) {
+        context.value = value;
+        context.docIdStart = indexReader.getInt(context.value, 0);
+        context.docIdEnd = indexReader.getInt(context.value, 1);
+      }
+      return value;
+    }
+
+  }
+
+  @Override
   public int getInt(int docId) {
     if (indexReader.getNumberOfRows() == 1) {
       return 0;
@@ -70,32 +85,12 @@ public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
     return Constants.EOF;
   }
 
-  @Override
-  public long getLong(int row) {
-    throw new UnsupportedOperationException("not allowed in sorted reader");
-  }
-
-  @Override
-  public float getFloat(int row) {
-    throw new UnsupportedOperationException("not allowed in sorted reader");
-  }
-
-  @Override
-  public double getDouble(int row) {
-    throw new UnsupportedOperationException("not allowed in sorted reader");
-  }
-
-  @Override
-  public String getString(int row) {
-    throw new UnsupportedOperationException("not allowed in sorted reader");
-  }
-
-  @Override
-  public byte[] getBytes(int row) {
-    throw new UnsupportedOperationException("not allowed in sorted reader");
-  }
-
   public int getLength() {
     return numDocs;
+  }
+
+  @Override
+  public SortedValueReaderContext createContext() {
+    return new SortedValueReaderContext();
   }
 }

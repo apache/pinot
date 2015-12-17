@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.util.CustomBitSet;
@@ -39,7 +40,7 @@ import java.nio.channels.FileChannel;
  * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section 
  *
  */
-public class FixedByteMultiValueReader implements SingleColumnMultiValueReader {
+public class FixedByteMultiValueReader extends BaseSingleColumnMultiValueReader {
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 1;
   //THIS is HARDCODED in THE FixedByteSkipListSCMVWriter class as well. 

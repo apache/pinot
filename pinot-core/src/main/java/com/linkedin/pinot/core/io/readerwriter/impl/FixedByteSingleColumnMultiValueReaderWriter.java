@@ -23,6 +23,7 @@ import java.util.List;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.SingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 
@@ -55,7 +56,7 @@ import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter
  *
  */
 
-public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumnMultiValueReaderWriter {
+public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColumnMultiValueReaderWriter {
 
   public static final int DEFAULT_MAX_NUMBER_OF_MULTIVALUES = 1000;
   /**

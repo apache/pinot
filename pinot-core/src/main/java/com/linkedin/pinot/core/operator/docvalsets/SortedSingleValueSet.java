@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.operator.docvalsets;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
 import com.linkedin.pinot.core.operator.docvaliterators.SortedSingleValueIterator;
-import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 public final class SortedSingleValueSet implements BlockValSet {
  

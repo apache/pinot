@@ -15,34 +15,39 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
-import com.google.common.primitives.Ints;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
-
 /**
  * Storage Layout
  * ==============
- * There will be three sections HEADER section, BITMAP and  RAW DATA
- * CHUNK OFFSET HEADER will contain one line per chunk, each line corresponding to the start offset and length of the chunk
- * BITMAP This will contain sequence of bits. The number of bits will be equal to the totalNumberOfValues.A bit is set to 1 if its start of a new docId. The number of bits set to 1 will be equal to the number of docs.
- * RAWDATA This simply has the actual multi valued data stored in sequence of int's. The number of ints is equal to the totalNumberOfValues
+ * There will be three sections HEADER section, BITMAP and RAW DATA
+ * CHUNK OFFSET HEADER will contain one line per chunk, each line corresponding to the start offset
+ * and length of the chunk
+ * BITMAP This will contain sequence of bits. The number of bits will be equal to the
+ * totalNumberOfValues.A bit is set to 1 if its start of a new docId. The number of bits set to 1
+ * will be equal to the number of docs.
+ * RAWDATA This simply has the actual multi valued data stored in sequence of int's. The number of
+ * ints is equal to the totalNumberOfValues
  * We divide all the documents into groups refered to as CHUNK. Each CHUNK will
  * - Have the same number of documents.
- * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up.
- * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section
- *
+ * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed
+ * the look up.
+ * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the
+ * bitmap to find the right offset in the raw data section
  */
-public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
+public class FixedBitMultiValueReader
+    extends BaseSingleColumnMultiValueReader<MultiValueReaderContext> {
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 1;
   private int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
@@ -66,8 +71,8 @@ public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
   private int numDocs;
   private boolean isMmap;
 
-  public FixedBitMultiValueReader(File file, int numDocs, int totalNumValues, int columnSizeInBits, boolean signed,
-      boolean isMmap) throws Exception {
+  public FixedBitMultiValueReader(File file, int numDocs, int totalNumValues, int columnSizeInBits,
+      boolean signed, boolean isMmap) throws Exception {
     this.numDocs = numDocs;
     this.totalNumValues = totalNumValues;
     float averageValuesPerDoc = totalNumValues / numDocs;
@@ -80,29 +85,34 @@ public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
     raf = new RandomAccessFile(file, "rw");
     this.isMmap = isMmap;
     if (isMmap) {
-      chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize, file,
-          this.getClass().getSimpleName() + " chunkOffsetsBuffer");
-      bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize, file,
-          this.getClass().getSimpleName() + " bitsetBuffer");
-      rawDataBuffer =
-          MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize, file,
-              this.getClass().getSimpleName() + " rawDataBuffer");
+      chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+          chunkOffsetHeaderSize, file, this.getClass().getSimpleName() + " chunkOffsetsBuffer");
+      bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize,
+          bitsetSize, file, this.getClass().getSimpleName() + " bitsetBuffer");
+      rawDataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE,
+          chunkOffsetHeaderSize + bitsetSize, rawDataSize, file,
+          this.getClass().getSimpleName() + " rawDataBuffer");
 
-      chunkOffsetsReader =
-          new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER,
-              new int[] { SIZE_OF_INT });
+      chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs,
+          NUM_COLS_IN_HEADER, new int[] {
+              SIZE_OF_INT
+      });
 
       customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
-      rawDataReader =
-          FixedBitSingleValueMultiColReader.forByteBuffer(rawDataBuffer, totalNumValues, 1,
-              new int[] { columnSizeInBits }, new boolean[] { signed });
+      rawDataReader = FixedBitSingleValueMultiColReader.forByteBuffer(rawDataBuffer, totalNumValues,
+          1, new int[] {
+              columnSizeInBits
+      }, new boolean[] {
+          signed
+      });
     } else {
       chunkOffsetsBuffer = MmapUtils.allocateDirectByteBuffer(chunkOffsetHeaderSize, file,
           this.getClass().getSimpleName() + " chunkOffsetsBuffer");
       raf.getChannel().read(chunkOffsetsBuffer);
-      chunkOffsetsReader =
-          new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER,
-              new int[] { SIZE_OF_INT });
+      chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs,
+          NUM_COLS_IN_HEADER, new int[] {
+              SIZE_OF_INT
+      });
       bitsetBuffer = MmapUtils.allocateDirectByteBuffer(bitsetSize, file,
           this.getClass().getSimpleName() + " bitsetBuffer");
       raf.getChannel().read(bitsetBuffer);
@@ -110,9 +120,12 @@ public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
       rawDataBuffer = MmapUtils.allocateDirectByteBuffer(rawDataSize, file,
           this.getClass().getSimpleName() + " rawDataBuffer");
       raf.getChannel().read(rawDataBuffer);
-      rawDataReader =
-          FixedBitSingleValueMultiColReader.forByteBuffer(rawDataBuffer, totalNumValues, 1,
-              new int[] { columnSizeInBits }, new boolean[] { signed });
+      rawDataReader = FixedBitSingleValueMultiColReader.forByteBuffer(rawDataBuffer, totalNumValues,
+          1, new int[] {
+              columnSizeInBits
+      }, new boolean[] {
+          signed
+      });
       raf.close();
     }
   }
@@ -193,16 +206,6 @@ public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
   }
 
   @Override
-  public int getCharArray(int row, char[] charArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
-  }
-
-  @Override
-  public int getShortArray(int row, short[] shortsArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
-  }
-
-  @Override
   public int getIntArray(int row, int[] intArray) {
     int startOffset = computeStartOffset(row);
     int length = computeLength(startOffset);
@@ -213,28 +216,45 @@ public class FixedBitMultiValueReader implements SingleColumnMultiValueReader {
   }
 
   @Override
-  public int getLongArray(int row, long[] longArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
+  public int getIntArray(int row, int[] intArray, MultiValueReaderContext readerContext) {
+    int startOffset = 0;
+    int endOffset = 0;
+    int chunkId = row / docsPerChunk;
+    int length;
+    if (readerContext.rowId != -1) {
+      if (row == readerContext.rowId + 1) {
+        startOffset = readerContext.endPosition;
+      } else if (readerContext.chunkId == chunkId && row >= readerContext.rowId) {
+        startOffset = (int) customBitSet.findNthBitSetAfter(readerContext.endPosition,
+            (row - readerContext.rowId - 1));
+      } else {
+        int chunkIdOffset = chunkOffsetsReader.getInt(chunkId, 0);
+        if (row % docsPerChunk == 0) {
+          startOffset = chunkIdOffset;
+        } else {
+          startOffset =
+              (int) customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
+        }
+      }
+    }
+    endOffset = customBitSet.findNthBitSetAfter(startOffset, 1);
+    if (endOffset < 0) {
+      length = (int) (totalNumValues - startOffset);
+    } else {
+      length = (int) (endOffset - startOffset);
+    }
+    rawDataReader.getInt(startOffset, length, 0, intArray);
+    readerContext.rowId = row;
+    readerContext.chunkId = chunkId;
+    readerContext.startPosition = startOffset;
+    readerContext.endPosition = endOffset;
+    return length;
+
   }
 
   @Override
-  public int getFloatArray(int row, float[] floatArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
+  public MultiValueReaderContext createContext() {
+    MultiValueReaderContext readerContext = new MultiValueReaderContext();
+    return readerContext;
   }
-
-  @Override
-  public int getDoubleArray(int row, double[] doubleArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
-  }
-
-  @Override
-  public int getStringArray(int row, String[] stringArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
-  }
-
-  @Override
-  public int getBytesArray(int row, byte[][] bytesArray) {
-    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
-  }
-
 }

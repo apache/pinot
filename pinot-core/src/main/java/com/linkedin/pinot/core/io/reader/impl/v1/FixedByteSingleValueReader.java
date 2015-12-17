@@ -18,27 +18,32 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 import java.io.File;
 import java.io.IOException;
 
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-
 
 /**
  * Nov 13, 2014
  */
 
-public class FixedByteSingleValueReader implements SingleColumnSingleValueReader {
+public class FixedByteSingleValueReader extends BaseSingleColumnSingleValueReader {
 
   private final File indexFile;
   private final FixedByteSingleValueMultiColReader dataFileReader;
   private final int rows;
 
-  public FixedByteSingleValueReader(File file, int rows, int columnSizeInBytes, boolean isMMap, boolean hasNulls) throws IOException {
+  public FixedByteSingleValueReader(File file, int rows, int columnSizeInBytes, boolean isMMap,
+      boolean hasNulls) throws IOException {
     indexFile = file;
     if (isMMap) {
-      //File file,
-      dataFileReader = FixedByteSingleValueMultiColReader.forMmap(indexFile, rows, 1, new int[] { columnSizeInBytes });
+      // File file,
+      dataFileReader = FixedByteSingleValueMultiColReader.forMmap(indexFile, rows, 1, new int[] {
+          columnSizeInBytes
+      });
     } else {
-      dataFileReader = FixedByteSingleValueMultiColReader.forHeap(indexFile, rows, 1, new int[] { columnSizeInBytes });
+      dataFileReader = FixedByteSingleValueMultiColReader.forHeap(indexFile, rows, 1, new int[] {
+          columnSizeInBytes
+      });
     }
 
     this.rows = rows;
@@ -58,43 +63,8 @@ public class FixedByteSingleValueReader implements SingleColumnSingleValueReader
   }
 
   @Override
-  public char getChar(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public short getShort(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public int getInt(int row) {
     return dataFileReader.getInt(row, 0);
-  }
-
-  @Override
-  public long getLong(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloat(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDouble(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getString(int row) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public byte[] getBytes(int row) {
-    throw new UnsupportedOperationException();
   }
 
 }

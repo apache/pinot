@@ -46,7 +46,6 @@ import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
 
-
 /**
  */
 public class FilterPlanNode implements PlanNode {
@@ -87,17 +86,17 @@ public class FilterPlanNode implements PlanNode {
       }
       final FilterOperator filterType = filterQueryTree.getOperator();
       switch (filterType) {
-        case AND:
-          reorder(operators);
-          ret = new AndOperator(operators);
-          break;
-        case OR:
-          reorder(operators);
-          ret = new OrOperator(operators);
-          break;
-        default:
-          throw new UnsupportedOperationException("Not support filter type - " + filterType
-              + " with children operators");
+      case AND:
+        reorder(operators);
+        ret = new AndOperator(operators);
+        break;
+      case OR:
+        reorder(operators);
+        ret = new OrOperator(operators);
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Not support filter type - " + filterType + " with children operators");
       }
     } else {
       final FilterOperator filterType = filterQueryTree.getOperator();
@@ -105,26 +104,26 @@ public class FilterPlanNode implements PlanNode {
       Predicate predicate = null;
       final List<String> value = filterQueryTree.getValue();
       switch (filterType) {
-        case EQUALITY:
-          predicate = new EqPredicate(column, value);
-          break;
-        case RANGE:
-          predicate = new RangePredicate(column, value);
-          break;
-        case REGEX:
-          predicate = new RegexPredicate(column, value);
-          break;
-        case NOT:
-          predicate = new NEqPredicate(column, value);
-          break;
-        case NOT_IN:
-          predicate = new NotInPredicate(column, value);
-          break;
-        case IN:
-          predicate = new InPredicate(column, value);
-          break;
-        default:
-          throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
+      case EQUALITY:
+        predicate = new EqPredicate(column, value);
+        break;
+      case RANGE:
+        predicate = new RangePredicate(column, value);
+        break;
+      case REGEX:
+        predicate = new RegexPredicate(column, value);
+        break;
+      case NOT:
+        predicate = new NEqPredicate(column, value);
+        break;
+      case NOT_IN:
+        predicate = new NotInPredicate(column, value);
+        break;
+      case IN:
+        predicate = new InPredicate(column, value);
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
       }
 
       DataSource ds;
@@ -133,13 +132,15 @@ public class FilterPlanNode implements PlanNode {
       BaseFilterOperator baseFilterOperator;
 
       if (dataSourceMetadata.hasInvertedIndex()) {
-        if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
-          //if the column is sorted use sorted inverted index based implementation
-          baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
-        } else if (!filterType.equals(FilterOperator.RANGE) || _segment instanceof RealtimeSegment) {
-          // jfim: ScanBasedFilterOperator is broken for realtime segments for now
-          // range evaluation based on inv index is inefficient, so do this only if is NOT range.
-          baseFilterOperator = new BitmapBasedFilterOperator(ds);
+        // jfim: ScanBasedFilterOperator is broken for realtime segments for now
+        // range evaluation based on inv index is inefficient, so do this only if is NOT range.
+        if (!filterType.equals(FilterOperator.RANGE) || _segment instanceof RealtimeSegment) {
+          if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
+            // if the column is sorted use sorted inverted index based implementation
+            baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
+          } else {
+            baseFilterOperator = new BitmapBasedFilterOperator(ds);
+          }
         } else {
           baseFilterOperator = new ScanBasedFilterOperator(ds);
         }
@@ -153,7 +154,8 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * Re orders operators, puts Sorted -> Inverted and then Raw scan. TODO: With Inverted, we can further optimize based on cardinality
+   * Re orders operators, puts Sorted -> Inverted and then Raw scan. TODO: With Inverted, we can
+   * further optimize based on cardinality
    * @param operators
    */
   private void reorder(List<Operator> operators) {
@@ -186,9 +188,8 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    final String treeStructure =
-        prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
-            + _brokerRequest.getFilterQuery();
+    final String treeStructure = prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n"
+        + prefix + "Argument 0: " + _brokerRequest.getFilterQuery();
     LOGGER.debug(treeStructure);
   }
 }

@@ -20,6 +20,8 @@ import java.io.Serializable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
+import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
+import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
 import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
@@ -33,8 +35,6 @@ import com.linkedin.pinot.core.query.selection.iterator.LongSelectionColumnItera
 import com.linkedin.pinot.core.query.selection.iterator.SelectionColumnIterator;
 import com.linkedin.pinot.core.query.selection.iterator.SelectionSingleValueColumnWithDictIterator;
 import com.linkedin.pinot.core.query.selection.iterator.StringArraySelectionColumnIterator;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeMultiValueBlock;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;

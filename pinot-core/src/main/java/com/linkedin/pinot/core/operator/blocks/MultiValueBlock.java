@@ -37,6 +37,7 @@ public class MultiValueBlock implements Block {
   private final ImmutableDictionaryReader dictionary;
   final ColumnMetadata columnMetadata;
   private Predicate predicate;
+  private BlockMetadataImpl blockMetadata;
 
   public MultiValueBlock(BlockId id, SingleColumnMultiValueReader multiValueReader, ImmutableDictionaryReader dict,
       ColumnMetadata metadata) {
@@ -44,6 +45,7 @@ public class MultiValueBlock implements Block {
     this.id = id;
     dictionary = dict;
     columnMetadata = metadata;
+    this.blockMetadata = new BlockMetadataImpl(metadata, dict);
   }
 
   public boolean hasDictionary() {
@@ -87,7 +89,6 @@ public class MultiValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-
     return new MultiValueSet(mVReader, columnMetadata);
   }
 
@@ -98,67 +99,6 @@ public class MultiValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    return new BlockMetadata() {
-
-      @Override
-      public int getMaxNumberOfMultiValues() {
-        return columnMetadata.getMaxNumberOfMultiValues();
-      }
-
-      @Override
-      public boolean isSparse() {
-        return false;
-      }
-
-      @Override
-      public boolean isSorted() {
-        return columnMetadata.isSorted();
-      }
-
-      @Override
-      public boolean isSingleValue() {
-        return columnMetadata.isSingleValue();
-      }
-
-      @Override
-      public boolean hasInvertedIndex() {
-        return columnMetadata.isHasInvertedIndex();
-      }
-
-      @Override
-      public boolean hasDictionary() {
-        return true;
-      }
-
-      @Override
-      public int getStartDocId() {
-        return 0;
-      }
-
-      @Override
-      public int getSize() {
-        return columnMetadata.getTotalDocs();
-      }
-
-      @Override
-      public int getLength() {
-        return columnMetadata.getTotalDocs();
-      }
-
-      @Override
-      public int getEndDocId() {
-        return columnMetadata.getTotalDocs() - 1;
-      }
-
-      @Override
-      public ImmutableDictionaryReader getDictionary() {
-        return dictionary;
-      }
-
-      @Override
-      public DataType getDataType() {
-        return columnMetadata.getDataType();
-      }
-    };
+    return blockMetadata;
   }
 }

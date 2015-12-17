@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.io.readerwriter.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.SingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 
@@ -25,7 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 
-public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColumnSingleValueReaderWriter {
+public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
 
   FixedByteSingleValueMultiColReader reader;
   FixedByteSingleValueMultiColWriter writer;
