@@ -207,6 +207,7 @@ public class SelectionOperatorUtils {
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
+  @Deprecated
   public static Serializable[] collectRowFromBlockValSets(int docId, Block[] blocks, DataSchema dataSchema) {
 
     final Serializable[] row = new Serializable[dataSchema.size()];

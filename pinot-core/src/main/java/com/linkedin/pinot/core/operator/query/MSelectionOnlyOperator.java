@@ -34,6 +34,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.selection.SelectionFetcher;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
@@ -80,15 +81,15 @@ public class MSelectionOnlyOperator extends BaseOperator {
     long numDocsScanned = 0;
     ProjectionBlock projectionBlock = null;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      int j = 0;
       for (int i = 0; i < _dataSchema.size(); ++i) {
-        _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
+        _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
+      SelectionFetcher selectionFetcher = new SelectionFetcher(_blocks, _dataSchema);
       BlockDocIdIterator blockDocIdIterator = projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator();
       int docId;
       while ((docId = blockDocIdIterator.next()) != Constants.EOF && _rowEvents.size() < _limitDocs) {
         numDocsScanned++;
-        _rowEvents.add(SelectionOperatorUtils.collectRowFromBlockValSets(docId, _blocks, _dataSchema));
+        _rowEvents.add(selectionFetcher.getRow(docId));
       }
       if (_rowEvents.size() == _limitDocs) {
         break;
