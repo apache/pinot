@@ -76,24 +76,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   @Override
-  public Plan makeInterSegmentPlan(BrokerRequest brokerRequest, List<SegmentDataManager> segmentDataManagers,
+  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs) {
     final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
     final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
     rootNode.setPlanNode(combinePlanNode);
     for (final SegmentDataManager segmentDataManager : segmentDataManagers) {
       combinePlanNode.addPlanNode(makeInnerSegmentPlan(segmentDataManager.getSegment(), brokerRequest));
-    }
-    return new GlobalPlanImplV0(rootNode);
-  }
-
-  @Override
-  public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
-    final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
-    final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
-    rootNode.setPlanNode(combinePlanNode);
-    for (final IndexSegment indexSegment : indexSegmentList) {
-      combinePlanNode.addPlanNode(makeInnerSegmentPlan(indexSegment, brokerRequest));
     }
     return new GlobalPlanImplV0(rootNode);
   }

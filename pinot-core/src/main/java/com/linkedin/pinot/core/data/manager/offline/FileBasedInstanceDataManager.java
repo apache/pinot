@@ -117,26 +117,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     }
 
     _isStarted = true;
-    LOGGER.info("InstanceDataManager is started! " + getServerInfo());
-  }
-
-  private String getServerInfo() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("\n[InstanceDataManager Info] : ");
-    for (String tableName : _tableDataManagerMap.keySet()) {
-      sb.append("\n\t{\n\t\tTable : [" + tableName + "];\n\t\tSegments : [");
-      boolean isFirstSegment = true;
-      for (SegmentDataManager segmentDataManager : _tableDataManagerMap.get(tableName).getAllSegments()) {
-        if (isFirstSegment) {
-          sb.append(segmentDataManager.getSegment().getSegmentName());
-          isFirstSegment = false;
-        } else {
-          sb.append(", " + segmentDataManager.getSegment().getSegmentName());
-        }
-      }
-      sb.append("]\n\t}");
-    }
-    return sb.toString();
+    LOGGER.info("InstanceDataManager is started!");
   }
 
   private void bootstrapSegmentsFromSegmentDir() throws Exception {
@@ -230,8 +211,8 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   @Override
   public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
     if (_tableDataManagerMap.containsKey(table)) {
-      if (_tableDataManagerMap.get(table).getSegment(segmentName) != null) {
-        return _tableDataManagerMap.get(table).getSegment(segmentName).getSegment().getSegmentMetadata();
+      if (_tableDataManagerMap.get(table).acquireSegment(segmentName) != null) {
+        return _tableDataManagerMap.get(table).acquireSegment(segmentName).getSegment().getSegmentMetadata();
       }
     }
     return null;

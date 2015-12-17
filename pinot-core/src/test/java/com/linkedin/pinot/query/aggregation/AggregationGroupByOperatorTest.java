@@ -24,9 +24,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import junit.framework.Assert;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -36,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -49,6 +45,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -74,6 +72,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import junit.framework.Assert;
 
 
 public class AggregationGroupByOperatorTest {
@@ -85,7 +84,7 @@ public class AggregationGroupByOperatorTest {
       + "TestAggregationGroupByOperatorList");
 
   public static IndexSegment _indexSegment;
-  private static List<IndexSegment> _indexSegmentList;
+  private static List<SegmentDataManager> _indexSegmentList;
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
@@ -98,7 +97,7 @@ public class AggregationGroupByOperatorTest {
   public void setup() throws Exception {
     setupSegment();
     setupQuery();
-    _indexSegmentList = new ArrayList<IndexSegment>();
+    _indexSegmentList = new ArrayList<SegmentDataManager>();
   }
 
   @AfterClass
@@ -161,7 +160,8 @@ public class AggregationGroupByOperatorTest {
       driver.build();
 
       LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(
+          ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -325,6 +325,7 @@ public class AggregationGroupByOperatorTest {
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
 
+    /*
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
 
@@ -344,6 +345,8 @@ public class AggregationGroupByOperatorTest {
 
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
     LOGGER.info("Result {}", jsonResult);
+    */
+    logJsonResult(brokerRequest, resultBlock);
   }
 
   @Test
@@ -361,6 +364,11 @@ public class AggregationGroupByOperatorTest {
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
     Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
 
+    logJsonResult(brokerRequest, resultBlock);
+  }
+
+  private void logJsonResult(BrokerRequest brokerRequest, IntermediateResultsBlock resultBlock)
+      throws Exception {
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
 
@@ -377,12 +385,7 @@ public class AggregationGroupByOperatorTest {
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
     final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
-    //    LOGGER.info("********************************");
-    //    for (int i = 0; i < reducedResults.size(); ++i) {
-    //      Map<String, Serializable> groupByResult = reducedResults.get(i);
-    //      LOGGER.info(groupByResult);
-    //    }
-    //    LOGGER.info("********************************");
+
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
     LOGGER.info("Result: {}", jsonResult);
   }
@@ -393,6 +396,11 @@ public class AggregationGroupByOperatorTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
+    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
+    assertBrokerResponse(numSegments, brokerResponse);
+  }
+
+  private BrokerResponse getBrokerResponse(PlanMaker instancePlanMaker, BrokerRequest brokerRequest) {
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
         instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
@@ -407,7 +415,7 @@ public class AggregationGroupByOperatorTest {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("Result: {} ", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
-    assertBrokerResponse(numSegments, brokerResponse);
+    return brokerResponse;
   }
 
   @Test
@@ -416,20 +424,7 @@ public class AggregationGroupByOperatorTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final BrokerRequest brokerRequest = getAggregationGroupByWithEmptyFilterBrokerRequest();
-    final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan =
-        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
-    globalPlan.print();
-    globalPlan.execute();
-    final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("Instance Response : {}", instanceResponse);
-
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("Response : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
     assertEmptyBrokerResponse(brokerResponse);
   }
 
@@ -443,17 +438,7 @@ public class AggregationGroupByOperatorTest {
     }
 
     // Assertion on Count
-    Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
-    Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
-        .toString());
-    Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
-        .toString());
-    Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
-        .toString());
-    Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
-        .toString());
-    Assert.assertEquals("distinctCount_column12",
-        brokerResponse.getAggregationResults().get(5).getString("function").toString());
+    assertionOnCount(brokerResponse);
 
     // Assertion on Aggregation Results
     LOGGER.info("brokerResponse = {}", brokerResponse);
@@ -477,16 +462,8 @@ public class AggregationGroupByOperatorTest {
     }
   }
 
-  private void assertEmptyBrokerResponse(BrokerResponse brokerResponse) throws JSONException {
-    Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
-    Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
-    for (int i = 0; i < _numAggregations; ++i) {
-      Assert.assertEquals("[\"column11\",\"column10\"]", brokerResponse.getAggregationResults()
-          .get(i).getJSONArray("groupByColumns").toString());
-      Assert.assertEquals(0, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
-    }
-
-    // Assertion on Count
+  private void assertionOnCount(BrokerResponse brokerResponse)
+      throws JSONException {
     Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
     Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
         .toString());
@@ -498,6 +475,19 @@ public class AggregationGroupByOperatorTest {
         .toString());
     Assert.assertEquals("distinctCount_column12",
         brokerResponse.getAggregationResults().get(5).getString("function").toString());
+  }
+
+  private void assertEmptyBrokerResponse(BrokerResponse brokerResponse) throws JSONException {
+    Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
+    Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
+    for (int i = 0; i < _numAggregations; ++i) {
+      Assert.assertEquals("[\"column11\",\"column10\"]", brokerResponse.getAggregationResults()
+          .get(i).getJSONArray("groupByColumns").toString());
+      Assert.assertEquals(0, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
+    }
+
+    // Assertion on Count
+    assertionOnCount(brokerResponse);
   }
 
   private static List<double[]> getAggregationResult(int numSegments) {

@@ -23,9 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import junit.framework.Assert;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -47,6 +43,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -70,6 +68,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import junit.framework.Assert;
 
 
 public class AggregationQueriesTest {
@@ -81,7 +80,7 @@ public class AggregationQueriesTest {
       + "TestAggregationQueriesList");
 
   public static IndexSegment _indexSegment;
-  private static List<IndexSegment> _indexSegmentList;
+  private static List<SegmentDataManager> _indexSegmentList;
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
@@ -93,7 +92,7 @@ public class AggregationQueriesTest {
   public void setup() throws Exception {
     setupSegment();
     setupQuery();
-    _indexSegmentList = new ArrayList<IndexSegment>();
+    _indexSegmentList = new ArrayList<SegmentDataManager>();
   }
 
   @AfterClass
@@ -147,7 +146,7 @@ public class AggregationQueriesTest {
       driver.build();
 
       LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -157,6 +156,10 @@ public class AggregationQueriesTest {
 
   @Test
   public void testAggregationFunctions() {
+    getIntermediateResultsBlock();
+  }
+
+  private IntermediateResultsBlock getIntermediateResultsBlock() {
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
         new ArrayList<BAggregationFunctionOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
@@ -177,38 +180,16 @@ public class AggregationQueriesTest {
         new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator, aggregationFunctionOperatorList);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
+
     for (int i = 0; i < _numAggregations; ++i) {
       LOGGER.info("Result : {}", block.getAggregationResult().get(i));
     }
+    return block;
   }
 
   @Test
   public void testAggregationFunctionsWithCombine() {
-    final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
-        new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
-
-    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
-
-    for (int i = 0; i < _numAggregations; ++i) {
-      final BAggregationFunctionOperator aggregationFunctionOperator =
-          new BAggregationFunctionOperator(_aggregationInfos.get(i), new UReplicatedProjectionOperator(
-              projectionOperator), true);
-
-      aggregationFunctionOperatorList.add(aggregationFunctionOperator);
-    }
-
-    final MAggregationOperator aggregationOperator =
-        new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator, aggregationFunctionOperatorList);
-
-    final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
-
-    for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result 1: {}", block.getAggregationResult().get(i));
-    }
-    /////////////////////////////////////////////////////////////////////////
+    IntermediateResultsBlock block = getIntermediateResultsBlock();
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList1 =
         new ArrayList<BAggregationFunctionOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
@@ -253,6 +234,11 @@ public class AggregationQueriesTest {
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
 
+    logReducedResults(resultBlock);
+  }
+
+  private void logReducedResults(IntermediateResultsBlock resultBlock)
+      throws Exception {
     final ReduceService reduceService = new DefaultReduceService();
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -287,23 +273,7 @@ public class AggregationQueriesTest {
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
     Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
 
-    final ReduceService reduceService = new DefaultReduceService();
-
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationResultDataTable());
-    final BrokerResponse reducedResults =
-        reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
-
-    LOGGER.info("Reduced Result : {}", reducedResults);
+    logReducedResults(resultBlock);
   }
 
   @Test
@@ -415,6 +385,10 @@ public class AggregationQueriesTest {
 
   private static AggregationInfo getSumAggregationInfo() {
     final String type = "sum";
+    return getAggregationInfo(type);
+  }
+
+  private static AggregationInfo getAggregationInfo(String type) {
     final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
     final AggregationInfo aggregationInfo = new AggregationInfo();
@@ -425,32 +399,17 @@ public class AggregationQueriesTest {
 
   private static AggregationInfo getMaxAggregationInfo() {
     final String type = "max";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getMinAggregationInfo() {
     final String type = "min";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getAvgAggregationInfo() {
     final String type = "avg";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getDistinctCountAggregationInfo(String dim) {

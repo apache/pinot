@@ -25,14 +25,12 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -46,6 +44,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -275,7 +275,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
-        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -303,6 +303,14 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
                 + "[\"890282370\",\"890662862\",\"AKXcXcIqsqOJFsdwxZ\",[\"2147483647\"],[\"2147483647\"],\"890662862\"],"
                 + "[\"972569181\",\"1458119540\",\"EOFxevm\",[\"593959\"],[\"225\"],\"890662862\"]]}");
 
+  }
+
+  private List<SegmentDataManager> makeSegMgrList(List<IndexSegment> indexSegmentList) {
+    List<SegmentDataManager> segMgrList = new ArrayList(indexSegmentList.size());
+    for (IndexSegment segment : indexSegmentList) {
+      segMgrList.add(new OfflineSegmentDataManager(segment));
+    }
+    return segMgrList;
   }
 
   private static Map<String, DataSource> getDataSourceMap() {

@@ -48,6 +48,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -86,7 +88,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
       + "TestAggregationGroupByWithDictionaryOperatorList");
 
   public static IndexSegment _indexSegment;
-  private static List<IndexSegment> _indexSegmentList;
+  private static List<SegmentDataManager> _indexSegmentList;
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
@@ -99,7 +101,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
   public void setup() throws Exception {
     setupSegment();
     setupQuery();
-    _indexSegmentList = new ArrayList<IndexSegment>();
+    _indexSegmentList = new ArrayList<SegmentDataManager>();
   }
 
   @AfterClass
@@ -133,7 +135,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
       driver.build();
 
       LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -393,6 +395,12 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
+    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
+
+    assertBrokerResponse(numSegments, brokerResponse);
+  }
+
+  private BrokerResponse getBrokerResponse(PlanMaker instancePlanMaker, BrokerRequest brokerRequest) {
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
         instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
@@ -408,8 +416,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("broker Response: {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
-
-    assertBrokerResponse(numSegments, brokerResponse);
+    return brokerResponse;
   }
 
   @Test
@@ -418,44 +425,14 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final BrokerRequest brokerRequest = getAggregationGroupByWithEmptyFilterBrokerRequest();
-    final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan =
-        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
-    globalPlan.print();
-    globalPlan.execute();
-    final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("instance Response: {}", instanceResponse);
-
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("broker Response: {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
     assertEmptyBrokerResponse(brokerResponse);
   }
 
   private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
     Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
-    Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
-    for (int i = 0; i < _numAggregations; ++i) {
-      Assert.assertEquals("[\"column11\",\"column10\"]", brokerResponse.getAggregationResults()
-          .get(i).getJSONArray("groupByColumns").toString());
-      Assert.assertEquals(15, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
-    }
-
-    // Assertion on Count
-    Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
-    Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
-        .toString());
-    Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
-        .toString());
-    Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
-        .toString());
-    Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
-        .toString());
-    Assert.assertEquals("distinctCount_column12",
-        brokerResponse.getAggregationResults().get(5).getString("function").toString());
+    final int groupSize = 15;
+    assertBrokerResponse(brokerResponse, groupSize);
 
     // Assertion on Aggregation Results
     final List<double[]> aggregationResult = getAggregationResult(numSegments);
@@ -481,11 +458,17 @@ public class AggregationGroupByWithDictionaryOperatorTest {
 
   private void assertEmptyBrokerResponse(BrokerResponse brokerResponse) throws JSONException {
     Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
+    final int groupSize = 0;
+    assertBrokerResponse(brokerResponse, groupSize);
+  }
+
+  private void assertBrokerResponse(BrokerResponse brokerResponse, int groupSize)
+      throws JSONException {
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
       Assert.assertEquals("[\"column11\",\"column10\"]", brokerResponse.getAggregationResults()
           .get(i).getJSONArray("groupByColumns").toString());
-      Assert.assertEquals(0, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
+      Assert.assertEquals(groupSize, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
     }
 
     // Assertion on Count
@@ -611,6 +594,10 @@ public class AggregationGroupByWithDictionaryOperatorTest {
 
   private static AggregationInfo getSumAggregationInfo() {
     final String type = "sum";
+    return getAggregationInfo(type);
+  }
+
+  private static AggregationInfo getAggregationInfo(String type) {
     final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
     final AggregationInfo aggregationInfo = new AggregationInfo();
@@ -621,32 +608,17 @@ public class AggregationGroupByWithDictionaryOperatorTest {
 
   private static AggregationInfo getMaxAggregationInfo() {
     final String type = "max";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getMinAggregationInfo() {
     final String type = "min";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getAvgAggregationInfo() {
     final String type = "avg";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getDistinctCountAggregationInfo(String dim) {
@@ -689,6 +661,12 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     FilterQueryTree filterQueryTree;
     final String filterColumn = "column11";
     final String filterVal = "U";
+    generateFilters(brokerRequest, filterColumn, filterVal);
+    return brokerRequest;
+  }
+
+  private static void generateFilters(BrokerRequest brokerRequest, String filterColumn, String filterVal) {
+    FilterQueryTree filterQueryTree;
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");
@@ -707,7 +685,6 @@ public class AggregationGroupByWithDictionaryOperatorTest {
       filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
     }
     RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
-    return brokerRequest;
   }
 
   private static BrokerRequest getAggregationGroupByWithEmptyFilterBrokerRequest() {
@@ -729,24 +706,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     FilterQueryTree filterQueryTree;
     final String filterColumn = "column11";
     final String filterVal = "uuuu";
-    if (filterColumn.contains(",")) {
-      final String[] filterColumns = filterColumn.split(",");
-      final String[] filterValues = filterVal.split(",");
-      final List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
-      for (int i = 0; i < filterColumns.length; i++) {
-
-        final List<String> vals = new ArrayList<String>();
-        vals.add(filterValues[i]);
-        final FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
-        nested.add(d);
-      }
-      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
-    } else {
-      final List<String> vals = new ArrayList<String>();
-      vals.add(filterVal);
-      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
-    }
-    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
+    generateFilters(brokerRequest, filterColumn, filterVal);
     return brokerRequest;
   }
 

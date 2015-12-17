@@ -26,15 +26,14 @@ import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -49,6 +48,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -84,7 +85,7 @@ public class SelectionQueriesForMultiValueColumnTest {
   public static IndexSegment _indexSegment = null;
   public Map<String, ColumnMetadata> _medataMap = null;
 
-  private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
+  private static List<SegmentDataManager> _indexSegmentList = new ArrayList<SegmentDataManager>();
 
   @BeforeClass
   public void setup() throws Exception {
@@ -144,7 +145,7 @@ public class SelectionQueriesForMultiValueColumnTest {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -190,6 +191,30 @@ public class SelectionQueriesForMultiValueColumnTest {
     final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
 
+    final JSONObject jsonResult = getJsonResult(resultBlock, selectionOperatorService);
+    assertColumnsInResult(jsonResult);
+
+    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
+    for (int i = 0; i < resultsJsonArray.length(); ++i) {
+      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
+      Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
+    }
+  }
+
+  private void assertColumnsInResult(JSONObject jsonResult)
+      throws JSONException {
+    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
+    Assert.assertEquals(columnJsonArray.getString(0), "column2");
+    Assert.assertEquals(columnJsonArray.getString(1), "column1");
+    Assert.assertEquals(columnJsonArray.getString(2), "column5");
+    Assert.assertEquals(columnJsonArray.getString(3), "column6");
+    Assert.assertEquals(columnJsonArray.getString(4), "column7");
+    Assert.assertEquals(columnJsonArray.getString(5), "count");
+  }
+
+  private JSONObject getJsonResult(IntermediateResultsBlock resultBlock,
+      SelectionOperatorService selectionOperatorService)
+      throws Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
@@ -204,19 +229,7 @@ public class SelectionQueriesForMultiValueColumnTest {
     final Collection<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column2");
-    Assert.assertEquals(columnJsonArray.getString(1), "column1");
-    Assert.assertEquals(columnJsonArray.getString(2), "column5");
-    Assert.assertEquals(columnJsonArray.getString(3), "column6");
-    Assert.assertEquals(columnJsonArray.getString(4), "column7");
-    Assert.assertEquals(columnJsonArray.getString(5), "count");
-
-    JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
-    for (int i = 0; i < resultsJsonArray.length(); ++i) {
-      JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
-      Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
-    }
+    return jsonResult;
   }
 
   @Test
@@ -238,27 +251,8 @@ public class SelectionQueriesForMultiValueColumnTest {
     final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
 
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final Collection<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
-    final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
-    System.out.println(jsonResult);
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column2");
-    Assert.assertEquals(columnJsonArray.getString(1), "column1");
-    Assert.assertEquals(columnJsonArray.getString(2), "column5");
-    Assert.assertEquals(columnJsonArray.getString(3), "column6");
-    Assert.assertEquals(columnJsonArray.getString(4), "column7");
-    Assert.assertEquals(columnJsonArray.getString(5), "count");
+    final JSONObject jsonResult = getJsonResult(resultBlock, selectionOperatorService);
+    assertColumnsInResult(jsonResult);
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
@@ -320,7 +314,6 @@ public class SelectionQueriesForMultiValueColumnTest {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
       Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
     }
-
   }
 
   private static Map<String, DataSource> getDataSourceMap() {

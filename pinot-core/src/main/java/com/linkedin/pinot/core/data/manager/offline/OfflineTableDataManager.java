@@ -231,32 +231,12 @@ public class OfflineTableDataManager implements TableDataManager {
   }
 
   @Override
-  public List<SegmentDataManager> getAllSegments() {
-    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
-    try {
-      _rwLock.readLock().lock();
-      for (String segmentName : _segmentsMap.keySet()) {
-        OfflineSegmentDataManager segmentDataManager;
-        _rwLock.readLock().lock();
-        segmentDataManager = _segmentsMap.get(segmentName);
-        if (segmentDataManager != null) {
-          segmentDataManager.incrementRefCnt();
-          ret.add(segmentDataManager);
-        }
-      }
-    } finally {
-      _rwLock.readLock().unlock();
-    }
-    return ret;
-  }
-
-  @Override
   public ExecutorService getExecutorService() {
     return _queryExecutorService;
   }
 
   @Override
-  public List<SegmentDataManager> getSegments(List<String> segmentList) {
+  public List<SegmentDataManager> acquireSegments(List<String> segmentList) {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
     try {
       _rwLock.readLock().lock();
@@ -275,7 +255,7 @@ public class OfflineTableDataManager implements TableDataManager {
   }
 
   @Override
-  public OfflineSegmentDataManager getSegment(String segmentName) {
+  public OfflineSegmentDataManager acquireSegment(String segmentName) {
     try {
       _rwLock.readLock().lock();
       OfflineSegmentDataManager segmentDataManager = _segmentsMap.get(segmentName);
@@ -289,7 +269,7 @@ public class OfflineTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void returnSegmentReader(SegmentDataManager segmentDataManager) {
+  public void releaseSegment(SegmentDataManager segmentDataManager) {
     if (segmentDataManager == null) {
       return;
     }

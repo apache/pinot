@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -35,7 +34,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -48,6 +46,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -85,7 +85,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
       + "TestAggregationGroupByOperatorForMultiValueList");
 
   public static IndexSegment _indexSegment;
-  private static List<IndexSegment> _indexSegmentList;
+  private static List<SegmentDataManager> _indexSegmentList;
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
@@ -98,7 +98,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
   public void setup() throws Exception {
     setupSegment();
     setupQuery();
-    _indexSegmentList = new ArrayList<IndexSegment>();
+    _indexSegmentList = new ArrayList<SegmentDataManager>();
   }
 
   @AfterClass
@@ -131,7 +131,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
       driver.build();
 
       LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -325,6 +325,11 @@ public class AggregationGroupByOperatorForMultiValueTest {
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
     LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
 
+    logJsonResult(brokerRequest, resultBlock);
+  }
+
+  private void logJsonResult(BrokerRequest brokerRequest, IntermediateResultsBlock resultBlock)
+      throws Exception {
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
 
@@ -360,24 +365,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 5721);
     Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
 
-    final AggregationGroupByOperatorService aggregationGroupByOperatorService =
-        new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
-
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationGroupByResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
-    final List<Map<String, Serializable>> reducedResults =
-        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
-    final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    LOGGER.info("Result: {}", jsonResult);
+    logJsonResult(brokerRequest, resultBlock);
   }
 
   @Test
@@ -386,20 +374,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
-    final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan =
-        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
-    globalPlan.print();
-    globalPlan.execute();
-    final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("instanceResponse: {}", instanceResponse);
-
-    final DefaultReduceService defaultReduceService = new DefaultReduceService();
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -409,6 +384,11 @@ public class AggregationGroupByOperatorForMultiValueTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final BrokerRequest brokerRequest = getAggregationGroupByWithEmptyFilterBrokerRequest();
+    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
+    assertEmptyBrokerResponse(brokerResponse);
+  }
+
+  private BrokerResponse getBrokerResponse(PlanMaker instancePlanMaker, BrokerRequest brokerRequest) {
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
         instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
@@ -423,7 +403,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
-    assertEmptyBrokerResponse(brokerResponse);
+    return brokerResponse;
   }
 
   private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
@@ -436,13 +416,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     }
 
     // Assertion on Count
-    Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
-    Assert.assertEquals("sum_count", brokerResponse.getAggregationResults().get(1).getString("function").toString());
-    Assert.assertEquals("max_count", brokerResponse.getAggregationResults().get(2).getString("function").toString());
-    Assert.assertEquals("min_count", brokerResponse.getAggregationResults().get(3).getString("function").toString());
-    Assert.assertEquals("avg_count", brokerResponse.getAggregationResults().get(4).getString("function").toString());
-    Assert.assertEquals("distinctCount_column2", brokerResponse.getAggregationResults().get(5).getString("function")
-        .toString());
+    assertionOnCount(brokerResponse);
 
     // Assertion on Aggregation Results
     final List<double[]> aggregationResult = getAggregationResult(numSegments);
@@ -481,6 +455,11 @@ public class AggregationGroupByOperatorForMultiValueTest {
     }
 
     // Assertion on Count
+    assertionOnCount(brokerResponse);
+  }
+
+  private void assertionOnCount(BrokerResponse brokerResponse)
+      throws JSONException {
     Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
     Assert.assertEquals("sum_count", brokerResponse.getAggregationResults().get(1).getString("function").toString());
     Assert.assertEquals("max_count", brokerResponse.getAggregationResults().get(2).getString("function").toString());
@@ -610,16 +589,15 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
   private static AggregationInfo getSumAggregationInfo() {
     final String type = "sum";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "count");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getMaxAggregationInfo() {
     final String type = "max";
+    return getAggregationInfo(type);
+  }
+
+  private static AggregationInfo getAggregationInfo(String type) {
     final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "count");
     final AggregationInfo aggregationInfo = new AggregationInfo();
@@ -630,22 +608,12 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
   private static AggregationInfo getMinAggregationInfo() {
     final String type = "min";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "count");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getAvgAggregationInfo() {
     final String type = "avg";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "count");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getDistinctCountAggregationInfo(String dim) {

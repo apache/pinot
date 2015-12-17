@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 
+
 /**
  * Make the huge plan, root is always ResultPlanNode, the child of it is a huge
  * plan node which will take the segment and query, then do everything.
@@ -42,13 +43,7 @@ public class InstancePlanMakerImplV3 implements PlanMaker {
   }
 
   @Override
-  public Plan makeInterSegmentPlan(BrokerRequest brokerRequest, List<SegmentDataManager> segmentDataManagers,
-      ExecutorService executorService, long timeOutMs) {
-    throw new UnsupportedOperationException("The query contains no aggregation or selection!");
-  }
-
-  @Override
-  public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest,
+  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs) {
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
   }

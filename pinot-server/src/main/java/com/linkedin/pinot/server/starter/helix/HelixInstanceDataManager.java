@@ -111,28 +111,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("{} started!", this.getClass().getName());
   }
 
-  // TODO: Unused. Remove once we verify that it is not needed.
-  // WARNING: Calling this method marks any loaded segments as being in-use. When helix instance is started, no segments are loaded,
-  // so none of them are marked as being in-use
-  private String getServerInfo() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("\n[InstanceDataManager Info] : ");
-    for (String tableName : _tableDataManagerMap.keySet()) {
-      sb.append("\n\t{\n\t\tTable : [" + tableName + "];\n\t\tSegments : [");
-      boolean isFirstSegment = true;
-      for (SegmentDataManager segmentDataManager : _tableDataManagerMap.get(tableName).getAllSegments()) {
-        if (isFirstSegment) {
-          sb.append(segmentDataManager.getSegment().getSegmentName());
-          isFirstSegment = false;
-        } else {
-          sb.append(", " + segmentDataManager.getSegment().getSegmentName());
-        }
-      }
-      sb.append("]\n\t}");
-    }
-    return sb.toString();
-  }
-
   @Override
   public boolean isStarted() {
     return _isStarted;
@@ -269,7 +247,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManager tableDataManager = _tableDataManagerMap.get(table);
     try {
       if (tableDataManager != null) {
-        segmentDataManager = tableDataManager.getSegment(segmentName);
+        segmentDataManager = tableDataManager.acquireSegment(segmentName);
         if (segmentDataManager != null) {
           return segmentDataManager.getSegment().getSegmentMetadata();
         }
@@ -277,7 +255,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       return null;
     } finally {
       if (segmentDataManager != null) {
-        tableDataManager.returnSegmentReader(segmentDataManager);
+        tableDataManager.releaseSegment(segmentDataManager);
       }
     }
   }

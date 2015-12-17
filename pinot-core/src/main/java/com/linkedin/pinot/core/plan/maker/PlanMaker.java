@@ -29,10 +29,6 @@ public interface PlanMaker {
 
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest);
 
-  @Deprecated // TODO Change tests to use the method that takes a list of SegmentDataManager
-  public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest,
-      ExecutorService executorService, long timeOutMs);
-
-  public Plan makeInterSegmentPlan(BrokerRequest brokerRequest, List<SegmentDataManager> segmentDataManagers,
+  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs);
 }

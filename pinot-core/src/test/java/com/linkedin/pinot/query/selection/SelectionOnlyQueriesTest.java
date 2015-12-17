@@ -25,14 +25,12 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -46,6 +44,8 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -79,7 +79,7 @@ public class SelectionOnlyQueriesTest {
   public static IndexSegment _indexSegment;
   public Map<String, ColumnMetadata> _medataMap;
 
-  private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
+  private static List<SegmentDataManager> _indexSegmentList = new ArrayList<SegmentDataManager>();
 
   @BeforeClass
   public void setup() throws Exception {
@@ -137,7 +137,7 @@ public class SelectionOnlyQueriesTest {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -180,25 +180,7 @@ public class SelectionOnlyQueriesTest {
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
 
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final Collection<Serializable[]> reducedResults =
-        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
-    DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
-    System.out.println(jsonResult);
+    final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
 
     JsonAssert
         .assertEqualsIgnoreOrder(
@@ -221,6 +203,16 @@ public class SelectionOnlyQueriesTest {
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
     Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
 
+    final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
+
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            jsonResult.toString(),
+            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"U\",\"GF\",\"8310347835142446717\"],[\"U\",\"WI\",\"6240989492723764727\"],[\"U\",\"xk\",\"6240989492723764727\"],[\"U\",\"Ld\",\"6240989492723764727\"],[\"U\",\"Zi\",\"8637957270245933828\"],[\"U\",\"RI\",\"8637957270245933828\"],[\"U\",\"ai\",\"6240989492723764727\"],[\"U\",\"Ot\",\"6240989492723764727\"],[\"U\",\"ZW\",\"8637957270245933828\"],[\"U\",\"iL\",\"8310347835142446717\"]]}");
+  }
+
+  private JSONObject getJsonObject(BrokerRequest brokerRequest, IntermediateResultsBlock resultBlock)
+      throws Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
@@ -238,13 +230,10 @@ public class SelectionOnlyQueriesTest {
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
 
+    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            jsonResult.toString(),
-            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"U\",\"GF\",\"8310347835142446717\"],[\"U\",\"WI\",\"6240989492723764727\"],[\"U\",\"xk\",\"6240989492723764727\"],[\"U\",\"Ld\",\"6240989492723764727\"],[\"U\",\"Zi\",\"8637957270245933828\"],[\"U\",\"RI\",\"8637957270245933828\"],[\"U\",\"ai\",\"6240989492723764727\"],[\"U\",\"Ot\",\"6240989492723764727\"],[\"U\",\"ZW\",\"8637957270245933828\"],[\"U\",\"iL\",\"8310347835142446717\"]]}");
+    return jsonResult;
   }
 
   @Test

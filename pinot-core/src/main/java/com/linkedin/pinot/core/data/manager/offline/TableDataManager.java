@@ -87,33 +87,24 @@ public interface TableDataManager {
   /**
    *
    * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
-   * using the {@link #returnSegmentReader(SegmentDataManager) returnSegmentReader} method
-   * @note Looks like this is called during start when we don't have any segments as yet.
-   * @return all the segments in this TableDataManager.
-   */
-  public List<SegmentDataManager> getAllSegments();
-
-  /**
-   *
-   * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
-   * using the {@link #returnSegmentReader(SegmentDataManager) returnSegmentReader} method
+   * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method
    * @return segments by giving a list of segment names in this TableDataManager.
    */
-  public List<SegmentDataManager> getSegments(List<String> segmentList);
+  public List<SegmentDataManager> acquireSegments(List<String> segmentList);
 
   /**
    *
    * @note This method gets a lock on the segment. It is the caller's responsibility to return the segment
-   * using the {@link #returnSegmentReader(SegmentDataManager) returnSegmentReader} method
+   * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method.
    * @return a segment by giving the name of this segment in this TableDataManager.
    */
-  public SegmentDataManager getSegment(String segmentName);
+  public SegmentDataManager acquireSegment(String segmentName);
 
   /**
   *
   * give back segmentReader, so the segment could be safely deleted.
   */
-  public void returnSegmentReader(SegmentDataManager segmentDataManager);
+  public void releaseSegment(SegmentDataManager segmentDataManager);
   
   /**
    * @return ExecutorService for query.

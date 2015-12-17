@@ -276,19 +276,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   }
 
   @Override
-  public List<SegmentDataManager> getAllSegments() {
-    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
-    synchronized (getGlobalLock()) {
-      for (SegmentDataManager segment : _segmentsMap.values()) {
-        incrementCount(segment.getSegmentName());
-        ret.add(segment);
-      }
-    }
-    return ret;
-  }
-
-  @Override
-  public List<SegmentDataManager> getSegments(List<String> segmentList) {
+  public List<SegmentDataManager> acquireSegments(List<String> segmentList) {
     List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
     synchronized (getGlobalLock()) {
       for (String segmentName : segmentList) {
@@ -302,7 +290,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   }
 
   @Override
-  public SegmentDataManager getSegment(String segmentName) {
+  public SegmentDataManager acquireSegment(String segmentName) {
     if (_segmentsMap.containsKey(segmentName)) {
       incrementCount(segmentName);
       return _segmentsMap.get(segmentName);
@@ -321,7 +309,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void returnSegmentReader(SegmentDataManager segmentDataManager) {
+  public void releaseSegment(SegmentDataManager segmentDataManager) {
     // TODO Implement this
   }
 

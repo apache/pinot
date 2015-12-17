@@ -115,8 +115,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
       long startPlanTime = System.nanoTime();
       final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(
-          brokerRequest,
           queryableSegmentDataManagerList,
+          brokerRequest,
           _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName())
               .getExecutorService(),
           getResourceTimeOut(instanceRequest.getQuery()));
@@ -159,7 +159,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         if (queryableSegmentDataManagerList != null) {
           for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
             _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
-                .returnSegmentReader(segmentDataManager);
+                .releaseSegment(segmentDataManager);
           }
         }
       }
@@ -175,7 +175,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (tableDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
       return new ArrayList<SegmentDataManager>();
     }
-    List<SegmentDataManager> listOfQueryableSegments = tableDataManager.getSegments(instanceRequest.getSearchSegments());
+    List<SegmentDataManager> listOfQueryableSegments = tableDataManager.acquireSegments(
+        instanceRequest.getSearchSegments());
     LOGGER.info("TableDataManager found {} segments before pruning", listOfQueryableSegments.size());
 
     Iterator<SegmentDataManager> it = listOfQueryableSegments.iterator();
@@ -184,7 +185,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       final IndexSegment indexSegment = segmentDataManager.getSegment();
       if (_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
         it.remove();
-        tableDataManager.returnSegmentReader(segmentDataManager);
+        tableDataManager.releaseSegment(segmentDataManager);
       }
     }
     return listOfQueryableSegments;

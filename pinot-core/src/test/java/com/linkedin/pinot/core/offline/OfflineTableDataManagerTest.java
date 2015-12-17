@@ -140,19 +140,19 @@ public class OfflineTableDataManagerTest {
     // Make sure that the segment is not destroyed before return.
     IndexSegment indexSegment = makeIndexSegment(segmentName, totalDocs);
     tableDataManager.addSegment(indexSegment);
-    SegmentDataManager segmentDataManager = tableDataManager.getSegment(segmentName);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     verifyCount(segmentDataManager, 2);
     tableDataManager.removeSegment(segmentName);
     verifyCount(segmentDataManager, 1);
     Assert.assertEquals(_nDestroys, 0);
-    tableDataManager.returnSegmentReader(segmentDataManager);
+    tableDataManager.releaseSegment(segmentDataManager);
     verifyCount(segmentDataManager, 0);
     Assert.assertEquals(_nDestroys, 1);
 
     // Now the segment should not be available for use.Also, returning a null reader is fine
-    segmentDataManager = tableDataManager.getSegment(segmentName);
+    segmentDataManager = tableDataManager.acquireSegment(segmentName);
     Assert.assertNull(segmentDataManager);
-    tableDataManager.returnSegmentReader(segmentDataManager);
+    tableDataManager.releaseSegment(segmentDataManager);
 
     // Removing the segment again is fine.
     tableDataManager.removeSegment(segmentName);
@@ -161,9 +161,9 @@ public class OfflineTableDataManagerTest {
     final String anotherSeg = "AnotherSegment";
     IndexSegment ix1 = makeIndexSegment(anotherSeg, totalDocs);
     tableDataManager.addSegment(ix1);
-    SegmentDataManager sdm1 = tableDataManager.getSegment(anotherSeg);
+    SegmentDataManager sdm1 = tableDataManager.acquireSegment(anotherSeg);
     verifyCount(sdm1, 2);
-    tableDataManager.returnSegmentReader(sdm1);
+    tableDataManager.releaseSegment(sdm1);
     verifyCount(sdm1, 1);
     // Now replace the segment with another one.
     IndexSegment ix2  = makeIndexSegment(anotherSeg, totalDocs+1);
@@ -321,7 +321,7 @@ public class OfflineTableDataManagerTest {
           for (Integer segmentId : segmentIds) {
             segmentList.add(segmentPrefix + segmentId);
           }
-          List<SegmentDataManager> segmentDataManagers = _tableDataManager.getSegments(segmentList);
+          List<SegmentDataManager> segmentDataManagers = _tableDataManager.acquireSegments(segmentList);
           // Some of them may be rejected, but that is OK.
 
           // Keep track of all segment data managers we ever accessed.
@@ -336,7 +336,7 @@ public class OfflineTableDataManagerTest {
             _closing = true;
           }
           for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-            _tableDataManager.returnSegmentReader(segmentDataManager);
+            _tableDataManager.releaseSegment(segmentDataManager);
           }
         } catch (Throwable t) {
           _masterThread.interrupt();
