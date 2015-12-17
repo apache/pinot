@@ -261,6 +261,7 @@ public class PinotHelixResourceManager {
       ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
       Map<String, String> segmentStatsMap = externalView.getStateMap(segmentName);
       if (segmentStatsMap != null) {
+        LOGGER.info("Found {} instances for segment '{}' in external view", segmentStatsMap.size(), segmentName);
         for (String instance : segmentStatsMap.keySet()) {
           final String segmentState = segmentStatsMap.get(instance);
 
@@ -282,6 +283,7 @@ public class PinotHelixResourceManager {
     }
 
     // Timed out
+    LOGGER.info("Timed out while waiting for segment '{}' to become '{}' in external view.", segmentName, targetState);
     return false;
   }
 
@@ -1297,8 +1299,10 @@ public class PinotHelixResourceManager {
     do {
       final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
       final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+      LOGGER.info("Found {} instances for segment '{}', in ideal state", instanceSet.size(), segmentName);
       for (final String instance : instanceSet) {
         idealState.setPartitionState(segmentName, instance, "ONLINE");
+        LOGGER.info("Setting Ideal State for segment '{}' to ONLINE for instance '{}'", segmentName, instance);
       }
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
     } while (!updateSuccessful);
@@ -1306,6 +1310,7 @@ public class PinotHelixResourceManager {
     // Check that the ideal state has been written to ZK
     updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
     instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
+    LOGGER.info("Found {} instances for segment '{}', after updating ideal state", instanceStateMap.size(), segmentName);
     for (String state : instanceStateMap.values()) {
       if (!"ONLINE".equals(state)) {
         LOGGER.error("Failed to write ONLINE ideal state!");
