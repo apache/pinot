@@ -201,7 +201,7 @@ public class MetricsGraphicsTimeSeriesResource {
       List<AnomalyResult> filtered = new ArrayList<>();
       for (AnomalyResult anomaly : anomalies) {
         String[] dimensions = anomaly.getDimensions().split(",");
-
+        //TODO what to do if the dimension key has changed?
         boolean matches = true;
         for (int i = 0; i < config.getDimensions().size(); i++) {
           DimensionSpec spec = config.getDimensions().get(i);

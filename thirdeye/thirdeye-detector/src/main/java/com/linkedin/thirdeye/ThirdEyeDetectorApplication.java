@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -154,11 +155,20 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
           public Void call() throws Exception {
             List<AnomalyFunctionSpec> functions;
             functions = anomalyFunctionSpecDAO.findAll();
+            LinkedList<AnomalyFunctionSpec> failedToStart = new LinkedList<AnomalyFunctionSpec>();
             for (AnomalyFunctionSpec function : functions) {
               if (function.getIsActive()) {
-                jobManager.start(function.getId());
-                LOG.info("Starting {}", function);
+                try {
+                  LOG.info("Starting {}", function);
+                  jobManager.start(function.getId());
+                } catch (Exception e) {
+                  LOG.error("Failed to schedule function " + function.getId(), e);
+                  failedToStart.add(function);
+                }
               }
+            }
+            if (!failedToStart.isEmpty()) {
+              LOG.warn("{} functions failed to start!: {}", failedToStart.size(), failedToStart);
             }
             return null;
           }
@@ -173,6 +183,12 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
 
     // Email reports
     final AtomicInteger applicationPort = new AtomicInteger(-1);
+    int dropwizardConfigPort = getApplicationPortNumber(config);
+    LOG.info("Dropwizard config port: {}", dropwizardConfigPort);
+    if (dropwizardConfigPort > 0) {
+      applicationPort.set(dropwizardConfigPort);
+    }
+
     final EmailReportJobManager emailReportJobManager = new EmailReportJobManager(quartzScheduler,
         emailConfigurationDAO, anomalyResultDAO, hibernate.getSessionFactory(), applicationPort);
 
@@ -197,13 +213,6 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
           }
         }
         LOG.info("Port from jetty server: {}", applicationPort.get());
-
-        // TODO this prevents people from using 0 for a random port in dropwizard.
-        int dropwizardConfigPort = getApplicationPortNumber(config);
-        LOG.info("Dropwizard config port: {}", dropwizardConfigPort);
-        if (dropwizardConfigPort > 0) {
-          applicationPort.set(dropwizardConfigPort);
-        }
 
         if (applicationPort.get() == -1) {
           throw new IllegalStateException("Could not determine application port");
