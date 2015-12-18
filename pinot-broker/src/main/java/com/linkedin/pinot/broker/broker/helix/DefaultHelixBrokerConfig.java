@@ -22,6 +22,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 
 public class DefaultHelixBrokerConfig {
+  public static final String HELIX_FLAPPING_TIME_WINDOW_NAME = "pinot.broker.helix.flappingTimeWindowMs";
 
   public static Configuration getDefaultBrokerConf() {
     Configuration brokerConf = new PropertiesConfiguration();
@@ -38,6 +39,9 @@ public class DefaultHelixBrokerConfig {
     brokerConf.addProperty("pinot.broker.client.enableConsole", "true");
     brokerConf.addProperty("pinot.broker.client.queryPort", "8099");
     brokerConf.addProperty("pinot.broker.client.consolePath", "../webapp");
+
+    // [PINOT-2435] setting to 0 so it doesn't disconnect from zk
+    brokerConf.addProperty("pinot.broker.helix.flappingTimeWindowMs", "0");
 
     return brokerConf;
   }

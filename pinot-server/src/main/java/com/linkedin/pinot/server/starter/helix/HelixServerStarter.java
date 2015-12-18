@@ -152,6 +152,8 @@ public class HelixServerStarter {
     Utils.logVersions();
 
     _serverConf = getInstanceServerConfig(moreConfigurations);
+    setupHelixSystemProperties(moreConfigurations);
+
     if (_serverInstance == null) {
       LOGGER.info("Trying to create a new ServerInstance!");
       _serverInstance = new ServerInstance();
@@ -164,6 +166,11 @@ public class HelixServerStarter {
 
   private ServerConf getInstanceServerConfig(Configuration moreConfigurations) {
     return DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(moreConfigurations);
+  }
+
+  private void setupHelixSystemProperties(Configuration conf) {
+    System.setProperty("helixmanager.flappingTimeWindow",
+        conf.getString(CommonConstants.Server.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS));
   }
 
   public void stop() {

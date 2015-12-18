@@ -60,6 +60,9 @@ public class DefaultHelixStarterServerConfig {
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_CLASS);
 
+    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
+        CommonConstants.Server.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS);
+
     // request handler factory parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS,
         CommonConstants.Server.DEFAULT_REQUEST_HANDLER_FACTORY_CLASS);

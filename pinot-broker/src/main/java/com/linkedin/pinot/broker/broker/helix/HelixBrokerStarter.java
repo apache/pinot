@@ -93,6 +93,7 @@ public class HelixBrokerStarter {
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
+    setupHelixSystemProperties();
     RoutingTableBuilder defaultOfflineRoutingTableBuilder =
         getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY));
     RoutingTableBuilder defaultRealtimeRoutingTableBuilder =
@@ -133,6 +134,12 @@ public class HelixBrokerStarter {
 
     _helixManager.addPreConnectCallback(() -> _brokerServerBuilder.getBrokerMetrics()
         .addMeteredValue(null, BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+  }
+
+  private void setupHelixSystemProperties() {
+    final String helixFlappingTimeWindowPropName = "helixmanager.flappingTimeWindow";
+    System.setProperty(helixFlappingTimeWindowPropName,
+        _pinotHelixProperties.getString(DefaultHelixBrokerConfig.HELIX_FLAPPING_TIME_WINDOW_NAME));
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {

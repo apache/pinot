@@ -172,6 +172,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS =
         "pinot.server.segment.minRetryDelayMillis";
 
+    public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
+
     public static final String DEFAULT_READ_MODE = "heap";
     public static final String DEFAULT_INSTANCE_DATA_DIR = "/tmp/PinotServer/test/index";
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = "/tmp/PinotServer/test/segmentTar";
@@ -186,6 +188,7 @@ public class CommonConstants {
         "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT = "5";
     public static final String DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "60000";
+    public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "0";
   }
 
   public static class Metric {
