@@ -23,6 +23,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 public class DefaultHelixBrokerConfig {
   public static final String HELIX_FLAPPING_TIME_WINDOW_NAME = "pinot.broker.helix.flappingTimeWindowMs";
+  public static final String DEFAULT_HELIX_FLAPPING_TIMEIWINDWOW_MS = "0";
 
   public static Configuration getDefaultBrokerConf() {
     Configuration brokerConf = new PropertiesConfiguration();

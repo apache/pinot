@@ -139,7 +139,8 @@ public class HelixBrokerStarter {
   private void setupHelixSystemProperties() {
     final String helixFlappingTimeWindowPropName = "helixmanager.flappingTimeWindow";
     System.setProperty(helixFlappingTimeWindowPropName,
-        _pinotHelixProperties.getString(DefaultHelixBrokerConfig.HELIX_FLAPPING_TIME_WINDOW_NAME));
+        _pinotHelixProperties.getString(DefaultHelixBrokerConfig.HELIX_FLAPPING_TIME_WINDOW_NAME,
+            DefaultHelixBrokerConfig.DEFAULT_HELIX_FLAPPING_TIMEIWINDWOW_MS));
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
