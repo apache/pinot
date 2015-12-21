@@ -28,6 +28,8 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -36,6 +38,7 @@ import com.linkedin.pinot.routing.ServerToSegmentSetMap;
  *
  */
 public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedRandomRoutingTableBuilder.class);
 
   private int _numberOfRoutingTables;
 
@@ -68,6 +71,7 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
       for (String instance : instanceToStateMap.keySet().toArray(new String[0])) {
         if (!instanceToStateMap.get(instance).equals("ONLINE") || pruner.isInactive(instance)) {
+          LOGGER.info("Removing offline/inactive instance from routing table computation", instance);
           instanceToStateMap.remove(instance);
         }
       }

@@ -47,12 +47,13 @@ public class RoutingTableInstancePruner {
    */
   public boolean isInactive(String instanceName) {
     if (!instanceConfigMap.containsKey(instanceName)) {
-      return false;
+      return true;
     }
 
     // If the instance is not enabled, return false.
     InstanceConfig instanceConfig = instanceConfigMap.get(instanceName);
     if (!instanceConfig.getInstanceEnabled()) {
+      LOGGER.info("Instance '{}' is disabled in the config map.", instanceName);
       return true;
     }
 
@@ -60,7 +61,8 @@ public class RoutingTableInstancePruner {
     if (instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
       try {
         if (instanceConfig.getRecord() == null) {
-          return false;
+          LOGGER.info("Config record not found for instance '{}'.", instanceName);
+          return true;
         }
         if (instanceConfig.getRecord()
             .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
@@ -68,7 +70,7 @@ public class RoutingTableInstancePruner {
               Boolean.valueOf(instanceConfig.getRecord()
                   .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS));
           if (status == true) {
-            LOGGER.info("found an instance : {} in shutting down state", instanceName);
+            LOGGER.info("found an instance : '{}' in shutting down state", instanceName);
           }
         }
       } catch (Exception e) {
