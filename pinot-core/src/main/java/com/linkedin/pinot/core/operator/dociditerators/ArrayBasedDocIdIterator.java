@@ -15,10 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-public final class ArrayBasedDocIdIterator implements BlockDocIdIterator {
+public final class ArrayBasedDocIdIterator implements IndexBasedDocIdIterator {
 
   int counter = 0;
   private int[] list;

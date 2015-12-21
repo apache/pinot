@@ -45,13 +45,22 @@ public class Pairs {
     public int getB() {
       return b;
     }
+
+    public void setA(int a) {
+      this.a = a;
+    }
+    public void setB(int b) {
+      this.b = b;
+    }
+
   }
+  
 
   public static class AscendingIntPairComparator implements Comparator<IntPair> {
 
     @Override
     public int compare(IntPair o1, IntPair o2) {
-      return new Integer(o1.a).compareTo(new Integer(o2.a));
+      return Integer.compare(o1.a, o2.a);
     }
   }
 

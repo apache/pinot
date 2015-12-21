@@ -23,12 +23,11 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 public final class MultiValueIterator extends BlockMultiValIterator {
 
-
   private int counter = 0;
   private ColumnMetadata columnMetadata;
   private SingleColumnMultiValueReader mVReader;
   MultiValueReaderContext context;
-  
+
   public MultiValueIterator(SingleColumnMultiValueReader mVReader, ColumnMetadata columnMetadata) {
     super();
     this.mVReader = mVReader;
@@ -38,7 +37,7 @@ public final class MultiValueIterator extends BlockMultiValIterator {
 
   @Override
   public int nextIntVal(int[] intArray) {
-    return mVReader.getIntArray(counter++, intArray);
+    return mVReader.getIntArray(counter++, intArray, context);
   }
 
   @Override

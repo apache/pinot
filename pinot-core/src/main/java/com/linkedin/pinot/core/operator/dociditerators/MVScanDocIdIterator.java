@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
-public class MVScanDocIdIterator implements BlockDocIdIterator {
+public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   static final Logger LOGGER = LoggerFactory.getLogger(MVScanDocIdIterator.class);
 
   BlockMultiValIterator valueIterator;
@@ -71,6 +71,15 @@ public class MVScanDocIdIterator implements BlockDocIdIterator {
   public void setEndDocId(int endDocId) {
     this.endDocId = endDocId;
   }
+  @Override
+  public boolean isMatch(int docId) {
+    if (currentDocId == Constants.EOF) {
+      return false;
+    }
+    valueIterator.skipTo(docId);
+    int length = valueIterator.nextIntVal(intArray);
+    return evaluator.apply(intArray, length);
+  }
 
   @Override
   public int advance(int targetDocId) {
@@ -91,7 +100,6 @@ public class MVScanDocIdIterator implements BlockDocIdIterator {
       return next;
     }
   }
-
   @Override
   public int next() {
     if (currentDocId == Constants.EOF) {
@@ -116,4 +124,5 @@ public class MVScanDocIdIterator implements BlockDocIdIterator {
   public String toString() {
     return MVScanDocIdIterator.class.getSimpleName()+ "[" + datasourceName +"]";
   }
+
 }

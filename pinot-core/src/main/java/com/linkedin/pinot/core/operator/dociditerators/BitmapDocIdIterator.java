@@ -20,7 +20,7 @@ import org.roaringbitmap.IntIterator;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-public final class BitmapDocIdIterator implements BlockDocIdIterator {
+public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   final private IntIterator iterator;
   private int endDocId;
   private int startDocId;

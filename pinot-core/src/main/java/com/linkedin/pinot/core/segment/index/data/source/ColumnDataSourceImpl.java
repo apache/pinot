@@ -35,10 +35,8 @@ import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
-
 /**
  * Nov 15, 2014
- *
  */
 
 public class ColumnDataSourceImpl extends DataSource {
@@ -50,8 +48,11 @@ public class ColumnDataSourceImpl extends DataSource {
   private int blockNextCallCount = 0;
   boolean isPredicateEvaluated = false;
 
+  private String name;
+
   public ColumnDataSourceImpl(ColumnIndexContainer indexContainer) {
     this.indexContainer = indexContainer;
+    this.name = "ColumnDataSourceImpl [" + indexContainer.getColumnMetadata().getColumnName() + "]";
   }
 
   @Override
@@ -74,19 +75,18 @@ public class ColumnDataSourceImpl extends DataSource {
 
     if (indexContainer.getColumnMetadata().isSingleValue()) {
       if (indexContainer.getColumnMetadata().isSorted()) {
-        b =
-            new SortedSingleValueBlock(blockId, (SortedForwardIndexReader) indexContainer.getForwardIndex(),
-                indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+        b = new SortedSingleValueBlock(blockId,
+            (SortedForwardIndexReader) indexContainer.getForwardIndex(),
+            indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       } else {
-        b =
-            new UnSortedSingleValueBlock(blockId,
-                (SingleColumnSingleValueReader) indexContainer.getForwardIndex(),
-                indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+        b = new UnSortedSingleValueBlock(blockId,
+            (SingleColumnSingleValueReader) indexContainer.getForwardIndex(),
+            indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       }
     } else {
-      b =
-          new MultiValueBlock(blockId, (SingleColumnMultiValueReader) indexContainer.getForwardIndex(),
-              indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+      b = new MultiValueBlock(blockId,
+          (SingleColumnMultiValueReader) indexContainer.getForwardIndex(),
+          indexContainer.getDictionary(), indexContainer.getColumnMetadata());
     }
 
     return b;
@@ -94,7 +94,7 @@ public class ColumnDataSourceImpl extends DataSource {
 
   @Override
   public String getOperatorName() {
-    return "ColumnDataSourceImpl [" + indexContainer.getColumnMetadata().getColumnName() +"]";
+    return name;
   }
 
   @Override
@@ -121,7 +121,8 @@ public class ColumnDataSourceImpl extends DataSource {
         if (indexContainer.getColumnMetadata().isSorted()) {
           return true;
         }
-        return indexContainer.getColumnMetadata().isHasInvertedIndex() && indexContainer.getInvertedIndex() != null;
+        return indexContainer.getColumnMetadata().isHasInvertedIndex()
+            && indexContainer.getInvertedIndex() != null;
       }
 
       @Override

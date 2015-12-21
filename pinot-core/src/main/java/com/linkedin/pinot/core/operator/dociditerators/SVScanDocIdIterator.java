@@ -15,14 +15,13 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
-public class SVScanDocIdIterator implements BlockDocIdIterator {
+public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   int currentDocId = -1;
   BlockSingleValIterator valueIterator;
   private int startDocId;
@@ -60,6 +59,16 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
    */
   public void setEndDocId(int endDocId) {
     this.endDocId = endDocId;
+  }
+
+  @Override
+  public boolean isMatch(int docId) {
+    if (currentDocId == Constants.EOF) {
+      return false;
+    }
+    valueIterator.skipTo(docId);
+    int dictIdForCurrentDoc = valueIterator.nextIntVal();
+    return evaluator.apply(dictIdForCurrentDoc);
   }
 
   @Override
@@ -108,4 +117,5 @@ public class SVScanDocIdIterator implements BlockDocIdIterator {
   public String toString() {
     return SVScanDocIdIterator.class.getSimpleName() + "[" + datasourceName + "]";
   }
+
 }

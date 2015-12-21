@@ -131,13 +131,13 @@ public class QueryRunner {
 
     String brokerHost = null;
     String brokerPort = null;
-    if (args.length == 3) {
+    if (args.length >= 3) {
       brokerHost = args[1];
       brokerPort = args[2];
     }
     boolean multiThreaded = false;
-    if (args.length == 4) {
-      if ("multi-threaded".equals(args[0])) {
+    if (args.length >= 4) {
+      if ("multi-threaded".equals(args[3])) {
         multiThreaded = true;
       }
     }

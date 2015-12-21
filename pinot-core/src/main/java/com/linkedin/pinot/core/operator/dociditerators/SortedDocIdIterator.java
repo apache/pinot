@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 
-public final class SortedDocIdIterator implements BlockDocIdIterator {
+public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   /**
    * 
    */

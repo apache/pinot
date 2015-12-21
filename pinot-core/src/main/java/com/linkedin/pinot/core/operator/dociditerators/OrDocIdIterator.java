@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-
 public final class OrDocIdIterator implements BlockDocIdIterator {
   private BlockDocIdIterator[] docIdIterators;
 
@@ -34,14 +33,20 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
   private int minDocId;
   private int maxDocId;
   private AtomicLong timeMeasure = new AtomicLong(0);
+  IntPair[] pointers;
 
   /**
    * @param docIdIterators
    */
   public OrDocIdIterator(BlockDocIdIterator[] docIdIterators) {
     this.docIdIterators = docIdIterators;
-    queue = new PriorityQueue<IntPair>(docIdIterators.length, new Pairs.AscendingIntPairComparator());
+    queue =
+        new PriorityQueue<IntPair>(docIdIterators.length, new Pairs.AscendingIntPairComparator());
     iteratorIsInQueue = new boolean[docIdIterators.length];
+    pointers= new IntPair[docIdIterators.length];
+    for (int i = 0; i < docIdIterators.length; i++) {
+      pointers[i] = new IntPair(0, i);
+    }
   }
 
   @Override
@@ -72,7 +77,8 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
       if (!iteratorIsInQueue[i]) {
         int nextDocId = docIdIterators[i].advance(targetDocId);
         if (nextDocId != Constants.EOF) {
-          queue.add(new IntPair(nextDocId, i));
+          pointers[i].setA(nextDocId);
+          queue.add(pointers[i]);
         }
         iteratorIsInQueue[i] = true;
       }
@@ -107,10 +113,9 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
       if (!iteratorIsInQueue[i]) {
         int nextDocId = docIdIterators[i].advance(currentDocId);
         if (nextDocId != Constants.EOF) {
-          if (!(nextDocId <= maxDocId && nextDocId >= minDocId)
-              && nextDocId >= currentDocId) {
-            throw new RuntimeException("next Doc : " + nextDocId + " should never crossing the range : [ "
-                + minDocId + ", " + maxDocId + " ]");
+          if (!(nextDocId <= maxDocId && nextDocId >= minDocId) && nextDocId >= currentDocId) {
+            throw new RuntimeException("next Doc : " + nextDocId
+                + " should never crossing the range : [ " + minDocId + ", " + maxDocId + " ]");
           }
           queue.add(new IntPair(nextDocId, i));
         }
@@ -125,10 +130,10 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     }
     long end = System.currentTimeMillis();
     timeMeasure.addAndGet(end - start);
-    //Remove this after tracing is added
-    //      if (currentDocId == Constants.EOF) {
-    //        LOGGER.debug("OR took:" + timeMeasure.get());
-    //      }
+    // Remove this after tracing is added
+    // if (currentDocId == Constants.EOF) {
+    // LOGGER.debug("OR took:" + timeMeasure.get());
+    // }
 
     return currentDocId;
   }

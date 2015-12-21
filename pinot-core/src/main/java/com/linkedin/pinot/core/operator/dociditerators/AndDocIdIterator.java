@@ -28,24 +28,54 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
 
   static final Logger LOGGER = LoggerFactory.getLogger(AndDocIdIterator.class);
   public final BlockDocIdIterator[] docIdIterators;
+  public ScanBasedDocIdIterator[] scanBasedDocIdIterators;
   public final int[] docIdPointers;
   public boolean reachedEnd = false;
   public int currentDocId = -1;
   int currentMax = -1;
   private AtomicLong timeMeasure = new AtomicLong();
   private AtomicLong[] timeMeasures;
-  
-  /**
-   * @param andBlockDocIdSet
-   */
-  public AndDocIdIterator(BlockDocIdIterator[] docIdIterators) {
-    this.docIdIterators = docIdIterators;
+  private boolean hasScanBasedIterators;
+
+  public AndDocIdIterator(BlockDocIdIterator[] blockDocIdIterators) {
+    int numIndexBasedIterators = 0;
+    int numScanBasedIterators = 0;
+    for (int i = 0; i < blockDocIdIterators.length; i++) {
+      if (blockDocIdIterators[i] instanceof IndexBasedDocIdIterator) {
+        numIndexBasedIterators = numIndexBasedIterators + 1;
+      } else if (blockDocIdIterators[i] instanceof ScanBasedDocIdIterator) {
+        numScanBasedIterators = numScanBasedIterators + 1;
+      }
+    }
+    // if we have at least one index based then do intersection based on index based only, and then
+    // check if matching docs apply on scan based iterator
+    if (numIndexBasedIterators > 0 && numScanBasedIterators > 0) {
+      hasScanBasedIterators = true;
+      int nonScanIteratorsSize = blockDocIdIterators.length - numScanBasedIterators;
+      this.docIdIterators = new BlockDocIdIterator[nonScanIteratorsSize];
+      this.scanBasedDocIdIterators = new ScanBasedDocIdIterator[numScanBasedIterators];
+      int nonScanBasedIndex = 0;
+      int scanBasedIndex = 0;
+      for (int i = 0; i < blockDocIdIterators.length; i++) {
+        if (blockDocIdIterators[i] instanceof ScanBasedDocIdIterator) {
+          this.scanBasedDocIdIterators[scanBasedIndex++] =
+              (ScanBasedDocIdIterator) blockDocIdIterators[i];
+        } else {
+          this.docIdIterators[nonScanBasedIndex++] = blockDocIdIterators[i];
+        }
+      }
+    } else {
+      hasScanBasedIterators = false;
+      this.docIdIterators = blockDocIdIterators;
+    }
     this.docIdPointers = new int[docIdIterators.length];
     Arrays.fill(docIdPointers, -1);
+
     timeMeasures = new AtomicLong[docIdIterators.length];
     for (int i = 0; i < docIdIterators.length; i++) {
       timeMeasures[i] = new AtomicLong(0);
     }
+
   }
 
   @Override
@@ -70,7 +100,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
     currentMax = currentMax + 1;
     // always increment the pointer to current max, when this is called first time, every one will
     // be set to start of posting list.
-    long childStart,childEnd;//to measure time spent in child iterators
+    long childStart, childEnd;// to measure time spent in child iterators
     for (int i = 0; i < docIdIterators.length; i++) {
       childStart = System.currentTimeMillis();
       docIdPointers[i] = docIdIterators[i].advance(currentMax);
@@ -94,14 +124,28 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
         throw new IllegalStateException(
             "Should never happen, docIdPointer should always >= currentMax");
       }
+      if (i == docIdIterators.length - 1 && hasScanBasedIterators) {
+        // this means we found the docId common to all nonScanBased iterators, now we need to ensure
+        // that its also found in scanBasedIterator, if not matched, we restart the intersection
+        for (ScanBasedDocIdIterator iterator : scanBasedDocIdIterators) {
+          if (!iterator.isMatch(currentMax)) {
+            i = -1;
+            currentMax = currentMax + 1;
+            break;
+          }
+        }
+      }
     }
+
     currentDocId = currentMax;
     long end = System.currentTimeMillis();
     timeMeasure.addAndGet(end - start);
+
     // Remove this after tracing is added
     if (currentDocId == Constants.EOF) {
-      if(LOGGER.isDebugEnabled()){
-        LOGGER.debug("AND operator took:{}. Break down by child iterators:{} times:{}", timeMeasure.get(), Arrays.toString(docIdIterators), Arrays.toString(timeMeasures));
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("AND operator took:{}. Break down by child iterators:{} times:{}",
+            timeMeasure.get(), Arrays.toString(docIdIterators), Arrays.toString(timeMeasures));
       }
     }
     return currentDocId;
@@ -111,8 +155,8 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   public int currentDocId() {
     return currentDocId;
   }
-  
-  public String toString(){
+
+  public String toString() {
     return Arrays.toString(docIdIterators);
   }
 }

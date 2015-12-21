@@ -75,7 +75,7 @@ public class SimpleRequestHandler implements RequestHandler {
       serDe.deserialize(queryRequest, byteArray);
       long deserRequestTime = System.nanoTime();
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, deserRequestTime - queryStartTime);
-      LOGGER.info("instance request : {}", queryRequest);
+      LOGGER.debug("instance request : {}", queryRequest);
       brokerRequest = queryRequest.getQuery();
 
       long startTime = System.nanoTime();
