@@ -404,12 +404,13 @@ public class SelectionOperatorService {
   }
 
   public Collection<Serializable[]> mergeToRowEventsSet(Block[] blocks) throws Exception {
+    SelectionFetcher selectionFetcher = new SelectionFetcher(blocks, _dataSchema);
     if (_doOrdering) {
       final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
           new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
       PriorityQueue<Integer> queue = (PriorityQueue<Integer>) _rowDocIdSet;
       while (!queue.isEmpty()) {
-        Serializable[] rowFromBlockValSets = getRowFromBlockValSets(queue.poll(), blocks);
+        Serializable[] rowFromBlockValSets = selectionFetcher.getRow(queue.poll());
         rowEventsPriorityQueue.add(rowFromBlockValSets);
       }
       merge(_rowEventsSet, rowEventsPriorityQueue);
@@ -417,7 +418,7 @@ public class SelectionOperatorService {
       final List<Serializable[]> rowEventsList = new ArrayList<Serializable[]>(_maxRowSize);
       List<Integer> list = (List<Integer>) _rowDocIdSet;
       for (int i = 0; i < Math.min(_maxRowSize, list.size()); i++) {
-        Serializable[] rowFromBlockValSets = getRowFromBlockValSets(list.get(i), blocks);
+        Serializable[] rowFromBlockValSets = selectionFetcher.getRow(list.get(i));
         rowEventsList.add(rowFromBlockValSets);
       }
       merge(_rowEventsSet, rowEventsList);
@@ -432,6 +433,7 @@ public class SelectionOperatorService {
     return new CompositeDocIdValComparator(sortSequence, blocks);
   }
 
+  @Deprecated
   private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks) throws Exception {
 
     final Serializable[] row = new Serializable[_dataSchema.size()];
