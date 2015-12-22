@@ -79,6 +79,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null);
   }
 
+  protected void dropTable() throws Exception {
+    dropOfflineTable("mytable");
+  }
+
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
@@ -161,7 +165,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
         Assert.fail("Segments were not completely loaded within two minutes");
       }
     }
-
   }
 
   @Override

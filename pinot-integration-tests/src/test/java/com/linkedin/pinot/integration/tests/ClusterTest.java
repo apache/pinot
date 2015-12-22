@@ -130,16 +130,23 @@ public abstract class ClusterTest extends ControllerTest {
     FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas", schemaName,
         new FileInputStream(schemaFile), schemaFile.length());
   }
+
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant, Collections.emptyList());
   }
+
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
       int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns) throws Exception {
     JSONObject request =
         ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName,
             "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+  }
+
+  protected void dropOfflineTable(String tableName) throws Exception {
+    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL)
+        .forTableDelete(tableName + "_OFFLINE"));
   }
   
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
