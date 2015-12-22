@@ -116,7 +116,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     int externalViewRecordVersion = externalView.getRecord().getVersion();
     if (_routingTableLastKnownZkVersionMap.containsKey(tableName)) {
       long lastKnownZkVersion = _routingTableLastKnownZkVersionMap.get(tableName);
-      if (externalViewRecordVersion <= lastKnownZkVersion) {
+      if (externalViewRecordVersion == lastKnownZkVersion) {
         LOGGER.info(
             "No change on routing table version (current version {}, last known version {}), do nothing for table {}",
             externalViewRecordVersion, lastKnownZkVersion, tableName);
