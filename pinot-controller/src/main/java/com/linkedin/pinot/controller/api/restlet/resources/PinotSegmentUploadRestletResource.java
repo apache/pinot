@@ -31,6 +31,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
@@ -251,8 +252,11 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
         // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files in the segment in
         // order to ensure the segment is not corrupted
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
-
-        return uploadSegment(tmpSegmentDir.listFiles()[0], dataFile);
+        File segmentFile = tmpSegmentDir.listFiles()[0];
+        String clientIpAddress = getClientInfo().getAddress();
+        String clientAddress = InetAddress.getByName(clientIpAddress).getHostName();
+        LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentFile.getName(), clientAddress);
+        return uploadSegment(segmentFile, dataFile);
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
