@@ -155,7 +155,9 @@ public class SegmentDictionaryCreator implements Closeable {
         stringValueToIndexMap = new Object2IntOpenHashMap<>(rowCount);
         for (int i = 0; i < revised.length; i++) {
           stringDictionaryWrite.setString(i, 0, revised[i]);
-          stringValueToIndexMap.put(revised[i], i);
+
+          // No need to store padded value, we can store and lookup by raw value.
+          stringValueToIndexMap.put(sortedObjects[i].toString(), i);
         }
         stringDictionaryWrite.close();
         break;
@@ -180,13 +182,8 @@ public class SegmentDictionaryCreator implements Closeable {
         return longValueToIndexMap.get(e);
       case STRING:
       case BOOLEAN:
-        final StringBuilder bld = new StringBuilder();
         String value = e.toString();
-        bld.append(value);
-        for (int i = 0; i < (stringColumnMaxLength - value.getBytes(Charset.forName("UTF-8")).length); i++) {
-          bld.append(V1Constants.Str.STRING_PAD_CHAR);
-        }
-        return stringValueToIndexMap.get(bld.toString());
+        return stringValueToIndexMap.get(value);
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + spec.getDataType() +
             " for column : " + spec.getName());
@@ -222,13 +219,8 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         for (int i = 0; i < multiValues.length; i++) {
-          final StringBuilder bld = new StringBuilder();
           String value = multiValues[i].toString();
-          bld.append(value);
-          for (int j = 0; j < (stringColumnMaxLength - value.getBytes(Charset.forName("UTF-8")).length); j++) {
-            bld.append(V1Constants.Str.STRING_PAD_CHAR);
-          }
-          ret[i] = stringValueToIndexMap.get(bld.toString());
+          ret[i] = stringValueToIndexMap.get(value);
         }
         break;
       default:
