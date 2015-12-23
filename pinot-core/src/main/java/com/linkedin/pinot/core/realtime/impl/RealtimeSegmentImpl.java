@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
@@ -63,6 +61,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class);
+  public static final int[] EMPTY_DICTIONARY_IDS_ARRAY = new int[0];
 
   private SegmentMetadataImpl _segmentMetadata;
   private final Schema dataSchema;
@@ -209,10 +208,17 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         rawRowToDicIdMap.put(dimension, dicId);
       } else {
         Object[] mValues = (Object[]) row.getValue(dimension);
-        int[] dicIds = new int[mValues.length];
-        for (int i = 0; i < dicIds.length; i++) {
-          dicIds[i] = dictionaryMap.get(dimension).indexOf(mValues[i]);
+        int[] dicIds;
+
+        if (mValues != null) {
+          dicIds = new int[mValues.length];
+          for (int i = 0; i < dicIds.length; i++) {
+            dicIds[i] = dictionaryMap.get(dimension).indexOf(mValues[i]);
+          }
+        } else {
+          dicIds = EMPTY_DICTIONARY_IDS_ARRAY;
         }
+
         ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWriterMap.get(dimension)).setIntArray(docId,
             dicIds);
         rawRowToDicIdMap.put(dimension, dicIds);
