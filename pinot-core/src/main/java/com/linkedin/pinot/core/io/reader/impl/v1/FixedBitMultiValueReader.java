@@ -222,10 +222,10 @@ public class FixedBitMultiValueReader
     int endOffset = 0;
     int chunkId = row / docsPerChunk;
     int length;
-    if (readerContext.chunkId == chunkId) {
+    if (readerContext.chunkId == chunkId && row > readerContext.rowId ) {
       if (row == readerContext.rowId + 1) {
         startOffset = readerContext.endPosition;
-      } else if (row >= readerContext.rowId) {
+      } else  {
         startOffset = (int) customBitSet.findNthBitSetAfter(readerContext.endPosition,
             (row - readerContext.rowId - 1));
       }
@@ -253,8 +253,8 @@ public class FixedBitMultiValueReader
     return length;
 
   }
-  
-  //for testing reader context
+
+  // for testing reader context
   private void validate(int row, int[] intArray, int length) {
     int[] temp = new int[intArray.length];
     int tempLength = getIntArray(row, temp);
