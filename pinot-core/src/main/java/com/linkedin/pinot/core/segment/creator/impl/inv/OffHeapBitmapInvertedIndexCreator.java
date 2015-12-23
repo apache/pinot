@@ -21,29 +21,26 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 /**
  * This version of Index Creator uses off heap memory to create the posting lists.
@@ -88,7 +85,7 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
   IntBuffer lengths;// used in multi value
 
   private int cardinality;
-  private int totalNumberOfEntries;
+  private int capacity;
   IntBuffer postingListBuffer; // entire posting list
   IntBuffer postingListLengths; // length of each posting list
   IntBuffer postingListStartOffsets; // start offset in posting List Buffer
@@ -108,7 +105,7 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     assert cardinality > 0 && numDocs > 0;
     this.cardinality = cardinality;
     this.numDocs = numDocs;
-    this.totalNumberOfEntries = spec.isSingleValueField() ? numDocs : totalNumberOfEntries;
+    this.capacity = spec.isSingleValueField() ? numDocs : totalNumberOfEntries;
     this.spec = spec;
     invertedIndexFile = new File(indexDir,
         spec.getName() + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
@@ -116,7 +113,7 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     start = System.currentTimeMillis();
 
     // create buffers to store raw values
-    valueBuffer = MmapUtils.allocateDirectByteBuffer(totalNumberOfEntries * Integer.BYTES, null,
+    valueBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
         "value buffer create bitmap index for " + spec.getName()).asIntBuffer();
     if (!spec.isSingleValueField()) {
       lengths = MmapUtils.allocateDirectByteBuffer(numDocs * INT_SIZE, null,
@@ -124,8 +121,8 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     }
 
     // create buffer to store posting lists
-    postingListBuffer = MmapUtils.allocateDirectByteBuffer(totalNumberOfEntries * INT_SIZE, null,
-        "posting list buffer to bitmap index for " + spec.getName()).asIntBuffer();
+    postingListBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE,
+        null, "posting list buffer to bitmap index for " + spec.getName()).asIntBuffer();
     postingListLengths = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
         "posting list lengths buffer to bitmap index for " + spec.getName()).asIntBuffer();
     postingListStartOffsets = MmapUtils
@@ -142,7 +139,10 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
   @Override
   public void add(int docId, int dictionaryId) {
     Preconditions.checkArgument(dictionaryId >= 0, "dictionary Id %s must >=0", dictionaryId);
-    indexSingleValue(dictionaryId, docId);
+    Preconditions.checkArgument(docId >= 0 && docId < numDocs, "docId Id %s must >=0 and < %s",
+        docId, numDocs);
+    indexSingleValue(docId, dictionaryId);
+
   }
 
   @Override
@@ -255,7 +255,7 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
       offset = offset + postingListLengths.get(i);
     }
     if (spec.isSingleValueField()) {
-      for (int i = 0; i < totalNumberOfEntries; i++) {
+      for (int i = 0; i < capacity; i++) {
         // read the value
         int dictId = valueBuffer.get(i);
         int dictIdOffset = postingListCurrentOffsets.get(dictId);
@@ -278,10 +278,10 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     }
   }
 
-  private void indexSingleValue(int entry, int docId) {
-    valueBuffer.put(docId, entry);
-    int length = postingListLengths.get(entry);
-    postingListLengths.put(entry, length + 1);
+  private void indexSingleValue(int docId, int dictId) {
+    valueBuffer.put(docId, dictId);
+    int length = postingListLengths.get(dictId);
+    postingListLengths.put(dictId, length + 1);
   }
 
   private void indexMultiValue(int docId, int[] entries, int length) {
@@ -294,4 +294,5 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     }
     lengths.put(docId, length);
   }
+
 }

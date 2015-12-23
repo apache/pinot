@@ -93,7 +93,7 @@ public class BitmapInvertedIndexCreatorTest {
 
     // GENERATE BITMAP USING HeapCreator and validate
     HeapBitmapInvertedIndexCreator heapCreator =
-        new HeapBitmapInvertedIndexCreator(indexDirHeap, cardinality, numDocs, numDocs, spec);
+        new HeapBitmapInvertedIndexCreator(indexDirHeap, cardinality, numDocs, 0, spec);
     for (int i = 0; i < numDocs; i++) {
       heapCreator.add(i, data[i]);
     }
