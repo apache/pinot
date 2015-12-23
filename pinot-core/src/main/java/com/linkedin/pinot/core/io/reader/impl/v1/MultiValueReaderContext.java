@@ -22,4 +22,13 @@ public class MultiValueReaderContext implements ReaderContext {
   int startPosition;
   int endPosition;
   int chunkId = -1;
+
+  protected MultiValueReaderContext clone() {
+    MultiValueReaderContext ret = new MultiValueReaderContext();
+    ret.rowId = rowId;
+    ret.startPosition = startPosition;
+    ret.endPosition = endPosition;
+    ret.chunkId = chunkId;
+    return ret;
+  }
 }

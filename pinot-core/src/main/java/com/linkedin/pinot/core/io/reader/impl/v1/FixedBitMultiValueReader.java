@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 
 import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.utils.MmapUtils;
@@ -221,20 +222,20 @@ public class FixedBitMultiValueReader
     int endOffset = 0;
     int chunkId = row / docsPerChunk;
     int length;
-    if (readerContext.rowId != -1) {
+    if (readerContext.chunkId == chunkId) {
       if (row == readerContext.rowId + 1) {
         startOffset = readerContext.endPosition;
-      } else if (readerContext.chunkId == chunkId && row >= readerContext.rowId) {
+      } else if (row >= readerContext.rowId) {
         startOffset = (int) customBitSet.findNthBitSetAfter(readerContext.endPosition,
             (row - readerContext.rowId - 1));
+      }
+    } else {
+      int chunkIdOffset = chunkOffsetsReader.getInt(chunkId, 0);
+      if (row % docsPerChunk == 0) {
+        startOffset = chunkIdOffset;
       } else {
-        int chunkIdOffset = chunkOffsetsReader.getInt(chunkId, 0);
-        if (row % docsPerChunk == 0) {
-          startOffset = chunkIdOffset;
-        } else {
-          startOffset =
-              (int) customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
-        }
+        startOffset =
+            (int) customBitSet.findNthBitSetAfter(chunkIdOffset, row - chunkId * docsPerChunk);
       }
     }
     endOffset = customBitSet.findNthBitSetAfter(startOffset, 1);
@@ -248,8 +249,24 @@ public class FixedBitMultiValueReader
     readerContext.chunkId = chunkId;
     readerContext.startPosition = startOffset;
     readerContext.endPosition = endOffset;
+    //validate(row, intArray, length);
     return length;
 
+  }
+  
+  //for testing reader context
+  private void validate(int row, int[] intArray, int length) {
+    int[] temp = new int[intArray.length];
+    int tempLength = getIntArray(row, temp);
+    if (tempLength != length) {
+      System.out.println("ERROR");
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (temp[i] != intArray[i]) {
+          System.out.println("ERROR expected startOffset:" + computeStartOffset(row));
+        }
+      }
+    }
   }
 
   @Override
