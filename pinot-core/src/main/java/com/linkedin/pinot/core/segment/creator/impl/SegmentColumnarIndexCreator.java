@@ -59,7 +59,7 @@ import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 
 
 /**
@@ -148,10 +148,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (String column : config.getInvertedIndexCreationColumns()) {
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
       int uniqueValueCount = indexCreationInfo.getDistinctValueCount();
-      invertedIndexCreatorMap.put(
-          column,
-          new BitmapInvertedIndexCreator(file, uniqueValueCount, schema
-              .getFieldSpecFor(column)));
+      OffHeapBitmapInvertedIndexCreator invertedIndexCreator =
+          new OffHeapBitmapInvertedIndexCreator(file, uniqueValueCount, totalDocs,
+              indexCreationInfo.getTotalNumberOfEntries(), schema.getFieldSpecFor(column));
+      invertedIndexCreatorMap.put(column, invertedIndexCreator);
     }
   }
 

@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Method;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
@@ -74,7 +75,7 @@ public class MmapUtils {
    *
    * @param buffer The buffer to unload, can be null
    */
-  public static void unloadByteBuffer(ByteBuffer buffer) {
+  public static void unloadByteBuffer(Buffer buffer) {
     if (null == buffer)
       return;
 

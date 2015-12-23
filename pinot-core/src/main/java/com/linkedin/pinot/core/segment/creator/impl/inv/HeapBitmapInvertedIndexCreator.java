@@ -34,16 +34,15 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 /**
  * Nov 12, 2014
  */
-
-public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexCreator.class);
+public class HeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HeapBitmapInvertedIndexCreator.class);
 
   private final File invertedIndexFile;
   private final FieldSpec spec;
   private final MutableRoaringBitmap[] invertedIndex;
   long start = 0;
 
-  public BitmapInvertedIndexCreator(File indexDir, int cardinality, FieldSpec spec) {
+  public HeapBitmapInvertedIndexCreator(File indexDir, int cardinality, int numDocs, int totalNumberOfEntries, FieldSpec spec) {
     this.spec = spec;
     invertedIndexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     invertedIndex = new MutableRoaringBitmap[cardinality];
@@ -87,23 +86,17 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
   }
 
   @Override
-  public void add(int docId, Object e) {
+  public void add(int docId, int[] dictionaryIds) {
+    add(docId, dictionaryIds, dictionaryIds.length);
+  }
+
+  @Override
+  public void add(int docId, int[] dictionaryIds, int length) {
     if (spec.isSingleValueField()) {
-      final int entry = ((Integer) e).intValue();
-      indexSingleValue(entry, docId);
-      return;
+      throw new RuntimeException("Method not applicable to single value fields");
     }
-
-    final Object[] entryArr = ((Object[]) e);
-    Arrays.sort(entryArr);
-
-    final int[] entries = new int[entryArr.length];
-
-    for (int i = 0; i < entryArr.length; i++) {
-      entries[i] = ((Integer) entryArr[i]).intValue();
-    }
-
-    indexMultiValue(entries, docId);
+    Arrays.sort(dictionaryIds, 0, length);
+    indexMultiValue(docId, dictionaryIds, length);
   }
 
   private void indexSingleValue(int entry, int docId) {
@@ -113,10 +106,11 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
     invertedIndex[entry].add(docId);
   }
 
-  private void indexMultiValue(int[] entries, int docId) {
-    for (final int entrie : entries) {
-      if (entrie != -1) {
-        invertedIndex[entrie].add(docId);
+  private void indexMultiValue(int docId, int[] entries, int length) {
+    for (int i = 0; i < length; i++) {
+      final int entry = entries[i];
+      if (entry != -1) {
+        invertedIndex[entry].add(docId);
       }
     }
   }

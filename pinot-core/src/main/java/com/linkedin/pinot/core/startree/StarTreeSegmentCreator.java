@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -203,9 +203,10 @@ public class StarTreeSegmentCreator implements SegmentCreator {
       }
 
       if (config.isCreateInvertedIndexEnabled()) {
-        invertedIndexCreatorMap.put(
-            column,
-            new BitmapInvertedIndexCreator(outDir, uniqueValueCount, schema.getFieldSpecFor(column)));
+        OffHeapBitmapInvertedIndexCreator invertedIndexCreator =
+            new OffHeapBitmapInvertedIndexCreator(outDir, uniqueValueCount, totalDocs,
+                indexCreationInfo.getTotalNumberOfEntries(), schema.getFieldSpecFor(column));
+        invertedIndexCreatorMap.put(column, invertedIndexCreator);
       }
     }
   }
@@ -239,13 +240,13 @@ public class StarTreeSegmentCreator implements SegmentCreator {
             int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
             ((SingleValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(nextMatchingDocumentId, dictionaryIndex);
             if (config.isCreateInvertedIndexEnabled()) {
-              invertedIndexCreatorMap.get(column).add(nextMatchingDocumentId, (Object) dictionaryIndex);
+              invertedIndexCreatorMap.get(column).add(nextMatchingDocumentId, dictionaryIndex);
             }
           } else {
-            int[] dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
-            ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(nextMatchingDocumentId, dictionaryIndex);
+            int[] dictionaryIndices = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
+            ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column)).index(nextMatchingDocumentId, dictionaryIndices);
             if (config.isCreateInvertedIndexEnabled()) {
-              invertedIndexCreatorMap.get(column).add(nextMatchingDocumentId, dictionaryIndex);
+              invertedIndexCreatorMap.get(column).add(nextMatchingDocumentId, dictionaryIndices);
             }
           }
         }
@@ -270,8 +271,8 @@ public class StarTreeSegmentCreator implements SegmentCreator {
       if (next.getDimensions().contains(StarTreeIndexNode.all())) {
         // Write using that document ID to all columns
         for (final String column : dictionaryCreatorMap.keySet()) {
-          Object dictionaryIndex = null; // TODO: Is this okay?
-
+          int dictionaryIndex = -1;
+          int[] dictionaryIndices = null;
           if (starTreeDimensionDictionary.containsKey(column)) {
             // Index the dimension value
             Integer dimensionId = starTreeDimensionDictionary.get(column);
@@ -282,7 +283,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
               if (schema.getFieldSpecFor(column).isSingleValueField()) {
                 dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(allValue);
               } else {
-                dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(allValue);
+                dictionaryIndices = dictionaryCreatorMap.get(column).indexOfMV(allValue);
               }
             } else {
               dictionaryIndex = dimensionValue;
@@ -294,7 +295,7 @@ public class StarTreeSegmentCreator implements SegmentCreator {
             if (schema.getFieldSpecFor(column).isSingleValueField()) {
               dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
             } else {
-              dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
+              dictionaryIndices = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
             }
           } else {
             // Just index the raw value
@@ -302,20 +303,24 @@ public class StarTreeSegmentCreator implements SegmentCreator {
             if (schema.getFieldSpecFor(column).isSingleValueField()) {
               dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
             } else {
-              dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
+              dictionaryIndices = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
             }
           }
 
           if (schema.getFieldSpecFor(column).isSingleValueField()) {
             ((SingleValueForwardIndexCreator)forwardIndexCreatorMap.get(column))
-                .index(currentAggregateDocumentId, (Integer) dictionaryIndex);
+                .index(currentAggregateDocumentId, dictionaryIndex);
           } else {
             ((MultiValueForwardIndexCreator)forwardIndexCreatorMap.get(column))
-                .index(currentAggregateDocumentId, (int[]) dictionaryIndex);
+                .index(currentAggregateDocumentId, dictionaryIndices);
           }
 
           if (config.isCreateInvertedIndexEnabled()) {
-            invertedIndexCreatorMap.get(column).add(currentAggregateDocumentId, dictionaryIndex);
+            if (schema.getFieldSpecFor(column).isSingleValueField()) {
+              invertedIndexCreatorMap.get(column).add(currentAggregateDocumentId, dictionaryIndex);
+            } else {
+              invertedIndexCreatorMap.get(column).add(currentAggregateDocumentId, dictionaryIndices);
+            }
           }
         }
         currentAggregateDocumentId++;
