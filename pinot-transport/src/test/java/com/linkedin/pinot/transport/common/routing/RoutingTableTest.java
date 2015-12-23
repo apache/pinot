@@ -47,12 +47,13 @@ public class RoutingTableTest {
     externalView.setState("segment1", "dataServer_instance_2", "ONLINE");
     externalView.setState("segment2", "dataServer_instance_2", "ONLINE");
     externalView.setState("segment2", "dataServer_instance_0", "ONLINE");
-    routingTable.markDataResourceOnline("testResource0_OFFLINE", externalView, new ArrayList<InstanceConfig>());
+    List<InstanceConfig> instanceConfigs = generateInstanceConfigs("dataServer_instance", 0, 2);
+    routingTable.markDataResourceOnline("testResource0_OFFLINE", externalView, instanceConfigs);
     ExternalView externalView1 = new ExternalView("testResource1_OFFLINE");
     externalView1.setState("segment10", "dataServer_instance_0", "ONLINE");
     externalView1.setState("segment11", "dataServer_instance_1", "ONLINE");
     externalView1.setState("segment12", "dataServer_instance_2", "ONLINE");
-    routingTable.markDataResourceOnline("testResource1_OFFLINE", externalView1, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource1_OFFLINE", externalView1, instanceConfigs);
     ExternalView externalView2 = new ExternalView("testResource2_OFFLINE");
     externalView2.setState("segment20", "dataServer_instance_0", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_0", "ONLINE");
@@ -63,7 +64,7 @@ public class RoutingTableTest {
     externalView2.setState("segment20", "dataServer_instance_2", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_2", "ONLINE");
     externalView2.setState("segment22", "dataServer_instance_2", "ONLINE");
-    routingTable.markDataResourceOnline("testResource2_OFFLINE", externalView2, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource2_OFFLINE", externalView2, instanceConfigs);
 
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource0_OFFLINE", "[segment0, segment1, segment2]", 3);
@@ -112,7 +113,8 @@ public class RoutingTableTest {
         "dataServer_instance_4", "ONLINE");
     externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5"),
         "dataServer_instance_5", "ONLINE");
-    routingTable.markDataResourceOnline("testResource0_REALTIME", externalView, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource0_REALTIME", externalView,
+        generateInstanceConfigs("dataServer_instance", 0, 5));
     ExternalView externalView1 = new ExternalView("testResource1_REALTIME");
     externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10"),
         "dataServer_instance_10", "ONLINE");
@@ -120,7 +122,8 @@ public class RoutingTableTest {
         "dataServer_instance_11", "ONLINE");
     externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12"),
         "dataServer_instance_12", "ONLINE");
-    routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1,
+        generateInstanceConfigs("dataServer_instance", 10, 12));
     ExternalView externalView2 = new ExternalView("testResource2_REALTIME");
     externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20"),
         "dataServer_instance_20", "ONLINE");
@@ -140,7 +143,8 @@ public class RoutingTableTest {
         "dataServer_instance_27", "ONLINE");
     externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28"),
         "dataServer_instance_28", "ONLINE");
-    routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2,
+        generateInstanceConfigs("dataServer_instance", 20, 28));
 
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(
@@ -198,4 +202,22 @@ public class RoutingTableTest {
     LOGGER.trace("********************************");
   }
 
+  /**
+   * Helper method to generate instance config lists. Instance names are generated as prefix_i, where
+   * i ranges from start to end.
+   *
+   * @param prefix Instance name prefix
+   * @param start Start index
+   * @param end End index
+   * @return
+   */
+  private List<InstanceConfig> generateInstanceConfigs(String prefix, int start, int end) {
+    List<InstanceConfig> configs = new ArrayList<>();
+
+    for (int i = start; i <= end; ++i) {
+      String instance = prefix + "_" + i;
+      configs.add(new InstanceConfig(instance));
+    }
+    return configs;
+  }
 }
