@@ -15,16 +15,11 @@
  */
 package com.linkedin.pinot.server.request;
 
-import io.netty.buffer.ByteBuf;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -37,6 +32,7 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
+import io.netty.buffer.ByteBuf;
 
 
 /**
@@ -75,6 +71,7 @@ public class SimpleRequestHandler implements RequestHandler {
       serDe.deserialize(queryRequest, byteArray);
       long deserRequestTime = System.nanoTime();
       _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, deserRequestTime - queryStartTime);
+      LOGGER.info("Processing requestId:{},numSegmentsToSearch={}", queryRequest.getRequestId(), queryRequest.getSearchSegmentsSize());
       LOGGER.debug("instance request : {}", queryRequest);
       brokerRequest = queryRequest.getQuery();
 

@@ -28,6 +28,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
@@ -96,18 +97,27 @@ public class HelixServerStarter {
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);
+
+    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(),
+        new ColumnarSegmentMetadataLoader(), zkPropertyStore, pinotHelixProperties, _instanceId);
+
+    // Register state model factory
     final StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(helixClusterName, _instanceId,
-            _serverInstance.getInstanceDataManager(), new ColumnarSegmentMetadataLoader(), pinotHelixProperties,
-            zkPropertyStore);
+            _serverInstance.getInstanceDataManager(),  zkPropertyStore, fetcherAndLoader);
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
     setShuttingDownStatus(false);
 
-    _serverInstance.getServerMetrics().addCallbackGauge(
-        "helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+    // Register message handler factory
+    SegmentMessageHandlerFactory messageHandlerFactory = new SegmentMessageHandlerFactory(fetcherAndLoader);
+    _helixManager.getMessagingService().registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
+        messageHandlerFactory);
+
+    _serverInstance.getServerMetrics()
+        .addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
 
     _helixManager.addPreConnectCallback(() ->
         _serverInstance.getServerMetrics().addMeteredValue(null, ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));

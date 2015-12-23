@@ -24,13 +24,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
@@ -47,7 +49,6 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -60,6 +61,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -1128,13 +1130,21 @@ public class PinotHelixResourceManager {
           OfflineSegmentZKMetadata offlineSegmentZKMetadata =
               ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, segmentMetadata.getTableName(),
                   segmentMetadata.getName());
-
           offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
           offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
           offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
           ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           LOGGER.info("Refresh segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
-          if (updateExistedSegment(offlineSegmentZKMetadata)) {
+          boolean success = false;
+          if (shouldSendMessage(offlineSegmentZKMetadata)) {
+            // Send a message to the servers to update the segment.
+            success = sendSegmentRefreshMessage(offlineSegmentZKMetadata);
+            // TODO Should we introduce a sleep here so that hadoop jobs don't pump all segments in one go?
+          } else {
+            // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
+            success = updateExistedSegment(offlineSegmentZKMetadata);
+          }
+          if (success) {
             res.status = ResponseStatus.success;
           } else {
             LOGGER.error("Failed to refresh segment {}, marking crc and creation time as invalid",
@@ -1169,6 +1179,62 @@ public class PinotHelixResourceManager {
     }
 
     return res;
+  }
+
+  // Check to see if the table has been explicitly configured to use messageBasedRefresh.
+  private boolean shouldSendMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
+    final String rawTableName = segmentZKMetadata.getTableName();
+    AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
+    TableCustomConfig customConfig = tableConfig.getCustomConfigs();
+    if (customConfig != null) {
+      Map<String, String> customConfigMap = customConfig.getCustomConfigs();
+      if (customConfigMap != null) {
+        // For now, use the message-based segment refresh only if explicitly defined for the segment.
+        // If not, go through the usual OFFLINE/ONLINE state transition.
+        if (customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) &&
+            Boolean.valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Attempt to send a message to refresh the new segment. We do not wait for any acknowledgements.
+   * The message is sent as session-specific, so if a new zk session is created (e.g. server restarts)
+   * it will not get the message.
+   *
+   * @param segmentZKMetadata is the metadata of the newly arrived segment.
+   * @return true if message has been sent to at least one instance of the server hosting the segment.
+   */
+  private boolean sendSegmentRefreshMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
+    final String segmentName = segmentZKMetadata.getSegmentName();
+    final String rawTableName = segmentZKMetadata.getTableName();
+    final String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(rawTableName);
+    final int timeoutMs = -1; // Infinite timeout on the recipient.
+
+    SegmentRefreshMessage refreshMessage = new SegmentRefreshMessage(tableName, segmentName, segmentZKMetadata.getCrc());
+
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableName);
+    recipientCriteria.setPartition(segmentName);
+    recipientCriteria.setSessionSpecific(true);
+
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    LOGGER.info("Sending message for segment {}:{} to recipients {}", segmentName, refreshMessage, recipientCriteria);
+    // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
+    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
+    boolean success = nMsgsSent > 0;
+    if (success) {
+      // TODO Would be nice if we can get the name of the instances to which messages were sent.
+      LOGGER.info("Sent {} msgs to refresh segment {}", nMsgsSent, segmentName);
+    } else {
+      LOGGER.warn("Unable to send segment refresh message for {}, nMsgs={}", segmentName, nMsgsSent);
+    }
+    return success;
   }
 
   /**
