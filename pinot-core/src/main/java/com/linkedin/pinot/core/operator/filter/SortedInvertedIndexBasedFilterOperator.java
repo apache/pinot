@@ -24,6 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
@@ -61,12 +62,12 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
     Dictionary dictionary = dataSource.getDictionary();
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
+    List<IntPair> pairs = new ArrayList<IntPair>();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     int[] dictionaryIds = evaluator.getMatchingDictionaryIds();
     for (int i = 0; i < dictionaryIds.length; i++) {
-      int[] minMax = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
-      pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
+      IntPair pair = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
+      pairs.add(pair);
     }
     LOGGER.debug("Creating a Sorted Block with pairs: {}", pairs);
     sortedBlock = new SortedBlock(dataSource.getOperatorName(),pairs);
@@ -80,11 +81,11 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   public static class SortedBlock extends BaseFilterBlock {
 
-    private List<Pair<Integer, Integer>> pairs;
+    private List<IntPair> pairs;
     private SortedDocIdSet sortedDocIdSet;
     private String datasourceName;
 
-    public SortedBlock(String datasourceName, List<Pair<Integer, Integer>> pairs) {
+    public SortedBlock(String datasourceName, List<IntPair> pairs) {
       this.datasourceName = datasourceName;
       this.pairs = pairs;
     }

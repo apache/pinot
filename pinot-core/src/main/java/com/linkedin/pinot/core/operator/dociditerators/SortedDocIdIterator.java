@@ -19,6 +19,7 @@ import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
@@ -27,13 +28,13 @@ public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   /**
    * 
    */
-  private List<Pair<Integer, Integer>> pairs;
+  private List<IntPair> pairs;
   private String datasourceName;
 
   /**
    * @param sortedDocIdSet
    */
-  public SortedDocIdIterator(String datasourceName, List<Pair<Integer, Integer>> pairs) {
+  public SortedDocIdIterator(String datasourceName, List<IntPair> pairs) {
     this.datasourceName = datasourceName;
     this.pairs = pairs;
   }

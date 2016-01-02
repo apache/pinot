@@ -19,6 +19,8 @@ import java.io.IOException;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
+
 
 public interface InvertedIndexReader {
 
@@ -34,7 +36,7 @@ public interface InvertedIndexReader {
    * @param docId
    * @return
    */
-  public int[] getMinMaxRangeFor(int docId);
+  public IntPair getMinMaxRangeFor(int docId);
 
   public void close() throws IOException;
 }

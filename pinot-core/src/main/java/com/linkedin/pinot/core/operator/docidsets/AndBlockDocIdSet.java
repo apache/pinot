@@ -16,20 +16,16 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.roaringbitmap.FastAggregation;
 import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
@@ -66,8 +62,6 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
-    long start, end;
-    start = System.currentTimeMillis();
     List<BlockDocIdIterator> rawIterators = new ArrayList<>();
     boolean useBitmapBasedIntersection = false;
     for (BlockDocIdSet docIdSet : blockDocIdSets) {
@@ -81,8 +75,8 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         if (docIdSet instanceof SortedDocIdSet) {
           MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
           SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-          List<Pair<Integer, Integer>> pairs = sortedDocIdSet.getRaw();
-          for (Pair<Integer, Integer> pair : pairs) {
+          List<IntPair> pairs = sortedDocIdSet.getRaw();
+          for (IntPair pair : pairs) {
             bitmap.add(pair.getLeft(), pair.getRight() + 1); // add takes [start, end) i.e inclusive
                                                              // start, exclusive end.
           }
@@ -109,7 +103,6 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
       BitmapDocIdIterator singleBitmapBlockIdIterator = new BitmapDocIdIterator(intIterator);
       singleBitmapBlockIdIterator.setStartDocId(minDocId);
       singleBitmapBlockIdIterator.setEndDocId(maxDocId);
-      end = System.currentTimeMillis();
       rawIterators.add(0, singleBitmapBlockIdIterator);
       docIdIterators = new BlockDocIdIterator[rawIterators.size()];
       rawIterators.toArray(docIdIterators);
@@ -119,11 +112,7 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
       }
     }
-    // if (docIdIterators.length == 1) {
-    // return docIdIterators[0];
-    // } else {
     return new AndDocIdIterator(docIdIterators);
-    // }
   }
 
   @SuppressWarnings("unchecked")

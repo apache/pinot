@@ -21,19 +21,24 @@ import java.io.IOException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-
 
 public class SortedInvertedIndexReader implements InvertedIndexReader {
   private final int cardinality;
   private final FixedByteSingleValueMultiColReader indexReader;
+  private final static IntPair EMPTY_PAIR = new IntPair(0, 0);
 
   public SortedInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
     this.cardinality = cardinality;
     if (isMmap) {
-      indexReader = FixedByteSingleValueMultiColReader.forMmap(file, cardinality, 2, new int[] { 4, 4 });
+      indexReader = FixedByteSingleValueMultiColReader.forMmap(file, cardinality, 2, new int[] {
+          4, 4
+      });
     } else {
-      indexReader = FixedByteSingleValueMultiColReader.forHeap(file, cardinality, 2, new int[] { 4, 4 });
+      indexReader = FixedByteSingleValueMultiColReader.forHeap(file, cardinality, 2, new int[] {
+          4, 4
+      });
     }
   }
 
@@ -57,14 +62,11 @@ public class SortedInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public int[] getMinMaxRangeFor(int dictId) {
-    int[] ret = new int[2];
+  public IntPair getMinMaxRangeFor(int dictId) {
     if (dictId >= cardinality) {
-      return ret;
+      return EMPTY_PAIR;
     }
-    ret[0] = indexReader.getInt(dictId, 0);
-    ret[1] = indexReader.getInt(dictId, 1);
-    return ret;
+    return new IntPair(indexReader.getInt(dictId, 0), indexReader.getInt(dictId, 1));
   }
 
   @Override

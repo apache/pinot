@@ -33,8 +33,6 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   public boolean reachedEnd = false;
   public int currentDocId = -1;
   int currentMax = -1;
-  private AtomicLong timeMeasure = new AtomicLong();
-  private AtomicLong[] timeMeasures;
   private boolean hasScanBasedIterators;
 
   public AndDocIdIterator(BlockDocIdIterator[] blockDocIdIterators) {
@@ -70,12 +68,6 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
     }
     this.docIdPointers = new int[docIdIterators.length];
     Arrays.fill(docIdPointers, -1);
-
-    timeMeasures = new AtomicLong[docIdIterators.length];
-    for (int i = 0; i < docIdIterators.length; i++) {
-      timeMeasures[i] = new AtomicLong(0);
-    }
-
   }
 
   @Override
@@ -93,19 +85,14 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int next() {
-    long start = System.currentTimeMillis();
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
     currentMax = currentMax + 1;
     // always increment the pointer to current max, when this is called first time, every one will
     // be set to start of posting list.
-    long childStart, childEnd;// to measure time spent in child iterators
     for (int i = 0; i < docIdIterators.length; i++) {
-      childStart = System.currentTimeMillis();
       docIdPointers[i] = docIdIterators[i].advance(currentMax);
-      childEnd = System.currentTimeMillis();
-      timeMeasures[i].addAndGet((childEnd - childStart));
       if (docIdPointers[i] == Constants.EOF) {
         reachedEnd = true;
         currentMax = Constants.EOF;
@@ -117,12 +104,6 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
           // we need to advance all pointer since we found a new max
           i = -1;
         }
-      } else if (docIdPointers[i] < currentMax) {
-        LOGGER.warn(
-            "Should never happen, {} returns docIdPointer : {} should always >= currentMax : {}",
-            docIdIterators[i], docIdPointers[i], currentMax);
-        throw new IllegalStateException(
-            "Should never happen, docIdPointer should always >= currentMax");
       }
       if (i == docIdIterators.length - 1 && hasScanBasedIterators) {
         // this means we found the docId common to all nonScanBased iterators, now we need to ensure
@@ -136,18 +117,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
         }
       }
     }
-
     currentDocId = currentMax;
-    long end = System.currentTimeMillis();
-    timeMeasure.addAndGet(end - start);
-
-    // Remove this after tracing is added
-    if (currentDocId == Constants.EOF) {
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("AND operator took:{}. Break down by child iterators:{} times:{}",
-            timeMeasure.get(), Arrays.toString(docIdIterators), Arrays.toString(timeMeasures));
-      }
-    }
     return currentDocId;
   }
 

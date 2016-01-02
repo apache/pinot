@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.operator.blocks.BlockFactory;
 import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
@@ -27,13 +28,13 @@ import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
 
 public class SortedDocIdSet implements FilterBlockDocIdSet {
 
-  public final List<Pair<Integer, Integer>> pairs;
+  public final List<IntPair> pairs;
   public final AtomicLong timeMeasure = new AtomicLong(0);
   int startDocId;
   int endDocId;
   private String datasourceName;
 
-  public SortedDocIdSet(String datasourceName,List<Pair<Integer, Integer>> pairs) {
+  public SortedDocIdSet(String datasourceName,List<IntPair> pairs) {
     this.datasourceName = datasourceName;
     this.pairs = pairs;
   }

@@ -243,7 +243,7 @@ public class TraceContextTest {
       }
       assertEquals(jobIdSet.size(), jobsPerRequest);
       // show trace
-      LOGGER.info("Trace Tree: {}", TraceContext.getTraceInfoOfRequestId(rqId));
+      LOGGER.debug("Trace Tree: {}", TraceContext.getTraceInfoOfRequestId(rqId));
     }
   }
 

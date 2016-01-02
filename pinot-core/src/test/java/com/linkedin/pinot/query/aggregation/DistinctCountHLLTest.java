@@ -293,7 +293,7 @@ public class DistinctCountHLLTest {
     // ------------ helper functions ------------
 
     private void println(String s) {
-        System.out.println(s);
+        LOGGER.debug(s);
     }
 
     private String getErrorString(long precise, long estimate) {

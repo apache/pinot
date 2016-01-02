@@ -168,7 +168,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
   public void testAggregationGroupBys() {
     final IntermediateResultsBlock block = getIntermediateResultsBlock();
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("AggregationResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("AggregationResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
   }
@@ -200,19 +200,19 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     final IntermediateResultsBlock block = getIntermediateResultsBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
     ////////////////////////////////////////////////////////////////////////////////
     final IntermediateResultsBlock block1 = getIntermediateResultsBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
   }
@@ -222,19 +222,19 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     final IntermediateResultsBlock block = getIntermediateResultsBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
     ////////////////////////////////////////////////////////////////////////////////
     final IntermediateResultsBlock block1 = getIntermediateResultsBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
     final DataTable dataTable = block.getAggregationGroupByResultDataTable();
@@ -243,7 +243,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(dataTable);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
+      LOGGER.debug("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
     }
   }
 

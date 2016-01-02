@@ -24,12 +24,14 @@ import java.io.RandomAccessFile;
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 
 /**
  * Aug 10, 2014
@@ -153,7 +155,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public int[] getMinMaxRangeFor(int dicId) {
+  public IntPair getMinMaxRangeFor(int dicId) {
     throw new UnsupportedOperationException("not supported in inverted index type bitmap");
   }
 }
