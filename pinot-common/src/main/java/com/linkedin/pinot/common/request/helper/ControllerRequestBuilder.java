@@ -87,6 +87,7 @@ public class ControllerRequestBuilder {
     JSONObject metadata = new JSONObject();
     JSONObject customConfigs = new JSONObject();
     customConfigs.put("d2Name", "xlntBetaPinot");
+    customConfigs.put("messageBasedRefresh", "true");
     metadata.put("customConfigs", customConfigs);
     creationRequest.put("metadata", metadata);
     return creationRequest;

@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Collections;
@@ -38,6 +34,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -123,6 +123,44 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     FileUtils.deleteQuietly(segmentTarDir);
   }
 
+  @Test
+  public void testRefresh() throws Exception {
+    final int nAtttempts = 5;
+    final String segment6 = "segmentToBeRefreshed_6";
+    final int nRows1 = 69;
+    generateAndUploadRandomSegment(segment6, nRows1);
+    verifyNRows(0, nRows1);
+    final int nRows2 = 198;
+    LOGGER.info("Segment {} loaded with {} rows, refreshing with {}", segment6, nRows1, nRows2);
+    generateAndUploadRandomSegment(segment6, nRows2);
+    verifyNRows(nRows1, nRows2);
+    // Load another segment while keeping this one in place.
+    final String segment9 = "newSegment_9";
+    final int nRows3 = 102;
+    generateAndUploadRandomSegment(segment9, nRows3);
+    verifyNRows(nRows2, nRows2+nRows3);
+  }
+
+  // Verify that the number of rows is either the initial value or the final value but not something else.
+  private void verifyNRows(int currentNrows, int finalNrows) throws Exception {
+    int attempt = 0; long sleepTime = 100;
+    long nRows = -1;
+    while (attempt < 10) {
+      Thread.sleep(sleepTime);
+      nRows = getCurrentServingNumDocs();
+      //nRows can either be the current value or the final value, not any other.
+      if (nRows == currentNrows) {
+        sleepTime *= 2;
+        attempt++;
+      } else  if (nRows == finalNrows) {
+        return;
+      } else {
+        Assert.fail("Found unexpected number of rows " + nRows);
+      }
+    }
+    Assert.fail("Failed to get from " + currentNrows + " to " + finalNrows);
+  }
+
   @Test(enabled = false)
   public void testUploadRefreshDelete() throws Exception {
     final int THREAD_COUNT = 1;
@@ -183,7 +221,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
                   // Delete this segment
                   LOGGER.info("Deleting segment {}", segmentName);
                   String reply = sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-                          forSegmentDelete("myresource", segmentName));
+                      forSegmentDelete("myresource", segmentName));
                   LOGGER.info("Deletion returned {}", reply);
 
                   // Set the number of rows to zero

@@ -80,7 +80,7 @@ public class SegmentFetcherAndLoader {
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
 
-    LOGGER.info("Adding or replacing segment {} for table {}", segmentId, tableName);
+    LOGGER.info("Adding or replacing segment {} for table {}", segmentId, tableName, offlineSegmentZKMetadata);
     try {
       SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
@@ -95,6 +95,7 @@ public class SegmentFetcherAndLoader {
           LOGGER.info("Segment {} found on disk, attempting to load it", segmentId);
           try {
             localSegmentMetadata = _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            LOGGER.info("Found segment {} crc {} on disk", segmentId, localSegmentMetadata.getCrc());
           } catch (Exception e) {
             LOGGER.error("Failed to load segment metadata from {}. Deleting it.", localSegmentDir, e);
             FileUtils.deleteQuietly(new File(localSegmentDir));
@@ -102,7 +103,7 @@ public class SegmentFetcherAndLoader {
           }
           try {
             if (!isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck)) {
-              LOGGER.info("Segment metadata same as before, loading {} from disk", segmentId);
+              LOGGER.info("Segment metadata same as before, loading {} (crc {}) from disk", segmentId, localSegmentMetadata.getCrc());
               AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
               _dataManager.addSegment(localSegmentMetadata, tableConfig);
               // TODO Update zk metadata with CRC for this instance
@@ -117,7 +118,7 @@ public class SegmentFetcherAndLoader {
       }
       // There is a very unlikely race condition that we may have gotten the metadata of a
       // segment that was not dropped when we checked, but was dropped after the check above.
-      // That is possible only if we get two helix transitions (to drop, and to add back) the
+      // That is possible only if we get two helix transitions (to drop, and then to add back) the
       // segment at the same, or very close to each other.If the race condition triggers, and the
       // two segments are same in metadata, then we may end up NOT adding back the segment
       // that is in the process of being dropped.
@@ -127,7 +128,7 @@ public class SegmentFetcherAndLoader {
       // that we have is different from that in zookeeper.
       if (isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck)) {
         if (localSegmentMetadata == null) {
-          LOGGER .info("Loading new segment from controller - " + segmentId);
+          LOGGER .info("Loading new segment {} from controller", segmentId);
         } else {
           LOGGER.info("Trying to refresh segment {} with new data.", segmentId);
         }
@@ -145,7 +146,7 @@ public class SegmentFetcherAndLoader {
             final SegmentMetadata segmentMetadata =
                 _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
             _dataManager.addSegment(segmentMetadata, tableConfig);
-            // TODO Update zk metadata with CRC for this instance
+            LOGGER.info("Downloaded segment {} crc {} from controller", segmentId, segmentMetadata.getCrc());
 
             // Successfully loaded the segment, break out of the retry loop
             break;
@@ -183,7 +184,7 @@ public class SegmentFetcherAndLoader {
           throw new RuntimeException(msg);
         }
       } else {
-        LOGGER.info("Get already loaded segment again, will do nothing.");
+        LOGGER.info("Got already loaded segment {} crc {} again, will do nothing.", segmentId, localSegmentMetadata.getCrc());
       }
     } catch (final Exception e) {
       LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);

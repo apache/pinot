@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -41,11 +40,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
-
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileStream;
@@ -69,9 +63,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -81,6 +75,9 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import kafka.javaapi.producer.Producer;
+import kafka.producer.KeyedMessage;
+import kafka.producer.ProducerConfig;
 
 
 /**
@@ -865,9 +862,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected long getCurrentServingNumDocs() {
     ensurePinotConnectionIsCreated();
-    com.linkedin.pinot.client.ResultSet resultSet =
-        _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0").getResultSet(0);
-    return resultSet.getInt(0);
+    com.linkedin.pinot.client.ResultSetGroup resultSetGroup =
+        _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0");
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getInt(0);
+    }
+    return 0;
   }
 
   protected int getGeneratedQueryCount() {

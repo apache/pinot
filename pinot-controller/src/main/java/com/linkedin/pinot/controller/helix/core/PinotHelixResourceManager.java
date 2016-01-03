@@ -1135,10 +1135,12 @@ public class PinotHelixResourceManager {
           offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
           ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           LOGGER.info("Refresh segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
-          boolean success = false;
+          boolean success = true;
           if (shouldSendMessage(offlineSegmentZKMetadata)) {
             // Send a message to the servers to update the segment.
-            success = sendSegmentRefreshMessage(offlineSegmentZKMetadata);
+            // We return success even if we are not able to send messages (which can happen if no servers are alive).
+            // For segment validation errors we would have returned earlier.
+            sendSegmentRefreshMessage(offlineSegmentZKMetadata);
             // TODO Should we introduce a sleep here so that hadoop jobs don't pump all segments in one go?
           } else {
             // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
@@ -1208,7 +1210,7 @@ public class PinotHelixResourceManager {
    * @param segmentZKMetadata is the metadata of the newly arrived segment.
    * @return true if message has been sent to at least one instance of the server hosting the segment.
    */
-  private boolean sendSegmentRefreshMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
+  private void sendSegmentRefreshMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
     final String segmentName = segmentZKMetadata.getSegmentName();
     final String rawTableName = segmentZKMetadata.getTableName();
     final String tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(rawTableName);
@@ -1227,14 +1229,14 @@ public class PinotHelixResourceManager {
     LOGGER.info("Sending message for segment {}:{} to recipients {}", segmentName, refreshMessage, recipientCriteria);
     // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
     int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
-    boolean success = nMsgsSent > 0;
-    if (success) {
+    if (nMsgsSent > 0) {
       // TODO Would be nice if we can get the name of the instances to which messages were sent.
       LOGGER.info("Sent {} msgs to refresh segment {}", nMsgsSent, segmentName);
     } else {
+      // May be the case when none of the servers are up yet. That is OK, because when they come up they will get the
+      // new version of the segment.
       LOGGER.warn("Unable to send segment refresh message for {}, nMsgs={}", segmentName, nMsgsSent);
     }
-    return success;
   }
 
   /**
