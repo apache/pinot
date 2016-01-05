@@ -66,9 +66,9 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     Iterator<IntPair> iterator = queue.iterator();
     while (iterator.hasNext()) {
       IntPair pair = iterator.next();
-      if (pair.getA() < targetDocId) {
+      if (pair.getLeft() < targetDocId) {
         iterator.remove();
-        iteratorIsInQueue[pair.getB()] = false;
+        iteratorIsInQueue[pair.getRight()] = false;
       }
     }
 
@@ -77,7 +77,7 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
       if (!iteratorIsInQueue[i]) {
         int nextDocId = docIdIterators[i].advance(targetDocId);
         if (nextDocId != Constants.EOF) {
-          pointers[i].setA(nextDocId);
+          pointers[i].setLeft(nextDocId);
           queue.add(pointers[i]);
         }
         iteratorIsInQueue[i] = true;
@@ -86,7 +86,7 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
 
     // Return the first element
     if (queue.size() > 0) {
-      currentDocId = queue.peek().getA();
+      currentDocId = queue.peek().getLeft();
     } else {
       currentDocId = Constants.EOF;
     }
@@ -103,9 +103,9 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
-    while (queue.size() > 0 && queue.peek().getA() <= currentDocId) {
+    while (queue.size() > 0 && queue.peek().getLeft() <= currentDocId) {
       IntPair pair = queue.remove();
-      iteratorIsInQueue[pair.getB()] = false;
+      iteratorIsInQueue[pair.getRight()] = false;
     }
     currentDocId++;
     // Grab the next value from each iterator, if it's not in the queue
@@ -124,7 +124,7 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     }
 
     if (queue.size() > 0) {
-      currentDocId = queue.peek().getA();
+      currentDocId = queue.peek().getLeft();
     } else {
       currentDocId = Constants.EOF;
     }

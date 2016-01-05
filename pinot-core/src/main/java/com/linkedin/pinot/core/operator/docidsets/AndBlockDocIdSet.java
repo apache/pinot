@@ -28,9 +28,13 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import com.linkedin.pinot.core.operator.dociditerators.DocIdIteratorWrapper;
+import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.util.SortedRangeIntersection;
 
 public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   /**
@@ -41,8 +45,8 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
   private List<FilterBlockDocIdSet> blockDocIdSets;
   private int minDocId = Integer.MIN_VALUE;
   private int maxDocId = Integer.MAX_VALUE;
-  private IntIterator intIterator;
-  private BlockDocIdIterator[] docIdIterators;
+  MutableRoaringBitmap answer = null;
+  boolean validate = false;
 
   public AndBlockDocIdSet(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.blockDocIdSets = blockDocIdSets;
@@ -62,6 +66,30 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
+    //TODO: Remove this validation code once we have enough testing
+    if (validate) {
+      BlockDocIdIterator slowIterator = slowIterator();
+      BlockDocIdIterator fastIterator = fastIterator();
+      List<Integer> matchedIds = new ArrayList<>();
+      while (true) {
+        int docId1 = slowIterator.next();
+        int docId2 = fastIterator.next();
+        if (docId1 != docId2) {
+          LOGGER.error("ERROR docId1:" + docId1 + " docId2:" + docId2);
+        } else {
+          matchedIds.add(docId1);
+        }
+        if (docId1 == Constants.EOF || docId2 == Constants.EOF) {
+          break;
+        }
+      }
+      answer = null;
+    }
+    return fastIterator();
+
+  }
+
+  public BlockDocIdIterator slowIterator() {
     List<BlockDocIdIterator> rawIterators = new ArrayList<>();
     boolean useBitmapBasedIntersection = false;
     for (BlockDocIdSet docIdSet : blockDocIdSets) {
@@ -69,6 +97,7 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         useBitmapBasedIntersection = true;
       }
     }
+    BlockDocIdIterator[] docIdIterators;
     if (useBitmapBasedIntersection) {
       List<ImmutableRoaringBitmap> allBitmaps = new ArrayList<ImmutableRoaringBitmap>();
       for (BlockDocIdSet docIdSet : blockDocIdSets) {
@@ -90,6 +119,7 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
           rawIterators.add(iterator);
         }
       }
+      IntIterator intIterator;
       if (allBitmaps.size() > 1) {
         MutableRoaringBitmap answer = (MutableRoaringBitmap) allBitmaps.get(0).clone();
         for (int i = 1; i < allBitmaps.size(); i++) {
@@ -115,10 +145,88 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
     return new AndDocIdIterator(docIdIterators);
   }
 
+  public BlockDocIdIterator fastIterator() {
+    long start = System.currentTimeMillis();
+    List<List<IntPair>> sortedRangeSets = new ArrayList<>();
+    List<ImmutableRoaringBitmap> childBitmaps = new ArrayList<ImmutableRoaringBitmap>();
+    List<FilterBlockDocIdSet> scanBasedDocIdSets = new ArrayList<>();
+    List<BlockDocIdIterator> remainingIterators = new ArrayList<>();
+
+    for (BlockDocIdSet docIdSet : blockDocIdSets) {
+      if (docIdSet instanceof SortedDocIdSet) {
+        SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
+        List<IntPair> pairs = sortedDocIdSet.getRaw();
+        sortedRangeSets.add(pairs);
+      } else if (docIdSet instanceof BitmapDocIdSet) {
+        BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) docIdSet;
+        ImmutableRoaringBitmap childBitmap = bitmapDocIdSet.getRaw();
+        childBitmaps.add(childBitmap);
+      } else if (docIdSet instanceof ScanBasedSingleValueDocIdSet) {
+        scanBasedDocIdSets.add((ScanBasedSingleValueDocIdSet) docIdSet);
+      } else if (docIdSet instanceof ScanBasedMultiValueDocIdSet) {
+        scanBasedDocIdSets.add((ScanBasedMultiValueDocIdSet) docIdSet);
+      } else {
+        // TODO:handle child OR/AND as bitmap if possible
+        remainingIterators.add(docIdSet.iterator());
+      }
+    }
+    // handle sorted ranges
+    // TODO: will be nice to re-order sorted and bitmap index based on size
+    if (sortedRangeSets.size() > 0) {
+      List<IntPair> pairList;
+      pairList = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSets);
+      answer = new MutableRoaringBitmap();
+      for (IntPair pair : pairList) {
+        // end is exclusive
+        answer.add(pair.getLeft(), pair.getRight() + 1);
+      }
+    }
+    // handle bitmaps
+    if (childBitmaps.size() > 0) {
+      if (answer == null) {
+        answer = (MutableRoaringBitmap) childBitmaps.get(0).clone();
+        for (int i = 1; i < childBitmaps.size(); i++) {
+          answer.and(childBitmaps.get(i));
+        }
+      } else {
+        for (int i = 0; i < childBitmaps.size(); i++) {
+          answer.and(childBitmaps.get(i));
+        }
+      }
+    }
+    // if we don't have any index, we need to scan entire data set
+    if (answer == null) {
+      answer = new MutableRoaringBitmap();
+      // end is exclusive
+      answer.add(minDocId, maxDocId + 1);
+    }
+
+    // handle raw iterators
+    for (FilterBlockDocIdSet scanBasedDocIdSet : scanBasedDocIdSets) {
+      ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) scanBasedDocIdSet.iterator();
+      MutableRoaringBitmap scanAnswer = iterator.applyAnd(answer);
+      answer.and(scanAnswer);
+    }
+    long end = System.currentTimeMillis();
+    LOGGER.debug("Time to evaluate and Filter:{}", (end - start));
+    // if other iterators exists resort to iterator style intersection
+    DocIdIteratorWrapper docIdIteratorWrapper = new DocIdIteratorWrapper(answer.getIntIterator());
+    if (remainingIterators.size() == 0) {
+      return docIdIteratorWrapper;
+    } else {
+      BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[remainingIterators.size() + 1];
+      docIdIterators[0] = docIdIteratorWrapper;
+      for (int i = 0; i < remainingIterators.size(); i++) {
+        docIdIterators[i + 1] = remainingIterators.get(i);
+      }
+      return new AndDocIdIterator(docIdIterators);
+    }
+  }
+
   @SuppressWarnings("unchecked")
   @Override
   public <T> T getRaw() {
-    return (T) intIterator;
+    return (T) answer;
   }
 
   @Override

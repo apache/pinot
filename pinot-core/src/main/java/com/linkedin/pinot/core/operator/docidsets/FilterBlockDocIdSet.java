@@ -15,16 +15,17 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
+
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 
 public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
-  public int getMinDocId();
+  int getMinDocId();
 
-  public int getMaxDocId();
+  int getMaxDocId();
 
-  public void setStartDocId(int startDocId);
+  void setStartDocId(int startDocId);
 
-  public void setEndDocId(int endDocId);
+  void setEndDocId(int endDocId);
 
 }

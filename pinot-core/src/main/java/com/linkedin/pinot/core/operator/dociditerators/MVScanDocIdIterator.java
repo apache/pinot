@@ -16,6 +16,9 @@
 package com.linkedin.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
+
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -37,8 +40,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private String datasourceName;
 
-  public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
-      PredicateEvaluator evaluator) {
+  public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet,
+      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.evaluator = evaluator;
     if (evaluator.alwaysFalse()) {
@@ -71,6 +74,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public void setEndDocId(int endDocId) {
     this.endDocId = endDocId;
   }
+
   @Override
   public boolean isMatch(int docId) {
     if (currentDocId == Constants.EOF) {
@@ -100,6 +104,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       return next;
     }
   }
+
   @Override
   public int next() {
     if (currentDocId == Constants.EOF) {
@@ -120,9 +125,29 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public int currentDocId() {
     return currentDocId;
   }
+
   @Override
   public String toString() {
-    return MVScanDocIdIterator.class.getSimpleName()+ "[" + datasourceName +"]";
+    return MVScanDocIdIterator.class.getSimpleName() + "[" + datasourceName + "]";
   }
 
+  @Override
+  public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
+
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    if (evaluator.alwaysFalse()) {
+      return result;
+    }
+    IntIterator intIterator = answer.getIntIterator();
+    int docId, length;
+    while (intIterator.hasNext()) {
+      docId = intIterator.next();
+      valueIterator.skipTo(docId);
+      length = valueIterator.nextIntVal(intArray);
+      if (evaluator.apply(intArray, length)) {
+        result.add(docId);
+      }
+    }
+    return result;
+  }
 }

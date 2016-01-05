@@ -105,7 +105,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
           i = -1;
         }
       }
-      if (i == docIdIterators.length - 1 && hasScanBasedIterators) {
+      if (hasScanBasedIterators  && i == docIdIterators.length - 1  ) {
         // this means we found the docId common to all nonScanBased iterators, now we need to ensure
         // that its also found in scanBasedIterator, if not matched, we restart the intersection
         for (ScanBasedDocIdIterator iterator : scanBasedDocIdIterators) {

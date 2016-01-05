@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 
 /**
@@ -30,5 +32,7 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
    * @return true if the doc id matches
    */
   boolean isMatch(int docId);
+
+  MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer);
 
 }

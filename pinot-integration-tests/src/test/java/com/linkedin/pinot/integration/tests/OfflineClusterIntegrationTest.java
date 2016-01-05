@@ -184,6 +184,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void testGeneratedQueries() throws Exception {
     super.testGeneratedQueries();
   }
+
+  @Override
+  @Test
+  public void testGeneratedQueriesWithMultivalues() throws Exception {
+    super.testGeneratedQueriesWithMultivalues();
+  }
+
   /**
    * NOTE:
    * If you are copying a failed query to test in isolation, you might have to do the following for group by queries

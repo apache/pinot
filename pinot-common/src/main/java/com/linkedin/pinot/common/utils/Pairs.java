@@ -36,31 +36,41 @@ public class Pairs {
       this.a = a;
       this.b = b;
     }
-
+    
     public int getLeft() {
       return a;
-    }
-
-    public int getA() {
-      return a;
-    }
-
-    public int getB() {
-      return b;
     }
 
     public int getRight() {
       return b;
     }
 
-    public void setA(int a) {
+    public void setLeft(int a) {
       this.a = a;
     }
 
-    public void setB(int b) {
+    public void setRight(int b) {
       this.b = b;
     }
 
+    @Override
+    public String toString() {
+      return "[" + a + "," + b + "]";
+    }
+
+    @Override
+    public int hashCode() {
+      return toString().hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IntPair) {
+        IntPair that = (IntPair) obj;
+        return obj != null && a == (that.a) && b == that.b;
+      }
+      return false;
+    }
   }
 
   public static class AscendingIntPairComparator implements Comparator<IntPair> {

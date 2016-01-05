@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -116,6 +119,24 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public String toString() {
     return SVScanDocIdIterator.class.getSimpleName() + "[" + datasourceName + "]";
+  }
+
+  @Override
+  public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    if (evaluator.alwaysFalse()) {
+      return result;
+    }
+    IntIterator intIterator = answer.getIntIterator();
+    int docId;
+    while (intIterator.hasNext()) {
+      docId = intIterator.next();
+      valueIterator.skipTo(docId);
+      if (evaluator.apply(valueIterator.nextIntVal())) {
+        result.add(docId);
+      }
+    }
+    return result;
   }
 
 }
