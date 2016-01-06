@@ -53,7 +53,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
-import javafx.util.Pair;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.annotation.ThreadSafe;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
@@ -347,7 +348,7 @@ public class BrokerRequestHandler {
           new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
               ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
               overriddenSelection, requestId, _brokerTimeOutMs);
-      responseFuturesList.put(request, new Pair(_scatterGatherer.scatterGather(scatterRequest, scatterGatherStats), respStats));
+      responseFuturesList.put(request, Pair.of(_scatterGatherer.scatterGather(scatterRequest, scatterGatherStats), respStats));
     }
     _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);
 
