@@ -1337,6 +1337,12 @@ public class PinotHelixResourceManager {
     do {
       final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
       final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+      if (instanceSet == null || instanceSet.size() == 0) {
+        // We are trying to refresh a segment, but there are no instances currently assigned for fielding this segment.
+        // When those instances do come up, the segment will be uploaded correctly, so return success but log a warning.
+        LOGGER.warn("No instances as yet for segment {}, table {}", segmentName, tableName);
+        return true;
+      }
       for (final String instance : instanceSet) {
         idealState.setPartitionState(segmentName, instance, "OFFLINE");
       }

@@ -338,12 +338,16 @@ public class HelixHelper {
         try {
           targetInstances = getInstancesForSegment.call();
         } catch (Exception e) {
-          LOGGER.error("Unable to get new instances for segment uploading.");
+          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName);
           return null;
         }
 
-        for (final String instance : targetInstances) {
-          idealState.setPartitionState(segmentName, instance, ONLINE);
+        if (targetInstances == null || targetInstances.size() == 0) {
+          LOGGER.warn("No instances assigned for segment {}, table {}", segmentName, tableName);
+        } else {
+          for (final String instance : targetInstances) {
+            idealState.setPartitionState(segmentName, instance, ONLINE);
+          }
         }
 
         idealState.setNumPartitions(idealState.getNumPartitions() + 1);
