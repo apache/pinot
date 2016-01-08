@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.inv;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -23,24 +28,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.IntBuffer;
 import java.nio.channels.FileChannel;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 /**
  * This version of Index Creator uses off heap memory to create the posting lists.
@@ -83,7 +75,7 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
   long start = 0;
   IntBuffer valueBuffer;
   IntBuffer lengths;// used in multi value
-
+  int currentVacantPos = 0;
   private int cardinality;
   private int capacity;
   IntBuffer postingListBuffer; // entire posting list
@@ -288,10 +280,11 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     for (int i = 0; i < length; i++) {
       final int entry = entries[i];
       Preconditions.checkArgument(entry >= 0, "dictionary Id %s must >=0", entry);
-      valueBuffer.put(docId + i, entry);
+      valueBuffer.put(currentVacantPos + i, entry);
       int postingListLength = postingListLengths.get(entry);
       postingListLengths.put(entry, postingListLength + 1);
     }
+    currentVacantPos += length;
     lengths.put(docId, length);
   }
 
