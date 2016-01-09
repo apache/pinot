@@ -91,6 +91,12 @@ public abstract class MutableDictionaryReader implements Dictionary {
   public abstract double getDoubleValue(int dictionaryId);
 
   @Override
+  public abstract int getIntValue(int dictionaryId);
+
+  @Override
+  public abstract float getFloatValue(int dictionaryId);
+
+  @Override
   public abstract String toString(int dictionaryId);
 
   public void print() {

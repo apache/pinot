@@ -65,6 +65,16 @@ public class IntDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  public float getFloatValue(int dictionaryId) {
+    return (float) getInt(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return getInt(dictionaryId);
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return new Integer(getInt(dictionaryId)).toString();
   }

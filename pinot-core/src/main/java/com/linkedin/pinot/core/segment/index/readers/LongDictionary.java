@@ -64,6 +64,16 @@ public class LongDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  public float getFloatValue(int dictionaryId) {
+    return (float) getLong(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return (int) getLong(dictionaryId);
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return new Long(getLong(dictionaryId)).toString();
   }

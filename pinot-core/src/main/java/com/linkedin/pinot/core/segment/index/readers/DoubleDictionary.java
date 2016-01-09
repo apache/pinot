@@ -69,7 +69,17 @@ public class DoubleDictionary extends ImmutableDictionaryReader  {
   public String getStringValue(int dictionaryId) {
     return (new Double(getDouble(dictionaryId))).toString();
   }
-  
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return (float) getDouble(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return (int) getDouble(dictionaryId);
+  }
+
   private double getDouble(int dictionaryId){
     return dataFileReader.getDouble(dictionaryId, 0);
   }

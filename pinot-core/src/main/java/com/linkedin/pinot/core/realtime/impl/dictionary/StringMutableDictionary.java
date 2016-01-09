@@ -86,6 +86,16 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   }
 
   @Override
+  public int getIntValue(int dictionaryId) {
+    return -1;
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return -1;
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return (String) getRawValueFromBiMap(dictionaryId);
   }

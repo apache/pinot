@@ -108,6 +108,16 @@ public class LongMutableDictionary extends MutableDictionaryReader {
   }
 
   @Override
+  public int getIntValue(int dictionaryId) {
+    return ((Long) getRawValueFromBiMap(dictionaryId)).intValue();
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return ((Long) getRawValueFromBiMap(dictionaryId)).floatValue();
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return ((Long) getRawValueFromBiMap(dictionaryId)).toString();
   }

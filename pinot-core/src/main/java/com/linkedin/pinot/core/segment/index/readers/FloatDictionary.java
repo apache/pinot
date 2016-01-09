@@ -56,7 +56,7 @@ public class FloatDictionary extends ImmutableDictionaryReader {
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(getFloat(dictionaryId));
+    return (double) getFloat(dictionaryId);
   }
 
   @Override
@@ -67,6 +67,16 @@ public class FloatDictionary extends ImmutableDictionaryReader {
   @Override
   public String getStringValue(int dictionaryId) {
     return new Float(getFloat(dictionaryId)).toString();
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return getFloat(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return (int) getFloat(dictionaryId);
   }
 
   public float getFloat(int dictionaryId) {

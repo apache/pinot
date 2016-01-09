@@ -38,6 +38,16 @@ public class IntArrayBackedImmutableDictionary extends ImmutableDictionaryReader
   }
 
   @Override
+  public float getFloatValue(int dictionaryId) {
+    return dictionary[dictionaryId];
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return dictionary[dictionaryId];
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return String.valueOf(dictionary[dictionaryId]);
   }

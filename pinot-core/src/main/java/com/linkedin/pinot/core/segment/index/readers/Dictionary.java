@@ -35,6 +35,10 @@ public interface Dictionary {
 
   String getStringValue(int dictionaryId);
 
+  float getFloatValue(int dictionaryId);
+
+  int getIntValue(int dictionaryId);
+
   String toString(int dictionaryId);
 
   int length();

@@ -76,6 +76,16 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  public int getIntValue(int dictionaryId) {
+    throw new RuntimeException("cannot converted string to int");
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    throw new RuntimeException("cannot converted string to float");
+  }
+
+  @Override
   public String getStringValue(int dictionaryId) {
     return getString(dictionaryId);
   }

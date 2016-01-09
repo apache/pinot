@@ -552,22 +552,24 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     for (String metric : dataSchema.getMetricNames()) {
+      final int dicId =
+          ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getInt(docId);
       switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
         case INT:
-          rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getInt(docId));
+          int intValue = dictionaryMap.get(metric).getIntValue(dicId);
+          rowValues.put(metric, intValue);
           break;
         case FLOAT:
-          rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getFloat(docId));
+          float floatValue = dictionaryMap.get(metric).getFloatValue(dicId);
+          rowValues.put(metric, floatValue);
           break;
         case LONG:
-          rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getLong(docId));
+          long longValue = dictionaryMap.get(metric).getLongValue(dicId);
+          rowValues.put(metric, longValue);
           break;
         case DOUBLE:
-          rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getDouble(docId));
+          double doubleValue = dictionaryMap.get(metric).getDoubleValue(dicId);
+          rowValues.put(metric, doubleValue);
           break;
         default:
           throw new UnsupportedOperationException("unsopported metric data type");
