@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,13 +13,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.Response;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -39,6 +48,8 @@ import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
+import com.sun.jersey.api.ConflictException;
+import com.sun.jersey.api.NotFoundException;
 
 @Path("/funnels")
 @Produces(MediaType.APPLICATION_JSON)
@@ -73,6 +84,45 @@ public class FunnelsDataProvider {
 
   public CustomFunnelSpec getFunnelSpecFor(String collection) {
     return funnelSpecsMap.get(collection);
+  }
+
+  @DELETE
+  @Path("/{collection}")
+  public Response deleteFunnel(@PathParam("collection") String collection) throws Exception
+  {
+    File collectionDir = new File(funnelsRoot, collection);
+    if (collectionDir.exists()) {
+      FileUtils.deleteDirectory(collectionDir);
+    } else {
+      throw new NotFoundException("Funnel for collection " + collection +" at " + collectionDir.getPath() + " does not exist");
+    }
+
+    return Response.noContent().build();
+  }
+
+  @POST
+  @Path("/{collection}")
+  @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+  public Response postFunnelConfig(@PathParam("collection") String collection, byte[] funnelConfigBytes) throws IOException
+  {
+    File collectionDir = new File(funnelsRoot, collection);
+    if (!collectionDir.exists())
+    {
+      FileUtils.forceMkdir(collectionDir);
+    }
+
+    File funnelConfigFile = new File(collectionDir, FUNNELS_CONFIG_FILE_NAME);
+
+    if (!funnelConfigFile.exists())
+    {
+      IOUtils.copy(new ByteArrayInputStream(funnelConfigBytes), new FileOutputStream(funnelConfigFile));
+    }
+    else
+    {
+      throw new ConflictException(funnelConfigFile.getPath()+" already exists. A DELETE of /funnels/{collection} is required first");
+    }
+
+    return Response.ok().build();
   }
 
   /**
