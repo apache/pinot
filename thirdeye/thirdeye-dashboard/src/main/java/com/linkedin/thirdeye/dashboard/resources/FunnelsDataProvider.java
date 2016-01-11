@@ -59,6 +59,7 @@ public class FunnelsDataProvider {
   private static final String DEFAULT_FUNNEL_VISUALIZATION_TYPE = "HEATMAP";
 
   private static String FUNNELS_CONFIG_FILE_NAME = "funnels.yml";
+  private static String FUNNELS_CONFIG_FILE_ARCHIVE = "funnels.archive";
 
   private static final Logger LOG = LoggerFactory.getLogger(FunnelsDataProvider.class);
   private static final Joiner METRIC_FUNCTION_JOINER = Joiner.on(",");
@@ -91,11 +92,20 @@ public class FunnelsDataProvider {
   public Response deleteFunnel(@PathParam("collection") String collection) throws Exception
   {
     File collectionDir = new File(funnelsRoot, collection);
-    if (collectionDir.exists()) {
-      FileUtils.deleteDirectory(collectionDir);
+    File funnelsConfigFile = new File(collectionDir, FUNNELS_CONFIG_FILE_NAME);
+
+    if (funnelsConfigFile.exists()) {
+
+      File funnelsConfigArchive = new File(collectionDir, FUNNELS_CONFIG_FILE_ARCHIVE);
+      if (funnelsConfigArchive.exists()) {
+        FileUtils.deleteQuietly(funnelsConfigArchive);
+      }
+      FileUtils.moveFile(funnelsConfigFile, funnelsConfigArchive);
     } else {
       throw new NotFoundException("Funnel for collection " + collection +" at " + collectionDir.getPath() + " does not exist");
     }
+
+    loadConfigs();
 
     return Response.noContent().build();
   }
@@ -103,7 +113,7 @@ public class FunnelsDataProvider {
   @POST
   @Path("/{collection}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response postFunnelConfig(@PathParam("collection") String collection, byte[] funnelConfigBytes) throws IOException
+  public Response postFunnelConfig(@PathParam("collection") String collection, byte[] funnelConfigBytes) throws Exception
   {
     File collectionDir = new File(funnelsRoot, collection);
     if (!collectionDir.exists())
@@ -122,8 +132,11 @@ public class FunnelsDataProvider {
       throw new ConflictException(funnelConfigFile.getPath()+" already exists. A DELETE of /funnels/{collection} is required first");
     }
 
+    loadConfigs();
+
     return Response.ok().build();
   }
+
 
   /**
    * Computes funnel views using the provided metric function w/ the metrics replaced for each of
@@ -300,6 +313,8 @@ public class FunnelsDataProvider {
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out
   // late}
   private void loadConfigs() throws Exception {
+
+    funnelSpecsMap.clear();
     // looping through all the dirs, finding one funnels file and loading it up
     ObjectMapper ymlReader = new ObjectMapper(new YAMLFactory());
     for (File f : funnelsRoot.listFiles()) {
