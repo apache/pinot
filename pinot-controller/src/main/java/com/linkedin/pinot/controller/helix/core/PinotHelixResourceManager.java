@@ -1183,7 +1183,7 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  // Check to see if the table has been explicitly configured to use messageBasedRefresh.
+  // Check to see if the table has been explicitly configured to NOT use messageBasedRefresh.
   private boolean shouldSendMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
     final String rawTableName = segmentZKMetadata.getTableName();
     AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
@@ -1191,15 +1191,13 @@ public class PinotHelixResourceManager {
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
       if (customConfigMap != null) {
-        // For now, use the message-based segment refresh only if explicitly defined for the segment.
-        // If not, go through the usual OFFLINE/ONLINE state transition.
         if (customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) &&
-            Boolean.valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY))) {
-          return true;
+            ! Boolean.valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY))) {
+          return false;
         }
       }
     }
-    return false;
+    return true;
   }
 
   /**
