@@ -17,20 +17,18 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import java.util.List;
 import java.util.Map;
-
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
-import kafka.javaapi.consumer.ConsumerConnector;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import kafka.consumer.ConsumerConfig;
+import kafka.consumer.ConsumerIterator;
+import kafka.consumer.KafkaStream;
+import kafka.javaapi.consumer.ConsumerConnector;
 
 
 /**
@@ -50,6 +48,8 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private ConsumerConnector consumer;
   private KafkaStream<byte[], byte[]> kafkaStreams;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;
+  private long lastLogTime = 0;
+  private long lastCount = 0;
 
   @Override
   public void init(StreamProviderConfig streamProviderConfig) throws Exception {
@@ -79,6 +79,20 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
       try {
         GenericRow row = decoder.decode(kafkaIterator.next().message());
         kafkaEventsConsumedCount.inc();
+
+        // TODO Remove this logging stuff
+        final long now = System.currentTimeMillis();
+        final long currentCount = kafkaEventsConsumedCount.count();
+        // Log every minute or 100k events
+        if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
+          if (lastCount == 0) {
+            LOGGER.warn("Consumed {} events from kafka", currentCount);
+          } else {
+            LOGGER.warn("Consumed {} events from kafka (rate:{}/s)", currentCount-lastCount, (float)(currentCount-lastCount)*1000/(now-lastLogTime));
+          }
+          lastCount = currentCount;
+          lastLogTime = now;
+        }
         return row;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while consuming events", e);
