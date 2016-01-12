@@ -3,10 +3,10 @@ package com.linkedin.thirdeye.dashboard;
 import java.io.File;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.http.client.HttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
 import com.linkedin.thirdeye.dashboard.resources.CollectionConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.ContributorDataProvider;
 import com.linkedin.thirdeye.dashboard.resources.CustomDashboardResource;
@@ -19,10 +19,10 @@ import com.linkedin.thirdeye.dashboard.task.ClearCachesTask;
 import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
+import com.linkedin.thirdeye.dashboard.util.ThirdEyeClientMap;
 
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
@@ -48,16 +48,19 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
 
     LOG.info("running the Dashboard application with configs, {}", config.toString());
 
-    final HttpClient httpClient =
-        new HttpClientBuilder(environment).using(config.getHttpClient()).build(getName());
+    // TODO upgrade dropwizard version so that this returns a CloseableHttpClient that can in turn
+    // be passed to DefaultThirdEyeClient via new constructors
+    // opt: also pass in object mapper, environment.getObjectMapper()
+    // final HttpClient httpClient =
+    // new HttpClientBuilder(environment).using(config.getHttpClient()).build(getName());
 
     ExecutorService queryExecutor =
         environment.lifecycle().executorService("query_executor").build();
 
     ConfigCache configCache = new ConfigCache();
-    DataCache dataCache = new DataCache(httpClient, environment.getObjectMapper());
-    QueryCache queryCache =
-        new QueryCache(httpClient, environment.getObjectMapper(), queryExecutor);
+    ThirdEyeClientMap thirdEyeClientMap = new ThirdEyeClientMap(new DefaultThirdEyeClientFactory());
+    DataCache dataCache = new DataCache(thirdEyeClientMap);
+    QueryCache queryCache = new QueryCache(thirdEyeClientMap, queryExecutor);
 
     CustomDashboardResource customDashboardResource = null;
     if (config.getCustomDashboardRoot() != null) {
@@ -108,4 +111,5 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
   public static void main(String[] args) throws Exception {
     new ThirdEyeDashboard().run(args);
   }
+
 }

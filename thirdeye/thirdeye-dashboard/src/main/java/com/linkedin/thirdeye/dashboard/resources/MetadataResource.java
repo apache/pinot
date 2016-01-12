@@ -1,14 +1,15 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.dashboard.api.SegmentDescriptor;
-import com.linkedin.thirdeye.dashboard.util.DataCache;
+import java.util.List;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import java.util.List;
+
+import com.linkedin.thirdeye.api.SegmentDescriptor;
+import com.linkedin.thirdeye.dashboard.util.DataCache;
 
 @Path("/metadata")
 @Produces(MediaType.APPLICATION_JSON)

@@ -1,15 +1,18 @@
 package com.linkedin.thirdeye.api;
 
-import org.joda.time.DateTime;
-
 import java.io.File;
 
+import org.joda.time.DateTime;
+
 public class SegmentDescriptor {
-  private final File file;
-  private final DateTime startWallTime;
-  private final DateTime endWallTime;
-  private final DateTime startDataTime;
-  private final DateTime endDataTime;
+  private File file;
+  private DateTime startWallTime;
+  private DateTime endWallTime;
+  private DateTime startDataTime;
+  private DateTime endDataTime;
+
+  public SegmentDescriptor() {
+  };
 
   public SegmentDescriptor(File file, DateTime startWallTime, DateTime endWallTime,
       DateTime startDataTime, DateTime endDataTime) {
@@ -39,4 +42,13 @@ public class SegmentDescriptor {
   public DateTime getEndDataTime() {
     return endDataTime;
   }
+
+  @Override
+  public String toString() {
+    if (file == null) {
+      return "null";
+    }
+    return file.getName();
+  }
+
 }

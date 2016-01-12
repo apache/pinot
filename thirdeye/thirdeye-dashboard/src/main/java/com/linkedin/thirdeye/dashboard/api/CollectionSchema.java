@@ -1,9 +1,12 @@
 package com.linkedin.thirdeye.dashboard.api;
 
-import com.google.common.base.Objects;
-
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+
+import com.google.common.base.Objects;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public class CollectionSchema {
   private List<String> dimensions;
@@ -12,6 +15,31 @@ public class CollectionSchema {
   private List<String> metricAliases;
 
   public CollectionSchema() {
+  }
+
+  public static CollectionSchema fromStarTreeConfig(StarTreeConfig config) {
+    CollectionSchema schema = new CollectionSchema();
+    List<DimensionSpec> dimensionSpecs = config.getDimensions();
+    ArrayList<String> dimensions = new ArrayList<>(dimensionSpecs.size());
+    ArrayList<String> dimensionAliases = new ArrayList<>(dimensionSpecs.size());
+    for (DimensionSpec spec : dimensionSpecs) {
+      dimensions.add(spec.getName());
+      dimensionAliases.add(spec.getAlias());
+    }
+    schema.setDimensions(dimensions);
+    schema.setDimensionAliases(dimensionAliases);
+
+    List<MetricSpec> metricSpecs = config.getMetrics();
+    ArrayList<String> metrics = new ArrayList<>(metricSpecs.size());
+    ArrayList<String> metricAliases = new ArrayList<>(metricSpecs.size());
+    for (MetricSpec spec : metricSpecs) {
+      metrics.add(spec.getName());
+      metricAliases.add(spec.getAlias());
+    }
+
+    schema.setMetrics(metrics);
+    schema.setMetricAliases(metricAliases);
+    return schema;
   }
 
   public List<String> getDimensions() {

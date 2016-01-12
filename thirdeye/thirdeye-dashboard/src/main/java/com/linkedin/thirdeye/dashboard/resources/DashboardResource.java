@@ -31,12 +31,12 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.SegmentDescriptor;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.DimensionViewType;
 import com.linkedin.thirdeye.dashboard.api.MetricViewType;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import com.linkedin.thirdeye.dashboard.api.SegmentDescriptor;
 import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
