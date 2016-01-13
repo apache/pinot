@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.anomaly.server.resources;
 
-import io.dropwizard.views.View;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -58,13 +56,18 @@ import com.linkedin.thirdeye.anomaly.util.ThirdEyeServerUtils;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
-import com.linkedin.thirdeye.client.FlowControlledDefaultThirdEyeClient;
+import com.linkedin.thirdeye.client.CachedThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.FlowControlledThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
+
+import io.dropwizard.views.View;
 
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
 public class FunctionTableResource {
+
+  private static final int MAX_PARALLEL_REQUESTS = 1;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionTableResource.class);
 
@@ -81,15 +84,17 @@ public class FunctionTableResource {
     collectionToConfigMap = new HashMap<>();
 
     for (ThirdEyeAnomalyDetectionConfiguration config : configs) {
-      DefaultThirdEyeClientConfig thirdEyeClientConfig = new DefaultThirdEyeClientConfig();
+      CachedThirdEyeClientConfig thirdEyeClientConfig = new CachedThirdEyeClientConfig();
       thirdEyeClientConfig.setExpirationTime(60);
       thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
       thirdEyeClientConfig.setExpireAfterAccess(false);
+      thirdEyeClientConfig.setUseCacheForExecuteMethod(true);
 
       collectionToConfigMap.put(config.getCollectionName(), config);
-      collectionToThirdEyeClient.put(config.getCollectionName(),
-          new FlowControlledDefaultThirdEyeClient(config.getThirdEyeServerHost(),
-              config.getThirdEyeServerPort(), thirdEyeClientConfig, 1));
+      ThirdEyeClient client = new DefaultThirdEyeClientFactory(thirdEyeClientConfig)
+          .getClient(config.getThirdEyeServerHost(), config.getThirdEyeServerPort());
+      client = new FlowControlledThirdEyeClient(client, MAX_PARALLEL_REQUESTS);
+      collectionToThirdEyeClient.put(config.getCollectionName(), client);
     }
   }
 

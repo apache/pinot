@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpHost;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -21,19 +19,20 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.SegmentDescriptor;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
 
+/**
+ * Standard client for querying against ThirdEye server. It is strongly recommended to use
+ * {@link CachedThirdEyeClient} or instantiate this class via {@link DefaultThirdEyeClientBuilder}
+ * to improve performance.
+ */
 public class DefaultThirdEyeClient implements ThirdEyeClient {
   private static final int DEFAULT_CACHE_EXPIRATION_DURATION = 5;
   private static final Logger LOG = LoggerFactory.getLogger(DefaultThirdEyeClient.class);
@@ -44,303 +43,141 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
   private static final String SEGMENTS_ENDPOINT = "/segments";
   private static final String UTF_8 = "UTF-8";
 
-  private final DefaultThirdEyeClientConfig config;
   private final HttpHost httpHost;
   private final CloseableHttpClient httpClient;
-  private final LoadingCache<QuerySpec, Map<DimensionKey, MetricTimeSeries>> resultCache;
-  private final LoadingCache<String, Map<String, MetricType>> schemaCache;
-  private final LoadingCache<String, StarTreeConfig> starTreeConfigCache;
-  private final LoadingCache<String, ThirdEyeRawResponse> rawResultCache;
-  private final LoadingCache<String, List<SegmentDescriptor>> segmentDescriptorCache;
-  private Supplier<List<String>> collectionsSupplier;
-  private final Supplier<List<String>> _baseCollectionsSupplier = new CollectionSupplier();
 
   public DefaultThirdEyeClient(String hostname, int port) {
-    this(hostname, port, new DefaultThirdEyeClientConfig());
-  }
-
-  @SuppressWarnings("unchecked")
-  public DefaultThirdEyeClient(String hostname, int port, DefaultThirdEyeClientConfig config) {
-    LOG.info("Initializing client for {}:{} with config {}", hostname, port, config);
-    this.config = config;
+    LOG.info("Initializing client for {}:{}", hostname, port);
     this.httpHost = new HttpHost(hostname, port);
     // TODO currently no way to configure the CloseableHttpClient
     this.httpClient = HttpClients.createDefault();
-
-    CacheBuilder builder = CacheBuilder.newBuilder();
-    if (config.isExpireAfterAccess()) {
-      builder.expireAfterAccess(config.getExpirationTime(), config.getExpirationUnit());
-    } else {
-      builder.expireAfterWrite(config.getExpirationTime(), config.getExpirationUnit());
-    }
-    this.resultCache = builder.build(new ResultCacheLoader());
-    this.rawResultCache = builder.build(new RawResultCacheLoader());
-
-    // TODO make these expiration times individually configurable
-    this.schemaCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(DEFAULT_CACHE_EXPIRATION_DURATION, TimeUnit.SECONDS)
-        .build(new SchemaCacheLoader());
-    this.starTreeConfigCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(DEFAULT_CACHE_EXPIRATION_DURATION, TimeUnit.SECONDS)
-        .build(new StarTreeConfigCacheLoader());
-    // longer because request involves file system operations (migrated from DataCache)
-    this.segmentDescriptorCache = CacheBuilder.newBuilder()
-        .expireAfterAccess(DEFAULT_CACHE_EXPIRATION_DURATION, TimeUnit.MINUTES)
-        .build(new SegmentDescriptorCacheLoader());
-
-    this.collectionsSupplier = buildCollectionsSupplier();
-
     LOG.info("Created DefaultThirdEyeClient to {}", httpHost);
-  }
-
-  private Supplier<List<String>> buildCollectionsSupplier() {
-    return Suppliers.memoizeWithExpiration(_baseCollectionsSupplier, config.getExpirationTime(),
-        config.getExpirationUnit());
   }
 
   @Override
   public Map<DimensionKey, MetricTimeSeries> execute(ThirdEyeRequest request) throws Exception {
-    QuerySpec querySpec = new QuerySpec(request.getCollection(), request.toSql());
-    LOG.debug("Generated SQL {}", request.toSql());
-    return resultCache.get(querySpec);
+    String sql = request.toSql();
+    LOG.debug("Generated SQL {}", sql);
+    ThirdEyeRawResponse rawResponse = getRawResponse(sql);
+
+    // Figure out the metric types of the projection
+    StarTreeConfig starTreeConfig = getStarTreeConfig(request.getCollection());
+    Map<String, MetricType> metricTypes = new HashMap<>();
+    for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
+      String metricName = metricSpec.getName();
+      MetricType metricType = metricSpec.getType();
+      metricTypes.put(metricName, metricType);
+    }
+    List<MetricType> projectionTypes = new ArrayList<>();
+    for (String metricName : rawResponse.getMetrics()) {
+      MetricType metricType = metricTypes.get(metricName);
+      projectionTypes.add(metricType);
+    }
+    return rawResponse.convert(projectionTypes);
   }
 
   @Override
   public ThirdEyeRawResponse getRawResponse(String sql) throws Exception {
-    return rawResultCache.get(sql);
+    HttpGet req = new HttpGet(QUERY_ENDPOINT + URLEncoder.encode(sql, UTF_8));
+    LOG.info("Executing sql request: {}", req);
+    CloseableHttpResponse res = httpClient.execute(httpHost, req);
+    try {
+      if (res.getStatusLine().getStatusCode() != 200) {
+        throw new IllegalStateException(res.getStatusLine().toString());
+      }
+
+      // Parse response
+      InputStream content = res.getEntity().getContent();
+      ThirdEyeRawResponse rawResponse = OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
+      return rawResponse;
+
+    } finally {
+      if (res.getEntity() != null) {
+        EntityUtils.consume(res.getEntity());
+      }
+      res.close();
+    }
   }
 
   @Override
   public StarTreeConfig getStarTreeConfig(String collection) throws Exception {
-    return starTreeConfigCache.get(collection);
+    HttpGet req = new HttpGet(COLLECTIONS_ENDPOINT + URLEncoder.encode(collection, UTF_8));
+    LOG.info("Retrieving star tree config: {}", req);
+    CloseableHttpResponse res = httpClient.execute(httpHost, req);
+    try {
+      if (res.getStatusLine().getStatusCode() != 200) {
+        throw new IllegalStateException(res.getStatusLine().toString());
+      }
+      InputStream content = res.getEntity().getContent();
+      StarTreeConfig starTreeConfig = OBJECT_MAPPER.readValue(content, StarTreeConfig.class);
+
+      return starTreeConfig;
+    } finally {
+      if (res.getEntity() != null) {
+        EntityUtils.consume(res.getEntity());
+      }
+      res.close();
+    }
   }
 
   @Override
   public List<String> getCollections() throws Exception {
-    return collectionsSupplier.get();
+    try {
+      HttpGet req = new HttpGet(COLLECTIONS_ENDPOINT);
+      LOG.info("Loading collections: {}", req);
+      CloseableHttpResponse res = httpClient.execute(httpHost, req);
+      try {
+        if (res.getStatusLine().getStatusCode() != 200) {
+          throw new IllegalStateException(res.getStatusLine().toString());
+        }
+        InputStream content = res.getEntity().getContent();
+
+        List<String> collections = OBJECT_MAPPER.readValue(content,
+            OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, String.class));
+        return collections;
+      } finally {
+        if (res.getEntity() != null) {
+          EntityUtils.consume(res.getEntity());
+        }
+        res.close();
+      }
+    } catch (IllegalStateException e) {
+      throw new RuntimeException(e);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
   public List<SegmentDescriptor> getSegmentDescriptors(String collection) throws Exception {
-    return segmentDescriptorCache.get(collection);
+    HttpGet req = new HttpGet(
+        COLLECTIONS_ENDPOINT + URLEncoder.encode(collection, UTF_8) + SEGMENTS_ENDPOINT);
+    LOG.info("Loading segment descriptors: {}", req);
+    CloseableHttpResponse res = httpClient.execute(httpHost, req);
+    try {
+      if (res.getStatusLine().getStatusCode() != 200) {
+        throw new IllegalStateException(res.getStatusLine().toString());
+      }
+      InputStream content = res.getEntity().getContent();
+
+      List<SegmentDescriptor> segments = OBJECT_MAPPER.readValue(content, OBJECT_MAPPER
+          .getTypeFactory().constructCollectionType(List.class, SegmentDescriptor.class));
+      return segments;
+    } finally {
+      if (res.getEntity() != null) {
+        EntityUtils.consume(res.getEntity());
+      }
+      res.close();
+    }
   }
 
   @Override
   public void clear() throws Exception {
-    resultCache.invalidateAll();
-    schemaCache.invalidateAll();
-    starTreeConfigCache.invalidateAll();
-    rawResultCache.invalidateAll();
-    this.collectionsSupplier = buildCollectionsSupplier();
-    segmentDescriptorCache.invalidateAll();
-
   }
 
   @Override
   public void close() throws Exception {
     httpClient.close();
-  }
-
-  /**
-   * Executes SQL statements against the /query resource.
-   */
-  private class ResultCacheLoader
-      extends CacheLoader<QuerySpec, Map<DimensionKey, MetricTimeSeries>> {
-    @Override
-    public Map<DimensionKey, MetricTimeSeries> load(QuerySpec querySpec) throws Exception {
-      LOG.info("Loading results for {}", querySpec);
-      String sql = querySpec.getSql();
-      ThirdEyeRawResponse rawResponse = getRawResponse(sql);
-
-      // Figure out the metric types of the projection
-      Map<String, MetricType> metricTypes = schemaCache.get(querySpec.getCollection());
-      List<MetricType> projectionTypes = new ArrayList<>();
-      for (String metricName : rawResponse.getMetrics()) {
-        MetricType metricType = metricTypes.get(metricName);
-        if (metricType == null) { // could be derived
-          metricType = MetricType.DOUBLE;
-        }
-        projectionTypes.add(metricType);
-      }
-
-      return rawResponse.convert(projectionTypes);
-    }
-  }
-
-  /**
-   * Executes SQL statements against the /query resource.
-   */
-  private class RawResultCacheLoader extends CacheLoader<String, ThirdEyeRawResponse> {
-
-    @Override
-    public ThirdEyeRawResponse load(String sql) throws Exception {
-
-      HttpGet req = new HttpGet(QUERY_ENDPOINT + URLEncoder.encode(sql, UTF_8));
-      LOG.info("Executing sql request: {}", req);
-      CloseableHttpResponse res = httpClient.execute(httpHost, req);
-      try {
-        if (res.getStatusLine().getStatusCode() != 200) {
-          throw new IllegalStateException(res.getStatusLine().toString());
-        }
-
-        // Parse response
-        InputStream content = res.getEntity().getContent();
-        ThirdEyeRawResponse rawResponse =
-            OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
-        return rawResponse;
-
-      } finally {
-        if (res.getEntity() != null) {
-          EntityUtils.consume(res.getEntity());
-        }
-        res.close();
-      }
-    }
-  }
-
-  /**
-   * Retrieves starTreeConfig from server
-   */
-  private class StarTreeConfigCacheLoader extends CacheLoader<String, StarTreeConfig> {
-
-    @Override
-    public StarTreeConfig load(String collection) throws Exception {
-      HttpGet req = new HttpGet(COLLECTIONS_ENDPOINT + URLEncoder.encode(collection, UTF_8));
-      LOG.info("Retrieving star tree config: {}", req);
-      CloseableHttpResponse res = httpClient.execute(httpHost, req);
-      try {
-        if (res.getStatusLine().getStatusCode() != 200) {
-          throw new IllegalStateException(res.getStatusLine().toString());
-        }
-        InputStream content = res.getEntity().getContent();
-        StarTreeConfig starTreeConfig = OBJECT_MAPPER.readValue(content, StarTreeConfig.class);
-
-        return starTreeConfig;
-      } finally {
-        if (res.getEntity() != null) {
-          EntityUtils.consume(res.getEntity());
-        }
-        res.close();
-      }
-    }
-  }
-
-  private class SchemaCacheLoader extends CacheLoader<String, Map<String, MetricType>> {
-    @Override
-    public Map<String, MetricType> load(String collection) throws Exception {
-      HttpGet req = new HttpGet(COLLECTIONS_ENDPOINT + URLEncoder.encode(collection, UTF_8));
-      LOG.info("Loading metric schema: {}", req);
-      CloseableHttpResponse res = httpClient.execute(httpHost, req);
-      try {
-        if (res.getStatusLine().getStatusCode() != 200) {
-          throw new IllegalStateException(res.getStatusLine().toString());
-        }
-        InputStream content = res.getEntity().getContent();
-        JsonNode json = OBJECT_MAPPER.readTree(content);
-
-        Map<String, MetricType> metricTypes = new HashMap<>();
-        for (JsonNode metricSpec : json.get("metrics")) {
-          String metricName = metricSpec.get("name").asText();
-          MetricType metricType = MetricType.valueOf(metricSpec.get("type").asText());
-          metricTypes.put(metricName, metricType);
-        }
-
-        LOG.info("Cached metric types for {}: {}", collection, metricTypes);
-        return metricTypes;
-      } finally {
-        if (res.getEntity() != null) {
-          EntityUtils.consume(res.getEntity());
-        }
-        res.close();
-      }
-    }
-  }
-
-  private class CollectionSupplier implements Supplier<List<String>> {
-    @Override
-    public List<String> get() {
-      try {
-        HttpGet req = new HttpGet(COLLECTIONS_ENDPOINT);
-        LOG.info("Loading collections: {}", req);
-        CloseableHttpResponse res = httpClient.execute(httpHost, req);
-        try {
-          if (res.getStatusLine().getStatusCode() != 200) {
-            throw new IllegalStateException(res.getStatusLine().toString());
-          }
-          InputStream content = res.getEntity().getContent();
-
-          List<String> collections = OBJECT_MAPPER.readValue(content,
-              OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, String.class));
-          return collections;
-        } finally {
-          if (res.getEntity() != null) {
-            EntityUtils.consume(res.getEntity());
-          }
-          res.close();
-        }
-      } catch (IllegalStateException | IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  };
-
-  private class SegmentDescriptorCacheLoader extends CacheLoader<String, List<SegmentDescriptor>> {
-
-    @Override
-    public List<SegmentDescriptor> load(String collection) throws Exception {
-      HttpGet req = new HttpGet(
-          COLLECTIONS_ENDPOINT + URLEncoder.encode(collection, UTF_8) + SEGMENTS_ENDPOINT);
-      LOG.info("Loading segment descriptors: {}", req);
-      CloseableHttpResponse res = httpClient.execute(httpHost, req);
-      try {
-        if (res.getStatusLine().getStatusCode() != 200) {
-          throw new IllegalStateException(res.getStatusLine().toString());
-        }
-        InputStream content = res.getEntity().getContent();
-
-        List<SegmentDescriptor> segments = OBJECT_MAPPER.readValue(content, OBJECT_MAPPER
-            .getTypeFactory().constructCollectionType(List.class, SegmentDescriptor.class));
-        return segments;
-      } finally {
-        if (res.getEntity() != null) {
-          EntityUtils.consume(res.getEntity());
-        }
-        res.close();
-      }
-    }
-
-  }
-
-  private static class QuerySpec {
-    private final String collection;
-    private final String sql;
-
-    QuerySpec(String collection, String sql) {
-      this.collection = collection;
-      this.sql = sql;
-    }
-
-    public String getCollection() {
-      return collection;
-    }
-
-    public String getSql() {
-      return sql;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof QuerySpec)) {
-        return false;
-      }
-      QuerySpec s = (QuerySpec) o;
-      return Objects.equals(sql, s.getSql()) && Objects.equals(collection, s.getCollection());
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(sql, collection);
-    }
   }
 
   public static void main(String[] args) throws Exception {
@@ -363,7 +200,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
       request.setGroupBy(args[6]);
     }
 
-    ThirdEyeClient client = new DefaultThirdEyeClient(host, port);
+    // Use builder to leverage cache in case in case multiple queries will be executed.
+    ThirdEyeClient client = new DefaultThirdEyeClientFactory().getClient(host, port);
     try {
       Map<DimensionKey, MetricTimeSeries> result = client.execute(request);
       for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet()) {

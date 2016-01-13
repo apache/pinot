@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.Objects;
+
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.util.SqlUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 public class ThirdEyeRequest {
   private String collection;
@@ -102,6 +105,25 @@ public class ThirdEyeRequest {
     }
     return SqlUtils.getSql(metricFunction, collection, startTime, endTime, dimensionValues);
   }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(collection, metricFunction, startTime, endTime, dimensionValues);
+  };
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof ThirdEyeRequest)) {
+      return false;
+    }
+    ThirdEyeRequest other = (ThirdEyeRequest) o;
+    return Objects.equals(getCollection(), other.getCollection())
+        && Objects.equals(getMetricFunction(), other.getMetricFunction())
+        && Objects.equals(getStartTime(), other.getStartTime())
+        && Objects.equals(getEndTime(), other.getEndTime())
+        && Objects.equals(getDimensionValues(), other.getDimensionValues());
+
+  };
 
   @Override
   public String toString() {

@@ -1,16 +1,16 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class ThirdEyeRawResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -41,17 +41,31 @@ public class ThirdEyeRawResponse {
     this.dimensions = dimensions;
   }
 
+  /** Key should be dimension key followed by timestamp. */
   public Map<String, Map<String, Number[]>> getData() {
     return data;
   }
 
+  /** Key should be dimension key followed by timestamp. */
   public void setData(Map<String, Map<String, Number[]>> data) {
     this.data = data;
   }
 
+  /**
+   * Converts this response to a Map<DimensionKey, MetricTimeSeries> using the provided metric types
+   * for each metric. If the metricType is null, this method assumes the corresponding metric is a
+   * derived metric and should be interpreted as a Double.
+   */
   public Map<DimensionKey, MetricTimeSeries> convert(List<MetricType> metricTypes)
       throws Exception {
-    MetricSchema metricSchema = new MetricSchema(metrics, metricTypes);
+    List<MetricType> filteredMetricTypes = new ArrayList<>(metricTypes);
+    for (int i = 0; i < filteredMetricTypes.size(); i++) {
+      MetricType metricType = filteredMetricTypes.get(i);
+      if (metricType == null) {
+        filteredMetricTypes.set(i, MetricType.DOUBLE);
+      }
+    }
+    MetricSchema metricSchema = new MetricSchema(metrics, filteredMetricTypes);
 
     // Convert raw data
     Map<DimensionKey, MetricTimeSeries> converted = new HashMap<>();

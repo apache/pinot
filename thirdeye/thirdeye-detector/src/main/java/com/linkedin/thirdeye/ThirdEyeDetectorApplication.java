@@ -20,8 +20,8 @@ import com.linkedin.thirdeye.api.AnomalyFunctionSpec;
 import com.linkedin.thirdeye.api.AnomalyResult;
 import com.linkedin.thirdeye.api.ContextualEvent;
 import com.linkedin.thirdeye.api.EmailConfiguration;
-import com.linkedin.thirdeye.client.DefaultThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
 import com.linkedin.thirdeye.db.AnomalyFunctionRelationDAO;
 import com.linkedin.thirdeye.db.AnomalyFunctionSpecDAO;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
@@ -106,8 +106,8 @@ public class ThirdEyeDetectorApplication extends Application<ThirdEyeDetectorCon
         new AnomalyFunctionRelationDAO(hibernate.getSessionFactory());
 
     // ThirdEye client
-    final ThirdEyeClient thirdEyeClient =
-        new DefaultThirdEyeClient(config.getThirdEyeHost(), config.getThirdEyePort());
+    final ThirdEyeClient thirdEyeClient = new DefaultThirdEyeClientFactory()
+        .getClient(config.getThirdEyeHost(), config.getThirdEyePort());
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {

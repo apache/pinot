@@ -12,7 +12,7 @@ public class SegmentDescriptor {
   private DateTime endDataTime;
 
   public SegmentDescriptor() {
-  };
+  }
 
   public SegmentDescriptor(File file, DateTime startWallTime, DateTime endWallTime,
       DateTime startDataTime, DateTime endDataTime) {

@@ -45,14 +45,17 @@ import com.linkedin.thirdeye.anomaly.util.TimeGranularityUtils;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
-import com.linkedin.thirdeye.client.FlowControlledDefaultThirdEyeClient;
+import com.linkedin.thirdeye.client.CachedThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.FlowControlledThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
 
 /**
  * This class may be called by the standalone modes of operation or an external scheduling service.
  */
 public class ThirdEyeAnomalyDetection implements Callable<Void> {
+
+  private static final int MAX_PARALLEL_REQUESTS = 1;
 
   private static final int DEFAULT_CACHE_EXPIRATION_MINUTES = 5;
 
@@ -78,14 +81,17 @@ public class ThirdEyeAnomalyDetection implements Callable<Void> {
    * {@inheritDoc}
    * @see java.util.concurrent.Callable#call()
    */
+  @Override
   public Void call() throws Exception {
-    DefaultThirdEyeClientConfig thirdEyeClientConfig = new DefaultThirdEyeClientConfig();
+    CachedThirdEyeClientConfig thirdEyeClientConfig = new CachedThirdEyeClientConfig();
     thirdEyeClientConfig.setExpirationTime(DEFAULT_CACHE_EXPIRATION_MINUTES);
     thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
     thirdEyeClientConfig.setExpireAfterAccess(false);
+    thirdEyeClientConfig.setUseCacheForExecuteMethod(true);
 
-    ThirdEyeClient thirdEyeClient = new FlowControlledDefaultThirdEyeClient(
-        config.getThirdEyeServerHost(), config.getThirdEyeServerPort(), thirdEyeClientConfig, 1);
+    ThirdEyeClient thirdEyeClient = new DefaultThirdEyeClientFactory(thirdEyeClientConfig)
+        .getClient(config.getThirdEyeServerHost(), config.getThirdEyeServerPort());
+    thirdEyeClient = new FlowControlledThirdEyeClient(thirdEyeClient, MAX_PARALLEL_REQUESTS);
 
     AnomalyDetectionFunctionFactory functionFactory;
     switch (config.getMode()) {

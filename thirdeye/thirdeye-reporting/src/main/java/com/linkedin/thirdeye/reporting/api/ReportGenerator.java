@@ -36,11 +36,10 @@ import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.reporting.api.TimeRange;
-import com.linkedin.thirdeye.client.DefaultThirdEyeClient;
-import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.CachedThirdEyeClientConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
 import com.linkedin.thirdeye.client.util.SqlUtils;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGeneratorApi;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
@@ -76,14 +75,13 @@ public class ReportGenerator implements Job {
   }
 
   private void createThirdeyeClient() throws URISyntaxException {
-
-    DefaultThirdEyeClientConfig thirdEyeClientConfig = new DefaultThirdEyeClientConfig();
+    CachedThirdEyeClientConfig thirdEyeClientConfig = new CachedThirdEyeClientConfig();
     thirdEyeClientConfig.setExpirationTime(DEFAULT_CACHE_EXPIRATION_MINUTES);
     thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
     thirdEyeClientConfig.setExpireAfterAccess(false);
-
-    thirdeyeClient =
-        new DefaultThirdEyeClient(getThirdeyeHost(), getThirdeyePort(), thirdEyeClientConfig);
+    thirdEyeClientConfig.setUseCacheForExecuteMethod(true);
+    thirdeyeClient = new DefaultThirdEyeClientFactory(thirdEyeClientConfig)
+        .getClient(getThirdeyeHost(), getThirdeyePort());
   }
 
   /**
