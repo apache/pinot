@@ -8,7 +8,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class UriUtils {
-  public static Map<String, String> extractDimensionValues(MultivaluedMap<String, String> multiMap) {
+  public static Map<String, String> extractDimensionValues(
+      MultivaluedMap<String, String> multiMap) {
     Map<String, String> dimensionValues = new TreeMap<>();
 
     for (Map.Entry<String, List<String>> entry : multiMap.entrySet()) {

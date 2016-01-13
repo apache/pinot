@@ -18,15 +18,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-
 public class QueryCache {
   private final ExecutorService executorService;
   private final LoadingCache<QuerySpec, QueryResult> cache;
 
-  public QueryCache(HttpClient httpClient, ObjectMapper objectMapper, ExecutorService executorService) {
+  public QueryCache(HttpClient httpClient, ObjectMapper objectMapper,
+      ExecutorService executorService) {
     this.executorService = executorService;
-    this.cache = CacheBuilder.newBuilder()
-        .expireAfterWrite(1, TimeUnit.MINUTES)
+    this.cache = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES)
         .build(new QueryCacheLoader(httpClient, objectMapper));
   }
 
@@ -38,7 +37,8 @@ public class QueryCache {
     return cache.get(new QuerySpec(serverUri, sql));
   }
 
-  public Future<QueryResult> getQueryResultAsync(final String serverUri, final String sql) throws Exception {
+  public Future<QueryResult> getQueryResultAsync(final String serverUri, final String sql)
+      throws Exception {
     return executorService.submit(new Callable<QueryResult>() {
       @Override
       public QueryResult call() throws Exception {
@@ -58,7 +58,8 @@ public class QueryCache {
 
     @Override
     public QueryResult load(QuerySpec querySpec) throws Exception {
-      URI uri = URI.create(querySpec.getServerUri() + "/query/" + URLEncoder.encode(querySpec.getSql(), "UTF-8"));
+      URI uri = URI.create(
+          querySpec.getServerUri() + "/query/" + URLEncoder.encode(querySpec.getSql(), "UTF-8"));
       HttpGet httpGet = new HttpGet(uri);
       HttpResponse httpResponse = httpClient.execute(httpGet);
 
@@ -107,9 +108,7 @@ public class QueryCache {
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(QuerySpec.class)
-          .add("serverUri", serverUri)
-          .add("sql", sql)
+      return Objects.toStringHelper(QuerySpec.class).add("serverUri", serverUri).add("sql", sql)
           .toString();
     }
   }

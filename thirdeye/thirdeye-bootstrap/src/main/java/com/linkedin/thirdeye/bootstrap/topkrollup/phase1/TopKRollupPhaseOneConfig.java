@@ -14,23 +14,23 @@ public class TopKRollupPhaseOneConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<MetricType> metricTypes;
-  private Map<String,Double> metricThresholds;
+  private Map<String, Double> metricThresholds;
+
   /**
    *
    */
-  public TopKRollupPhaseOneConfig(){
+  public TopKRollupPhaseOneConfig() {
 
   }
-/**
- *
- * @param dimensionNames
- * @param metricNames
- * @param metricTypes
- * @param metricThresholds
- */
-  public TopKRollupPhaseOneConfig(List<String> dimensionNames,
-      List<String> metricNames, List<MetricType> metricTypes,
-      Map<String, Double> metricThresholds) {
+
+  /**
+   * @param dimensionNames
+   * @param metricNames
+   * @param metricTypes
+   * @param metricThresholds
+   */
+  public TopKRollupPhaseOneConfig(List<String> dimensionNames, List<String> metricNames,
+      List<MetricType> metricTypes, Map<String, Double> metricThresholds) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -54,20 +54,17 @@ public class TopKRollupPhaseOneConfig {
     return metricThresholds;
   }
 
-  public static TopKRollupPhaseOneConfig fromStarTreeConfig(StarTreeConfig config)
-  {
+  public static TopKRollupPhaseOneConfig fromStarTreeConfig(StarTreeConfig config) {
 
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
+    for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
@@ -81,9 +78,6 @@ public class TopKRollupPhaseOneConfig {
       }
     }
 
-    return new TopKRollupPhaseOneConfig(dimensionNames,
-                                    metricNames,
-                                    metricTypes,
-                                    metricThresholds);
+    return new TopKRollupPhaseOneConfig(dimensionNames, metricNames, metricTypes, metricThresholds);
   }
 }

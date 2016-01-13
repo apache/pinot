@@ -6,8 +6,7 @@ import java.util.Set;
 /**
  * A getAggregate on a {@link StarTree} that returns metrics for a dimension combination.
  */
-public interface StarTreeQuery
-{
+public interface StarTreeQuery {
   /** @return A set of dimension names whose values are "*" for this getAggregate */
   Set<String> getStarDimensionNames();
 

@@ -31,8 +31,7 @@ public class AnomalyFunctionRelationResource {
   @POST
   @UnitOfWork
   @Path("/{parentId}/{childId}")
-  public Response create(@PathParam("parentId") Long parentId,
-                         @PathParam("childId") Long childId) {
+  public Response create(@PathParam("parentId") Long parentId, @PathParam("childId") Long childId) {
     AnomalyFunctionRelation relation = new AnomalyFunctionRelation();
     relation.setParentId(parentId);
     relation.setChildId(childId);
@@ -52,7 +51,7 @@ public class AnomalyFunctionRelationResource {
   @UnitOfWork
   @Path("/{parentId}/{childId}")
   public Response deleteByParent(@PathParam("parentId") Long parentId,
-                                 @PathParam("childId") Long childId) {
+      @PathParam("childId") Long childId) {
     dao.delete(parentId, childId);
     return Response.noContent().build();
   }

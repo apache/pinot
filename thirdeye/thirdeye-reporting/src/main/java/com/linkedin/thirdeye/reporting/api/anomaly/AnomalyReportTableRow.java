@@ -19,10 +19,10 @@ public class AnomalyReportTableRow {
   private Number anomalyScore;
   private Number anomalyVolume;
 
-  private static final DateFormat DATE_FORMAT =  new SimpleDateFormat("yyyy-MM-dd h a");
+  private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd h a");
 
-  public AnomalyReportTableRow(DateTime timestamp, String dimensions, String description, boolean scoreIsPercent,
-      Number anomalyScore, Number anomalyVolume) {
+  public AnomalyReportTableRow(DateTime timestamp, String dimensions, String description,
+      boolean scoreIsPercent, Number anomalyScore, Number anomalyVolume) {
     super();
     this.timestamp = timestamp;
     this.date = DATE_FORMAT.format(timestamp.toDate()).toLowerCase();
@@ -92,8 +92,8 @@ public class AnomalyReportTableRow {
 
   @Override
   public String toString() {
-    return "AnomalyReportTableRow [timestamp=" + timestamp + ", date=" + date + ", dimensions=" + dimensions
-        + ", description=" + description + ", scoreIsPercent=" + scoreIsPercent + ", anomalyScore=" + anomalyScore
-        + ", anomalyVolume=" + anomalyVolume + "]\n";
+    return "AnomalyReportTableRow [timestamp=" + timestamp + ", date=" + date + ", dimensions="
+        + dimensions + ", description=" + description + ", scoreIsPercent=" + scoreIsPercent
+        + ", anomalyScore=" + anomalyScore + ", anomalyVolume=" + anomalyVolume + "]\n";
   }
 }

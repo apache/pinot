@@ -20,19 +20,18 @@ import com.linkedin.thirdeye.anomaly.database.AnomalyTableRow;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 
-
 public class FlotTimeSeries {
   private final String metric;
   private final String dimensions;
   private final String dimensionNames;
-  //TODO once confirmed that this is no longer required, get rid of oldLabel.
+  // TODO once confirmed that this is no longer required, get rid of oldLabel.
   private final String oldLabel;
   private final String label;
   private final List<Number[]> data;
   private final MultivaluedMap<String, String> annotations;
 
-  public FlotTimeSeries(String metric, String dimensions, String dimensionNames, String oldLabel, String label,
-      List<Number[]> data, MultivaluedMap<String, String> annotations) {
+  public FlotTimeSeries(String metric, String dimensions, String dimensionNames, String oldLabel,
+      String label, List<Number[]> data, MultivaluedMap<String, String> annotations) {
     this.metric = metric;
     this.dimensions = dimensions;
     this.dimensionNames = dimensionNames;
@@ -77,13 +76,13 @@ public class FlotTimeSeries {
     return annotations;
   }
 
-  public static List<FlotTimeSeries> fromQueryResult(CollectionSchema schema, ObjectMapper objectMapper,
-      QueryResult queryResult) throws Exception {
+  public static List<FlotTimeSeries> fromQueryResult(CollectionSchema schema,
+      ObjectMapper objectMapper, QueryResult queryResult) throws Exception {
     return fromQueryResult(schema, objectMapper, queryResult, null);
   }
 
-  public static List<FlotTimeSeries> fromQueryResult(CollectionSchema schema, ObjectMapper objectMapper,
-      QueryResult queryResult, String labelPrefix) throws Exception {
+  public static List<FlotTimeSeries> fromQueryResult(CollectionSchema schema,
+      ObjectMapper objectMapper, QueryResult queryResult, String labelPrefix) throws Exception {
     List<FlotTimeSeries> allSeries = new ArrayList<>();
 
     List<String> dimensions = queryResult.getDimensions();
@@ -98,11 +97,14 @@ public class FlotTimeSeries {
       }
 
       for (Map.Entry<String, Number[]> timeEntry : entry.getValue().entrySet()) {
-        Long time = Long.valueOf(timeEntry.getKey()); // must not use ISO8601 strings, instead epoch time
+        Long time = Long.valueOf(timeEntry.getKey()); // must not use ISO8601 strings, instead epoch
+                                                      // time
         for (int i = 0; i < queryResult.getMetrics().size(); i++) {
           String name = queryResult.getMetrics().get(i);
           Number value = timeEntry.getValue()[i];
-          timeSeriesByMetric.get(name).add(new Number[] { time, value });
+          timeSeriesByMetric.get(name).add(new Number[] {
+              time, value
+          });
         }
       }
 
@@ -160,19 +162,21 @@ public class FlotTimeSeries {
           }
         }
 
-        allSeries.add(new FlotTimeSeries(metricSeriesEntry.getKey(), entry.getKey(), dimensionNamesJson,
-            oldLabel.toString(), label.toString(), series, null));
+        allSeries.add(new FlotTimeSeries(metricSeriesEntry.getKey(), entry.getKey(),
+            dimensionNamesJson, oldLabel.toString(), label.toString(), series, null));
       }
     }
 
     return allSeries;
   }
 
-  public static List<FlotTimeSeries> anomaliesFromQueryResult(CollectionSchema schema, ObjectMapper objectMapper,
-      QueryResult queryResult, String labelPrefix, List<AnomalyTableRow> anomalies) throws Exception {
+  public static List<FlotTimeSeries> anomaliesFromQueryResult(CollectionSchema schema,
+      ObjectMapper objectMapper, QueryResult queryResult, String labelPrefix,
+      List<AnomalyTableRow> anomalies) throws Exception {
 
     // remap anomalies by dimension key
-    Multimap<DimensionKey, AnomalyTableRow> anomaliesByDimensionKey = groupAnomaliesByDimensionKey(schema, anomalies);
+    Multimap<DimensionKey, AnomalyTableRow> anomaliesByDimensionKey =
+        groupAnomaliesByDimensionKey(schema, anomalies);
 
     // annotations
 
@@ -200,9 +204,13 @@ public class FlotTimeSeries {
         for (String anomalousMetric : anomaly.getMetrics()) {
           int anomalousMetricIndex = queryResult.getMetrics().indexOf(anomalousMetric);
           if (anomalousMetricIndex != -1) {
-            Number metricValue = (metricValuesInResult != null) ? metricValuesInResult[anomalousMetricIndex] : 0;
-            timeSeriesByMetric.get(anomalousMetric).add(new Number[] { timeWindow, metricValue });
-            annotationsByMetric.get(anomalousMetric).add(timeWindowString, anomalyTableRowToAnnotation(anomaly));
+            Number metricValue =
+                (metricValuesInResult != null) ? metricValuesInResult[anomalousMetricIndex] : 0;
+            timeSeriesByMetric.get(anomalousMetric).add(new Number[] {
+                timeWindow, metricValue
+            });
+            annotationsByMetric.get(anomalousMetric).add(timeWindowString,
+                anomalyTableRowToAnnotation(anomaly));
           }
         }
       }
@@ -234,8 +242,9 @@ public class FlotTimeSeries {
         }
 
         // TODO Discuss w/ Greg+Kishore: do we need to modify label appearances for anomalies?
-        allSeries.add(new FlotTimeSeries(metricSeriesEntry.getKey(), entry.getKey(), dimensionNamesJson,
-            label.toString(), label.toString(), series, annotationsByMetric.get(metricName)));
+        allSeries
+            .add(new FlotTimeSeries(metricSeriesEntry.getKey(), entry.getKey(), dimensionNamesJson,
+                label.toString(), label.toString(), series, annotationsByMetric.get(metricName)));
       }
     }
     return allSeries;
@@ -243,17 +252,18 @@ public class FlotTimeSeries {
 
   private static String anomalyTableRowToAnnotation(AnomalyTableRow anomaly) {
     StringBuilder sb = new StringBuilder()
-        .append(String.format("<b>id</b>: %d (%s_%d)<br>", anomaly.getId(), anomaly.getFunctionTable(),
-            anomaly.getFunctionId()))
+        .append(String.format("<b>id</b>: %d (%s_%d)<br>", anomaly.getId(),
+            anomaly.getFunctionTable(), anomaly.getFunctionId()))
         .append(String.format("<b>name</b>: %s<br>", anomaly.getFunctionName()))
-        .append(String.format("<b>description</b>: %s<br>", anomaly.getFunctionDescription())).append(String
-            .format("<b>score, volume</b>: %.03f, %.03f<br>", anomaly.getAnomalyScore(), anomaly.getAnomalyVolume()))
+        .append(String.format("<b>description</b>: %s<br>", anomaly.getFunctionDescription()))
+        .append(String.format("<b>score, volume</b>: %.03f, %.03f<br>", anomaly.getAnomalyScore(),
+            anomaly.getAnomalyVolume()))
         .append(anomaly.getProperties().toString());
     return sb.toString();
   }
 
-  private static Multimap<DimensionKey, AnomalyTableRow> groupAnomaliesByDimensionKey(CollectionSchema schema,
-      List<AnomalyTableRow> anomalies) {
+  private static Multimap<DimensionKey, AnomalyTableRow> groupAnomaliesByDimensionKey(
+      CollectionSchema schema, List<AnomalyTableRow> anomalies) {
     Multimap<DimensionKey, AnomalyTableRow> anomaliesByDimensionKey = ArrayListMultimap.create();
     for (AnomalyTableRow anomaly : anomalies) {
       String[] dimensionValues = new String[schema.getDimensions().size()];

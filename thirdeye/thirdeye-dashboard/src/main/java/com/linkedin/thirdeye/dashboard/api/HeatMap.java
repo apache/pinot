@@ -15,13 +15,8 @@ public class HeatMap implements Comparable<HeatMap> {
   private final List<HeatMapCell> cells;
   private final List<String> statsNames;
 
-  public HeatMap(ObjectMapper objectMapper,
-                 String metric,
-                 String metricAlias,
-                 String dimension,
-                 String dimensionAlias,
-                 List<HeatMapCell> cells,
-                 List<String> statsNames) {
+  public HeatMap(ObjectMapper objectMapper, String metric, String metricAlias, String dimension,
+      String dimensionAlias, List<HeatMapCell> cells, List<String> statsNames) {
     this.objectMapper = objectMapper;
     this.metric = metric;
     this.metricAlias = metricAlias;
@@ -61,13 +56,9 @@ public class HeatMap implements Comparable<HeatMap> {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(HeatMap.class)
-        .add("metric", metric)
-        .add("metricAlias", metricAlias)
-        .add("dimension", dimension)
-        .add("dimensionAlias", dimensionAlias)
-        .add("statsNames", statsNames)
-        .toString();
+    return Objects.toStringHelper(HeatMap.class).add("metric", metric)
+        .add("metricAlias", metricAlias).add("dimension", dimension)
+        .add("dimensionAlias", dimensionAlias).add("statsNames", statsNames).toString();
   }
 
   @Override

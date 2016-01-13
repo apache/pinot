@@ -9,9 +9,7 @@ import java.util.Map;
  * Wrapper class to represent the metric schema <code>
  * e.g.
  * </code>
- *
  * @author kgopalak
- *
  */
 public class MetricSchema {
 
@@ -71,13 +69,11 @@ public class MetricSchema {
     return names;
   }
 
-  public static MetricSchema fromMetricSpecs(List<MetricSpec> metricSpecs)
-  {
+  public static MetricSchema fromMetricSpecs(List<MetricSpec> metricSpecs) {
     List<String> metricNames = new ArrayList<String>(metricSpecs.size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(metricSpecs.size());
 
-    for (MetricSpec metricSpec : metricSpecs)
-    {
+    for (MetricSpec metricSpec : metricSpecs) {
       metricNames.add(metricSpec.getName());
       metricTypes.add(metricSpec.getType());
     }
@@ -86,10 +82,8 @@ public class MetricSchema {
   }
 
   @Override
-  public boolean equals(Object o)
-  {
-    if (!(o instanceof MetricSchema))
-    {
+  public boolean equals(Object o) {
+    if (!(o instanceof MetricSchema)) {
       return false;
     }
 
@@ -99,8 +93,7 @@ public class MetricSchema {
   }
 
   @Override
-  public int hashCode()
-  {
+  public int hashCode() {
     return names.hashCode() + 13 * types.hashCode();
   }
 }

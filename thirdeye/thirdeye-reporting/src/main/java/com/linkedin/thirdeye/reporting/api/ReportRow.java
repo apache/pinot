@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.reporting.api;
 
-
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 
@@ -24,8 +23,9 @@ public class ReportRow {
 
   private static DateFormat DATE_FORMAT = new SimpleDateFormat("HH a");
 
-  public ReportRow(DateTime currentStart, DateTime currentEnd, DateTime baselineStart, DateTime baselineEnd,
-      DimensionKey dimensionKey, String dimension, String metric, Number baseline, Number current) {
+  public ReportRow(DateTime currentStart, DateTime currentEnd, DateTime baselineStart,
+      DateTime baselineEnd, DimensionKey dimensionKey, String dimension, String metric,
+      Number baseline, Number current) {
     this.currentStart = currentStart;
     this.date = DATE_FORMAT.format(currentStart.toDate());
     this.currentEnd = currentEnd;

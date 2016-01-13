@@ -11,7 +11,8 @@ public class CollectionSchema {
   private List<String> metrics;
   private List<String> metricAliases;
 
-  public CollectionSchema() {}
+  public CollectionSchema() {
+  }
 
   public List<String> getDimensions() {
     return dimensions;
@@ -47,11 +48,8 @@ public class CollectionSchema {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(CollectionSchema.class)
-        .add("dimensions", dimensions)
-        .add("dimensionAliases", dimensionAliases)
-        .add("metrics", metrics)
-        .add("metricAliases", metricAliases)
-        .toString();
+    return Objects.toStringHelper(CollectionSchema.class).add("dimensions", dimensions)
+        .add("dimensionAliases", dimensionAliases).add("metrics", metrics)
+        .add("metricAliases", metricAliases).toString();
   }
 }

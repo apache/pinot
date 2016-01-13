@@ -42,25 +42,30 @@ public class EmailReportJob implements Job {
 
   @Override
   public void execute(final JobExecutionContext context) throws JobExecutionException {
-    final EmailConfiguration config = (EmailConfiguration) context.getJobDetail().getJobDataMap().get(CONFIG);
-    SessionFactory sessionFactory = (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
+    final EmailConfiguration config =
+        (EmailConfiguration) context.getJobDetail().getJobDataMap().get(CONFIG);
+    SessionFactory sessionFactory =
+        (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     int applicationPort = context.getJobDetail().getJobDataMap().getInt(APPLICATION_PORT);
 
     // Get time
-    long deltaMillis = TimeUnit.MILLISECONDS.convert(config.getWindowSize(), config.getWindowUnit());
+    long deltaMillis =
+        TimeUnit.MILLISECONDS.convert(config.getWindowSize(), config.getWindowUnit());
     final DateTime now = DateTime.now().toDateTime(DateTimeZone.UTC);
     final DateTime then = now.minus(deltaMillis);
 
     // Get the anomalies in that range
     final List<AnomalyResult> results;
     try {
-      results = new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory).execute(new Callable<List<AnomalyResult>>() {
-        @Override
-        public List<AnomalyResult> call() throws Exception {
-          AnomalyResultDAO resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-          return resultDAO.findAllByCollectionAndTime(config.getCollection(), then, now);
-        }
-      });
+      results = new HibernateSessionWrapper<List<AnomalyResult>>(sessionFactory)
+          .execute(new Callable<List<AnomalyResult>>() {
+            @Override
+            public List<AnomalyResult> call() throws Exception {
+              AnomalyResultDAO resultDAO =
+                  (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
+              return resultDAO.findAllByCollectionAndTime(config.getCollection(), then, now);
+            }
+          });
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -72,12 +77,8 @@ public class EmailReportJob implements Job {
     String visualizerLink;
     try {
       visualizerLink = String.format("http://%s:%d/#/time-series/%s/%s/%s/%s?overlay=1w",
-          InetAddress.getLocalHost().getCanonicalHostName(),
-          applicationPort,
-          config.getCollection(),
-          config.getMetric(),
-          then,
-          now);
+          InetAddress.getLocalHost().getCanonicalHostName(), applicationPort,
+          config.getCollection(), config.getMetric(), then, now);
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -90,13 +91,8 @@ public class EmailReportJob implements Job {
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/email/");
       freemarkerConfig.setDefaultEncoding(CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      Map<String, Object> templateData = ImmutableMap.of(
-          "anomalyResults", (Object) results,
-          "startTime", then,
-          "endTime", now,
-          "visualizerLink", visualizerLink,
-          "idLink", idLink
-      );
+      Map<String, Object> templateData = ImmutableMap.of("anomalyResults", (Object) results,
+          "startTime", then, "endTime", now, "visualizerLink", visualizerLink, "idLink", idLink);
       Template template = freemarkerConfig.getTemplate("simple-anomaly-report.ftl");
       template.process(templateData, out);
     } catch (Exception e) {
@@ -110,7 +106,8 @@ public class EmailReportJob implements Job {
       email.setHostName(config.getSmtpHost());
       email.setSmtpPort(config.getSmtpPort());
       if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
-        email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
+        email.setAuthenticator(
+            new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
         email.setSSLOnConnect(true);
       }
       email.setFrom(config.getFromAddress());
@@ -118,11 +115,8 @@ public class EmailReportJob implements Job {
         email.addTo(toAddress);
       }
       email.setSubject(String.format("[ThirdEye] (%s:%s) %d anomalies (%s to %s)",
-          config.getCollection(),
-          config.getMetric(),
-          results.size(),
-          DateTimeFormat.longDateTime().print(then),
-          DateTimeFormat.longDateTime().print(now)));
+          config.getCollection(), config.getMetric(), results.size(),
+          DateTimeFormat.longDateTime().print(then), DateTimeFormat.longDateTime().print(now)));
       email.setHtmlMsg(new String(baos.toByteArray(), CHARSET));
       email.send();
     } catch (Exception e) {

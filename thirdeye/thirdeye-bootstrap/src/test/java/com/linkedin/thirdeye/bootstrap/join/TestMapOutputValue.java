@@ -13,23 +13,31 @@ import com.linkedin.thirdeye.bootstrap.AvroTestUtil;
 public class TestMapOutputValue {
 
   String input1SourceName = "input1";
-  String[] input1Dimensions = new String[] { "joinKey", "d1", "d2", "d3" };
-  String[] input1Metrics = new String[] { "m1" };
+  String[] input1Dimensions = new String[] {
+      "joinKey", "d1", "d2", "d3"
+  };
+  String[] input1Metrics = new String[] {
+      "m1"
+  };
 
   String input2SourceName = "input2";
-  String[] input2Dimensions = new String[] { "joinKey", "d4", "d5", "d6" };
-  String[] input2Metrics = new String[] { "m2" };
+  String[] input2Dimensions = new String[] {
+      "joinKey", "d4", "d5", "d6"
+  };
+  String[] input2Metrics = new String[] {
+      "m2"
+  };
 
   @Test
   public void testSerDeser() throws Exception {
-    Schema schema1 = AvroTestUtil.createSchemaFor(input1SourceName,
-        input1Dimensions, input1Metrics);
+    Schema schema1 =
+        AvroTestUtil.createSchemaFor(input1SourceName, input1Dimensions, input1Metrics);
 
-    Schema schema2 = AvroTestUtil.createSchemaFor(input2SourceName,
-        input2Dimensions, input2Metrics);
+    Schema schema2 =
+        AvroTestUtil.createSchemaFor(input2SourceName, input2Dimensions, input2Metrics);
 
-    GenericRecord record1 = AvroTestUtil.generateDummyRecord(schema1,
-        input1Dimensions, input1Metrics);
+    GenericRecord record1 =
+        AvroTestUtil.generateDummyRecord(schema1, input1Dimensions, input1Metrics);
 
     // construct map output value and serialize
     MapOutputValue valueOrig = new MapOutputValue(schema1.getName(), record1);

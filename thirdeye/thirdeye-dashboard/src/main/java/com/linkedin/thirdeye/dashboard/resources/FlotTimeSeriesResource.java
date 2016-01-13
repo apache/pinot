@@ -40,8 +40,8 @@ public class FlotTimeSeriesResource {
   private final AnomalyDatabaseConfig anomalyDatabase;
   private final boolean displayAnomalies;
 
-  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache, ObjectMapper objectMapper,
-      ConfigCache configCache, AnomalyDatabaseConfig anomalyDatabase) {
+  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache,
+      ObjectMapper objectMapper, ConfigCache configCache, AnomalyDatabaseConfig anomalyDatabase) {
     this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
@@ -54,12 +54,10 @@ public class FlotTimeSeriesResource {
 
   @GET
   @Path("/TIME_SERIES_FULL/{collection}/{metricFunction}/{baselineMillis}/{currentMillis}")
-  public List<FlotTimeSeries> getAll(
-      @PathParam("collection") String collection,
+  public List<FlotTimeSeries> getAll(@PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction,
       @PathParam("baselineMillis") Long baselineMillis,
-      @PathParam("currentMillis") Long currentMillis,
-      @Context UriInfo uriInfo) throws Exception {
+      @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
     // Dimension groups
@@ -69,27 +67,27 @@ public class FlotTimeSeriesResource {
       reverseDimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, uriInfo.getQueryParameters(), reverseDimensionGroups);
+    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current,
+        uriInfo.getQueryParameters(), reverseDimensionGroups);
     QueryResult queryResult = queryCache.getQueryResult(serverUri, sql).checkEmpty();
 
-    List<FlotTimeSeries> allSeries = FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
+    List<FlotTimeSeries> allSeries =
+        FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
     if (displayAnomalies) {
-      List<AnomalyTableRow> anomalies = AnomalyTable.selectRows(anomalyDatabase, collection, null, null, null, null,
-          null, false, null, new TimeRange(baselineMillis, currentMillis));
-      allSeries.addAll(FlotTimeSeries.anomaliesFromQueryResult(schema, objectMapper, queryResult, ANOMALY_LABEL_PREFIX,
-          anomalies));
+      List<AnomalyTableRow> anomalies = AnomalyTable.selectRows(anomalyDatabase, collection, null,
+          null, null, null, null, false, null, new TimeRange(baselineMillis, currentMillis));
+      allSeries.addAll(FlotTimeSeries.anomaliesFromQueryResult(schema, objectMapper, queryResult,
+          ANOMALY_LABEL_PREFIX, anomalies));
     }
     return allSeries;
   }
 
   @GET
   @Path("/TIME_SERIES_OVERLAY/{collection}/{metricFunction}/{baselineMillis}/{currentMillis}/{windowMillis}")
-  public List<FlotTimeSeries> getOverlay(
-      @PathParam("collection") String collection,
+  public List<FlotTimeSeries> getOverlay(@PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction,
       @PathParam("baselineMillis") Long baselineMillis,
-      @PathParam("currentMillis") Long currentMillis,
-      @PathParam("windowMillis") Long windowMillis,
+      @PathParam("currentMillis") Long currentMillis, @PathParam("windowMillis") Long windowMillis,
       @Context UriInfo uriInfo) throws Exception {
     DateTime baselineRangeStart = new DateTime(baselineMillis - windowMillis);
     DateTime baselineRangeEnd = new DateTime(baselineMillis);
@@ -106,36 +104,35 @@ public class FlotTimeSeriesResource {
     }
 
     // Generate SQL
-    String baselineSeriesSql
-        = SqlUtils.getSql(metricFunction, collection, baselineRangeStart, baselineRangeEnd, dimensionValues, reverseDimensionGroups);
-    String currentSeriesSql
-        = SqlUtils.getSql(metricFunction, collection, currentRangeStart, currentRangeEnd, dimensionValues, reverseDimensionGroups);
+    String baselineSeriesSql = SqlUtils.getSql(metricFunction, collection, baselineRangeStart,
+        baselineRangeEnd, dimensionValues, reverseDimensionGroups);
+    String currentSeriesSql = SqlUtils.getSql(metricFunction, collection, currentRangeStart,
+        currentRangeEnd, dimensionValues, reverseDimensionGroups);
 
     // Query (async)
-    Future<QueryResult> baselineResult
-        = queryCache.getQueryResultAsync(serverUri, baselineSeriesSql);
-    Future<QueryResult> currentResult
-        = queryCache.getQueryResultAsync(serverUri, currentSeriesSql);
+    Future<QueryResult> baselineResult =
+        queryCache.getQueryResultAsync(serverUri, baselineSeriesSql);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentSeriesSql);
 
     // Query for anomalies
     List<AnomalyTableRow> anomalies = null;
     if (displayAnomalies) {
-      anomalies = AnomalyTable.selectRows(anomalyDatabase, collection, null, null, null, null, null, false, null,
-          new TimeRange(currentMillis - windowMillis, currentMillis));
+      anomalies = AnomalyTable.selectRows(anomalyDatabase, collection, null, null, null, null, null,
+          false, null, new TimeRange(currentMillis - windowMillis, currentMillis));
     }
 
     // Generate series
-    List<FlotTimeSeries> baselineSeries
-        = FlotTimeSeries.fromQueryResult(schema, objectMapper, baselineResult.get().checkEmpty(), BASELINE_LABEL_PREFIX);
+    List<FlotTimeSeries> baselineSeries = FlotTimeSeries.fromQueryResult(schema, objectMapper,
+        baselineResult.get().checkEmpty(), BASELINE_LABEL_PREFIX);
 
     QueryResult currentQueryResult = currentResult.get().checkEmpty();
-    List<FlotTimeSeries> currentSeries
-        = FlotTimeSeries.fromQueryResult(schema, objectMapper, currentQueryResult);
+    List<FlotTimeSeries> currentSeries =
+        FlotTimeSeries.fromQueryResult(schema, objectMapper, currentQueryResult);
 
     List<FlotTimeSeries> anomalySeries;
     if (displayAnomalies) {
-      anomalySeries = FlotTimeSeries.anomaliesFromQueryResult(schema, objectMapper, currentQueryResult,
-          ANOMALY_LABEL_PREFIX, anomalies);
+      anomalySeries = FlotTimeSeries.anomaliesFromQueryResult(schema, objectMapper,
+          currentQueryResult, ANOMALY_LABEL_PREFIX, anomalies);
     } else {
       anomalySeries = new ArrayList<>(0);
     }
@@ -149,8 +146,8 @@ public class FlotTimeSeriesResource {
     }
 
     // Combine
-    List<FlotTimeSeries> combinedSeries = new ArrayList<>(baselineSeries.size() + currentSeries.size()
-        + anomalySeries.size());
+    List<FlotTimeSeries> combinedSeries =
+        new ArrayList<>(baselineSeries.size() + currentSeries.size() + anomalySeries.size());
     combinedSeries.addAll(currentSeries);
     combinedSeries.addAll(baselineSeries);
     combinedSeries.addAll(anomalySeries);

@@ -19,15 +19,14 @@ public final class ReportConstants {
   public static String SCHEDULE_SPEC_OBJECT = "scheduleSpec";
   public static String MISSING_SEGMENTS_OBJECT = "missingSegments";
 
-
   public static String MAIL_SMTP_HOST_KEY = "mail.smtp.host";
   public static String MAIL_SMTP_HOST_VALUE = "email.corp.linkedin.com";
   public static String REPORT_EMAIL_TEMPLATE_PATH = "src/main/resources/report-email-template.ftl";
 
-  public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd h a z");
+  public static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormat.forPattern("YYYY-MM-dd h a z");
   public static final DateTimeFormatter HOUR_FORMATTER = DateTimeFormat.forPattern("h a");
 
   public static String REPORT_SUBJECT_PREFIX = "Thirdeye Reports";
-
 
 }

@@ -120,7 +120,8 @@ public class StarTreeManagerImpl implements StarTreeManager {
           LOGGER.info("Opened tree {} for collection {}", dataDir.getName(), collection);
 
           // Read index metadata
-          InputStream indexMetadataFile = new FileInputStream(new File(dataDir, StarTreeConstants.METADATA_FILE_NAME));
+          InputStream indexMetadataFile =
+              new FileInputStream(new File(dataDir, StarTreeConstants.METADATA_FILE_NAME));
           Properties indexMetadataProps = new Properties();
           indexMetadataProps.load(indexMetadataFile);
           indexMetadataFile.close();
@@ -135,21 +136,12 @@ public class StarTreeManagerImpl implements StarTreeManager {
 
         // Create mutable in-memory tree
         StarTreeConfig inMemoryConfig = new StarTreeConfig(config.getCollection(),
-            StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
-            new Properties(),
-            config.getAnomalyDetectionFunctionClass(),
-            config.getAnomalyDetectionFunctionConfig(),
-            config.getAnomalyHandlerClass(),
-            config.getAnomalyHandlerConfig(),
-            config.getAnomalyDetectionMode(),
-            config.getDimensions(),
-            config.getMetrics(),
-            config.getTime(),
-            config.getJoinSpec(),
-            config.getRollup(),
-            config.getTopKRollup(),
-            config.getSplit(),
-            false);
+            StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(), new Properties(),
+            config.getAnomalyDetectionFunctionClass(), config.getAnomalyDetectionFunctionConfig(),
+            config.getAnomalyHandlerClass(), config.getAnomalyHandlerConfig(),
+            config.getAnomalyDetectionMode(), config.getDimensions(), config.getMetrics(),
+            config.getTime(), config.getJoinSpec(), config.getRollup(), config.getTopKRollup(),
+            config.getSplit(), false);
         final StarTree mutableTree = new StarTreeImpl(inMemoryConfig);
         mutableTree.open();
         mutableTrees.put(collection, mutableTree);
@@ -220,7 +212,8 @@ public class StarTreeManagerImpl implements StarTreeManager {
           for (WatchEvent<?> event : key.pollEvents()) {
             if (event.kind() == OVERFLOW) {
               LOGGER.info("Received an overflow event");
-              for (Entry<String, ConcurrentMap<File, StarTree>> collectionEntry : trees.entrySet()) {
+              for (Entry<String, ConcurrentMap<File, StarTree>> collectionEntry : trees
+                  .entrySet()) {
                 for (Entry<File, StarTree> mapEntry : collectionEntry.getValue().entrySet()) {
                   if (!mapEntry.getKey().exists()) {
                     collectionEntry.getValue().remove(mapEntry.getKey());
@@ -236,30 +229,35 @@ public class StarTreeManagerImpl implements StarTreeManager {
 
             LOGGER.info("{} {}", ev.kind(), path);
 
-            if (file.getName().startsWith(StorageUtils.getDataDirPrefix()) && ev.kind().equals(ENTRY_DELETE)) {
+            if (file.getName().startsWith(StorageUtils.getDataDirPrefix())
+                && ev.kind().equals(ENTRY_DELETE)) {
               for (Entry<String, ConcurrentMap<File, StarTree>> entry : trees.entrySet()) {
                 entry.getValue().get(path.toFile()).close();
                 entry.getValue().remove(path.toFile());
               }
             } else if (file.getName().startsWith(StorageUtils.getDataDirPrefix())) {
-              StorageUtils.waitForModifications(file, REFRESH_WAIT_SLEEP_MILLIS, REFRESH_WAIT_TIMEOUT_MILLIS);
+              StorageUtils.waitForModifications(file, REFRESH_WAIT_SLEEP_MILLIS,
+                  REFRESH_WAIT_TIMEOUT_MILLIS);
 
               synchronized (trees) {
                 // Read tree structure
                 File treeFile = new File(file, StarTreeConstants.TREE_FILE_NAME);
-                ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(treeFile));
+                ObjectInputStream inputStream =
+                    new ObjectInputStream(new FileInputStream(treeFile));
                 StarTreeNode root = (StarTreeNode) inputStream.readObject();
                 inputStream.close();
 
                 // Read index metadata
-                InputStream indexMetadataFile = new FileInputStream(new File(file, StarTreeConstants.METADATA_FILE_NAME));
+                InputStream indexMetadataFile =
+                    new FileInputStream(new File(file, StarTreeConstants.METADATA_FILE_NAME));
                 Properties indexMetadataProps = new Properties();
                 indexMetadataProps.load(indexMetadataFile);
                 indexMetadataFile.close();
                 IndexMetadata indexMetadata = IndexMetadata.fromProperties(indexMetadataProps);
                 allIndexMetadata.put(root.getId(), indexMetadata);
 
-                Long previous = maxDataTime.putIfAbsent(config.getCollection(), indexMetadata.getMaxDataTimeMillis());
+                Long previous = maxDataTime.putIfAbsent(config.getCollection(),
+                    indexMetadata.getMaxDataTimeMillis());
                 if (previous != null) {
                   if (indexMetadata.getMaxDataTimeMillis() > previous) {
                     maxDataTime.put(config.getCollection(), indexMetadata.getMaxDataTimeMillis());
@@ -268,13 +266,15 @@ public class StarTreeManagerImpl implements StarTreeManager {
 
                 Map<File, StarTree> existingTrees = trees.get(config.getCollection());
                 if (existingTrees == null) {
-                  LOGGER.error("There is a watch on collection {} but no open trees!", config.getCollection());
+                  LOGGER.error("There is a watch on collection {} but no open trees!",
+                      config.getCollection());
                 } else {
                   // If tree is already open, close it
                   StarTree existingTree = existingTrees.get(file);
                   if (existingTree != null) {
                     existingTree.close();
-                    LOGGER.info("Closed existing tree {} in {}", existingTree.getRoot().getId(), file);
+                    LOGGER.info("Closed existing tree {} in {}", existingTree.getRoot().getId(),
+                        file);
                   }
 
                   // Create tree
@@ -284,7 +284,8 @@ public class StarTreeManagerImpl implements StarTreeManager {
                     trees.get(config.getCollection()).put(file, starTree);
                     LOGGER.info("Opened tree {} from {}", starTree.getRoot().getId(), file);
                   } catch (Exception e) {
-                    // n.b. there may be partial data i.e. during a push; another watch will be fired later
+                    // n.b. there may be partial data i.e. during a push; another watch will be
+                    // fired later
                     if (LOGGER.isDebugEnabled()) {
                       LOGGER.debug("Error while watching collection directory", e);
                     }
@@ -292,7 +293,6 @@ public class StarTreeManagerImpl implements StarTreeManager {
                 }
               }
             }
-
 
           }
         } catch (Exception e) {

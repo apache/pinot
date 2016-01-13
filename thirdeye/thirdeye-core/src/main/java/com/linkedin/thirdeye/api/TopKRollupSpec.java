@@ -12,27 +12,20 @@ public class TopKRollupSpec {
 
   }
 
-
   public Map<String, Double> getThreshold() {
     return threshold;
   }
-
 
   public void setThreshold(Map<String, Double> threshold) {
     this.threshold = threshold;
   }
 
-
   public List<TopKDimensionSpec> getTopKDimensionSpec() {
     return topKDimensionSpec;
   }
 
-
   public void setTopKDimensionSpec(List<TopKDimensionSpec> topKDimensionSpec) {
     this.topKDimensionSpec = topKDimensionSpec;
   }
-
-
-
 
 }

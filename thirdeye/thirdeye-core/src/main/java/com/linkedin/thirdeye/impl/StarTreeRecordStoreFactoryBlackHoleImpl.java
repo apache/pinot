@@ -11,19 +11,16 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordStoreFactory
-{
+public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordStoreFactory {
   private List<MetricSpec> metricSpecs;
 
   @Override
-  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
-  {
+  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig) {
     this.metricSpecs = starTreeConfig.getMetrics();
   }
 
   @Override
-  public StarTreeRecordStore createRecordStore(UUID nodeId)
-  {
+  public StarTreeRecordStore createRecordStore(UUID nodeId) {
     return new StarTreeRecordStoreBlackHoleImpl(metricSpecs);
   }
 

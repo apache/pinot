@@ -18,7 +18,8 @@ public class DimensionTableRow {
       } else if (current[i] == null) {
         ratio[i] = 0;
       } else {
-        ratio[i] = (current[i].doubleValue() - baseline[i].doubleValue()) / baseline[i].doubleValue();
+        ratio[i] =
+            (current[i].doubleValue() - baseline[i].doubleValue()) / baseline[i].doubleValue();
       }
     }
   }

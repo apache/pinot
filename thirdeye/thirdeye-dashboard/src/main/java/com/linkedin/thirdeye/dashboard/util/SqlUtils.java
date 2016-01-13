@@ -18,28 +18,18 @@ public class SqlUtils {
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
 
-  public static String getSql(String metricFunction,
-                              String collection,
-                              DateTime start,
-                              DateTime end,
-                              Map<String, String> dimensionValues) {
+  public static String getSql(String metricFunction, String collection, DateTime start,
+      DateTime end, Map<String, String> dimensionValues) {
     return getSql(metricFunction, collection, start, end, toMultivaluedMap(dimensionValues), null);
   }
 
-  public static String getSql(String metricFunction,
-                              String collection,
-                              DateTime start,
-                              DateTime end,
-                              MultivaluedMap<String, String> dimensionValues,
-                              Map<String, Map<String, List<String>>> dimensionGroups) {
+  public static String getSql(String metricFunction, String collection, DateTime start,
+      DateTime end, MultivaluedMap<String, String> dimensionValues,
+      Map<String, Map<String, List<String>>> dimensionGroups) {
     StringBuilder sb = new StringBuilder();
 
-    sb.append("SELECT ")
-        .append(metricFunction)
-        .append(" FROM ")
-        .append(collection)
-        .append(" WHERE ")
-        .append(getBetweenClause(start, end));
+    sb.append("SELECT ").append(metricFunction).append(" FROM ").append(collection)
+        .append(" WHERE ").append(getBetweenClause(start, end));
 
     String dimensionWhereClause = getDimensionWhereClause(dimensionValues, dimensionGroups);
     if (dimensionWhereClause != null) {
@@ -59,7 +49,7 @@ public class SqlUtils {
   }
 
   public static String getDimensionWhereClause(MultivaluedMap<String, String> dimensionValues,
-                                               Map<String, Map<String, List<String>>> dimensionGroups) {
+      Map<String, Map<String, List<String>>> dimensionGroups) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, List<String>> entry : dimensionValues.entrySet()) {
       if (entry.getValue().size() == 1 && "!".equals(entry.getValue().get(0))) {
@@ -111,7 +101,8 @@ public class SqlUtils {
     return ISODateTimeFormat.dateTimeNoMillis().print(dateTime.toDateTime(DateTimeZone.UTC));
   }
 
-  public static MultivaluedMap<String, String> toMultivaluedMap(Map<String, String> dimensionValues) {
+  public static MultivaluedMap<String, String> toMultivaluedMap(
+      Map<String, String> dimensionValues) {
     MultivaluedMap<String, String> multiMap = new MultivaluedMapImpl();
     for (Map.Entry<String, String> entry : dimensionValues.entrySet()) {
       multiMap.putSingle(entry.getKey(), entry.getValue());

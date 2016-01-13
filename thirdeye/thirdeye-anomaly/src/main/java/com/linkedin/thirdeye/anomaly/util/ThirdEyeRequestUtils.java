@@ -28,27 +28,20 @@ public class ThirdEyeRequestUtils {
    * @param aggregationFunction
    * @param timeRange
    * @return
-   *  The anomaly detection dataset with at least the data in the requested timeRange
+   *         The anomaly detection dataset with at least the data in the requested timeRange
    * @throws Exception
    */
-  public static ThirdEyeRequest buildRequest(
-      String collection,
-      String groupByDimension,
-      Map<String, String> fixedDimensionValues,
-      List<String> metricNames,
-      TimeGranularity aggregationGranularity,
-      TimeRange timeRange) throws Exception
-  {
+  public static ThirdEyeRequest buildRequest(String collection, String groupByDimension,
+      Map<String, String> fixedDimensionValues, List<String> metricNames,
+      TimeGranularity aggregationGranularity, TimeRange timeRange) throws Exception {
     DateTime start = new DateTime(timeRange.getStart(), DateTimeZone.UTC);
     // make the start time more generic
     start = start.withMillisOfDay(0);
     DateTime end = new DateTime(timeRange.getEnd(), DateTimeZone.UTC);
 
-    ThirdEyeRequest request = new ThirdEyeRequest()
-      .setCollection(collection)
-      .setStartTime(start)
-      .setEndTime(end)
-      .setMetricFunction(buildMetricFunction(aggregationGranularity, metricNames));
+    ThirdEyeRequest request =
+        new ThirdEyeRequest().setCollection(collection).setStartTime(start).setEndTime(end)
+            .setMetricFunction(buildMetricFunction(aggregationGranularity, metricNames));
 
     if (groupByDimension != NULL_GROUP_BY) {
       request.setGroupBy(groupByDimension);
@@ -61,7 +54,8 @@ public class ThirdEyeRequestUtils {
     return request;
   }
 
-  private static String buildMetricFunction(TimeGranularity aggregationGranularity, List<String> metricNames) {
+  private static String buildMetricFunction(TimeGranularity aggregationGranularity,
+      List<String> metricNames) {
     return String.format("AGGREGATE_%d_%s(%s)", aggregationGranularity.getSize(),
         aggregationGranularity.getUnit().toString().toUpperCase(), COMMA.join(metricNames));
   }

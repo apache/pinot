@@ -40,149 +40,183 @@ import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
-*
-* @author ajaspal
-*
-*/
-public class TestStarTreeBootstrapPhase2
-{
+ * @author ajaspal
+ */
+public class TestStarTreeBootstrapPhase2 {
   private static final String CONF_FILE = "config.yml";
   private static MapDriver<BytesWritable, BytesWritable, BytesWritable, BytesWritable> mapDriver;
   private static ReduceDriver<BytesWritable, BytesWritable, BytesWritable, BytesWritable> reduceDriver;
   private static StarTreeBootstrapPhaseTwoConfig starTreeBootstrapConfig;
   private static String thirdEyeRoot;
 
-  private List<Pair<BytesWritable, BytesWritable>> generateTestDataMapper(StarTreeNode root) throws Exception
-  {
-    List<Pair<BytesWritable, BytesWritable>> inputRecords = new ArrayList<Pair<BytesWritable, BytesWritable>>();
+  private List<Pair<BytesWritable, BytesWritable>> generateTestDataMapper(StarTreeNode root)
+      throws Exception {
+    List<Pair<BytesWritable, BytesWritable>> inputRecords =
+        new ArrayList<Pair<BytesWritable, BytesWritable>>();
     UUID uuid = null;
     LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
     StarTreeUtils.traverseAndGetLeafNodes(leafNodes, root);
     for (StarTreeNode node : leafNodes) {
-      if(node.getDimensionValue().equals("C1")){
+      if (node.getDimensionValue().equals("C1")) {
         uuid = node.getId();
         break;
       }
     }
 
-    String []combination = {"A1", "B1", "C1"};
+    String[] combination = {
+        "A1", "B1", "C1"
+    };
     DimensionKey key = new DimensionKey(combination);
     BootstrapPhaseMapOutputKey outputKey1 = new BootstrapPhaseMapOutputKey(uuid, key.toMD5());
-    BootstrapPhaseMapOutputValue outputValue1 = new BootstrapPhaseMapOutputValue(key, TestStarTreeBootstrapPhase2.TestHelper.generateMetricTimeSeries(starTreeBootstrapConfig, 10));
-    inputRecords.add(new Pair<BytesWritable, BytesWritable>(new BytesWritable(outputKey1.toBytes()), new BytesWritable(outputValue1.toBytes())));
+    BootstrapPhaseMapOutputValue outputValue1 =
+        new BootstrapPhaseMapOutputValue(key, TestStarTreeBootstrapPhase2.TestHelper
+            .generateMetricTimeSeries(starTreeBootstrapConfig, 10));
+    inputRecords.add(new Pair<BytesWritable, BytesWritable>(new BytesWritable(outputKey1.toBytes()),
+        new BytesWritable(outputValue1.toBytes())));
 
-    String []combination2 = {"A2", "B2", "C1"};
+    String[] combination2 = {
+        "A2", "B2", "C1"
+    };
     key = new DimensionKey(combination2);
     BootstrapPhaseMapOutputKey outputKey2 = new BootstrapPhaseMapOutputKey(uuid, key.toMD5());
-    BootstrapPhaseMapOutputValue outputValue2 = new BootstrapPhaseMapOutputValue(key, TestStarTreeBootstrapPhase2.TestHelper.generateMetricTimeSeries(starTreeBootstrapConfig, 10));
-    inputRecords.add(new Pair<BytesWritable, BytesWritable>(new BytesWritable(outputKey2.toBytes()), new BytesWritable(outputValue2.toBytes())));
+    BootstrapPhaseMapOutputValue outputValue2 =
+        new BootstrapPhaseMapOutputValue(key, TestStarTreeBootstrapPhase2.TestHelper
+            .generateMetricTimeSeries(starTreeBootstrapConfig, 10));
+    inputRecords.add(new Pair<BytesWritable, BytesWritable>(new BytesWritable(outputKey2.toBytes()),
+        new BytesWritable(outputValue2.toBytes())));
 
     return inputRecords;
   }
 
-  private List<Pair<BytesWritable,List<BytesWritable>>> generateTestDataReducer(StarTreeNode root) throws IOException
-  {
-    List<Pair<BytesWritable,List<BytesWritable>>> inputRecords = new ArrayList<Pair<BytesWritable,List<BytesWritable>>>();
+  private List<Pair<BytesWritable, List<BytesWritable>>> generateTestDataReducer(StarTreeNode root)
+      throws IOException {
+    List<Pair<BytesWritable, List<BytesWritable>>> inputRecords =
+        new ArrayList<Pair<BytesWritable, List<BytesWritable>>>();
     List<BytesWritable> list = new ArrayList<BytesWritable>();
 
     UUID uuid = null;
     LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
     StarTreeUtils.traverseAndGetLeafNodes(leafNodes, root);
     for (StarTreeNode node : leafNodes) {
-      if(node.getDimensionValue().equals("C1")){
+      if (node.getDimensionValue().equals("C1")) {
         uuid = node.getId();
         break;
       }
     }
 
-    String []combination1 = {"A1", "B1", "C1"};
+    String[] combination1 = {
+        "A1", "B1", "C1"
+    };
     DimensionKey dimKey = new DimensionKey(combination1);
-    BootstrapPhaseMapOutputValue outputValue1 = new BootstrapPhaseMapOutputValue(dimKey, TestStarTreeBootstrapPhase2.TestHelper.generateMetricTimeSeries(starTreeBootstrapConfig, 10));
+    BootstrapPhaseMapOutputValue outputValue1 =
+        new BootstrapPhaseMapOutputValue(dimKey, TestStarTreeBootstrapPhase2.TestHelper
+            .generateMetricTimeSeries(starTreeBootstrapConfig, 10));
     list.add(new BytesWritable(outputValue1.toBytes()));
 
-    BootstrapPhaseMapOutputValue outputValue2 = new BootstrapPhaseMapOutputValue(dimKey, TestStarTreeBootstrapPhase2.TestHelper.generateMetricTimeSeries(starTreeBootstrapConfig, 10));
+    BootstrapPhaseMapOutputValue outputValue2 =
+        new BootstrapPhaseMapOutputValue(dimKey, TestStarTreeBootstrapPhase2.TestHelper
+            .generateMetricTimeSeries(starTreeBootstrapConfig, 10));
     list.add(new BytesWritable(outputValue2.toBytes()));
 
-    inputRecords.add(new Pair<BytesWritable,List<BytesWritable>>(new BytesWritable(uuid.toString().getBytes()),list));
+    inputRecords.add(new Pair<BytesWritable, List<BytesWritable>>(
+        new BytesWritable(uuid.toString().getBytes()), list));
     return inputRecords;
   }
 
-
-  private void generateAndSerializeStarTree() throws IOException
-  {
-    List<Pair<BytesWritable,  BytesWritable>> inputRecords = new ArrayList<Pair<BytesWritable,  BytesWritable>>();
-    String []combination1 = {"A1", "B1", "C1"};
+  private void generateAndSerializeStarTree() throws IOException {
+    List<Pair<BytesWritable, BytesWritable>> inputRecords =
+        new ArrayList<Pair<BytesWritable, BytesWritable>>();
+    String[] combination1 = {
+        "A1", "B1", "C1"
+    };
     DimensionKey dimKey = new DimensionKey(combination1);
-    MetricTimeSeries timeSeries = TestHelper.generateRandomMetricTimeSeries(starTreeBootstrapConfig);
-    Pair<BytesWritable,  BytesWritable> record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes())
-                                                                          , new BytesWritable(timeSeries.toBytes()));
+    MetricTimeSeries timeSeries =
+        TestHelper.generateRandomMetricTimeSeries(starTreeBootstrapConfig);
+    Pair<BytesWritable, BytesWritable> record = new Pair<BytesWritable, BytesWritable>(
+        new BytesWritable(dimKey.toBytes()), new BytesWritable(timeSeries.toBytes()));
     inputRecords.add(record);
 
-    String []combination2 = {"A1", "B1", "C2"};
+    String[] combination2 = {
+        "A1", "B1", "C2"
+    };
     dimKey = new DimensionKey(combination2);
-    timeSeries = TestStarTreeBootstrapPhase2.TestHelper.generateRandomMetricTimeSeries(starTreeBootstrapConfig);
-    record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes())
-                                                                          , new BytesWritable(timeSeries.toBytes()));
+    timeSeries = TestStarTreeBootstrapPhase2.TestHelper
+        .generateRandomMetricTimeSeries(starTreeBootstrapConfig);
+    record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes()),
+        new BytesWritable(timeSeries.toBytes()));
     inputRecords.add(record);
 
-    String []combination3 = {"A1", "B1", "C3"};
+    String[] combination3 = {
+        "A1", "B1", "C3"
+    };
     dimKey = new DimensionKey(combination3);
-    timeSeries = TestStarTreeBootstrapPhase2.TestHelper.generateRandomMetricTimeSeries(starTreeBootstrapConfig);
-    record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes())
-                                                                          , new BytesWritable(timeSeries.toBytes()));
+    timeSeries = TestStarTreeBootstrapPhase2.TestHelper
+        .generateRandomMetricTimeSeries(starTreeBootstrapConfig);
+    record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes()),
+        new BytesWritable(timeSeries.toBytes()));
     inputRecords.add(record);
 
-    String []combination4 = {"A2", "B1", "C3"};
+    String[] combination4 = {
+        "A2", "B1", "C3"
+    };
     dimKey = new DimensionKey(combination4);
-    timeSeries = TestStarTreeBootstrapPhase2.TestHelper.generateRandomMetricTimeSeries(starTreeBootstrapConfig);
-    record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes())
-                                                                          , new BytesWritable(timeSeries.toBytes()));
+    timeSeries = TestStarTreeBootstrapPhase2.TestHelper
+        .generateRandomMetricTimeSeries(starTreeBootstrapConfig);
+    record = new Pair<BytesWritable, BytesWritable>(new BytesWritable(dimKey.toBytes()),
+        new BytesWritable(timeSeries.toBytes()));
     inputRecords.add(record);
 
     MapDriver<BytesWritable, BytesWritable, BytesWritable, BytesWritable> mapDriver;
     StarTreeGenerationMapper mapper = new StarTreeGenerationMapper();
     mapDriver = MapDriver.newMapDriver(mapper);
     Configuration config = mapDriver.getConfiguration();
-    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
-    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(), thirdEyeRoot + File.separator + "startree_generation");
+    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH.toString(),
+        ClassLoader.getSystemResource(CONF_FILE).toString());
+    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(),
+        thirdEyeRoot + File.separator + "startree_generation");
     mapDriver.addAll(inputRecords);
     mapDriver.run();
   }
 
   @BeforeClass
-  public void setUp() throws IOException
-  {
+  public void setUp() throws IOException {
     BootstrapPhaseTwoMapper mapper = new BootstrapPhaseTwoMapper();
     mapDriver = MapDriver.newMapDriver(mapper);
     Configuration config = mapDriver.getConfiguration();
-    config.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+    config.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString(),
+        ClassLoader.getSystemResource(CONF_FILE).toString());
 
     Path configPath = new Path(ClassLoader.getSystemResource(CONF_FILE).toString());
     FileSystem fs = FileSystem.get(config);
     StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
     starTreeBootstrapConfig = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
-    thirdEyeRoot = System.getProperty("java.io.tmpdir") ;
-    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(), thirdEyeRoot + File.separator + "startree_generation");
+    thirdEyeRoot = System.getProperty("java.io.tmpdir");
+    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(),
+        thirdEyeRoot + File.separator + "startree_generation");
 
     BootstrapPhaseTwoReducer reducer = new BootstrapPhaseTwoReducer();
     reduceDriver = ReduceDriver.newReduceDriver(reducer);
     config = reduceDriver.getConfiguration();
-    config.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
-    config.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString(), thirdEyeRoot + File.separator + "startree_bootstrap_phase2");
-    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(), thirdEyeRoot + File.separator + "startree_generation");
+    config.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString(),
+        ClassLoader.getSystemResource(CONF_FILE).toString());
+    config.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString(),
+        thirdEyeRoot + File.separator + "startree_bootstrap_phase2");
+    config.set(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(),
+        thirdEyeRoot + File.separator + "startree_generation");
   }
 
   @Test
-  public void testStarTreeBootstrapPhase2() throws Exception
-  {
-   generateAndSerializeStarTree();
-    String starTreeOutputPath = mapDriver.getConfiguration().get(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString());
+  public void testStarTreeBootstrapPhase2() throws Exception {
+    generateAndSerializeStarTree();
+    String starTreeOutputPath = mapDriver.getConfiguration()
+        .get(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString());
     String collectionName = starTreeBootstrapConfig.getCollectionName();
     Path pathToTree = new Path(starTreeOutputPath + "/" + "tree.bin");
     FileSystem dfs = FileSystem.get(mapDriver.getConfiguration());
     InputStream is = dfs.open(pathToTree);
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
-    List<Pair<BytesWritable, BytesWritable>> inputRecords = generateTestDataMapper(starTreeRootNode);
+    List<Pair<BytesWritable, BytesWritable>> inputRecords =
+        generateTestDataMapper(starTreeRootNode);
 
     mapDriver.addAll(inputRecords);
     List<Pair<BytesWritable, BytesWritable>> result = mapDriver.run();
@@ -191,14 +225,14 @@ public class TestStarTreeBootstrapPhase2
     // and 4 empty entries for other leaves.
     Assert.assertEquals(6, result.size());
 
-    List<Pair<BytesWritable,List<BytesWritable>>> input =  generateTestDataReducer(starTreeRootNode);
+    List<Pair<BytesWritable, List<BytesWritable>>> input =
+        generateTestDataReducer(starTreeRootNode);
     reduceDriver.addAll(input);
     result = reduceDriver.run();
   }
 
   @AfterClass
-  public void deleteDir() throws IOException
-  {
+  public void deleteDir() throws IOException {
     File f = new File(thirdEyeRoot + File.separator + "startree_generation");
     FileUtils.deleteDirectory(f);
     f = new File(thirdEyeRoot + File.separator + "startree_bootstrap_phase2");
@@ -209,56 +243,52 @@ public class TestStarTreeBootstrapPhase2
     FileUtils.deleteDirectory(f);
   }
 
-  static class TestHelper
-  {
+  static class TestHelper {
 
-    public static long generateRandomHoursSinceEpoch(){
+    public static long generateRandomHoursSinceEpoch() {
       Random rng = new Random();
       // setting base value to year 2012
-      long unixtime=(long) (1293861599+ rng.nextDouble()*(60*60*24*365));
+      long unixtime = (long) (1293861599 + rng.nextDouble() * (60 * 60 * 24 * 365));
       return TimeUnit.SECONDS.toHours(unixtime);
     }
 
-    public static long generateRandomTime(){
+    public static long generateRandomTime() {
       Random rng = new Random();
-      long unixtime=(long) (1293861599+rng.nextDouble()*(60*60*24*365));
+      long unixtime = (long) (1293861599 + rng.nextDouble() * (60 * 60 * 24 * 365));
       return unixtime;
     }
 
-    public static MetricTimeSeries generateRandomMetricTimeSeries(StarTreeBootstrapPhaseTwoConfig config)
-    {
+    public static MetricTimeSeries generateRandomMetricTimeSeries(
+        StarTreeBootstrapPhaseTwoConfig config) {
       List<String> names = config.getMetricNames();
       List<MetricType> types = config.getMetricTypes();
       MetricSchema schema = new MetricSchema(names, types);
       MetricTimeSeries series = new MetricTimeSeries(schema);
       long timeStamp = TimeUnit.HOURS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       RandomDataGenerator rand = new RandomDataGenerator();
-      for(int i = 0;i<names.size();i++){
+      for (int i = 0; i < names.size(); i++) {
         series.set(timeStamp, names.get(i), rand.nextInt(0, 100));
       }
       return series;
     }
 
-    public static MetricTimeSeries generateMetricTimeSeries(StarTreeBootstrapPhaseTwoConfig config, Integer value)
-    {
+    public static MetricTimeSeries generateMetricTimeSeries(StarTreeBootstrapPhaseTwoConfig config,
+        Integer value) {
       List<String> names = config.getMetricNames();
       List<MetricType> types = config.getMetricTypes();
       MetricSchema schema = new MetricSchema(names, types);
       MetricTimeSeries series = new MetricTimeSeries(schema);
       long timeStamp = TimeUnit.HOURS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      for(int i = 0;i<names.size();i++){
+      for (int i = 0; i < names.size(); i++) {
         series.set(timeStamp, names.get(i), value);
       }
       return series;
     }
 
-    public static MetricSchema getMetricSchema(StarTreeBootstrapPhaseTwoConfig config)
-    {
+    public static MetricSchema getMetricSchema(StarTreeBootstrapPhaseTwoConfig config) {
       List<String> names = config.getMetricNames();
       List<MetricType> types = config.getMetricTypes();
       return new MetricSchema(names, types);
     }
   }
 }
-
-

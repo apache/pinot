@@ -18,7 +18,8 @@ public class TestSqlUtils {
     DateTime start = ISODateTimeFormat.dateTimeParser().parseDateTime("2015-01-01TZ");
     DateTime end = ISODateTimeFormat.dateTimeParser().parseDateTime("2015-01-02TZ");
     String betweenClause = SqlUtils.getBetweenClause(start, end);
-    Assert.assertEquals(betweenClause, "time BETWEEN '2015-01-01T00:00:00Z' AND '2015-01-02T00:00:00Z'");
+    Assert.assertEquals(betweenClause,
+        "time BETWEEN '2015-01-01T00:00:00Z' AND '2015-01-02T00:00:00Z'");
   }
 
   @Test

@@ -4,8 +4,7 @@ import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
-public final class StarTreeConstants
-{
+public final class StarTreeConstants {
   public static final String STAR = "*";
   public static final String OTHER = "?";
   public static final String ALL = "!";
@@ -28,13 +27,12 @@ public final class StarTreeConstants
   public static final String DICT_FILE_SUFFIX = ".dict";
   public static final String PARTITION_FOLDER_PREFIX = "partition";
 
-
   public static final String METRIC_STORE = "metricStore";
   public static final String DIMENSION_STORE = "dimensionStore";
   public static final String DICT_STORE = "dictStore";
 
-
-  public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
+  public static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 
   public enum Schedule {
     HOURLY {

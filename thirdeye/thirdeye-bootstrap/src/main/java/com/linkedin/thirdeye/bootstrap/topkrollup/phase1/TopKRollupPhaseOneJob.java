@@ -46,17 +46,15 @@ import com.linkedin.thirdeye.bootstrap.aggregation.MetricSums;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
 /**
- * Map Input = Input from aggregation Key:(serialized dimension key), value:(serialized metricTimeSeires)
- *
+ * Map Input = Input from aggregation Key:(serialized dimension key), value:(serialized
+ * metricTimeSeires)
  * Map Output = Key:(dimensionName, dimensionValue) Value:(metricTimeSeries)
- *
  * Reduce Output = Key:(dimensionName, dimensionValue) Value:(aggregated metricTimeSeries)
  * Reduce emits the record only if metric sums
  * are greater than threshold specified in config
  */
 public class TopKRollupPhaseOneJob extends Configured {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(TopKRollupPhaseOneJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TopKRollupPhaseOneJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -65,7 +63,6 @@ public class TopKRollupPhaseOneJob extends Configured {
   private Properties props;
 
   /**
-   *
    * @param name
    * @param props
    */
@@ -75,9 +72,8 @@ public class TopKRollupPhaseOneJob extends Configured {
     this.props = props;
   }
 
-
-  public static class TopKRollupPhaseOneMapper extends
-    Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class TopKRollupPhaseOneMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private TopKRollupPhaseOneConfig config;
     StarTreeConfig starTreeConfig;
     private List<String> dimensionNames;
@@ -90,8 +86,7 @@ public class TopKRollupPhaseOneJob extends Configured {
       LOGGER.info("TopKRollupPhaseOneJob.TopKRollupPhaseOneMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE1_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE1_CONFIG_PATH.toString()));
       try {
         starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = TopKRollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
@@ -129,13 +124,12 @@ public class TopKRollupPhaseOneJob extends Configured {
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
     }
   }
 
-  public static class TopKRollupPhaseOneReducer extends
-    Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class TopKRollupPhaseOneReducer
+      extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
 
     private StarTreeConfig starTreeConfig;
     private TopKRollupPhaseOneConfig config;
@@ -154,8 +148,7 @@ public class TopKRollupPhaseOneJob extends Configured {
 
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE1_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE1_CONFIG_PATH.toString()));
       try {
         starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = TopKRollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
@@ -166,8 +159,10 @@ public class TopKRollupPhaseOneJob extends Configured {
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
 
-        MetricSums metricSumsObj = OBJECT_MAPPER.readValue(fileSystem.open(
-            new Path(configuration.get(TOPK_ROLLUP_PHASE1_METRIC_SUMS_PATH.toString()))), MetricSums.class);
+        MetricSums metricSumsObj = OBJECT_MAPPER.readValue(
+            fileSystem
+                .open(new Path(configuration.get(TOPK_ROLLUP_PHASE1_METRIC_SUMS_PATH.toString()))),
+            MetricSums.class);
         metricSums = metricSumsObj.getMetricSum();
 
       } catch (Exception e) {
@@ -179,8 +174,10 @@ public class TopKRollupPhaseOneJob extends Configured {
     public void reduce(BytesWritable topkRollupKey, Iterable<BytesWritable> timeSeriesIterable,
         Context context) throws IOException, InterruptedException {
 
-      TopKRollupPhaseOneMapOutputKey wrapper = TopKRollupPhaseOneMapOutputKey.fromBytes(topkRollupKey.getBytes());
-      LOGGER.info("DimensionName {} DimensionValue {}", wrapper.getDimensionName(), wrapper.getDimensionValue());
+      TopKRollupPhaseOneMapOutputKey wrapper =
+          TopKRollupPhaseOneMapOutputKey.fromBytes(topkRollupKey.getBytes());
+      LOGGER.info("DimensionName {} DimensionValue {}", wrapper.getDimensionName(),
+          wrapper.getDimensionValue());
 
       MetricTimeSeries aggregateSeries = new MetricTimeSeries(metricSchema);
       for (BytesWritable writable : timeSeriesIterable) {
@@ -227,7 +224,6 @@ public class TopKRollupPhaseOneJob extends Configured {
     }
   }
 
-
   public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
@@ -266,8 +262,8 @@ public class TopKRollupPhaseOneJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(TOPK_ROLLUP_PHASE1_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(TOPK_ROLLUP_PHASE1_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 

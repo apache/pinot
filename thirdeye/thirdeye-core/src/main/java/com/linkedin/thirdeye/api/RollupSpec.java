@@ -5,38 +5,32 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Properties;
 
-public class RollupSpec
-{
+public class RollupSpec {
   private String functionClass;
   private Properties functionConfig;
   private List<String> order;
 
-  public RollupSpec() {}
+  public RollupSpec() {
+  }
 
-  public RollupSpec(String functionClass,
-                    Properties functionConfig,
-                    List<String> order)
-  {
+  public RollupSpec(String functionClass, Properties functionConfig, List<String> order) {
     this.functionClass = functionClass;
     this.functionConfig = functionConfig;
     this.order = order;
   }
 
   @JsonProperty
-  public String getFunctionClass()
-  {
+  public String getFunctionClass() {
     return functionClass;
   }
 
   @JsonProperty
-  public Properties getFunctionConfig()
-  {
+  public Properties getFunctionConfig() {
     return functionConfig;
   }
 
   @JsonProperty
-  public List<String> getOrder()
-  {
+  public List<String> getOrder() {
     return order;
   }
 }

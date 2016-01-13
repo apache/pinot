@@ -14,20 +14,23 @@ public class ThirdEyeUnitConversionFunction implements ThirdEyeFunction {
   private final TimeUnit outputUnit;
   private final List<String> metricNames;
 
-  public ThirdEyeUnitConversionFunction(long outputSize, TimeUnit outputUnit, List<String> metricNames) {
+  public ThirdEyeUnitConversionFunction(long outputSize, TimeUnit outputUnit,
+      List<String> metricNames) {
     this.outputSize = outputSize;
     this.outputUnit = outputUnit;
     this.metricNames = metricNames;
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query,
+      MetricTimeSeries timeSeries) {
     List<MetricType> types = new ArrayList<>(metricNames.size());
     for (String name : metricNames) {
       types.add(timeSeries.getSchema().getMetricType(name));
     }
     MetricSchema schema = new MetricSchema(metricNames, types);
-    MetricTimeSeries converted = ThirdEyeFunctionUtils.copyBlankSeriesSame(schema.getNames(), schema);
+    MetricTimeSeries converted =
+        ThirdEyeFunctionUtils.copyBlankSeriesSame(schema.getNames(), schema);
 
     long inputSize = config.getTime().getBucket().getSize();
     TimeUnit inputUnit = config.getTime().getBucket().getUnit();

@@ -28,9 +28,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-public class TestStarTreeRecordStoreCircularBufferImpl
-{
-  private final Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
+public class TestStarTreeRecordStoreCircularBufferImpl {
+  private final Map<String, Map<String, Integer>> forwardIndex =
+      new HashMap<String, Map<String, Integer>>();
   private final int numTimeBuckets = 4;
   private final int numRecords = 100;
 
@@ -42,18 +42,18 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   private StarTreeRecordStore recordStore;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
-    starTreeConfig = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
+  public void beforeClass() throws Exception {
+    starTreeConfig =
+        StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
 
     metricSchema = MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics());
 
-    rootDir = new File(System.getProperty("java.io.tmpdir"), TestStarTreeRecordStoreCircularBufferImpl.class.getSimpleName());
+    rootDir = new File(System.getProperty("java.io.tmpdir"),
+        TestStarTreeRecordStoreCircularBufferImpl.class.getSimpleName());
 
     nodeId = UUID.randomUUID();
 
-    if (rootDir.exists())
-    {
+    if (rootDir.exists()) {
       FileUtils.forceDelete(rootDir);
     }
     FileUtils.forceMkdir(rootDir);
@@ -89,8 +89,8 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     forwardIndex.put("B", bValues);
     forwardIndex.put("C", cValues);
 
-    new ObjectMapper().writeValue(
-            new File(rootDir, nodeId + StarTreeConstants.INDEX_FILE_SUFFIX), forwardIndex);
+    new ObjectMapper().writeValue(new File(rootDir, nodeId + StarTreeConstants.INDEX_FILE_SUFFIX),
+        forwardIndex);
 
     Properties config = new Properties();
     recordStoreFactory = new StarTreeRecordStoreFactoryCircularBufferImpl();
@@ -98,54 +98,40 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   }
 
   @BeforeMethod
-  public void beforeMethod() throws Exception
-  {
+  public void beforeMethod() throws Exception {
     recordStore = recordStoreFactory.createRecordStore(nodeId);
 
     // Generate records
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
-    for (int i = 0; i < numRecords; i++)
-    {
+    for (int i = 0; i < numRecords; i++) {
       DimensionKey dimensionKey = new DimensionKey(new String[] {
-              "A" + (i % 4),
-              "B" + (i % 3),
-              "C" + (i % 2)
+          "A" + (i % 4), "B" + (i % 3), "C" + (i % 2)
       });
 
       MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
       timeSeries.set(i / (numRecords / numTimeBuckets), "M", 1);
 
       StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder()
-              .setDimensionKey(dimensionKey)
-              .setMetricTimeSeries(timeSeries);
+          .setDimensionKey(dimensionKey).setMetricTimeSeries(timeSeries);
       records.add(builder.build(starTreeConfig));
     }
 
     DimensionKey dimensionKey = new DimensionKey(new String[] {
-            StarTreeConstants.OTHER,
-            StarTreeConstants.OTHER,
-            StarTreeConstants.OTHER
+        StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER
     });
 
     MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
     timeSeries.set(0, "M", 0);
 
     // Add all-other record
-    records.add(new StarTreeRecordImpl.Builder()
-                        .setDimensionKey(dimensionKey)
-                        .setMetricTimeSeries(timeSeries)
-                        .build(starTreeConfig));
+    records.add(new StarTreeRecordImpl.Builder().setDimensionKey(dimensionKey)
+        .setMetricTimeSeries(timeSeries).build(starTreeConfig));
 
     // Fill a buffer and write to bufferFile
-    OutputStream outputStream = new FileOutputStream(
-            new File(rootDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX));
-    StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            outputStream,
-            starTreeConfig,
-            forwardIndex,
-            records,
-            numTimeBuckets,
-            true);
+    OutputStream outputStream =
+        new FileOutputStream(new File(rootDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX));
+    StarTreeRecordStoreCircularBufferImpl.fillBuffer(outputStream, starTreeConfig, forwardIndex,
+        records, numTimeBuckets, true);
     outputStream.flush();
     outputStream.close();
 
@@ -154,20 +140,16 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   }
 
   @AfterClass
-  public void afterClass() throws Exception
-  {
+  public void afterClass() throws Exception {
     FileUtils.forceDelete(rootDir);
   }
 
   @Test
-  public void testIterator() throws Exception
-  {
+  public void testIterator() throws Exception {
     long sum = 0;
 
-    for (StarTreeRecord record : recordStore)
-    {
-      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet())
-      {
+    for (StarTreeRecord record : recordStore) {
+      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet()) {
         sum += record.getMetricTimeSeries().get(timeWindow, "M").intValue();
       }
     }
@@ -176,16 +158,13 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   }
 
   @Test
-  public void testClear() throws Exception
-  {
+  public void testClear() throws Exception {
     recordStore.clear();
 
     long sum = 0;
 
-    for (StarTreeRecord record : recordStore)
-    {
-      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet())
-      {
+    for (StarTreeRecord record : recordStore) {
+      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet()) {
         sum += record.getMetricTimeSeries().get(timeWindow, "M").intValue();
       }
     }
@@ -194,77 +173,66 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   }
 
   @Test
-  public void testGetMetricSums() throws Exception
-  {
+  public void testGetMetricSums() throws Exception {
     // Specific
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("A0", "B0", "C0"))
-            .build(starTreeConfig);
+        .setDimensionKey(getDimensionKey("A0", "B0", "C0")).build(starTreeConfig);
     Number[] result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], 4 + 3 + 2);
 
     // Aggregate
-    query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("*", "*", "*"))
-            .build(starTreeConfig);
+    query = new StarTreeQueryImpl.Builder().setDimensionKey(getDimensionKey("*", "*", "*"))
+        .build(starTreeConfig);
     result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], numRecords);
   }
 
   @Test
-  public void testGetTimeSeries() throws Exception
-  {
-    StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("*", "*", "*"))
-            .setTimeRange(new TimeRange(0L, 3L))
-            .build(starTreeConfig);
+  public void testGetTimeSeries() throws Exception {
+    StarTreeQuery query =
+        new StarTreeQueryImpl.Builder().setDimensionKey(getDimensionKey("*", "*", "*"))
+            .setTimeRange(new TimeRange(0L, 3L)).build(starTreeConfig);
     MetricTimeSeries timeSeries = recordStore.getTimeSeries(query);
     Assert.assertEquals(timeSeries.getTimeWindowSet().size(), 4);
 
-    for (Long timeWindow : timeSeries.getTimeWindowSet())
-    {
+    for (Long timeWindow : timeSeries.getTimeWindowSet()) {
       Assert.assertEquals(timeSeries.get(timeWindow, "M").intValue(), 25);
     }
 
     // No time range
-    query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("*", "*", "*"))
-            .build(starTreeConfig);
-    try
-    {
+    query = new StarTreeQueryImpl.Builder().setDimensionKey(getDimensionKey("*", "*", "*"))
+        .build(starTreeConfig);
+    try {
       recordStore.getTimeSeries(query);
       Assert.fail();
-    }
-    catch (Exception e)
-    {
+    } catch (Exception e) {
       // Good
     }
   }
 
   @Test
-  public void testLeastOtherMatch() throws Exception
-  {
+  public void testLeastOtherMatch() throws Exception {
     MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
     timeSeries.set(0, "M", 1);
 
     // This will go into all-other bucket because AX is unrecognized
-    StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionKey(getDimensionKey("AX", "B0", "C0"))
-            .setMetricTimeSeries(timeSeries)
-            .build(starTreeConfig);
+    StarTreeRecord record =
+        new StarTreeRecordImpl.Builder().setDimensionKey(getDimensionKey("AX", "B0", "C0"))
+            .setMetricTimeSeries(timeSeries).build(starTreeConfig);
 
     recordStore.update(record);
 
-    StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey(StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER))
-            .build(starTreeConfig);
+    StarTreeQuery query = new StarTreeQueryImpl.Builder().setDimensionKey(
+        getDimensionKey(StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER))
+        .build(starTreeConfig);
 
     Number[] sums = recordStore.getMetricSums(query);
     Assert.assertEquals(sums[0], 1);
   }
 
-  private DimensionKey getDimensionKey(String a, String b, String c)
-  {
-    return new DimensionKey(new String[] {a, b, c});
+  private DimensionKey getDimensionKey(String a, String b, String c) {
+    return new DimensionKey(new String[] {
+        a, b, c
+    });
   }
 }

@@ -62,13 +62,13 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     this.resultCache = builder.build(new ResultCacheLoader());
     this.rawResultCache = builder.build(new RawResultCacheLoader());
 
-    this.schemaCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(Long.MAX_VALUE, TimeUnit.MILLISECONDS) // never
-        .build(new SchemaCacheLoader());
+    this.schemaCache =
+        CacheBuilder.newBuilder().expireAfterWrite(Long.MAX_VALUE, TimeUnit.MILLISECONDS) // never
+            .build(new SchemaCacheLoader());
 
-    this.starTreeConfigCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(Long.MAX_VALUE, TimeUnit.MILLISECONDS) // never
-        .build(new StarTreeConfigCacheLoader());
+    this.starTreeConfigCache =
+        CacheBuilder.newBuilder().expireAfterWrite(Long.MAX_VALUE, TimeUnit.MILLISECONDS) // never
+            .build(new StarTreeConfigCacheLoader());
 
     LOG.info("Created DefaultThirdEyeClient to {}", httpHost);
   }
@@ -79,7 +79,6 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     LOG.debug("Generated SQL {}", request.toSql());
     return resultCache.get(querySpec);
   }
-
 
   @Override
   public ThirdEyeRawResponse getRawResponse(String sql) throws Exception {
@@ -99,7 +98,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
   /**
    * Executes SQL statements against the /query resource.
    */
-  private class ResultCacheLoader extends CacheLoader<QuerySpec, Map<DimensionKey, MetricTimeSeries>> {
+  private class ResultCacheLoader
+      extends CacheLoader<QuerySpec, Map<DimensionKey, MetricTimeSeries>> {
     @Override
     public Map<DimensionKey, MetricTimeSeries> load(QuerySpec querySpec) throws Exception {
       HttpGet req = new HttpGet("/query/" + URLEncoder.encode(querySpec.getSql(), "UTF-8"));
@@ -111,7 +111,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
 
         // Parse response
         InputStream content = res.getEntity().getContent();
-        ThirdEyeRawResponse rawResponse = OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
+        ThirdEyeRawResponse rawResponse =
+            OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
 
         // Figure out the metric types of the projection
         Map<String, MetricType> metricTypes = schemaCache.get(querySpec.getCollection());
@@ -149,7 +150,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
 
         // Parse response
         InputStream content = res.getEntity().getContent();
-        ThirdEyeRawResponse rawResponse = OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
+        ThirdEyeRawResponse rawResponse =
+            OBJECT_MAPPER.readValue(content, ThirdEyeRawResponse.class);
         return rawResponse;
 
       } finally {
@@ -217,7 +219,6 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     }
   }
 
-
   private static class QuerySpec {
     private String collection;
     private String sql;
@@ -252,7 +253,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
 
   public static void main(String[] args) throws Exception {
     if (args.length != 6 && args.length != 7) {
-      throw new IllegalArgumentException("usage: host port collection metricFunction startTime endTime [groupBy]");
+      throw new IllegalArgumentException(
+          "usage: host port collection metricFunction startTime endTime [groupBy]");
     }
 
     String host = args[0];
@@ -262,11 +264,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[4]);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[5]);
 
-    ThirdEyeRequest request = new ThirdEyeRequest()
-        .setCollection(collection)
-        .setStartTime(startTime)
-        .setEndTime(endTime)
-        .setMetricFunction(metricFunction);
+    ThirdEyeRequest request = new ThirdEyeRequest().setCollection(collection)
+        .setStartTime(startTime).setEndTime(endTime).setMetricFunction(metricFunction);
 
     if (args.length == 7) {
       request.setGroupBy(args[6]);

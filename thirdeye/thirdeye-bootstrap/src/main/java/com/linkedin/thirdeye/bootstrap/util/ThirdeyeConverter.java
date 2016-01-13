@@ -14,7 +14,6 @@
  ******************************************************************************/
 package com.linkedin.thirdeye.bootstrap.util;
 
-
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 

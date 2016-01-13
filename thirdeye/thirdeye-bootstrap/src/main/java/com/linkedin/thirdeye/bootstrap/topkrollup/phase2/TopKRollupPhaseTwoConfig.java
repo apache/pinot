@@ -22,22 +22,22 @@ public class TopKRollupPhaseTwoConfig {
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private List<TopKDimensionSpec> rollupDimensionConfig;
+
   /**
    *
    */
-  public TopKRollupPhaseTwoConfig(){
+  public TopKRollupPhaseTwoConfig() {
 
   }
-/**
- *
- * @param dimensionNames
- * @param metricNames
- * @param metricTypes
- * @param rollupDimensionConfig
- */
-  public TopKRollupPhaseTwoConfig(List<String> dimensionNames,
-      List<String> metricNames, List<MetricType> metricTypes,
-      List<TopKDimensionSpec> rollupDimensionConfig) {
+
+  /**
+   * @param dimensionNames
+   * @param metricNames
+   * @param metricTypes
+   * @param rollupDimensionConfig
+   */
+  public TopKRollupPhaseTwoConfig(List<String> dimensionNames, List<String> metricNames,
+      List<MetricType> metricTypes, List<TopKDimensionSpec> rollupDimensionConfig) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -61,20 +61,17 @@ public class TopKRollupPhaseTwoConfig {
     return rollupDimensionConfig;
   }
 
-  public static TopKRollupPhaseTwoConfig fromStarTreeConfig(StarTreeConfig config)
-  {
+  public static TopKRollupPhaseTwoConfig fromStarTreeConfig(StarTreeConfig config) {
 
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
+    for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
@@ -83,10 +80,7 @@ public class TopKRollupPhaseTwoConfig {
       rollupDimensionConfig = config.getTopKRollup().getTopKDimensionSpec();
     }
 
-
-    return new TopKRollupPhaseTwoConfig(dimensionNames,
-                                    metricNames,
-                                    metricTypes,
-                                    rollupDimensionConfig);
+    return new TopKRollupPhaseTwoConfig(dimensionNames, metricNames, metricTypes,
+        rollupDimensionConfig);
   }
 }

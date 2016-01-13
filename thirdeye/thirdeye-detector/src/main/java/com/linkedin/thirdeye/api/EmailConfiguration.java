@@ -19,10 +19,7 @@ import java.util.concurrent.TimeUnit;
 @Entity
 @Table(name = "email_configurations")
 @NamedQueries({
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll",
-        query = "SELECT c FROM EmailConfiguration c"
-    )
+    @NamedQuery(name = "com.linkedin.thirdeye.api.EmailConfiguration#findAll", query = "SELECT c FROM EmailConfiguration c")
 })
 public class EmailConfiguration {
   @Id
@@ -189,18 +186,10 @@ public class EmailConfiguration {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("collection", collection)
-        .add("metric", metric)
-        .add("fromAddress", fromAddress)
-        .add("toAddresses", toAddresses)
-        .add("cron", cron)
-        .add("smtpHost", smtpHost)
-        .add("smtpPort", smtpPort)
-        .add("smtpUser", smtpUser)
-        .add("windowSize", windowSize)
-        .add("windowUnit", windowUnit)
-        .add("isActive", isActive)
+    return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
+        .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
+        .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
+        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
         .toString();
   }
 }

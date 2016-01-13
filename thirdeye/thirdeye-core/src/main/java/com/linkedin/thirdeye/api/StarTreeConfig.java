@@ -9,12 +9,11 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Properties;
 
-
-public final class StarTreeConfig
-{
+public final class StarTreeConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryDefaultImpl.class.getCanonicalName();
+  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS =
+      StarTreeRecordStoreFactoryDefaultImpl.class.getCanonicalName();
 
   private String collection;
   private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
@@ -36,25 +35,15 @@ public final class StarTreeConfig
   private Properties anomalyHandlerConfig = new Properties();
   private String anomalyDetectionMode;
 
-  public StarTreeConfig() {}
+  public StarTreeConfig() {
+  }
 
-  public StarTreeConfig(String collection,
-                        String recordStoreFactoryClass,
-                        Properties recordStoreFactoryConfig,
-                        String anomalyDetectionFunctionClass,
-                        Properties anomalyDetectionFunctionConfig,
-                        String anomalyHandlerClass,
-                        Properties anomalyHandlerConfig,
-                        String anomalyDetectionMode,
-                        List<DimensionSpec> dimensions,
-                        List<MetricSpec> metrics,
-                        TimeSpec time,
-                        JoinSpec joinSpec,
-                        RollupSpec rollup,
-                        TopKRollupSpec topKRollup,
-                        SplitSpec split,
-                        boolean fixed)
-  {
+  public StarTreeConfig(String collection, String recordStoreFactoryClass,
+      Properties recordStoreFactoryConfig, String anomalyDetectionFunctionClass,
+      Properties anomalyDetectionFunctionConfig, String anomalyHandlerClass,
+      Properties anomalyHandlerConfig, String anomalyDetectionMode, List<DimensionSpec> dimensions,
+      List<MetricSpec> metrics, TimeSpec time, JoinSpec joinSpec, RollupSpec rollup,
+      TopKRollupSpec topKRollup, SplitSpec split, boolean fixed) {
     this.collection = collection;
     this.recordStoreFactoryClass = recordStoreFactoryClass;
     this.recordStoreFactoryConfig = recordStoreFactoryConfig;
@@ -73,93 +62,75 @@ public final class StarTreeConfig
     this.fixed = fixed;
   }
 
-  public String getCollection()
-  {
+  public String getCollection() {
     return collection;
   }
 
-  public String getRecordStoreFactoryClass()
-  {
+  public String getRecordStoreFactoryClass() {
     return recordStoreFactoryClass;
   }
 
-  public Properties getRecordStoreFactoryConfig()
-  {
+  public Properties getRecordStoreFactoryConfig() {
     return recordStoreFactoryConfig;
   }
 
-  public List<DimensionSpec> getDimensions()
-  {
+  public List<DimensionSpec> getDimensions() {
     return dimensions;
   }
 
-  public String getAnomalyDetectionFunctionClass()
-  {
+  public String getAnomalyDetectionFunctionClass() {
     return anomalyDetectionFunctionClass;
   }
 
-  public Properties getAnomalyDetectionFunctionConfig()
-  {
+  public Properties getAnomalyDetectionFunctionConfig() {
     return anomalyDetectionFunctionConfig;
   }
 
-  public String getAnomalyHandlerClass()
-  {
+  public String getAnomalyHandlerClass() {
     return anomalyHandlerClass;
   }
 
-  public Properties getAnomalyHandlerConfig()
-  {
+  public Properties getAnomalyHandlerConfig() {
     return anomalyHandlerConfig;
   }
 
-  public String getAnomalyDetectionMode()
-  {
+  public String getAnomalyDetectionMode() {
     return anomalyDetectionMode;
   }
 
-  public List<MetricSpec> getMetrics()
-  {
+  public List<MetricSpec> getMetrics() {
     return metrics;
   }
 
-  public TimeSpec getTime()
-  {
+  public TimeSpec getTime() {
     return time;
   }
 
-  public JoinSpec getJoinSpec()
-  {
+  public JoinSpec getJoinSpec() {
     return joinSpec;
   }
 
-  public RollupSpec getRollup()
-  {
+  public RollupSpec getRollup() {
     return rollup;
   }
 
-  public TopKRollupSpec getTopKRollup()
-  {
+  public TopKRollupSpec getTopKRollup() {
     return topKRollup;
   }
 
-  public SplitSpec getSplit()
-  {
+  public SplitSpec getSplit() {
     return split;
   }
 
-  public boolean isFixed()
-  {
+  public boolean isFixed() {
     return fixed;
   }
 
-  public String encode() throws IOException
-  {
+  public String encode() throws IOException {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
-  public static class Builder
-  {
+  public static class Builder {
     private String collection;
     private List<DimensionSpec> dimensions;
     private List<MetricSpec> metrics;
@@ -177,220 +148,171 @@ public final class StarTreeConfig
     private SplitSpec split = new SplitSpec();
     private boolean fixed = true;
 
-    public String getCollection()
-    {
+    public String getCollection() {
       return collection;
     }
 
-    public Builder setCollection(String collection)
-    {
+    public Builder setCollection(String collection) {
       this.collection = collection;
       return this;
     }
 
-    public List<DimensionSpec> getDimensions()
-    {
+    public List<DimensionSpec> getDimensions() {
       return dimensions;
     }
 
-    public Builder setDimensions(List<DimensionSpec> dimensions)
-    {
+    public Builder setDimensions(List<DimensionSpec> dimensions) {
       this.dimensions = dimensions;
       return this;
     }
 
-    public List<MetricSpec> getMetrics()
-    {
+    public List<MetricSpec> getMetrics() {
       return metrics;
     }
 
-    public Builder setMetrics(List<MetricSpec> metrics)
-    {
+    public Builder setMetrics(List<MetricSpec> metrics) {
       this.metrics = metrics;
       return this;
     }
 
-    public String getRecordStoreFactoryClass()
-    {
+    public String getRecordStoreFactoryClass() {
       return recordStoreFactoryClass;
     }
 
-    public Builder setRecordStoreFactoryClass(String recordStoreFactoryClass)
-    {
+    public Builder setRecordStoreFactoryClass(String recordStoreFactoryClass) {
       this.recordStoreFactoryClass = recordStoreFactoryClass;
       return this;
     }
 
-    public String getAnomalyDetectionFunctionClass()
-    {
+    public String getAnomalyDetectionFunctionClass() {
       return anomalyDetectionFunctionClass;
     }
 
-    public Builder setAnomalyDetectionFunctionClass(String anomalyDetectionFunctionClass)
-    {
+    public Builder setAnomalyDetectionFunctionClass(String anomalyDetectionFunctionClass) {
       this.anomalyDetectionFunctionClass = anomalyDetectionFunctionClass;
       return this;
     }
 
-    public Properties getAnomalyDetectionFunctionConfig()
-    {
+    public Properties getAnomalyDetectionFunctionConfig() {
       return anomalyDetectionFunctionConfig;
     }
 
-    public Builder setAnomalyDetectionFunctionConfig(Properties anomalyDetectionFunctionConfig)
-    {
+    public Builder setAnomalyDetectionFunctionConfig(Properties anomalyDetectionFunctionConfig) {
       this.anomalyDetectionFunctionConfig = anomalyDetectionFunctionConfig;
       return this;
     }
 
-    public String getAnomalyHandlerClass()
-    {
+    public String getAnomalyHandlerClass() {
       return anomalyHandlerClass;
     }
 
-    public Builder setAnomalyHandlerClass(String anomalyHandlerClass)
-    {
+    public Builder setAnomalyHandlerClass(String anomalyHandlerClass) {
       this.anomalyHandlerClass = anomalyHandlerClass;
       return this;
     }
 
-    public Properties getAnomalyHandlerConfig()
-    {
+    public Properties getAnomalyHandlerConfig() {
       return anomalyHandlerConfig;
     }
 
-    public Builder setAnomalyHandlerConfig(Properties anomalyHandlerConfig)
-    {
+    public Builder setAnomalyHandlerConfig(Properties anomalyHandlerConfig) {
       this.anomalyHandlerConfig = anomalyHandlerConfig;
       return this;
     }
 
-    public String getAnomalyDetectionMode()
-    {
+    public String getAnomalyDetectionMode() {
       return anomalyDetectionMode;
     }
 
-    public Builder setAnomalyDetectionMode(String anomalyDetectionMode)
-    {
+    public Builder setAnomalyDetectionMode(String anomalyDetectionMode) {
       this.anomalyDetectionMode = anomalyDetectionMode;
       return this;
     }
 
-    public Properties getRecordStoreFactoryConfig()
-    {
+    public Properties getRecordStoreFactoryConfig() {
       return recordStoreFactoryConfig;
     }
 
-    public Builder setRecordStoreFactoryConfig(Properties recordStoreFactoryConfig)
-    {
+    public Builder setRecordStoreFactoryConfig(Properties recordStoreFactoryConfig) {
       this.recordStoreFactoryConfig = recordStoreFactoryConfig;
       return this;
     }
 
-    public TimeSpec getTime()
-    {
+    public TimeSpec getTime() {
       return time;
     }
 
-    public Builder setTime(TimeSpec time)
-    {
+    public Builder setTime(TimeSpec time) {
       this.time = time;
       return this;
     }
 
-    public JoinSpec getJoinSpec()
-    {
+    public JoinSpec getJoinSpec() {
       return joinSpec;
     }
 
-    public Builder setJoinSpec(JoinSpec joinSpec)
-    {
+    public Builder setJoinSpec(JoinSpec joinSpec) {
       this.joinSpec = joinSpec;
       return this;
     }
 
-    public RollupSpec getRollup()
-    {
+    public RollupSpec getRollup() {
       return rollup;
     }
 
-    public Builder setRollup(RollupSpec rollup)
-    {
+    public Builder setRollup(RollupSpec rollup) {
       this.rollup = rollup;
       return this;
     }
 
-    public TopKRollupSpec getTopKRollup()
-    {
+    public TopKRollupSpec getTopKRollup() {
       return topKRollup;
     }
 
-    public Builder setTopKRollup(TopKRollupSpec topKRollup)
-    {
+    public Builder setTopKRollup(TopKRollupSpec topKRollup) {
       this.topKRollup = topKRollup;
       return this;
     }
 
-    public SplitSpec getSplit()
-    {
+    public SplitSpec getSplit() {
       return split;
     }
 
-    public Builder setSplit(SplitSpec split)
-    {
+    public Builder setSplit(SplitSpec split) {
       this.split = split;
       return this;
     }
 
-    public boolean isFixed()
-    {
+    public boolean isFixed() {
       return fixed;
     }
 
-    public Builder setFixed(boolean fixed)
-    {
+    public Builder setFixed(boolean fixed) {
       this.fixed = fixed;
       return this;
     }
 
-    public StarTreeConfig build() throws Exception
-    {
-      if (collection == null)
-      {
+    public StarTreeConfig build() throws Exception {
+      if (collection == null) {
         throw new IllegalArgumentException("Must provide collection");
       }
 
-      if (dimensions == null || dimensions.isEmpty())
-      {
+      if (dimensions == null || dimensions.isEmpty()) {
         throw new IllegalArgumentException("Must provide dimension names");
       }
 
-      if (metrics == null || metrics.isEmpty())
-      {
+      if (metrics == null || metrics.isEmpty()) {
         throw new IllegalArgumentException("Must provide metric specs");
       }
 
-      return new StarTreeConfig(collection,
-                                recordStoreFactoryClass,
-                                recordStoreFactoryConfig,
-                                anomalyDetectionFunctionClass,
-                                anomalyDetectionFunctionConfig,
-                                anomalyHandlerClass,
-                                anomalyHandlerConfig,
-                                anomalyDetectionMode,
-                                dimensions,
-                                metrics,
-                                time,
-                                joinSpec,
-                                rollup,
-                                topKRollup,
-                                split,
-                                fixed);
+      return new StarTreeConfig(collection, recordStoreFactoryClass, recordStoreFactoryConfig,
+          anomalyDetectionFunctionClass, anomalyDetectionFunctionConfig, anomalyHandlerClass,
+          anomalyHandlerConfig, anomalyDetectionMode, dimensions, metrics, time, joinSpec, rollup,
+          topKRollup, split, fixed);
     }
   }
 
-  public static StarTreeConfig decode(InputStream inputStream) throws IOException
-  {
+  public static StarTreeConfig decode(InputStream inputStream) throws IOException {
     return OBJECT_MAPPER.readValue(inputStream, StarTreeConfig.class);
   }
 

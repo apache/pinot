@@ -14,9 +14,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 
 /**
  * Class to record stats about the aggregation job
- *
  * @author kgopalak
- *
  */
 public class AggregationStats {
 
@@ -47,7 +45,6 @@ public class AggregationStats {
 
   /**
    * Record the output
-   *
    * @param series
    */
   public void record(MetricTimeSeries series) {
@@ -66,12 +63,14 @@ public class AggregationStats {
     }
   }
 
-  private static String fields[] = new String[] { "75th", "95th", "98th",
-      "99th", "999th", "Max", "Min", "Mean", "Median", "count", "StdDev" };
+  private static String fields[] = new String[] {
+      "75th", "95th", "98th", "99th", "999th", "Max", "Min", "Mean", "Median", "count", "StdDev"
+  };
 
   public String toString() throws RuntimeException {
     StringWriter sw = new StringWriter();
-    Map<String, Map<String, Object>> resultPerTimeWindow = new HashMap<String, Map<String, Object>>();
+    Map<String, Map<String, Object>> resultPerTimeWindow =
+        new HashMap<String, Map<String, Object>>();
     Map<String, Map<String, Object>> resultAggregated = new HashMap<String, Map<String, Object>>();
     sw.append(String.format(metricNameFormat, "MetricName"));
     for (String field : fields) {

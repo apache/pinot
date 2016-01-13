@@ -88,11 +88,11 @@ public class ThirdEyeAvroUtils {
 
   /**
    * Returns a new value based on some condition.
-   *
    * @param dimensionValue
-   *  An integral numeric dimension value
+   *          An integral numeric dimension value
    * @param config
-   *  Contains a "condition", "operator" (LT, LE, GT, GE, EQ), "true" value if true, "false" value if false
+   *          Contains a "condition", "operator" (LT, LE, GT, GE, EQ), "true" value if true, "false"
+   *          value if false
    */
   private static String parseTernaryValue(String dimensionValue, Properties config) {
     String trueValue = config.getProperty("trueValue");
@@ -109,11 +109,16 @@ public class ThirdEyeAvroUtils {
     long value = Long.valueOf(dimensionValue);
     long conditionValue = Long.valueOf(config.getProperty("condition"));
     switch (operator) {
-      case EQ: return value == conditionValue ? trueValue : falseValue;
-      case LT: return value < conditionValue ? trueValue : falseValue;
-      case LE: return value <= conditionValue ? trueValue : falseValue;
-      case GT: return value > conditionValue ? trueValue : falseValue;
-      case GE: return value >= conditionValue ? trueValue : falseValue;
+    case EQ:
+      return value == conditionValue ? trueValue : falseValue;
+    case LT:
+      return value < conditionValue ? trueValue : falseValue;
+    case LE:
+      return value <= conditionValue ? trueValue : falseValue;
+    case GT:
+      return value > conditionValue ? trueValue : falseValue;
+    case GE:
+      return value >= conditionValue ? trueValue : falseValue;
     }
 
     throw new IllegalStateException("Could not apply " + config + " to value " + dimensionValue);
@@ -127,12 +132,12 @@ public class ThirdEyeAvroUtils {
       String dimensionValue = getRecordValue(dimensionSpec.getName(), record);
       if (!NULL_VALUE.equals(dimensionValue) && dimensionSpec.getType() != null) {
         switch (dimensionSpec.getType()) {
-          case EMAIL_DOMAIN:
-            dimensionValue = parseEmailDomain(dimensionValue, dimensionSpec.getConfig());
-            break;
-          case TERNARY:
-            dimensionValue = parseTernaryValue(dimensionValue, dimensionSpec.getConfig());
-            break;
+        case EMAIL_DOMAIN:
+          dimensionValue = parseEmailDomain(dimensionValue, dimensionSpec.getConfig());
+          break;
+        case TERNARY:
+          dimensionValue = parseTernaryValue(dimensionValue, dimensionSpec.getConfig());
+          break;
         }
       }
       dimensionValues[i] = dimensionValue;
@@ -155,11 +160,12 @@ public class ThirdEyeAvroUtils {
     // Convert time to storage granularity
     TimeGranularity inputGranularity = config.getTime().getInput();
     TimeGranularity bucketGranularity = config.getTime().getBucket();
-    time = bucketGranularity.getUnit().convert(
-        time * inputGranularity.getSize(), inputGranularity.getUnit()) / bucketGranularity.getSize();
+    time = bucketGranularity.getUnit().convert(time * inputGranularity.getSize(),
+        inputGranularity.getUnit()) / bucketGranularity.getSize();
 
     // Metrics
-    MetricTimeSeries timeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(config.getMetrics()));
+    MetricTimeSeries timeSeries =
+        new MetricTimeSeries(MetricSchema.fromMetricSpecs(config.getMetrics()));
     for (int i = 0; i < config.getMetrics().size(); i++) {
       MetricSpec metricSpec = config.getMetrics().get(i);
       Number metricValue = getMetricValue(metricSpec, record);

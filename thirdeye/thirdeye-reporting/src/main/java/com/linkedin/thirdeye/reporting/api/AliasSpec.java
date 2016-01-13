@@ -15,14 +15,12 @@ public class AliasSpec {
   public AliasSpec() {
   }
 
-
   public AliasSpec(Map<String, Map<String, String>> dimensionValues, Map<String, String> metric,
       Map<String, String> dimension) {
     this.dimensionValues = dimensionValues;
     this.metric = metric;
     this.dimension = dimension;
   }
-
 
   public Map<String, Map<String, String>> getDimensionValues() {
     return dimensionValues;
@@ -36,22 +34,20 @@ public class AliasSpec {
     return dimension;
   }
 
-
   public void setDimensionValues(Map<String, Map<String, String>> dimensionValues) {
     this.dimensionValues = dimensionValues;
   }
-
 
   public void setMetric(Map<String, String> metric) {
     this.metric = metric;
   }
 
-
   public void setDimension(Map<String, String> dimension) {
     this.dimension = dimension;
   }
 
-  public static void alias(ReportConfig reportConfig, List<Table> tables, Map<String, AnomalyReportTable> anomalyReportTables) {
+  public static void alias(ReportConfig reportConfig, List<Table> tables,
+      Map<String, AnomalyReportTable> anomalyReportTables) {
 
     if (reportConfig.getAliases() == null) {
       return;
@@ -66,7 +62,8 @@ public class AliasSpec {
 
       // alias dimension values
       String groupByDimension = table.getTableSpec().getGroupBy();
-      if (groupByDimension != null && dimensionValuesMap != null && dimensionValuesMap.containsKey(groupByDimension)) {
+      if (groupByDimension != null && dimensionValuesMap != null
+          && dimensionValuesMap.containsKey(groupByDimension)) {
         Map<String, String> dimensionValues = dimensionValuesMap.get(groupByDimension);
         for (TableReportRow tableReportRow : table.getTableReportRows()) {
           GroupBy groupBy = tableReportRow.getGroupByDimensions();
@@ -89,7 +86,7 @@ public class AliasSpec {
 
       // alias groupby dimension
       if (dimensionMap != null && dimensionMap.containsKey(table.getTableSpec().getGroupBy())) {
-         table.getTableSpec().setGroupBy(dimensionMap.get(table.getTableSpec().getGroupBy()));
+        table.getTableSpec().setGroupBy(dimensionMap.get(table.getTableSpec().getGroupBy()));
       }
     }
 
@@ -101,6 +98,5 @@ public class AliasSpec {
       }
     }
   }
-
 
 }

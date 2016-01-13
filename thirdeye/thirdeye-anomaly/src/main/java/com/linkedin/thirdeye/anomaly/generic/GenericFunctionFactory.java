@@ -22,7 +22,8 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 public class GenericFunctionFactory extends AnomalyDetectionFunctionFactory {
 
   /** */
-  private static final String BUILTIN_FUNCTION_QUALIFIED_NAME_PREFIX = "com.linkedin.thirdeye.anomaly.builtin.";
+  private static final String BUILTIN_FUNCTION_QUALIFIED_NAME_PREFIX =
+      "com.linkedin.thirdeye.anomaly.builtin.";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GenericFunctionFactory.class);
 
@@ -33,14 +34,16 @@ public class GenericFunctionFactory extends AnomalyDetectionFunctionFactory {
 
   /**
    * Loads a function from an external jar or a built in function if no jar url is specified.
-   *
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory#getFunction(com.linkedin.thirdeye.api.StarTreeConfig, com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig, com.linkedin.thirdeye.anomaly.database.FunctionTableRow)
+   * @see com.linkedin.thirdeye.anomaly.api.AnomalyDetectionFunctionFactory#getFunction(com.linkedin.thirdeye.api.StarTreeConfig,
+   *      com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig,
+   *      com.linkedin.thirdeye.anomaly.database.FunctionTableRow)
    */
   @Override
-  public AnomalyDetectionFunction getFunction(StarTreeConfig starTreeConfig, AnomalyDatabaseConfig dbconfig,
-      FunctionTableRow functionTableRow) throws IllegalFunctionException, ClassCastException, IOException,
-      ClassNotFoundException, InstantiationException, IllegalAccessException {
+  public AnomalyDetectionFunction getFunction(StarTreeConfig starTreeConfig,
+      AnomalyDatabaseConfig dbconfig, FunctionTableRow functionTableRow)
+          throws IllegalFunctionException, ClassCastException, IOException, ClassNotFoundException,
+          InstantiationException, IllegalAccessException {
 
     GenericFunctionTableRow genericFunctionTableRow = (GenericFunctionTableRow) functionTableRow;
 
@@ -52,7 +55,9 @@ public class GenericFunctionFactory extends AnomalyDetectionFunctionFactory {
       // load class in custom jar using reflection
       LOGGER.info("loading jar at '{}'", jarUrlString);
       URL jarUrl = new URL(jarUrlString);
-      URLClassLoader loader = new URLClassLoader(new URL[]{ jarUrl });
+      URLClassLoader loader = new URLClassLoader(new URL[] {
+          jarUrl
+      });
       functionClass = Class.forName(className, true, loader);
     } else {
       // load class in the anomaly jar by simple name

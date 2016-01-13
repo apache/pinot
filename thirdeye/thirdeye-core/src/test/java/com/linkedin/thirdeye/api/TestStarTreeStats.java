@@ -10,12 +10,12 @@ import java.io.File;
 import java.util.Collection;
 import java.util.UUID;
 
-public class TestStarTreeStats
-{
+public class TestStarTreeStats {
   @Test
-  public void testList(){
-    Collection<File> listFiles = FileUtils.listFiles(new File("."), FileFileFilter.FILE, DirectoryFileFilter.DIRECTORY);
-    for(File f: listFiles){
+  public void testList() {
+    Collection<File> listFiles =
+        FileUtils.listFiles(new File("."), FileFileFilter.FILE, DirectoryFileFilter.DIRECTORY);
+    for (File f : listFiles) {
       System.out.println(f.getAbsolutePath());
     }
     UUID orig = UUID.randomUUID();
@@ -26,9 +26,9 @@ public class TestStarTreeStats
     Long.parseLong("57ba8715be1d", 16);
     System.out.println(temp);
   }
+
   @Test
-  public void testStats() throws Exception
-  {
+  public void testStats() throws Exception {
     StarTreeStats stats = new StarTreeStats();
 
     stats.countNode();

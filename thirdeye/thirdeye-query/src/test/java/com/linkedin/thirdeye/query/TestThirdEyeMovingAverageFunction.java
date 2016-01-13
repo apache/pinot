@@ -16,7 +16,8 @@ public class TestThirdEyeMovingAverageFunction {
   @BeforeClass
   public void beforeClass() throws Exception {
     config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("test-config.yml"));
-    metricSchema = new MetricSchema(ImmutableList.of("L", "D"), ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
+    metricSchema = new MetricSchema(ImmutableList.of("L", "D"),
+        ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
     query = new ThirdEyeQuery();
     query.addMetricName("L");
   }
@@ -29,8 +30,9 @@ public class TestThirdEyeMovingAverageFunction {
       timeSeries.increment(i, "D", 1.0);
     }
 
-    MetricTimeSeries derived = new ThirdEyeMovingAverageFunction(
-        new TimeGranularity(7, TimeUnit.HOURS)).apply(config, query, timeSeries);
+    MetricTimeSeries derived =
+        new ThirdEyeMovingAverageFunction(new TimeGranularity(7, TimeUnit.HOURS)).apply(config,
+            query, timeSeries);
 
     Assert.assertEquals(derived.getTimeWindowSet().size(), 14);
     Assert.assertEquals(derived.getSchema().getNames().size(), 2);

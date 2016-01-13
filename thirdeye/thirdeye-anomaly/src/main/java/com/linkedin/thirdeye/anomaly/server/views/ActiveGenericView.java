@@ -11,10 +11,7 @@ public class ActiveGenericView extends AbstractView {
 
   private final List<GenericFunctionTableRow> functions;
 
-  public ActiveGenericView(
-      String database,
-      String functionTable,
-      String collection,
+  public ActiveGenericView(String database, String functionTable, String collection,
       List<GenericFunctionTableRow> functions) {
     super("active-generic-view.ftl", database, functionTable, collection);
     this.functions = functions;

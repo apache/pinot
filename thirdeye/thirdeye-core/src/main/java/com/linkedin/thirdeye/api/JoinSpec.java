@@ -13,11 +13,11 @@ public class JoinSpec {
 
   private String joinKeyExtractorClass;
 
-  private Map<String,String> joinKeyExtractorConfig;
+  private Map<String, String> joinKeyExtractorConfig;
 
   private String joinUDFClass;
 
-  private Map<String,String> joinUDFConfig;
+  private Map<String, String> joinUDFConfig;
 
   /**
    * Empty constructor needed for serialization/deserialization libraries
@@ -26,17 +26,15 @@ public class JoinSpec {
   }
 
   /**
-   *
    * @param sourceNames
    * @param joinKeyExtractClass
    * @param joinKeyExtractorConfig
    * @param joinUDFClass
    * @param joinUDFConfig
    */
-  public JoinSpec(List<String> sourceNames, String joinConfigUDFClass,
-      String joinKeyExtractClass,
-      Map<String,String> joinKeyExtractorConfig, String joinUDFClass,
-      Map<String,String> joinUDFConfig) {
+  public JoinSpec(List<String> sourceNames, String joinConfigUDFClass, String joinKeyExtractClass,
+      Map<String, String> joinKeyExtractorConfig, String joinUDFClass,
+      Map<String, String> joinUDFConfig) {
     super();
     this.sourceNames = sourceNames;
     this.joinConfigUDFClass = joinConfigUDFClass;
@@ -45,8 +43,6 @@ public class JoinSpec {
     this.joinUDFClass = joinUDFClass;
     this.joinUDFConfig = joinUDFConfig;
   }
-
-
 
   public String getJoinConfigUDFClass() {
     return joinConfigUDFClass;
@@ -64,11 +60,11 @@ public class JoinSpec {
     this.joinKeyExtractorClass = joinKeyExtractorClass;
   }
 
-  public Map<String,String> getJoinKeyExtractorConfig() {
+  public Map<String, String> getJoinKeyExtractorConfig() {
     return joinKeyExtractorConfig;
   }
 
-  public void setJoinKeyExtractorConfig(Map<String,String> joinKeyExtractorConfig) {
+  public void setJoinKeyExtractorConfig(Map<String, String> joinKeyExtractorConfig) {
     this.joinKeyExtractorConfig = joinKeyExtractorConfig;
   }
 
@@ -80,11 +76,11 @@ public class JoinSpec {
     this.joinUDFClass = joinUDFClass;
   }
 
-  public Map<String,String> getJoinUDFConfig() {
+  public Map<String, String> getJoinUDFConfig() {
     return joinUDFConfig;
   }
 
-  public void setJoinUDFConfig(Map<String,String> joinUDFConfig) {
+  public void setJoinUDFConfig(Map<String, String> joinUDFConfig) {
     this.joinUDFConfig = joinUDFConfig;
   }
 

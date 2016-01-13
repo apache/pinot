@@ -7,7 +7,8 @@ public class DefaultThirdEyeClientConfig {
   private long expirationTime = 60;
   private TimeUnit expirationUnit = TimeUnit.SECONDS;
 
-  public DefaultThirdEyeClientConfig() {}
+  public DefaultThirdEyeClientConfig() {
+  }
 
   public boolean isExpireAfterAccess() {
     return expireAfterAccess;

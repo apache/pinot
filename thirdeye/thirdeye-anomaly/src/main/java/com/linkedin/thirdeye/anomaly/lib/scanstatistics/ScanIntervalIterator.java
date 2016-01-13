@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.lib.scanstatistics;
 
 import com.google.common.collect.Range;
 
-
 /**
  * A O(1) space iterator for ranges.
  */
@@ -23,9 +22,9 @@ public class ScanIntervalIterator {
    * @param min
    * @param max
    * @param minWidth
-   *  The smallest interval to consider (inclusive)
+   *          The smallest interval to consider (inclusive)
    * @param maxWidth
-   *  The largest interval to consider (inclusive)
+   *          The largest interval to consider (inclusive)
    */
   public ScanIntervalIterator(int min, int max, int minWidth, int maxWidth, int increment) {
     this.min = min;
@@ -63,7 +62,7 @@ public class ScanIntervalIterator {
 
   /**
    * @return
-   *  Whether there is another interval.
+   *         Whether there is another interval.
    */
   public boolean hasNext() {
     return upperHead <= max && lowerHead <= max - minWidth;
@@ -71,12 +70,11 @@ public class ScanIntervalIterator {
 
   /**
    * Calls to next() should be preceded by hasNext(). Otherwise, behavior is undefined.
-   *
    * @return
-   *  The next interval.
+   *         The next interval.
    */
   public Range<Integer> next() {
-    Range<Integer> interval = Range.closedOpen((int)lowerHead, (int)upperHead);
+    Range<Integer> interval = Range.closedOpen((int) lowerHead, (int) upperHead);
     update();
     return interval;
   }

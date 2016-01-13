@@ -12,10 +12,10 @@ public class StateSpaceDataUtils {
 
   /**
    * @return
-   *  The intput time series with timestamps nulled out.
+   *         The intput time series with timestamps nulled out.
    */
-  public static void removeTimeStamps(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, Set<Long> omitTimestamps)
-  {
+  public static void removeTimeStamps(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps,
+      Set<Long> omitTimestamps) {
     if (omitTimestamps.size() > 0) {
       for (int i = 0; i < inputTimeSeries.length; i++) {
         if (omitTimestamps.contains(inputTimeStamps[i])) {
@@ -27,10 +27,10 @@ public class StateSpaceDataUtils {
 
   /**
    * @return
-   *  The range of data for which to make predictions.
+   *         The range of data for which to make predictions.
    */
-  public static DoubleMatrix[] getPredictionData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, long trainEnd,
-      int stepsAhead) throws Exception {
+  public static DoubleMatrix[] getPredictionData(DoubleMatrix[] inputTimeSeries,
+      long[] inputTimeStamps, long trainEnd, int stepsAhead) throws Exception {
     int startPredictionIndex = -1;
     for (int i = 0; i < inputTimeStamps.length; i++) {
       if (inputTimeStamps[i] > trainEnd) {
@@ -49,13 +49,12 @@ public class StateSpaceDataUtils {
     }
   }
 
-
   /**
    * @return
-   *  The range of data between train start and train end
+   *         The range of data between train start and train end
    */
-  public static DoubleMatrix[] getTrainingData(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps, long trainStart,
-      long trainEnd) throws Exception {
+  public static DoubleMatrix[] getTrainingData(DoubleMatrix[] inputTimeSeries,
+      long[] inputTimeStamps, long trainStart, long trainEnd) throws Exception {
     // clean data
     // sanity check
     if (inputTimeSeries.length != inputTimeStamps.length) {
@@ -86,8 +85,7 @@ public class StateSpaceDataUtils {
     }
 
     if (trainStart < inputTimeStamps[0] || trainEnd > inputTimeStamps[inputTimeStamps.length - 1]
-        || startIndex >= endIndex)
-    {
+        || startIndex >= endIndex) {
       throw new Exception("training data range not valid.");
     }
 
@@ -95,7 +93,8 @@ public class StateSpaceDataUtils {
     return Arrays.copyOfRange(inputTimeSeries, startIndex, endIndex);
   }
 
-  public static double estimateTrainingMean(DoubleMatrix[] processTrainingTimeSeries, int seasonal) {
+  public static double estimateTrainingMean(DoubleMatrix[] processTrainingTimeSeries,
+      int seasonal) {
     return estimateTrainingRawMoment(processTrainingTimeSeries, seasonal, 1);
   }
 
@@ -104,15 +103,14 @@ public class StateSpaceDataUtils {
    * @param seasonal
    * @param degree
    * @return
-   *  The raw moment of one season of training data.
+   *         The raw moment of one season of training data.
    */
-  public static double estimateTrainingRawMoment(DoubleMatrix[] processTrainingTimeSeries, int seasonal, int degree) {
+  public static double estimateTrainingRawMoment(DoubleMatrix[] processTrainingTimeSeries,
+      int seasonal, int degree) {
     double estimate = 0;
     double count = 0;
-    for (int ii = 0; ii < seasonal + 1; ii++)
-    {
-      if (processTrainingTimeSeries[ii] != null)
-      {
+    for (int ii = 0; ii < seasonal + 1; ii++) {
+      if (processTrainingTimeSeries[ii] != null) {
         count++;
         estimate += Math.pow(processTrainingTimeSeries[ii].get(0, 0), degree);
       }
@@ -124,20 +122,19 @@ public class StateSpaceDataUtils {
    * @param processTrainingTimeSeries
    * @param seasonal
    * @return
-   *  The variance of one season of training data
+   *         The variance of one season of training data
    */
-  public static double estimateTrainingVariance(DoubleMatrix[] processTrainingTimeSeries, int seasonal) {
+  public static double estimateTrainingVariance(DoubleMatrix[] processTrainingTimeSeries,
+      int seasonal) {
     double estimateMean = estimateTrainingMean(processTrainingTimeSeries, seasonal);
     double estimateVariance = 0;
     double count = 0;
-    for (int ii = 0; ii < seasonal + 1; ii++)
-    {
-      if (processTrainingTimeSeries[ii] != null)
-      {
+    for (int ii = 0; ii < seasonal + 1; ii++) {
+      if (processTrainingTimeSeries[ii] != null) {
         count++;
         estimateVariance += Math.pow(processTrainingTimeSeries[ii].get(0, 0) - estimateMean, 2);
       }
     }
-    return  estimateVariance / count;
+    return estimateVariance / count;
   }
 }

@@ -35,15 +35,14 @@ public class QueryResource {
   @GET
   @Path("/{sql}")
   @Timed
-  public QueryResponse get(@PathParam("sql") String sql,
-                           @QueryParam("iso8601") boolean iso8601,
-                           @QueryParam("timeZone") String timeZoneString) throws Exception {
+  public QueryResponse get(@PathParam("sql") String sql, @QueryParam("iso8601") boolean iso8601,
+      @QueryParam("timeZone") String timeZoneString) throws Exception {
     sql = URLDecoder.decode(sql, "UTF-8");
 
     ThirdEyeQueryResult result;
     try {
       result = queryExecutor.executeQuery(sql);
-    } catch (IllegalArgumentException|IllegalStateException e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
       LOGGER.error("Malformed SQL {}", sql, e);
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception e) {

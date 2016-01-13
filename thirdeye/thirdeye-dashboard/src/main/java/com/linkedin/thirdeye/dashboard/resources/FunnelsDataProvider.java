@@ -89,8 +89,7 @@ public class FunnelsDataProvider {
 
   @DELETE
   @Path("/{collection}")
-  public Response deleteFunnel(@PathParam("collection") String collection) throws Exception
-  {
+  public Response deleteFunnel(@PathParam("collection") String collection) throws Exception {
     File collectionDir = new File(funnelsRoot, collection);
     File funnelsConfigFile = new File(collectionDir, FUNNELS_CONFIG_FILE_NAME);
 
@@ -102,7 +101,8 @@ public class FunnelsDataProvider {
       }
       FileUtils.moveFile(funnelsConfigFile, funnelsConfigArchive);
     } else {
-      throw new NotFoundException("Funnel for collection " + collection +" at " + collectionDir.getPath() + " does not exist");
+      throw new NotFoundException("Funnel for collection " + collection + " at "
+          + collectionDir.getPath() + " does not exist");
     }
 
     loadConfigs();
@@ -113,30 +113,27 @@ public class FunnelsDataProvider {
   @POST
   @Path("/{collection}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response postFunnelConfig(@PathParam("collection") String collection, byte[] funnelConfigBytes) throws Exception
-  {
+  public Response postFunnelConfig(@PathParam("collection") String collection,
+      byte[] funnelConfigBytes) throws Exception {
     File collectionDir = new File(funnelsRoot, collection);
-    if (!collectionDir.exists())
-    {
+    if (!collectionDir.exists()) {
       FileUtils.forceMkdir(collectionDir);
     }
 
     File funnelConfigFile = new File(collectionDir, FUNNELS_CONFIG_FILE_NAME);
 
-    if (!funnelConfigFile.exists())
-    {
-      IOUtils.copy(new ByteArrayInputStream(funnelConfigBytes), new FileOutputStream(funnelConfigFile));
-    }
-    else
-    {
-      throw new ConflictException(funnelConfigFile.getPath()+" already exists. A DELETE of /funnels/{collection} is required first");
+    if (!funnelConfigFile.exists()) {
+      IOUtils.copy(new ByteArrayInputStream(funnelConfigBytes),
+          new FileOutputStream(funnelConfigFile));
+    } else {
+      throw new ConflictException(funnelConfigFile.getPath()
+          + " already exists. A DELETE of /funnels/{collection} is required first");
     }
 
     loadConfigs();
 
     return Response.ok().build();
   }
-
 
   /**
    * Computes funnel views using the provided metric function w/ the metrics replaced for each of

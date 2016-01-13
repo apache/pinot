@@ -18,18 +18,16 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 public class CircularBufferUtil {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(CircularBufferUtil.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CircularBufferUtil.class);
 
-  public static void createLeafBufferFile(
-      Map<DimensionKey, MetricTimeSeries> map, List<int[]> leafRecords,
-      String fileName, List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, int numTimeBuckets,
+  public static void createLeafBufferFile(Map<DimensionKey, MetricTimeSeries> map,
+      List<int[]> leafRecords, String fileName, List<String> dimensionNames,
+      List<String> metricNames, List<MetricType> metricTypes, int numTimeBuckets,
       Map<String, Map<Integer, String>> reverseForwardIndex) throws IOException {
     int numRecords = leafRecords.size();
     int perRecordDimesionKeySize = dimensionNames.size() * (Integer.SIZE / 8);
-    int metricSize =0;
-    for(MetricType type:metricTypes){
+    int metricSize = 0;
+    for (MetricType type : metricTypes) {
       metricSize += type.byteSize();
     }
     int perTimeWindowMetricSize = Long.SIZE / 8 + metricSize;
@@ -55,8 +53,7 @@ public class CircularBufferUtil {
     };
     RandomAccessFile raf = new RandomAccessFile(fileName, "rw");
     FileChannel fc = raf.getChannel();
-    MappedByteBuffer buffer = fc.map(FileChannel.MapMode.READ_WRITE, 0,
-        totalBufferSize);
+    MappedByteBuffer buffer = fc.map(FileChannel.MapMode.READ_WRITE, 0, totalBufferSize);
     Collections.sort(leafRecords, c);
     int recordIndex = 0;
     for (int[] leafRecord : leafRecords) {
@@ -92,8 +89,8 @@ public class CircularBufferUtil {
       }
 
       // now write the metrics;
-      String[] dimValues = StarTreeUtils.convertToStringValue(
-          reverseForwardIndex, leafRecord, dimensionNames);
+      String[] dimValues =
+          StarTreeUtils.convertToStringValue(reverseForwardIndex, leafRecord, dimensionNames);
       // get the aggregated timeseries for this dimensionKey
       DimensionKey dimensionKey = new DimensionKey(dimValues);
       MetricTimeSeries metricTimeSeries = map.get(dimensionKey);
@@ -102,8 +99,8 @@ public class CircularBufferUtil {
         // add a star tree record for each timewindow
         for (long timeWindow : metricTimeSeries.getTimeWindowSet()) {
           int bucket = (int) (timeWindow % numTimeBuckets);
-          buffer.position(recordStartOffset + perRecordDimesionKeySize + bucket
-              * perTimeWindowMetricSize);
+          buffer.position(
+              recordStartOffset + perRecordDimesionKeySize + bucket * perTimeWindowMetricSize);
           buffer.putLong(timeWindow);
           for (int j = 0; j < metricNames.size(); j++) {
             String metricName = metricNames.get(j);

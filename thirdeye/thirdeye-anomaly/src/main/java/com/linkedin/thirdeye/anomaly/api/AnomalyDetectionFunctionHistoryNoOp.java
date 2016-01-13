@@ -12,7 +12,8 @@ import com.linkedin.thirdeye.api.TimeRange;
  */
 public class AnomalyDetectionFunctionHistoryNoOp implements AnomalyDetectionFunctionHistory {
 
-  private static final AnomalyDetectionFunctionHistoryNoOp _sharedInstance = new AnomalyDetectionFunctionHistoryNoOp();
+  private static final AnomalyDetectionFunctionHistoryNoOp _sharedInstance =
+      new AnomalyDetectionFunctionHistoryNoOp();
 
   public static AnomalyDetectionFunctionHistoryNoOp sharedInstance() {
     return _sharedInstance;
@@ -23,6 +24,7 @@ public class AnomalyDetectionFunctionHistoryNoOp implements AnomalyDetectionFunc
   private AnomalyDetectionFunctionHistoryNoOp() {
     // Do nothing
   }
+
   @Override
   public void init(TimeRange queryTimeRange) {
     // Do nothing

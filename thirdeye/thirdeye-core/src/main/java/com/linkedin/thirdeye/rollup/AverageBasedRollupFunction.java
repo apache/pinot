@@ -8,18 +8,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- *
  * @author kgopalak
- *
  */
 
-
-public class AverageBasedRollupFunction implements RollupThresholdFunction
-{
+public class AverageBasedRollupFunction implements RollupThresholdFunction {
 
   private String metricName;
   private int averageThreshold;
   private int timeWindowSize;
+
   public AverageBasedRollupFunction(Map<String, String> params) {
     this.metricName = params.get("metricName");
     this.averageThreshold = Integer.parseInt(params.get("threshold"));
@@ -38,7 +35,7 @@ public class AverageBasedRollupFunction implements RollupThresholdFunction
   }
 
   @Override
-  public TimeGranularity getRollupAggregationGranularity(){
+  public TimeGranularity getRollupAggregationGranularity() {
     return null;
   }
 }

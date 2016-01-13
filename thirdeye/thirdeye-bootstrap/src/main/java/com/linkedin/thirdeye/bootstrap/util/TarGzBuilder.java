@@ -96,8 +96,7 @@ public class TarGzBuilder {
           LOGGER.info("Skipping entry:{} since it was already added", entry.getName());
           continue;
         }
-        if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
-        {
+        if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME)) {
           continue;
         }
         LOGGER.info("Adding entry:" + entry.getName());
@@ -122,7 +121,6 @@ public class TarGzBuilder {
     }
   }
 
-
   /*
    * closes all the output stream and the output file is created.
    */
@@ -133,7 +131,6 @@ public class TarGzBuilder {
     bOut.close();
     fOut.close();
   }
-
 
   public IndexMetadata getMetadataObjectBootstrap(Path path) throws Exception {
     TarArchiveInputStream debInputStream = null;
@@ -146,8 +143,7 @@ public class TarGzBuilder {
           (TarArchiveInputStream) new ArchiveStreamFactory().createArchiveInputStream("tar", is);
       TarArchiveEntry entry = null;
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
-        if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
-        {
+        if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME)) {
           byte[] content = new byte[(int) entry.getSize()];
           debInputStream.read(content, 0, content.length);
           ByteArrayInputStream inputStream = new ByteArrayInputStream(content);

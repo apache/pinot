@@ -16,7 +16,10 @@ public abstract class FunctionTableRow {
   /** Name of the function, e.g., 'percent-change', 'arima', etc. */
   private String functionName;
 
-  /** Human understandable description of the function and what it is to compute. e.g., '20% drop in X' */
+  /**
+   * Human understandable description of the function and what it is to compute. e.g., '20% drop in
+   * X'
+   */
   private String functionDescription;
 
   /** The collection to containing data to apply the function to */
@@ -63,7 +66,6 @@ public abstract class FunctionTableRow {
 
   /**
    * Base function table init from result set
-   *
    * @param rs
    * @throws SQLException
    */
@@ -78,7 +80,6 @@ public abstract class FunctionTableRow {
 
   /**
    * Initialize any additional fields in subclass
-   *
    * @param rs
    * @throws SQLException
    */

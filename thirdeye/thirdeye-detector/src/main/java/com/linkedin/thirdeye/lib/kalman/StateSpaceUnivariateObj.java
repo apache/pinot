@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.lib.kalman;
 
-
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.jblas.DoubleMatrix;
 import org.slf4j.Logger;
@@ -15,18 +14,14 @@ public class StateSpaceUnivariateObj implements UnivariateFunction {
   private DoubleMatrix initial_state_mean_;
   private DoubleMatrix initial_state_covariance_;
   private double r_;
-  private int dimension_of_states_ ;
+  private int dimension_of_states_;
   private int dimension_of_observations_;
   // Observations.
   private DoubleMatrix[] observations_;
 
-  public StateSpaceUnivariateObj(
-      DoubleMatrix state_transition_matrix,
-      DoubleMatrix observation_matrix,
-      double r,
-      DoubleMatrix m0,
-      DoubleMatrix initial_state_covariance,
-      DoubleMatrix[] observations) {
+  public StateSpaceUnivariateObj(DoubleMatrix state_transition_matrix,
+      DoubleMatrix observation_matrix, double r, DoubleMatrix m0,
+      DoubleMatrix initial_state_covariance, DoubleMatrix[] observations) {
 
     observation_matrix_ = observation_matrix.dup();
     state_transition_matrix_ = state_transition_matrix.dup();
@@ -39,17 +34,14 @@ public class StateSpaceUnivariateObj implements UnivariateFunction {
   }
 
   public double value(double state_noise) {
-    DoubleMatrix transition_covariance_matrix = DoubleMatrix.eye(dimension_of_states_).muli(state_noise);
-    DoubleMatrix observation_covariance_matrix = DoubleMatrix.eye(dimension_of_observations_).muli(r_ * state_noise);
+    DoubleMatrix transition_covariance_matrix =
+        DoubleMatrix.eye(dimension_of_states_).muli(state_noise);
+    DoubleMatrix observation_covariance_matrix =
+        DoubleMatrix.eye(dimension_of_observations_).muli(r_ * state_noise);
 
-    StateSpaceModel model  = new StateSpaceModel(
-        state_transition_matrix_,
-        observation_matrix_,
-        transition_covariance_matrix,
-        observation_covariance_matrix,
-        initial_state_mean_,
-        initial_state_covariance_,
-        observations_);
+    StateSpaceModel model = new StateSpaceModel(state_transition_matrix_, observation_matrix_,
+        transition_covariance_matrix, observation_covariance_matrix, initial_state_mean_,
+        initial_state_covariance_, observations_);
     double ll = model.getLogLikeliHood();
     LOGGER.info("log likelihood : {}, state noise : {}", ll, state_noise);
     return ll;

@@ -15,17 +15,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class StarTreeViewer
-{
+public class StarTreeViewer {
   private StarTreeNode root;
   private PrintWriter printWriter;
 
-  public StarTreeViewer(StarTreeNode root, PrintWriter printWriter){
+  public StarTreeViewer(StarTreeNode root, PrintWriter printWriter) {
     this.root = root;
     this.printWriter = printWriter;
   }
 
-  public void print(){
+  public void print() {
     StarTreeUtils.printNode(printWriter, root, 0);
     printWriter.flush();
 
@@ -49,30 +48,26 @@ public class StarTreeViewer
     printWriter.println();
     printWriter.println("(total=" + numNodes.get() + ", leaves=" + numLeaves.get() + ")");
     Collections.sort(depths);
-    for (Integer depth : depths)
-    {
+    for (Integer depth : depths) {
       Integer leafCount = leafDepthCount.get(depth);
       Integer parentCount = parentDepthCount.get(depth);
-      Integer totalCount = (leafCount == null ? 0 : leafCount) + (parentCount == null ? 0 : parentCount);
+      Integer totalCount =
+          (leafCount == null ? 0 : leafCount) + (parentCount == null ? 0 : parentCount);
 
       printWriter.println("\tat depth=" + depth + ":");
       printWriter.println("\t\ttotal=" + totalCount);
-      if (leafCount != null)
-      {
+      if (leafCount != null) {
         printWriter.println("\t\tleaves=" + leafCount);
       }
-      if (parentCount != null)
-      {
+      if (parentCount != null) {
         printWriter.println("\t\tparents=" + parentCount);
       }
     }
     printWriter.flush();
   }
 
-  public static void main(String[] args) throws Exception
-  {
-    if (args.length != 1)
-    {
+  public static void main(String[] args) throws Exception {
+    if (args.length != 1) {
       throw new IllegalArgumentException("usage: tree.bin");
     }
     PrintWriter printWriter = new PrintWriter(System.out);
@@ -84,38 +79,30 @@ public class StarTreeViewer
     dumper.print();
   }
 
-  private static void countNodes(StarTreeNode node,
-                                 AtomicInteger numNodes,
-                                 AtomicInteger numLeaves,
-                                 Map<Integer, Integer> leafDepthCount,
-                                 Map<Integer, Integer> parentDepthCount,
-                                 int currentDepth)
-  {
-    if (node.isLeaf())
-    {
+  private static void countNodes(StarTreeNode node, AtomicInteger numNodes, AtomicInteger numLeaves,
+      Map<Integer, Integer> leafDepthCount, Map<Integer, Integer> parentDepthCount,
+      int currentDepth) {
+    if (node.isLeaf()) {
       numLeaves.incrementAndGet();
       numNodes.incrementAndGet();
       updateDepthCount(leafDepthCount, currentDepth);
-    }
-    else
-    {
+    } else {
       numNodes.incrementAndGet();
       updateDepthCount(parentDepthCount, currentDepth);
 
-      for (StarTreeNode child : node.getChildren())
-      {
+      for (StarTreeNode child : node.getChildren()) {
         countNodes(child, numNodes, numLeaves, leafDepthCount, parentDepthCount, currentDepth + 1);
       }
-      countNodes(node.getOtherNode(), numNodes, numLeaves, leafDepthCount, parentDepthCount, currentDepth + 1);
-      countNodes(node.getStarNode(), numNodes, numLeaves, leafDepthCount, parentDepthCount, currentDepth + 1);
+      countNodes(node.getOtherNode(), numNodes, numLeaves, leafDepthCount, parentDepthCount,
+          currentDepth + 1);
+      countNodes(node.getStarNode(), numNodes, numLeaves, leafDepthCount, parentDepthCount,
+          currentDepth + 1);
     }
   }
 
-  private static void updateDepthCount(Map<Integer, Integer> depthCount, int depth)
-  {
+  private static void updateDepthCount(Map<Integer, Integer> depthCount, int depth) {
     Integer count = depthCount.get(depth);
-    if (count == null)
-    {
+    if (count == null) {
       count = 0;
     }
     depthCount.put(depth, count + 1);

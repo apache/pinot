@@ -13,8 +13,8 @@ public class FlowControlledDefaultThirdEyeClient extends DefaultThirdEyeClient {
 
   private final Semaphore requestPermits;
 
-  public FlowControlledDefaultThirdEyeClient(String hostname, int port, DefaultThirdEyeClientConfig config,
-      int maxParallelRequests) {
+  public FlowControlledDefaultThirdEyeClient(String hostname, int port,
+      DefaultThirdEyeClientConfig config, int maxParallelRequests) {
     super(hostname, port, config);
     requestPermits = new Semaphore(maxParallelRequests);
   }

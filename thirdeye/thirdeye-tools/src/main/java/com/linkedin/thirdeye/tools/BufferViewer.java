@@ -39,19 +39,17 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class BufferViewer
-{
-  public static void main(String[] args) throws Exception
-  {
+public class BufferViewer {
+  public static void main(String[] args) throws Exception {
     Options options = new Options();
-    options.addOption("excludeZeroValues", false, "Should exclude rows for which all metric values are zero");
+    options.addOption("excludeZeroValues", false,
+        "Should exclude rows for which all metric values are zero");
     CommandLine commandLine = new GnuParser().parse(options, args);
     args = commandLine.getArgs();
 
     boolean excludeZeroValues = commandLine.hasOption("excludeZeroValues");
 
-    if (args.length != 2)
-    {
+    if (args.length != 2) {
       throw new IllegalArgumentException("usage: collectionDir nodeId");
     }
 
@@ -63,92 +61,81 @@ public class BufferViewer
 
     File dimensionStoreDir = new File(dataDir, StarTreeConstants.DIMENSION_STORE);
 
-    File[] dimensionIndexFiles = dimensionStoreDir.listFiles(new FilenameFilter()
-    {
+    File[] dimensionIndexFiles = dimensionStoreDir.listFiles(new FilenameFilter() {
       @Override
-      public boolean accept(File dir, String name)
-      {
+      public boolean accept(File dir, String name) {
         return name.endsWith(StarTreeConstants.INDEX_FILE_SUFFIX);
       }
     });
 
-    if (dimensionIndexFiles == null)
-    {
+    if (dimensionIndexFiles == null) {
       throw new IllegalStateException("No index files in " + dimensionStoreDir);
     }
 
     List<DimensionIndexEntry> nodeDimensionIndexEntries = new ArrayList<DimensionIndexEntry>();
-    for (File dimensionIndexFile : dimensionIndexFiles)
-    {
-      List<DimensionIndexEntry> dimensionIndexEntries = StorageUtils.readDimensionIndex(dimensionIndexFile);
+    for (File dimensionIndexFile : dimensionIndexFiles) {
+      List<DimensionIndexEntry> dimensionIndexEntries =
+          StorageUtils.readDimensionIndex(dimensionIndexFile);
 
-      for (DimensionIndexEntry indexEntry : dimensionIndexEntries)
-      {
-        if (indexEntry.getNodeId().equals(nodeId))
-        {
+      for (DimensionIndexEntry indexEntry : dimensionIndexEntries) {
+        if (indexEntry.getNodeId().equals(nodeId)) {
           nodeDimensionIndexEntries.add(indexEntry);
         }
       }
     }
 
-    if (nodeDimensionIndexEntries.size() != 1)
-    {
-      throw new IllegalStateException("There must be exactly one dimension index entry per node. " +
-                                          "There are " + nodeDimensionIndexEntries.size());
+    if (nodeDimensionIndexEntries.size() != 1) {
+      throw new IllegalStateException("There must be exactly one dimension index entry per node. "
+          + "There are " + nodeDimensionIndexEntries.size());
     }
 
     DimensionIndexEntry nodeDimensionIndexEntry = nodeDimensionIndexEntries.get(0);
 
     // Read star tree config
-    StarTreeConfig starTreeConfig = StarTreeConfig.decode(
-        new FileInputStream(new File(args[0], StarTreeConstants.CONFIG_FILE_NAME)));
+    StarTreeConfig starTreeConfig = StarTreeConfig
+        .decode(new FileInputStream(new File(args[0], StarTreeConstants.CONFIG_FILE_NAME)));
 
     // Read dictionary
-    DimensionDictionary dimensionDictionary = getDictionary(
-        nodeDimensionIndexEntry, new File(dimensionStoreDir, nodeDimensionIndexEntry.getFileId().toString() + StarTreeConstants.DICT_FILE_SUFFIX));
+    DimensionDictionary dimensionDictionary =
+        getDictionary(nodeDimensionIndexEntry, new File(dimensionStoreDir,
+            nodeDimensionIndexEntry.getFileId().toString() + StarTreeConstants.DICT_FILE_SUFFIX));
 
     // Read dimension buffers
-    ByteBuffer dimensionBuffer = getDimensionBuffer(
-        nodeDimensionIndexEntry, new File(dimensionStoreDir, nodeDimensionIndexEntry.getFileId().toString() + StarTreeConstants.BUFFER_FILE_SUFFIX));
-    DimensionStore dimensionStore
-        = new DimensionStoreImmutableImpl(starTreeConfig, dimensionBuffer, dimensionDictionary);
+    ByteBuffer dimensionBuffer =
+        getDimensionBuffer(nodeDimensionIndexEntry, new File(dimensionStoreDir,
+            nodeDimensionIndexEntry.getFileId().toString() + StarTreeConstants.BUFFER_FILE_SUFFIX));
+    DimensionStore dimensionStore =
+        new DimensionStoreImmutableImpl(starTreeConfig, dimensionBuffer, dimensionDictionary);
 
     // Read metric index
 
     File metricStoreDir = new File(dataDir, StarTreeConstants.METRIC_STORE);
 
-    File[] metricIndexFiles = metricStoreDir.listFiles(new FilenameFilter()
-    {
+    File[] metricIndexFiles = metricStoreDir.listFiles(new FilenameFilter() {
       @Override
-      public boolean accept(File dir, String name)
-      {
+      public boolean accept(File dir, String name) {
         return name.endsWith(StarTreeConstants.INDEX_FILE_SUFFIX);
       }
     });
 
-    if (metricIndexFiles == null)
-    {
+    if (metricIndexFiles == null) {
       throw new IllegalStateException("No index files in " + metricStoreDir);
     }
 
     List<MetricIndexEntry> nodeMetricIndexEntries = new ArrayList<MetricIndexEntry>();
     Set<UUID> fileIds = new HashSet<UUID>();
-    for (File metricIndexFile : metricIndexFiles)
-    {
+    for (File metricIndexFile : metricIndexFiles) {
       List<MetricIndexEntry> metricIndexEntries = StorageUtils.readMetricIndex(metricIndexFile);
 
-      for (MetricIndexEntry metricIndexEntry : metricIndexEntries)
-      {
-        if (metricIndexEntry.getNodeId().equals(nodeId))
-        {
+      for (MetricIndexEntry metricIndexEntry : metricIndexEntries) {
+        if (metricIndexEntry.getNodeId().equals(nodeId)) {
           nodeMetricIndexEntries.add(metricIndexEntry);
           fileIds.add(metricIndexEntry.getFileId());
         }
       }
     }
 
-    if (nodeMetricIndexEntries.isEmpty())
-    {
+    if (nodeMetricIndexEntries.isEmpty()) {
       throw new IllegalStateException("No metric index entries for " + nodeId);
     }
 
@@ -156,21 +143,19 @@ public class BufferViewer
 
     Map<UUID, ByteBuffer> metricBuffers = new HashMap<UUID, ByteBuffer>();
 
-    for (UUID fileId : fileIds)
-    {
+    for (UUID fileId : fileIds) {
       File bufferFile = new File(metricStoreDir, fileId + StarTreeConstants.BUFFER_FILE_SUFFIX);
       metricBuffers.put(fileId, mapBuffer(bufferFile));
     }
 
-    ConcurrentMap<TimeRange, List<ByteBuffer>> projectedBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
+    ConcurrentMap<TimeRange, List<ByteBuffer>> projectedBuffers =
+        new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
 
-    for (MetricIndexEntry indexEntry : nodeMetricIndexEntries)
-    {
+    for (MetricIndexEntry indexEntry : nodeMetricIndexEntries) {
       ByteBuffer metricBuffer = getMetricBuffer(indexEntry, metricBuffers);
 
       List<ByteBuffer> buffers = projectedBuffers.get(indexEntry.getTimeRange());
-      if (buffers == null)
-      {
+      if (buffers == null) {
         buffers = new ArrayList<ByteBuffer>();
         projectedBuffers.put(indexEntry.getTimeRange(), buffers);
       }
@@ -182,32 +167,26 @@ public class BufferViewer
 
     // Dump buffer
 
-    for (DimensionKey dimensionKey : dimensionStore.getDimensionKeys())
-    {
-      MetricTimeSeries timeSeries
-          = metricStore.getTimeSeries(new ArrayList(dimensionStore.findMatchingKeys(dimensionKey).values()), null);
+    for (DimensionKey dimensionKey : dimensionStore.getDimensionKeys()) {
+      MetricTimeSeries timeSeries = metricStore.getTimeSeries(
+          new ArrayList(dimensionStore.findMatchingKeys(dimensionKey).values()), null);
 
       List<Long> times = new ArrayList<Long>(timeSeries.getTimeWindowSet());
       Collections.sort(times);
 
       Number[] current = new Number[starTreeConfig.getMetrics().size()];
-      for (Long time : times)
-      {
+      for (Long time : times) {
         boolean nonZero = false;
-        for (int i = 0; i < starTreeConfig.getMetrics().size(); i++)
-        {
+        for (int i = 0; i < starTreeConfig.getMetrics().size(); i++) {
           current[i] = timeSeries.get(time, starTreeConfig.getMetrics().get(i).getName());
-          if (!NumberUtils.isZero(current[i], starTreeConfig.getMetrics().get(i).getType()))
-          {
+          if (!NumberUtils.isZero(current[i], starTreeConfig.getMetrics().get(i).getType())) {
             nonZero = true;
           }
         }
 
-        if (!excludeZeroValues || nonZero)
-        {
+        if (!excludeZeroValues || nonZero) {
           System.out.print(dimensionKey + "\t@" + time);
-          for (Number value : current)
-          {
+          for (Number value : current) {
             System.out.print("\t" + value);
           }
           System.out.println();
@@ -216,16 +195,15 @@ public class BufferViewer
     }
   }
 
-  private static ByteBuffer mapBuffer(File bufferFile) throws IOException
-  {
+  private static ByteBuffer mapBuffer(File bufferFile) throws IOException {
     FileChannel channel = new RandomAccessFile(bufferFile, "r").getChannel();
     ByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, bufferFile.length());
     buffer.order(ByteOrder.BIG_ENDIAN);
     return buffer;
   }
 
-  private static DimensionDictionary getDictionary(DimensionIndexEntry indexEntry, File dictionaryFile) throws IOException
-  {
+  private static DimensionDictionary getDictionary(DimensionIndexEntry indexEntry,
+      File dictionaryFile) throws IOException {
     ByteBuffer dictionaryBuffer = mapBuffer(dictionaryFile);
 
     dictionaryBuffer.rewind();
@@ -235,20 +213,17 @@ public class BufferViewer
     ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(dictionaryBytes));
 
     DimensionDictionary dictionary;
-    try
-    {
+    try {
       dictionary = (DimensionDictionary) ois.readObject();
-    }
-    catch (ClassNotFoundException e)
-    {
+    } catch (ClassNotFoundException e) {
       throw new IOException(e);
     }
 
     return dictionary;
   }
 
-  private static ByteBuffer getDimensionBuffer(DimensionIndexEntry indexEntry, File bufferFile) throws IOException
-  {
+  private static ByteBuffer getDimensionBuffer(DimensionIndexEntry indexEntry, File bufferFile)
+      throws IOException {
     ByteBuffer dimensionBuffer = mapBuffer(bufferFile);
 
     dimensionBuffer.rewind();
@@ -260,12 +235,12 @@ public class BufferViewer
     return slicedBuffer;
   }
 
-  private static ByteBuffer getMetricBuffer(MetricIndexEntry indexEntry, Map<UUID, ByteBuffer> metricBuffers) throws IOException
-  {
+  private static ByteBuffer getMetricBuffer(MetricIndexEntry indexEntry,
+      Map<UUID, ByteBuffer> metricBuffers) throws IOException {
     ByteBuffer metricBuffer = metricBuffers.get(indexEntry.getFileId());
-    if (metricBuffer == null)
-    {
-      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + StarTreeConstants.BUFFER_FILE_SUFFIX);
+    if (metricBuffer == null) {
+      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId()
+          + StarTreeConstants.BUFFER_FILE_SUFFIX);
     }
 
     metricBuffer.rewind();

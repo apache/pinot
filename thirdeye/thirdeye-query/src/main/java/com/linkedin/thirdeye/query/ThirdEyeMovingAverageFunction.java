@@ -12,7 +12,8 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
     this.window = window;
 
     if (window.getSize() < 1) {
-      throw new IllegalArgumentException("Must provide non-zero positive integer for window: " + window);
+      throw new IllegalArgumentException(
+          "Must provide non-zero positive integer for window: " + window);
     }
   }
 
@@ -21,13 +22,15 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query,
+      MetricTimeSeries timeSeries) {
     List<MetricType> metricTypes = new ArrayList<>();
     for (String metricName : timeSeries.getSchema().getNames()) {
       metricTypes.add(MetricType.DOUBLE);
     }
     List<String> metricNames = timeSeries.getSchema().getNames();
-    MetricTimeSeries movingAverage = new MetricTimeSeries(new MetricSchema(metricNames, metricTypes));
+    MetricTimeSeries movingAverage =
+        new MetricTimeSeries(new MetricSchema(metricNames, metricTypes));
 
     if (timeSeries.getTimeWindowSet().isEmpty()) {
       return movingAverage;
@@ -37,8 +40,9 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
     Long maxTime = Collections.max(timeSeries.getTimeWindowSet());
 
     // Convert window to collection time
-    long collectionWindow = config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
-        / config.getTime().getBucket().getSize();
+    long collectionWindow =
+        config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
+            / config.getTime().getBucket().getSize();
     Long startTime = minTime + collectionWindow;
 
     // Initialize
@@ -53,18 +57,14 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
 
         // Add current position to current sum
         Number newValue = timeSeries.get(time, metricName);
-        currentSum[j] = NumberUtils.sum(
-            currentSum[j],
-            newValue.doubleValue() / collectionWindow,
-            metricType);
+        currentSum[j] =
+            NumberUtils.sum(currentSum[j], newValue.doubleValue() / collectionWindow, metricType);
 
         if (time >= startTime) {
           // Subtract one that fell out of window
           Number oldValue = timeSeries.get(time - collectionWindow, metricName);
-          currentSum[j] = NumberUtils.difference(
-              currentSum[j],
-              oldValue.doubleValue() / collectionWindow,
-              metricType);
+          currentSum[j] = NumberUtils.difference(currentSum[j],
+              oldValue.doubleValue() / collectionWindow, metricType);
 
           // Update new series
           movingAverage.increment(time, metricName, currentSum[j]);

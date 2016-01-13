@@ -14,7 +14,8 @@ public class ThirdEyeRequest {
   private DateTime endTime;
   private Multimap<String, String> dimensionValues = LinkedListMultimap.create();
 
-  public ThirdEyeRequest() {}
+  public ThirdEyeRequest() {
+  }
 
   public ThirdEyeRequest(ThirdEyeRequest other) {
     this.collection = other.getCollection();
@@ -104,12 +105,8 @@ public class ThirdEyeRequest {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("collection", collection)
-        .add("metricFunction", metricFunction)
-        .add("startTime", startTime)
-        .add("endTime", endTime)
-        .add("dimensionValues", dimensionValues)
-        .toString();
+    return MoreObjects.toStringHelper(this).add("collection", collection)
+        .add("metricFunction", metricFunction).add("startTime", startTime).add("endTime", endTime)
+        .add("dimensionValues", dimensionValues).toString();
   }
 }

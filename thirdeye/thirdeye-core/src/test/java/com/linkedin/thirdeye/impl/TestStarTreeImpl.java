@@ -28,8 +28,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-public class TestStarTreeImpl
-{
+public class TestStarTreeImpl {
   private File rootDir;
   private StarTreeConfig config;
   private StarTreeRecordStoreFactory recordStoreFactory;
@@ -37,28 +36,32 @@ public class TestStarTreeImpl
   private MetricSchema metricSchema;
 
   @BeforeMethod
-  public void beforeMethod() throws Exception
-  {
+  public void beforeMethod() throws Exception {
     rootDir = new File(System.getProperty("java.io.tmpdir"), TestStarTreeImpl.class.getName());
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
-    try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
+    try {
+      FileUtils.forceMkdir(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
 
-    config = new StarTreeConfig.Builder()
-            .setCollection("dummy")
-            .setSplit(new SplitSpec(4, null))
+    config =
+        new StarTreeConfig.Builder().setCollection("dummy").setSplit(new SplitSpec(4, null))
             .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
-            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
-            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
-            .setFixed(false)
-            .build();
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"),
+                new DimensionSpec("C")))
+        .setRecordStoreFactoryClass(
+            StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName()).setFixed(false)
+        .build();
 
     metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
 
     starTree = new StarTreeImpl(config);
     starTree.open();
 
-    for (int i = 0; i < 100; i++)
-    {
+    for (int i = 0; i < 100; i++) {
       MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
       ts.set(i, "M", 1);
 
@@ -79,15 +82,16 @@ public class TestStarTreeImpl
   }
 
   @AfterMethod
-  public void afterMethod() throws Exception
-  {
+  public void afterMethod() throws Exception {
     starTree.close();
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
   }
 
   @Test
-  public void testQuery() throws Exception
-  {
+  public void testQuery() throws Exception {
     StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
     queryBuilder.setTimeRange(new TimeRange(0L, 100L));
 
@@ -113,8 +117,7 @@ public class TestStarTreeImpl
   }
 
   @Test
-  public void testTimeRangeQuery() throws Exception
-  {
+  public void testTimeRangeQuery() throws Exception {
     // All
     StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
     queryBuilder.setDimensionKey(getDimensionKey("*", "*", "*"));
@@ -124,16 +127,14 @@ public class TestStarTreeImpl
   }
 
   @Test
-  public void testGetDimensionValues() throws Exception
-  {
+  public void testGetDimensionValues() throws Exception {
     Set<String> aValues = starTree.getDimensionValues("A", null);
     Set<String> expectedValues = new HashSet<String>(Arrays.asList("A0", "A1", "AX", "?"));
     Assert.assertEquals(aValues, expectedValues);
   }
 
   @Test
-  public void testSerialization() throws Exception
-  {
+  public void testSerialization() throws Exception {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     ObjectOutputStream objectOutputStream = new ObjectOutputStream(baos);
     objectOutputStream.writeObject(starTree.getRoot());
@@ -143,19 +144,18 @@ public class TestStarTreeImpl
   }
 
   @Test
-  public void testFindAll() throws Exception
-  {
+  public void testFindAll() throws Exception {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("*", "*", "C0"))
-            .build(config);
+        .setDimensionKey(getDimensionKey("*", "*", "C0")).build(config);
 
     Collection<StarTreeNode> nodes = starTree.findAll(query);
 
     Assert.assertEquals(nodes.size(), 2); // all stars, and specific C0 node
   }
 
-  private DimensionKey getDimensionKey(String a, String b, String c)
-  {
-    return new DimensionKey(new String[] {a, b, c});
+  private DimensionKey getDimensionKey(String a, String b, String c) {
+    return new DimensionKey(new String[] {
+        a, b, c
+    });
   }
 }

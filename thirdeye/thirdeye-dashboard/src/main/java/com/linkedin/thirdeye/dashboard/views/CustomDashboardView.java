@@ -10,7 +10,8 @@ public class CustomDashboardView extends View {
   private final String name;
   private final List<Pair<CustomDashboardComponentSpec, View>> componentViews;
 
-  public CustomDashboardView(String name, List<Pair<CustomDashboardComponentSpec, View>> componentViews) {
+  public CustomDashboardView(String name,
+      List<Pair<CustomDashboardComponentSpec, View>> componentViews) {
     super("custom-dashboard.ftl");
     this.name = name;
     this.componentViews = componentViews;

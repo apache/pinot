@@ -18,11 +18,9 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   private static final Joiner CSV = Joiner.on(",");
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey,
-                                     MetricTimeSeries timeSeries,
-                                     DateTime windowStart,
-                                     DateTime windowEnd,
-                                     List<AnomalyResult> knownAnomalies) throws Exception {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
+          throws Exception {
     List<AnomalyResult> anomalyResults = new ArrayList<>();
 
     // Parse function properties
@@ -53,7 +51,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
     }
 
     // Compute the bucket size, so we can iterate in those steps
-    long bucketMillis = TimeUnit.MILLISECONDS.convert(getSpec().getBucketSize(), getSpec().getBucketUnit());
+    long bucketMillis =
+        TimeUnit.MILLISECONDS.convert(getSpec().getBucketSize(), getSpec().getBucketUnit());
 
     // Compute the weight of this time series (average across whole)
     double averageValue = 0;
@@ -78,7 +77,8 @@ public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
       if (baselineValue > 0) {
         double percentChange = (currentValue - baselineValue) / baselineValue;
 
-        if (changeThreshold > 0 && percentChange > changeThreshold || changeThreshold < 0 && percentChange < changeThreshold) {
+        if (changeThreshold > 0 && percentChange > changeThreshold
+            || changeThreshold < 0 && percentChange < changeThreshold) {
           AnomalyResult anomalyResult = new AnomalyResult();
           anomalyResult.setCollection(getSpec().getCollection());
           anomalyResult.setMetric(metric);

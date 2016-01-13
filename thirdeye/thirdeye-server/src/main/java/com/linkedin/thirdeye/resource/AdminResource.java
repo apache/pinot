@@ -10,22 +10,18 @@ import javax.ws.rs.core.Response;
 
 import com.codahale.metrics.annotation.Timed;
 
-
 @Path("/")
 @Produces(MediaType.TEXT_PLAIN)
-public class AdminResource
-{
+public class AdminResource {
 
   @GET
-  public Response returnDefaultDashboard()
-  {
+  public Response returnDefaultDashboard() {
     return Response.seeOther(URI.create("/dashboard")).build();
   }
 
   @GET
   @Path("/admin")
-  public String sayGood()
-  {
+  public String sayGood() {
     return "GOOD";
   }
 

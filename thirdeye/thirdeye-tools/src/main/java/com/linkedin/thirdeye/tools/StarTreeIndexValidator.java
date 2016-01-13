@@ -15,9 +15,7 @@ import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
  * Performs validation checks on the star tree and the leaf data
- *
  * @author kgopalak
- *
  */
 public class StarTreeIndexValidator {
   public static void main(String[] args) throws Exception {
@@ -27,8 +25,8 @@ public class StarTreeIndexValidator {
 
     StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(config));
 
-    StarTreeNode starTreeRootNode = StarTreePersistanceUtil
-        .loadStarTree(new FileInputStream(pathToTreeBinary));
+    StarTreeNode starTreeRootNode =
+        StarTreePersistanceUtil.loadStarTree(new FileInputStream(pathToTreeBinary));
 
     List<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
     StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTreeRootNode);
@@ -38,16 +36,13 @@ public class StarTreeIndexValidator {
     int totalCount = 0;
     int errorCount = 0;
     for (StarTreeNode node : leafNodes) {
-      String[] parentDimValues = new String[node.getAncestorDimensionNames()
-          .size() + 1];
+      String[] parentDimValues = new String[node.getAncestorDimensionNames().size() + 1];
 
-      Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
-          .readForwardIndex(node.getId().toString(), dataDirectory);
-      Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils
-          .toReverseIndex(forwardIndex);
-      List<int[]> leafRecords = StarTreePersistanceUtil.readLeafRecords(
-          dataDirectory, node.getId().toString(), starTreeConfig
-              .getDimensions().size());
+      Map<String, Map<String, Integer>> forwardIndex =
+          StarTreePersistanceUtil.readForwardIndex(node.getId().toString(), dataDirectory);
+      Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils.toReverseIndex(forwardIndex);
+      List<int[]> leafRecords = StarTreePersistanceUtil.readLeafRecords(dataDirectory,
+          node.getId().toString(), starTreeConfig.getDimensions().size());
       List<String> ancestorDimensionNames = node.getAncestorDimensionNames();
       for (int i = 0; i < ancestorDimensionNames.size(); i++) {
         String name = ancestorDimensionNames.get(i);
@@ -55,8 +50,8 @@ public class StarTreeIndexValidator {
       }
       parentDimValues[parentDimValues.length - 1] = node.getDimensionValue();
       String[] childDimValues = new String[dimensionSpecs.size()];
-      System.out.println("START: Processing leaf node:" + node.getId() + " "
-          + node.getPath() + " numChildren:" + leafRecords.size());
+      System.out.println("START: Processing leaf node:" + node.getId() + " " + node.getPath()
+          + " numChildren:" + leafRecords.size());
       for (int arr[] : leafRecords) {
         Arrays.fill(childDimValues, "");
         boolean passed = true;
@@ -73,11 +68,10 @@ public class StarTreeIndexValidator {
           if (node.getDimensionName().equals(name)) {
             parentNodeVal = node.getDimensionValue();
           }
-          if (parentNodeVal != null
-              && !parentNodeVal.equals(StarTreeConstants.STAR)) {
+          if (parentNodeVal != null && !parentNodeVal.equals(StarTreeConstants.STAR)) {
             if (!parentNodeVal.equals(childDimValues[i])) {
-              System.out.println("\t\t\t\t ERROR: "+ name +" : parentVal:"+ parentNodeVal +" childVal:"+ childDimValues[i]
-                  + Arrays.toString(childDimValues));
+              System.out.println("\t\t\t\t ERROR: " + name + " : parentVal:" + parentNodeVal
+                  + " childVal:" + childDimValues[i] + Arrays.toString(childDimValues));
               passed = false;
             }
           }
@@ -89,7 +83,6 @@ public class StarTreeIndexValidator {
       System.out.println("END: Processing leaf node:" + node.getId());
 
     }
-    System.out.println("total Count: " + totalCount + " failed count: "
-        + errorCount);
+    System.out.println("total Count: " + totalCount + " failed count: " + errorCount);
   }
 }

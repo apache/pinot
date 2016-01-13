@@ -18,9 +18,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Wrapper class to represent an array of dimension values.
- *
  * @author kgopalak
- *
  */
 public class DimensionKey implements Comparable<DimensionKey> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionKey.class);
@@ -34,11 +32,11 @@ public class DimensionKey implements Comparable<DimensionKey> {
       LOGGER.error("Error initializing md5 message digest toMD5 will fail", e);
     }
   }
+
   final int hashCode;
   private String[] dimensionValues;
 
   /**
-   *
    * @param dimensionValues
    */
   public DimensionKey(String[] dimensionValues) {
@@ -47,19 +45,15 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   *
    * @return
    */
   public String[] getDimensionValues() {
     return dimensionValues;
   }
 
-  public String getDimensionValue(List<DimensionSpec> dimensionSpecs, String dimensionName)
-  {
-    for (int i = 0; i < dimensionSpecs.size(); i++)
-    {
-      if (dimensionSpecs.get(i).getName().equals(dimensionName))
-      {
+  public String getDimensionValue(List<DimensionSpec> dimensionSpecs, String dimensionName) {
+    for (int i = 0; i < dimensionSpecs.size(); i++) {
+      if (dimensionSpecs.get(i).getName().equals(dimensionName)) {
         return dimensionValues[i];
       }
     }
@@ -67,7 +61,6 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   *
    * @return
    * @throws IOException
    */
@@ -96,7 +89,6 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   *
    * @param bytes
    * @return
    * @throws IOException
@@ -130,14 +122,12 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   *
    * @param that
    * @return
    */
   public int compareTo(DimensionKey that) {
     // assumes both have the same length
-    int length = Math.min(this.dimensionValues.length,
-        that.dimensionValues.length);
+    int length = Math.min(this.dimensionValues.length, that.dimensionValues.length);
     int ret = 0;
     for (int i = 0; i < length; i++) {
       ret = this.dimensionValues[i].compareTo(that.dimensionValues[i]);
@@ -161,8 +151,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
     // assumes both have the same length
     if (obj instanceof DimensionKey) {
       DimensionKey that = (DimensionKey) obj;
-      int length = Math.min(this.dimensionValues.length,
-          that.dimensionValues.length);
+      int length = Math.min(this.dimensionValues.length, that.dimensionValues.length);
       boolean ret = true;
       for (int i = 0; i < length; i++) {
         ret = this.dimensionValues[i].equals(that.dimensionValues[i]);

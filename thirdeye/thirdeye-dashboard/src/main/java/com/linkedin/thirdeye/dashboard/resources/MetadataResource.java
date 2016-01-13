@@ -23,7 +23,8 @@ public class MetadataResource {
 
   @GET
   @Path("/{collection}/segments")
-  public List<SegmentDescriptor> getSegments(@PathParam("collection") String collection) throws Exception {
+  public List<SegmentDescriptor> getSegments(@PathParam("collection") String collection)
+      throws Exception {
     return dataCache.getSegmentDescriptors(serverUri, collection);
   }
 }

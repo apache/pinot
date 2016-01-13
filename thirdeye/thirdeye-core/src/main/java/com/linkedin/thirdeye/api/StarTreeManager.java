@@ -8,11 +8,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public interface StarTreeManager
-{
+public interface StarTreeManager {
   /**
    * @return
-   *   A List of all collections for which configs have been registered.
+   *         A List of all collections for which configs have been registered.
    */
   Set<String> getCollections();
 
@@ -25,7 +24,6 @@ public interface StarTreeManager
   StarTree getMutableStarTree(String collection);
 
   /**
-   *
    * Returns the maxDataTime available in the collection
    */
   Long getMaxDataTime(String collection);

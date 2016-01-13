@@ -43,11 +43,13 @@ public class StandAloneKafkaConsumer {
     StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(cli.getArgs()[0]));
     ObjectMapper objectMapper = new ObjectMapper(new YAMLFactory());
     objectMapper.registerModule(new JodaModule());
-    final ThirdEyeKafkaConfig kafkaConfig = objectMapper.readValue(new File(cli.getArgs()[1]), ThirdEyeKafkaConfig.class);
+    final ThirdEyeKafkaConfig kafkaConfig =
+        objectMapper.readValue(new File(cli.getArgs()[1]), ThirdEyeKafkaConfig.class);
     File rootDir = new File(cli.getArgs()[2]);
 
     if (cli.hasOption("randomGroupId")) {
-      kafkaConfig.setGroupId(StandAloneKafkaConsumer.class.getSimpleName() + "_" + UUID.randomUUID());
+      kafkaConfig
+          .setGroupId(StandAloneKafkaConsumer.class.getSimpleName() + "_" + UUID.randomUUID());
     }
 
     // Components
@@ -58,38 +60,22 @@ public class StandAloneKafkaConsumer {
 
     // Tree
     StarTreeConfig inMemoryConfig = new StarTreeConfig(config.getCollection(),
-        StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
-        new Properties(),
-        config.getAnomalyDetectionFunctionClass(),
-        config.getAnomalyDetectionFunctionConfig(),
-        config.getAnomalyHandlerClass(),
-        config.getAnomalyHandlerConfig(),
-        config.getAnomalyDetectionMode(),
-        config.getDimensions(),
-        config.getMetrics(),
-        config.getTime(),
-        config.getJoinSpec(),
-        config.getRollup(),
-        config.getTopKRollup(),
-        config.getSplit(),
-        false);
+        StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(), new Properties(),
+        config.getAnomalyDetectionFunctionClass(), config.getAnomalyDetectionFunctionConfig(),
+        config.getAnomalyHandlerClass(), config.getAnomalyHandlerConfig(),
+        config.getAnomalyDetectionMode(), config.getDimensions(), config.getMetrics(),
+        config.getTime(), config.getJoinSpec(), config.getRollup(), config.getTopKRollup(),
+        config.getSplit(), false);
     final StarTree mutableTree = new StarTreeImpl(inMemoryConfig);
     mutableTree.open();
 
     // Report stats to console
     ConsoleReporter reporter = ConsoleReporter.forRegistry(metricRegistry)
-        .convertRatesTo(TimeUnit.SECONDS)
-        .convertDurationsTo(TimeUnit.MILLISECONDS)
-        .build();
+        .convertRatesTo(TimeUnit.SECONDS).convertDurationsTo(TimeUnit.MILLISECONDS).build();
 
     // Consumer
-    final ThirdEyeKafkaConsumer kafkaConsumer = new ThirdEyeKafkaConsumer(
-        mutableTree,
-        kafkaConfig,
-        consumerExecutors,
-        taskScheduler,
-        dataUpdateManager,
-        metricRegistry);
+    final ThirdEyeKafkaConsumer kafkaConsumer = new ThirdEyeKafkaConsumer(mutableTree, kafkaConfig,
+        consumerExecutors, taskScheduler, dataUpdateManager, metricRegistry);
 
     // Shutdown
     Runtime.getRuntime().addShutdownHook(new Thread() {

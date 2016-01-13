@@ -1,4 +1,4 @@
-  package com.linkedin.thirdeye.resource;
+package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
@@ -51,8 +51,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Path("/collections")
 @Produces(MediaType.APPLICATION_JSON)
-public class CollectionsResource implements Managed
-{
+public class CollectionsResource implements Managed {
   private static final String LAST_POST_DATA_MILLIS = "lastPostDataMillis";
   private static final String DATA_TIME_LAG_MILLIS = "dataTimeLagMillis";
   private static final Logger LOG = LoggerFactory.getLogger(CollectionsResource.class);
@@ -63,11 +62,8 @@ public class CollectionsResource implements Managed
   private final MetricRegistry metricRegistry;
   private final ConcurrentMap<String, AtomicLong> lastPostDataMillis;
 
-  public CollectionsResource(StarTreeManager manager,
-                             MetricRegistry metricRegistry,
-                             DataUpdateManager dataUpdateManager,
-                             File rootDir)
-  {
+  public CollectionsResource(StarTreeManager manager, MetricRegistry metricRegistry,
+      DataUpdateManager dataUpdateManager, File rootDir) {
     this.manager = manager;
     this.rootDir = rootDir;
     this.dataUpdateManager = dataUpdateManager;
@@ -78,12 +74,12 @@ public class CollectionsResource implements Managed
   @Override
   public void start() throws Exception {
 
-    for (String collection : manager.getCollections())
-    {
+    for (String collection : manager.getCollections()) {
       final String collectionName = collection;
       // Metric for time we last received a POST to update collection's data
       lastPostDataMillis.putIfAbsent(collection, new AtomicLong(System.currentTimeMillis()));
-      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, LAST_POST_DATA_MILLIS),
+      metricRegistry.register(
+          MetricRegistry.name(CollectionsResource.class, collection, LAST_POST_DATA_MILLIS),
           new Gauge<Long>() {
             @Override
             public Long getValue() {
@@ -93,15 +89,13 @@ public class CollectionsResource implements Managed
     }
   }
 
-
   @Override
   public void stop() throws Exception {
 
   }
 
   @GET
-  public List<String> getCollections()
-  {
+  public List<String> getCollections() {
     List<String> collections = new ArrayList<String>(manager.getCollections());
     Collections.sort(collections);
     return collections;
@@ -109,11 +103,9 @@ public class CollectionsResource implements Managed
 
   @GET
   @Path("/{collection}")
-  public StarTreeConfig getConfig(@PathParam("collection") String collection)
-  {
+  public StarTreeConfig getConfig(@PathParam("collection") String collection) {
     StarTreeConfig config = manager.getConfig(collection);
-    if (config == null)
-    {
+    if (config == null) {
       throw new NotFoundException("No collection " + collection);
     }
     return config;
@@ -121,22 +113,17 @@ public class CollectionsResource implements Managed
 
   @DELETE
   @Path("/{collection}")
-  public Response deleteCollection(@PathParam("collection") String collection) throws Exception
-  {
+  public Response deleteCollection(@PathParam("collection") String collection) throws Exception {
     StarTreeConfig config = manager.getConfig(collection);
-    if (config == null)
-    {
+    if (config == null) {
       throw new NotFoundException("No collection " + collection);
     }
 
     manager.close(collection);
 
-    try
-    {
+    try {
       dataUpdateManager.deleteCollection(collection);
-    }
-    catch (FileNotFoundException e)
-    {
+    } catch (FileNotFoundException e) {
       throw new NotFoundException(e.getMessage());
     }
 
@@ -146,38 +133,33 @@ public class CollectionsResource implements Managed
   @POST
   @Path("/{collection}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response postConfig(@PathParam("collection") String collection, byte[] configBytes) throws IOException
-  {
+  public Response postConfig(@PathParam("collection") String collection, byte[] configBytes)
+      throws IOException {
     File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
+    if (!collectionDir.exists()) {
       FileUtils.forceMkdir(collectionDir);
     }
 
     File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
 
-    if (!configFile.exists())
-    {
+    if (!configFile.exists()) {
       IOUtils.copy(new ByteArrayInputStream(configBytes), new FileOutputStream(configFile));
-    }
-    else
-    {
-      throw new ConflictException(configFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
+    } else {
+      throw new ConflictException(configFile.getPath()
+          + " already exists. A DELETE of /collections/{collection} is required first");
     }
     return Response.ok().build();
   }
 
   @GET
   @Path("/{collection}/kafkaConfig")
-  public byte[] getKafkaConfig(@PathParam("collection") String collection) throws Exception
-  {
-    File kafkaConfigFile = new File(new File(rootDir, collection), StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
-    if (!kafkaConfigFile.exists())
-    {
+  public byte[] getKafkaConfig(@PathParam("collection") String collection) throws Exception {
+    File kafkaConfigFile =
+        new File(new File(rootDir, collection), StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
+    if (!kafkaConfigFile.exists()) {
       throw new NotFoundException();
     }
-    if (!kafkaConfigFile.isAbsolute())
-    {
+    if (!kafkaConfigFile.isAbsolute()) {
       throw new WebApplicationException(Response.Status.BAD_REQUEST);
     }
 
@@ -186,15 +168,13 @@ public class CollectionsResource implements Managed
 
   @POST
   @Path("/{collection}/kafkaConfig")
-  public Response postKafkaConfig(@PathParam("collection") String collection, byte[] kafkaConfigBytes) throws Exception
-  {
+  public Response postKafkaConfig(@PathParam("collection") String collection,
+      byte[] kafkaConfigBytes) throws Exception {
     File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
+    if (!collectionDir.exists()) {
       FileUtils.forceMkdir(collectionDir);
     }
-    if (!collectionDir.isAbsolute())
-    {
+    if (!collectionDir.isAbsolute()) {
       throw new WebApplicationException(Response.Status.BAD_REQUEST);
     }
 
@@ -207,17 +187,14 @@ public class CollectionsResource implements Managed
 
   @DELETE
   @Path("/{collection}/kafkaConfig")
-  public Response deleteKafkaConfig(@PathParam("collection") String collection) throws Exception
-  {
+  public Response deleteKafkaConfig(@PathParam("collection") String collection) throws Exception {
     File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.isAbsolute())
-    {
+    if (!collectionDir.isAbsolute()) {
       throw new WebApplicationException(Response.Status.BAD_REQUEST);
     }
 
     File kafkaConfigFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
-    if (!kafkaConfigFile.exists())
-    {
+    if (!kafkaConfigFile.exists()) {
       throw new NotFoundException();
     }
 
@@ -231,43 +208,37 @@ public class CollectionsResource implements Managed
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
   @Timed
   public Response postData(@PathParam("collection") String collection,
-                           @PathParam("minTime") long minTimeMillis,
-                           @PathParam("maxTime") long maxTimeMillis,
-                           @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule,
-                           InputStream dataBytes) throws Exception
-  {
+      @PathParam("minTime") long minTimeMillis, @PathParam("maxTime") long maxTimeMillis,
+      @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule, InputStream dataBytes)
+          throws Exception {
     DateTime minTime = new DateTime(minTimeMillis, DateTimeZone.UTC);
     DateTime maxTime = new DateTime(maxTimeMillis, DateTimeZone.UTC);
 
     LOG.info("Received data for {} in {} to {}", collection, minTime, maxTime);
 
-    dataUpdateManager.updateData(
-        collection,
-        schedule,
-        minTime,
-        maxTime,
-        dataBytes);
+    dataUpdateManager.updateData(collection, schedule, minTime, maxTime, dataBytes);
 
     final String collectionName = collection;
-    AtomicLong value = lastPostDataMillis.putIfAbsent(collectionName, new AtomicLong(System.currentTimeMillis()));
-    if (value == null)
-    {
-      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collectionName, LAST_POST_DATA_MILLIS),
+    AtomicLong value =
+        lastPostDataMillis.putIfAbsent(collectionName, new AtomicLong(System.currentTimeMillis()));
+    if (value == null) {
+      metricRegistry.register(
+          MetricRegistry.name(CollectionsResource.class, collectionName, LAST_POST_DATA_MILLIS),
           new Gauge<Long>() {
 
             @Override
             public Long getValue() {
-             return lastPostDataMillis.get(collectionName).get();
+              return lastPostDataMillis.get(collectionName).get();
             }
           });
-    }
-    else
-    {
+    } else {
       value.set((System.currentTimeMillis()));
     }
 
-    if (!metricRegistry.getGauges().containsKey(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS))) {
-      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
+    if (!metricRegistry.getGauges().containsKey(
+        MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS))) {
+      metricRegistry.register(
+          MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
           new Gauge<Long>() {
 
             @Override
@@ -286,7 +257,8 @@ public class CollectionsResource implements Managed
 
   @GET
   @Path("/{collection}/segments")
-  public List<SegmentDescriptor> getSegments(@PathParam("collection") String collection) throws Exception {
+  public List<SegmentDescriptor> getSegments(@PathParam("collection") String collection)
+      throws Exception {
     File collectionDir = new File(rootDir, collection);
     if (!collectionDir.exists()) {
       throw new NotFoundException("No collection " + collection);
@@ -318,10 +290,11 @@ public class CollectionsResource implements Managed
         }
 
         IndexMetadata indexMetadata = IndexMetadata.fromProperties(properties);
-        DateTime startWallTime= new DateTime(indexMetadata.getStartTimeMillis());
-        DateTime endWallTime= new DateTime(indexMetadata.getEndTimeMillis());
-        descriptors.add(new SegmentDescriptor(dataDir, startWallTime, endWallTime, new DateTime(
-            indexMetadata.getMinDataTimeMillis()), new DateTime(indexMetadata.getMaxDataTimeMillis())));
+        DateTime startWallTime = new DateTime(indexMetadata.getStartTimeMillis());
+        DateTime endWallTime = new DateTime(indexMetadata.getEndTimeMillis());
+        descriptors.add(new SegmentDescriptor(dataDir, startWallTime, endWallTime,
+            new DateTime(indexMetadata.getMinDataTimeMillis()),
+            new DateTime(indexMetadata.getMaxDataTimeMillis())));
       }
     }
 
@@ -343,8 +316,8 @@ public class CollectionsResource implements Managed
       return null;
     }
     TimeGranularity bucket = config.getTime().getBucket();
-    long millis = TimeUnit.MILLISECONDS.convert(collectionTime * bucket.getSize(), bucket.getUnit());
+    long millis =
+        TimeUnit.MILLISECONDS.convert(collectionTime * bucket.getSize(), bucket.getUnit());
     return new DateTime(millis);
   }
 }
-

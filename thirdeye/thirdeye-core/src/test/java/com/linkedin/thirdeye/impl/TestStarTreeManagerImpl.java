@@ -42,33 +42,28 @@ public class TestStarTreeManagerImpl {
   private long timeout = 25000;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
+  public void beforeClass() throws Exception {
     rootDir = new File(System.getProperty("java.io.tmpdir"), TestStarTreeImpl.class.getName());
     baseConfig = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("sample-config.yml"));
     collection = baseConfig.getCollection();
     collectionDir = new File(rootDir, collection);
-    try { FileUtils.forceDelete(collectionDir); } catch (Exception e) { /* ok */ }
-    try { FileUtils.forceMkdir(collectionDir); } catch (Exception e) { /* ok */ }
+    try {
+      FileUtils.forceDelete(collectionDir);
+    } catch (Exception e) {
+      /* ok */ }
+    try {
+      FileUtils.forceMkdir(collectionDir);
+    } catch (Exception e) {
+      /* ok */ }
 
     SplitSpec split = new SplitSpec(5, baseConfig.getSplit().getOrder());
-    config = new StarTreeConfig(
-        baseConfig.getCollection(),
-        StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName(),
-        new Properties(),
+    config = new StarTreeConfig(baseConfig.getCollection(),
+        StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName(), new Properties(),
         baseConfig.getAnomalyDetectionFunctionClass(),
-        baseConfig.getAnomalyDetectionFunctionConfig(),
-        baseConfig.getAnomalyHandlerClass(),
-        baseConfig.getAnomalyHandlerConfig(),
-        baseConfig.getAnomalyDetectionMode(),
-        baseConfig.getDimensions(),
-        baseConfig.getMetrics(),
-        baseConfig.getTime(),
-        baseConfig.getJoinSpec(),
-        baseConfig.getRollup(),
-        baseConfig.getTopKRollup(),
-        split,
-        false);
+        baseConfig.getAnomalyDetectionFunctionConfig(), baseConfig.getAnomalyHandlerClass(),
+        baseConfig.getAnomalyHandlerConfig(), baseConfig.getAnomalyDetectionMode(),
+        baseConfig.getDimensions(), baseConfig.getMetrics(), baseConfig.getTime(),
+        baseConfig.getJoinSpec(), baseConfig.getRollup(), baseConfig.getTopKRollup(), split, false);
 
     // create config file
     File configFile = new File(collectionDir, "config.yml");
@@ -88,7 +83,8 @@ public class TestStarTreeManagerImpl {
     starTree.close();
 
     // create metadata
-    IndexMetadata indexMetadata = new IndexMetadata(0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L, "HOURLY", "MILLISECONDS", 1, IndexFormat.VARIABLE_SIZE);
+    IndexMetadata indexMetadata = new IndexMetadata(0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L, "HOURLY",
+        "MILLISECONDS", 1, IndexFormat.VARIABLE_SIZE);
     properties = indexMetadata.toProperties();
 
   }
@@ -105,8 +101,10 @@ public class TestStarTreeManagerImpl {
     // create data directory
     File dataDir1 = new File(collectionDir, "data_1");
     StarTreePersistanceUtil.saveTree(starTree, dataDir1.getPath());
-    FileUtils.moveFile(new File(dataDir1, collection+"-tree.bin"), new File(dataDir1, StarTreeConstants.TREE_FILE_NAME));
-    properties.store(new FileOutputStream(new File(dataDir1, StarTreeConstants.METADATA_FILE_NAME)), "properties file");
+    FileUtils.moveFile(new File(dataDir1, collection + "-tree.bin"),
+        new File(dataDir1, StarTreeConstants.TREE_FILE_NAME));
+    properties.store(new FileOutputStream(new File(dataDir1, StarTreeConstants.METADATA_FILE_NAME)),
+        "properties file");
 
     pollForStarTreesAddition(dataDir1);
 
@@ -118,8 +116,10 @@ public class TestStarTreeManagerImpl {
     // create new data directory
     File dataDir2 = new File(collectionDir, "data_2");
     StarTreePersistanceUtil.saveTree(starTree, dataDir2.getPath());
-    FileUtils.moveFile(new File(dataDir2, collection+"-tree.bin"), new File(dataDir2, StarTreeConstants.TREE_FILE_NAME));
-    properties.store(new FileOutputStream(new File(dataDir2, StarTreeConstants.METADATA_FILE_NAME)), "properties file");
+    FileUtils.moveFile(new File(dataDir2, collection + "-tree.bin"),
+        new File(dataDir2, StarTreeConstants.TREE_FILE_NAME));
+    properties.store(new FileOutputStream(new File(dataDir2, StarTreeConstants.METADATA_FILE_NAME)),
+        "properties file");
 
     pollForStarTreesAddition(dataDir2);
 
@@ -131,17 +131,19 @@ public class TestStarTreeManagerImpl {
 
   }
 
-
   @AfterClass
-  public void afterClass() throws Exception
-  {
+  public void afterClass() throws Exception {
     starTree.close();
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
   }
 
-  private DimensionKey getDimensionKey(String a, String b, String c)
-  {
-    return new DimensionKey(new String[] {a, b, c});
+  private DimensionKey getDimensionKey(String a, String b, String c) {
+    return new DimensionKey(new String[] {
+        a, b, c
+    });
   }
 
   private void pollForStarTreesAddition(File dataDir) throws InterruptedException {

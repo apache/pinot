@@ -39,14 +39,13 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 
 /**
- * THis job, splits the input data into aboveThreshold and belowThreshold by applying RollupThresholdFunction on the each record.
+ * THis job, splits the input data into aboveThreshold and belowThreshold by applying
+ * RollupThresholdFunction on the each record.
  * The belowThreshold records are processed in the subsequent jobs (Phase2 and Phase 3 of Rollup)
  * @author kgopalak
- *
  */
 public class RollupPhaseOneJob extends Configured {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(RollupPhaseOneJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RollupPhaseOneJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -55,7 +54,6 @@ public class RollupPhaseOneJob extends Configured {
   private Properties props;
 
   /**
-   *
    * @param name
    * @param props
    */
@@ -66,12 +64,10 @@ public class RollupPhaseOneJob extends Configured {
   }
 
   /**
-   *
    * @author kgopalak
-   *
    */
-  public static class RollupPhaseOneMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseOneMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseOneConfig config;
     private List<String> dimensionNames;
     private List<MetricType> metricTypes;
@@ -85,8 +81,7 @@ public class RollupPhaseOneJob extends Configured {
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE1_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE1_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
@@ -94,7 +89,7 @@ public class RollupPhaseOneJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         String className = config.getThresholdFuncClassName();
-        Map<String,String> params = config.getThresholdFuncParams();
+        Map<String, String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
         thresholdFunc = (RollupThresholdFunction) constructor.newInstance(params);
 
@@ -104,9 +99,8 @@ public class RollupPhaseOneJob extends Configured {
     }
 
     @Override
-    public void map(BytesWritable dimensionKeyBytes,
-        BytesWritable metricTimeSeriesBytes, Context context)
-        throws IOException, InterruptedException {
+    public void map(BytesWritable dimensionKeyBytes, BytesWritable metricTimeSeriesBytes,
+        Context context) throws IOException, InterruptedException {
       DimensionKey dimensionKey;
       dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
       if (LOGGER.isDebugEnabled()) {
@@ -117,12 +111,12 @@ public class RollupPhaseOneJob extends Configured {
       timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
       if (thresholdFunc.isAboveThreshold(timeSeries)) {
         // write this to a different output path
-        mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold"
-            + "/" + "aboveThreshold");
+        mos.write(dimensionKeyBytes, metricTimeSeriesBytes,
+            "aboveThreshold" + "/" + "aboveThreshold");
         context.getCounter(RollupCounter.ABOVE_THRESHOLD).increment(1);
       } else {
-        mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold"
-            + "/" + "belowThreshold");
+        mos.write(dimensionKeyBytes, metricTimeSeriesBytes,
+            "belowThreshold" + "/" + "belowThreshold");
         context.getCounter(RollupCounter.BELOW_THRESHOLD).increment(1);
 
       }
@@ -132,14 +126,11 @@ public class RollupPhaseOneJob extends Configured {
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
       mos.close();
     }
 
   }
-
-
 
   public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
@@ -160,8 +151,7 @@ public class RollupPhaseOneJob extends Configured {
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
-    String inputPathDir = getAndSetConfiguration(configuration,
-        ROLLUP_PHASE1_INPUT_PATH);
+    String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE1_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE1_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE1_OUTPUT_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
@@ -171,41 +161,33 @@ public class RollupPhaseOneJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    MultipleOutputs.addNamedOutput(job, "aboveThreshold",
-        SequenceFileOutputFormat.class, BytesWritable.class,
-        BytesWritable.class);
-    MultipleOutputs.addNamedOutput(job, "belowThreshold",
-        SequenceFileOutputFormat.class, BytesWritable.class,
-        BytesWritable.class);
+    MultipleOutputs.addNamedOutput(job, "aboveThreshold", SequenceFileOutputFormat.class,
+        BytesWritable.class, BytesWritable.class);
+    MultipleOutputs.addNamedOutput(job, "belowThreshold", SequenceFileOutputFormat.class,
+        BytesWritable.class, BytesWritable.class);
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
-
-
-
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
     Counters counters = job.getCounters();
-    for(Enum e: RollupCounter.values()){
+    for (Enum e : RollupCounter.values()) {
       Counter counter = counters.findCounter(e);
       System.out.println(counter.getDisplayName() + " : " + counter.getValue());
     }
 
     JobStatus status = job.getStatus();
-    if(status.getState() == JobStatus.State.SUCCEEDED)
-    {
+    if (status.getState() == JobStatus.State.SUCCEEDED) {
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path belowThresholdPath = new Path(new Path(
-          getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "belowThreshold");
-      Path aboveThresholdPath = new Path(new Path(
-          getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "aboveThreshold");
+      Path belowThresholdPath =
+          new Path(new Path(getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "belowThreshold");
+      Path aboveThresholdPath =
+          new Path(new Path(getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "aboveThreshold");
 
-      if (!fileSystem.exists(belowThresholdPath))
-      {
+      if (!fileSystem.exists(belowThresholdPath)) {
         fileSystem.mkdirs(belowThresholdPath);
       }
-      if (!fileSystem.exists(aboveThresholdPath))
-      {
+      if (!fileSystem.exists(aboveThresholdPath)) {
         fileSystem.mkdirs(aboveThresholdPath);
       }
     }
@@ -228,7 +210,8 @@ public class RollupPhaseOneJob extends Configured {
     }
     return propValue;
   }
-  public static enum RollupCounter{
+
+  public static enum RollupCounter {
     ABOVE_THRESHOLD,
     BELOW_THRESHOLD
   }

@@ -37,16 +37,15 @@ public class StarTreeImpl implements StarTree {
   private final File dataDir;
   private final MetricSchema metricSchema;
 
-  public StarTreeImpl(StarTreeConfig config)
-  {
+  public StarTreeImpl(StarTreeConfig config) {
     this(config, null);
   }
 
   public StarTreeImpl(StarTreeConfig config, File dataDir) {
-    this(config, dataDir, new StarTreeNodeImpl(UUID.randomUUID(),
-        StarTreeConstants.STAR, StarTreeConstants.STAR,
-        new ArrayList<String>(), new HashMap<String, String>(),
-        new HashMap<String, StarTreeNode>(), null, null));
+    this(config, dataDir,
+        new StarTreeNodeImpl(UUID.randomUUID(), StarTreeConstants.STAR, StarTreeConstants.STAR,
+            new ArrayList<String>(), new HashMap<String, String>(),
+            new HashMap<String, StarTreeNode>(), null, null));
   }
 
   public StarTreeImpl(StarTreeConfig config, File dataDir, StarTreeNode root) {
@@ -56,17 +55,12 @@ public class StarTreeImpl implements StarTree {
     this.dataDir = dataDir;
     this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
 
-    try
-    {
-      this.recordStoreFactory
-              = (StarTreeRecordStoreFactory) Class.forName(config.getRecordStoreFactoryClass()).newInstance();
+    try {
+      this.recordStoreFactory = (StarTreeRecordStoreFactory) Class
+          .forName(config.getRecordStoreFactoryClass()).newInstance();
 
-      this.recordStoreFactory.init(dataDir,
-                                   config,
-                                   config.getRecordStoreFactoryConfig());
-    }
-    catch (Exception e)
-    {
+      this.recordStoreFactory.init(dataDir, config, config.getRecordStoreFactoryConfig());
+    } catch (Exception e) {
       throw new IllegalStateException(e);
     }
   }
@@ -82,8 +76,7 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
-  public StarTreeRecordStoreFactory getRecordStoreFactory()
-  {
+  public StarTreeRecordStoreFactory getRecordStoreFactory() {
     return recordStoreFactory;
   }
 
@@ -125,74 +118,55 @@ public class StarTreeImpl implements StarTree {
 
   private boolean shouldSplit(StarTreeNode node) {
     return !config.isFixed()
-            && node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries
-            && node.getRecordStore().getRecordCount() > maxRecordStoreEntries
-            && node.getAncestorDimensionNames().size() < config.getDimensions().size();
+        && node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries
+        && node.getRecordStore().getRecordCount() > maxRecordStoreEntries
+        && node.getAncestorDimensionNames().size() < config.getDimensions().size();
   }
 
-  private void add(StarTreeNode node, StarTreeRecord record)
-  {
-    if (node.isLeaf())
-    {
+  private void add(StarTreeNode node, StarTreeRecord record) {
+    if (node.isLeaf()) {
       node.getRecordStore().update(record);
       boolean valid = true;
-      if (!node.getDimensionValue().equals(StarTreeConstants.STAR))
-      {
-        for (String name : node.getAncestorDimensionNames())
-        {
-          String recordValue = record.getDimensionKey().getDimensionValue(config.getDimensions(), name);
-          if (!recordValue.equals(node.getAncestorDimensionValues().get(name)))
-          {
+      if (!node.getDimensionValue().equals(StarTreeConstants.STAR)) {
+        for (String name : node.getAncestorDimensionNames()) {
+          String recordValue =
+              record.getDimensionKey().getDimensionValue(config.getDimensions(), name);
+          if (!recordValue.equals(node.getAncestorDimensionValues().get(name))) {
             valid = false;
           }
         }
 
-        String recordValue = record.getDimensionKey().getDimensionValue(config.getDimensions(), node.getDimensionName());
-        if (!recordValue.equals(node.getDimensionValue()))
-        {
+        String recordValue = record.getDimensionKey().getDimensionValue(config.getDimensions(),
+            node.getDimensionName());
+        if (!recordValue.equals(node.getDimensionValue())) {
           valid = false;
         }
       }
-      if (valid)
-      {
-        if (LOGGER.isTraceEnabled())
-        {
-          LOGGER.trace(
-              "Added record:{} to node:{}",
-              StarTreeUtils.toDimensionString(record, config.getDimensions()),
-              node.getPath());
+      if (valid) {
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Added record:{} to node:{}",
+              StarTreeUtils.toDimensionString(record, config.getDimensions()), node.getPath());
         }
-      } else
-      {
-        LOGGER.error(
-            "INVALID: Added record:{} to node:{}",
-            StarTreeUtils.toDimensionString(record, config.getDimensions()),
-            node.getPath());
+      } else {
+        LOGGER.error("INVALID: Added record:{} to node:{}",
+            StarTreeUtils.toDimensionString(record, config.getDimensions()), node.getPath());
 
       }
-      if (shouldSplit(node))
-      {
-        synchronized (node)
-        {
-          if (shouldSplit(node))
-          {
+      if (shouldSplit(node)) {
+        synchronized (node) {
+          if (shouldSplit(node)) {
             Set<String> blacklist = new HashSet<String>();
             blacklist.addAll(node.getAncestorDimensionNames());
             blacklist.add(node.getDimensionName());
 
             String splitDimensionName = null;
-            if (config.getSplit().getOrder() == null)
-            {
+            if (config.getSplit().getOrder() == null) {
               // Pick highest cardinality dimension
-              splitDimensionName = node.getRecordStore()
-                                       .getMaxCardinalityDimension(blacklist);
-            } else
-            {
+              splitDimensionName = node.getRecordStore().getMaxCardinalityDimension(blacklist);
+            } else {
               // Pick next to split on from fixed order
-              for (String dimensionName : config.getSplit().getOrder())
-              {
-                if (!blacklist.contains(dimensionName))
-                {
+              for (String dimensionName : config.getSplit().getOrder()) {
+                if (!blacklist.contains(dimensionName)) {
                   splitDimensionName = dimensionName;
                   break;
                 }
@@ -200,40 +174,32 @@ public class StarTreeImpl implements StarTree {
             }
 
             // Split if we found a valid dimension
-            if (splitDimensionName != null)
-            {
+            if (splitDimensionName != null) {
               node.split(splitDimensionName);
             }
           }
         }
       }
-    }
-    else
-    {
+    } else {
       // Look for a specific dimension node under this node
       String childDimensionName = node.getChildDimensionName();
-      String childDimensionValue = record.getDimensionKey().getDimensionValue(config.getDimensions(), childDimensionName);
+      String childDimensionValue =
+          record.getDimensionKey().getDimensionValue(config.getDimensions(), childDimensionName);
       StarTreeNode target = node.getChild(childDimensionValue);
 
-      if (target == null)
-      {
-        if (config.isFixed())
-        {
+      if (target == null) {
+        if (config.isFixed()) {
           // If couldn't find one, use other node
           target = node.getOtherNode();
           StarTreeRecord aliasOtherRecord = record.aliasOther(childDimensionName);
 
           // Add to this node
           add(target, aliasOtherRecord);
-        }
-        else
-        {
+        } else {
           target = node.addChildNode(childDimensionValue);
           add(target, record);
         }
-      }
-      else
-      {
+      } else {
         add(target, record);
       }
 
@@ -254,7 +220,8 @@ public class StarTreeImpl implements StarTree {
       if (node.getRecordStore() != null) {
         node.getRecordStore().close();
       } else {
-        throw new IllegalStateException("Cannot close null record store for leaf node "+node.getId());
+        throw new IllegalStateException(
+            "Cannot close null record store for leaf node " + node.getId());
       }
     } else {
       for (StarTreeNode child : node.getChildren()) {
@@ -276,8 +243,7 @@ public class StarTreeImpl implements StarTree {
   public void getDimensionValues(StarTreeNode node, String dimensionName,
       Map<String, Collection<String>> fixedDimensions, Set<String> collector) {
     if (node.isLeaf()) {
-      Set<String> dimensionValues = node.getRecordStore().getDimensionValues(
-          dimensionName);
+      Set<String> dimensionValues = node.getRecordStore().getDimensionValues(dimensionName);
       if (dimensionValues != null) {
         collector.addAll(dimensionValues);
       }
@@ -294,8 +260,7 @@ public class StarTreeImpl implements StarTree {
 
       // The other node (n.b. don't need star because those are just repeats)
       if (shouldTraverse(node.getOtherNode(), fixedDimensions)) {
-        getDimensionValues(node.getOtherNode(), dimensionName, fixedDimensions,
-            collector);
+        getDimensionValues(node.getOtherNode(), dimensionName, fixedDimensions, collector);
       }
     }
   }
@@ -303,7 +268,6 @@ public class StarTreeImpl implements StarTree {
   /**
    * Returns true if we should traverse to a child given a set of fixed
    * dimensions.
-   *
    * <p>
    * That is, the dimension isn't fixed (null or star), or is fixed and value is
    * equal.
@@ -333,7 +297,8 @@ public class StarTreeImpl implements StarTree {
     } else {
       StarTreeNode target;
 
-      String queryDimensionValue = query.getDimensionKey().getDimensionValue(config.getDimensions(), node.getChildDimensionName());
+      String queryDimensionValue = query.getDimensionKey().getDimensionValue(config.getDimensions(),
+          node.getChildDimensionName());
       if (StarTreeConstants.STAR.equals(queryDimensionValue)) {
         target = node.getStarNode();
       } else if (StarTreeConstants.OTHER.equals(queryDimensionValue)) {
@@ -357,14 +322,14 @@ public class StarTreeImpl implements StarTree {
     return collector;
   }
 
-  private void findAll(StarTreeNode node, StarTreeQuery query,
-      Collection<StarTreeNode> collector) {
+  private void findAll(StarTreeNode node, StarTreeQuery query, Collection<StarTreeNode> collector) {
     if (node.isLeaf()) {
       collector.add(node);
     } else {
       StarTreeNode target;
 
-      String queryDimensionValue = query.getDimensionKey().getDimensionValue(config.getDimensions(), node.getChildDimensionName());
+      String queryDimensionValue = query.getDimensionKey().getDimensionValue(config.getDimensions(),
+          node.getChildDimensionName());
       if (StarTreeConstants.STAR.equals(queryDimensionValue)) {
         target = node.getStarNode();
       } else if (StarTreeConstants.OTHER.equals(queryDimensionValue)) {
@@ -393,21 +358,15 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
-  public void eachLeaf(StarTreeCallback callback)
-  {
+  public void eachLeaf(StarTreeCallback callback) {
     eachLeaf(root, callback);
   }
 
-  private void eachLeaf(StarTreeNode node, StarTreeCallback callback)
-  {
-    if (node.isLeaf())
-    {
+  private void eachLeaf(StarTreeNode node, StarTreeCallback callback) {
+    if (node.isLeaf()) {
       callback.call(node);
-    }
-    else
-    {
-      for (StarTreeNode child : node.getChildren())
-      {
+    } else {
+      for (StarTreeNode child : node.getChildren()) {
         eachLeaf(child, callback);
       }
       eachLeaf(node.getOtherNode(), callback);
@@ -416,41 +375,32 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
-  public void clear() throws IOException
-  {
-    eachLeaf(new StarTreeCallback()
-    {
+  public void clear() throws IOException {
+    eachLeaf(new StarTreeCallback() {
       @Override
-      public void call(StarTreeNode node)
-      {
-        if (node.getRecordStore() != null)
-        {
+      public void call(StarTreeNode node) {
+        if (node.getRecordStore() != null) {
           node.getRecordStore().clear();
         }
       }
     });
   }
 
-  public void getStats(StarTreeNode node, StarTreeStats stats)
-  {
-    if (node.isLeaf())
-    {
-      if (node.getRecordStore() == null)
-      {
-        throw new IllegalStateException("Node " + node.getId() + " does not have record store. Has tree been opened?");
+  public void getStats(StarTreeNode node, StarTreeStats stats) {
+    if (node.isLeaf()) {
+      if (node.getRecordStore() == null) {
+        throw new IllegalStateException(
+            "Node " + node.getId() + " does not have record store. Has tree been opened?");
       }
       stats.countRecords(node.getRecordStore().getRecordCountEstimate());
       stats.updateMinTime(node.getRecordStore().getMinTime());
       stats.updateMaxTime(node.getRecordStore().getMaxTime());
       stats.countNode();
       stats.countLeaf();
-    }
-    else
-    {
+    } else {
       stats.countNode();
 
-      for (StarTreeNode child : node.getChildren())
-      {
+      for (StarTreeNode child : node.getChildren()) {
         getStats(child, stats);
       }
       getStats(node.getOtherNode(), stats);
@@ -459,10 +409,8 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
-  public boolean equals(Object o)
-  {
-    if (!(o instanceof StarTree))
-    {
+  public boolean equals(Object o) {
+    if (!(o instanceof StarTree)) {
       return false;
     }
 
@@ -472,8 +420,7 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
-  public int hashCode()
-  {
+  public int hashCode() {
     return root.hashCode();
   }
 }

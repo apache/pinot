@@ -19,16 +19,16 @@ public class AggregationJobConfig {
   private String timeUnit;
   private String aggregationGranularity;
   private String thresholdFuncClassName;
-  private Map<String,String> thresholdFuncParams;
+  private Map<String, String> thresholdFuncParams;
 
   public AggregationJobConfig() {
 
   }
 
-  public AggregationJobConfig(List<String> dimensionNames,
-      List<String> metricNames, List<MetricType> metricTypes,
-      String timeColumnName, String timeUnit, String aggregationGranularity,
-      String thresholdFuncClassName, Map<String, String> thresholdFuncParams) {
+  public AggregationJobConfig(List<String> dimensionNames, List<String> metricNames,
+      List<MetricType> metricTypes, String timeColumnName, String timeUnit,
+      String aggregationGranularity, String thresholdFuncClassName,
+      Map<String, String> thresholdFuncParams) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -76,33 +76,28 @@ public class AggregationJobConfig {
     List<String> metricNames = null;
     List<MetricType> metricTypes = null;
     List<String> dimensionNames = null;
-    Map<String, String> rollupFunctionConfig  = null;
+    Map<String, String> rollupFunctionConfig = null;
 
     try {
       metricNames = new ArrayList<String>(config.getMetrics().size());
       metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-      for (MetricSpec spec : config.getMetrics())
-      {
+      for (MetricSpec spec : config.getMetrics()) {
         metricNames.add(spec.getName());
         metricTypes.add(spec.getType());
       }
 
       dimensionNames = new ArrayList<String>(config.getDimensions().size());
-      for (DimensionSpec dimensionSpec : config.getDimensions())
-      {
+      for (DimensionSpec dimensionSpec : config.getDimensions()) {
         dimensionNames.add(dimensionSpec.getName());
       }
 
       rollupFunctionConfig = new HashMap<String, String>();
-      if (config.getRollup().getFunctionConfig() != null)
-      {
-        for (Map.Entry<Object, Object> entry : config.getRollup().getFunctionConfig().entrySet())
-        {
+      if (config.getRollup().getFunctionConfig() != null) {
+        for (Map.Entry<Object, Object> entry : config.getRollup().getFunctionConfig().entrySet()) {
           rollupFunctionConfig.put((String) entry.getKey(), (String) entry.getValue());
         }
       }
-    }
-    catch (Exception e) {
+    } catch (Exception e) {
       if (config.getMetrics() == null) {
         throw new IllegalStateException("Metrics missing from config : " + config.encode(), e);
       } else if (config.getDimensions() == null) {
@@ -111,12 +106,9 @@ public class AggregationJobConfig {
         throw new IllegalStateException("Error reading config : " + config.encode(), e);
       }
     }
-    return new AggregationJobConfig(dimensionNames,
-                                    metricNames,
-                                    metricTypes,
-                                    config.getTime().getColumnName(),
-                                    config.getTime().getInput().getUnit().toString(),
-                                    config.getTime().getBucket().getUnit().toString(),
-                                    config.getRollup().getFunctionClass(), rollupFunctionConfig);
+    return new AggregationJobConfig(dimensionNames, metricNames, metricTypes,
+        config.getTime().getColumnName(), config.getTime().getInput().getUnit().toString(),
+        config.getTime().getBucket().getUnit().toString(), config.getRollup().getFunctionClass(),
+        rollupFunctionConfig);
   }
 }

@@ -10,7 +10,8 @@ public class QueryResult {
   private List<String> dimensions;
   private List<String> metrics;
 
-  public QueryResult() {}
+  public QueryResult() {
+  }
 
   public Map<String, Map<String, Number[]>> getData() {
     return data;

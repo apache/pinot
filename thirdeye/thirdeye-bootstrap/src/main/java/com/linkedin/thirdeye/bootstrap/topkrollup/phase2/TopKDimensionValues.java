@@ -26,7 +26,7 @@ public class TopKDimensionValues {
 
   public void addValue(String dimension, String value) {
     if (topKDimensions.get(dimension) == null) {
-      topKDimensions.put(dimension,  new HashSet<String>());
+      topKDimensions.put(dimension, new HashSet<String>());
     }
     topKDimensions.get(dimension).add(value);
   }
@@ -40,6 +40,5 @@ public class TopKDimensionValues {
       topKDimensions.get(entry.getKey()).addAll(entry.getValue());
     }
   }
-
 
 }

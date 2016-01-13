@@ -21,20 +21,21 @@ public class TopKRollupPhaseThreeConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<MetricType> metricTypes;
+
   /**
    *
    */
-  public TopKRollupPhaseThreeConfig(){
+  public TopKRollupPhaseThreeConfig() {
 
   }
-/**
- *
- * @param dimensionNames
- * @param metricNames
- * @param metricTypes
- */
-  public TopKRollupPhaseThreeConfig(List<String> dimensionNames,
-      List<String> metricNames, List<MetricType> metricTypes) {
+
+  /**
+   * @param dimensionNames
+   * @param metricNames
+   * @param metricTypes
+   */
+  public TopKRollupPhaseThreeConfig(List<String> dimensionNames, List<String> metricNames,
+      List<MetricType> metricTypes) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -53,27 +54,20 @@ public class TopKRollupPhaseThreeConfig {
     return metricTypes;
   }
 
-  public static TopKRollupPhaseThreeConfig fromStarTreeConfig(StarTreeConfig config)
-  {
+  public static TopKRollupPhaseThreeConfig fromStarTreeConfig(StarTreeConfig config) {
 
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
+    for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
-
-
-    return new TopKRollupPhaseThreeConfig(dimensionNames,
-                                    metricNames,
-                                    metricTypes);
+    return new TopKRollupPhaseThreeConfig(dimensionNames, metricNames, metricTypes);
   }
 }

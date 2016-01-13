@@ -8,18 +8,15 @@ import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
- *
  * @author kgopalak
- *
  */
 
-
-public class AverageBasedRollupFunction implements RollupThresholdFunction
-{
+public class AverageBasedRollupFunction implements RollupThresholdFunction {
 
   private String metricName;
   private int averageThreshold;
   private int timeWindowSize;
+
   public AverageBasedRollupFunction(Map<String, String> params) {
     this.metricName = params.get("metricName");
     this.averageThreshold = Integer.parseInt(params.get("threshold"));
@@ -38,7 +35,7 @@ public class AverageBasedRollupFunction implements RollupThresholdFunction
   }
 
   @Override
-  public TimeGranularity getRollupAggregationGranularity(){
+  public TimeGranularity getRollupAggregationGranularity() {
     return null;
   }
 }

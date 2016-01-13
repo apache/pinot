@@ -14,13 +14,16 @@ import java.util.Map;
 
 public class ThirdEyeRawResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final TypeReference<List<String>> LIST_TYPE_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> LIST_TYPE_REF =
+      new TypeReference<List<String>>() {
+      };
 
   private List<String> metrics;
   private List<String> dimensions;
   private Map<String, Map<String, Number[]>> data;
 
-  public ThirdEyeRawResponse() {}
+  public ThirdEyeRawResponse() {
+  }
 
   public List<String> getMetrics() {
     return metrics;
@@ -46,7 +49,8 @@ public class ThirdEyeRawResponse {
     this.data = data;
   }
 
-  public Map<DimensionKey, MetricTimeSeries> convert(List<MetricType> metricTypes) throws Exception {
+  public Map<DimensionKey, MetricTimeSeries> convert(List<MetricType> metricTypes)
+      throws Exception {
     MetricSchema metricSchema = new MetricSchema(metrics, metricTypes);
 
     // Convert raw data

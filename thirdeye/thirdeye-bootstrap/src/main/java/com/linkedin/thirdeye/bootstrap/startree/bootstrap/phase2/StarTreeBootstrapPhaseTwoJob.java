@@ -78,8 +78,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     this.props = props;
   }
 
-  public static class BootstrapPhaseTwoMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class BootstrapPhaseTwoMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
 
     private StarTreeBootstrapPhaseTwoConfig config;
     private List<String> dimensionNames;
@@ -181,7 +181,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
   public static class BootstrapPhaseTwoReducer extends
 
-  Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private StarTreeBootstrapPhaseTwoConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -263,7 +263,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     @Override
     public void reduce(BytesWritable keyWritable,
         Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable, Context context)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
 
       String nodeId = new String(keyWritable.copyBytes());
 
@@ -271,16 +271,13 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
       Map<DimensionKey, MetricTimeSeries> records = new HashMap<DimensionKey, MetricTimeSeries>();
 
-
       String dimensionStoreIndexDir = localInputDataDir + "/dimensionStore";
-      DimensionDictionary dictionary =
-          new DimensionDictionary(StarTreePersistanceUtil.readForwardIndex(nodeId,
-              dimensionStoreIndexDir));
+      DimensionDictionary dictionary = new DimensionDictionary(
+          StarTreePersistanceUtil.readForwardIndex(nodeId, dimensionStoreIndexDir));
 
       // Read all combinations
-      List<int[]> allCombinations =
-          StarTreePersistanceUtil.readLeafRecords(dimensionStoreIndexDir, nodeId, starTreeConfig
-              .getDimensions().size());
+      List<int[]> allCombinations = StarTreePersistanceUtil.readLeafRecords(dimensionStoreIndexDir,
+          nodeId, starTreeConfig.getDimensions().size());
 
       // Aggregate time series for each dimension combination
       for (BytesWritable recordBytes : bootstrapMapOutputValueWritableIterable) {
@@ -293,21 +290,19 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
           records.get(record.getDimensionKey()).aggregate(record.getMetricTimeSeries());
         }
 
-        List<Long> timeWindowSet = new ArrayList<Long>(record.getMetricTimeSeries().getTimeWindowSet());
+        List<Long> timeWindowSet =
+            new ArrayList<Long>(record.getMetricTimeSeries().getTimeWindowSet());
 
         // Get metadata for each record
-        if (timeWindowSet != null && timeWindowSet.size() != 0)
-        {
+        if (timeWindowSet != null && timeWindowSet.size() != 0) {
           Collections.sort(timeWindowSet);
 
           long recordMin = timeWindowSet.get(0);
           long recordMax = timeWindowSet.get(timeWindowSet.size() - 1);
-          if (recordMin < minDataTime)
-          {
+          if (recordMin < minDataTime) {
             minDataTime = recordMin;
           }
-          if (recordMax > maxDataTime)
-          {
+          if (recordMax > maxDataTime) {
             maxDataTime = recordMax;
           }
         }
@@ -325,19 +320,19 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       }
 
       // Write dimension / metric buffers
-      VariableSizeBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId, starTreeConfig,
-          records, dictionary);
+      VariableSizeBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId,
+          starTreeConfig, records, dictionary);
 
       // Create metadata object
-      long minDataTimeMillis = TimeUnit.MILLISECONDS.convert
-          (minDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getAggregationGranularity()));
+      long minDataTimeMillis = TimeUnit.MILLISECONDS.convert(minDataTime * config.getBucketSize(),
+          TimeUnit.valueOf(config.getAggregationGranularity()));
 
-      long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert
-          (maxDataTime * config.getBucketSize() , TimeUnit.valueOf(config.getAggregationGranularity()));
+      long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert(maxDataTime * config.getBucketSize(),
+          TimeUnit.valueOf(config.getAggregationGranularity()));
 
-      indexMetadata = new IndexMetadata
-          (minDataTime, maxDataTime, minDataTimeMillis, maxDataTimeMillis,
-              config.getAggregationGranularity(), config.getBucketSize(), IndexFormat.VARIABLE_SIZE);
+      indexMetadata = new IndexMetadata(minDataTime, maxDataTime, minDataTimeMillis,
+          maxDataTimeMillis, config.getAggregationGranularity(), config.getBucketSize(),
+          IndexFormat.VARIABLE_SIZE);
 
       LOGGER.info("END: processing {}", nodeId);
     }
@@ -359,8 +354,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         LOGGER.info(f.getAbsolutePath());
       }
       // Combine
-      VariableSizeBufferUtil.combineDataFiles(dfs.open(pathToTree), new File(localTmpDataDir), new File(
-          localOutputDataDir));
+      VariableSizeBufferUtil.combineDataFiles(dfs.open(pathToTree), new File(localTmpDataDir),
+          new File(localOutputDataDir));
       Collection<File> listFilesAfterCombine =
           FileUtils.listFiles(new File(localOutputDataDir), null, true);
       LOGGER.info("Files under " + localOutputDataDir + " after combining");
@@ -371,7 +366,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       FileSystem localFS = FileSystem.getLocal(context.getConfiguration());
       // Create tar gz of directory
       TarGzBuilder builder = new TarGzBuilder(outputTarGz, localFS, localFS);
-      //add tree
+      // add tree
       builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.TREE_FILE_NAME));
 
       // add metadata
@@ -380,18 +375,19 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.METADATA_FILE_NAME));
       }
 
-      Collection<File> dimFiles = FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);
+      Collection<File> dimFiles =
+          FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);
       for (File f : dimFiles) {
-        builder.addFileEntry(new Path(f.getAbsolutePath()), "dimensionStore/"+ f.getName());
+        builder.addFileEntry(new Path(f.getAbsolutePath()), "dimensionStore/" + f.getName());
       }
-      Collection<File> metricFiles = FileUtils.listFiles(new File(localOutputDataDir + "/metricStore"), null, true);
+      Collection<File> metricFiles =
+          FileUtils.listFiles(new File(localOutputDataDir + "/metricStore"), null, true);
       for (File f : metricFiles) {
-        builder.addFileEntry(new Path(f.getAbsolutePath()), "metricStore/"+ f.getName());
+        builder.addFileEntry(new Path(f.getAbsolutePath()), "metricStore/" + f.getName());
       }
-
 
       builder.finish();
-      //TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, outputTarGz);
+      // TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, outputTarGz);
       Path src, dst;
       // Copy to HDFS
       src = FileSystem.getLocal(new Configuration()).makeQualified(new Path(outputTarGz));

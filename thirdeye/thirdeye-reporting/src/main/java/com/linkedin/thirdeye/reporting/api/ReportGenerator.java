@@ -48,8 +48,7 @@ import com.linkedin.thirdeye.reporting.util.DimensionKeyUtils;
 import com.linkedin.thirdeye.reporting.util.SegmentDescriptorUtils;
 import com.linkedin.thirdeye.reporting.util.ThirdeyeUrlUtils;
 
-
-public class ReportGenerator implements Job{
+public class ReportGenerator implements Job {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportGenerator.class);
   private static DecimalFormat DOUBLE_FORMAT = new DecimalFormat("0.00");
@@ -69,7 +68,8 @@ public class ReportGenerator implements Job{
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
     try {
-      generateReports(context.getJobDetail().getDescription(), context.getJobDetail().getJobDataMap());
+      generateReports(context.getJobDetail().getDescription(),
+          context.getJobDetail().getJobDataMap());
     } catch (Exception e) {
       LOGGER.error("Generate Reports failed", e);
     }
@@ -82,7 +82,8 @@ public class ReportGenerator implements Job{
     thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
     thirdEyeClientConfig.setExpireAfterAccess(false);
 
-    thirdeyeClient = new DefaultThirdEyeClient(getThirdeyeHost(), getThirdeyePort(), thirdEyeClientConfig);
+    thirdeyeClient =
+        new DefaultThirdEyeClient(getThirdeyeHost(), getThirdeyePort(), thirdEyeClientConfig);
   }
 
   /**
@@ -127,30 +128,41 @@ public class ReportGenerator implements Job{
         TimeUnit baselineUnit = tableSpec.getBaselineUnit();
 
         DateTime endTime = new DateTime().minus(TimeUnit.MILLISECONDS.convert(lagSize, lagUnit));
-        DateTime currentEndHour = new DateTime(DateUtils.truncate(new Date(endTime.getMillis()), Calendar.HOUR));
-        DateTime baselineEndHour = currentEndHour.minus(TimeUnit.MILLISECONDS.convert(baselineSize, baselineUnit));
+        DateTime currentEndHour =
+            new DateTime(DateUtils.truncate(new Date(endTime.getMillis()), Calendar.HOUR));
+        DateTime baselineEndHour =
+            currentEndHour.minus(TimeUnit.MILLISECONDS.convert(baselineSize, baselineUnit));
         DateTime currentStartHour = currentEndHour.minus(TimeUnit.MILLISECONDS.convert(
-            scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(), scheduleSpec.getAggregationUnit()));
+            scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(),
+            scheduleSpec.getAggregationUnit()));
         DateTime baselineStartHour = baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(
-            scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(), scheduleSpec.getAggregationUnit()));
-        reportConfig.setStartTime(currentStartHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
-        reportConfig.setStartTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getStartTime()));
-        reportConfig.setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
-        reportConfig.setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()));
+            scheduleSpec.getReportWindow() * scheduleSpec.getAggregationSize(),
+            scheduleSpec.getAggregationUnit()));
+        reportConfig.setStartTime(
+            currentStartHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
+        reportConfig.setStartTimeString(
+            ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getStartTime()));
+        reportConfig
+            .setEndTime(currentEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
+        reportConfig
+            .setEndTimeString(ReportConstants.DATE_TIME_FORMATTER.print(reportConfig.getEndTime()));
 
         // check for missing data segments in thirdeye
-        missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection, reportConfig.getTimezone(),
-            reportConfig.getStartTime(), reportConfig.getEndTime(),
+        missingSegments = SegmentDescriptorUtils.checkSegments(serverUri, collection,
+            reportConfig.getTimezone(), reportConfig.getStartTime(), reportConfig.getEndTime(),
             baselineStartHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())),
             baselineEndHour.withZone(DateTimeZone.forID(reportConfig.getTimezone())));
-        if (missingSegments !=null && missingSegments.size() != 0) {
+        if (missingSegments != null && missingSegments.size() != 0) {
           ReportEmailSender.sendErrorReport(missingSegments, scheduleSpec, reportConfig);
         }
 
         // generate thirdeye url
-        URL thirdeyeUri = ThirdeyeUrlUtils.getThirdeyeUri(reportConfig.getDashboardUri(), collection, scheduleSpec, tableSpec,
-            baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)).getMillis(),
-            currentEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY, DEFAULT_AGGREGATION_UNIT)).getMillis());
+        URL thirdeyeUri = ThirdeyeUrlUtils.getThirdeyeUri(reportConfig.getDashboardUri(),
+            collection, scheduleSpec, tableSpec,
+            baselineEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY,
+                DEFAULT_AGGREGATION_UNIT)).getMillis(),
+            currentEndHour.minus(TimeUnit.MILLISECONDS.convert(DEFAULT_AGGREGATION_GRANULARITY,
+                DEFAULT_AGGREGATION_UNIT)).getMillis());
         LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
 
         Map<String, String> dimensionValues = DimensionKeyUtils.createDimensionValues(tableSpec);
@@ -159,36 +171,43 @@ public class ReportGenerator implements Job{
         List<TableReportRow> tableReportRows = new ArrayList<>();
 
         for (int i = 0; i < scheduleSpec.getReportWindow(); i++) {
-          currentEndHour = currentStartHour.plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
-          baselineEndHour = baselineStartHour.plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
+          currentEndHour = currentStartHour
+              .plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
+          baselineEndHour = baselineStartHour
+              .plus(TimeUnit.MILLISECONDS.convert(aggregationSize, aggregationUnit));
 
           // generate report for every metric
           for (String metric : tableSpec.getMetrics()) {
 
-            LOGGER.info("Metric : "+metric);
+            LOGGER.info("Metric : " + metric);
             // sql query
-            String currentSql = SqlUtils.getSql(metric, collection, currentStartHour, currentEndHour, dimensionValues);
-            String baselineSql = SqlUtils.getSql(metric, collection, baselineStartHour, baselineEndHour, dimensionValues);
+            String currentSql = SqlUtils.getSql(metric, collection, currentStartHour,
+                currentEndHour, dimensionValues);
+            String baselineSql = SqlUtils.getSql(metric, collection, baselineStartHour,
+                baselineEndHour, dimensionValues);
 
-            LOGGER.info("Current sql : "+currentSql);
-            LOGGER.info("Baseline sql : "+baselineSql);
+            LOGGER.info("Current sql : " + currentSql);
+            LOGGER.info("Baseline sql : " + baselineSql);
             ThirdEyeRawResponse currentQueryResult = thirdeyeClient.getRawResponse(currentSql);
             ThirdEyeRawResponse baselineQueryResult = thirdeyeClient.getRawResponse(baselineSql);
 
             LOGGER.info("Applying filters");
             // apply filters
-            Map<DimensionKey, Number> currentReportOutput = applyFilters(currentQueryResult, tableSpec, metric, currentStartHour, currentEndHour);
-            Map<DimensionKey, Number> baselineReportOutput = applyFilters(baselineQueryResult, tableSpec, metric, baselineStartHour, baselineEndHour);
+            Map<DimensionKey, Number> currentReportOutput = applyFilters(currentQueryResult,
+                tableSpec, metric, currentStartHour, currentEndHour);
+            Map<DimensionKey, Number> baselineReportOutput = applyFilters(baselineQueryResult,
+                tableSpec, metric, baselineStartHour, baselineEndHour);
 
             LOGGER.info("Creating report rows");
             // create report rows
             List<ReportRow> reportRows;
             if (tableSpec.getGroupBy() != null) {
-              reportRows = createRow(currentStartHour, currentEndHour, baselineStartHour, baselineEndHour,
-                  currentReportOutput, baselineReportOutput, metric, currentQueryResult.getDimensions().indexOf(tableSpec.getGroupBy()));
+              reportRows = createRow(currentStartHour, currentEndHour, baselineStartHour,
+                  baselineEndHour, currentReportOutput, baselineReportOutput, metric,
+                  currentQueryResult.getDimensions().indexOf(tableSpec.getGroupBy()));
             } else {
-              reportRows = createRow(currentStartHour, currentEndHour, baselineStartHour, baselineEndHour,
-                  currentReportOutput, baselineReportOutput, metric, -1);
+              reportRows = createRow(currentStartHour, currentEndHour, baselineStartHour,
+                  baselineEndHour, currentReportOutput, baselineReportOutput, metric, -1);
             }
 
             if (metricTableRows.get(metric) == null) {
@@ -210,12 +229,13 @@ public class ReportGenerator implements Job{
 
         // find anomalies
         if (scheduleSpec.isFindAnomalies() && reportConfig.getDbconfig() != null) {
-          if (anomalyReportTables == null ) {
+          if (anomalyReportTables == null) {
             anomalyReportTables = new HashMap<String, AnomalyReportTable>();
           }
           LOGGER.info("Finding anomalies...");
           AnomalyReportGeneratorApi anomalyReportGeneratorApi = new AnomalyReportGeneratorApi();
-          anomalyReportTables.putAll(anomalyReportGeneratorApi.getAnomalies(reportConfig, tableSpec, collection));
+          anomalyReportTables
+              .putAll(anomalyReportGeneratorApi.getAnomalies(reportConfig, tableSpec, collection));
         }
 
         Table table = new Table(tableReportRows, tableSpec, thirdeyeUri);
@@ -228,7 +248,8 @@ public class ReportGenerator implements Job{
 
       LOGGER.info("Creating data model");
       // send data to email sender
-      ReportEmailDataModel reportObjects = new ReportEmailDataModel(reportConfig, tables, anomalyReportTables, missingSegments, scheduleSpec, new ReportEmailCssSpec());
+      ReportEmailDataModel reportObjects = new ReportEmailDataModel(reportConfig, tables,
+          anomalyReportTables, missingSegments, scheduleSpec, new ReportEmailCssSpec());
       ReportEmailSender reportEmailSender = new ReportEmailSender(reportObjects, templatePath);
       reportEmailSender.emailReport();
 
@@ -237,8 +258,8 @@ public class ReportGenerator implements Job{
     }
   }
 
-
-  private List<TableReportRow> getGroupBy(Map<String, List<ReportRow>> metricTableRows, List<String> metrics) {
+  private List<TableReportRow> getGroupBy(Map<String, List<ReportRow>> metricTableRows,
+      List<String> metrics) {
     List<TableReportRow> tableReportRows = new ArrayList<TableReportRow>();
     for (String metric : metrics) {
       List<ReportRow> rows = metricTableRows.get(metric);
@@ -247,7 +268,9 @@ public class ReportGenerator implements Job{
         if (row.getDimension().equals("Total")) {
           startTime = "Total";
         } else {
-          startTime = ReportConstants.HOUR_FORMATTER.print(row.getCurrentStart().withZone(DateTimeZone.forID(reportConfig.getTimezone()))).toLowerCase();
+          startTime = ReportConstants.HOUR_FORMATTER
+              .print(row.getCurrentStart().withZone(DateTimeZone.forID(reportConfig.getTimezone())))
+              .toLowerCase();
         }
         TableReportRow tableReportRow = new TableReportRow();
         tableReportRow.setGroupByDimensions(new GroupBy(startTime, row.getDimension()));
@@ -286,8 +309,10 @@ public class ReportGenerator implements Job{
         ReportRow lastMetric1Row = metric1Rows.get(metric1Rows.size() - 1);
         ReportRow lastMetric2Row = metric2Rows.get(metric2Rows.size() - 1);
         ReportRow lastMetricRow = metricRows.get(metricRows.size() - 1);
-        lastMetricRow.setBaseline(lastMetric1Row.getBaseline().doubleValue() / lastMetric2Row.getBaseline().doubleValue());
-        lastMetricRow.setCurrent(lastMetric1Row.getCurrent().doubleValue() / lastMetric2Row.getCurrent().doubleValue());
+        lastMetricRow.setBaseline(lastMetric1Row.getBaseline().doubleValue()
+            / lastMetric2Row.getBaseline().doubleValue());
+        lastMetricRow.setCurrent(
+            lastMetric1Row.getCurrent().doubleValue() / lastMetric2Row.getCurrent().doubleValue());
       }
     }
   }
@@ -308,8 +333,10 @@ public class ReportGenerator implements Job{
 
       int metricPosition = 0;
       List<MetricSpec> metricSpecs = getMetricSpecs(metric);
-      MetricTimeSeries currentSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(metricSpecs));
-      MetricTimeSeries baselineSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(metricSpecs));
+      MetricTimeSeries currentSeries =
+          new MetricTimeSeries(MetricSchema.fromMetricSpecs(metricSpecs));
+      MetricTimeSeries baselineSeries =
+          new MetricTimeSeries(MetricSchema.fromMetricSpecs(metricSpecs));
 
       for (int i = 0; i < tableRows.size(); i++) {
         currentSeries.set(i, metric, tableRows.get(i).getCurrent());
@@ -318,7 +345,9 @@ public class ReportGenerator implements Job{
       summary.setCurrent(currentSeries.getMetricSums()[metricPosition]);
       summary.setBaseline(baselineSeries.getMetricSums()[metricPosition]);
 
-      summary.setRatio(DOUBLE_FORMAT.format((summary.getCurrent().doubleValue() - summary.getBaseline().doubleValue())/(summary.getBaseline().doubleValue()) * 100));
+      summary.setRatio(DOUBLE_FORMAT
+          .format((summary.getCurrent().doubleValue() - summary.getBaseline().doubleValue())
+              / (summary.getBaseline().doubleValue()) * 100));
       summary.setDimension("Total");
       tableRows.add(summary);
     }
@@ -327,8 +356,10 @@ public class ReportGenerator implements Job{
   /**
    * Create report rows
    */
-  private List<ReportRow> createRow(DateTime currentStartHour, DateTime currentEndHour, DateTime baselineStartHour, DateTime baselineEndHour,
-      Map<DimensionKey, Number> currentReportOutput, Map<DimensionKey, Number> baselineReportOutput, String metric, int dimensionPosition) {
+  private List<ReportRow> createRow(DateTime currentStartHour, DateTime currentEndHour,
+      DateTime baselineStartHour, DateTime baselineEndHour,
+      Map<DimensionKey, Number> currentReportOutput, Map<DimensionKey, Number> baselineReportOutput,
+      String metric, int dimensionPosition) {
 
     List<ReportRow> reportRows = new ArrayList<ReportRow>();
     for (Entry<DimensionKey, Number> entry : currentReportOutput.entrySet()) {
@@ -339,12 +370,14 @@ public class ReportGenerator implements Job{
         dimension = entry.getKey().getDimensionValues()[dimensionPosition];
       }
 
-      ReportRow row = new ReportRow(currentStartHour, currentEndHour,
-            baselineStartHour, baselineEndHour,
-            entry.getKey(), dimension, metric,
-            baselineReportOutput.get(entry.getKey()) == null ? 0 : baselineReportOutput.get(entry.getKey()),
-            entry.getValue());
-      row.setRatio(DOUBLE_FORMAT.format((row.getCurrent().doubleValue() - row.getBaseline().doubleValue()) / (row.getBaseline().doubleValue()) * 100));
+      ReportRow row =
+          new ReportRow(currentStartHour, currentEndHour, baselineStartHour, baselineEndHour,
+              entry.getKey(), dimension, metric, baselineReportOutput.get(entry.getKey()) == null
+                  ? 0 : baselineReportOutput.get(entry.getKey()),
+              entry.getValue());
+      row.setRatio(
+          DOUBLE_FORMAT.format((row.getCurrent().doubleValue() - row.getBaseline().doubleValue())
+              / (row.getBaseline().doubleValue()) * 100));
       reportRows.add(row);
     }
     return reportRows;
@@ -355,15 +388,19 @@ public class ReportGenerator implements Job{
    * @param queryResult : Thirdeye raw sql response
    * @return
    */
-  private Map<DimensionKey, Number> applyFilters(ThirdEyeRawResponse queryResult, TableSpec tableSpec, String metric, DateTime startTime, DateTime endTime) throws JsonParseException, JsonMappingException, IOException {
+  private Map<DimensionKey, Number> applyFilters(ThirdEyeRawResponse queryResult,
+      TableSpec tableSpec, String metric, DateTime startTime, DateTime endTime)
+          throws JsonParseException, JsonMappingException, IOException {
 
     Map<DimensionKey, Number> reportOutput = new HashMap<DimensionKey, Number>();
 
     // apply fixed dimensions filter
     String[] filteredDimension = new String[queryResult.getDimensions().size()];
     for (int i = 0; i < queryResult.getDimensions().size(); i++) {
-      if (tableSpec.getFixedDimensions() != null && tableSpec.getFixedDimensions().containsKey(queryResult.getDimensions().get(i))) {
-        filteredDimension[i] = tableSpec.getFixedDimensions().get(queryResult.getDimensions().get(i));
+      if (tableSpec.getFixedDimensions() != null
+          && tableSpec.getFixedDimensions().containsKey(queryResult.getDimensions().get(i))) {
+        filteredDimension[i] =
+            tableSpec.getFixedDimensions().get(queryResult.getDimensions().get(i));
       } else {
         filteredDimension[i] = "*";
       }
@@ -376,7 +413,7 @@ public class ReportGenerator implements Job{
     if (tableSpec.getGroupBy() != null) {
       dimensionPosition = queryResult.getDimensions().indexOf(tableSpec.getGroupBy());
       // include specific dimension values
-      if (tableSpec.getFilter()!= null && tableSpec.getFilter().getIncludeDimensions() != null) {
+      if (tableSpec.getFilter() != null && tableSpec.getFilter().getIncludeDimensions() != null) {
         for (String includeDimension : tableSpec.getFilter().getIncludeDimensions()) {
           filteredDimension[dimensionPosition] = includeDimension;
           includeDimensions.add(DimensionKeyUtils.createQueryKey(filteredDimension));

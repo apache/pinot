@@ -14,18 +14,13 @@ public class Table {
     this.thirdeyeURI = thirdeyeUri;
   }
 
-
-
   public List<TableReportRow> getTableReportRows() {
     return tableReportRows;
   }
 
-
-
   public void setTableReportRows(List<TableReportRow> tableReportRows) {
     this.tableReportRows = tableReportRows;
   }
-
 
   public TableSpec getTableSpec() {
     return tableSpec;
@@ -35,17 +30,12 @@ public class Table {
     this.tableSpec = tableSpec;
   }
 
-
-
   public URL getThirdeyeURI() {
     return thirdeyeURI;
   }
 
-
-
   public void setThirdeyeURI(URL thirdeyeURI) {
     this.thirdeyeURI = thirdeyeURI;
   }
-
 
 }

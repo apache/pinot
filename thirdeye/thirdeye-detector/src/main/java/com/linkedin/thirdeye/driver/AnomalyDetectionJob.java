@@ -56,7 +56,8 @@ public class AnomalyDetectionJob implements Job {
     anomalyFunction = (AnomalyFunction) context.getJobDetail().getJobDataMap().get(FUNCTION);
     thirdEyeClient = (ThirdEyeClient) context.getJobDetail().getJobDataMap().get(CLIENT);
     resultDAO = (AnomalyResultDAO) context.getJobDetail().getJobDataMap().get(RESULT_DAO);
-    relationDAO = (AnomalyFunctionRelationDAO) context.getJobDetail().getJobDataMap().get(RELATION_DAO);
+    relationDAO =
+        (AnomalyFunctionRelationDAO) context.getJobDetail().getJobDataMap().get(RELATION_DAO);
     sessionFactory = (SessionFactory) context.getJobDetail().getJobDataMap().get(SESSION_FACTORY);
     metricRegistry = (MetricRegistry) context.getJobDetail().getJobDataMap().get(METRIC_REGISTRY);
     String windowEndProp = context.getJobDetail().getJobDataMap().getString(WINDOW_END);
@@ -73,8 +74,7 @@ public class AnomalyDetectionJob implements Job {
     if (windowEndProp == null) {
       long delayMillis = 0;
       if (anomalyFunction.getSpec().getWindowDelay() != null) {
-        delayMillis = TimeUnit.MILLISECONDS.convert(
-            anomalyFunction.getSpec().getWindowDelay(),
+        delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunction.getSpec().getWindowDelay(),
             anomalyFunction.getSpec().getWindowUnit());
       }
       windowEnd = DateTime.now().minus(delayMillis);
@@ -84,8 +84,7 @@ public class AnomalyDetectionJob implements Job {
 
     // Compute window start
     if (windowStartProp == null) {
-      long windowMillis = TimeUnit.MILLISECONDS.convert(
-          anomalyFunction.getSpec().getWindowSize(),
+      long windowMillis = TimeUnit.MILLISECONDS.convert(anomalyFunction.getSpec().getWindowSize(),
           anomalyFunction.getSpec().getWindowUnit());
       windowStart = windowEnd.minus(windowMillis);
     } else {
@@ -93,10 +92,8 @@ public class AnomalyDetectionJob implements Job {
     }
 
     // Compute metric function
-    metricFunction = String.format("AGGREGATE_%d_%s(%s)",
-        anomalyFunction.getSpec().getBucketSize(),
-        anomalyFunction.getSpec().getBucketUnit(),
-        anomalyFunction.getSpec().getMetric());
+    metricFunction = String.format("AGGREGATE_%d_%s(%s)", anomalyFunction.getSpec().getBucketSize(),
+        anomalyFunction.getSpec().getBucketUnit(), anomalyFunction.getSpec().getMetric());
 
     // Collection
     collection = anomalyFunction.getSpec().getCollection();
@@ -106,11 +103,9 @@ public class AnomalyDetectionJob implements Job {
 
     // Seed request with top-level...
     Queue<ThirdEyeRequest> queue = new LinkedList<>();
-    ThirdEyeRequest req = new ThirdEyeRequest()
-        .setCollection(anomalyFunction.getSpec().getCollection())
-        .setMetricFunction(metricFunction)
-        .setStartTime(windowStart)
-        .setEndTime(windowEnd);
+    ThirdEyeRequest req =
+        new ThirdEyeRequest().setCollection(anomalyFunction.getSpec().getCollection())
+            .setMetricFunction(metricFunction).setStartTime(windowStart).setEndTime(windowEnd);
     queue.add(req);
 
     // And all the dimensions which we should explore
@@ -154,12 +149,8 @@ public class AnomalyDetectionJob implements Job {
       try {
         // Run algorithm
         long startTime = System.currentTimeMillis();
-        List<AnomalyResult> results = anomalyFunction.analyze(
-            entry.getKey(),
-            entry.getValue(),
-            windowStart,
-            windowEnd,
-            knownAnomalies);
+        List<AnomalyResult> results = anomalyFunction.analyze(entry.getKey(), entry.getValue(),
+            windowStart, windowEnd, knownAnomalies);
         long endTime = System.currentTimeMillis();
         histogram.update(endTime - startTime);
 
@@ -170,7 +161,8 @@ public class AnomalyDetectionJob implements Job {
         results.removeAll(knownAnomalies);
 
         if (!results.isEmpty()) {
-          LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(), windowStart, windowEnd);
+          LOG.info("{} has {} anomalies in window {} to {}", entry.getKey(), results.size(),
+              windowStart, windowEnd);
         }
       } catch (Exception e) {
         LOG.error("Could not compute for {}", entry.getKey(), e);
@@ -189,14 +181,15 @@ public class AnomalyDetectionJob implements Job {
       Transaction transaction = session.beginTransaction();
       try {
         // The ones for this function
-        results.addAll(resultDAO.findAllByCollectionTimeAndFunction(
-            collection, windowStart, windowEnd, anomalyFunction.getSpec().getId()));
+        results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
+            windowEnd, anomalyFunction.getSpec().getId()));
 
         // The ones for any related functions
-        List<AnomalyFunctionRelation> relations = relationDAO.findByParent(anomalyFunction.getSpec().getId());
+        List<AnomalyFunctionRelation> relations =
+            relationDAO.findByParent(anomalyFunction.getSpec().getId());
         for (AnomalyFunctionRelation relation : relations) {
-          results.addAll(resultDAO.findAllByCollectionTimeAndFunction(
-              collection, windowStart, windowEnd, relation.getChildId()));
+          results.addAll(resultDAO.findAllByCollectionTimeAndFunction(collection, windowStart,
+              windowEnd, relation.getChildId()));
         }
 
         transaction.commit();

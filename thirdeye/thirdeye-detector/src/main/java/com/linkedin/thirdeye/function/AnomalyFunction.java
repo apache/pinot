@@ -15,23 +15,20 @@ public interface AnomalyFunction {
 
   /**
    * Analyzes a metric time series and returns any anomalous points / intervals.
-   *
    * @param dimensionKey
-   *  The dimension combination corresponding to timeSeries.
+   *          The dimension combination corresponding to timeSeries.
    * @param timeSeries
-   *  The metric time series data.
+   *          The metric time series data.
    * @param windowStart
-   *  The beginning of the range corresponding to timeSeries.
+   *          The beginning of the range corresponding to timeSeries.
    * @param windowEnd
-   *  The end of the range corresponding to timeSeries.
+   *          The end of the range corresponding to timeSeries.
    * @param knownAnomalies
-   *  Any known anomalies in the time range.
+   *          Any known anomalies in the time range.
    * @return
-   *  A list of anomalies that were not previously known.
+   *         A list of anomalies that were not previously known.
    */
-  List<AnomalyResult> analyze(DimensionKey dimensionKey,
-                              MetricTimeSeries timeSeries,
-                              DateTime windowStart,
-                              DateTime windowEnd,
-                              List<AnomalyResult> knownAnomalies) throws Exception;
+  List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
+          throws Exception;
 }

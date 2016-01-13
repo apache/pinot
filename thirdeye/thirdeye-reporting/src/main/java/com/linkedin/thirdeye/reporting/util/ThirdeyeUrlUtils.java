@@ -16,17 +16,20 @@ public class ThirdeyeUrlUtils {
   public final static String DEFAULT_AGGREGATION_GRANULARITY = "1";
   public final static String DEFAULT_AGGREGATION_UNIT = "HOURS";
 
-
-  public static URL getThirdeyeUri(String dashboardUri, String collection, ScheduleSpec scheduleSpec, TableSpec tableSpec, long startTime, long endTime) throws MalformedURLException {
+  public static URL getThirdeyeUri(String dashboardUri, String collection,
+      ScheduleSpec scheduleSpec, TableSpec tableSpec, long startTime, long endTime)
+          throws MalformedURLException {
 
     List<String> thirdeyeUri = new ArrayList<String>();
     thirdeyeUri.add(dashboardUri);
     thirdeyeUri.add("dashboard");
     thirdeyeUri.add(collection);
-    String metricFunction = "AGGREGATE_"+DEFAULT_AGGREGATION_GRANULARITY+"_"+DEFAULT_AGGREGATION_UNIT;
-    thirdeyeUri.add(metricFunction+"("+Joiner.on(',').join(tableSpec.getMetrics())+")");
+    String metricFunction =
+        "AGGREGATE_" + DEFAULT_AGGREGATION_GRANULARITY + "_" + DEFAULT_AGGREGATION_UNIT;
+    thirdeyeUri.add(metricFunction + "(" + Joiner.on(',').join(tableSpec.getMetrics()) + ")");
 
-    if (scheduleSpec.getAggregationSize() == 1 && scheduleSpec.getAggregationUnit() == TimeUnit.HOURS) {
+    if (scheduleSpec.getAggregationSize() == 1
+        && scheduleSpec.getAggregationUnit() == TimeUnit.HOURS) {
       thirdeyeUri.add("INTRA_DAY");
     } else {
       thirdeyeUri.add("TIME_SERIES_FULL");
@@ -43,7 +46,7 @@ public class ThirdeyeUrlUtils {
     if (tableSpec.getFixedDimensions() != null) {
       List<String> fixedDimensions = new ArrayList<String>();
       for (Entry<String, String> entry : tableSpec.getFixedDimensions().entrySet()) {
-        fixedDimensions.add(entry.getKey()+"="+entry.getValue());
+        fixedDimensions.add(entry.getKey() + "=" + entry.getValue());
       }
       uri = uri + "?" + Joiner.on('&').join(fixedDimensions);
     }

@@ -54,8 +54,8 @@ public class RollupPhaseThreeJob extends Configured {
     this.props = props;
   }
 
-  public static class RollupPhaseThreeMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseThreeMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseThreeConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -91,8 +91,8 @@ public class RollupPhaseThreeJob extends Configured {
 
     @Override
     public void map(BytesWritable rawDimensionMD5KeyWritable,
-        BytesWritable rollupReduceOutputWritable, Context context) throws IOException,
-        InterruptedException {
+        BytesWritable rollupReduceOutputWritable, Context context)
+            throws IOException, InterruptedException {
       // pass through, in the reduce we gather all possible roll up for a given
       // rawDimensionKey
       context.write(rawDimensionMD5KeyWritable, rollupReduceOutputWritable);
@@ -105,8 +105,8 @@ public class RollupPhaseThreeJob extends Configured {
 
   }
 
-  public static class RollupPhaseThreeReducer extends
-      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseThreeReducer
+      extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseThreeConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -140,7 +140,7 @@ public class RollupPhaseThreeJob extends Configured {
     @Override
     public void reduce(BytesWritable rawDimensionMD5KeyWritable,
         Iterable<BytesWritable> rollupReduceOutputWritableIterable, Context context)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
       DimensionKey rawDimensionKey = null;
       MetricTimeSeries rawMetricTimeSeries = null;
       Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap =
@@ -160,11 +160,10 @@ public class RollupPhaseThreeJob extends Configured {
       if (selectedRollup == null)
         throw new IllegalStateException(
             "rollup function could not find any dimension combination that passes threshold - "
-            + "Try a lower threshold, or a different threshold metric: " +
-                "rawDimensionKey=" + rawDimensionKey +
-                ";possibleRollupTimeSeriesMap=" + possibleRollupTimeSeriesMap);
-      context.write(new BytesWritable(selectedRollup.toBytes()), new BytesWritable(
-          rawMetricTimeSeries.toBytes()));
+                + "Try a lower threshold, or a different threshold metric: " + "rawDimensionKey="
+                + rawDimensionKey + ";possibleRollupTimeSeriesMap=" + possibleRollupTimeSeriesMap);
+      context.write(new BytesWritable(selectedRollup.toBytes()),
+          new BytesWritable(rawMetricTimeSeries.toBytes()));
     }
   }
 
@@ -206,8 +205,8 @@ public class RollupPhaseThreeJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat
-        .setOutputPath(job, new Path(getAndCheck(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 

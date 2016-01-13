@@ -8,13 +8,13 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.api.DimensionKey;
 
 public class DimensionKeyTest {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(DimensionKeyTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DimensionKeyTest.class);
 
   @Test
   public void serDeserTest() throws Exception {
-    String[] dimensionValues = new String[] { "us", "chrome", "gmail.com",
-        "android" };
+    String[] dimensionValues = new String[] {
+        "us", "chrome", "gmail.com", "android"
+    };
     DimensionKey key = new DimensionKey(dimensionValues);
     System.out.println("tostring--" + key.toString());
     byte[] serializedBytes;

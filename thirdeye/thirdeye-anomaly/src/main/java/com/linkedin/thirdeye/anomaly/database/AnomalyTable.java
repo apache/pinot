@@ -42,54 +42,42 @@ public class AnomalyTable {
   /**
    * @param dbConfig
    * @param collection
-   *  Collection conatining anomalies
+   *          Collection conatining anomalies
    * @param functionName
-   *  SQL pattern for function name to match
+   *          SQL pattern for function name to match
    * @param functionDescription
-   *  SQL pattern for description to match
+   *          SQL pattern for description to match
    * @param metrics
-   *  The list of metrics used
+   *          The list of metrics used
    * @param topLevelOnly
-   *  Only anomalies with all * dimensions
+   *          Only anomalies with all * dimensions
    * @param orderBy
-   *  Components of orderBy clause
+   *          Components of orderBy clause
    * @param startTimeWindow
    * @param endTimeWindow
    * @return
-   *  List of rows based on query produced
+   *         List of rows based on query produced
    * @throws SQLException
    */
-  public static List<AnomalyTableRow> selectRows(
-      AnomalyDatabaseConfig dbConfig,
-      String collection,
-      String functionName,
-      String functionDescription,
-      Set<String> metrics,
-      boolean topLevelOnly,
-      List<String> orderBy,
-      long startTimeWindow,
-      long endTimeWindow) throws SQLException {
-    return selectRows(dbConfig, collection, null, functionName, functionDescription, null, metrics, topLevelOnly,
-        orderBy, new TimeRange(startTimeWindow, endTimeWindow));
+  public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, String collection,
+      String functionName, String functionDescription, Set<String> metrics, boolean topLevelOnly,
+      List<String> orderBy, long startTimeWindow, long endTimeWindow) throws SQLException {
+    return selectRows(dbConfig, collection, null, functionName, functionDescription, null, metrics,
+        topLevelOnly, orderBy, new TimeRange(startTimeWindow, endTimeWindow));
   }
 
-  public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, int functionId, TimeRange timeRange)
-      throws SQLException {
-    List<String> orderBy = Arrays.asList(new String[]{"time_window"});
+  public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, int functionId,
+      TimeRange timeRange) throws SQLException {
+    List<String> orderBy = Arrays.asList(new String[] {
+        "time_window"
+    });
     return selectRows(dbConfig, null, functionId, null, null, null, null, false, orderBy, null);
   }
 
-  public static List<AnomalyTableRow> selectRows(
-      AnomalyDatabaseConfig dbConfig,
-      String collection,
-      Integer functionId,
-      String functionName,
-      String functionDescription,
-      Map<String, String> dimensions,
-      Set<String> metrics,
-      boolean topLevelOnly,
-      List<String> orderBy,
-      TimeRange timeRange) throws SQLException {
+  public static List<AnomalyTableRow> selectRows(AnomalyDatabaseConfig dbConfig, String collection,
+      Integer functionId, String functionName, String functionDescription,
+      Map<String, String> dimensions, Set<String> metrics, boolean topLevelOnly,
+      List<String> orderBy, TimeRange timeRange) throws SQLException {
 
     Connection conn = null;
     Statement stmt = null;
@@ -174,7 +162,6 @@ public class AnomalyTable {
 
   /**
    * Create anomaly table if it does not exist
-   *
    * @param dbConfig
    * @throws IOException
    * @throws SQLException
@@ -189,19 +176,20 @@ public class AnomalyTable {
 
   /**
    * Adds the row to the anomaly table referenced in dbConfig
-   *
    * @param dbConfig
    * @param row
    * @throws IOException
    */
-  public static void insertRow(AnomalyDatabaseConfig dbConfig, AnomalyTableRow row) throws IOException {
+  public static void insertRow(AnomalyDatabaseConfig dbConfig, AnomalyTableRow row)
+      throws IOException {
     Connection conn = null;
     PreparedStatement preparedStmt = null;
 
     try {
       conn = dbConfig.getConnection();
 
-      preparedStmt = conn.prepareStatement(buildAnomlayTableInsertStmt(dbConfig.getAnomalyTableName()));
+      preparedStmt =
+          conn.prepareStatement(buildAnomlayTableInsertStmt(dbConfig.getAnomalyTableName()));
       preparedStmt.setString(1, row.getFunctionTable());
       preparedStmt.setInt(2, row.getFunctionId());
       preparedStmt.setString(3, row.getFunctionDescription());
@@ -250,14 +238,8 @@ public class AnomalyTable {
    * @return
    */
   private static String buildAnomalyTableSelectStatement(AnomalyDatabaseConfig dbconfig,
-      Integer functionId,
-      String functionName,
-      String functionDescription,
-      String collection,
-      boolean topLevelOnly,
-      List<String> orderBy,
-      TimeRange timeRange)
-  {
+      Integer functionId, String functionName, String functionDescription, String collection,
+      boolean topLevelOnly, List<String> orderBy, TimeRange timeRange) {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT * FROM ").append(dbconfig.getAnomalyTableName()).append(" WHERE ");
 
@@ -288,7 +270,8 @@ public class AnomalyTable {
     }
 
     if (timeRange != null) {
-      whereClause.add("time_window BETWEEN '" + timeRange.getStart() + "' AND '" + timeRange.getEnd() + "'");
+      whereClause.add(
+          "time_window BETWEEN '" + timeRange.getStart() + "' AND '" + timeRange.getEnd() + "'");
     }
 
     sb.append(AND.join(whereClause));
@@ -302,12 +285,14 @@ public class AnomalyTable {
   }
 
   private static String buildAnomalyTableCreateStmt(String anomalyTableName) throws IOException {
-    String formatString = ResourceUtils.getResourceAsString("database/anomaly/create-anomaly-table-template.sql");
+    String formatString =
+        ResourceUtils.getResourceAsString("database/anomaly/create-anomaly-table-template.sql");
     return String.format(formatString, anomalyTableName);
   }
 
   private static String buildAnomlayTableInsertStmt(String tableName) throws IOException {
-    String formatString = ResourceUtils.getResourceAsString("database/anomaly/insert-into-anomaly-table-template.sql");
+    String formatString = ResourceUtils
+        .getResourceAsString("database/anomaly/insert-into-anomaly-table-template.sql");
     return String.format(formatString, tableName);
   }
 
@@ -320,7 +305,8 @@ public class AnomalyTable {
     }
   }
 
-  private static String serializeDimensions(Map<String, String> dimensionsMap) throws JsonProcessingException {
+  private static String serializeDimensions(Map<String, String> dimensionsMap)
+      throws JsonProcessingException {
     return OBJECT_MAPPER.writeValueAsString(dimensionsMap);
   }
 

@@ -23,6 +23,7 @@ import java.util.concurrent.Executors;
 public class KafkaConsumerManager implements Managed {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerManager.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
+
   static {
     OBJECT_MAPPER.registerModule(new JodaModule());
   }
@@ -33,10 +34,8 @@ public class KafkaConsumerManager implements Managed {
   private final MetricRegistry metricRegistry;
   private final Map<String, ThirdEyeKafkaConsumer> consumers;
 
-  public KafkaConsumerManager(File rootDir,
-                              StarTreeManager starTreeManager,
-                              DataUpdateManager dataUpdateManager,
-                              MetricRegistry metricRegistry) {
+  public KafkaConsumerManager(File rootDir, StarTreeManager starTreeManager,
+      DataUpdateManager dataUpdateManager, MetricRegistry metricRegistry) {
     this.rootDir = rootDir;
     this.starTreeManager = starTreeManager;
     this.dataUpdateManager = dataUpdateManager;
@@ -82,13 +81,10 @@ public class KafkaConsumerManager implements Managed {
     File collectionDir = new File(rootDir, collection);
     File kafkaFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
     ThirdEyeKafkaConfig kafkaConfig = OBJECT_MAPPER.readValue(kafkaFile, ThirdEyeKafkaConfig.class);
-    ThirdEyeKafkaConsumer consumer = new ThirdEyeKafkaConsumer(
-        starTreeManager.getMutableStarTree(collection),
-        kafkaConfig,
-        Executors.newSingleThreadExecutor(),
-        Executors.newSingleThreadScheduledExecutor(),
-        dataUpdateManager,
-        metricRegistry);
+    ThirdEyeKafkaConsumer consumer =
+        new ThirdEyeKafkaConsumer(starTreeManager.getMutableStarTree(collection), kafkaConfig,
+            Executors.newSingleThreadExecutor(), Executors.newSingleThreadScheduledExecutor(),
+            dataUpdateManager, metricRegistry);
     consumers.put(collection, consumer);
     consumer.start();
     LOG.info("Started Kafka consumer for {}", collection);

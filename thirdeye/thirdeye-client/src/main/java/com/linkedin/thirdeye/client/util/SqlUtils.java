@@ -18,27 +18,17 @@ public class SqlUtils {
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
 
-  public static String getSql(String metricFunction,
-                              String collection,
-                              DateTime start,
-                              DateTime end,
-                              Map<String, String> dimensionValues) {
+  public static String getSql(String metricFunction, String collection, DateTime start,
+      DateTime end, Map<String, String> dimensionValues) {
     return getSql(metricFunction, collection, start, end, toMultimap(dimensionValues));
   }
 
-  public static String getSql(String metricFunction,
-                              String collection,
-                              DateTime start,
-                              DateTime end,
-                              Multimap<String, String> dimensionValues) {
+  public static String getSql(String metricFunction, String collection, DateTime start,
+      DateTime end, Multimap<String, String> dimensionValues) {
     StringBuilder sb = new StringBuilder();
 
-    sb.append("SELECT ")
-        .append(metricFunction)
-        .append(" FROM ")
-        .append(collection)
-        .append(" WHERE ")
-        .append(getBetweenClause(start, end));
+    sb.append("SELECT ").append(metricFunction).append(" FROM ").append(collection)
+        .append(" WHERE ").append(getBetweenClause(start, end));
 
     String dimensionWhereClause = getDimensionWhereClause(dimensionValues);
     if (dimensionWhereClause != null) {

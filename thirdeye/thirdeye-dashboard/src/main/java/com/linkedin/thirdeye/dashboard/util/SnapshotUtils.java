@@ -17,38 +17,35 @@ public class SnapshotUtils {
 
   /**
    * Calculates the compression loss.
-   *
    * <p>
-   *   We expect currentValue to be expectedGrowthRatio * baselineValue.
-   *   The difference between these two quantities is the compression loss.
+   * We expect currentValue to be expectedGrowthRatio * baselineValue.
+   * The difference between these two quantities is the compression loss.
    * </p>
-   *
    * @param expectedGrowthRatio
-   *  The ratio by which we expect baselineValue to grow
+   *          The ratio by which we expect baselineValue to grow
    * @param baselineValue
-   *  Starting value
+   *          Starting value
    * @param currentValue
-   *  Ending value
+   *          Ending value
    * @param standardDeviation
-   *  The standard deviation of the distribution of baseline values
+   *          The standard deviation of the distribution of baseline values
    */
-  private static double compressionLoss(double expectedGrowthRatio,
-                                        double baselineValue,
-                                        double currentValue,
-                                        double standardDeviation) {
-    NormalDistribution dist = new NormalDistribution(baselineValue * expectedGrowthRatio, standardDeviation);
+  private static double compressionLoss(double expectedGrowthRatio, double baselineValue,
+      double currentValue, double standardDeviation) {
+    NormalDistribution dist =
+        new NormalDistribution(baselineValue * expectedGrowthRatio, standardDeviation);
     return -Math.log(dist.density(currentValue));
   }
 
   /**
    * Returns descriptive statistics for each metric for a set of dimension combinations.
-   *
    * @param numMetrics
-   *  The number of metric values
+   *          The number of metric values
    * @param metricsByDimension
-   *  Metrics grouped by dimension combination
+   *          Metrics grouped by dimension combination
    */
-  private static DescriptiveStatistics[] getStats(int numMetrics, Map<String, Number[]> metricsByDimension) {
+  private static DescriptiveStatistics[] getStats(int numMetrics,
+      Map<String, Number[]> metricsByDimension) {
     if (metricsByDimension.isEmpty()) {
       throw new IllegalArgumentException("Cannot calculate statistics for no metrics");
     }
@@ -72,17 +69,15 @@ public class SnapshotUtils {
 
   /**
    * Compute the initial growth ratio at the highest aggregation granularity.
-   *
    * @param numMetrics
-   *  The number of metric values
+   *          The number of metric values
    * @param baseline
-   *  Baseline data grouped by dimension
+   *          Baseline data grouped by dimension
    * @param current
-   *  Current data grouped by dimension
+   *          Current data grouped by dimension
    */
-  private static double[] getInitialRatios(int numMetrics,
-                                           Map<String, Number[]> baseline,
-                                           Map<String, Number[]> current) {
+  private static double[] getInitialRatios(int numMetrics, Map<String, Number[]> baseline,
+      Map<String, Number[]> current) {
     double[] ratios = new double[numMetrics];
     for (int i = 0; i < numMetrics; i++) {
       double valueT1 = 0.0;
@@ -106,23 +101,19 @@ public class SnapshotUtils {
 
   /**
    * Returns the records that were biggest movers.
-   *
    * @param metricIdx
-   *  Only compute snapshot on this particular metric
+   *          Only compute snapshot on this particular metric
    * @param maxRecords
-   *  Return this many records
+   *          Return this many records
    * @param growthRatio
-   *  The expected growth ratio from baseline to current
+   *          The expected growth ratio from baseline to current
    * @param baseline
-   *  Baseline data
+   *          Baseline data
    * @param current
-   *  Current data
+   *          Current data
    */
-  private static SnapshotResult computeOneSnapshot(int metricIdx,
-                                                   int maxRecords,
-                                                   double growthRatio,
-                                                   Map<String, Number[]> baseline,
-                                                   Map<String, Number[]> current) {
+  private static SnapshotResult computeOneSnapshot(int metricIdx, int maxRecords,
+      double growthRatio, Map<String, Number[]> baseline, Map<String, Number[]> current) {
     int rowNum = baseline.size();
     int colNum = maxRecords + 1;
     RealMatrix table = new Array2DRowRealMatrix(rowNum, colNum);
@@ -193,9 +184,11 @@ public class SnapshotUtils {
       double currentValue = currentData[metricIdx].doubleValue();
 
       for (int j = 1; j < colNum; j++) {
-        // D(T_(i+1), n, r) = min (D(T_i, n-1, r) + D(t_(i+1), 1, r), D(T_i, n, r) +D(t_(i+1), 0, r))
+        // D(T_(i+1), n, r) = min (D(T_i, n-1, r) + D(t_(i+1), 1, r), D(T_i, n, r) +D(t_(i+1), 0,
+        // r))
         double t1 = table.getEntry(i - 1, j - 1);
-        double t2 = table.getEntry(i - 1, j) + compressionLoss(growthRatio, baselineValue, currentValue, stDev);
+        double t2 = table.getEntry(i - 1, j)
+            + compressionLoss(growthRatio, baselineValue, currentValue, stDev);
         table.setEntry(i, j, Math.min(t1, t2));
 
         // Record combinations
@@ -217,10 +210,8 @@ public class SnapshotUtils {
   /**
    * Computes snapshot for each metric.
    */
-  private static String[][] computeSnapshot(int maxRecords,
-                                            int numMetrics,
-                                            Map<String, Number[]> baseline,
-                                            Map<String, Number[]> current) {
+  private static String[][] computeSnapshot(int maxRecords, int numMetrics,
+      Map<String, Number[]> baseline, Map<String, Number[]> current) {
     double[] ratios = getInitialRatios(numMetrics, baseline, current);
     String[][] records = new String[numMetrics][];
 
@@ -228,14 +219,15 @@ public class SnapshotUtils {
       double ratio = ratios[i];
       double lo = ratio / 2;
       double hi = 2 * ratio;
-      int steps = 50;  // TODO Configurable? (was 100)
+      int steps = 50; // TODO Configurable? (was 100)
       double stepSize = (hi - lo) / steps;
       double minCost = computeOneSnapshot(i, maxRecords, lo, baseline, current).getCost();
       double minRatio = lo;
 
       for (int j = 1; j < steps; j++) {
         double currentRatio = lo + i * stepSize;
-        double currentCost = computeOneSnapshot(i, maxRecords, currentRatio, baseline, current).getCost();
+        double currentCost =
+            computeOneSnapshot(i, maxRecords, currentRatio, baseline, current).getCost();
         if (currentCost < minCost) {
           minCost = currentCost;
           minRatio = currentRatio;

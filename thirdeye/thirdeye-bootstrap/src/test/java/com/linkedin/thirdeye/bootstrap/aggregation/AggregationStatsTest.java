@@ -15,11 +15,10 @@ import com.linkedin.thirdeye.api.MetricType;
 
 public class AggregationStatsTest {
   @Test
-  public void simpleTest() throws JsonGenerationException,
-      JsonMappingException, IOException {
+  public void simpleTest() throws JsonGenerationException, JsonMappingException, IOException {
     List<String> metricNames = Lists.newArrayList("m1", "m2", "m3", "m4", "m5");
-    List<MetricType> metricTypes = Lists.newArrayList(MetricType.INT,
-        MetricType.INT, MetricType.INT, MetricType.INT, MetricType.INT);
+    List<MetricType> metricTypes = Lists.newArrayList(MetricType.INT, MetricType.INT,
+        MetricType.INT, MetricType.INT, MetricType.INT);
     MetricSchema schema = new MetricSchema(metricNames, metricTypes);
     AggregationStats holder = new AggregationStats(schema);
     int count = 0;

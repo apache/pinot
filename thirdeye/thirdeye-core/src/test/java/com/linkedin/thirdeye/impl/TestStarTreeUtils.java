@@ -20,34 +20,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TestStarTreeUtils
-{
+public class TestStarTreeUtils {
   private StarTreeConfig config;
   private MetricSchema metricSchema;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
+  public void beforeClass() throws Exception {
     config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("sample-config.yml"));
     metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
   }
 
   @Test
-  public void testFilterQueries() throws Exception
-  {
-    StarTreeConfig config = new StarTreeConfig.Builder()
-            .setCollection("dummy")
-            .setSplit(new SplitSpec(4, null))
+  public void testFilterQueries() throws Exception {
+    StarTreeConfig config =
+        new StarTreeConfig.Builder().setCollection("dummy").setSplit(new SplitSpec(4, null))
             .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
-            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
-            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
-            .build();
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"),
+                new DimensionSpec("C")))
+        .setRecordStoreFactoryClass(
+            StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName()).build();
 
     StarTree starTree = new StarTreeImpl(config);
     starTree.open();
 
-    for (int i = 0; i < 100; i++)
-    {
+    for (int i = 0; i < 100; i++) {
       MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
       ts.set(i, "M", 1);
 
@@ -58,8 +54,9 @@ public class TestStarTreeUtils
     }
 
     StarTreeQuery baseQuery = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey(StarTreeConstants.ALL, StarTreeConstants.STAR, StarTreeConstants.STAR))
-            .build(config);
+        .setDimensionKey(
+            getDimensionKey(StarTreeConstants.ALL, StarTreeConstants.STAR, StarTreeConstants.STAR))
+        .build(config);
 
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
     Assert.assertEquals(queries.size(), 3); // A0 and A1, and "?"
@@ -69,13 +66,16 @@ public class TestStarTreeUtils
 
     List<StarTreeQuery> filteredQueries = StarTreeUtils.filterQueries(config, queries, filter);
     Assert.assertEquals(filteredQueries.size(), 1);
-    Assert.assertEquals(filteredQueries.get(0).getDimensionKey().getDimensionValue(config.getDimensions(), "A"), "A0");
+    Assert.assertEquals(
+        filteredQueries.get(0).getDimensionKey().getDimensionValue(config.getDimensions(), "A"),
+        "A0");
 
     starTree.close();
   }
 
-  private DimensionKey getDimensionKey(String a, String b, String c)
-  {
-    return new DimensionKey(new String[] {a, b, c});
+  private DimensionKey getDimensionKey(String a, String b, String c) {
+    return new DimensionKey(new String[] {
+        a, b, c
+    });
   }
 }

@@ -33,7 +33,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.linkedin.thirdeye.reporting.api.ReportConfig;
 import com.linkedin.thirdeye.reporting.api.ReportConstants;
 
-
 @Path("/reports")
 @Produces(MediaType.APPLICATION_JSON)
 public class ReportsResource implements Managed {
@@ -76,7 +75,8 @@ public class ReportsResource implements Managed {
 
   @GET
   @Path("/{report}")
-  public ReportConfig getReportConfig(@PathParam("report") String reportFileName) throws FileNotFoundException, IOException {
+  public ReportConfig getReportConfig(@PathParam("report") String reportFileName)
+      throws FileNotFoundException, IOException {
     File reportConfigFile = new File(reportConfigPath, reportFileName);
     if (!reportConfigFile.exists()) {
       throw new NotFoundException("Report config " + reportFileName + " does not exist");
@@ -98,23 +98,20 @@ public class ReportsResource implements Managed {
   @POST
   @Path("/{report}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response postConfig(@PathParam("report") String reportFileName, byte[] configBytes) throws IOException
-  {
+  public Response postConfig(@PathParam("report") String reportFileName, byte[] configBytes)
+      throws IOException {
     File reportConfigFolder = new File(reportConfigPath);
-    if (!reportConfigFolder.exists())
-    {
+    if (!reportConfigFolder.exists()) {
       FileUtils.forceMkdir(reportConfigFolder);
     }
 
     File reportConfigFile = new File(reportConfigFolder, reportFileName);
 
-    if (!reportConfigFile.exists())
-    {
+    if (!reportConfigFile.exists()) {
       IOUtils.copy(new ByteArrayInputStream(configBytes), new FileOutputStream(reportConfigFile));
-    }
-    else
-    {
-      throw new ConflictException(reportConfigFile.getPath()+" already exists. A DELETE of /reports/{report} is required first");
+    } else {
+      throw new ConflictException(reportConfigFile.getPath()
+          + " already exists. A DELETE of /reports/{report} is required first");
     }
     return Response.ok().build();
   }

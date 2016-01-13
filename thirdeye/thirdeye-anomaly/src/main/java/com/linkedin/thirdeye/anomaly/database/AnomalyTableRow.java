@@ -29,7 +29,7 @@ public class AnomalyTableRow {
   /** Collection on which the function was run */
   String collection;
 
-  /** The window of time the anomaly occurred at*/
+  /** The window of time the anomaly occurred at */
   long timeWindow;
 
   /** The number of dimensions that are non '*' */
@@ -168,10 +168,11 @@ public class AnomalyTableRow {
   /**
    * @param dimensions
    * @return
-   *  Whether the dimension keys are the same
+   *         Whether the dimension keys are the same
    */
   public boolean compareDimensions(Map<String, String> dimensions) {
-    if (this.dimensions == null || dimensions == null || this.dimensions.size() != dimensions.size()) {
+    if (this.dimensions == null || dimensions == null
+        || this.dimensions.size() != dimensions.size()) {
       return false;
     }
     for (Entry<String, String> entry : dimensions.entrySet()) {

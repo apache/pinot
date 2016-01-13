@@ -16,7 +16,8 @@ public class KafkaTask extends Task {
   }
 
   @Override
-  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter) throws Exception {
+  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter)
+      throws Exception {
     Collection<String> collections = params.get("collection");
     Collection<String> actions = params.get("action");
 

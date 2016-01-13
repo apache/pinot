@@ -6,7 +6,6 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
 public class CustomFunnelSpec {
 
   private String collection;
@@ -30,7 +29,6 @@ public class CustomFunnelSpec {
       funnelSpecMap.put(spec.getName(), spec);
     }
   }
-
 
   public String toString() {
     String ret = null;

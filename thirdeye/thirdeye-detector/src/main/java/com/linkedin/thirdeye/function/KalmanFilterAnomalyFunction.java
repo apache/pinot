@@ -44,26 +44,25 @@ public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
 
   /**
    * Previous function state by kv. TODO : this is a hack...
-   *
    * Save the EstimatedStateNoise with keys identified by dimensionKey and the functionConfig.
-   *  - This doesn't improve worst case performance (cold-start)
-   *  - Seeding optimization with a previous EstimatedStateNoise speeds up convergence by 3-5x.
-   *  - This is kept in memory to avoid bad state from persisting between runs.
-   *  - If there are 10000 series being analyzed on a single machine every hour, then we probably need more machines.
+   * - This doesn't improve worst case performance (cold-start)
+   * - Seeding optimization with a previous EstimatedStateNoise speeds up convergence by 3-5x.
+   * - This is kept in memory to avoid bad state from persisting between runs.
+   * - If there are 10000 series being analyzed on a single machine every hour, then we probably
+   * need more machines.
    */
   private static final LRUMap<String, Double> NON_DURABLE_STATE_KV_PAIRS = new LRUMap<>(100, 10000);
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey,
-                                     MetricTimeSeries timeSeries,
-                                     DateTime windowStart,
-                                     DateTime windowEnd,
-                                     List<AnomalyResult> knownAnomalies) throws Exception {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
+          throws Exception {
     Properties props = getProperties();
     int seasonal = Integer.valueOf(props.getProperty(SEASONAL, PROP_DEFAULT_SEASONAL));
     int order = Integer.valueOf(props.getProperty(ORDER, PROP_DEFAULT_ORDER));
     int r = Integer.valueOf(props.getProperty(R, PROP_DEFAULT_KNOB));
-    double pValueThreshold = Double.valueOf(props.getProperty(P_VALUE_THRESHOLD, PROP_DEFAULT_P_VALUE_THRESHOLD));
+    double pValueThreshold =
+        Double.valueOf(props.getProperty(P_VALUE_THRESHOLD, PROP_DEFAULT_P_VALUE_THRESHOLD));
 
     long trainStartInput = Collections.min(timeSeries.getTimeWindowSet());
     long trainEndInput = Collections.max(timeSeries.getTimeWindowSet());
@@ -82,8 +81,8 @@ public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
     Set<Long> omitTimestamps = new HashSet<Long>();
 
     // convert the data to arrays
-    Pair<long[], double[]> arraysFromSeries = MetricTimeSeriesUtils.toArray(timeSeries, metric, bucketMillis,
-        omitTimestamps, 0.0);
+    Pair<long[], double[]> arraysFromSeries =
+        MetricTimeSeriesUtils.toArray(timeSeries, metric, bucketMillis, omitTimestamps, 0.0);
     long[] timestamps = arraysFromSeries.getFirst();
     double[] observations = arraysFromSeries.getSecond();
 
@@ -92,21 +91,16 @@ public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
       omitTimestamps.add(ar.getStartTimeUtc());
     }
 
-    StateSpaceAnomalyDetector stateSpaceDetector = new StateSpaceAnomalyDetector(
-        trainStartInput,
-        trainEndInput,
-        -1, // stepsAhead
-        bucketMillis,
-        omitTimestamps,
-        seasonal,
-        order,
-        order + seasonal - 1, // numStates
-        1, // outputStates
-        r);
+    StateSpaceAnomalyDetector stateSpaceDetector =
+        new StateSpaceAnomalyDetector(trainStartInput, trainEndInput, -1, // stepsAhead
+            bucketMillis, omitTimestamps, seasonal, order, order + seasonal - 1, // numStates
+            1, // outputStates
+            r);
 
     // cached state hack
     final String FUNCTION_INVOCATION_STATE_KEY = getKVMapKeyString(props, dimensionKey);
-    Double initialEstimatedStateNoise = NON_DURABLE_STATE_KV_PAIRS.get(FUNCTION_INVOCATION_STATE_KEY);
+    Double initialEstimatedStateNoise =
+        NON_DURABLE_STATE_KV_PAIRS.get(FUNCTION_INVOCATION_STATE_KEY);
     if (initialEstimatedStateNoise != null) {
       stateSpaceDetector.setInitialEstimatedStateNoise(initialEstimatedStateNoise);
     }
@@ -114,27 +108,30 @@ public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
     Map<Long, StateSpaceDataPoint> resultsByTimeWindow;
     LOGGER.info("detecting anomalies using kalman filter");
     long startTime = System.nanoTime();
-    resultsByTimeWindow = stateSpaceDetector.detectAnomalies(observations, timestamps, bucketMillis);
-    LOGGER.info("algorithm took {} seconds", TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
+    resultsByTimeWindow =
+        stateSpaceDetector.detectAnomalies(observations, timestamps, bucketMillis);
+    LOGGER.info("algorithm took {} seconds",
+        TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
 
     // cached state
-    NON_DURABLE_STATE_KV_PAIRS.put(FUNCTION_INVOCATION_STATE_KEY, stateSpaceDetector.getEstimatedStateNoise());
+    NON_DURABLE_STATE_KV_PAIRS.put(FUNCTION_INVOCATION_STATE_KEY,
+        stateSpaceDetector.getEstimatedStateNoise());
 
-    // translate FanomalyDataPoints to AnomalyResults (sort them to make the anomaly ids in the db easier to look at)
+    // translate FanomalyDataPoints to AnomalyResults (sort them to make the anomaly ids in the db
+    // easier to look at)
     List<AnomalyResult> anomalyResults = new LinkedList<AnomalyResult>();
-    for (long timeWindow : new TreeSet<>(resultsByTimeWindow.keySet()))
-    {
+    for (long timeWindow : new TreeSet<>(resultsByTimeWindow.keySet())) {
       StateSpaceDataPoint stateSpaceDataPoint = resultsByTimeWindow.get(timeWindow);
 
-      if (stateSpaceDataPoint.pValue < pValueThreshold)
-      {
+      if (stateSpaceDataPoint.pValue < pValueThreshold) {
         Properties resultProperties = new Properties();
         resultProperties.put("actualValue", "" + stateSpaceDataPoint.actualValue);
         resultProperties.put("predictedValue", "" + stateSpaceDataPoint.predictedValue);
         resultProperties.put("stdError", "" + stateSpaceDataPoint.stdError);
         resultProperties.put("pValue", "" + stateSpaceDataPoint.pValue);
         resultProperties.put("predictedDate", "" + stateSpaceDataPoint.predictedDate);
-        resultProperties.setProperty("timestamp", new DateTime(timeWindow, DateTimeZone.UTC).toString());
+        resultProperties.setProperty("timestamp",
+            new DateTime(timeWindow, DateTimeZone.UTC).toString());
 
         AnomalyResult anomalyResult = new AnomalyResult();
         anomalyResult.setScore(stateSpaceDataPoint.pValue);
@@ -156,9 +153,11 @@ public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
 
   /**
    * @return
-   *  Key uniquely identifying this function configuration and the dimension key it is run on.
+   *         Key uniquely identifying this function configuration and the dimension key it is run
+   *         on.
    */
-  private static String getKVMapKeyString(Properties functionProperties, DimensionKey dimensionKey) throws Exception {
+  private static String getKVMapKeyString(Properties functionProperties, DimensionKey dimensionKey)
+      throws Exception {
     MessageDigest md = MessageDigest.getInstance("MD5");
     md.update(functionProperties.toString().getBytes());
     md.update(dimensionKey.toString().getBytes());

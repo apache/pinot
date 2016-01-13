@@ -22,7 +22,8 @@ public class AnomalyDetectionJobResource {
   private final AnomalyDetectionJobManager manager;
   private final AnomalyFunctionSpecDAO specDAO;
 
-  public AnomalyDetectionJobResource(AnomalyDetectionJobManager manager, AnomalyFunctionSpecDAO specDAO) {
+  public AnomalyDetectionJobResource(AnomalyDetectionJobManager manager,
+      AnomalyFunctionSpecDAO specDAO) {
     this.manager = manager;
     this.specDAO = specDAO;
   }
@@ -45,9 +46,8 @@ public class AnomalyDetectionJobResource {
   @POST
   @Path("/{id}/ad-hoc")
   @UnitOfWork
-  public Response adHoc(@PathParam("id") Long id,
-                    @QueryParam("start") String start,
-                    @QueryParam("end") String end) throws Exception {
+  public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String start,
+      @QueryParam("end") String end) throws Exception {
     manager.runAdHoc(id, start, end);
     return Response.ok().build();
   }

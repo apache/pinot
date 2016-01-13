@@ -9,9 +9,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 /**
- *
  * @author kgopalak
- *
  */
 public class BootstrapPhaseMapOutputKey {
 
@@ -24,7 +22,7 @@ public class BootstrapPhaseMapOutputKey {
    */
   byte[] md5;
 
-  int hashCode ;
+  int hashCode;
 
   public BootstrapPhaseMapOutputKey(UUID nodeId, byte[] md5) throws IOException {
     super();
@@ -33,11 +31,9 @@ public class BootstrapPhaseMapOutputKey {
     this.hashCode = Arrays.hashCode(toBytes());
   }
 
-
   public UUID getNodeId() {
     return nodeId;
   }
-
 
   public byte[] getMd5() {
     return md5;
@@ -54,16 +50,16 @@ public class BootstrapPhaseMapOutputKey {
     return Arrays.equals(this.md5, that.md5) && this.nodeId.equals(that.nodeId);
   }
 
-  public byte[] toBytes() throws IOException{
+  public byte[] toBytes() throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);
     byte[] bytes;
-    //write uuid
+    // write uuid
     bytes = nodeId.toString().getBytes();
     dos.writeInt(bytes.length);
     dos.write(bytes);
 
-    //write dimensionKey md5
+    // write dimensionKey md5
     dos.writeInt(md5.length);
     dos.write(md5);
 
@@ -75,13 +71,13 @@ public class BootstrapPhaseMapOutputKey {
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
     int length;
     byte[] b;
-    //read nodeId
+    // read nodeId
     length = in.readInt();
     b = new byte[length];
     in.readFully(b);
     UUID nodeId = UUID.fromString(new String(b));
 
-    //read md5
+    // read md5
     length = in.readInt();
     byte[] md5 = new byte[length];
     in.readFully(md5);

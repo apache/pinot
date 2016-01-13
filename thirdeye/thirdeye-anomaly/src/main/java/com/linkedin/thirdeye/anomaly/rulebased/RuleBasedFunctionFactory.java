@@ -25,7 +25,8 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
    * Supported rule types
    */
   private enum RuleTypes {
-    PERCENTCHANGE, ABSOLUTECHANGE,
+    PERCENTCHANGE,
+    ABSOLUTECHANGE,
   }
 
   @Override
@@ -34,20 +35,22 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
   }
 
   @Override
-  public AnomalyDetectionFunction getFunction(StarTreeConfig starTreeConfig, AnomalyDatabaseConfig dbconfig,
-      FunctionTableRow functionTableRow) throws IllegalFunctionException, ClassCastException {
-    RuleBasedFunctionTableRow ruleBasedFunctionTableRow = (RuleBasedFunctionTableRow) functionTableRow;
+  public AnomalyDetectionFunction getFunction(StarTreeConfig starTreeConfig,
+      AnomalyDatabaseConfig dbconfig, FunctionTableRow functionTableRow)
+          throws IllegalFunctionException, ClassCastException {
+    RuleBasedFunctionTableRow ruleBasedFunctionTableRow =
+        (RuleBasedFunctionTableRow) functionTableRow;
 
     /*
      * Begin: perform some basic rule validation
      */
-    TimeGranularity aggregateGranularity = new TimeGranularity(ruleBasedFunctionTableRow.getAggregateSize(),
-        ruleBasedFunctionTableRow.getAggregateUnit());
+    TimeGranularity aggregateGranularity = new TimeGranularity(
+        ruleBasedFunctionTableRow.getAggregateSize(), ruleBasedFunctionTableRow.getAggregateUnit());
     if (aggregateGranularity.getSize() <= 0) {
       throw new IllegalFunctionException("aggregate size must be positive");
     }
-    TimeGranularity baselineGranularity = new TimeGranularity(ruleBasedFunctionTableRow.getBaselineSize(),
-        ruleBasedFunctionTableRow.getBaselineUnit());
+    TimeGranularity baselineGranularity = new TimeGranularity(
+        ruleBasedFunctionTableRow.getBaselineSize(), ruleBasedFunctionTableRow.getBaselineUnit());
     if (baselineGranularity.getSize() <= 0) {
       throw new IllegalFunctionException("baseline size must be positive");
     }
@@ -58,29 +61,28 @@ public class RuleBasedFunctionFactory extends AnomalyDetectionFunctionFactory {
     DimensionKeyMatchTable<Double> deltaTable = null;
     if (ruleBasedFunctionTableRow.getDeltaTableName() != null
         && ruleBasedFunctionTableRow.getDeltaTableName().length() > 0) {
-      deltaTable = DeltaTable.load(dbconfig, starTreeConfig, ruleBasedFunctionTableRow.getDeltaTableName());
+      deltaTable =
+          DeltaTable.load(dbconfig, starTreeConfig, ruleBasedFunctionTableRow.getDeltaTableName());
     }
 
     AnomalyDetectionFunction func;
     switch (RuleTypes.valueOf(ruleBasedFunctionTableRow.getFunctionName().toUpperCase())) {
-      case PERCENTCHANGE:
-      {
-        func = new AnomalyDetectionFunctionPercentChange(baselineGranularity, aggregateGranularity,
-            ruleBasedFunctionTableRow.getMetricName(), ruleBasedFunctionTableRow.getDelta())
-          .setDeltaTable(deltaTable);
-        break;
-      }
-      case ABSOLUTECHANGE:
-      {
-        func = new AnomalyDetectionFunctionAbsoluteChange(baselineGranularity, aggregateGranularity,
-            ruleBasedFunctionTableRow.getMetricName(), ruleBasedFunctionTableRow.getDelta())
-          .setDeltaTable(deltaTable);
-        break;
-      }
-      default:
-      {
-        throw new IllegalFunctionException("no rule of type " + ruleBasedFunctionTableRow.getFunctionName());
-      }
+    case PERCENTCHANGE: {
+      func = new AnomalyDetectionFunctionPercentChange(baselineGranularity, aggregateGranularity,
+          ruleBasedFunctionTableRow.getMetricName(), ruleBasedFunctionTableRow.getDelta())
+              .setDeltaTable(deltaTable);
+      break;
+    }
+    case ABSOLUTECHANGE: {
+      func = new AnomalyDetectionFunctionAbsoluteChange(baselineGranularity, aggregateGranularity,
+          ruleBasedFunctionTableRow.getMetricName(), ruleBasedFunctionTableRow.getDelta())
+              .setDeltaTable(deltaTable);
+      break;
+    }
+    default: {
+      throw new IllegalFunctionException(
+          "no rule of type " + ruleBasedFunctionTableRow.getFunctionName());
+    }
     }
 
     // wrap function in consecutive function

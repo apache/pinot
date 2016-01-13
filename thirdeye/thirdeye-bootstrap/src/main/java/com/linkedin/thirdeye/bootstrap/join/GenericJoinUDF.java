@@ -14,8 +14,7 @@ import com.linkedin.thirdeye.bootstrap.join.GenericJoinUDFConfig.Field;
 
 public class GenericJoinUDF implements JoinUDF {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(GenericJoinUDF.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GenericJoinUDF.class);
   private GenericJoinUDFConfig config;
   private Schema outputSchema;
   private List<Field> fields;

@@ -10,23 +10,19 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 
 import java.io.File;
 
-public class SegmentDescriptor{
+public class SegmentDescriptor {
   private File file;
   private DateTime startWallTime;
   private DateTime endWallTime;
   private DateTime startDataTime;
   private DateTime endDataTime;
 
-
   public SegmentDescriptor() {
 
   }
 
-  public SegmentDescriptor(File file,
-                           DateTime startWallTime,
-                           DateTime endWallTime,
-                           DateTime startDataTime,
-                           DateTime endDataTime) {
+  public SegmentDescriptor(File file, DateTime startWallTime, DateTime endWallTime,
+      DateTime startDataTime, DateTime endDataTime) {
     this.file = file;
     this.startWallTime = startWallTime;
     this.endWallTime = endWallTime;
@@ -44,10 +40,10 @@ public class SegmentDescriptor{
 
   }
 
-
   public BaseDateTime getStartWallTime(String timezone) {
     String[] tokens = file.getName().split("_");
-    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[2]);
+    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone))
+        .parseDateTime(tokens[2]);
   }
 
   public DateTime getEndWallTime() {
@@ -57,7 +53,8 @@ public class SegmentDescriptor{
 
   public DateTime getEndWallTime(String timezone) {
     String[] tokens = file.getName().split("_");
-    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[3]);
+    return StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone))
+        .parseDateTime(tokens[3]);
   }
 
   public DateTime getStartDataTime() {
@@ -70,13 +67,14 @@ public class SegmentDescriptor{
 
   public boolean includesTime(long time, String timezone) {
     String[] tokens = file.getName().split("_");
-    long wallStartTime = StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[2]).getMillis();
-    long wallEndTime = StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[3]).getMillis();
+    long wallStartTime = StarTreeConstants.DATE_TIME_FORMATTER
+        .withZone(DateTimeZone.forID(timezone)).parseDateTime(tokens[2]).getMillis();
+    long wallEndTime = StarTreeConstants.DATE_TIME_FORMATTER.withZone(DateTimeZone.forID(timezone))
+        .parseDateTime(tokens[3]).getMillis();
     if (time >= wallStartTime && time < wallEndTime) {
       return true;
     }
     return false;
   }
-
 
 }

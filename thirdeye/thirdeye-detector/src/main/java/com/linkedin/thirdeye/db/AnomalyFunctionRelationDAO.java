@@ -17,8 +17,7 @@ public class AnomalyFunctionRelationDAO extends AbstractDAO<AnomalyFunctionRelat
 
   public void delete(Long parentId) {
     namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionRelation#deleteByParent")
-        .setParameter("parentId", parentId)
-        .executeUpdate();
+        .setParameter("parentId", parentId).executeUpdate();
   }
 
   public void delete(Long parentId, Long childId) {
@@ -33,6 +32,7 @@ public class AnomalyFunctionRelationDAO extends AbstractDAO<AnomalyFunctionRelat
   }
 
   public List<AnomalyFunctionRelation> findByParent(Long parentId) {
-    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionRelation#findByParent").setParameter("parentId", parentId));
+    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionRelation#findByParent")
+        .setParameter("parentId", parentId));
   }
 }

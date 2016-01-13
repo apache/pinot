@@ -9,7 +9,8 @@ public class DimensionGroupSpec {
   private String collection;
   private List<DimensionGroup> groups;
 
-  public DimensionGroupSpec() {}
+  public DimensionGroupSpec() {
+  }
 
   public String getCollection() {
     return collection;

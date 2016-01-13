@@ -14,7 +14,8 @@ public class StarTreeRecordStoreFactoryHashMapImpl implements StarTreeRecordStor
   private Properties recordStoreConfig;
 
   @Override
-  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig) throws IOException {
+  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
+      throws IOException {
     this.starTreeConfig = starTreeConfig;
     this.recordStoreConfig = recordStoreConfig;
   }

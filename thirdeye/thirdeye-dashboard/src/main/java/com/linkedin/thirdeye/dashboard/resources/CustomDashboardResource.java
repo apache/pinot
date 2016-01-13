@@ -36,7 +36,8 @@ import java.util.concurrent.TimeUnit;
 public class CustomDashboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(CustomDashboardResource.class);
   private static final Joiner METRIC_FUNCTION_JOINER = Joiner.on(",");
-  private static final TypeReference<List<String>> LIST_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> LIST_REF = new TypeReference<List<String>>() {
+  };
   private final File customDashboardRoot;
   private final String serverUri;
   private final QueryCache queryCache;
@@ -44,11 +45,8 @@ public class CustomDashboardResource {
   private final ConfigCache configCache;
   private final ObjectMapper objectMapper;
 
-  public CustomDashboardResource(File customDashboardRoot,
-                                 String serverUri,
-                                 QueryCache queryCache,
-                                 DataCache dataCache,
-                                 ConfigCache configCache) {
+  public CustomDashboardResource(File customDashboardRoot, String serverUri, QueryCache queryCache,
+      DataCache dataCache, ConfigCache configCache) {
     this.customDashboardRoot = customDashboardRoot;
     this.serverUri = serverUri;
     this.queryCache = queryCache;
@@ -77,20 +75,21 @@ public class CustomDashboardResource {
   @POST
   @Path("/config/{collection}/{name}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response post(
-      @PathParam("collection") String collection,
-      @PathParam("name") String name, byte[] config) throws Exception {
+  public Response post(@PathParam("collection") String collection, @PathParam("name") String name,
+      byte[] config) throws Exception {
     File collectionDir = new File(customDashboardRoot, collection);
     File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Do not overwrite existing
     if (configFile.exists()) {
-      return Response.status(Response.Status.CONFLICT).entity("Config already exists for " + name).build();
+      return Response.status(Response.Status.CONFLICT).entity("Config already exists for " + name)
+          .build();
     }
 
     // Create collection dir if it doesn't exist
@@ -104,7 +103,8 @@ public class CustomDashboardResource {
       IOUtils.copy(new ByteArrayInputStream(config), outputStream);
       LOG.info("Created custom dashboard {} for collection {}", name, collection);
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not write to " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not write to " + configFile).build();
     }
 
     return Response.ok().build();
@@ -119,7 +119,8 @@ public class CustomDashboardResource {
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Check if exists
@@ -131,19 +132,22 @@ public class CustomDashboardResource {
       byte[] config = IOUtils.toByteArray(inputStream);
       return Response.ok(config, MediaType.APPLICATION_OCTET_STREAM).build();
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not read from " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not read from " + configFile).build();
     }
   }
 
   @DELETE
   @Path("/config/{collection}/{name}")
-  public Response delete(@PathParam("collection") String collection, @PathParam("name") String name) {
+  public Response delete(@PathParam("collection") String collection,
+      @PathParam("name") String name) {
     File collectionDir = new File(customDashboardRoot, collection);
     File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Check if exists
@@ -157,7 +161,8 @@ public class CustomDashboardResource {
       LOG.info("Deleted custom dashboard {} for collection {}", name, collection);
       return Response.noContent().build();
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not delete " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not delete " + configFile).build();
     }
   }
 
@@ -165,12 +170,9 @@ public class CustomDashboardResource {
 
   @GET
   @Path("/dashboard/{collection}/{name}/{year}/{month}/{day}")
-  public CustomDashboardView getCustomDashboard(
-      @PathParam("collection") String collection,
-      @PathParam("name") String name,
-      @PathParam("year") Integer year,
-      @PathParam("month") Integer month,
-      @PathParam("day") Integer day) throws Exception {
+  public CustomDashboardView getCustomDashboard(@PathParam("collection") String collection,
+      @PathParam("name") String name, @PathParam("year") Integer year,
+      @PathParam("month") Integer month, @PathParam("day") Integer day) throws Exception {
     CustomDashboardSpec spec = configCache.getCustomDashboardSpec(collection, name);
 
     // Get funnel views
@@ -188,14 +190,15 @@ public class CustomDashboardResource {
 
       View view = null;
       switch (componentSpec.getType()) {
-        case FUNNEL:
-          view = getCustomFunnelTabularView(collection, year, month, day, metrics, dimensionValues);
-          break;
-        case TIME_SERIES:
-          view = getCustomTimeSeriesView(collection, year, month, day, metrics, dimensionValues, groupBy);
-          break;
-        default:
-          throw new IllegalStateException("Invalid funnel spec " + componentSpec.getType());
+      case FUNNEL:
+        view = getCustomFunnelTabularView(collection, year, month, day, metrics, dimensionValues);
+        break;
+      case TIME_SERIES:
+        view = getCustomTimeSeriesView(collection, year, month, day, metrics, dimensionValues,
+            groupBy);
+        break;
+      default:
+        throw new IllegalStateException("Invalid funnel spec " + componentSpec.getType());
       }
 
       if (view != null) {
@@ -206,14 +209,9 @@ public class CustomDashboardResource {
     return new CustomDashboardView(name, views);
   }
 
-  private CustomTimeSeriesView getCustomTimeSeriesView(
-      String collection,
-      Integer year,
-      Integer month,
-      Integer day,
-      List<String> metricList,
-      MultivaluedMap<String, String> queryParams,
-      String groupBy) throws Exception {
+  private CustomTimeSeriesView getCustomTimeSeriesView(String collection, Integer year,
+      Integer month, Integer day, List<String> metricList,
+      MultivaluedMap<String, String> queryParams, String groupBy) throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
     DateTime current = new DateTime(year, month, day, 0, 0);
@@ -233,7 +231,8 @@ public class CustomDashboardResource {
     if (dimensionGroupSpec != null) {
       dimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, dimensionGroups);
+    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues,
+        dimensionGroups);
     QueryResult result = queryCache.getQueryResult(serverUri, sql);
 
     // Get index of group by so we can extract values for labels
@@ -297,7 +296,9 @@ public class CustomDashboardResource {
       List<Number[]> series = new ArrayList<>();
       for (Long time : times) {
         Number value = seriesMap.get(time);
-        series.add(new Number[] { time, value == null ? 0 : value });
+        series.add(new Number[] {
+            time, value == null ? 0 : value
+        });
       }
       allSeries.put(chosenValue, series);
     }
@@ -305,12 +306,8 @@ public class CustomDashboardResource {
     return new CustomTimeSeriesView(allSeries);
   }
 
-  private CustomFunnelTabularView getCustomFunnelTabularView(
-      String collection,
-      Integer year,
-      Integer month,
-      Integer day,
-      List<String> metricList,
+  private CustomFunnelTabularView getCustomFunnelTabularView(String collection, Integer year,
+      Integer month, Integer day, List<String> metricList,
       MultivaluedMap<String, String> queryParams) throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
@@ -328,8 +325,10 @@ public class CustomDashboardResource {
     }
 
     // SQL
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, queryParams, dimensionGroups);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, queryParams, dimensionGroups);
+    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd,
+        queryParams, dimensionGroups);
+    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd,
+        queryParams, dimensionGroups);
     LOG.info("Generated SQL: {}", baselineSql);
     LOG.info("Generated SQL: {}", currentSql);
 
@@ -357,10 +356,12 @@ public class CustomDashboardResource {
         // Compute percent change
         Number[] change = new Number[baselineValues.length];
         for (int i = 0; i < baselineValues.length; i++) {
-          if (baselineValues[i] == null || currentValues[i] == null || baselineValues[i].doubleValue() == 0.0) {
+          if (baselineValues[i] == null || currentValues[i] == null
+              || baselineValues[i].doubleValue() == 0.0) {
             change[i] = null; // i.e. N/A, or cannot compute ratio to baseline
           } else {
-            change[i] = (currentValues[i].doubleValue() - baselineValues[i].doubleValue()) / baselineValues[i].doubleValue();
+            change[i] = (currentValues[i].doubleValue() - baselineValues[i].doubleValue())
+                / baselineValues[i].doubleValue();
           }
         }
 
@@ -409,7 +410,8 @@ public class CustomDashboardResource {
           Response.Status.BAD_REQUEST);
     }
 
-    Map.Entry<String, Map<String, Number[]>> first = queryResult.getData().entrySet().iterator().next();
+    Map.Entry<String, Map<String, Number[]>> first =
+        queryResult.getData().entrySet().iterator().next();
 
     for (Map.Entry<String, Number[]> entry : first.getValue().entrySet()) {
       data.put(Long.valueOf(entry.getKey()), entry.getValue());

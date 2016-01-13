@@ -18,16 +18,16 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafkaDecoder
-{
-  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeKafkaDecoderSchemaRegistryAvroImpl.class);
+public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafkaDecoder {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(ThirdEyeKafkaDecoderSchemaRegistryAvroImpl.class);
 
   private static final String PROP_SCHEMA_REGISTRY_URI = "schema.registry.uri";
   private static final int MD5_LENGTH_BYTES = 16;
   private static final int MAGIC_BYTE_LENGTH = 1;
 
-  private final ConcurrentMap<String, DatumReader<GenericRecord>> readers
-          = new ConcurrentHashMap<String, DatumReader<GenericRecord>>();
+  private final ConcurrentMap<String, DatumReader<GenericRecord>> readers =
+      new ConcurrentHashMap<String, DatumReader<GenericRecord>>();
 
   private final ThreadLocal<BinaryDecoder> decoderThreadLocal = new ThreadLocal<BinaryDecoder>();
 
@@ -37,27 +37,31 @@ public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafka
   private String schemaRegistryUri;
 
   @Override
-  public void init(StarTreeConfig starTreeConfig, ThirdEyeKafkaConfig kafkaConfig) throws Exception
-  {
+  public void init(StarTreeConfig starTreeConfig, ThirdEyeKafkaConfig kafkaConfig)
+      throws Exception {
     this.starTreeConfig = starTreeConfig;
     this.kafkaConfig = kafkaConfig;
     this.schemaRegistryUri = kafkaConfig.getDecoderConfig().getProperty(PROP_SCHEMA_REGISTRY_URI);
 
-    if (schemaRegistryUri == null)
-    {
+    if (schemaRegistryUri == null) {
       throw new IllegalArgumentException("Must provide " + PROP_SCHEMA_REGISTRY_URI);
     }
   }
 
   @Override
-  public StarTreeRecord decode(byte[] bytes) throws IOException
-  {
-    String md5 = hex(Arrays.copyOfRange(bytes, MAGIC_BYTE_LENGTH, MD5_LENGTH_BYTES + MAGIC_BYTE_LENGTH));  // n.b. first byte is assumed magic byte
+  public StarTreeRecord decode(byte[] bytes) throws IOException {
+    String md5 =
+        hex(Arrays.copyOfRange(bytes, MAGIC_BYTE_LENGTH, MD5_LENGTH_BYTES + MAGIC_BYTE_LENGTH)); // n.b.
+                                                                                                 // first
+                                                                                                 // byte
+                                                                                                 // is
+                                                                                                 // assumed
+                                                                                                 // magic
+                                                                                                 // byte
 
     // Get reader
     DatumReader<GenericRecord> reader = readers.get(md5);
-    if (reader == null)
-    {
+    if (reader == null) {
       InputStream inputStream = URI.create(schemaRegistryUri + "/id=" + md5).toURL().openStream();
       Schema schema = Schema.parse(inputStream);
       inputStream.close();
@@ -69,29 +73,24 @@ public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafka
     // Decode record
     int offset = MAGIC_BYTE_LENGTH + MD5_LENGTH_BYTES;
     int length = bytes.length - offset;
-    decoderThreadLocal.set(DecoderFactory.defaultFactory().createBinaryDecoder(bytes, offset, length, decoderThreadLocal.get()));
+    decoderThreadLocal.set(DecoderFactory.defaultFactory().createBinaryDecoder(bytes, offset,
+        length, decoderThreadLocal.get()));
     GenericRecord record = reader.read(null, decoderThreadLocal.get());
 
-    if (record.getSchema().getName().equals(kafkaConfig.getTopicName()))
-    {
+    if (record.getSchema().getName().equals(kafkaConfig.getTopicName())) {
       return ThirdEyeAvroUtils.convert(starTreeConfig, record);
-    }
-    else
-    {
+    } else {
       LOGGER.warn("Received event with record name {} not topic name {}, skipping",
-               record.getSchema().getName(), kafkaConfig.getTopicName());
+          record.getSchema().getName(), kafkaConfig.getTopicName());
       return null;
     }
   }
 
-  public static String hex(byte[] bytes)
-  {
+  public static String hex(byte[] bytes) {
     StringBuilder builder = new StringBuilder(2 * bytes.length);
-    for (int i = 0; i < bytes.length; i++)
-    {
+    for (int i = 0; i < bytes.length; i++) {
       String hexString = Integer.toHexString(0xFF & bytes[i]);
-      if (hexString.length() < 2)
-      {
+      if (hexString.length() < 2) {
         hexString = "0" + hexString;
       }
       builder.append(hexString);

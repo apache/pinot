@@ -24,10 +24,10 @@ public class FixedDimensionIteratorTest {
   @Test
   public void combinationsTest() throws Exception {
     Map<String, List<String>> fixedDimensions = new HashMap<>();
-    fixedDimensions.put("apples", new ArrayList<String>(Arrays.asList("a","b","c","d")));
-    fixedDimensions.put("oranges", new ArrayList<String>(Arrays.asList("x","y","z")));
-    fixedDimensions.put("pears", new ArrayList<String>(Arrays.asList("1","2")));
-    fixedDimensions.put("berries", new ArrayList<String>(Arrays.asList("*","%","&","(",")")));
+    fixedDimensions.put("apples", new ArrayList<String>(Arrays.asList("a", "b", "c", "d")));
+    fixedDimensions.put("oranges", new ArrayList<String>(Arrays.asList("x", "y", "z")));
+    fixedDimensions.put("pears", new ArrayList<String>(Arrays.asList("1", "2")));
+    fixedDimensions.put("berries", new ArrayList<String>(Arrays.asList("*", "%", "&", "(", ")")));
 
     int expectedCount = 1;
     for (List<String> value : fixedDimensions.values()) {

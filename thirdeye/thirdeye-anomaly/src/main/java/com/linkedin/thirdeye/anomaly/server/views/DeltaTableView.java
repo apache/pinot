@@ -17,13 +17,8 @@ public class DeltaTableView extends AbstractView {
   private final List<List<String>> rows;
   private final String responseUrl;
 
-  public DeltaTableView(
-      StarTreeConfig starTreeConfig,
-      DimensionKeyMatchTable<Double> matchTable,
-      String responseUrl,
-      String database,
-      String funtionTable,
-      String collection) {
+  public DeltaTableView(StarTreeConfig starTreeConfig, DimensionKeyMatchTable<Double> matchTable,
+      String responseUrl, String database, String funtionTable, String collection) {
     super("delta-table-view.ftl", database, funtionTable, collection);
     this.responseUrl = responseUrl;
 

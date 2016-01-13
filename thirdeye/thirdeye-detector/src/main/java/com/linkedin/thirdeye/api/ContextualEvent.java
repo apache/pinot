@@ -9,10 +9,7 @@ import java.util.Objects;
 @Table(name = "contextual_events")
 @NamedQueries({
 
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.ContextualEvent#findAllByTime",
-        query = "SELECT e FROM ContextualEvent e WHERE e.timeUtc >= :startTimeUtc AND e.timeUtc <= :endTimeUtc"
-    )
+    @NamedQuery(name = "com.linkedin.thirdeye.api.ContextualEvent#findAllByTime", query = "SELECT e FROM ContextualEvent e WHERE e.timeUtc >= :startTimeUtc AND e.timeUtc <= :endTimeUtc")
 })
 public class ContextualEvent implements Comparable<ContextualEvent> {
   @Id
@@ -31,7 +28,8 @@ public class ContextualEvent implements Comparable<ContextualEvent> {
   @Column(name = "reference", nullable = true)
   private String reference;
 
-  public ContextualEvent() {}
+  public ContextualEvent() {
+  }
 
   public long getId() {
     return id;
@@ -80,13 +78,8 @@ public class ContextualEvent implements Comparable<ContextualEvent> {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("id", id)
-        .add("timeUtc", timeUtc)
-        .add("title", title)
-        .add("description", description)
-        .add("reference", reference)
-        .toString();
+    return MoreObjects.toStringHelper(this).add("id", id).add("timeUtc", timeUtc)
+        .add("title", title).add("description", description).add("reference", reference).toString();
   }
 
   @Override
@@ -95,10 +88,8 @@ public class ContextualEvent implements Comparable<ContextualEvent> {
       return false;
     }
     ContextualEvent e = (ContextualEvent) o;
-    return Objects.equals(id, e.getId())
-        && Objects.equals(timeUtc, e.getTimeUtc())
-        && Objects.equals(title, e.getTitle())
-        && Objects.equals(description, e.getDescription())
+    return Objects.equals(id, e.getId()) && Objects.equals(timeUtc, e.getTimeUtc())
+        && Objects.equals(title, e.getTitle()) && Objects.equals(description, e.getDescription())
         && Objects.equals(reference, e.getReference());
   }
 

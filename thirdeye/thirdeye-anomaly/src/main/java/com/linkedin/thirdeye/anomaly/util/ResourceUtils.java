@@ -18,6 +18,7 @@ public class ResourceUtils {
     return writer.toString();
   }
 
-  private ResourceUtils() {}
+  private ResourceUtils() {
+  }
 
 }

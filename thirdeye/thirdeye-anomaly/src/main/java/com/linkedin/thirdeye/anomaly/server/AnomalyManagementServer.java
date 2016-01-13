@@ -17,7 +17,8 @@ public class AnomalyManagementServer extends Application<AnomalyManagementServer
 
   private final List<ThirdEyeAnomalyDetectionConfiguration> anomalyDetectionConfigs;
 
-  public AnomalyManagementServer(List<ThirdEyeAnomalyDetectionConfiguration> anomalyDetectionConfigs) {
+  public AnomalyManagementServer(
+      List<ThirdEyeAnomalyDetectionConfiguration> anomalyDetectionConfigs) {
     this.anomalyDetectionConfigs = anomalyDetectionConfigs;
   }
 
@@ -27,7 +28,8 @@ public class AnomalyManagementServer extends Application<AnomalyManagementServer
   }
 
   @Override
-  public void run(AnomalyManagementServerConfiguration config, Environment environment) throws Exception {
+  public void run(AnomalyManagementServerConfiguration config, Environment environment)
+      throws Exception {
     environment.jersey().register(new FunctionTableResource(anomalyDetectionConfigs));
   }
 

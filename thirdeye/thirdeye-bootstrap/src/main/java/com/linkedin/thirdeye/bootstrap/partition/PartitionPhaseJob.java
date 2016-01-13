@@ -24,17 +24,14 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.StarTreeConstants;
 
-
 public class PartitionPhaseJob extends Configured {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(PartitionPhaseJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionPhaseJob.class);
 
   private String name;
 
   private Properties props;
 
   /**
-   *
    * @param name
    * @param props
    */
@@ -44,8 +41,8 @@ public class PartitionPhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class PartitionMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class PartitionMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     MultipleOutputs<BytesWritable, BytesWritable> mos;
     private int numPartitions;
 
@@ -58,9 +55,8 @@ public class PartitionPhaseJob extends Configured {
     }
 
     @Override
-    public void map(BytesWritable dimensionKeyBytes,
-        BytesWritable metricTimeSeriesBytes, Context context)
-        throws IOException, InterruptedException {
+    public void map(BytesWritable dimensionKeyBytes, BytesWritable metricTimeSeriesBytes,
+        Context context) throws IOException, InterruptedException {
 
       int partition = Math.abs(dimensionKeyBytes.hashCode()) % numPartitions;
 
@@ -69,14 +65,11 @@ public class PartitionPhaseJob extends Configured {
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
       mos.close();
     }
 
   }
-
-
 
   public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
@@ -100,7 +93,8 @@ public class PartitionPhaseJob extends Configured {
     String inputPathDir = getAndSetConfiguration(configuration, PARTITION_PHASE_INPUT_PATH);
     getAndSetConfiguration(configuration, PARTITION_PHASE_CONFIG_PATH);
     getAndSetConfiguration(configuration, PARTITION_PHASE_OUTPUT_PATH);
-    int numPartitions = Integer.valueOf(getAndSetConfiguration(configuration, PARTITION_PHASE_NUM_PARTITIONS));
+    int numPartitions =
+        Integer.valueOf(getAndSetConfiguration(configuration, PARTITION_PHASE_NUM_PARTITIONS));
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
@@ -108,13 +102,13 @@ public class PartitionPhaseJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    for (int i = 0 ; i < numPartitions; i ++) {
+    for (int i = 0; i < numPartitions; i++) {
       MultipleOutputs.addNamedOutput(job, StarTreeConstants.PARTITION_FOLDER_PREFIX + i,
           SequenceFileOutputFormat.class, BytesWritable.class, BytesWritable.class);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(PARTITION_PHASE_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(PARTITION_PHASE_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 

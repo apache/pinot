@@ -6,7 +6,6 @@ public class TopKDimensionSpec {
   int top;
   String metricName;
 
-
   public TopKDimensionSpec() {
 
   }
@@ -20,27 +19,30 @@ public class TopKDimensionSpec {
   public String getDimensionName() {
     return dimensionName;
   }
+
   public void setDimensionName(String dimensionName) {
     this.dimensionName = dimensionName;
   }
+
   public int getTop() {
     return top;
   }
+
   public void setTop(int top) {
     this.top = top;
   }
+
   public String getMetricName() {
     return metricName;
   }
+
   public void setMetricName(String metricName) {
     this.metricName = metricName;
   }
 
   public String toString() {
-    return "{ dimensionName : " + dimensionName
-        + ", top : " + top
-        + ", metricName : " + metricName + " }";
+    return "{ dimensionName : " + dimensionName + ", top : " + top + ", metricName : " + metricName
+        + " }";
   }
-
 
 }

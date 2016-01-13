@@ -29,7 +29,8 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
  */
 public abstract class AbstractBaseAnomalyDetectionTask {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractBaseAnomalyDetectionTask.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(AbstractBaseAnomalyDetectionTask.class);
 
   private final AnomalyDetectionTaskInfo taskInfo;
   private final StarTreeConfig starTreeConfig;
@@ -46,13 +47,11 @@ public abstract class AbstractBaseAnomalyDetectionTask {
   /** the time range to monitor for anomalies */
   private final TimeRange monitoringWindow;
 
-  public AbstractBaseAnomalyDetectionTask(
-      StarTreeConfig starTreeConfig,
-      AnomalyDetectionTaskInfo taskInfo,
-      AnomalyDetectionFunction function,
-      AnomalyDetectionFunctionHistory functionHistory,
-      ThirdEyeClient thirdEyeClient) {
-    this(starTreeConfig, taskInfo, function, functionHistory, thirdEyeClient, new HashSet<String>());
+  public AbstractBaseAnomalyDetectionTask(StarTreeConfig starTreeConfig,
+      AnomalyDetectionTaskInfo taskInfo, AnomalyDetectionFunction function,
+      AnomalyDetectionFunctionHistory functionHistory, ThirdEyeClient thirdEyeClient) {
+    this(starTreeConfig, taskInfo, function, functionHistory, thirdEyeClient,
+        new HashSet<String>());
   }
 
   /**
@@ -62,14 +61,10 @@ public abstract class AbstractBaseAnomalyDetectionTask {
    * @param functionHistory
    * @param thirdEyeClient
    */
-  public AbstractBaseAnomalyDetectionTask(
-      StarTreeConfig starTreeConfig,
-      AnomalyDetectionTaskInfo taskInfo,
-      AnomalyDetectionFunction function,
-      AnomalyDetectionFunctionHistory functionHistory,
-      ThirdEyeClient thirdEyeClient,
-      Set<String> additionalMetricsRequiredByTask)
-  {
+  public AbstractBaseAnomalyDetectionTask(StarTreeConfig starTreeConfig,
+      AnomalyDetectionTaskInfo taskInfo, AnomalyDetectionFunction function,
+      AnomalyDetectionFunctionHistory functionHistory, ThirdEyeClient thirdEyeClient,
+      Set<String> additionalMetricsRequiredByTask) {
     this.starTreeConfig = starTreeConfig;
     this.taskInfo = taskInfo;
     this.function = function;
@@ -95,27 +90,27 @@ public abstract class AbstractBaseAnomalyDetectionTask {
    * @param dimensionKey
    * @param metricTimeSeries
    * @return
-   *  The list of anomalies produced by the function
+   *         The list of anomalies produced by the function
    * @throws FunctionDidNotEvaluateException
    */
-  protected List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries metricTimeSeries)
-      throws FunctionDidNotEvaluateException {
-    List<AnomalyResult> anomalyResults = function.analyze(dimensionKey, metricTimeSeries, monitoringWindow,
-        functionHistory.getHistoryForDimensionKey(dimensionKey));
+  protected List<AnomalyResult> analyze(DimensionKey dimensionKey,
+      MetricTimeSeries metricTimeSeries) throws FunctionDidNotEvaluateException {
+    List<AnomalyResult> anomalyResults = function.analyze(dimensionKey, metricTimeSeries,
+        monitoringWindow, functionHistory.getHistoryForDimensionKey(dimensionKey));
     filterAnomalyResults(anomalyResults, monitoringWindow);
     return anomalyResults;
   }
 
   /**
    * @return
-   *  The DimensionKeys and MetricTimeSeries from a query
+   *         The DimensionKeys and MetricTimeSeries from a query
    * @throws Exception
    */
   protected Map<DimensionKey, MetricTimeSeries> getDataset(Map<String, String> fixedDimensionValues,
       String groupByDimension) throws Exception {
     ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(starTreeConfig.getCollection(),
-        groupByDimension, fixedDimensionValues, metricsRequiredByTask, function.getAggregationTimeGranularity(),
-        queryTimeRange);
+        groupByDimension, fixedDimensionValues, metricsRequiredByTask,
+        function.getAggregationTimeGranularity(), queryTimeRange);
     Map<DimensionKey, MetricTimeSeries> dataset = thirdEyeClient.execute(request);
 
     /*
@@ -144,7 +139,6 @@ public abstract class AbstractBaseAnomalyDetectionTask {
 
   /**
    * Perform basic sanity check on the dataset and log warnings if failed.
-   *
    * @param dataset
    */
   private void sanityCheckDataset(Map<DimensionKey, MetricTimeSeries> dataset) {
@@ -152,13 +146,13 @@ public abstract class AbstractBaseAnomalyDetectionTask {
       MetricTimeSeries metricTimeSeries = dataset.get(dimensionKey);
       Set<Long> seriesTimeWindowSet = metricTimeSeries.getTimeWindowSet();
       if (seriesTimeWindowSet.contains(monitoringWindow.getStart()) == false) {
-        LOGGER.warn("dataset series {} does not contain expected start time window {}", dimensionKey,
-            monitoringWindow.getStart());
+        LOGGER.warn("dataset series {} does not contain expected start time window {}",
+            dimensionKey, monitoringWindow.getStart());
       }
-      long lastExpectedTimeWindow =
-          monitoringWindow.getEnd() - TimeGranularityUtils.toMillis(function.getAggregationTimeGranularity());
-      if (lastExpectedTimeWindow != monitoringWindow.getStart() &&
-          seriesTimeWindowSet.contains(lastExpectedTimeWindow) == false) {
+      long lastExpectedTimeWindow = monitoringWindow.getEnd()
+          - TimeGranularityUtils.toMillis(function.getAggregationTimeGranularity());
+      if (lastExpectedTimeWindow != monitoringWindow.getStart()
+          && seriesTimeWindowSet.contains(lastExpectedTimeWindow) == false) {
         LOGGER.warn("dataset series {} does not contain expected end time window {}", dimensionKey,
             lastExpectedTimeWindow);
       }
@@ -169,11 +163,12 @@ public abstract class AbstractBaseAnomalyDetectionTask {
    * @param monitoringInterval
    * @param function
    * @return
-   *  The range of data required for the task, determined by the start and end times defined in the taskInfo and the
-   *  requirements of the function.
+   *         The range of data required for the task, determined by the start and end times defined
+   *         in the taskInfo and the
+   *         requirements of the function.
    */
-  private static TimeRange getTaskTimeSeriesRange(TimeRange monitoringInterval, AnomalyDetectionFunction function)
-  {
+  private static TimeRange getTaskTimeSeriesRange(TimeRange monitoringInterval,
+      AnomalyDetectionFunction function) {
     long end = monitoringInterval.getEnd();
     TimeGranularity functionGranularity = function.getTrainingWindowTimeGranularity();
     long start;
@@ -189,9 +184,10 @@ public abstract class AbstractBaseAnomalyDetectionTask {
 
   /**
    * @param anomalyResults
-   *  The list of anomalyResults to be filtered
+   *          The list of anomalyResults to be filtered
    */
-  private static void filterAnomalyResults(List<AnomalyResult> anomalyResults, TimeRange timeRange) {
+  private static void filterAnomalyResults(List<AnomalyResult> anomalyResults,
+      TimeRange timeRange) {
     Iterator<AnomalyResult> it = anomalyResults.iterator();
     while (it.hasNext()) {
       AnomalyResult anomalyResult = it.next();
@@ -227,7 +223,8 @@ public abstract class AbstractBaseAnomalyDetectionTask {
     long minMonitoringWindowMillis = TimeGranularityUtils.toMillis(minMonitoringTimeGranularity);
     long monitoringIntervalMillis = monitoringInterval.getEnd() - monitoringInterval.getStart();
     if (minMonitoringWindowMillis > monitoringIntervalMillis) {
-      return new TimeRange(monitoringInterval.getEnd() - minMonitoringWindowMillis, monitoringInterval.getEnd());
+      return new TimeRange(monitoringInterval.getEnd() - minMonitoringWindowMillis,
+          monitoringInterval.getEnd());
     } else {
       return monitoringInterval;
     }

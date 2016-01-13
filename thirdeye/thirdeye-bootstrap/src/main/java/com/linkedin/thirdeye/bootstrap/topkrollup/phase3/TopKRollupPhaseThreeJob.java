@@ -42,15 +42,12 @@ import com.linkedin.thirdeye.bootstrap.topkrollup.phase2.TopKDimensionValues;
 /**
  * Map Input = Key:(Serialized dimensionKey) Value:(Serialized metricTimeSeries) from
  * aggregation phase
- *
  * Map Output = Key:(Serialized dimensionKey) Value:(Serialized metricTimeSeries)
  * Map replaces every dimension value which is not in top k by ?
- *
  * Reduce Output = Key:(Serialized dimensionKey) Value:(Serialized metricTimeSeries)
  */
 public class TopKRollupPhaseThreeJob extends Configured {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(TopKRollupPhaseThreeJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TopKRollupPhaseThreeJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -59,7 +56,6 @@ public class TopKRollupPhaseThreeJob extends Configured {
   private Properties props;
 
   /**
-   *
    * @param name
    * @param props
    */
@@ -69,9 +65,8 @@ public class TopKRollupPhaseThreeJob extends Configured {
     this.props = props;
   }
 
-
-  public static class TopKRollupPhaseThreeMapper extends
-    Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class TopKRollupPhaseThreeMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private TopKRollupPhaseThreeConfig config;
     StarTreeConfig starTreeConfig;
     List<MetricType> metricTypes;
@@ -88,8 +83,7 @@ public class TopKRollupPhaseThreeJob extends Configured {
       LOGGER.info("TopKRollupPhaseThreeJob.TopKRollupPhaseThreeMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE3_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE3_CONFIG_PATH.toString()));
       Path topKDimensionsPath = new Path(configuration.get(TOPK_DIMENSIONS_PATH.toString()));
       try {
         starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
@@ -113,7 +107,8 @@ public class TopKRollupPhaseThreeJob extends Configured {
           }
         });
         for (FileStatus fileStatus : fileStatuses) {
-          TopKDimensionValues valuesFile = OBJECT_MAPPER.readValue(fileSystem.open(fileStatus.getPath()), TopKDimensionValues.class);
+          TopKDimensionValues valuesFile = OBJECT_MAPPER
+              .readValue(fileSystem.open(fileStatus.getPath()), TopKDimensionValues.class);
           topKDimensionValues.addMap(valuesFile);
         }
         topKDimensionValuesSet = topKDimensionValues.getTopKDimensions();
@@ -153,13 +148,12 @@ public class TopKRollupPhaseThreeJob extends Configured {
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
     }
   }
 
-  public static class TopKRollupPhaseThreeReducer extends
-    Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class TopKRollupPhaseThreeReducer
+      extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
 
     private StarTreeConfig starTreeConfig;
     private TopKRollupPhaseThreeConfig config;
@@ -175,8 +169,7 @@ public class TopKRollupPhaseThreeJob extends Configured {
 
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE3_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(TOPK_ROLLUP_PHASE3_CONFIG_PATH.toString()));
       try {
         starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = TopKRollupPhaseThreeConfig.fromStarTreeConfig(starTreeConfig);
@@ -210,7 +203,6 @@ public class TopKRollupPhaseThreeJob extends Configured {
 
     }
   }
-
 
   public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
@@ -250,8 +242,8 @@ public class TopKRollupPhaseThreeJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(TOPK_ROLLUP_PHASE3_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(TOPK_ROLLUP_PHASE3_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 

@@ -9,7 +9,8 @@ public class DimensionGroup {
   private String regex;
   private List<String> values;
 
-  public DimensionGroup() {}
+  public DimensionGroup() {
+  }
 
   public String getName() {
     return name;
@@ -49,9 +50,7 @@ public class DimensionGroup {
       return false;
     }
     DimensionGroup g = (DimensionGroup) o;
-    return Objects.equals(name, g.getName())
-        && Objects.equals(dimension, g.getDimension())
-        && Objects.equals(regex, g.getRegex())
-        && Objects.equals(values, g.getValues());
+    return Objects.equals(name, g.getName()) && Objects.equals(dimension, g.getDimension())
+        && Objects.equals(regex, g.getRegex()) && Objects.equals(values, g.getValues());
   }
 }

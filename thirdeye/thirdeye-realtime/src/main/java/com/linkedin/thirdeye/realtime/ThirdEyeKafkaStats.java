@@ -28,45 +28,33 @@ public class ThirdEyeKafkaStats {
   private final Meter bytesRead;
 
   public ThirdEyeKafkaStats(String collection, String topic, MetricRegistry metricRegistry) {
-    String recordsAddedName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        RECORDS_ADDED);
+    String recordsAddedName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, RECORDS_ADDED);
     metricRegistry.remove(recordsAddedName);
     this.recordsAdded = metricRegistry.meter(recordsAddedName);
 
-    String recordsErrorName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        RECORDS_ERROR);
+    String recordsErrorName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, RECORDS_ERROR);
     metricRegistry.remove(recordsErrorName);
     this.recordsError = metricRegistry.meter(recordsErrorName);
 
-    String recordsSkippedInvalidName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        RECORDS_SKIPPED_INVALID);
+    String recordsSkippedInvalidName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, RECORDS_SKIPPED_INVALID);
     metricRegistry.remove(recordsSkippedInvalidName);
     this.recordsSkippedInvalid = metricRegistry.meter(recordsSkippedInvalidName);
 
-    String recordsSkippedExpiredName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        RECORDS_SKIPPED_EXPIRED);
+    String recordsSkippedExpiredName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, RECORDS_SKIPPED_EXPIRED);
     metricRegistry.remove(recordsSkippedExpiredName);
     this.recordsSkippedExpired = metricRegistry.meter(recordsSkippedExpiredName);
 
-    String bytesReadName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        BYTES_READ);
+    String bytesReadName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, BYTES_READ);
     metricRegistry.remove(bytesReadName);
     this.bytesRead = metricRegistry.meter(bytesReadName);
 
-    final String lastPersistTimeMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        LAST_PERSIST_TIME_MILLIS);
+    final String lastPersistTimeMillisName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, LAST_PERSIST_TIME_MILLIS);
     metricRegistry.remove(lastPersistTimeMillisName);
     metricRegistry.register(lastPersistTimeMillisName, new Gauge<Long>() {
       @Override
@@ -76,9 +64,7 @@ public class ThirdEyeKafkaStats {
     });
 
     String lastConsumedRecordTimeMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        LAST_CONSUMED_RECORD_TIME_MILLIS);
+        collection, topic, LAST_CONSUMED_RECORD_TIME_MILLIS);
     metricRegistry.remove(lastConsumedRecordTimeMillisName);
     metricRegistry.register(lastConsumedRecordTimeMillisName, new Gauge<Long>() {
       @Override
@@ -87,10 +73,8 @@ public class ThirdEyeKafkaStats {
       }
     });
 
-    String dataTimeMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        DATA_TIME_MILLIS);
+    String dataTimeMillisName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, DATA_TIME_MILLIS);
     metricRegistry.remove(dataTimeMillisName);
     metricRegistry.register(dataTimeMillisName, new Gauge<Long>() {
       @Override
@@ -99,10 +83,8 @@ public class ThirdEyeKafkaStats {
       }
     });
 
-    String dataLagMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        DATA_LAG_MILLIS);
+    String dataLagMillisName =
+        MetricRegistry.name(ThirdEyeKafkaStats.class, collection, topic, DATA_LAG_MILLIS);
     metricRegistry.remove(dataLagMillisName);
     metricRegistry.register(dataLagMillisName, new Gauge<Long>() {
       @Override
@@ -112,9 +94,7 @@ public class ThirdEyeKafkaStats {
     });
 
     final String timeSinceLastPersistMillisName = MetricRegistry.name(ThirdEyeKafkaStats.class,
-        collection,
-        topic,
-        TIME_SINCE_LAST_PERSIST_MILLIS);
+        collection, topic, TIME_SINCE_LAST_PERSIST_MILLIS);
     metricRegistry.remove(timeSinceLastPersistMillisName);
     metricRegistry.register(timeSinceLastPersistMillisName, new Gauge<Long>() {
       @Override

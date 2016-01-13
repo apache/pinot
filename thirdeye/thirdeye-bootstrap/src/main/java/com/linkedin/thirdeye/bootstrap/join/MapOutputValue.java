@@ -32,16 +32,13 @@ public class MapOutputValue {
     this.record = record;
   }
 
-
   public String getSchemaName() {
     return schemaName;
   }
 
-
   public GenericRecord getRecord() {
     return record;
   }
-
 
   public byte[] toBytes() throws IOException {
     ByteArrayOutputStream dataStream = new ByteArrayOutputStream();
@@ -67,10 +64,9 @@ public class MapOutputValue {
     return out.toByteArray();
   }
 
-  public static MapOutputValue fromBytes(byte[] bytes,
-      Map<String, Schema> schemaMap) throws IOException {
-    DataInputStream dataInputStream = new DataInputStream(
-        new ByteArrayInputStream(bytes));
+  public static MapOutputValue fromBytes(byte[] bytes, Map<String, Schema> schemaMap)
+      throws IOException {
+    DataInputStream dataInputStream = new DataInputStream(new ByteArrayInputStream(bytes));
     int length = dataInputStream.readInt();
     byte[] sourceNameBytes = new byte[length];
     dataInputStream.read(sourceNameBytes);
@@ -82,10 +78,8 @@ public class MapOutputValue {
     dataInputStream.read(recordBytes);
     Schema schema = schemaMap.get(schemaName);
     GenericRecord record = new GenericData.Record(schema);
-    binaryDecoder = DecoderFactory.get().binaryDecoder(recordBytes,
-        binaryDecoder);
-    GenericDatumReader<GenericRecord> gdr = new GenericDatumReader<GenericRecord>(
-        schema);
+    binaryDecoder = DecoderFactory.get().binaryDecoder(recordBytes, binaryDecoder);
+    GenericDatumReader<GenericRecord> gdr = new GenericDatumReader<GenericRecord>(schema);
     gdr.read(record, binaryDecoder);
     return new MapOutputValue(schemaName, record);
   }

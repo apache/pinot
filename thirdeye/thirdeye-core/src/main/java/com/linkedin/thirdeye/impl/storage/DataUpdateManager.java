@@ -42,14 +42,12 @@ public class DataUpdateManager {
   private final boolean autoExpire;
   private final ConcurrentMap<String, Lock> collectionLocks;
 
-
   /**
    * A utility to manage data on the file system.
-   *
    * @param rootDir
-   *  The root directory on the file system under which collection data is stored
+   *          The root directory on the file system under which collection data is stored
    * @param autoExpire
-   * If set to true, deletes lower granularity overlapping segments
+   *          If set to true, deletes lower granularity overlapping segments
    */
   public DataUpdateManager(File rootDir, boolean autoExpire) {
     this.rootDir = rootDir;
@@ -73,10 +71,8 @@ public class DataUpdateManager {
   /**
    * Deletes a specific data directory for a collection (min/max time must be exact).
    */
-  public void deleteData(String collection,
-                         String schedule,
-                         DateTime minTime,
-                         DateTime maxTime) throws Exception {
+  public void deleteData(String collection, String schedule, DateTime minTime, DateTime maxTime)
+      throws Exception {
     Lock lock = collectionLocks.get(collection);
     if (lock == null) {
       collectionLocks.putIfAbsent(collection, new ReentrantLock());
@@ -127,13 +123,14 @@ public class DataUpdateManager {
       File[] matchingDirs = collectionDir.listFiles(new FilenameFilter() {
         @Override
         public boolean accept(File dir, String name) {
-          return name.startsWith(dataDirPrefix) &&
-              StorageUtils.getMaxTime(name).compareTo(maxDateTime) <= 0;
+          return name.startsWith(dataDirPrefix)
+              && StorageUtils.getMaxTime(name).compareTo(maxDateTime) <= 0;
         }
       });
 
       if (matchingDirs == null || matchingDirs.length == 0) {
-        throw new FileNotFoundException("No directory with prefix " + dataDirPrefix +" and maxTime less than " + maxTime);
+        throw new FileNotFoundException(
+            "No directory with prefix " + dataDirPrefix + " and maxTime less than " + maxTime);
       }
 
       for (File dataDir : matchingDirs) {
@@ -146,33 +143,26 @@ public class DataUpdateManager {
     }
   }
 
-  public void updateData(String collection,
-                         String schedule,
-                         DateTime minTime,
-                         DateTime maxTime,
-                         byte[] data) throws Exception {
+  public void updateData(String collection, String schedule, DateTime minTime, DateTime maxTime,
+      byte[] data) throws Exception {
     updateData(collection, schedule, minTime, maxTime, new ByteArrayInputStream(data));
   }
 
   /**
    * Loads a data segment.
-   *
    * @param collection
-   *  The collection name (store in rootDir/collection)
+   *          The collection name (store in rootDir/collection)
    * @param schedule
-   *  E.g. HOURLY or DAILY
+   *          E.g. HOURLY or DAILY
    * @param minTime
-   *  The lower bound wall-clock time
+   *          The lower bound wall-clock time
    * @param maxTime
-   *  The upper bound wall-clock time
+   *          The upper bound wall-clock time
    * @param data
-   *  A gzipped tar archive containing data in the appropriate directory structure
+   *          A gzipped tar archive containing data in the appropriate directory structure
    */
-  public void updateData(String collection,
-                         String schedule,
-                         DateTime minTime,
-                         DateTime maxTime,
-                         InputStream data) throws Exception {
+  public void updateData(String collection, String schedule, DateTime minTime, DateTime maxTime,
+      InputStream data) throws Exception {
     Lock lock = collectionLocks.get(collection);
     if (lock == null) {
       collectionLocks.putIfAbsent(collection, new ReentrantLock());
@@ -214,10 +204,11 @@ public class DataUpdateManager {
         LOGGER.info("Tree ID for {} is {}", loadId, treeId);
 
         // Move into data dir
-        File dataDir = new File(collectionDir, StorageUtils.getDataDirName(treeId, schedule, minTime, maxTime));
+        File dataDir = new File(collectionDir,
+            StorageUtils.getDataDirName(treeId, schedule, minTime, maxTime));
         if (dataDir.exists()) {
-          throw new Exception("Data is already uploaded for timerange:" + minTime + " to "
-              + maxTime + ". Please delete the existing data for this range and try again");
+          throw new Exception("Data is already uploaded for timerange:" + minTime + " to " + maxTime
+              + ". Please delete the existing data for this range and try again");
         }
         FileUtils.forceMkdir(dataDir);
         StorageUtils.moveAllFiles(tmpDir, dataDir);
@@ -232,7 +223,9 @@ public class DataUpdateManager {
           expireSegments(collectionDir, minTime, maxTime, schedule);
         }
       } finally {
-        if (treeStream != null) { treeStream.close(); }
+        if (treeStream != null) {
+          treeStream.close();
+        }
         FileUtils.forceDelete(tmpDir);
         LOGGER.info("Deleted tmp dir {}", tmpDir);
       }
@@ -242,61 +235,61 @@ public class DataUpdateManager {
     }
   }
 
-  public void expireSegments(File collectionDir, DateTime minTime, DateTime maxTime, String schedule) throws IOException {
+  public void expireSegments(File collectionDir, DateTime minTime, DateTime maxTime,
+      String schedule) throws IOException {
 
     final String dataSchedule = schedule;
     File[] higherDataDirs = collectionDir.listFiles(new FilenameFilter() {
 
       @Override
       public boolean accept(File dir, String name) {
-        return name.startsWith(StorageUtils.getDataDirPrefix()) &&
-            StorageUtils.getSchedule(name).equals(dataSchedule) &&
-        StarTreeConstants.Schedule.valueOf(dataSchedule).getLowerSchedule() != null;
+        return name.startsWith(StorageUtils.getDataDirPrefix())
+            && StorageUtils.getSchedule(name).equals(dataSchedule)
+            && StarTreeConstants.Schedule.valueOf(dataSchedule).getLowerSchedule() != null;
       }
     });
 
     for (File higherDataDir : higherDataDirs) {
 
-        String lowerSchedule = StarTreeConstants.Schedule.valueOf(StorageUtils.getSchedule(higherDataDir.getName())).getLowerSchedule();
-        DateTime maxDateTime = StorageUtils.getMaxTime(higherDataDir.getName());
-        DateTime startDateTime = StorageUtils.getMinTime(higherDataDir.getName());
+      String lowerSchedule = StarTreeConstants.Schedule
+          .valueOf(StorageUtils.getSchedule(higherDataDir.getName())).getLowerSchedule();
+      DateTime maxDateTime = StorageUtils.getMaxTime(higherDataDir.getName());
+      DateTime startDateTime = StorageUtils.getMinTime(higherDataDir.getName());
 
-        while (startDateTime.compareTo(maxDateTime) < 0) {
-          DateTime endDateTime = StarTreeConstants.Schedule.valueOf(lowerSchedule).getEndDateTime(startDateTime);
-          final String lowerDir = StorageUtils.getDataDirPrefix(lowerSchedule, startDateTime, endDateTime);
+      while (startDateTime.compareTo(maxDateTime) < 0) {
+        DateTime endDateTime =
+            StarTreeConstants.Schedule.valueOf(lowerSchedule).getEndDateTime(startDateTime);
+        final String lowerDir =
+            StorageUtils.getDataDirPrefix(lowerSchedule, startDateTime, endDateTime);
 
-          File[] lowerDataDir = collectionDir.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-              return StorageUtils.isExpirable(pathname, lowerDir);
-            }
-          });
-          for (File expireDataDir : lowerDataDir) {
-            LOGGER.info("Deleting segment {}", expireDataDir);
-            FileUtils.deleteDirectory(expireDataDir);
+        File[] lowerDataDir = collectionDir.listFiles(new FileFilter() {
+          @Override
+          public boolean accept(File pathname) {
+            return StorageUtils.isExpirable(pathname, lowerDir);
           }
-          startDateTime = endDateTime;
+        });
+        for (File expireDataDir : lowerDataDir) {
+          LOGGER.info("Deleting segment {}", expireDataDir);
+          FileUtils.deleteDirectory(expireDataDir);
         }
+        startDateTime = endDateTime;
       }
+    }
   }
 
   /**
    * Creates a data segment from the data that's currently stored in an index.
-   *
    * @param schedule
-   *  The schedule at which the index is being persisted
+   *          The schedule at which the index is being persisted
    * @param minTime
-   *  The wall-clock time that the first record was added to the tree
+   *          The wall-clock time that the first record was added to the tree
    * @param maxTime
-   *  The wall-clock time that the last record was added to the tree
+   *          The wall-clock time that the last record was added to the tree
    * @param starTree
-   *  The index to persist
+   *          The index to persist
    */
-  public void persistTree(String collection,
-                          String schedule,
-                          DateTime minTime,
-                          DateTime maxTime,
-                          final StarTree starTree) throws Exception {
+  public void persistTree(String collection, String schedule, DateTime minTime, DateTime maxTime,
+      final StarTree starTree) throws Exception {
     Lock lock = collectionLocks.get(collection);
     if (lock == null) {
       collectionLocks.putIfAbsent(collection, new ReentrantLock());
@@ -359,13 +352,16 @@ public class DataUpdateManager {
             }
             DimensionKey catchAllKey = new DimensionKey(catchAll);
             List<MetricSpec> metrics = starTree.getConfig().getMetrics();
-            MetricTimeSeries timeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(metrics)); // empty
+            MetricTimeSeries timeSeries =
+                new MetricTimeSeries(MetricSchema.fromMetricSpecs(metrics)); // empty
             if (!records.containsKey(catchAllKey)) {
               records.put(catchAllKey, timeSeries);
             }
 
-            DimensionDictionary dictionary = new DimensionDictionary(node.getRecordStore().getForwardIndex());
-            VariableSizeBufferUtil.createLeafBufferFiles(leafBufferDir, node.getId().toString(), starTree.getConfig(), records, dictionary);
+            DimensionDictionary dictionary =
+                new DimensionDictionary(node.getRecordStore().getForwardIndex());
+            VariableSizeBufferUtil.createLeafBufferFiles(leafBufferDir, node.getId().toString(),
+                starTree.getConfig(), records, dictionary);
           } catch (Exception e) {
             LOGGER.error("Error creating leaf buffer files for {}", node.getId(), e);
           }
@@ -389,17 +385,22 @@ public class DataUpdateManager {
       LOGGER.info("Creating index metadata {}", metadataFile);
       TimeUnit aggregationGranularity = starTree.getConfig().getTime().getBucket().getUnit();
       int bucketSize = starTree.getConfig().getTime().getBucket().getSize();
-      Long minDataTimeMillis = TimeUnit.MILLISECONDS.convert(minDataTime.get() * bucketSize, aggregationGranularity);
-      Long maxDataTimeMillis = TimeUnit.MILLISECONDS.convert(maxDataTime.get() * bucketSize, aggregationGranularity);
-      Long startTime = aggregationGranularity.convert(minTime.getMillis(), TimeUnit.MILLISECONDS) / bucketSize;
-      Long endTime = aggregationGranularity.convert(maxTime.getMillis(), TimeUnit.MILLISECONDS) / bucketSize;
+      Long minDataTimeMillis =
+          TimeUnit.MILLISECONDS.convert(minDataTime.get() * bucketSize, aggregationGranularity);
+      Long maxDataTimeMillis =
+          TimeUnit.MILLISECONDS.convert(maxDataTime.get() * bucketSize, aggregationGranularity);
+      Long startTime =
+          aggregationGranularity.convert(minTime.getMillis(), TimeUnit.MILLISECONDS) / bucketSize;
+      Long endTime =
+          aggregationGranularity.convert(maxTime.getMillis(), TimeUnit.MILLISECONDS) / bucketSize;
 
       IndexMetadata metadata =
-          new IndexMetadata(minDataTime.get(), maxDataTime.get(), minDataTimeMillis, maxDataTimeMillis,
-              startTime, endTime, minTime.getMillis(), maxTime.getMillis(),
+          new IndexMetadata(minDataTime.get(), maxDataTime.get(), minDataTimeMillis,
+              maxDataTimeMillis, startTime, endTime, minTime.getMillis(), maxTime.getMillis(),
               schedule, aggregationGranularity.toString(), bucketSize, IndexFormat.VARIABLE_SIZE);
       OutputStream metadataStream = new FileOutputStream(metadataFile);
-      metadata.toProperties().store(metadataStream, "This segment was created via DataUpdateManager#persistTree");
+      metadata.toProperties().store(metadataStream,
+          "This segment was created via DataUpdateManager#persistTree");
       metadataStream.close();
 
       File configFile = new File(segmentBufferDir, StarTreeConstants.CONFIG_FILE_NAME);
@@ -409,9 +410,11 @@ public class DataUpdateManager {
 
       // Move the segment buffers into actual data directory
       String treeId = starTree.getRoot().getId().toString();
-      File dataDir = new File(collectionDir, StorageUtils.getDataDirName(treeId, schedule, minTime, maxTime));
+      File dataDir =
+          new File(collectionDir, StorageUtils.getDataDirName(treeId, schedule, minTime, maxTime));
       if (dataDir.exists()) {
-        throw new Exception("Data is already persisted for timerange:" + minTime + " to " + maxTime);
+        throw new Exception(
+            "Data is already persisted for timerange:" + minTime + " to " + maxTime);
       }
       LOGGER.info("Moving segments into {}", dataDir);
       FileUtils.forceMkdir(dataDir);
@@ -433,29 +436,20 @@ public class DataUpdateManager {
 
   /**
    * Returns a merged tree with all dimensions and data.
-   *
    * @param starTrees
-   *  A collection of star trees all with the same configuration.
+   *          A collection of star trees all with the same configuration.
    */
   public StarTree mergeTrees(Collection<StarTree> starTrees) throws Exception {
     // Create the merged tree structure
     StarTreeConfig baseConfig = starTrees.iterator().next().getConfig();
     StarTreeConfig inMemoryConfig = new StarTreeConfig(baseConfig.getCollection(),
-        StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(),
-        new Properties(),
+        StarTreeRecordStoreFactoryHashMapImpl.class.getCanonicalName(), new Properties(),
         baseConfig.getAnomalyDetectionFunctionClass(),
-        baseConfig.getAnomalyDetectionFunctionConfig(),
-        baseConfig.getAnomalyHandlerClass(),
-        baseConfig.getAnomalyHandlerConfig(),
-        baseConfig.getAnomalyDetectionMode(),
-        baseConfig.getDimensions(),
-        baseConfig.getMetrics(),
-        baseConfig.getTime(),
-        baseConfig.getJoinSpec(),
-        baseConfig.getRollup(),
-        baseConfig.getTopKRollup(),
-        baseConfig.getSplit(),
-        false);
+        baseConfig.getAnomalyDetectionFunctionConfig(), baseConfig.getAnomalyHandlerClass(),
+        baseConfig.getAnomalyHandlerConfig(), baseConfig.getAnomalyDetectionMode(),
+        baseConfig.getDimensions(), baseConfig.getMetrics(), baseConfig.getTime(),
+        baseConfig.getJoinSpec(), baseConfig.getRollup(), baseConfig.getTopKRollup(),
+        baseConfig.getSplit(), false);
     final StarTree mergedTree = new StarTreeImpl(inMemoryConfig);
     mergedTree.open();
 
@@ -474,9 +468,8 @@ public class DataUpdateManager {
     return mergedTree;
   }
 
-  private static void updateMap(Map<DimensionKey, MetricTimeSeries> map,
-                                DimensionKey key,
-                                MetricTimeSeries timeSeries) {
+  private static void updateMap(Map<DimensionKey, MetricTimeSeries> map, DimensionKey key,
+      MetricTimeSeries timeSeries) {
     MetricTimeSeries series = map.get(key);
     if (series == null) {
       series = new MetricTimeSeries(timeSeries.getSchema());

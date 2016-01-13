@@ -16,8 +16,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 
-public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
-{
+public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaDecoderAvroImpl.class);
 
   public static final String PROP_RECORD_OFFSET = "record.offset";
@@ -31,15 +30,14 @@ public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
   private DatumReader<GenericRecord> datumReader;
 
   @Override
-  public void init(StarTreeConfig starTreeConfig, ThirdEyeKafkaConfig kafkaConfig) throws Exception
-  {
+  public void init(StarTreeConfig starTreeConfig, ThirdEyeKafkaConfig kafkaConfig)
+      throws Exception {
     this.starTreeConfig = starTreeConfig;
     this.decoderThreadLocal = new ThreadLocal<BinaryDecoder>();
 
     // Get schema
     String schemaUri = kafkaConfig.getDecoderConfig().getProperty(PROP_SCHEMA_URI);
-    if (schemaUri == null)
-    {
+    if (schemaUri == null) {
       throw new IllegalStateException("Must provide " + PROP_SCHEMA_URI);
     }
     InputStream schemaInputStream = URI.create(schemaUri).toURL().openStream();
@@ -53,20 +51,18 @@ public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
 
     // Set any record offset
     String recordOffsetProp = kafkaConfig.getDecoderConfig().getProperty(PROP_RECORD_OFFSET);
-    if (recordOffsetProp != null)
-    {
+    if (recordOffsetProp != null) {
       this.recordOffset = Integer.valueOf(recordOffsetProp);
     }
   }
 
   @Override
-  public StarTreeRecord decode(byte[] bytes) throws IOException
-  {
-    if (recordOffset > 0)
-    {
+  public StarTreeRecord decode(byte[] bytes) throws IOException {
+    if (recordOffset > 0) {
       bytes = Arrays.copyOfRange(bytes, recordOffset, bytes.length);
     }
-    decoderThreadLocal.set(DecoderFactory.defaultFactory().createBinaryDecoder(bytes, decoderThreadLocal.get()));
+    decoderThreadLocal
+        .set(DecoderFactory.defaultFactory().createBinaryDecoder(bytes, decoderThreadLocal.get()));
     GenericRecord record = datumReader.read(null, decoderThreadLocal.get());
     return ThirdEyeAvroUtils.convert(starTreeConfig, record);
   }

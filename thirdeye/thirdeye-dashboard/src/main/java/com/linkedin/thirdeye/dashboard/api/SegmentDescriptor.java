@@ -11,13 +11,11 @@ public class SegmentDescriptor {
   private DateTime startDataTime;
   private DateTime endDataTime;
 
-  public SegmentDescriptor() {}
+  public SegmentDescriptor() {
+  }
 
-  public SegmentDescriptor(File file,
-                           DateTime startWallTime,
-                           DateTime endWallTime,
-                           DateTime startDataTime,
-                           DateTime endDataTime) {
+  public SegmentDescriptor(File file, DateTime startWallTime, DateTime endWallTime,
+      DateTime startDataTime, DateTime endDataTime) {
     this.file = file;
     this.startWallTime = startWallTime;
     this.endWallTime = endWallTime;

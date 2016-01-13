@@ -23,10 +23,7 @@ public class CustomTimeSeriesView extends View {
     List<Map<String, Object>> json = new ArrayList<>();
 
     for (Map.Entry<String, List<Number[]>> entry : data.entrySet()) {
-      json.add(ImmutableMap.of(
-          "label", entry.getKey(),
-          "data", entry.getValue()
-      ));
+      json.add(ImmutableMap.of("label", entry.getKey(), "data", entry.getValue()));
     }
 
     return OBJECT_MAPPER.writeValueAsString(json);

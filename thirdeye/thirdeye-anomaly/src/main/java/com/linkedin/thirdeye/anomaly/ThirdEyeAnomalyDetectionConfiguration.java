@@ -9,20 +9,22 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
  * This class is configuration for thirdeye-anomaly detection.
- *
  * The purpose of this configuration is to:
- *  - configure a single round of anomaly detection
- *  - be generic to online and ad-hoc runs of anomaly detection
- *
+ * - configure a single round of anomaly detection
+ * - be generic to online and ad-hoc runs of anomaly detection
  * This config does not handle:
- *  - scheduling (detection interval)
- *  - polling (how often to poll thirdeye-server)
+ * - scheduling (detection interval)
+ * - polling (how often to poll thirdeye-server)
  */
 public class ThirdEyeAnomalyDetectionConfiguration {
 
-  /** Built in modes of operation that determine how function definitions in the anomaly database are interpreted */
+  /**
+   * Built in modes of operation that determine how function definitions in the anomaly database are
+   * interpreted
+   */
   public enum Mode {
-    RULEBASED, GENERIC,
+    RULEBASED,
+    GENERIC,
   }
 
   /** The mode determining how to interpret the anomaly database function specifications. */
@@ -37,7 +39,10 @@ public class ThirdEyeAnomalyDetectionConfiguration {
   /** The port to request data from the server */
   private short thirdEyeServerPort;
 
-  /** The configuration for the anomaly database including: url, function table, anomaly table, user credentials */
+  /**
+   * The configuration for the anomaly database including: url, function table, anomaly table, user
+   * credentials
+   */
   private AnomalyDatabaseConfig anomalyDatabaseConfig;
 
   /** List of anomaly detection driver configurations pertaining to each collection */
@@ -47,7 +52,8 @@ public class ThirdEyeAnomalyDetectionConfiguration {
   private TimeGranularity maxWaitToCompletion = new TimeGranularity(1, TimeUnit.HOURS);
 
   /**
-   * Only run this functionId. This should only be used for testing purposes. The is_active column should be used
+   * Only run this functionId. This should only be used for testing purposes. The is_active column
+   * should be used
    * to control which functions are run in production.
    */
   private Integer functionIdToEvaluate = null;

@@ -29,15 +29,14 @@ public class AnomalyDetectionFunctionConsecutive extends AnomalyDetectionFunctio
     this.length = length;
   }
 
-
   @Override
-  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException {
+  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig)
+      throws IllegalFunctionException {
     super.init(starTreeConfig, functionConfig);
   }
 
   /**
    * Adds length times aggregate granularity time to the child's minimum window time granularity.
-   *
    * {@inheritDoc}
    * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#getTrainingWindowTimeGranularity()
    */
@@ -53,29 +52,32 @@ public class AnomalyDetectionFunctionConsecutive extends AnomalyDetectionFunctio
   }
 
   /**
-   * Returns a list of anomaly results, with anomaly score being the average. Properties are inherited from the last
+   * Returns a list of anomaly results, with anomaly score being the average. Properties are
+   * inherited from the last
    * anomaly result in the window.
-   *
    * {@inheritDoc}
-   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.api.DimensionKey, com.linkedin.thirdeye.api.MetricTimeSeries)
+   * @see com.linkedin.thirdeye.anomaly.api.function.AnomalyDetectionFunction#analyze(com.linkedin.thirdeye.api.DimensionKey,
+   *      com.linkedin.thirdeye.api.MetricTimeSeries)
    */
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,
-      List<AnomalyResult> anomalyHistory) {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series,
+      TimeRange timeInterval, List<AnomalyResult> anomalyHistory) {
     // consecutive requires the nested function to produce some extra results
-    long newTimeIntervalStart = timeInterval.getStart() - (
-        length * TimeGranularityUtils.toMillis(childFunc.getAggregationTimeGranularity()));
+    long newTimeIntervalStart = timeInterval.getStart()
+        - (length * TimeGranularityUtils.toMillis(childFunc.getAggregationTimeGranularity()));
     TimeRange timeIntervalExtended = new TimeRange(newTimeIntervalStart, timeInterval.getEnd());
 
-    List<AnomalyResult> consecutiveResults = new ArrayList<AnomalyResult>(series.getTimeWindowSet().size());
-    List<AnomalyResult> intermediateResults = childFunc.analyze(dimensionKey, series, timeIntervalExtended,
-        anomalyHistory);
+    List<AnomalyResult> consecutiveResults =
+        new ArrayList<AnomalyResult>(series.getTimeWindowSet().size());
+    List<AnomalyResult> intermediateResults =
+        childFunc.analyze(dimensionKey, series, timeIntervalExtended, anomalyHistory);
     HashMap<Long, AnomalyResult> mappedResults = new HashMap<>();
     for (AnomalyResult ar : intermediateResults) {
       mappedResults.put(ar.getTimeWindow(), ar);
     }
 
-    long windowGranularity = TimeGranularityUtils.toMillis(childFunc.getAggregationTimeGranularity());
+    long windowGranularity =
+        TimeGranularityUtils.toMillis(childFunc.getAggregationTimeGranularity());
     for (Long timeWindow : mappedResults.keySet()) {
       int anomalyCount = 0;
       double scoreAvg = 0;
@@ -94,8 +96,8 @@ public class AnomalyDetectionFunctionConsecutive extends AnomalyDetectionFunctio
       }
 
       // inherit properties from latest in consecutive series
-      consecutiveResults.add(new AnomalyResult(anomalyCount == length, timeWindow, scoreAvg, volumeAvg,
-          mappedResults.get(timeWindow).getProperties()));
+      consecutiveResults.add(new AnomalyResult(anomalyCount == length, timeWindow, scoreAvg,
+          volumeAvg, mappedResults.get(timeWindow).getProperties()));
     }
     return consecutiveResults;
   }

@@ -55,7 +55,7 @@ public class AnomalyResultResource {
   @UnitOfWork
   @Path("/{collection}/{startIsoTime}")
   public List<AnomalyResult> find(@PathParam("collection") String collection,
-                                  @PathParam("startIsoTime") String startIsoTime) {
+      @PathParam("startIsoTime") String startIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
     DateTime endTime = DateTime.now();
     return dao.findAllByCollectionAndTime(collection, startTime, endTime);
@@ -66,8 +66,7 @@ public class AnomalyResultResource {
   @UnitOfWork
   @Path("/{collection}/{startIsoTime}/{endIsoTime}")
   public List<AnomalyResult> find(@PathParam("collection") String collection,
-                                  @PathParam("startIsoTime") String startIsoTime,
-                                  @PathParam("endIsoTime") String endIsoTime) {
+      @PathParam("startIsoTime") String startIsoTime, @PathParam("endIsoTime") String endIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endIsoTime);
     return dao.findAllByCollectionAndTime(collection, startTime, endTime);

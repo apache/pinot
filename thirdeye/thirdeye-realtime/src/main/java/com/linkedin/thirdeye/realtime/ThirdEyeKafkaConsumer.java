@@ -40,26 +40,22 @@ public class ThirdEyeKafkaConsumer {
 
   /**
    * Consumes data from Kafka for one collection.
-   *
    * @param starTree
-   *  The mutable index
+   *          The mutable index
    * @param kafkaConfig
-   *  The kafka configuration (e.g. zk address, topic, etc.)
+   *          The kafka configuration (e.g. zk address, topic, etc.)
    * @param consumerExecutors
-   *  Used to consume messages from Kafka
+   *          Used to consume messages from Kafka
    * @param taskScheduler
-   *  Used to schedule persist task
+   *          Used to schedule persist task
    * @param dataUpdateManager
-   *  Utility to persist segments
+   *          Utility to persist segments
    * @param metricRegistry
-   *  The server's metric registry for reporting
+   *          The server's metric registry for reporting
    */
-  public ThirdEyeKafkaConsumer(StarTree starTree,
-                               ThirdEyeKafkaConfig kafkaConfig,
-                               ExecutorService consumerExecutors,
-                               ScheduledExecutorService taskScheduler,
-                               DataUpdateManager dataUpdateManager,
-                               MetricRegistry metricRegistry) {
+  public ThirdEyeKafkaConsumer(StarTree starTree, ThirdEyeKafkaConfig kafkaConfig,
+      ExecutorService consumerExecutors, ScheduledExecutorService taskScheduler,
+      DataUpdateManager dataUpdateManager, MetricRegistry metricRegistry) {
     if (starTree == null) {
       throw new NullPointerException("Provided star tree is null");
     }
@@ -90,7 +86,8 @@ public class ThirdEyeKafkaConsumer {
       // Construct decoder
       LOG.info("Constructing decoder {}", kafkaConfig.getDecoderClass());
       Class<?> decoderClass = Class.forName(kafkaConfig.getDecoderClass());
-      ThirdEyeKafkaDecoder decoder = (ThirdEyeKafkaDecoder) decoderClass.getConstructor().newInstance();
+      ThirdEyeKafkaDecoder decoder =
+          (ThirdEyeKafkaDecoder) decoderClass.getConstructor().newInstance();
       decoder.init(starTree.getConfig(), kafkaConfig);
 
       // Configure Kafka consumer
@@ -106,13 +103,16 @@ public class ThirdEyeKafkaConsumer {
       // Create stream
       LOG.info("Creating Kafka message streams");
       Map<String, Integer> topicMap = Collections.singletonMap(kafkaConfig.getTopicName(), 1);
-      Map<String, List<KafkaStream<byte[], byte[]>>> streams = consumer.createMessageStreams(topicMap);
+      Map<String, List<KafkaStream<byte[], byte[]>>> streams =
+          consumer.createMessageStreams(topicMap);
       if (streams.size() != 1) {
-        throw new IllegalStateException("Can only consume one stream for " + kafkaConfig.getTopicName());
+        throw new IllegalStateException(
+            "Can only consume one stream for " + kafkaConfig.getTopicName());
       }
       List<KafkaStream<byte[], byte[]>> topicStreams = streams.values().iterator().next();
       if (topicStreams.size() != 1) {
-        throw new IllegalStateException("Can only consume one stream for " + kafkaConfig.getTopicName());
+        throw new IllegalStateException(
+            "Can only consume one stream for " + kafkaConfig.getTopicName());
       }
       KafkaStream<byte[], byte[]> stream = topicStreams.get(0);
 
@@ -125,7 +125,8 @@ public class ThirdEyeKafkaConsumer {
       persistTask.set(new PersistTask(consumer, starTree));
       TimeGranularity interval = kafkaConfig.getPersistInterval();
       LOG.info("Scheduling persist task at {}", interval);
-      taskScheduler.scheduleAtFixedRate(persistTask.get(), interval.getSize(), interval.getSize(), interval.getUnit());
+      taskScheduler.scheduleAtFixedRate(persistTask.get(), interval.getSize(), interval.getSize(),
+          interval.getUnit());
     }
   }
 
@@ -153,7 +154,8 @@ public class ThirdEyeKafkaConsumer {
     private final ThirdEyeKafkaDecoder decoder;
     private final KafkaStream<byte[], byte[]> stream;
 
-    EventIterator(StarTree starTree, ThirdEyeKafkaDecoder decoder, KafkaStream<byte[], byte[]> stream) {
+    EventIterator(StarTree starTree, ThirdEyeKafkaDecoder decoder,
+        KafkaStream<byte[], byte[]> stream) {
       this.starTree = starTree;
       this.decoder = decoder;
       this.stream = stream;

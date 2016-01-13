@@ -34,15 +34,15 @@ public class ReportEmailSender {
     this.templatePath = templatePath;
   }
 
-  public void emailReport()  {
+  public void emailReport() {
 
     try {
 
-      FileTemplateLoader ftl = new FileTemplateLoader(
-          new File(templatePath));
+      FileTemplateLoader ftl = new FileTemplateLoader(new File(templatePath));
       Configuration emailConfiguration = new Configuration();
       emailConfiguration.setTemplateLoader(ftl);
-      Template emailReportTemplate = emailConfiguration.getTemplate(reportObjects.getScheduleSpec().getEmailTemplate());
+      Template emailReportTemplate =
+          emailConfiguration.getTemplate(reportObjects.getScheduleSpec().getEmailTemplate());
 
       Writer emailOutput = new StringWriter();
       emailReportTemplate.process(reportObjects, emailOutput);
@@ -53,27 +53,29 @@ public class ReportEmailSender {
 
       Message emailReportMessage = new MimeMessage(session);
       for (String emailIdFrom : reportObjects.getScheduleSpec().getEmailFrom().split(",")) {
-        emailReportMessage.setFrom(new InternetAddress(emailIdFrom, reportObjects.getScheduleSpec().getNameFrom()));
+        emailReportMessage.setFrom(
+            new InternetAddress(emailIdFrom, reportObjects.getScheduleSpec().getNameFrom()));
       }
       for (String emailIdTo : reportObjects.getScheduleSpec().getEmailTo().split(",")) {
         emailReportMessage.addRecipient(Message.RecipientType.TO,
-                         new InternetAddress(emailIdTo, reportObjects.getScheduleSpec().getNameTo()));
+            new InternetAddress(emailIdTo, reportObjects.getScheduleSpec().getNameTo()));
       }
-      emailReportMessage.setSubject(ReportConstants.REPORT_SUBJECT_PREFIX +
-          " (" + reportObjects.getReportConfig().getCollection().toUpperCase() + ") " +
-          reportObjects.getReportConfig().getName());
+      emailReportMessage.setSubject(ReportConstants.REPORT_SUBJECT_PREFIX + " ("
+          + reportObjects.getReportConfig().getCollection().toUpperCase() + ") "
+          + reportObjects.getReportConfig().getName());
       emailReportMessage.setContent(emailOutput.toString(), "text/html");
-      LOGGER.info("Sending email from {} to {}  ",
-          reportObjects.getScheduleSpec().getEmailFrom(), reportObjects.getScheduleSpec().getEmailTo());
+      LOGGER.info("Sending email from {} to {}  ", reportObjects.getScheduleSpec().getEmailFrom(),
+          reportObjects.getScheduleSpec().getEmailTo());
 
       Transport.send(emailReportMessage);
 
     } catch (Exception e) {
-     e.printStackTrace();
+      e.printStackTrace();
     }
   }
 
-  public static void sendErrorReport(List<TimeRange> missingSegments, ScheduleSpec scheduleSpec, ReportConfig reportConfig) {
+  public static void sendErrorReport(List<TimeRange> missingSegments, ScheduleSpec scheduleSpec,
+      ReportConfig reportConfig) {
     StringBuilder sb = new StringBuilder("Data segments missing : ");
     sb.append(System.getProperty("line.separator"));
     for (TimeRange tr : missingSegments) {
@@ -83,16 +85,15 @@ public class ReportEmailSender {
       sb.append(System.getProperty("line.separator"));
     }
 
-    String subject = ReportConstants.REPORT_SUBJECT_PREFIX +
-    " (Data Segments Missing)" +
-    " " + reportConfig.getCollection().toUpperCase() +
-    " (" + reportConfig.getEndTimeString() +
-    ") " + reportConfig.getName();
+    String subject = ReportConstants.REPORT_SUBJECT_PREFIX + " (Data Segments Missing)" + " "
+        + reportConfig.getCollection().toUpperCase() + " (" + reportConfig.getEndTimeString() + ") "
+        + reportConfig.getName();
 
     sendErrorReport(subject, sb.toString(), scheduleSpec, reportConfig);
   }
 
-  public static void sendErrorReport(String subject, String message, ScheduleSpec scheduleSpec, ReportConfig reportConfig) {
+  public static void sendErrorReport(String subject, String message, ScheduleSpec scheduleSpec,
+      ReportConfig reportConfig) {
     try {
 
       Properties props = new Properties();
@@ -105,12 +106,12 @@ public class ReportEmailSender {
       }
       for (String emailIdTo : scheduleSpec.getErrorEmailTo().split(",")) {
         emailReportMessage.addRecipient(Message.RecipientType.TO,
-                         new InternetAddress(emailIdTo, scheduleSpec.getNameTo()));
+            new InternetAddress(emailIdTo, scheduleSpec.getNameTo()));
       }
       emailReportMessage.setSubject(subject);
       emailReportMessage.setContent(message, "text/html");
-      LOGGER.info("Sending error email from {} to {}  ",
-          scheduleSpec.getEmailFrom(), scheduleSpec.getEmailTo());
+      LOGGER.info("Sending error email from {} to {}  ", scheduleSpec.getEmailFrom(),
+          scheduleSpec.getEmailTo());
 
       Transport.send(emailReportMessage);
 

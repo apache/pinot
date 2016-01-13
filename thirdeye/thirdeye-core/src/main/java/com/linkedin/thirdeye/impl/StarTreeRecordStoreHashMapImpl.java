@@ -31,7 +31,8 @@ public class StarTreeRecordStoreHashMapImpl implements StarTreeRecordStore {
   public void update(StarTreeRecord record) {
     lock.writeLock().lock();
     try {
-      MetricTimeSeries existing = store.putIfAbsent(record.getDimensionKey(), record.getMetricTimeSeries());
+      MetricTimeSeries existing =
+          store.putIfAbsent(record.getDimensionKey(), record.getMetricTimeSeries());
       if (existing != null) {
         existing.aggregate(record.getMetricTimeSeries());
       }

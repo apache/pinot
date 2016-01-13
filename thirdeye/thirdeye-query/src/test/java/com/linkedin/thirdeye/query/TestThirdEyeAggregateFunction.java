@@ -17,7 +17,8 @@ public class TestThirdEyeAggregateFunction {
   @BeforeClass
   public void beforeClass() throws Exception {
     config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("test-config.yml"));
-    metricSchema = new MetricSchema(ImmutableList.of("L", "D"), ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
+    metricSchema = new MetricSchema(ImmutableList.of("L", "D"),
+        ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
     timeSeries = new MetricTimeSeries(metricSchema);
     for (int i = 0; i < 16; i++) {
       timeSeries.increment(i, "L", 1);
@@ -30,8 +31,8 @@ public class TestThirdEyeAggregateFunction {
 
   @Test
   public void testValid_simple() {
-    MetricTimeSeries derived = new ThirdEyeAggregateFunction(
-        new TimeGranularity(4, TimeUnit.HOURS)).apply(config, query, timeSeries);
+    MetricTimeSeries derived = new ThirdEyeAggregateFunction(new TimeGranularity(4, TimeUnit.HOURS))
+        .apply(config, query, timeSeries);
     Assert.assertEquals(derived.getTimeWindowSet().size(), 4);
 
     for (long i = 0; i < 16; i += 4) {

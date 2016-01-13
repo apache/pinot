@@ -14,7 +14,8 @@ public abstract class AnomalyDetectionFunctionAbstractBase implements AnomalyDet
   private TimeGranularity aggregateTimeGranularity;
 
   @Override
-  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException {
+  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig)
+      throws IllegalFunctionException {
     // nothing to do
   }
 

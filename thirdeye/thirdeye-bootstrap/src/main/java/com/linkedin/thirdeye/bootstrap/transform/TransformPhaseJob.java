@@ -45,17 +45,14 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
 /**
  * Transform job to transform input files from one schema to another
- *
  * Required properties:
  * transform.input.schema=<path to input schema on hdfs>
  * transform.output.schema=<path to output schema on hdfs>
  * transform.input.path=<path to input data files on hdfs>
  * transform.output.path=<output data path on hdfs>
  * transform.udf.class=<UDF class to perform transformation>
- *
  */
 public class TransformPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformPhaseJob.class);
@@ -70,8 +67,8 @@ public class TransformPhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class GenericTransformMapper extends
-      Mapper<AvroKey<GenericRecord>, NullWritable, IntWritable, AvroValue<GenericRecord>> {
+  public static class GenericTransformMapper
+      extends Mapper<AvroKey<GenericRecord>, NullWritable, IntWritable, AvroValue<GenericRecord>> {
 
     TransformUDF transformUDF;
     int numReducers;
@@ -134,21 +131,17 @@ public class TransformPhaseJob extends Configured {
 
   }
 
-  public static class GenericTransformReducer extends Reducer<IntWritable, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable>
-  {
+  public static class GenericTransformReducer
+      extends Reducer<IntWritable, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
     @Override
     public void reduce(IntWritable key, Iterable<AvroValue<GenericRecord>> values, Context context)
-            throws IOException, InterruptedException
-    {
-      for (AvroValue<GenericRecord> value : values)
-      {
+        throws IOException, InterruptedException {
+      for (AvroValue<GenericRecord> value : values) {
         GenericRecord record = value.datum();
         context.write(new AvroKey<GenericRecord>(record), NullWritable.get());
       }
     }
   }
-
-
 
   public Job run() throws Exception {
 
@@ -168,8 +161,7 @@ public class TransformPhaseJob extends Configured {
     FileSystem fs = FileSystem.get(configuration);
 
     // Set outputSchema, output path
-    String outputSchemaPath =
-        getAndSetConfiguration(configuration, TRANSFORM_OUTPUT_AVRO_SCHEMA);
+    String outputSchemaPath = getAndSetConfiguration(configuration, TRANSFORM_OUTPUT_AVRO_SCHEMA);
     Schema.Parser parser = new Schema.Parser();
     Schema outputSchema = parser.parse(fs.open(new Path(outputSchemaPath)));
     LOGGER.info("{}", outputSchema);
@@ -238,7 +230,7 @@ public class TransformPhaseJob extends Configured {
 
     // Map config
     job.setMapperClass(GenericTransformMapper.class);
-    //AvroJob.setInputKeySchema(job, inputSchema);
+    // AvroJob.setInputKeySchema(job, inputSchema);
     job.setInputFormatClass(DelegatingAvroKeyInputFormat.class);
     job.setMapOutputKeyClass(IntWritable.class);
     job.setMapOutputValueClass(AvroValue.class);
@@ -255,8 +247,8 @@ public class TransformPhaseJob extends Configured {
     return job;
   }
 
-
-  private String getAndSetConfiguration(Configuration configuration, TransformPhaseJobConstants constant) {
+  private String getAndSetConfiguration(Configuration configuration,
+      TransformPhaseJobConstants constant) {
     String value = getAndCheck(constant.toString());
     configuration.set(constant.toString(), value);
     return value;

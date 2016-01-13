@@ -11,13 +11,8 @@ public class ExecuteFunctionView extends AbstractView {
   private final List<String> dimensionNames;
   private final String responseUrl;
 
-  public ExecuteFunctionView(
-      String database,
-      String functionTable,
-      String collection,
-      int functionId,
-      List<String> dimensionNames,
-      String responseUrl) {
+  public ExecuteFunctionView(String database, String functionTable, String collection,
+      int functionId, List<String> dimensionNames, String responseUrl) {
     super("execute-function-view.ftl", database, functionTable, collection);
     this.functionId = functionId;
     this.responseUrl = responseUrl;

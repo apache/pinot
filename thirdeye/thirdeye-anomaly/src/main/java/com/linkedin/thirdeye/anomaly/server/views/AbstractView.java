@@ -11,10 +11,7 @@ public abstract class AbstractView extends View {
   private final String functionTable;
   private final String collection;
 
-  protected AbstractView(
-      String templateName,
-      String database,
-      String functionTable,
+  protected AbstractView(String templateName, String database, String functionTable,
       String collection) {
     super(templateName);
     this.collection = collection;

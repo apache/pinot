@@ -22,7 +22,6 @@ public class StarTreeGenerationConfig {
   }
 
   /**
-   *
    * @param collectionName
    * @param dimensionNames
    * @param metricNames
@@ -31,10 +30,9 @@ public class StarTreeGenerationConfig {
    * @param timeColumnName
    * @param splitThreshold
    */
-  public StarTreeGenerationConfig(String collectionName,
-      List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, List<String> splitOrder, String timeColumnName,
-      int splitThreshold) {
+  public StarTreeGenerationConfig(String collectionName, List<String> dimensionNames,
+      List<String> metricNames, List<MetricType> metricTypes, List<String> splitOrder,
+      String timeColumnName, int splitThreshold) {
     super();
     this.collectionName = collectionName;
     this.dimensionNames = dimensionNames;
@@ -73,29 +71,21 @@ public class StarTreeGenerationConfig {
     return splitThreshold;
   }
 
-
-  public static StarTreeGenerationConfig fromStarTreeConfig(StarTreeConfig config)
-  {
+  public static StarTreeGenerationConfig fromStarTreeConfig(StarTreeConfig config) {
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
+    for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
-    return new StarTreeGenerationConfig(config.getCollection(),
-                                        dimensionNames,
-                                        metricNames,
-                                        metricTypes,
-                                        config.getSplit().getOrder(),
-                                        config.getTime().getColumnName(),
-                                        config.getSplit().getThreshold());
+    return new StarTreeGenerationConfig(config.getCollection(), dimensionNames, metricNames,
+        metricTypes, config.getSplit().getOrder(), config.getTime().getColumnName(),
+        config.getSplit().getThreshold());
   }
 }

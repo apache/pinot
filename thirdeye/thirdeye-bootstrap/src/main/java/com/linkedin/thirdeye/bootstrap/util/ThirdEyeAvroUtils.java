@@ -17,9 +17,10 @@ import java.util.concurrent.TimeUnit;
  * TODO: The logic to parse / extract derived dimension values should probably be somewhere else,
  * but we can put it in here for now until we refactor (maybe into a thirdeye-avro module that
  * can be used by both thirdeye-realtime and thirdeye-bootstrap).
- *
- * n.b. This (roughly) same class exists in the thirdeye-realtime module, but due to Avro version mismatch
- * with other transitive dependencies in the deployment framework at LinkedIn, refactoring the logic into
+ * n.b. This (roughly) same class exists in the thirdeye-realtime module, but due to Avro version
+ * mismatch
+ * with other transitive dependencies in the deployment framework at LinkedIn, refactoring the logic
+ * into
  * a common place will potentially cause trouble.
  */
 public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
@@ -104,11 +105,11 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
 
   /**
    * Returns a new value based on some condition.
-   *
    * @param dimensionValue
-   *  An integral numeric dimension value
+   *          An integral numeric dimension value
    * @param config
-   *  Contains a "condition", "operator" (LT, LE, GT, GE, EQ), "true" value if true, "false" value if false
+   *          Contains a "condition", "operator" (LT, LE, GT, GE, EQ), "true" value if true, "false"
+   *          value if false
    */
   private static String parseTernaryValue(String dimensionValue, Properties config) {
     String trueValue = config.getProperty("trueValue");
@@ -125,11 +126,16 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
     long value = Long.valueOf(dimensionValue);
     long conditionValue = Long.valueOf(config.getProperty("condition"));
     switch (operator) {
-      case EQ: return value == conditionValue ? trueValue : falseValue;
-      case LT: return value < conditionValue ? trueValue : falseValue;
-      case LE: return value <= conditionValue ? trueValue : falseValue;
-      case GT: return value > conditionValue ? trueValue : falseValue;
-      case GE: return value >= conditionValue ? trueValue : falseValue;
+    case EQ:
+      return value == conditionValue ? trueValue : falseValue;
+    case LT:
+      return value < conditionValue ? trueValue : falseValue;
+    case LE:
+      return value <= conditionValue ? trueValue : falseValue;
+    case GT:
+      return value > conditionValue ? trueValue : falseValue;
+    case GE:
+      return value >= conditionValue ? trueValue : falseValue;
     }
 
     throw new IllegalStateException("Could not apply " + config + " to value " + dimensionValue);
@@ -139,9 +145,8 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
     return convert(config, record, null);
   }
 
-  public static StarTreeRecord convert(StarTreeConfig config,
-                                       GenericRecord record,
-                                       DateTimeFormatter dateTimeFormatter) {
+  public static StarTreeRecord convert(StarTreeConfig config, GenericRecord record,
+      DateTimeFormatter dateTimeFormatter) {
     // Dimensions
     String[] dimensionValues = new String[config.getDimensions().size()];
     for (int i = 0; i < config.getDimensions().size(); i++) {
@@ -149,12 +154,12 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
       String dimensionValue = getRecordValue(dimensionSpec.getName(), record);
       if (!NULL_VALUE.equals(dimensionValue) && dimensionSpec.getType() != null) {
         switch (dimensionSpec.getType()) {
-          case EMAIL_DOMAIN:
-            dimensionValue = parseEmailDomain(dimensionValue, dimensionSpec.getConfig());
-            break;
-          case TERNARY:
-            dimensionValue = parseTernaryValue(dimensionValue, dimensionSpec.getConfig());
-            break;
+        case EMAIL_DOMAIN:
+          dimensionValue = parseEmailDomain(dimensionValue, dimensionSpec.getConfig());
+          break;
+        case TERNARY:
+          dimensionValue = parseTernaryValue(dimensionValue, dimensionSpec.getConfig());
+          break;
         }
       }
       dimensionValues[i] = dimensionValue;
@@ -175,11 +180,13 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
     if (dateTimeFormatter == null) {
       // Time is raw long
       Long sourceTimeWindow = Long.parseLong(timeStr);
-      time = bucket.getUnit().convert(sourceTimeWindow * input.getSize(), input.getUnit()) / bucket.getSize();
+      time = bucket.getUnit().convert(sourceTimeWindow * input.getSize(), input.getUnit())
+          / bucket.getSize();
     } else {
       // We parse time into milliseconds, then convert to aggregation granularity
       DateTime sourceTimeWindow = dateTimeFormatter.parseDateTime(timeStr);
-      time = bucket.getUnit().convert(sourceTimeWindow.getMillis(), TimeUnit.MILLISECONDS) / bucket.getSize();
+      time = bucket.getUnit().convert(sourceTimeWindow.getMillis(), TimeUnit.MILLISECONDS)
+          / bucket.getSize();
     }
 
     if (time <= 0) {
@@ -188,7 +195,8 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
     }
 
     // Metrics
-    MetricTimeSeries timeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(config.getMetrics()));
+    MetricTimeSeries timeSeries =
+        new MetricTimeSeries(MetricSchema.fromMetricSpecs(config.getMetrics()));
     for (int i = 0; i < config.getMetrics().size(); i++) {
       MetricSpec metricSpec = config.getMetrics().get(i);
       Number metricValue = getMetricValue(metricSpec, record);
@@ -197,6 +205,5 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
 
     return new StarTreeRecordImpl(config, dimensionKey, timeSeries);
   }
-
 
 }

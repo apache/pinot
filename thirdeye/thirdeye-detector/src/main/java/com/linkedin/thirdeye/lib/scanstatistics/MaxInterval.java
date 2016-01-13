@@ -24,11 +24,7 @@ public class MaxInterval {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("_interval", _interval)
-        .add("_maxLikelihood", _maxLikelihood)
-        .toString();
+    return MoreObjects.toStringHelper(this).add("_interval", _interval)
+        .add("_maxLikelihood", _maxLikelihood).toString();
   }
 }
-
-

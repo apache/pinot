@@ -16,21 +16,19 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Lists;
 
-
 /**
- *
  * @author kgopalak
- *
  */
 public class MetricTimeSeriesTest {
   @Test
   public void testSimple() throws Exception {
     List<String> names = Lists.newArrayList("metric1", "metric2", "metric3", "metric4", "metric5");
-    List<MetricType> types =
-        Lists.newArrayList(MetricType.INT, MetricType.INT, MetricType.INT, MetricType.INT, MetricType.INT);
+    List<MetricType> types = Lists.newArrayList(MetricType.INT, MetricType.INT, MetricType.INT,
+        MetricType.INT, MetricType.INT);
     MetricSchema schema = new MetricSchema(names, types);
     MetricTimeSeries series = new MetricTimeSeries(schema);
-    long startHourSinceEpoch = TimeUnit.HOURS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    long startHourSinceEpoch =
+        TimeUnit.HOURS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     Random rand = new Random();
     int NUM_TIME_WINDOWS = 100;
     int[][] data = new int[NUM_TIME_WINDOWS][];

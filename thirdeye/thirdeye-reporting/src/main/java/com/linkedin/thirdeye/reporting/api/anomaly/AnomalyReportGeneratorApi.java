@@ -15,23 +15,25 @@ public class AnomalyReportGeneratorApi {
 
   }
 
-  public Map<String, AnomalyReportTable> getAnomalies(ReportConfig reportConfig, TableSpec tableSpec, String collection) throws IOException {
+  public Map<String, AnomalyReportTable> getAnomalies(ReportConfig reportConfig,
+      TableSpec tableSpec, String collection) throws IOException {
 
     DBSpec dbSpec = reportConfig.getDbconfig();
     Map<String, AnomalyReportTable> anomalyTables = new HashMap<String, AnomalyReportTable>();
 
     for (String metric : tableSpec.getMetrics()) {
 
-      AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig(dbSpec.getUrl(), dbSpec.getFunctionTableName(), dbSpec.getAnomalyTableName(),
-          dbSpec.getUser(), dbSpec.getPassword(), dbSpec.isUseConnectionPool());
+      AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig(dbSpec.getUrl(),
+          dbSpec.getFunctionTableName(), dbSpec.getAnomalyTableName(), dbSpec.getUser(),
+          dbSpec.getPassword(), dbSpec.isUseConnectionPool());
 
       AnomalyReportGenerator anomalyReportGenerator = new AnomalyReportGenerator(dbConfig);
-      anomalyTables.put(metric, anomalyReportGenerator.getAnomalyTable(collection, metric,
-          reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20, reportConfig.getTimezone()));
+      anomalyTables.put(metric,
+          anomalyReportGenerator.getAnomalyTable(collection, metric,
+              reportConfig.getStartTime().getMillis(), reportConfig.getEndTime().getMillis(), 20,
+              reportConfig.getTimezone()));
     }
     return anomalyTables;
   }
-
-
 
 }

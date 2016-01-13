@@ -43,14 +43,11 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
    * @param driverConfig
    * @param starTreeConfig
    * @param timeRange
-   *  The time range that want to detect anomalies on.
+   *          The time range that want to detect anomalies on.
    * @param thirdEyeClient
    */
-  public AnomalyDetectionDriver(
-      AnomalyDetectionDriverConfig driverConfig,
-      StarTreeConfig starTreeConfig,
-      TimeRange timeRange,
-      ThirdEyeClient thirdEyeClient) {
+  public AnomalyDetectionDriver(AnomalyDetectionDriverConfig driverConfig,
+      StarTreeConfig starTreeConfig, TimeRange timeRange, ThirdEyeClient thirdEyeClient) {
     /*
      * Use the metric specified in the driverConfig
      */
@@ -60,7 +57,8 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
       /*
        * Use the first metric in the collection if no metric is specified.
        */
-      LOGGER.warn("no metric provided for thresholding collection {}", starTreeConfig.getCollection());
+      LOGGER.warn("no metric provided for thresholding collection {}",
+          starTreeConfig.getCollection());
       dimensionKeyContributionMetric = starTreeConfig.getMetrics().get(0).getName();
     }
 
@@ -103,17 +101,13 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
 
   /**
    * @return
-   *  The time series for the  all *s dimension combination.
+   *         The time series for the all *s dimension combination.
    * @throws Exception
    */
   private Entry<DimensionKey, MetricTimeSeries> getTotalSeries() throws Exception {
-    ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(
-        starTreeConfig.getCollection(),
-        ThirdEyeRequestUtils.NULL_GROUP_BY,
-        new HashMap<String, String>(),
-        Collections.singletonList(dimensionKeyContributionMetric),
-        ONE_HOURS,
-        timeRange);
+    ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(starTreeConfig.getCollection(),
+        ThirdEyeRequestUtils.NULL_GROUP_BY, new HashMap<String, String>(),
+        Collections.singletonList(dimensionKeyContributionMetric), ONE_HOURS, timeRange);
     Map<DimensionKey, MetricTimeSeries> dataset = thirdEyeClient.execute(request);
     if (dataset.size() != 1) {
       throw new IllegalStateException();
@@ -124,7 +118,7 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
   /**
    * @param series
    * @return
-   *  The sum over the contribution estimate metric
+   *         The sum over the contribution estimate metric
    */
   private double sumOverContributionMetric(MetricTimeSeries series) {
     Number[] sums = series.getMetricSums();
@@ -132,18 +126,19 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
   }
 
   /**
-   * Recursively explore to find out which dimension combinations pass the minimum threshold. By nature of the
-   * precedence there will be no duplicates. This will be most efficient from a networking perspective if precedence of
+   * Recursively explore to find out which dimension combinations pass the minimum threshold. By
+   * nature of the
+   * precedence there will be no duplicates. This will be most efficient from a networking
+   * perspective if precedence of
    * dimensions is ordered by descending cardinality.
-   *
    * @param dimensionValues
-   *  Previously fixed dimension values.
+   *          Previously fixed dimension values.
    * @param groupByDimensionIndex
-   *  The index in the dimensionPrecedence list to start expanding at.
+   *          The index in the dimensionPrecedence list to start expanding at.
    * @param totalSeriesSum
-   *  The denominator of the contributionEstimate.
+   *          The denominator of the contributionEstimate.
    * @param dimensionKeySeries
-   *  The List in which to append results.
+   *          The List in which to append results.
    * @throws Exception
    */
   private void explore(Map<String, String> dimensionValues, int groupByDimensionIndex,
@@ -157,13 +152,9 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
     // base case: groupByDimensionIndex == driverConfig.getDimensionPrecedence().size()
     for (int i = groupByDimensionIndex; i < driverConfig.getDimensionPrecedence().size(); i++) {
       String groupByDimension = driverConfig.getDimensionPrecedence().get(i);
-      ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(
-          starTreeConfig.getCollection(),
-          groupByDimension,
-          dimensionValues,
-          Collections.singletonList(dimensionKeyContributionMetric),
-          ONE_HOURS,
-          timeRange);
+      ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(starTreeConfig.getCollection(),
+          groupByDimension, dimensionValues,
+          Collections.singletonList(dimensionKeyContributionMetric), ONE_HOURS, timeRange);
       Map<DimensionKey, MetricTimeSeries> dataset = thirdEyeClient.execute(request);
 
       for (Entry<DimensionKey, MetricTimeSeries> entry : dataset.entrySet()) {
@@ -177,8 +168,8 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
         DimensionKey dimensionKey = entry.getKey();
         dimensionKeySeries.add(new DimensionKeySeries(dimensionKey, estimateProportion));
 
-        dimensionValues.put(groupByDimension, dimensionKey.getDimensionValue(
-            starTreeConfig.getDimensions(), groupByDimension));
+        dimensionValues.put(groupByDimension,
+            dimensionKey.getDimensionValue(starTreeConfig.getDimensions(), groupByDimension));
         explore(dimensionValues, i + 1, totalSeriesSum, dimensionKeySeries);
         dimensionValues.remove(groupByDimension);
       }

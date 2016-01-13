@@ -15,7 +15,6 @@ public class TopKRollupPhaseTwoMapOutputKey {
     this.dimensionName = dimensionName;
   }
 
-
   public String getDimensionName() {
     return dimensionName;
   }

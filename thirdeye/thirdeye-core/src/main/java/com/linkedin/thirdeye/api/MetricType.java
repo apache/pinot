@@ -3,9 +3,7 @@ package com.linkedin.thirdeye.api;
 /**
  * Represents the various data types supported for a metric<br/>
  * Currently we support INT, SHORT, LONG, FLOAT, DOUBLE
- *
  * @author kgopalak
- *
  */
 public enum MetricType {
 

@@ -68,8 +68,8 @@ public class StarTreeGenerationJob extends Configured {
     this.props = props;
   }
 
-  public static class StarTreeGenerationMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class StarTreeGenerationMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private StarTreeConfig starTreeConfig;
     private StarTreeGenerationConfig config;
     private List<String> dimensionNames;
@@ -118,14 +118,13 @@ public class StarTreeGenerationJob extends Configured {
         collectionName = config.getCollectionName();
         List<String> splitOrder = config.getSplitOrder();
         int maxRecordStoreEntries = config.getSplitThreshold();
-        StarTreeConfig genConfig =
-            new StarTreeConfig.Builder()
-                .setRecordStoreFactoryClass(
-                    StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
-                .setCollection(collectionName) //
-                .setDimensions(dimensionSpecs)//
-                .setMetrics(metricSpecs).setTime(starTreeConfig.getTime()) //
-                .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).setFixed(false).build();
+        StarTreeConfig genConfig = new StarTreeConfig.Builder()
+            .setRecordStoreFactoryClass(
+                StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
+            .setCollection(collectionName) //
+            .setDimensions(dimensionSpecs)//
+            .setMetrics(metricSpecs).setTime(starTreeConfig.getTime()) //
+            .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).setFixed(false).build();
 
         starTree = new StarTreeImpl(genConfig);
         starTree.open();
@@ -198,14 +197,15 @@ public class StarTreeGenerationJob extends Configured {
 
       } while (prevLeafNodes != leafNodes.size());
 
-      context.getCounter(StarTreeGenerationCounters.NUM_LEAF_NODES).setValue(starTree.getStats().getLeafCount());
-      context.getCounter(StarTreeGenerationCounters.STARTREE_DEPTH).setValue(StarTreeUtils.getDepth(starTree.getRoot()));
-      context.getCounter(StarTreeGenerationCounters.NODE_COUNT).setValue(starTree.getStats().getNodeCount());
+      context.getCounter(StarTreeGenerationCounters.NUM_LEAF_NODES)
+          .setValue(starTree.getStats().getLeafCount());
+      context.getCounter(StarTreeGenerationCounters.STARTREE_DEPTH)
+          .setValue(StarTreeUtils.getDepth(starTree.getRoot()));
+      context.getCounter(StarTreeGenerationCounters.NODE_COUNT)
+          .setValue(starTree.getStats().getNodeCount());
 
       // close will invoke compaction
       starTree.close();
-
-
 
       FileSystem dfs = FileSystem.get(context.getConfiguration());
       Path src, dst;
@@ -213,9 +213,8 @@ public class StarTreeGenerationJob extends Configured {
       StarTreePersistanceUtil.saveTree(starTree, localOutputDir);
 
       String treeOutputFileName = collectionName + "-tree.bin";
-      src =
-          FileSystem.getLocal(new Configuration()).makeQualified(
-              new Path(localOutputDir + "/" + treeOutputFileName));
+      src = FileSystem.getLocal(new Configuration())
+          .makeQualified(new Path(localOutputDir + "/" + treeOutputFileName));
       dst = dfs.makeQualified(new Path(hdfsOutputPath, "tree.bin"));
       LOGGER.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
@@ -270,8 +269,8 @@ public class StarTreeGenerationJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
     LOGGER.info("Finished running star tree generation job");

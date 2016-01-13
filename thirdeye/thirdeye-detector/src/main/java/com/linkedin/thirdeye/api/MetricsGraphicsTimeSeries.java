@@ -83,4 +83,3 @@ public class MetricsGraphicsTimeSeries {
     this.anomalyResults = anomalyResults;
   }
 }
-

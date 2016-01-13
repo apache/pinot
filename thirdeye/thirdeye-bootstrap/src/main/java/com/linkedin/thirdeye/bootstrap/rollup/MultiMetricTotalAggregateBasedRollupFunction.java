@@ -31,27 +31,28 @@ import com.linkedin.thirdeye.api.RollupThresholdFunction;
  */
 import com.linkedin.thirdeye.api.TimeGranularity;
 
-public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThresholdFunction
-{
+public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThresholdFunction {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiMetricTotalAggregateBasedRollupFunction.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(MultiMetricTotalAggregateBasedRollupFunction.class);
   private String[] metricNames;
   private String thresholdExpr;
-  public MultiMetricTotalAggregateBasedRollupFunction(Map<String, String> params){
+
+  public MultiMetricTotalAggregateBasedRollupFunction(Map<String, String> params) {
     this.metricNames = params.get("metricNames").split(",");
     this.thresholdExpr = params.get("thresholdExpr");
   }
+
   /**
    *
    */
   @Override
-  public boolean isAboveThreshold(MetricTimeSeries timeSeries)
-  {
+  public boolean isAboveThreshold(MetricTimeSeries timeSeries) {
     Set<Long> timeWindowSet = timeSeries.getTimeWindowSet();
     JexlEngine jexl = new JexlEngine();
     JexlContext context = new MapContext();
     Expression e = jexl.createExpression(this.thresholdExpr);
-    for(String metricName : metricNames){
+    for (String metricName : metricNames) {
       long sum = 0;
       for (Long timeWindow : timeWindowSet) {
         sum += timeSeries.get(timeWindow, metricName).longValue();
@@ -61,12 +62,11 @@ public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThres
         LOGGER.debug(metricName + " = " + sum);
       }
     }
-    return ((Boolean)e.evaluate(context)).booleanValue();
+    return ((Boolean) e.evaluate(context)).booleanValue();
   }
 
   @Override
-  public TimeGranularity getRollupAggregationGranularity(){
+  public TimeGranularity getRollupAggregationGranularity() {
     return null;
   }
 }
-

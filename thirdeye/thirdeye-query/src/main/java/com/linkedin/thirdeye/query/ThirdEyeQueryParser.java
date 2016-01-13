@@ -19,12 +19,8 @@ import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-public class ThirdEyeQueryParser implements
-    SelectVisitor,
-    SelectItemVisitor,
-    FromItemVisitor,
-    ExpressionVisitor,
-    ItemsListVisitor {
+public class ThirdEyeQueryParser implements SelectVisitor, SelectItemVisitor, FromItemVisitor,
+    ExpressionVisitor, ItemsListVisitor {
 
   private enum TerminalState {
     BETWEEN_LEFT,
@@ -199,29 +195,29 @@ public class ThirdEyeQueryParser implements
   @Override
   public void visit(StringValue stringValue) {
     switch (terminalState.peek()) {
-      case DIMENSION_EQUALS_RIGHT:
-        currentValue = stringValue.getValue();
-        return;
-      case BETWEEN_START:
-        query.setStart(ISODateTimeFormat.dateTimeParser().parseDateTime(stringValue.getValue()));
-        return;
-      case BETWEEN_END:
-        query.setEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(stringValue.getValue()));
-        return;
-      case SELECT_ITEM:
-        query.addMetricName(stringValue.getValue());
-        return;
-      case GROUP_BY:
-        query.addGroupByColumn(stringValue.getValue());
-        return;
-      case FUNCTION_AGGREGATE:
-      case FUNCTION_MOVING_AVERAGE:
-        query.addMetricName(stringValue.getValue());
-        return;
-      case FUNCTION_SUM:
-      case FUNCTION_RATIO:
-        functionMetrics.add(stringValue.getValue());
-        return;
+    case DIMENSION_EQUALS_RIGHT:
+      currentValue = stringValue.getValue();
+      return;
+    case BETWEEN_START:
+      query.setStart(ISODateTimeFormat.dateTimeParser().parseDateTime(stringValue.getValue()));
+      return;
+    case BETWEEN_END:
+      query.setEnd(ISODateTimeFormat.dateTimeParser().parseDateTime(stringValue.getValue()));
+      return;
+    case SELECT_ITEM:
+      query.addMetricName(stringValue.getValue());
+      return;
+    case GROUP_BY:
+      query.addGroupByColumn(stringValue.getValue());
+      return;
+    case FUNCTION_AGGREGATE:
+    case FUNCTION_MOVING_AVERAGE:
+      query.addMetricName(stringValue.getValue());
+      return;
+    case FUNCTION_SUM:
+    case FUNCTION_RATIO:
+      functionMetrics.add(stringValue.getValue());
+      return;
     }
     throw new IllegalStateException("Invalid SQL: " + sql);
   }
@@ -331,27 +327,28 @@ public class ThirdEyeQueryParser implements
   @Override
   public void visit(Column column) {
     switch (terminalState.peek()) {
-      case BETWEEN_LEFT:
-        if (!"time".equals(column.getColumnName())) {
-          throw new IllegalStateException("Invalid time column " + column.getColumnName() + " (must be 'time')");
-        }
-        return;
-      case SELECT_ITEM:
-        query.addMetricName(column.getColumnName());
-        return;
-      case DIMENSION_EQUALS_LEFT:
-        currentDimension = column.getColumnName();
-        return;
-      case GROUP_BY:
-        query.addGroupByColumn(column.getColumnName());
-        return;
-      case FUNCTION_MOVING_AVERAGE:
-      case FUNCTION_AGGREGATE:
-        query.addMetricName(column.getColumnName());
-      case FUNCTION_SUM:
-      case FUNCTION_RATIO:
-        functionMetrics.add(column.getColumnName());
-        return;
+    case BETWEEN_LEFT:
+      if (!"time".equals(column.getColumnName())) {
+        throw new IllegalStateException(
+            "Invalid time column " + column.getColumnName() + " (must be 'time')");
+      }
+      return;
+    case SELECT_ITEM:
+      query.addMetricName(column.getColumnName());
+      return;
+    case DIMENSION_EQUALS_LEFT:
+      currentDimension = column.getColumnName();
+      return;
+    case GROUP_BY:
+      query.addGroupByColumn(column.getColumnName());
+      return;
+    case FUNCTION_MOVING_AVERAGE:
+    case FUNCTION_AGGREGATE:
+      query.addMetricName(column.getColumnName());
+    case FUNCTION_SUM:
+    case FUNCTION_RATIO:
+      functionMetrics.add(column.getColumnName());
+      return;
     }
     throw new IllegalStateException("Invalid SQL: " + sql);
   }
@@ -468,8 +465,6 @@ public class ThirdEyeQueryParser implements
     throw new IllegalStateException("Invalid SQL: " + sql);
   }
 
-
-
   @Override
   public void visit(SelectExpressionItem selectExpressionItem) {
     terminalState.push(TerminalState.SELECT_ITEM);
@@ -491,6 +486,7 @@ public class ThirdEyeQueryParser implements
 
   private static TimeGranularity parseTimeGranularity(String functionName) {
     String[] tokens = functionName.split("_");
-    return new TimeGranularity(Integer.valueOf(tokens[tokens.length - 2]), TimeUnit.valueOf(tokens[tokens.length - 1]));
+    return new TimeGranularity(Integer.valueOf(tokens[tokens.length - 2]),
+        TimeUnit.valueOf(tokens[tokens.length - 1]));
   }
 }

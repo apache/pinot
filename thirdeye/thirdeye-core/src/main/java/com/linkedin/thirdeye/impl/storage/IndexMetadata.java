@@ -26,11 +26,11 @@ public class IndexMetadata {
   private String aggregationGranularity;
   // The number of aggregationGranularity units (e.g. 10 MINUTES)
   private int bucketSize;
-  
+
   private IndexFormat indexFormat;
 
   public IndexMetadata(Long minDataTime, Long maxDataTime, Long minDataTimeMillis,
-      Long maxDataTimeMillis, String aggregationGranularity, int bucketSize, 
+      Long maxDataTimeMillis, String aggregationGranularity, int bucketSize,
       IndexFormat indexFormat) {
     this.minDataTime = minDataTime;
     this.maxDataTime = maxDataTime;
@@ -47,7 +47,7 @@ public class IndexMetadata {
 
   public IndexMetadata(Long minDataTime, Long maxDataTime, Long minDataTimeMillis,
       Long maxDataTimeMillis, Long startTime, Long endTime, Long startTimeMillis,
-      Long endTimeMillis, String timeGranularity, String aggregationGranularity, int bucketSize, 
+      Long endTimeMillis, String timeGranularity, String aggregationGranularity, int bucketSize,
       IndexFormat indexFormat) {
     this.minDataTime = minDataTime;
     this.maxDataTime = maxDataTime;
@@ -188,8 +188,8 @@ public class IndexMetadata {
     properties.setProperty(StarTreeMetadataProperties.END_TIME, Long.toString(endTime));
     properties.setProperty(StarTreeMetadataProperties.START_TIME_MILLIS,
         Long.toString(startTimeMillis));
-    properties
-        .setProperty(StarTreeMetadataProperties.END_TIME_MILLIS, Long.toString(endTimeMillis));
+    properties.setProperty(StarTreeMetadataProperties.END_TIME_MILLIS,
+        Long.toString(endTimeMillis));
     properties.setProperty(StarTreeMetadataProperties.TIME_GRANULARITY, timeGranularity);
     properties.setProperty(StarTreeMetadataProperties.AGGREGATION_GRANULARITY,
         aggregationGranularity);
@@ -211,7 +211,8 @@ public class IndexMetadata {
     String aggregationGranularity =
         properties.getProperty(StarTreeMetadataProperties.AGGREGATION_GRANULARITY);
     String bucketSize = properties.getProperty(StarTreeMetadataProperties.BUCKET_SIZE);
-    IndexFormat indexFormat = IndexFormat.valueOf(properties.getProperty(StarTreeMetadataProperties.INDEX_FORMAT, IndexFormat.FIXED_SIZE.name()));
+    IndexFormat indexFormat = IndexFormat.valueOf(properties
+        .getProperty(StarTreeMetadataProperties.INDEX_FORMAT, IndexFormat.FIXED_SIZE.name()));
     if (minDataTime == null || maxDataTime == null || minDataTimeMillis == null
         || maxDataTimeMillis == null || aggregationGranularity == null || bucketSize == null) {
       throw new IllegalStateException("Cannot find required metadata properties");
@@ -252,7 +253,8 @@ public class IndexMetadata {
     String aggregationGranularity =
         getAndCheck(properties, StarTreeMetadataProperties.AGGREGATION_GRANULARITY);
     String bucketSize = getAndCheck(properties, StarTreeMetadataProperties.BUCKET_SIZE);
-    IndexFormat indexFormat = IndexFormat.valueOf(properties.getProperty(StarTreeMetadataProperties.INDEX_FORMAT, IndexFormat.FIXED_SIZE.name()));
+    IndexFormat indexFormat = IndexFormat.valueOf(properties
+        .getProperty(StarTreeMetadataProperties.INDEX_FORMAT, IndexFormat.FIXED_SIZE.name()));
 
     indexMetadata.setMinDataTime(Long.valueOf(minDataTime));
     indexMetadata.setMaxDataTime(Long.valueOf(maxDataTime));

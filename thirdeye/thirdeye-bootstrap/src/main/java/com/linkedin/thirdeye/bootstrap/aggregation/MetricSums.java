@@ -23,22 +23,21 @@ public class MetricSums {
   public Map<String, Long> getMetricSum() {
     return metricSum;
   }
+
   public void setMetricSum(Map<String, Long> metricSum) {
     this.metricSum = metricSum;
   }
+
   public void addMetricSum(String metricName, long metricValue) {
     metricSum.put(metricName, metricValue);
   }
 
-  public byte[] toBytes() throws IOException
-  {
+  public byte[] toBytes() throws IOException {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(this);
   }
 
-  public static MetricSums fromBytes(byte[] bytes) throws IOException
-  {
+  public static MetricSums fromBytes(byte[] bytes) throws IOException {
     return OBJECT_MAPPER.readValue(bytes, MetricSums.class);
   }
-
 
 }

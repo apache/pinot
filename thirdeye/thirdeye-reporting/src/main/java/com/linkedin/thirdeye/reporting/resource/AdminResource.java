@@ -6,23 +6,18 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-
-
 @Path("/")
 @Produces(MediaType.TEXT_PLAIN)
-public class AdminResource
-{
+public class AdminResource {
 
   @GET
-  public Response returnNoResponse()
-  {
+  public Response returnNoResponse() {
     return Response.noContent().build();
   }
 
   @GET
   @Path("/admin")
-  public String sayGood()
-  {
+  public String sayGood() {
     return "GOOD";
   }
 

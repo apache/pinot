@@ -71,8 +71,8 @@ public class JoinPhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class GenericJoinMapper extends
-      Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+  public static class GenericJoinMapper
+      extends Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
     private JoinPhaseConfig config;
     String sourceName;
     JoinKeyExtractor joinKeyExtractor;
@@ -118,8 +118,8 @@ public class JoinPhaseJob extends Configured {
       LOGGER.info("Join Key:{}", joinKeyValue);
 
       if (!"INVALID".equals(joinKeyValue)) {
-        context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
-          mapOutputValue.toBytes()));
+        context.write(new BytesWritable(joinKeyValue.toString().getBytes()),
+            new BytesWritable(mapOutputValue.toBytes()));
       }
     }
 
@@ -130,8 +130,8 @@ public class JoinPhaseJob extends Configured {
 
   }
 
-  public static class GenericJoinReducer extends
-      Reducer<BytesWritable, BytesWritable, AvroKey<GenericRecord>, NullWritable> {
+  public static class GenericJoinReducer
+      extends Reducer<BytesWritable, BytesWritable, AvroKey<GenericRecord>, NullWritable> {
     private JoinPhaseConfig config;
     String statOutputDir;
     private FileSystem fileSystem;
@@ -151,9 +151,8 @@ public class JoinPhaseJob extends Configured {
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = JoinPhaseConfig.fromStarTreeConfig(starTreeConfig);
-        Map<String, String> schemaJSONMapping =
-            new ObjectMapper().readValue(context.getConfiguration().get("schema.json.mapping"),
-                MAP_STRING_STRING_TYPE);
+        Map<String, String> schemaJSONMapping = new ObjectMapper().readValue(
+            context.getConfiguration().get("schema.json.mapping"), MAP_STRING_STRING_TYPE);
 
         LOGGER.info("Schema JSON Mapping: {}", schemaJSONMapping);
         for (String sourceName : schemaJSONMapping.keySet()) {
@@ -167,9 +166,8 @@ public class JoinPhaseJob extends Configured {
         Constructor<?> constructor = Class.forName(joinUDFClass).getConstructor(Map.class);
         LOGGER.info("Initializing JoinUDFClass:{} with params:{}", joinUDFClass, params);
         joinUDF = (JoinUDF) constructor.newInstance(params);
-        String outputSchemaPath =
-            context.getConfiguration()
-                .get(JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA.toString());
+        String outputSchemaPath = context.getConfiguration()
+            .get(JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA.toString());
         // Avro schema
         Schema.Parser parser = new Schema.Parser();
         Schema outputSchema = parser.parse(fileSystem.open(new Path(outputSchemaPath)));
@@ -221,8 +219,8 @@ public class JoinPhaseJob extends Configured {
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
       for (String counterName : countersMap.keySet()) {
-        context.getCounter("DynamicCounter", counterName).increment(
-            countersMap.get(counterName).get());
+        context.getCounter("DynamicCounter", counterName)
+            .increment(countersMap.get(counterName).get());
       }
     }
   }
@@ -259,7 +257,6 @@ public class JoinPhaseJob extends Configured {
     Constructor<?> constructor = Class.forName(joinConfigUDFClass).getConstructor();
     JoinConfigUDF joinConfigUDF = (JoinConfigUDF) constructor.newInstance();
     joinConfigUDF.setJoinConfig(job);
-
 
     List<String> sourceNames = joinPhaseConfig.getJoinSpec().getSourceNames();
 
@@ -360,7 +357,8 @@ public class JoinPhaseJob extends Configured {
     }
   }
 
-  private String getAndSetConfiguration(Configuration configuration, JoinPhaseJobConstants constant) {
+  private String getAndSetConfiguration(Configuration configuration,
+      JoinPhaseJobConstants constant) {
     String value = getAndCheck(constant.toString());
     configuration.set(constant.toString(), value);
     return value;

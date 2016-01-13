@@ -102,8 +102,6 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 
-
-
 public class ThirdeyeIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdeyeIntegrationTest.class);
@@ -149,17 +147,13 @@ public class ThirdeyeIntegrationTest {
   Path starTreeBootstrapPhase2Output;
   Path serverPackageOutput;
 
-
   @BeforeClass
   public static void setup() throws InterruptedException, IOException {
     if (cluster == null) {
       conf.set("dfs.namenode.replication.min", "" + replicationFactor);
       conf.set("dfs.block.size", "" + blockSize);
       conf.set("io.bytes.per.checksum", "" + 4);
-      cluster = new MiniDFSCluster
-          .Builder(conf)
-          .numDataNodes(numDataNodes)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       fs = cluster.getFileSystem();
     }
   }
@@ -175,7 +169,8 @@ public class ThirdeyeIntegrationTest {
   @Before
   public void beforeMethod() throws Exception {
 
-    propertiesFile = new File(getClass().getClassLoader().getResource("integrationTest/"+PROPERTIES_FILE).getFile());
+    propertiesFile = new File(
+        getClass().getClassLoader().getResource("integrationTest/" + PROPERTIES_FILE).getFile());
     properties = new Properties();
     properties.load(new InputStreamReader(new FileInputStream(propertiesFile)));
 
@@ -189,19 +184,28 @@ public class ThirdeyeIntegrationTest {
     DATA_DIR = properties.getProperty(ThirdEyeJobConstants.THIRDEYE_DIMENSION_INDEX_REF.getName());
     THIRDEYE_SERVER = properties.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName());
 
-    rootDir = new File(System.getProperty("java.io.tmpdir"), ThirdeyeIntegrationTest.class.getName());
+    rootDir =
+        new File(System.getProperty("java.io.tmpdir"), ThirdeyeIntegrationTest.class.getName());
 
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { }
-    try { FileUtils.forceMkdir(rootDir); } catch (Exception e) {}
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+    }
+    try {
+      FileUtils.forceMkdir(rootDir);
+    } catch (Exception e) {
+    }
   }
 
   @After
   public void afterMethod() throws Exception {
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) {  }
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+    }
   }
 
-
- @Test
+  @Test
   public void testEndToEndIntegration() throws Exception {
 
     LOGGER.info("End to end integration testing starting");
@@ -243,52 +247,55 @@ public class ThirdeyeIntegrationTest {
     testCreateServer();
 
     LOGGER.info("End to end integration testing completed");
-}
+  }
 
+  private void checkData() throws IOException {
 
-   private void checkData() throws IOException {
+    long metric1SumActual = 0;
+    long metric1SumExpected = 0;
 
-     long metric1SumActual = 0;
-     long metric1SumExpected = 0;
+    // calculate metric1 from /query
+    String sql = "SELECT metric1 FROM " + COLLECTION + " WHERE time BETWEEN '"
+        + getDateString(MIN_TIME) + "' AND '" + getDateString(MAX_TIME) + "'";
+    URL url = new URL(THIRDEYE_SERVER + "/query/" + URLEncoder.encode(sql, "UTF-8"));
+    ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    ThirdEyeRawResponse queryResult = OBJECT_MAPPER
+        .readValue((new InputStreamReader(url.openStream(), "UTF-8")), ThirdEyeRawResponse.class);
+    for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
+      for (Entry<String, Number[]> metricEntry : entry.getValue().entrySet()) {
+        metric1SumActual += metricEntry.getValue()[0].longValue();
+      }
+    }
 
-     // calculate metric1 from /query
-     String sql = "SELECT metric1 FROM " + COLLECTION + " WHERE time BETWEEN '" +getDateString(MIN_TIME)+ "' AND '" + getDateString(MAX_TIME) +"'";
-     URL url = new URL(THIRDEYE_SERVER + "/query/" + URLEncoder.encode(sql, "UTF-8"));
-     ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-     ThirdEyeRawResponse queryResult =  OBJECT_MAPPER.readValue((new InputStreamReader(url.openStream(), "UTF-8")), ThirdEyeRawResponse.class);
-     for (Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
-       for (Entry<String, Number[]> metricEntry : entry.getValue().entrySet()) {
-         metric1SumActual += metricEntry.getValue()[0].longValue();
-       }
-     }
+    // calculate metric1 from input files
+    File schemaFile = new File(
+        getClass().getClassLoader().getResource("integrationTest/" + SCHEMA_FILE).getFile());
+    Schema schema = new Schema.Parser().parse(schemaFile);
+    GenericRecord record = new GenericData.Record(schema);
+    File avroDataInput = new File(rootDir, COLLECTION);
+    avroDataInput = new File(avroDataInput, INPUT_DIR);
 
-     // calculate metric1 from input files
-     File schemaFile = new File(getClass().getClassLoader().getResource("integrationTest/"+SCHEMA_FILE).getFile());
-     Schema schema = new Schema.Parser().parse(schemaFile);
-     GenericRecord record = new GenericData.Record(schema);
-     File avroDataInput = new File(rootDir, COLLECTION);
-     avroDataInput = new File(avroDataInput, INPUT_DIR);
+    for (File avroFile : avroDataInput.listFiles()) {
+      DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
+      DataFileReader<GenericRecord> dataFileReader = new DataFileReader<>(avroFile, datumReader);
 
-     for (File avroFile : avroDataInput.listFiles()) {
-       DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
-       DataFileReader<GenericRecord> dataFileReader = new DataFileReader<>(avroFile, datumReader);
-
-       while (dataFileReader.hasNext()) {
-         record = dataFileReader.next();
-         long metric1 = (long) record.get("metric1");
-         metric1SumExpected += metric1;
-       }
-     }
-     assertTrue("Data mismatch between input files and server", metric1SumActual == metric1SumExpected);
-   }
-
+      while (dataFileReader.hasNext()) {
+        record = dataFileReader.next();
+        long metric1 = (long) record.get("metric1");
+        metric1SumExpected += metric1;
+      }
+    }
+    assertTrue("Data mismatch between input files and server",
+        metric1SumActual == metric1SumExpected);
+  }
 
   private void testServerUpload() throws Exception {
 
     LOGGER.info("Starting server_upload job");
 
     // server_upload
-    new ThirdEyeJob("server_upload", properties).serverUpload(fs, ROOT, COLLECTION, FlowSpec.METRIC_INDEX, MIN_TIME, MAX_TIME);
+    new ThirdEyeJob("server_upload", properties).serverUpload(fs, ROOT, COLLECTION,
+        FlowSpec.METRIC_INDEX, MIN_TIME, MAX_TIME);
 
     // restore
     String uri = "http://localhost:8081/tasks/restore?collection=" + COLLECTION;
@@ -296,7 +303,8 @@ public class ThirdeyeIntegrationTest {
     HttpPost postRequest = new HttpPost(uri);
     HttpResponse response = httpClient.execute(postRequest);
     httpClient.close();
-    assertTrue("failed to restore collection "+COLLECTION, response.getStatusLine().getStatusCode() == 200);
+    assertTrue("failed to restore collection " + COLLECTION,
+        response.getStatusLine().getStatusCode() == 200);
 
     // check
     uri = THIRDEYE_SERVER + "/collections/" + COLLECTION;
@@ -309,8 +317,7 @@ public class ThirdeyeIntegrationTest {
     LOGGER.info("server_upload job completed");
   }
 
-  private void testCreateServer() throws Exception
-  {
+  private void testCreateServer() throws Exception {
 
     // start server
     File ROOT_DIR = new File(rootDir, "thirdeye-server");
@@ -318,8 +325,8 @@ public class ThirdeyeIntegrationTest {
     ThirdEyeApplication.Config config = new ThirdEyeApplication.Config();
     config.setRootDir(ROOT_DIR.getAbsolutePath());
 
-    DropWizardApplicationRunner.DropWizardServer<ThirdEyeApplication.Config> server
-            = DropWizardApplicationRunner.createServer(config, ThirdEyeApplication.class);
+    DropWizardApplicationRunner.DropWizardServer<ThirdEyeApplication.Config> server =
+        DropWizardApplicationRunner.createServer(config, ThirdEyeApplication.class);
 
     assertTrue(server.getMetricRegistry() != null);
 
@@ -328,20 +335,16 @@ public class ThirdeyeIntegrationTest {
     // Try to contact it
     long startTime = System.currentTimeMillis();
     boolean success = false;
-    while (System.currentTimeMillis() - startTime < REQUEST_TIMEOUT_MILLIS)
-    {
-      try
-      {
-        HttpURLConnection conn = (HttpURLConnection) URI.create("http://localhost:8080/admin").toURL().openConnection();
+    while (System.currentTimeMillis() - startTime < REQUEST_TIMEOUT_MILLIS) {
+      try {
+        HttpURLConnection conn =
+            (HttpURLConnection) URI.create("http://localhost:8080/admin").toURL().openConnection();
         byte[] res = IOUtils.toByteArray(conn.getInputStream());
-        if (Arrays.equals(res, "GOOD".getBytes()))
-        {
+        if (Arrays.equals(res, "GOOD".getBytes())) {
           success = true;
           break;
         }
-      }
-      catch (Exception e)
-      {
+      } catch (Exception e) {
         // Re-try
       }
     }
@@ -362,13 +365,16 @@ public class ThirdeyeIntegrationTest {
     LOGGER.info("Starting server_package job");
 
     // server_package
-    new ThirdEyeJob("server_package", properties).serverPackage(fs, ROOT, COLLECTION, FlowSpec.METRIC_INDEX, MIN_TIME, MAX_TIME);
-    assertTrue("failed to create data.tar.gz in server_package", fs.exists(new Path(serverPackageOutput, "data.tar.gz")));
+    new ThirdEyeJob("server_package", properties).serverPackage(fs, ROOT, COLLECTION,
+        FlowSpec.METRIC_INDEX, MIN_TIME, MAX_TIME);
+    assertTrue("failed to create data.tar.gz in server_package",
+        fs.exists(new Path(serverPackageOutput, "data.tar.gz")));
 
     LOGGER.info("server_package job completed");
   }
 
-  private void testStartreeBootstrapPhase2() throws ClassNotFoundException, IOException, InterruptedException {
+  private void testStartreeBootstrapPhase2()
+      throws ClassNotFoundException, IOException, InterruptedException {
     LOGGER.info("Starting startree_bootstrap_phase2 job");
 
     // Startree Bootstrap Phase 2
@@ -391,31 +397,41 @@ public class ThirdeyeIntegrationTest {
 
     // startree bootstrap phase2 phase config
     Configuration configuration = job.getConfiguration();
-    configuration.set(STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH.toString(), starTreeBootstrapPhase1Output.toString());
-    configuration.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(), starTreeGenerationOutput.toString());
+    configuration.set(STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH.toString(),
+        starTreeBootstrapPhase1Output.toString());
+    configuration.set(
+        StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(),
+        starTreeGenerationOutput.toString());
     configuration.set(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString(), configFilePath.toString());
-    configuration.set(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString(), starTreeBootstrapPhase2Output.toString());
+    configuration.set(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString(),
+        starTreeBootstrapPhase2Output.toString());
 
     // execute job
-    FileInputFormat.addInputPath(job, new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH.toString())));
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString())));
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
     assertTrue("startree_bootstrap_phase2 job failed", job.isSuccessful());
-    assertTrue("startree_bootstrap_phase2 folder not created", fs.exists(starTreeBootstrapPhase2Output));
-    FileStatus[] startreeBootstrapPhase2Status = fs.listStatus(starTreeBootstrapPhase2Output, new PathFilter() {
-      @Override
-      public boolean accept(Path path) {
-        return path.getName().startsWith("data");
-      }
-    });
-    assertTrue("data.tar.gz not generated in startree_bootstrap_phase2", startreeBootstrapPhase2Status.length != 0);
+    assertTrue("startree_bootstrap_phase2 folder not created",
+        fs.exists(starTreeBootstrapPhase2Output));
+    FileStatus[] startreeBootstrapPhase2Status =
+        fs.listStatus(starTreeBootstrapPhase2Output, new PathFilter() {
+          @Override
+          public boolean accept(Path path) {
+            return path.getName().startsWith("data");
+          }
+        });
+    assertTrue("data.tar.gz not generated in startree_bootstrap_phase2",
+        startreeBootstrapPhase2Status.length != 0);
 
     LOGGER.info("startree_bootstrap_phase2 job completed");
   }
 
-  private void testStartreeBootstrapPhase1() throws ClassNotFoundException, IOException, InterruptedException {
+  private void testStartreeBootstrapPhase1()
+      throws ClassNotFoundException, IOException, InterruptedException {
     LOGGER.info("Starting startree_bootstrap_phase1 job");
 
     // Startree Bootstrap Phase1
@@ -444,31 +460,40 @@ public class ThirdeyeIntegrationTest {
     // star tree bootstrap phase 1 config
     Configuration configuration = job.getConfiguration();
     configuration.set(STAR_TREE_BOOTSTRAP_INPUT_PATH.toString(), inputFilePath.toString());
-    configuration.set(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(), starTreeGenerationOutput.toString());
+    configuration.set(
+        StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(),
+        starTreeGenerationOutput.toString());
     configuration.set(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(), configFilePath.toString());
-    configuration.set(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString(), starTreeBootstrapPhase1Output.toString());
+    configuration.set(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString(),
+        starTreeBootstrapPhase1Output.toString());
     configuration.set(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString(), schemaFilePath.toString());
     configuration.set(STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString(), DEFAULT_CONVERTER_CLASS);
     // execute job
-    FileInputFormat.addInputPath(job, new Path(configuration.get(STAR_TREE_BOOTSTRAP_INPUT_PATH.toString())));
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(STAR_TREE_BOOTSTRAP_INPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
     assertTrue("startree_bootstrap_phase1 job failed", job.isSuccessful());
-    assertTrue("startree_bootstrap_phase1 folder not created", fs.exists(starTreeBootstrapPhase1Output));
-    FileStatus[] startreeBootstrapPhase1Status = fs.listStatus(starTreeBootstrapPhase1Output, new PathFilter() {
-      @Override
-      public boolean accept(Path path) {
-        return path.getName().startsWith("part");
-      }
-    });
-    assertTrue("startree_bootstrap_phase1 data not generated", startreeBootstrapPhase1Status.length != 0);
+    assertTrue("startree_bootstrap_phase1 folder not created",
+        fs.exists(starTreeBootstrapPhase1Output));
+    FileStatus[] startreeBootstrapPhase1Status =
+        fs.listStatus(starTreeBootstrapPhase1Output, new PathFilter() {
+          @Override
+          public boolean accept(Path path) {
+            return path.getName().startsWith("part");
+          }
+        });
+    assertTrue("startree_bootstrap_phase1 data not generated",
+        startreeBootstrapPhase1Status.length != 0);
 
     LOGGER.info("startree_bootstrap_phase1 job completed");
   }
 
-  private void testStartreeGeneration() throws IOException, ClassNotFoundException, InterruptedException {
+  private void testStartreeGeneration()
+      throws IOException, ClassNotFoundException, InterruptedException {
     LOGGER.info("Starting startree_generation job");
 
     // Startree Generation
@@ -493,15 +518,19 @@ public class ThirdeyeIntegrationTest {
     configuration.set(STAR_TREE_GEN_OUTPUT_PATH.toString(), starTreeGenerationOutput.toString());
 
     // execute job
-    FileInputFormat.addInputPath(job, new Path(configuration.get(STAR_TREE_GEN_INPUT_PATH.toString())));
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(STAR_TREE_GEN_OUTPUT_PATH.toString())));
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(STAR_TREE_GEN_INPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(STAR_TREE_GEN_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
     assertTrue("startree_generation job failed", job.isSuccessful());
     assertTrue("startree_generation folder not created", fs.exists(starTreeGenerationOutput));
-    assertTrue("tree.bin not generated in startree_generation", fs.exists(new Path(starTreeGenerationOutput, "tree.bin")));
-    assertTrue("dimensionStore.tar.gz not generated in startree_generation", fs.exists(new Path(starTreeGenerationOutput, "dimensionStore.tar.gz")));
+    assertTrue("tree.bin not generated in startree_generation",
+        fs.exists(new Path(starTreeGenerationOutput, "tree.bin")));
+    assertTrue("dimensionStore.tar.gz not generated in startree_generation",
+        fs.exists(new Path(starTreeGenerationOutput, "dimensionStore.tar.gz")));
 
     LOGGER.info("startree_generation job completed");
   }
@@ -534,12 +563,14 @@ public class ThirdeyeIntegrationTest {
     configuration.set(PARTITION_PHASE_OUTPUT_PATH.toString(), partitionOutputPath.toString());
     configuration.set(PARTITION_PHASE_NUM_PARTITIONS.toString(), "5");
 
-    FileInputFormat.addInputPath(job, new Path(configuration.get(PARTITION_PHASE_INPUT_PATH.toString())));
-    for (int i = 0 ; i < numPartitions; i ++) {
-      MultipleOutputs.addNamedOutput(job, "partition" + i,
-          SequenceFileOutputFormat.class, BytesWritable.class, BytesWritable.class);
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(PARTITION_PHASE_INPUT_PATH.toString())));
+    for (int i = 0; i < numPartitions; i++) {
+      MultipleOutputs.addNamedOutput(job, "partition" + i, SequenceFileOutputFormat.class,
+          BytesWritable.class, BytesWritable.class);
     }
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(PARTITION_PHASE_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(PARTITION_PHASE_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
@@ -585,7 +616,8 @@ public class ThirdeyeIntegrationTest {
 
     // Rollup phase 4 config
     Configuration configuration = job.getConfiguration();
-    configuration.set(ROLLUP_PHASE4_INPUT_PATH.toString(), rollupPhase3OutputPath.toString()+","+aboveThresholdPath.toString());
+    configuration.set(ROLLUP_PHASE4_INPUT_PATH.toString(),
+        rollupPhase3OutputPath.toString() + "," + aboveThresholdPath.toString());
     configuration.set(ROLLUP_PHASE4_CONFIG_PATH.toString(), configFilePath.toString());
     configuration.set(ROLLUP_PHASE4_OUTPUT_PATH.toString(), rollupPhase4OutputPath.toString());
 
@@ -593,7 +625,8 @@ public class ThirdeyeIntegrationTest {
     for (String inputPath : configuration.get(ROLLUP_PHASE4_INPUT_PATH.toString()).split(",")) {
       FileInputFormat.addInputPath(job, new Path(inputPath));
     }
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
@@ -639,8 +672,10 @@ public class ThirdeyeIntegrationTest {
     configuration.set(ROLLUP_PHASE3_OUTPUT_PATH.toString(), rollupPhase3OutputPath.toString());
 
     // execute job
-    FileInputFormat.addInputPath(job, new Path(configuration.get(ROLLUP_PHASE3_INPUT_PATH.toString())));
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE3_INPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
@@ -686,8 +721,10 @@ public class ThirdeyeIntegrationTest {
     configuration.set(ROLLUP_PHASE2_ANALYSIS_PATH.toString(), dimensionStatsPath.toString());
 
     // execute job
-    FileInputFormat.addInputPath(job, new Path(configuration.get(ROLLUP_PHASE2_INPUT_PATH.toString())));
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(ROLLUP_PHASE2_OUTPUT_PATH.toString())));
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE2_INPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE2_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
@@ -732,10 +769,14 @@ public class ThirdeyeIntegrationTest {
     configuration.set(ROLLUP_PHASE1_OUTPUT_PATH.toString(), rollupPhase1OutputPath.toString());
 
     // execute job
-    FileInputFormat.addInputPath(job, new Path(configuration.get(ROLLUP_PHASE1_INPUT_PATH.toString())));
-    MultipleOutputs.addNamedOutput(job, "aboveThreshold", SequenceFileOutputFormat.class, BytesWritable.class, BytesWritable.class);
-    MultipleOutputs.addNamedOutput(job, "belowThreshold", SequenceFileOutputFormat.class, BytesWritable.class, BytesWritable.class);
-    FileOutputFormat.setOutputPath(job, new Path(configuration.get(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
+    FileInputFormat.addInputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE1_INPUT_PATH.toString())));
+    MultipleOutputs.addNamedOutput(job, "aboveThreshold", SequenceFileOutputFormat.class,
+        BytesWritable.class, BytesWritable.class);
+    MultipleOutputs.addNamedOutput(job, "belowThreshold", SequenceFileOutputFormat.class,
+        BytesWritable.class, BytesWritable.class);
+    FileOutputFormat.setOutputPath(job,
+        new Path(configuration.get(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
     job.waitForCompletion(true);
 
     // tests
@@ -804,36 +845,38 @@ public class ThirdeyeIntegrationTest {
 
     // tests
     assertTrue("aggregation job failed", job.isSuccessful());
-    // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks are used (gbrandt, 2015-08-27)
-//    assertTrue("Dimension stats folder not created", fs.exists(dimensionStatsPath));
-//    FileStatus[] dimensionStatus = fs.listStatus(dimensionStatsPath, new PathFilter() {
-//      @Override
-//      public boolean accept(Path path) {
-//        return path.getName().endsWith(".stat");
-//      }
-//    });
-//    assertTrue("Dimension stats not generated", dimensionStatus.length != 0);
-//    assertTrue("Aggregation ouput folder not created", fs.exists(aggregationOutputPath));
-//    FileStatus[] aggregationStatus = fs.listStatus(aggregationOutputPath, new PathFilter() {
-//      @Override
-//      public boolean accept(Path path) {
-//        return path.getName().startsWith("part");
-//      }
-//    });
-//    assertTrue("Aggregation results not generated", aggregationStatus.length != 0);
+    // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks
+    // are used (gbrandt, 2015-08-27)
+    // assertTrue("Dimension stats folder not created", fs.exists(dimensionStatsPath));
+    // FileStatus[] dimensionStatus = fs.listStatus(dimensionStatsPath, new PathFilter() {
+    // @Override
+    // public boolean accept(Path path) {
+    // return path.getName().endsWith(".stat");
+    // }
+    // });
+    // assertTrue("Dimension stats not generated", dimensionStatus.length != 0);
+    // assertTrue("Aggregation ouput folder not created", fs.exists(aggregationOutputPath));
+    // FileStatus[] aggregationStatus = fs.listStatus(aggregationOutputPath, new PathFilter() {
+    // @Override
+    // public boolean accept(Path path) {
+    // return path.getName().startsWith("part");
+    // }
+    // });
+    // assertTrue("Aggregation results not generated", aggregationStatus.length != 0);
 
     LOGGER.info("aggregation job completed");
   }
 
   private void testDataGeneration() throws Exception {
-    File configFile = new File(getClass().getClassLoader().getResource("integrationTest/"+CONFIG_FILE).getFile());
-    File schemaFile = new File(getClass().getClassLoader().getResource("integrationTest/"+SCHEMA_FILE).getFile());
+    File configFile = new File(
+        getClass().getClassLoader().getResource("integrationTest/" + CONFIG_FILE).getFile());
+    File schemaFile = new File(
+        getClass().getClassLoader().getResource("integrationTest/" + SCHEMA_FILE).getFile());
 
     // Data generation
     File avroDataInput = new File(rootDir, COLLECTION);
     avroDataInput = new File(avroDataInput, INPUT_DIR);
-    if (!avroDataInput.exists())
-    {
+    if (!avroDataInput.exists()) {
       FileUtils.forceMkdir(avroDataInput);
     }
 
@@ -856,7 +899,7 @@ public class ThirdeyeIntegrationTest {
     inputFilePath = new Path(ROOT, INPUT_DIR);
     Path outputDir = new Path(ROOT, COLLECTION);
     fs.delete(inputFilePath, true);
-    fs.delete(outputDir,true);
+    fs.delete(outputDir, true);
 
     // Copy input
     fs.copyFromLocalFile(new Path(avroDataInput.getAbsolutePath()), inputFilePath);

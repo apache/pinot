@@ -59,8 +59,8 @@ public class RollupPhaseTwoJob extends Configured {
     this.props = props;
   }
 
-  public static class RollupPhaseTwoMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseTwoMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseTwoConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -161,18 +161,21 @@ public class RollupPhaseTwoJob extends Configured {
         FileStatus[] dimensionStatsFiles = fileSystem.listStatus(analysisResults);
         for (FileStatus fileStatus : dimensionStatsFiles) {
           Path dimensionStatsFile = fileStatus.getPath();
-          DimensionStats dimensionStats = objectMapper.readValue(new InputStreamReader(fileSystem.open(dimensionStatsFile)), DimensionStats.class);
+          DimensionStats dimensionStats = objectMapper.readValue(
+              new InputStreamReader(fileSystem.open(dimensionStatsFile)), DimensionStats.class);
           aggDimensionStats.update(dimensionStats);
         }
 
         SortedSet<Entry<String, Set<String>>> sortedDimensionCardinality =
-            new TreeSet<Entry<String, Set<String>>> (new Comparator<Entry<String, Set<String>>>() {
+            new TreeSet<Entry<String, Set<String>>>(new Comparator<Entry<String, Set<String>>>() {
 
-             @Override
-             public int compare(Entry<String, Set<String>> dimension1, Entry<String, Set<String>> dimension2) {
-               return (new Integer(dimension2.getValue().size())).compareTo(dimension1.getValue().size());
-             }
-       });
+              @Override
+              public int compare(Entry<String, Set<String>> dimension1,
+                  Entry<String, Set<String>> dimension2) {
+                return (new Integer(dimension2.getValue().size()))
+                    .compareTo(dimension1.getValue().size());
+              }
+            });
         sortedDimensionCardinality.addAll(aggDimensionStats.getDimensionValues().entrySet());
         LOGGER.info("Sorted order {}", sortedDimensionCardinality);
 
@@ -181,7 +184,7 @@ public class RollupPhaseTwoJob extends Configured {
         while (it.hasNext()) {
           rollupOrder.add(it.next().getKey());
         }
-      } catch (Exception e){
+      } catch (Exception e) {
         // Continue with earlier rollup config
         LOGGER.info("exception {}", e);
       }
@@ -194,8 +197,8 @@ public class RollupPhaseTwoJob extends Configured {
 
   }
 
-  public static class RollupPhaseTwoReducer extends
-      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseTwoReducer
+      extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseTwoConfig config;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
@@ -224,7 +227,7 @@ public class RollupPhaseTwoJob extends Configured {
     @Override
     public void reduce(BytesWritable rollupDimensionKeyMD5Writable,
         Iterable<BytesWritable> rollupMapOutputWritableIterable, Context context)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
       DimensionKey rollupDimensionKey = null;
       MetricTimeSeries rollupTimeSeries = new MetricTimeSeries(metricSchema);
       // LOGGER.info("rollup Dimension:{}", rollupDimensionKey);
@@ -245,9 +248,8 @@ public class RollupPhaseTwoJob extends Configured {
       }
       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
         RollupPhaseTwoReduceOutput output;
-        output =
-            new RollupPhaseTwoReduceOutput(rollupDimensionKey, rollupTimeSeries, entry.getKey(),
-                entry.getValue());
+        output = new RollupPhaseTwoReduceOutput(rollupDimensionKey, rollupTimeSeries,
+            entry.getKey(), entry.getValue());
         // key
         byte[] md5 = entry.getKey().toMD5();
         keyWritable.set(md5, 0, md5.length);
@@ -261,7 +263,8 @@ public class RollupPhaseTwoJob extends Configured {
         // rollupDimensionKey,rollupTimeSeries );
       }
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
+        LOGGER.debug(
+            String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
       }
     }
   }
@@ -303,8 +306,8 @@ public class RollupPhaseTwoJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat
-        .setOutputPath(job, new Path(getAndCheck(ROLLUP_PHASE2_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(ROLLUP_PHASE2_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 

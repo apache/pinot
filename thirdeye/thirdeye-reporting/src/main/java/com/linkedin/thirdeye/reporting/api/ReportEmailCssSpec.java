@@ -131,7 +131,6 @@ public class ReportEmailCssSpec {
     return cellStyle4;
   }
 
-
   public String getMetricCellTotalPositiveStyle() {
     return metricCellTotalPositiveStyle;
   }
@@ -191,7 +190,7 @@ public class ReportEmailCssSpec {
   private String loadCss(String cssFile) throws IOException {
 
     String css = null;
-    //InputStream is = ClassLoader.getSystemResourceAsStream("assets/css/" + cssFile);
+    // InputStream is = ClassLoader.getSystemResourceAsStream("assets/css/" + cssFile);
     URL resource = getClass().getClassLoader().getResource(cssFile);
     InputStream is = resource.openStream();
     try {
@@ -202,7 +201,5 @@ public class ReportEmailCssSpec {
 
     return css;
   }
-
-
 
 }

@@ -27,7 +27,7 @@ public class ScanIntervalIteratorTest {
   private void testSingle(int min, int max, int minWidth, int maxWidth) {
     ScanIntervalIterator it = new ScanIntervalIterator(min, max, minWidth, maxWidth, 1);
     HashSet<Range<Integer>> found = new HashSet<>();
-    while(it.hasNext()) {
+    while (it.hasNext()) {
       Range<Integer> curr = it.next();
       found.add(curr);
     }
@@ -44,7 +44,7 @@ public class ScanIntervalIteratorTest {
       for (int j = min; j < i; j++) {
         int width = i - j;
         if (width >= minWidth && width <= maxWidth) {
-          found.add(Range.closedOpen(j,i));
+          found.add(Range.closedOpen(j, i));
         }
       }
     }

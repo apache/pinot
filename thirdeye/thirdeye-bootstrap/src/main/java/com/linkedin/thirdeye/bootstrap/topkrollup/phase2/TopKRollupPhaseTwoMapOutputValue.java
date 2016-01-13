@@ -47,7 +47,8 @@ public class TopKRollupPhaseTwoMapOutputValue {
     return baos.toByteArray();
   }
 
-  public static TopKRollupPhaseTwoMapOutputValue fromBytes(byte[] buffer, MetricSchema schema) throws IOException {
+  public static TopKRollupPhaseTwoMapOutputValue fromBytes(byte[] buffer, MetricSchema schema)
+      throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
     int length;
     byte[] bytes;
