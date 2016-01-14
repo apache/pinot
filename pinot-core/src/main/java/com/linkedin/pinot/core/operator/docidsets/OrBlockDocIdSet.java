@@ -19,14 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
+import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.OrDocIdIterator;
 
@@ -83,8 +82,8 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
         if (docIdSet instanceof SortedDocIdSet) {
           MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
           SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-          List<Pair<Integer, Integer>> pairs = sortedDocIdSet.getRaw();
-          for (Pair<Integer, Integer> pair : pairs) {
+          List<Pairs.IntPair> pairs = sortedDocIdSet.getRaw();
+          for (Pairs.IntPair pair : pairs) {
             bitmap.add(pair.getLeft(), pair.getRight() + 1); //add takes [start, end) i.e inclusive start, exclusive end.
           }
           allBitmaps.add(bitmap);
