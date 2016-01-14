@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.MetricName;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.roaringbitmap.IntIterator;
@@ -57,9 +59,12 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
+  private static Counter invalidRowsDropped = Metrics.newCounter(new MetricName(RealtimeSegmentImpl.class, "invalidRowsDropped"));
+
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class);
   public static final int[] EMPTY_DICTIONARY_IDS_ARRAY = new int[0];
 
@@ -162,6 +167,48 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public boolean index(GenericRow row) {
+    // Validate row prior to indexing it
+    StringBuilder invalidColumns = null;
+
+    for (String dimension : dataSchema.getDimensionNames()) {
+      Object value = row.getValue(dimension);
+      if (value == null) {
+        if (invalidColumns == null) {
+          invalidColumns = new StringBuilder(dimension);
+        } else {
+          invalidColumns.append(", ").append(dimension);
+        }
+      }
+    }
+
+    for (String metric : dataSchema.getMetricNames()) {
+      Object value = row.getValue(metric);
+      if (value == null) {
+        if (invalidColumns == null) {
+          invalidColumns = new StringBuilder(metric);
+        } else {
+          invalidColumns.append(", ").append(metric);
+        }
+      }
+    }
+
+    {
+      Object value = row.getValue(incomingTimeColumnName);
+      if (value == null) {
+        if (invalidColumns == null) {
+          invalidColumns = new StringBuilder(incomingTimeColumnName);
+        } else {
+          invalidColumns.append(", ").append(incomingTimeColumnName);
+        }
+      }
+    }
+
+    if (invalidColumns != null) {
+      LOGGER.warn("Dropping invalid row {} with null values for column(s) {}", row, invalidColumns);
+      invalidRowsDropped.inc();
+      return true;
+    }
+
     // updating dictionary for dimensions only
     // its ok to insert this first
     // since filtering won't return back anything unless a new entry is made in the inverted index
