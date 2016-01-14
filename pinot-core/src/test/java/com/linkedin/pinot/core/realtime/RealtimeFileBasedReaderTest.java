@@ -155,6 +155,7 @@ public class RealtimeFileBasedReaderTest {
         Block realtimeBlock = realtimeDS.nextBlock();
 
         BlockMetadata offlineMetadata = offlineBlock.getMetadata();
+        BlockMetadata realtimeMetadata = realtimeBlock.getMetadata();
 
         BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
         BlockSingleValIterator realtimeValIterator =
@@ -165,7 +166,13 @@ public class RealtimeFileBasedReaderTest {
         while (realtimeValIterator.hasNext()) {
           int offlineDicId = offlineValIterator.nextIntVal();
           int realtimeDicId = realtimeValIterator.nextIntVal();
-          Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId), realtimeDicId);
+          Object value;
+          if (realtimeMetadata.hasDictionary()) {
+            value = realtimeMetadata.getDictionary().get(realtimeDicId);
+          } else {
+            value = realtimeDicId;
+          }
+          Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId), value);
         }
         Assert.assertEquals(offlineValIterator.hasNext(), realtimeValIterator.hasNext());
       }
