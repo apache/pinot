@@ -20,12 +20,12 @@ import org.roaringbitmap.IntIterator;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-public class DocIdIteratorWrapper implements BlockDocIdIterator {
+public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
 
   private IntIterator iterator;
   int currentDocId = -1;
 
-  public DocIdIteratorWrapper(IntIterator iterator) {
+  public RangelessBitmapDocIdIterator(IntIterator iterator) {
     this.iterator = iterator;
   }
 
@@ -36,21 +36,34 @@ public class DocIdIteratorWrapper implements BlockDocIdIterator {
 
   @Override
   public int next() {
-    if (iterator.hasNext()) {
-      return (currentDocId = iterator.next());
+    // Empty?
+    if (currentDocId == Constants.EOF || !iterator.hasNext()) {
+      return Constants.EOF;
     }
-    return (currentDocId = Constants.EOF);
+
+    currentDocId = iterator.next();
+
+    return currentDocId;
   }
 
   @Override
   public int advance(int targetDocId) {
-    int docId;
-    while (iterator.hasNext()) {
-      if((docId = iterator.next()) >= targetDocId){
-        return ((currentDocId = docId));
-      }
+    if (targetDocId < currentDocId) {
+      throw new IllegalArgumentException("Trying to move backwards to docId " + targetDocId +
+          ", current position " + currentDocId);
     }
-    return (currentDocId = Constants.EOF);
+
+    if (currentDocId == targetDocId) {
+      return currentDocId;
+    } else {
+      int curr = next();
+
+      while(curr < targetDocId && curr != Constants.EOF) {
+        curr = next();
+      }
+
+      return curr;
+    }
   }
 
 }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
+import com.linkedin.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,7 +32,6 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.DocIdIteratorWrapper;
 import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.util.SortedRangeIntersection;
@@ -210,12 +210,12 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
     long end = System.currentTimeMillis();
     LOGGER.debug("Time to evaluate and Filter:{}", (end - start));
     // if other iterators exists resort to iterator style intersection
-    DocIdIteratorWrapper docIdIteratorWrapper = new DocIdIteratorWrapper(answer.getIntIterator());
+    BlockDocIdIterator answerDocIdIterator = new RangelessBitmapDocIdIterator(answer.getIntIterator());
     if (remainingIterators.size() == 0) {
-      return docIdIteratorWrapper;
+      return answerDocIdIterator;
     } else {
       BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[remainingIterators.size() + 1];
-      docIdIterators[0] = docIdIteratorWrapper;
+      docIdIterators[0] = answerDocIdIterator;
       for (int i = 0; i < remainingIterators.size(); i++) {
         docIdIterators[i + 1] = remainingIterators.get(i);
       }

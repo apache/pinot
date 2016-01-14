@@ -255,13 +255,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312";
+    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312 and Carrier = 'DL'";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
+    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312 and Carrier = 'DL'";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
+    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312 and Carrier = 'DL'";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
+    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312 and Carrier = 'DL'";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
   }
 

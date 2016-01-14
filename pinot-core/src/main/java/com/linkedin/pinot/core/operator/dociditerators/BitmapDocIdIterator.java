@@ -17,12 +17,11 @@ package com.linkedin.pinot.core.operator.dociditerators;
 
 import org.roaringbitmap.IntIterator;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
 public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   final private IntIterator iterator;
-  private int endDocId;
+  private int endDocId = Integer.MAX_VALUE;
   private int startDocId;
   private int currentDocId = -1;
 
@@ -45,58 +44,42 @@ public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
 
   @Override
   public int next() {
-    int next = Constants.EOF;
-    boolean found = false;
-    while (iterator.hasNext()) {
-      next = iterator.next();
-      if (next > endDocId) {
-        break;
-      }
-      if (next >= startDocId) {
-        found = true;
-        break;
-      }
+    // Empty?
+    if (currentDocId == Constants.EOF || !iterator.hasNext()) {
+      return Constants.EOF;
     }
-    if (found) {
-      currentDocId = next;
-    } else {
+
+    currentDocId = iterator.next();
+
+    // Advance to startDocId if necessary
+    while(currentDocId < startDocId && iterator.hasNext()) {
+      currentDocId = iterator.next();
+    }
+
+    // Current docId outside of the valid range?
+    if (currentDocId < startDocId || endDocId < currentDocId) {
       currentDocId = Constants.EOF;
     }
+
     return currentDocId;
   }
 
   @Override
   public int advance(int targetDocId) {
-    if (targetDocId < startDocId) {
-      targetDocId = startDocId;
-    } else if (targetDocId > endDocId) {
-      currentDocId = Constants.EOF;
+    if (targetDocId < currentDocId) {
+      throw new IllegalArgumentException("Trying to move backwards to docId " + targetDocId +
+          ", current position " + currentDocId);
     }
-    if (currentDocId == Constants.EOF) {
-      return currentDocId;
-    }
+
     if (currentDocId == targetDocId) {
       return currentDocId;
-    }
-    boolean found = false;
-    int next = Constants.EOF;
-    while (iterator.hasNext()) {
-      next = iterator.next();
-      if (next > endDocId) {
-        break;
-      }
-      if (next >= targetDocId) {
-        found = true;
-        break;
-      }
-    }
-    if (found) {
-      currentDocId = next;
     } else {
-      currentDocId = Constants.EOF;
+      int curr = next();
+      while(curr < targetDocId && curr != Constants.EOF) {
+        curr = next();
+      }
+      return curr;
     }
-    long end = System.nanoTime();
-    return currentDocId;
   }
 
   public String toString() {
