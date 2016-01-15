@@ -226,13 +226,8 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @param col
    * @return
    */
-  private long computeBitOffset(int row, int col) {
-    if (row >= rows || col >= cols) {
-      final String message = String.format("Input (%d,%d) is not with in expected range (%d,%d)",
-          row, col, rows, cols);
-      throw new IndexOutOfBoundsException(message);
-    }
-    final long offset = ((long) row) * rowSizeInBits + colBitOffSets[col];
+  private int computeBitOffset(int row, int col) {
+    final int offset = row * rowSizeInBits + colBitOffSets[col];
     return offset;
   }
 
