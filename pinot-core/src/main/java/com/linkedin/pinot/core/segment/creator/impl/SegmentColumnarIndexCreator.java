@@ -45,10 +45,13 @@ import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
@@ -69,6 +72,8 @@ import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedInd
  */
 
 public class SegmentColumnarIndexCreator implements SegmentCreator {
+  private Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
+
   // TODO Refactor class name to match interface name
   private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
@@ -146,6 +151,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     for (String column : config.getInvertedIndexCreationColumns()) {
+      if(!schema.isExisted(column)){
+        LOGGER.warn("Skipping enabling index on column:{} since its missing in schema", column);
+        continue;
+      }
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
       int uniqueValueCount = indexCreationInfo.getDistinctValueCount();
       OffHeapBitmapInvertedIndexCreator invertedIndexCreator =

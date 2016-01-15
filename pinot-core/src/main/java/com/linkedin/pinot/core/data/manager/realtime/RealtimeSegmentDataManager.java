@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.data.manager.realtime;
 
 import java.io.File;
+import java.util.List;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -65,19 +67,21 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private TimerTask segmentStatusTask;
   private final RealtimeTableDataManager notifier;
   private Thread indexingThread;
-  
+
   private final String sortedColumn;
+  private final List<String> invertedIndexColumns;
 
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
       RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema) throws Exception {
     this.schema = schema;
-    if (tableConfig.getIndexingConfig().getSortedColumn().isEmpty()) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig.getSortedColumn().isEmpty()) {
       LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column");
       this.sortedColumn = null;
     } else {
-      String firstSortedColumn = tableConfig.getIndexingConfig().getSortedColumn().get(0);
+      String firstSortedColumn = indexingConfig.getSortedColumn().get(0);
       if (this.schema.isExisted(firstSortedColumn)) {
         LOGGER.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata.", firstSortedColumn);
         this.sortedColumn = firstSortedColumn;
@@ -87,6 +91,10 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         this.sortedColumn = null;
       }
     }
+    //inverted index columns
+    invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+    LOGGER.info("Enabling inverted  index for columns name: {}", invertedIndexColumns);
+
     this.segmentMetatdaZk = segmentMetadata;
     this.segmentName = segmentMetadata.getSegmentName();
 
@@ -94,9 +102,9 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
     this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
     this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
-    
+
     segmentEndTimeThreshold = start + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
-    
+
     this.resourceDir = new File(resourceDataDir);
     this.resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!resourceTmpDir.exists()) {
@@ -154,14 +162,14 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           // kill the timer first
           segmentStatusTask.cancel();
           LOGGER.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
-          LOGGER.info("Indexed " + realtimeSegment.getRawDocumentCount()
-              + " raw events, current number of docs = " + realtimeSegment.getTotalDocs());
+          LOGGER.info("Indexed " + realtimeSegment.getRawDocumentCount() + " raw events, current number of docs = "
+              + realtimeSegment.getTotalDocs());
           File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
           // lets convert the segment now
           RealtimeSegmentConverter converter =
-              new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(),
-                  schema, segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn);
+              new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
+                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns);
 
           LOGGER.info("Trying to build segment!");
           converter.build();
@@ -223,18 +231,18 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   private void computeKeepIndexing() {
     if (keepIndexing) {
-      LOGGER.debug("Current indexed " + realtimeSegment.getRawDocumentCount()
-          + " raw events, success = " + realtimeSegment.getSuccessIndexedCount()
-          + " docs, total = " + realtimeSegment.getTotalDocs() + " docs in realtime segment");
+      LOGGER.debug("Current indexed " + realtimeSegment.getRawDocumentCount() + " raw events, success = "
+          + realtimeSegment.getSuccessIndexedCount() + " docs, total = " + realtimeSegment.getTotalDocs()
+          + " docs in realtime segment");
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
           || realtimeSegment.getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
         if (realtimeSegment.getRawDocumentCount() == 0) {
           LOGGER.info("no new events coming in, extending the end time by another hour");
-          segmentEndTimeThreshold = System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+          segmentEndTimeThreshold =
+              System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
           return;
         }
-        LOGGER.info("Stopped indexing due to reaching segment limit: "
-            + realtimeSegment.getRawDocumentCount()
+        LOGGER.info("Stopped indexing due to reaching segment limit: " + realtimeSegment.getRawDocumentCount()
             + " raw documents indexed, segment is aged "
             + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
         keepIndexing = false;

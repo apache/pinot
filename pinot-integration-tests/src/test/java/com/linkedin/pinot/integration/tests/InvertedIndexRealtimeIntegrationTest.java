@@ -25,12 +25,14 @@ import com.linkedin.pinot.common.data.Schema;
  *
  */
 @Test
-public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrationTest{
-  @Override
-  protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
-    addSchema(schemaFile, "schemaFile");
-    Schema schema = Schema.fromFile(schemaFile);
-    addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null, schema.getDimensionNames());
-  }
+public class InvertedIndexRealtimeIntegrationTest extends RealtimeClusterIntegrationTest{
 
+  @Override
+  protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
+      String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
+      String brokerTenant, File avroFile, int realtimeSegmentFlushSize) throws Exception {
+    Schema schema = Schema.fromFile(getSchemaFile());
+    super.addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
+        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, realtimeSegmentFlushSize, schema.getDimensionNames());
+  }
 }

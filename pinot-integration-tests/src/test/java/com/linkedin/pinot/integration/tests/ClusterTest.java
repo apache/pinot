@@ -92,8 +92,8 @@ public abstract class ClusterTest extends ControllerTest {
       for (int i = 0; i < serverCount; i++) {
         Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR
-            + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
             Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
         overrideOfflineServerConf(configuration);
@@ -131,24 +131,26 @@ public abstract class ClusterTest extends ControllerTest {
         new FileInputStream(schemaFile), schemaFile.length());
   }
 
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
-      int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
-    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant, Collections.emptyList());
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,
+      String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
+    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant,
+        serverTenant, Collections.emptyList());
   }
 
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType,
-      int retentionTimeValue, String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns) throws Exception {
-    JSONObject request =
-        ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName,
-            "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns);
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,
+      String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns)
+          throws Exception {
+    JSONObject request = ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant,
+        timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
+        "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 
   protected void dropOfflineTable(String tableName) throws Exception {
-    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL)
-        .forTableDelete(tableName + "_OFFLINE"));
+    sendDeleteRequest(
+        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName + "_OFFLINE"));
   }
-  
+
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
@@ -180,9 +182,18 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType,
-      int retentionDays, String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic,
-      String schemaName, String serverTenant, String brokerTenant, File avroFile, int realtimeSegmentFlushSize) throws Exception {
+  protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
+      String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
+      String brokerTenant, File avroFile, int realtimeSegmentFlushSize) throws Exception {
+    List<String> invertedIndexColumns = Collections.emptyList();
+    addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
+        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, realtimeSegmentFlushSize, invertedIndexColumns);
+  }
+
+  protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
+      String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
+      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, List<String> invertedIndexColumns)
+          throws Exception {
     JSONObject metadata = new JSONObject();
     metadata.put("streamType", "kafka");
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
@@ -192,13 +203,12 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
     metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset", "smallest");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+        "smallest");
 
-    JSONObject request =
-        ControllerRequestBuilder
-            .buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeColumnType,
-                retentionTimeUnit, Integer.toString(retentionDays),
-                1, "BalanceNumSegmentAssignmentStrategy", metadata, schemaName);
+    JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
+        timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
+        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, invertedIndexColumns);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
@@ -210,18 +220,22 @@ public abstract class ClusterTest extends ControllerTest {
     int retentionDays = 900;
     String retentionTimeUnit = "Days";
     addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000);
-    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant);
+        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, Collections.emptyList());
+    addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant,
+        serverTenant);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
     JSONObject request = ControllerRequestBuilder.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(), request.toString());
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(),
+        request.toString());
   }
 
-  protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount) throws Exception {
+  protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount)
+      throws Exception {
     JSONObject request = ControllerRequestBuilder.buildServerTenantCreateRequestJSON(tenantName,
         offlineServerCount + realtimeServerCount, offlineServerCount, realtimeServerCount);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forServerTenantCreate(), request.toString());
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forServerTenantCreate(),
+        request.toString());
   }
 }

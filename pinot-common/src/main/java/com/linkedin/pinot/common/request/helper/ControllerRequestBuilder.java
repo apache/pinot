@@ -96,6 +96,15 @@ public class ControllerRequestBuilder {
   public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName) throws JSONException {
+    List<String> invertedIndexColumns = Collections.emptyList();
+    return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType, retentionTimeUnit,
+        retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName, invertedIndexColumns);
+  }
+
+  public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
+      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+      String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, List<String> invertedIndexColumns)
+          throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -111,9 +120,6 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
-    JSONArray invertedIndexColumns = new JSONArray();
-    invertedIndexColumns.put("column1");
-    invertedIndexColumns.put("column2");
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
     tableIndexConfig.put("loadMode", "HEAP");
     tableIndexConfig.put("lazyLoad", "false");
