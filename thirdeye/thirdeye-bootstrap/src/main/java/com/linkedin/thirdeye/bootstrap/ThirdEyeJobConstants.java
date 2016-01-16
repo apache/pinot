@@ -19,6 +19,7 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_POLL_ENABLE("thirdeye.poll.enable"),
   THIRDEYE_POLL_FREQUENCY("thirdeye.poll.frequency"),
   THIRDEYE_POLL_TIMEOUT("thirdeye.poll.timeout"),
+  THIRDEYE_CHECK_COMPLETENESS_CLASS("thirdeye.check.completeness.class"),
   THIRDEYE_COMPACTION("thirdeye.compaction"),
   THIRDEYE_PRESERVE_TIME_COMPACTION("thirdeye.preserve.time.compaction"),
   THIRDEYE_MR_CONF("thirdeye.mr.conf"),

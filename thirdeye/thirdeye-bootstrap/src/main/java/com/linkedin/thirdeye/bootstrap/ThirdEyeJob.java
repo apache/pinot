@@ -63,6 +63,7 @@ import com.linkedin.thirdeye.bootstrap.topkrollup.phase3.TopKRollupPhaseThreeJob
 import com.linkedin.thirdeye.bootstrap.transform.TransformPhaseJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
+import com.linkedin.thirdeye.bootstrap.wait.WaitUDF;
 import com.linkedin.thirdeye.impl.storage.IndexFormat;
 import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
@@ -1263,8 +1264,22 @@ public class ThirdEyeJob {
         if (elapsedTime > pollTimeout) {
           LOGGER.info("Timed out waiting for input");
         }
-
       }
+
+      String thirdeyeCheckCompletenessClass = inputConfig
+          .getProperty(ThirdEyeJobConstants.THIRDEYE_CHECK_COMPLETENESS_CLASS.getName());
+      LOGGER.info("ThirdeyeCheckCompletenessClass {}", thirdeyeCheckCompletenessClass);
+      if (thirdeyeCheckCompletenessClass != null) {
+        Constructor<?> constructor = Class.forName(thirdeyeCheckCompletenessClass).getConstructor();
+        WaitUDF waitUdf = (WaitUDF) constructor.newInstance();
+        waitUdf.init(inputConfig);
+
+        boolean complete = waitUdf.checkCompleteness();
+        if (!complete) {
+          throw new RuntimeException("Input folder not complete");
+        }
+      }
+
     } else if (PhaseSpec.CLEANUP.equals(phaseSpec)) {
 
       boolean cleanupSkip = Boolean.parseBoolean(inputConfig
