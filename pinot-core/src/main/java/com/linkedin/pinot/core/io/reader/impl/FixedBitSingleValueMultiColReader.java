@@ -226,8 +226,8 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
    * @param col
    * @return
    */
-  private int computeBitOffset(int row, int col) {
-    final int offset = row * rowSizeInBits + colBitOffSets[col];
+  private long computeBitOffset(int row, int col) {
+    final long offset = ( (long)row * rowSizeInBits ) + colBitOffSets[col];
     return offset;
   }
 
