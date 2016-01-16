@@ -1268,15 +1268,17 @@ public class ThirdEyeJob {
 
       String thirdeyeCheckCompletenessClass = inputConfig
           .getProperty(ThirdEyeJobConstants.THIRDEYE_CHECK_COMPLETENESS_CLASS.getName());
-      LOGGER.info("ThirdeyeCheckCompletenessClass {}", thirdeyeCheckCompletenessClass);
+
       if (thirdeyeCheckCompletenessClass != null) {
+
+        LOGGER.info("Initializing class {}", thirdeyeCheckCompletenessClass);
         Constructor<?> constructor = Class.forName(thirdeyeCheckCompletenessClass).getConstructor();
         WaitUDF waitUdf = (WaitUDF) constructor.newInstance();
         waitUdf.init(inputConfig);
 
         boolean complete = waitUdf.checkCompleteness();
         if (!complete) {
-          throw new RuntimeException("Input folder not complete");
+          throw new RuntimeException("Input folder {} has not received all records");
         }
       }
 
