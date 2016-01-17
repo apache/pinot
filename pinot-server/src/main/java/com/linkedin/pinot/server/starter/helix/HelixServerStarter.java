@@ -18,12 +18,15 @@ package com.linkedin.pinot.server.starter.helix;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -117,19 +120,47 @@ public class HelixServerStarter {
         messageHandlerFactory);
 
     _serverInstance.getServerMetrics()
-        .addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+        .addCallbackGauge("helix.connected", 
+            new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return _helixManager.isConnected() ? 1L : 0L;
+              }
+            });
 
-    _helixManager.addPreConnectCallback(() ->
-        _serverInstance.getServerMetrics().addMeteredValue(null, ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+    _helixManager.addPreConnectCallback(
+        new PreConnectCallback() {
+          
+          @Override
+          public void onPreConnect() {
+            _serverInstance.getServerMetrics().addMeteredValue(null,
+                ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          }
+        });
 
     _serverInstance.getServerMetrics().addCallbackGauge(
-        "memory.directByteBufferUsage", MmapUtils::getDirectByteBufferUsage);
+        "memory.directByteBufferUsage", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return MmapUtils.getDirectByteBufferUsage();
+              }
+            });
 
     _serverInstance.getServerMetrics().addCallbackGauge(
-        "memory.mmapBufferUsage", MmapUtils::getMmapBufferUsage);
+        "memory.mmapBufferUsage", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return MmapUtils.getMmapBufferUsage();
+              }
+         });
 
     _serverInstance.getServerMetrics().addCallbackGauge(
-        "memory.mmapBufferCount", MmapUtils::getMmapBufferCount);
+        "memory.mmapBufferCount", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return MmapUtils.getMmapBufferCount();
+              }
+            });
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {

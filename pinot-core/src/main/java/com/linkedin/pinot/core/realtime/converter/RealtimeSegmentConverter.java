@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.realtime.converter;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -70,7 +71,7 @@ public class RealtimeSegmentConverter {
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, Collections.emptyList());
+    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>());
   }
 
   public void build() throws Exception {

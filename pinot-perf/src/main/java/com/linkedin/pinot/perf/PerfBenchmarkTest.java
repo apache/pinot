@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.perf;
 
+import java.util.ArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +29,7 @@ public class PerfBenchmarkTest {
   private static void setupCluster(String dataDir, String offlineTableName) throws Exception {
     LOGGER.info("Setting up cluster");
     PerfBenchmarkRunner.startComponents(true, true, true, false);
-    PerfBenchmarkRunner.startServerWithPreLoadedSegments(dataDir, offlineTableName, Lists.newArrayList());
+    PerfBenchmarkRunner.startServerWithPreLoadedSegments(dataDir, offlineTableName, new ArrayList<String>());
   }
 
   private static void runQueries(String queryFile) throws Exception {

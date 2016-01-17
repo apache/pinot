@@ -180,7 +180,7 @@ public class PinotSegmentRebalancer {
       Map<String, String> serverToStateMap = mapping.get(segment);
       for (String server : serverToStateMap.keySet()) {
         if (!serverToSegmentMapping.containsKey(server)) {
-          serverToSegmentMapping.put(server, new ArrayList<>());
+          serverToSegmentMapping.put(server, new ArrayList<String>());
         }
         serverToSegmentMapping.get(server).add(segment);
       }

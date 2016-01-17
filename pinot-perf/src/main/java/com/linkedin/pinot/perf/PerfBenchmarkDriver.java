@@ -39,6 +39,7 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -254,7 +255,7 @@ public class PerfBenchmarkDriver {
   }
 
   public void configureTable(String tableName) throws Exception {
-    configureTable(tableName, Collections.emptyList());
+    configureTable(tableName, new ArrayList<String>());
   }
 
   public void configureTable(String tableName, List<String> invertedIndexColumns) throws Exception {

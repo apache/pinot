@@ -44,9 +44,15 @@ public class Utils {
 
   public static void main(String[] args) {
     List<List<Object>> test = new ArrayList<>();
-    test.add(Arrays.asList(1, 2, 3));
-    test.add(Arrays.asList(9));
-    test.add(Arrays.asList(4, 5));
+    List<Object> list1 = new ArrayList<Object>();
+    list1.addAll(Arrays.asList(1, 2, 3));
+    test.add(list1);
+    List<Object> list2 = new ArrayList<Object>();
+    list2.addAll(Arrays.asList(9));
+    test.add(list2);
+    List<Object> list3 = new ArrayList<Object>();
+    list3.addAll(Arrays.asList(4, 5));
+    test.add(list3);
 
     for (List<Object> list : cartesianProduct(test)) {
       for (Object object : list) {

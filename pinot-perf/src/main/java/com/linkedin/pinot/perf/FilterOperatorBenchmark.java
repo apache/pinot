@@ -92,7 +92,7 @@ public class FilterOperatorBenchmark {
       segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest, 
           totalDocsMatched, timesSpent));
     }
-    ExecutorService executorService = Executors.newWorkStealingPool();
+    ExecutorService executorService = Executors.newCachedThreadPool();
     for (int run = 0; run < 5; run++) {
       System.out.println("START RUN:"+ run );
       totalDocsMatched.set(0);

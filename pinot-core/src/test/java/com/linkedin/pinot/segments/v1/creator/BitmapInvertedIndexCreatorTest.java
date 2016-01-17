@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
+import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -24,6 +25,7 @@ import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedInd
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -31,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -69,7 +70,7 @@ public class BitmapInvertedIndexCreatorTest {
     Random r = new Random();
     Map<Integer, Set<Integer>> postingListMap = new HashMap<>();
     for (int i = 0; i < cardinality; i++) {
-      postingListMap.put(i, new LinkedHashSet<>());
+      postingListMap.put(i, new LinkedHashSet<Integer>());
     }
     for (int i = 0; i < numDocs; i++) {
       data[i] = r.nextInt(cardinality);
@@ -116,9 +117,7 @@ public class BitmapInvertedIndexCreatorTest {
       Set<Integer> expected = postingListMap.get(i);
       Assert.assertEquals(bitmap.getCardinality(), expected.size());
       int[] actual = bitmap.toArray();
-      List<Integer> actualList = Arrays.stream(actual)
-          .boxed()
-          .collect(Collectors.toList());
+      List<Integer> actualList = Ints.asList(actual);
       Assert.assertEquals(actualList, expected);
     }
 
@@ -148,7 +147,7 @@ public class BitmapInvertedIndexCreatorTest {
     Random r = new Random();
     Map<Integer, Set<Integer>> postingListMap = new HashMap<>();
     for (int i = 0; i < cardinality; i++) {
-      postingListMap.put(i, new LinkedHashSet<>());
+      postingListMap.put(i, new LinkedHashSet<Integer>());
     }
     int totalNumberOfEntries = 0;
     for (int docId = 0; docId < numDocs; docId++) {

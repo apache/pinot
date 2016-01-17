@@ -103,7 +103,7 @@ public class ScanBasedQueryProcessor {
   private List<ResultTable> processSegments(final String query, final BrokerRequest brokerRequest)
       throws InterruptedException {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
-    List<ResultTable> resultTables = Collections.synchronizedList(new ArrayList<ResultTable>());
+    final List<ResultTable> resultTables = Collections.synchronizedList(new ArrayList<ResultTable>());
 
     for (final SegmentQueryProcessor segmentQueryProcessor : _segmentQueryProcessorMap.values()) {
       executorService.execute(new Runnable() {

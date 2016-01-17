@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller;
 
 import java.io.File;
+import java.util.concurrent.Callable;
 
 import org.restlet.Application;
 import org.restlet.Component;
@@ -108,9 +109,20 @@ public class ControllerStarter {
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
     controllerMetrics.addCallbackGauge(
-        "helix.connected", () -> helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L);
+            "helix.connected",
+            new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L;
+              }
+            });
     controllerMetrics.addCallbackGauge(
-        "helix.leader", () -> helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L);
+        "helix.leader", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
+              }
+            });
   }
 
   public void stop() {

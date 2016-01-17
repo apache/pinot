@@ -95,7 +95,7 @@ public class Pql2CompilerTest {
 
   @Test
   public void testHardcodedQueries() {
-    PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<>());
+    PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<String, String[]>());
     Pql2Compiler pql2Compiler = new Pql2Compiler();
 
     testQuery(pql1Compiler, pql2Compiler, "select count(*) from foo where x not in (1,2,3)");
@@ -115,7 +115,7 @@ public class Pql2CompilerTest {
       File avroFile = new File(tempDir, "On_Time_On_Time_Performance_2014_1.avro");
       QueryGenerator qg = new QueryGenerator(Collections.singletonList(avroFile), "whatever", "whatever");
 
-      PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<>());
+      PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<String, String[]>());
       Pql2Compiler pql2Compiler = new Pql2Compiler();
 
       for (int i = 1; i <= 1000000; i++) {

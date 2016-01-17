@@ -134,7 +134,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,
       String retentionTimeUnit, String brokerTenant, String serverTenant) throws Exception {
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant,
-        serverTenant, Collections.emptyList());
+        serverTenant, new ArrayList<String>());
   }
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,
@@ -220,7 +220,7 @@ public abstract class ClusterTest extends ControllerTest {
     int retentionDays = 900;
     String retentionTimeUnit = "Days";
     addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, Collections.emptyList());
+        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, new ArrayList<String>());
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant,
         serverTenant);
   }

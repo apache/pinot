@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import java.util.ArrayList;
 import java.util.Collections;
+
+import com.linkedin.pinot.core.query.utils.Pair;
 
 
 public class CountFunction extends AggregationFunc {
@@ -31,7 +34,7 @@ public class CountFunction extends AggregationFunc {
       count += new Long((row.get(_column, _name)).toString());
     }
 
-    ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
+    ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);
     resultTable.add(0, count);
 
     return resultTable;

@@ -115,7 +115,7 @@ public class HybridQuickstart {
 
     File tempDir = new File("/tmp/" + System.currentTimeMillis());
     tempDir.mkdir();
-    QuickstartRunner runner =
+    final QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 2, 2, 1, tempDir, false);
     printStatus(color.YELLOW, "***** starting kafka  *****");
     startKafka();
@@ -140,7 +140,7 @@ public class HybridQuickstart {
 
     printStatus(color.YELLOW,
         "***** publishing data to kafka for airline realtime to start consuming event stream  *****");
-    AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(schemaFile), dataFile);
+    final AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(schemaFile), dataFile);
     stream.run();
     
     printStatus(color.YELLOW, "***** Pinot Hybrid with hybrid table setup is complete *****");

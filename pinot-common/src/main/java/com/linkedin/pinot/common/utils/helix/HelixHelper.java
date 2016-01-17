@@ -328,7 +328,7 @@ public class HelixHelper {
    * @param segmentName Name of the new segment to be added
    * @param getInstancesForSegment Callable returning list of instances where the segment should be uploaded.
    */
-  public static void addSegmentToIdealState(HelixManager helixManager, String tableName, final String segmentName,
+  public static void addSegmentToIdealState(HelixManager helixManager, final String tableName, final String segmentName,
       final Callable<List<String>> getInstancesForSegment) {
 
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {

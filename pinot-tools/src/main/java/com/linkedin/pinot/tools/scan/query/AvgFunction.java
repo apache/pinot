@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import java.util.ArrayList;
 import java.util.Collections;
+
+import com.linkedin.pinot.core.query.utils.Pair;
 
 
 public class AvgFunction extends AggregationFunc {
@@ -46,7 +49,7 @@ public class AvgFunction extends AggregationFunc {
     average[0] = sum;
     average[1] = numEntries;
 
-    ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
+    ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);
     resultTable.add(0, average);
     return resultTable;
   }

@@ -17,9 +17,12 @@ package com.linkedin.pinot.controller;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+
+import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
@@ -111,7 +114,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
     // The set method converted comma separated string into ArrayList, so need to convert back to String here.
     if (zkAddressObj instanceof ArrayList) {
-      return String.join(",", (ArrayList) zkAddressObj);
+      List<String> zkAddressList = (ArrayList<String>) zkAddressObj;
+      String[] zkAddress =  zkAddressList.toArray(new String[0]);
+      return StringUtil.join(",", zkAddress);
     } else if (zkAddressObj instanceof String) {
       return (String) zkAddressObj;
     } else {

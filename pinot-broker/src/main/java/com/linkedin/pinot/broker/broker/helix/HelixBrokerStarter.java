@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -27,6 +28,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -130,10 +132,21 @@ public class HelixBrokerStarter {
     _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
-        "helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+        "helix.connected", new Callable<Long>() {
+          @Override
+          public Long call() throws Exception {
+            return _helixManager.isConnected() ? 1L : 0L;
+          }
+        });
 
-    _helixManager.addPreConnectCallback(() -> _brokerServerBuilder.getBrokerMetrics()
-        .addMeteredValue(null, BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+    _helixManager.addPreConnectCallback(
+        new PreConnectCallback() {
+          @Override
+          public void onPreConnect() {
+            _brokerServerBuilder.getBrokerMetrics()
+            .addMeteredValue(null, BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          }
+        });
   }
 
   private void setupHelixSystemProperties() {

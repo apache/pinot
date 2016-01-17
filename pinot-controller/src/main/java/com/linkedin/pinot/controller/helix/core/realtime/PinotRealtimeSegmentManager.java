@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Function;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -162,9 +163,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     LOGGER.info("Computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAdd.toArray()));
 
     // Add the new segments to the server instances
-    for (String segmentId : listOfSegmentsToAdd) {
+    for (final String segmentId : listOfSegmentsToAdd) {
       String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
-      String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(segmentId);
+      final String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(segmentId);
 
       // Does the ideal state already contain this segment?
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
@@ -182,8 +183,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
         // Update the ideal state to add the new realtime segment
         HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), resourceName,
-            idealState -> PinotTableIdealStateBuilder
-                .addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName),
+            new Function<IdealState, IdealState>() {
+              @Override
+              public IdealState apply(IdealState idealState) {
+                return PinotTableIdealStateBuilder
+                    .addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName);
+              }
+            },
             RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
       }
     }

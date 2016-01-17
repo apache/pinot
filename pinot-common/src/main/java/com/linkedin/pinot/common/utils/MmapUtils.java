@@ -44,7 +44,7 @@ public class MmapUtils {
   private static final AtomicInteger MMAP_BUFFER_COUNT = new AtomicInteger(0);
   private static final long BYTES_IN_MEGABYTE = 1024L * 1024L;
   private static final Map<ByteBuffer, AllocationContext> BUFFER_TO_CONTEXT_MAP =
-      Collections.synchronizedMap(new WeakIdentityHashMap<>());
+      Collections.synchronizedMap(new WeakIdentityHashMap<ByteBuffer, AllocationContext>());
 
   private enum AllocationType {
     MMAP,

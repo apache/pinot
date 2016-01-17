@@ -16,9 +16,12 @@
 
 package com.linkedin.pinot.tools.scan.query;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+
+import com.linkedin.pinot.core.query.utils.Pair;
 
 
 public class DistinctCountFunction extends AggregationFunc {
@@ -46,7 +49,7 @@ public class DistinctCountFunction extends AggregationFunc {
       }
     }
 
-    ResultTable resultTable = new ResultTable(Collections.emptyList(), 1);
+    ResultTable resultTable = new ResultTable(new ArrayList<Pair>(), 1);
     resultTable.add(0, distinctSet);
 
     return resultTable;
