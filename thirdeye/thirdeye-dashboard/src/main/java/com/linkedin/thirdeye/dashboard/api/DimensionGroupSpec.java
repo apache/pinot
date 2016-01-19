@@ -1,9 +1,15 @@
 package com.linkedin.thirdeye.dashboard.api;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimap;
 
 public class DimensionGroupSpec {
   private String collection;
@@ -70,19 +76,18 @@ public class DimensionGroupSpec {
   }
 
   @JsonIgnore
-  public Map<String, Map<String, List<String>>> getReverseMapping() {
-    Map<String, Map<String, List<String>>> reverse = new HashMap<>();
+  public Map<String, Multimap<String, String>> getReverseMapping() {
+    Map<String, Multimap<String, String>> reverse = new HashMap<>();
 
     for (DimensionGroup group : groups) {
       if (group.getValues() != null) {
-        Map<String, List<String>> subMap = reverse.get(group.getDimension());
+        Multimap<String, String> subMap = reverse.get(group.getDimension());
         if (subMap == null) {
-          subMap = new HashMap<>();
+          subMap = LinkedListMultimap.create();
           reverse.put(group.getDimension(), subMap);
         }
-
         // Groups will be unique
-        subMap.put(group.getName(), group.getValues());
+        subMap.putAll(group.getName(), group.getValues());
       }
     }
 

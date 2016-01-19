@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 
 public class QueryCache {
@@ -20,18 +21,19 @@ public class QueryCache {
     clientMap.clear();
   }
 
-  public QueryResult getQueryResult(String serverUri, String sql) throws Exception {
-    ThirdEyeRawResponse rawResponse = clientMap.get(serverUri).getRawResponse(sql);
+  public QueryResult getQueryResult(String serverUri, ThirdEyeRequest request) throws Exception {
+    ThirdEyeRawResponse rawResponse = clientMap.get(serverUri).getRawResponse(request);
     return QueryResult.fromThirdEyeResponse(rawResponse);
   }
 
-  public Future<QueryResult> getQueryResultAsync(final String serverUri, final String sql)
-      throws Exception {
+  public Future<QueryResult> getQueryResultAsync(final String serverUri,
+      final ThirdEyeRequest request) throws Exception {
     return executorService.submit(new Callable<QueryResult>() {
       @Override
       public QueryResult call() throws Exception {
-        return getQueryResult(serverUri, sql);
+        return getQueryResult(serverUri, request);
       }
     });
   }
+
 }

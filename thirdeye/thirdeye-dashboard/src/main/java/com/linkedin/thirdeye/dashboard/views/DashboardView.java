@@ -1,14 +1,14 @@
 package com.linkedin.thirdeye.dashboard.views;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.ws.rs.core.MultivaluedMap;
-
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dashboard.resources.DashboardConfigResource;
 
 import io.dropwizard.views.View;
@@ -20,7 +20,7 @@ public class DashboardView extends View {
   private final Map<String, String> aliases;
   private final List<String> metrics;
   private final List<String> metricAliases;
-  private final MultivaluedMap<String, String> selectedDimensions;
+  private final Multimap<String, String> selectedDimensions;
   private final DateTime baselineTime;
   private final DateTime currentTime;
   private final DimensionView dimensionView;
@@ -30,7 +30,7 @@ public class DashboardView extends View {
   private final String feedbackEmailAddress;
   private final List<String> funnelNames;
 
-  public DashboardView(String collection, MultivaluedMap<String, String> selectedDimensions,
+  public DashboardView(String collection, Multimap<String, String> selectedDimensions,
       DateTime baselineTime, DateTime currentTime, DimensionView dimensionView,
       DateTime earliestDataTime, DateTime latestDataTime, List<String> customDashboardNames,
       String feedbackEmailAddress, List<String> allFunnelNames,
@@ -65,10 +65,12 @@ public class DashboardView extends View {
 
   public Map<String, String> getSelectedDimensions() {
     Map<String, String> dimensions = new HashMap<>(selectedDimensions.size());
-    for (Map.Entry<String, List<String>> entry : selectedDimensions.entrySet()) {
-      String value = StringUtils.join(entry.getValue(), " OR ");
-      dimensions.put(entry.getKey(), value);
+    for (String key : selectedDimensions.keySet()) {
+      Collection<String> values = selectedDimensions.get(key);
+      String value = StringUtils.join(values, " OR ");
+      dimensions.put(key, value);
     }
+
     return dimensions;
   }
 

@@ -1,16 +1,18 @@
 package com.linkedin.thirdeye.client.util;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.Multimap;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.format.ISODateTimeFormat;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.ISODateTimeFormat;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
 public class SqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
@@ -18,13 +20,29 @@ public class SqlUtils {
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
 
-  public static String getSql(String metricFunction, String collection, DateTime start,
-      DateTime end, Map<String, String> dimensionValues) {
-    return getSql(metricFunction, collection, start, end, toMultimap(dimensionValues));
+  public static String getThirdEyeSql(ThirdEyeRequest request) {
+    String metricFunction = request.getMetricFunction();
+    String collection = request.getCollection();
+    DateTime startTime = request.getStartTime();
+    DateTime endTime = request.getEndTime();
+    if (metricFunction == null) {
+      throw new IllegalStateException("Must provide metric function, e.g. `AGGREGATE_1_HOURS(m1)`");
+    }
+    if (collection == null) {
+      throw new IllegalStateException("Must provide collection name");
+    }
+    if (startTime == null || endTime == null) {
+      throw new IllegalStateException("Must provide start and end time");
+    } else if (startTime.isAfter(endTime)) {
+      throw new IllegalStateException(
+          "Start time must come before end: " + startTime + ", " + endTime);
+    }
+    return getSql(metricFunction, collection, startTime, endTime, request.getDimensionValues(),
+        request.getGroupBy());
   }
 
-  public static String getSql(String metricFunction, String collection, DateTime start,
-      DateTime end, Multimap<String, String> dimensionValues) {
+  static String getSql(String metricFunction, String collection, DateTime start, DateTime end,
+      Multimap<String, String> dimensionValues, Set<String> groupBy) {
     StringBuilder sb = new StringBuilder();
 
     sb.append("SELECT ").append(metricFunction).append(" FROM ").append(collection)
@@ -35,7 +53,7 @@ public class SqlUtils {
       sb.append(" AND ").append(dimensionWhereClause);
     }
 
-    String groupByClause = getDimensionGroupByClause(dimensionValues);
+    String groupByClause = getDimensionGroupByClause(groupBy);
     if (groupByClause != null) {
       sb.append(" ").append(groupByClause);
     }
@@ -43,18 +61,13 @@ public class SqlUtils {
     return sb.toString();
   }
 
-  public static String getBetweenClause(DateTime start, DateTime end) {
+  static String getBetweenClause(DateTime start, DateTime end) {
     return String.format("time BETWEEN '%s' AND '%s'", getDateString(start), getDateString(end));
   }
 
-  public static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
+  static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
-      if (entry.getValue().size() == 1 && "!".equals(entry.getValue().iterator().next())) {
-        // Part of group by clause
-        continue;
-      }
-
       List<String> equals = new ArrayList<>(entry.getValue().size());
       for (String value : entry.getValue()) {
         equals.add(EQUALS.join(entry.getKey(), String.format("'%s'", value)));
@@ -68,12 +81,13 @@ public class SqlUtils {
     return AND.join(components);
   }
 
-  public static String getDimensionGroupByClause(Multimap<String, String> dimensionValues) {
+  static String getDimensionGroupByClause(Set<String> groupBy) {
+    if (groupBy == null) {
+      return null;
+    }
     List<String> components = new ArrayList<>();
-    for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
-      if (entry.getValue().size() == 1 && "!".equals(entry.getValue().iterator().next())) {
-        components.add(String.format("'%s'", entry.getKey()));
-      }
+    for (String group : groupBy) {
+      components.add(String.format("'%s'", group));
     }
     if (components.isEmpty()) {
       return null;
@@ -85,11 +99,4 @@ public class SqlUtils {
     return ISODateTimeFormat.dateTimeNoMillis().print(dateTime.toDateTime(DateTimeZone.UTC));
   }
 
-  private static Multimap<String, String> toMultimap(Map<String, String> map) {
-    ImmutableMultimap.Builder<String, String> builder = ImmutableMultimap.builder();
-    for (Map.Entry<String, String> entry : map.entrySet()) {
-      builder.put(entry.getKey(), entry.getValue());
-    }
-    return builder.build();
-  }
 }

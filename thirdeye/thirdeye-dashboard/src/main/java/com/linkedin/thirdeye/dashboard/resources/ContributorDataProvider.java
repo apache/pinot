@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -15,9 +14,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
-
 import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -27,13 +23,16 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
 import com.linkedin.thirdeye.dashboard.api.MetricTable;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.IntraPeriod;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewContributors;
 
@@ -70,9 +69,8 @@ public class ContributorDataProvider {
    * Sends the appropriate queries and uses the response to create contributor tables.
    */
   public View generateDimensionContributorView(String collection, String metricFunction,
-      MultivaluedMap<String, String> selectedDimensions, UriInfo uriInfo, List<String> dimensions,
-      DateTime baselineStart, DateTime currentStart,
-      Map<String, Map<String, List<String>>> reverseDimensionGroups)
+      Multimap<String, String> selectedDimensions, List<String> dimensions, DateTime baselineStart,
+      DateTime currentStart, Map<String, Multimap<String, String>> reverseDimensionGroups)
           throws Exception, InterruptedException, ExecutionException {
     IntraPeriod intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
     long intraPeriodMillis = intraPeriod.getMillis();
@@ -82,43 +80,48 @@ public class ContributorDataProvider {
     currentStart = ViewUtils.standardizeDate(currentStart, intraPeriod);
 
     long baselineOffset = currentStart.getMillis() - baselineStart.getMillis();
+    Multimap<String, String> expandedDimensionValues =
+        ThirdEyeRequestUtils.expandDimensionGroups(selectedDimensions, reverseDimensionGroups);
+    ThirdEyeRequest baselineTotalReq =
+        new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
+            .setStartTime(baselineStart).setEndTime(baselineStart.plus(intraPeriodMillis))
+            .setDimensionValues(expandedDimensionValues).build();
+    ThirdEyeRequest currentTotalReq =
+        new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
+            .setStartTime(currentStart).setEndTime(currentStart.plus(intraPeriodMillis))
+            .setDimensionValues(expandedDimensionValues).build();
 
-    String baselineTotalSql = SqlUtils.getSql(metricFunction, collection, baselineStart,
-        baselineStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
-    String currentTotalSql = SqlUtils.getSql(metricFunction, collection, currentStart,
-        currentStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
-
-    LOGGER.info("Generated SQL for contributor baseline total {}: {}", uriInfo.getRequestUri(),
-        baselineTotalSql);
-    LOGGER.info("Generated SQL for contributor current total {}: {}", uriInfo.getRequestUri(),
-        currentTotalSql);
+    LOGGER.info("Generated request for contributor baseline total: {}", baselineTotalReq);
+    LOGGER.info("Generated request for contributor current total: {}", currentTotalReq);
     Future<QueryResult> baselineTotalResultFuture =
-        queryCache.getQueryResultAsync(serverUri, baselineTotalSql);
+        queryCache.getQueryResultAsync(serverUri, baselineTotalReq);
     Future<QueryResult> currentTotalResultFuture =
-        queryCache.getQueryResultAsync(serverUri, currentTotalSql);
+        queryCache.getQueryResultAsync(serverUri, currentTotalReq);
 
     Map<String, Future<QueryResult>> baselineResultFutures = new HashMap<>();
     Map<String, Future<QueryResult>> currentResultFutures = new HashMap<>();
     for (String dimension : dimensions) {
       // Dimensions should be filtered already, but there's an additional check here.
       if (!selectedDimensions.containsKey(dimension)) {
-        // Generate SQL
-        selectedDimensions.put(dimension, Arrays.asList("!"));
-        String baselineGroupBySql = SqlUtils.getSql(metricFunction, collection, baselineStart,
-            baselineStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
-        String currentGroupBySql = SqlUtils.getSql(metricFunction, collection, currentStart,
-            currentStart.plus(intraPeriodMillis), selectedDimensions, reverseDimensionGroups);
-        LOGGER.info("Generated SQL for contributor baseline {} {}: {}", dimension,
-            uriInfo.getRequestUri(), baselineGroupBySql);
-        LOGGER.info("Generated SQL for contributor current {} {}: {}", dimension,
-            uriInfo.getRequestUri(), currentGroupBySql);
-        selectedDimensions.remove(dimension);
+        // Generate requests
+        ThirdEyeRequest baselineGroupByReq =
+            new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
+                .setStartTime(baselineStart).setEndTime(baselineStart.plus(intraPeriodMillis))
+                .setDimensionValues(expandedDimensionValues).setGroupBy(dimension).build();
+        ThirdEyeRequest currentGroupByReq =
+            new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
+                .setStartTime(currentStart).setEndTime(currentStart.plus(intraPeriodMillis))
+                .setDimensionValues(expandedDimensionValues).setGroupBy(dimension).build();
+        LOGGER.info("Generated request for contributor baseline {} : {}", dimension,
+            baselineGroupByReq);
+        LOGGER.info("Generated request for contributor current {}: {}", dimension,
+            currentGroupByReq);
 
         // Query (in parallel)
         baselineResultFutures.put(dimension,
-            queryCache.getQueryResultAsync(serverUri, baselineGroupBySql));
+            queryCache.getQueryResultAsync(serverUri, baselineGroupByReq));
         currentResultFutures.put(dimension,
-            queryCache.getQueryResultAsync(serverUri, currentGroupBySql));
+            queryCache.getQueryResultAsync(serverUri, currentGroupByReq));
 
       } else {
         LOGGER.warn(

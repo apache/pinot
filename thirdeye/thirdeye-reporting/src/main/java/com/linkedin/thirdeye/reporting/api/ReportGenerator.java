@@ -39,8 +39,9 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.CachedThirdEyeClientConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
-import com.linkedin.thirdeye.client.util.SqlUtils;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportGeneratorApi;
 import com.linkedin.thirdeye.reporting.api.anomaly.AnomalyReportTable;
 import com.linkedin.thirdeye.reporting.util.DimensionKeyUtils;
@@ -164,6 +165,7 @@ public class ReportGenerator implements Job {
         LOGGER.info("Generating Thirdeye URL {}", thirdeyeUri);
 
         Map<String, String> dimensionValues = DimensionKeyUtils.createDimensionValues(tableSpec);
+        String groupBy = tableSpec.getGroupBy();
         LOGGER.info("Generated dimension values");
         Map<String, List<ReportRow>> metricTableRows = new HashMap<>();
         List<TableReportRow> tableReportRows = new ArrayList<>();
@@ -176,18 +178,19 @@ public class ReportGenerator implements Job {
 
           // generate report for every metric
           for (String metric : tableSpec.getMetrics()) {
-
             LOGGER.info("Metric : " + metric);
-            // sql query
-            String currentSql = SqlUtils.getSql(metric, collection, currentStartHour,
-                currentEndHour, dimensionValues);
-            String baselineSql = SqlUtils.getSql(metric, collection, baselineStartHour,
-                baselineEndHour, dimensionValues);
+            ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
+                .setMetricFunction(metric).setStartTime(currentStartHour).setEndTime(currentEndHour)
+                .setDimensionValues(dimensionValues).setGroupBy(groupBy).build();
+            ThirdEyeRequest baselineReq =
+                new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metric)
+                    .setStartTime(baselineStartHour).setEndTime(baselineEndHour)
+                    .setDimensionValues(dimensionValues).setGroupBy(groupBy).build();
+            LOGGER.info("Current req: {}", currentReq);
+            LOGGER.info("Baseline req: {}", baselineReq);
 
-            LOGGER.info("Current sql : " + currentSql);
-            LOGGER.info("Baseline sql : " + baselineSql);
-            ThirdEyeRawResponse currentQueryResult = thirdeyeClient.getRawResponse(currentSql);
-            ThirdEyeRawResponse baselineQueryResult = thirdeyeClient.getRawResponse(baselineSql);
+            ThirdEyeRawResponse currentQueryResult = thirdeyeClient.getRawResponse(currentReq);
+            ThirdEyeRawResponse baselineQueryResult = thirdeyeClient.getRawResponse(baselineReq);
 
             LOGGER.info("Applying filters");
             // apply filters

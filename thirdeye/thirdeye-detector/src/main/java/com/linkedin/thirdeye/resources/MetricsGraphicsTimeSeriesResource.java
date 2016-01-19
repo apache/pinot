@@ -39,6 +39,7 @@ import com.linkedin.thirdeye.api.MetricsGraphicsTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
 
 import io.dropwizard.hibernate.UnitOfWork;
@@ -71,7 +72,7 @@ public class MetricsGraphicsTimeSeriesResource {
     Multimap<String, String> fixedValues = extractDimensionValues(uriInfo);
 
     // Get time series data
-    ThirdEyeRequest req = new ThirdEyeRequest().setCollection(collection)
+    ThirdEyeRequestBuilder req = new ThirdEyeRequestBuilder().setCollection(collection)
         .setMetricFunction(getMetricFunction(metric, bucketSize)).setStartTime(startTime)
         .setEndTime(endTime).setDimensionValues(fixedValues);
 
@@ -80,7 +81,7 @@ public class MetricsGraphicsTimeSeriesResource {
     }
 
     // Do query
-    Map<DimensionKey, MetricTimeSeries> res = thirdEyeClient.execute(req);
+    Map<DimensionKey, MetricTimeSeries> res = thirdEyeClient.execute(req.build());
     Map<DimensionKey, List<Map<String, Object>>> dataByDimensionKey = new HashMap<>(res.size());
     final Map<DimensionKey, Double> totalVolume = new HashMap<>(res.size());
 
@@ -154,9 +155,9 @@ public class MetricsGraphicsTimeSeriesResource {
 
       long shiftMillis = endTime.getMillis() - overlayEnd.getMillis();
 
-      ThirdEyeRequest overlayReq = new ThirdEyeRequest().setCollection(collection)
+      ThirdEyeRequest overlayReq = new ThirdEyeRequestBuilder().setCollection(collection)
           .setMetricFunction(getMetricFunction(metric, bucketSize)).setStartTime(overlayStart)
-          .setEndTime(overlayEnd).setDimensionValues(fixedValues);
+          .setEndTime(overlayEnd).setDimensionValues(fixedValues).build();
 
       Map<DimensionKey, MetricTimeSeries> overlayRes = thirdEyeClient.execute(overlayReq);
       for (Map.Entry<DimensionKey, MetricTimeSeries> entry : overlayRes.entrySet()) {
@@ -169,7 +170,7 @@ public class MetricsGraphicsTimeSeriesResource {
 
     MetricsGraphicsTimeSeries timeSeries = new MetricsGraphicsTimeSeries();
     timeSeries.setTitle(metric + (groupBy == null || "".equals(groupBy) ? "" : " by " + groupBy));
-    timeSeries.setDescription(req.toSql());
+    timeSeries.setDescription(req.toString());
     timeSeries.setData(data);
     timeSeries.setxAccessor("time");
     timeSeries.setyAccessor("value");
@@ -201,7 +202,7 @@ public class MetricsGraphicsTimeSeriesResource {
       List<AnomalyResult> filtered = new ArrayList<>();
       for (AnomalyResult anomaly : anomalies) {
         String[] dimensions = anomaly.getDimensions().split(",");
-        //TODO what to do if the dimension key has changed?
+        // TODO what to do if the dimension key has changed?
         boolean matches = true;
         for (int i = 0; i < config.getDimensions().size(); i++) {
           DimensionSpec spec = config.getDimensions().get(i);

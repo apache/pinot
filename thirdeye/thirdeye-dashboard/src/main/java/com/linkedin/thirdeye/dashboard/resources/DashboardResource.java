@@ -1,13 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -19,7 +17,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
@@ -31,7 +28,11 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.SegmentDescriptor;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.DimensionViewType;
@@ -41,7 +42,7 @@ import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.QueryUtils;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
+import com.linkedin.thirdeye.dashboard.util.UriUtils;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.DimensionView;
 import com.linkedin.thirdeye.dashboard.views.DimensionViewFunnel;
@@ -224,19 +225,17 @@ public class DashboardResource {
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineMillis") Long baselineMillis,
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
-    MultivaluedMap<String, String> selectedDimensions = uriInfo.getQueryParameters();
-    List<String> selectedFunnelsList = selectedDimensions.remove("funnels");
+    Multimap<String, String> selectedDimensions = UriUtils.extractDimensionValues(uriInfo);
+    Collection<String> selectedFunnelsList = UriUtils.extractFunnels(uriInfo);
     String selectedFunnels = (selectedFunnelsList == null || selectedFunnelsList.isEmpty()) ? null
-        : selectedFunnelsList.get(0);
+        : selectedFunnelsList.iterator().next();
 
     // Check no group bys
-    for (Entry<String, List<String>> entry : selectedDimensions.entrySet()) {
-      for (String value : entry.getValue()) {
-        if ("!".equals(value)) {
-          throw new WebApplicationException(
-              new IllegalArgumentException("No group by dimensions allowed"),
-              Response.Status.BAD_REQUEST);
-        }
+    for (String value : selectedDimensions.values()) {
+      if (ThirdEyeRequest.GROUP_BY_VALUE.equals(value)) {
+        throw new WebApplicationException(
+            new IllegalArgumentException("No group by dimensions allowed"),
+            Response.Status.BAD_REQUEST);
       }
     }
 
@@ -309,19 +308,19 @@ public class DashboardResource {
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
     // TODO may be useful for refactor later.
     return getDimensionView(collection, metricFunction, dimensionViewType, baselineMillis,
-        currentMillis, uriInfo.getQueryParameters(), null, uriInfo);
+        currentMillis, UriUtils.extractDimensionValues(uriInfo), null, uriInfo);
   }
 
   private View getDimensionView(String collection, String metricFunction,
       DimensionViewType dimensionViewType, Long baselineMillis, Long currentMillis,
-      MultivaluedMap<String, String> selectedDimensions, String funnels, UriInfo uriInfo)
+      Multimap<String, String> selectedDimensions, String funnels, UriInfo uriInfo)
           throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
-
+    LOGGER.info("Request uri: {}", uriInfo.getRequestUri());
     // Dimension groups
-    Map<String, Map<String, List<String>>> reverseDimensionGroups = null;
+    Map<String, Multimap<String, String>> reverseDimensionGroups = null;
     DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
     if (dimensionGroupSpec != null) {
       reverseDimensionGroups = dimensionGroupSpec.getReverseMapping();
@@ -333,37 +332,25 @@ public class DashboardResource {
     case MULTI_TIME_SERIES:
       List<String> viewDimensions = dashboardConfigResource.getDimensions(collection, uriInfo);
       return contributorResource.generateDimensionContributorView(collection, metricFunction,
-          selectedDimensions, uriInfo, viewDimensions, baseline, current, reverseDimensionGroups);
+          selectedDimensions, viewDimensions, baseline, current, reverseDimensionGroups);
 
     case HEAT_MAP:
       Map<String, Future<QueryResult>> resultActualFutures = new HashMap<>();
-      // Map<String, Future<QueryResult>> resultCurrentFutures = new HashMap<>();
-      // Map<String, Future<QueryResult>> resultBaselineFutures = new HashMap<>();
-
+      // TODO separate this into two requests for the current + baseline period only (eg 2 days
+      // instead of a full week)
+      Multimap<String, String> expandedDimensionValues =
+          ThirdEyeRequestUtils.expandDimensionGroups(selectedDimensions, reverseDimensionGroups);
       for (String dimension : schema.getDimensions()) {
         if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
-          selectedDimensions.put(dimension, Arrays.asList("!"));
-          String actualSql = SqlUtils.getSql(metricFunction, collection, baseline, current,
-              selectedDimensions, reverseDimensionGroups);
-          // String currentSql = SqlUtils.getSql(metricFunction, collection, current, current,
-          // selectedDimensions, reverseDimensionGroups);
-          // String baselineSql = SqlUtils.getSql(metricFunction, collection, baseline, baseline,
-          // selectedDimensions, reverseDimensionGroups);
-          LOGGER.info("Generated actual SQL for heat map {}: {}", uriInfo.getRequestUri(),
-              actualSql);
-          // LOGGER.info("Generated current SQL for heat map {}: {}", uriInfo.getRequestUri(),
-          // currentSql);
-          // LOGGER.info("Generated baseline SQL for heat map {}: {}", uriInfo.getRequestUri(),
-          // baselineSql);
-          selectedDimensions.remove(dimension);
+          ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
+              .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
+              .setDimensionValues(expandedDimensionValues).setGroupBy(dimension).build();
+
+          LOGGER.info("Generated request for heat map: {}", req);
 
           // Query (in parallel)
-          resultActualFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, actualSql));
-          // resultCurrentFutures.put(dimension,
-          // queryCache.getQueryResultAsync(serverUri, currentSql));
-          // resultBaselineFutures.put(dimension,
-          // queryCache.getQueryResultAsync(serverUri, baselineSql));
+          resultActualFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, req));
         }
       }
 

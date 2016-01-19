@@ -26,7 +26,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.SegmentDescriptor;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
+import com.linkedin.thirdeye.client.util.SqlUtils;
 
 /**
  * Standard client for querying against ThirdEye server. It is strongly recommended to use
@@ -56,9 +58,8 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public Map<DimensionKey, MetricTimeSeries> execute(ThirdEyeRequest request) throws Exception {
-    String sql = request.toSql();
-    LOG.debug("Generated SQL {}", sql);
-    ThirdEyeRawResponse rawResponse = getRawResponse(sql);
+
+    ThirdEyeRawResponse rawResponse = getRawResponse(request);
 
     // Figure out the metric types of the projection
     StarTreeConfig starTreeConfig = getStarTreeConfig(request.getCollection());
@@ -77,7 +78,9 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public ThirdEyeRawResponse getRawResponse(String sql) throws Exception {
+  public ThirdEyeRawResponse getRawResponse(ThirdEyeRequest request) throws Exception {
+    String sql = SqlUtils.getThirdEyeSql(request);
+    LOG.debug("Generated SQL {}", sql);
     HttpGet req = new HttpGet(QUERY_ENDPOINT + URLEncoder.encode(sql, UTF_8));
     LOG.info("Executing sql request: {}", req);
     CloseableHttpResponse res = httpClient.execute(httpHost, req);
@@ -193,17 +196,17 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[4]);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[5]);
 
-    ThirdEyeRequest request = new ThirdEyeRequest().setCollection(collection)
+    ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder().setCollection(collection)
         .setStartTime(startTime).setEndTime(endTime).setMetricFunction(metricFunction);
 
     if (args.length == 7) {
-      request.setGroupBy(args[6]);
+      requestBuilder.setGroupBy(args[6]);
     }
 
     // Use builder to leverage cache in case in case multiple queries will be executed.
     ThirdEyeClient client = new DefaultThirdEyeClientFactory().getClient(host, port);
     try {
-      Map<DimensionKey, MetricTimeSeries> result = client.execute(request);
+      Map<DimensionKey, MetricTimeSeries> result = client.execute(requestBuilder.build());
       for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet()) {
         System.out.println(entry.getKey() + " #=> " + entry.getValue());
       }

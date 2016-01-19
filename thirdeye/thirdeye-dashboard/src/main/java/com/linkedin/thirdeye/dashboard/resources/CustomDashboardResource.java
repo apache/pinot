@@ -1,23 +1,32 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.base.Joiner;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardSpec;
-import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardComponentSpec;
-import com.linkedin.thirdeye.dashboard.util.*;
-import com.linkedin.thirdeye.dashboard.views.CustomDashboardView;
-import com.linkedin.thirdeye.dashboard.views.CustomFunnelTabularView;
-import com.linkedin.thirdeye.dashboard.views.CustomTimeSeriesView;
-import com.sun.jersey.core.util.MultivaluedMapImpl;
-import io.dropwizard.views.View;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Future;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math3.util.Pair;
@@ -25,12 +34,27 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.*;
-import javax.ws.rs.core.*;
-import java.io.*;
-import java.util.*;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
+import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardComponentSpec;
+import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardSpec;
+import com.linkedin.thirdeye.dashboard.util.ConfigCache;
+import com.linkedin.thirdeye.dashboard.util.DataCache;
+import com.linkedin.thirdeye.dashboard.util.QueryCache;
+import com.linkedin.thirdeye.dashboard.views.CustomDashboardView;
+import com.linkedin.thirdeye.dashboard.views.CustomFunnelTabularView;
+import com.linkedin.thirdeye.dashboard.views.CustomTimeSeriesView;
+
+import io.dropwizard.views.View;
 
 @Path("/custom-dashboard")
 public class CustomDashboardResource {
@@ -178,10 +202,10 @@ public class CustomDashboardResource {
     // Get funnel views
     List<Pair<CustomDashboardComponentSpec, View>> views = new ArrayList<>();
     for (CustomDashboardComponentSpec componentSpec : spec.getComponents()) {
-      MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
+      Multimap<String, String> dimensionValues = LinkedListMultimap.create();
       if (componentSpec.getDimensions() != null) {
         for (Map.Entry<String, List<String>> entry : componentSpec.getDimensions().entrySet()) {
-          dimensionValues.put(entry.getKey(), entry.getValue());
+          dimensionValues.putAll(entry.getKey(), entry.getValue());
         }
       }
 
@@ -210,30 +234,33 @@ public class CustomDashboardResource {
   }
 
   private CustomTimeSeriesView getCustomTimeSeriesView(String collection, Integer year,
-      Integer month, Integer day, List<String> metricList,
-      MultivaluedMap<String, String> queryParams, String groupBy) throws Exception {
+      Integer month, Integer day, List<String> metricList, Multimap<String, String> queryParams,
+      String groupBy) throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
     DateTime current = new DateTime(year, month, day, 0, 0);
     DateTime baseline = current.minusWeeks(1);
-    MultivaluedMap<String, String> dimensionValues = queryParams;
+    Multimap<String, String> dimensionValues = queryParams;
 
     if (groupBy != null) {
       if (dimensionValues.containsKey(groupBy)) {
         throw new IllegalArgumentException("Cannot group by fixed dimension");
       }
-      dimensionValues.put(groupBy, Arrays.asList("!"));
     }
 
     // Query
-    Map<String, Map<String, List<String>>> dimensionGroups = null;
+    Map<String, Multimap<String, String>> dimensionGroups = null;
     DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
     if (dimensionGroupSpec != null) {
       dimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues,
-        dimensionGroups);
-    QueryResult result = queryCache.getQueryResult(serverUri, sql);
+    Multimap<String, String> expandedDimensionValues =
+        ThirdEyeRequestUtils.expandDimensionGroups(dimensionValues, dimensionGroups);
+
+    ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
+        .setDimensionValues(expandedDimensionValues).setGroupBy(groupBy).build();
+    QueryResult result = queryCache.getQueryResult(serverUri, req);
 
     // Get index of group by so we can extract values for labels
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
@@ -307,8 +334,8 @@ public class CustomDashboardResource {
   }
 
   private CustomFunnelTabularView getCustomFunnelTabularView(String collection, Integer year,
-      Integer month, Integer day, List<String> metricList,
-      MultivaluedMap<String, String> queryParams) throws Exception {
+      Integer month, Integer day, List<String> metricList, Multimap<String, String> queryParams)
+          throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
 
@@ -317,24 +344,28 @@ public class CustomDashboardResource {
     DateTime baselineEnd = currentEnd.minusWeeks(1);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
-    // Dimension groups
-    Map<String, Map<String, List<String>>> dimensionGroups = null;
+    Map<String, Multimap<String, String>> dimensionGroups = null;
     DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
     if (dimensionGroupSpec != null) {
       dimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
 
-    // SQL
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd,
-        queryParams, dimensionGroups);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd,
-        queryParams, dimensionGroups);
-    LOG.info("Generated SQL: {}", baselineSql);
-    LOG.info("Generated SQL: {}", currentSql);
+    Multimap<String, String> expandedDimensionValues =
+        ThirdEyeRequestUtils.expandDimensionGroups(queryParams, dimensionGroups);
+
+    // Requests
+    ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(baselineStart).setEndTime(baselineEnd)
+        .setDimensionValues(expandedDimensionValues).build();
+    ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(currentStart).setEndTime(currentEnd)
+        .setDimensionValues(expandedDimensionValues).build();
+    LOG.info("Generated Req: {}", baselineReq);
+    LOG.info("Generated Req: {}", currentReq);
 
     // Query
-    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);
-    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentSql);
+    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineReq);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentReq);
 
     // Baseline data
     Map<Long, Number[]> baselineData = extractFunnelData(baselineResult.get());

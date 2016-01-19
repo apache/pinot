@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.anomaly.api.AnomalyDetectionDriverConfig;
-import com.linkedin.thirdeye.anomaly.util.ThirdEyeRequestUtils;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -22,6 +21,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
 
 /**
  * This class implements the exploration driver.
@@ -106,7 +106,7 @@ public class AnomalyDetectionDriver implements Callable<List<DimensionKeySeries>
    */
   private Entry<DimensionKey, MetricTimeSeries> getTotalSeries() throws Exception {
     ThirdEyeRequest request = ThirdEyeRequestUtils.buildRequest(starTreeConfig.getCollection(),
-        ThirdEyeRequestUtils.NULL_GROUP_BY, new HashMap<String, String>(),
+        null, new HashMap<String, String>(),
         Collections.singletonList(dimensionKeyContributionMetric), ONE_HOURS, timeRange);
     Map<DimensionKey, MetricTimeSeries> dataset = thirdEyeClient.execute(request);
     if (dataset.size() != 1) {

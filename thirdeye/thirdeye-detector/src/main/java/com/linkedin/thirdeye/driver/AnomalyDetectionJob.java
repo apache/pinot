@@ -1,17 +1,12 @@
 package com.linkedin.thirdeye.driver;
 
-import com.codahale.metrics.Histogram;
-import com.codahale.metrics.MetricRegistry;
-import com.google.common.collect.ImmutableList;
-import com.linkedin.thirdeye.api.AnomalyFunctionRelation;
-import com.linkedin.thirdeye.api.AnomalyResult;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.db.AnomalyFunctionRelationDAO;
-import com.linkedin.thirdeye.db.AnomalyResultDAO;
-import com.linkedin.thirdeye.function.AnomalyFunction;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.TimeUnit;
+
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -24,8 +19,19 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.MetricRegistry;
+import com.google.common.collect.ImmutableList;
+import com.linkedin.thirdeye.api.AnomalyFunctionRelation;
+import com.linkedin.thirdeye.api.AnomalyResult;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.db.AnomalyFunctionRelationDAO;
+import com.linkedin.thirdeye.db.AnomalyResultDAO;
+import com.linkedin.thirdeye.function.AnomalyFunction;
 
 public class AnomalyDetectionJob implements Job {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionJob.class);
@@ -103,9 +109,9 @@ public class AnomalyDetectionJob implements Job {
 
     // Seed request with top-level...
     Queue<ThirdEyeRequest> queue = new LinkedList<>();
-    ThirdEyeRequest req =
-        new ThirdEyeRequest().setCollection(anomalyFunction.getSpec().getCollection())
-            .setMetricFunction(metricFunction).setStartTime(windowStart).setEndTime(windowEnd);
+    ThirdEyeRequest req = new ThirdEyeRequestBuilder()
+        .setCollection(anomalyFunction.getSpec().getCollection()).setMetricFunction(metricFunction)
+        .setStartTime(windowStart).setEndTime(windowEnd).build();
     queue.add(req);
 
     // And all the dimensions which we should explore
@@ -113,8 +119,8 @@ public class AnomalyDetectionJob implements Job {
     if (exploreDimensionsString != null) {
       String[] exploreDimensions = exploreDimensionsString.split(",");
       for (String exploreDimension : exploreDimensions) {
-        ThirdEyeRequest groupByReq = new ThirdEyeRequest(req);
-        groupByReq.setGroupBy(exploreDimension);
+        ThirdEyeRequest groupByReq =
+            new ThirdEyeRequestBuilder(req).setGroupBy(exploreDimension).build();
         queue.add(groupByReq);
       }
     }

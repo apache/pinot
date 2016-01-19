@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,7 +22,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -35,12 +33,15 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
-import com.sun.jersey.core.util.MultivaluedMapImpl;
+import com.linkedin.thirdeye.dashboard.util.UriUtils;
 
 /**
  * REST controller providing general collection information such as dimensions and metrics.
@@ -73,7 +74,7 @@ public class DashboardConfigResource {
   }
 
   public List<String> getAllDimensions(String collection) throws Exception {
-    MultivaluedMap<String, String> nul = null;
+    Multimap<String, String> nul = null;
     return getDimensions(collection, nul);
   }
 
@@ -82,11 +83,11 @@ public class DashboardConfigResource {
   @Path("/dimensions/{collection}")
   public List<String> getDimensions(@PathParam("collection") String collection,
       @Context UriInfo uriInfo) throws Exception {
-    return getDimensions(collection, uriInfo.getQueryParameters());
+    return getDimensions(collection, UriUtils.extractDimensionValues(uriInfo));
   }
 
   public List<String> getDimensions(String collection,
-      MultivaluedMap<String, String> selectedDimensionValues) throws Exception {
+      Multimap<String, String> selectedDimensionValues) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
     Set<String> selectedDimensions =
         (selectedDimensionValues == null ? null : selectedDimensionValues.keySet());
@@ -201,19 +202,18 @@ public class DashboardConfigResource {
     String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION,
         METRIC_FUNCTION_JOINER.join(metrics));
 
-    MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
+    Multimap<String, String> dimensionValues = LinkedListMultimap.create();
     Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
     // query w/ group by for each dimension.
     for (String dimension : dimensions) {
-      // Generate SQL
-      dimensionValues.put(dimension, Arrays.asList("!"));
-      String sql =
-          SqlUtils.getSql(dummyFunction, collection, baseline, current, dimensionValues, null);
-      LOGGER.info("Generated SQL for dimension retrieval {}: {}", serverUri, sql);
-      dimensionValues.remove(dimension);
+      // Generate request
+      ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
+          .setMetricFunction(dummyFunction).setStartTime(baseline).setEndTime(current)
+          .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
+      LOGGER.info("Generated request for dimension retrieval {}: {}", serverUri, req);
 
       // Query (in parallel)
-      resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, sql));
+      resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, req));
     }
 
     Map<String, Collection<String>> collectedDimensionValues = new HashMap<>();

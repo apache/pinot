@@ -9,9 +9,10 @@ import com.linkedin.thirdeye.api.SegmentDescriptor;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public interface ThirdEyeClient {
+
   Map<DimensionKey, MetricTimeSeries> execute(ThirdEyeRequest request) throws Exception;
 
-  ThirdEyeRawResponse getRawResponse(String sql) throws Exception;
+  ThirdEyeRawResponse getRawResponse(ThirdEyeRequest request) throws Exception;
 
   StarTreeConfig getStarTreeConfig(String collection) throws Exception;
 

@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,7 +20,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.io.FileUtils;
@@ -35,6 +33,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Joiner;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
 import com.linkedin.thirdeye.dashboard.api.MetricDataRow;
@@ -45,7 +47,6 @@ import com.linkedin.thirdeye.dashboard.api.funnel.FunnelSpec;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.IntraPeriod;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.ViewUtils;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 import com.sun.jersey.api.ConflictException;
@@ -144,7 +145,7 @@ public class FunnelsDataProvider {
    */
   public List<FunnelTable> computeFunnelViews(String collection, String metricFunction,
       String selectedFunnels, long baselineMillis, long currentMillis,
-      MultivaluedMap<String, String> dimensionValues) throws Exception {
+      Multimap<String, String> dimensionValues) throws Exception {
     IntraPeriod intraPeriod = ViewUtils.getIntraPeriod(metricFunction);
 
     List<FunnelTable> funnelViews = new ArrayList<FunnelTable>();
@@ -211,7 +212,7 @@ public class FunnelsDataProvider {
    */
   public FunnelTable getFunnelDataFor(String collection, String urlMetricFunction, FunnelSpec spec,
       long baselineMillis, long currentMillis, IntraPeriod intraPeriod,
-      MultivaluedMap<String, String> dimensionValuesMap) throws Exception {
+      Multimap<String, String> dimensionValuesMap) throws Exception {
 
     // TODO : {dpatel} : this entire flow is extremely similar to custom dashboards, we should merge
     // them
@@ -228,23 +229,25 @@ public class FunnelsDataProvider {
         + String.format("(%s)", METRIC_FUNCTION_JOINER.join(spec.getActualMetricNames()))
         + StringUtils.repeat(")", metricFunctionLevels.size() - 1);
 
-    DimensionGroupSpec dimSpec = DimensionGroupSpec.emptySpec(collection);
-
-    Map<String, Map<String, List<String>>> dimensionGroups =
+    Map<String, Multimap<String, String>> dimensionGroups =
         DimensionGroupSpec.emptySpec(collection).getReverseMapping();
+    Multimap<String, String> expandedDimensionValues =
+        ThirdEyeRequestUtils.expandDimensionGroups(dimensionValuesMap, dimensionGroups);
 
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd,
-        dimensionValuesMap, dimensionGroups);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd,
-        dimensionValuesMap, dimensionGroups);
+    ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(baselineStart).setEndTime(baselineEnd)
+        .setDimensionValues(expandedDimensionValues).build();
+    ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(currentStart).setEndTime(currentEnd)
+        .setDimensionValues(expandedDimensionValues).build();
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());
-    LOG.info("Generated SQL for funnel baseline: {}", baselineSql);
-    LOG.info("Generated SQL for funnel current: {}", currentSql);
+    LOG.info("Generated request for funnel baseline: {}", baselineReq);
+    LOG.info("Generated request for funnel current: {}", currentReq);
 
     // Query
-    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);
-    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentSql);
+    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineReq);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentReq);
 
     // Baseline data
     Map<Long, Number[]> baselineData =

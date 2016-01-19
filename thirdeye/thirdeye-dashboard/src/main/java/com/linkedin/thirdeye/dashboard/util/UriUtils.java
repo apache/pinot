@@ -1,24 +1,29 @@
 package com.linkedin.thirdeye.dashboard.util;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.Map.Entry;
+
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.UriInfo;
+
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimap;
 
 public class UriUtils {
-  public static Map<String, String> extractDimensionValues(
-      MultivaluedMap<String, String> multiMap) {
-    Map<String, String> dimensionValues = new TreeMap<>();
+  private static final String FUNNELS_KEY = "funnels";
 
-    for (Map.Entry<String, List<String>> entry : multiMap.entrySet()) {
-
-      if (!entry.getKey().equals("funnels")) {
-        dimensionValues.put(entry.getKey(), entry.getValue().get(0));
+  public static Multimap<String, String> extractDimensionValues(UriInfo uriInfo) {
+    MultivaluedMap<String, String> mvMap = uriInfo.getQueryParameters();
+    ImmutableMultimap.Builder<String, String> builder = ImmutableMultimap.builder();
+    for (Entry<String, List<String>> entry : mvMap.entrySet()) {
+      if (!FUNNELS_KEY.equals(entry.getKey())) {
+        builder.putAll(entry.getKey(), entry.getValue());
       }
     }
+    return builder.build();
+  }
 
-    return dimensionValues;
+  public static List<String> extractFunnels(UriInfo uriInfo) {
+    return uriInfo.getQueryParameters().get(FUNNELS_KEY);
   }
 }

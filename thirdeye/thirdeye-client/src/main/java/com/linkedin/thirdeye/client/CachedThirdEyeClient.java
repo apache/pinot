@@ -36,7 +36,7 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
 
   private final LoadingCache<ThirdEyeRequest, Map<DimensionKey, MetricTimeSeries>> resultCache;
   private final LoadingCache<String, StarTreeConfig> starTreeConfigCache;
-  private final LoadingCache<String, ThirdEyeRawResponse> rawResultCache;
+  private final LoadingCache<ThirdEyeRequest, ThirdEyeRawResponse> rawResultCache;
   private final LoadingCache<String, List<SegmentDescriptor>> segmentDescriptorCache;
   private Supplier<List<String>> collectionsSupplier;
   private final Supplier<List<String>> _baseCollectionsSupplier = new CollectionSupplier();
@@ -94,9 +94,9 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public ThirdEyeRawResponse getRawResponse(String sql) throws Exception {
-    LOG.info("getRawResponse: {}", sql);
-    return rawResultCache.get(sql);
+  public ThirdEyeRawResponse getRawResponse(ThirdEyeRequest request) throws Exception {
+    LOG.info("getRawResponse: {}", request);
+    return rawResultCache.get(request);
   }
 
   @Override
@@ -148,8 +148,7 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
       if (!config.useCacheForExecuteMethod()) {
         return client.execute(request);
       }
-
-      ThirdEyeRawResponse thirdEyeRawResponse = rawResultCache.get(request.toSql());
+      ThirdEyeRawResponse thirdEyeRawResponse = rawResultCache.get(request);
       StarTreeConfig starTreeConfig = starTreeConfigCache.get(request.getCollection());
       Map<String, MetricType> metricTypes = new HashMap<>();
       for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
@@ -166,20 +165,14 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
     }
   }
 
-  /**
-   * Executes SQL statements against the /query resource.
-   */
-  private class RawResultCacheLoader extends CacheLoader<String, ThirdEyeRawResponse> {
+  private class RawResultCacheLoader extends CacheLoader<ThirdEyeRequest, ThirdEyeRawResponse> {
 
     @Override
-    public ThirdEyeRawResponse load(String sql) throws Exception {
-      return client.getRawResponse(sql);
+    public ThirdEyeRawResponse load(ThirdEyeRequest request) throws Exception {
+      return client.getRawResponse(request);
     }
   }
 
-  /**
-   * Retrieves starTreeConfig from server
-   */
   private class StarTreeConfigCacheLoader extends CacheLoader<String, StarTreeConfig> {
 
     @Override

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.util;
+package com.linkedin.thirdeye.dashboard.util;
 
 import java.util.Arrays;
 import java.util.List;

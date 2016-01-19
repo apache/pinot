@@ -16,8 +16,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
  * A third-eye client wrapper that limits the maximum number of connections.
  */
 public class FlowControlledThirdEyeClient implements ThirdEyeClient {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FlowControlledThirdEyeClient.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FlowControlledThirdEyeClient.class);
 
   private final Semaphore requestPermits;
   private final ThirdEyeClient client;
@@ -40,10 +39,10 @@ public class FlowControlledThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public ThirdEyeRawResponse getRawResponse(String sql) throws Exception {
+  public ThirdEyeRawResponse getRawResponse(ThirdEyeRequest request) throws Exception {
     requestPermits.acquireUninterruptibly();
     try {
-      return client.getRawResponse(sql);
+      return client.getRawResponse(request);
     } finally {
       requestPermits.release();
     }
