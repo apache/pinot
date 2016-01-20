@@ -15,24 +15,6 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-
-import org.apache.commons.io.FileUtils;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -40,6 +22,22 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.HeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 @Test
 public class BitmapInvertedIndexCreatorTest {
@@ -69,9 +67,9 @@ public class BitmapInvertedIndexCreatorTest {
 
     // GENERATE RANDOM DATA SET
     Random r = new Random();
-    Map<Integer, List<Integer>> postingListMap = new HashMap<>();
+    Map<Integer, Set<Integer>> postingListMap = new HashMap<>();
     for (int i = 0; i < cardinality; i++) {
-      postingListMap.put(i, new ArrayList<>());
+      postingListMap.put(i, new LinkedHashSet<>());
     }
     for (int i = 0; i < numDocs; i++) {
       data[i] = r.nextInt(cardinality);
@@ -109,16 +107,19 @@ public class BitmapInvertedIndexCreatorTest {
   }
 
   private void validate(String colName, File bitmapIndexFile, int cardinality,
-      Map<Integer, List<Integer>> postingListMap) throws IOException {
+      Map<Integer, Set<Integer>> postingListMap) throws IOException {
     Assert.assertTrue(bitmapIndexFile.exists());
     BitmapInvertedIndexReader reader =
         new BitmapInvertedIndexReader(bitmapIndexFile, cardinality, false);
-    for (int i = 0; i > cardinality; i++) {
+    for (int i = 0; i < cardinality; i++) {
       ImmutableRoaringBitmap bitmap = reader.getImmutable(i);
-      List<Integer> expected = postingListMap.get(i);
+      Set<Integer> expected = postingListMap.get(i);
       Assert.assertEquals(bitmap.getCardinality(), expected.size());
       int[] actual = bitmap.toArray();
-      Assert.assertEquals(Lists.newArrayList(actual), expected);
+      List<Integer> actualList = Arrays.stream(actual)
+          .boxed()
+          .collect(Collectors.toList());
+      Assert.assertEquals(actualList, expected);
     }
 
   }
@@ -145,9 +146,9 @@ public class BitmapInvertedIndexCreatorTest {
 
     // GENERATE RANDOM MULTI VALUE DATA SET
     Random r = new Random();
-    Map<Integer, List<Integer>> postingListMap = new HashMap<>();
+    Map<Integer, Set<Integer>> postingListMap = new HashMap<>();
     for (int i = 0; i < cardinality; i++) {
-      postingListMap.put(i, new ArrayList<>());
+      postingListMap.put(i, new LinkedHashSet<>());
     }
     int totalNumberOfEntries = 0;
     for (int docId = 0; docId < numDocs; docId++) {
