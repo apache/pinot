@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.transport.perf;
 
-import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -38,7 +31,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -47,11 +39,12 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -68,9 +61,15 @@ import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
 
 
 public class ScatterGatherPerfClient implements Runnable {
@@ -316,7 +315,9 @@ public class ScatterGatherPerfClient implements Runnable {
   private String sendRequestAndGetResponse(SimpleScatterGatherRequest request,
       final ScatterGatherStats scatterGatherStats) throws InterruptedException,
       ExecutionException, IOException, ClassNotFoundException {
-    CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request, scatterGatherStats);
+    BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
+    CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request, scatterGatherStats,
+        brokerMetrics);
     ByteBuf b = future.getOne();
     String r = null;
     if (null != b) {
@@ -343,7 +344,8 @@ public class ScatterGatherPerfClient implements Runnable {
   private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request,
       final ScatterGatherStats scatterGatherStats)
       throws InterruptedException {
-    return _scatterGather.scatterGather(request, scatterGatherStats);
+    final BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
+    return _scatterGather.scatterGather(request, scatterGatherStats, brokerMetrics);
   }
 
   private static class QueueEntry {
@@ -490,6 +492,11 @@ public class ScatterGatherPerfClient implements Runnable {
     @Override
     public long getRequestId() {
       return _requestId;
+    }
+
+    @Override
+    public BrokerRequest getBrokerRequest() {
+      return null;
     }
   }
 

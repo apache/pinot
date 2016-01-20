@@ -15,6 +15,19 @@
  */
 package com.linkedin.pinot.requestHandler;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.annotation.ThreadSafe;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -45,20 +58,6 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.annotation.ThreadSafe;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -251,7 +250,8 @@ public class BrokerRequestHandler {
         new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
             ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
             overriddenSelection, requestId, _brokerTimeOutMs);
-    CompositeFuture<ServerInstance, ByteBuf> response = _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats);
+    CompositeFuture<ServerInstance, ByteBuf> response = _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats,
+        _brokerMetrics);
 
     //Step 5 - Deserialize Responses and build instance response map
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -348,7 +348,8 @@ public class BrokerRequestHandler {
           new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
               ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
               overriddenSelection, requestId, _brokerTimeOutMs);
-      responseFuturesList.put(request, Pair.of(_scatterGatherer.scatterGather(scatterRequest, scatterGatherStats), respStats));
+      responseFuturesList.put(request, Pair.of(_scatterGatherer.scatterGather(scatterRequest, scatterGatherStats,
+          _brokerMetrics), respStats));
     }
     _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);
 
@@ -517,6 +518,10 @@ public class BrokerRequestHandler {
       return new SerDe(new TCompactProtocol.Factory());
     }
 
+    @Override
+    public BrokerRequest getBrokerRequest() {
+      return _brokerRequest;
+    }
   }
 
   public static class RequestProcessingException extends ProcessingException {

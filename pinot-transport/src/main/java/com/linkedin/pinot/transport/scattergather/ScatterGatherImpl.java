@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,13 +26,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -50,6 +48,8 @@ import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 
 /**
@@ -77,7 +77,8 @@ public class ScatterGatherImpl implements ScatterGather {
   }
 
   @Override
-  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest, final ScatterGatherStats scatterGatherStats)
+  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest,
+      final ScatterGatherStats scatterGatherStats, final BrokerMetrics brokerMetrics)
       throws InterruptedException {
     ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterRequest);
 
@@ -89,7 +90,7 @@ public class ScatterGatherImpl implements ScatterGather {
     // do Selection for each segment-set/segmentId
     selectServices(ctxt);
 
-    return sendRequest(ctxt, scatterGatherStats);
+    return sendRequest(ctxt, scatterGatherStats, brokerMetrics);
   }
 
   /**
@@ -98,10 +99,12 @@ public class ScatterGatherImpl implements ScatterGather {
    *
    * @param ctxt Scatter-Gather Request context with selected servers for each request.
    * @param scatterGatherStats
+   * @param brokerMetrics for updating stats
    * @return a composite future representing the gather process.
    * @throws InterruptedException
    */
-  protected CompositeFuture<ServerInstance, ByteBuf> sendRequest(ScatterGatherRequestContext ctxt, final ScatterGatherStats scatterGatherStats)
+  protected CompositeFuture<ServerInstance, ByteBuf> sendRequest(ScatterGatherRequestContext ctxt,
+      final ScatterGatherStats scatterGatherStats, final BrokerMetrics brokerMetrics)
       throws InterruptedException {
     TimerContext t = MetricsHelper.startTimer();
 
@@ -121,7 +124,7 @@ public class ScatterGatherImpl implements ScatterGather {
       scatterGatherStats.initServer(e.getKey().toString());
       SingleRequestHandler handler =
           new SingleRequestHandler(_connPool, e.getKey(), ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(),
-              requestDispatchLatch);
+              requestDispatchLatch, brokerMetrics);
       // Submit to thread-pool for checking-out and sending request
       _executorService.submit(handler);
       handlers.add(handler);
@@ -371,11 +374,13 @@ public class ScatterGatherImpl implements ScatterGather {
     private final long _timeoutMS;
 
     private final long _initTime;
+    private final BrokerMetrics _brokerMetrics;
     private long _startTime;
     private long _endTime;
 
     public SingleRequestHandler(KeyedPool<ServerInstance, NettyClientConnection> connPool, ServerInstance server,
-        ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch) {
+        ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch,
+        final BrokerMetrics brokerMetrics) {
       _connPool = connPool;
       _server = server;
       _request = request;
@@ -383,6 +388,7 @@ public class ScatterGatherImpl implements ScatterGather {
       _requestDispatchLatch = latch;
       _timeoutMS = timeoutMS;
       _initTime = System.currentTimeMillis();
+      _brokerMetrics = brokerMetrics;
     }
 
     @Override
@@ -400,7 +406,7 @@ public class ScatterGatherImpl implements ScatterGather {
     }
 
     public long getSendCompletionTimeMillis() {
-      return _endTime - _initTime;
+      return _endTime > _initTime ? _endTime - _initTime : 0;
     }
 
     // If the 'run' gets called more than 5ms after we created this object, something is wrong.
@@ -417,6 +423,8 @@ public class ScatterGatherImpl implements ScatterGather {
       }
 
       NettyClientConnection conn = null;
+      boolean gotConnection = false;
+      boolean error = true;
       try {
         KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(_server);
 
@@ -436,6 +444,7 @@ public class ScatterGatherImpl implements ScatterGather {
           // is not able to create a connection, and this one was a waiting request.
           // In either case, there is no point in retrying  this request
           if (conn != null && conn.validate()) {
+            gotConnection = true;
             break;
           }
           // If we get a null error map, then it is most likely a case of "Connection Refused" from remote.
@@ -447,7 +456,7 @@ public class ScatterGatherImpl implements ScatterGather {
           if (errorMap != null && errorMap.containsKey(_server)) {
             errStr = errorMap.get(_server).getMessage();
           }
-          LOGGER.warn("Destroying invalid conn {}:", conn, errStr);
+          LOGGER.warn("Destroying invalid conn {}:{}", conn, errStr);
           if (conn != null) {
             _connPool.destroyObject(_server, conn);
           }
@@ -461,15 +470,25 @@ public class ScatterGatherImpl implements ScatterGather {
         _responseFuture = conn.sendRequest(req, _request.getRequestId(), timeRemaining);
         _isSent.set(true);
         LOGGER.debug("Response Future is : {}", _responseFuture);
+        error = false;
       } catch (TimeoutException e1) {
-        LOGGER.error("Timed out waiting for connection for server (" + _server + ") (" + _request.getRequestId()
-            + "). Setting error future", e1);
+        LOGGER.error("Timed out waiting for connection for server ({})({})(gotConnection={}). Setting error future",
+            _server, _request.getRequestId(), gotConnection, e1);
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
       } catch (Exception e) {
-        LOGGER.error("Got exception sending request (" + _request.getRequestId() + "). Setting error future", e);
+        LOGGER.error("Got exception sending request ({})(gotConnection={}). Setting error future",
+            _request.getRequestId(), gotConnection, e);
         _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
       } finally {
         _requestDispatchLatch.countDown();
+        BrokerRequest brokerRequest = (BrokerRequest) _request.getBrokerRequest();
+        if (error) {
+          if (gotConnection) {
+            _brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_SEND_ERROR, 1);
+          } else {
+            _brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR, 1);
+          }
+        }
       }
     }
 

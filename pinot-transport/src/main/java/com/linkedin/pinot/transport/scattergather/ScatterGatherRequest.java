@@ -16,7 +16,7 @@
 package com.linkedin.pinot.transport.scattergather;
 
 import java.util.Map;
-
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
@@ -97,4 +97,9 @@ public interface ScatterGatherRequest {
    * @return
    */
   public long getRequestTimeoutMS();
+
+  /**
+   * @return the BrokerRequest object used for this scatterGather
+   */
+  public BrokerRequest getBrokerRequest();
 }

@@ -15,12 +15,6 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.ResourceLeakDetector;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,13 +26,13 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
 import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -56,6 +50,11 @@ import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl.ScatterGatherRequestContext;
 import com.yammer.metrics.core.MetricsRegistry;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.ResourceLeakDetector;
 
 
 public class ScatterGatherTest {
@@ -252,7 +251,8 @@ public class ScatterGatherTest {
     ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
 
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
+    BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
@@ -337,7 +337,8 @@ public class ScatterGatherTest {
     ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
+    BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
     Assert.assertEquals(v.size(), 4);
 
@@ -442,7 +443,8 @@ public class ScatterGatherTest {
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
+    BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
@@ -559,7 +561,8 @@ public class ScatterGatherTest {
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats);
+    final BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
+    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
@@ -756,6 +759,10 @@ public class ScatterGatherTest {
       return 1L;
     }
 
+    @Override
+    public BrokerRequest getBrokerRequest() {
+      return null;
+    }
   }
 
   public static class MyReplicaSelection extends ReplicaSelection {
