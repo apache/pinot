@@ -26,21 +26,19 @@ public interface BlockValSet {
   BlockValIterator iterator();
 
   DataType getValueType();
-/*
-  int getDictionaryId(int docId);
 
-  // methods are on dictionaryId
-  int getIntValueAt(int dictionaryId);
-
-  long getLongValueAt(int dictionaryId);
-
-  float getFloatValueAt(int dictionaryId);
-
-  double getDoubleValueAt(int dictionaryId);
-
-  String getStringValueAt(int dictionaryId);
-
-  int getDictionarySize();
-  */
+  /**
+   * Copies the dictionaryIds for the input range DocIds.
+   * Expects that the out array is properly sized
+   * @param inDocIds input set of doc ids for which to read dictionaryIds
+   * @param inStartPos start index in inDocIds
+   * @param inDocIdsSize size of inDocIds
+   * @param outDictionaryIds out parameter giving the dictionary ids corresponding to
+   *                         input docIds
+   * @param outStartPos starting index position in outDictionaryIds. Indexes will
+   *                    be copied starting at this position.
+   *                    outDictionaryIds must be atleast (outStartPos + inDocIdsSize) in size
+   */
+  void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
 
 }

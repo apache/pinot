@@ -28,11 +28,11 @@ import com.linkedin.pinot.core.common.Constants;
 public class SumAggregationNoDictionaryFunction extends SumAggregationFunction {
 
   @Override
-  public Double aggregate(Block docIdSetBlock, Block[] block) {
+  public Double aggregate(Block docIdSetBlock, Block[] blocks) {
     double ret = 0;
     int docId = 0;
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blocks[0].getBlockValueSet().iterator();
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       if (blockValIterator.skipTo(docId)) {

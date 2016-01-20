@@ -41,4 +41,10 @@ public final class MultiValueSet implements BlockValSet {
   public DataType getValueType() {
     return columnMetadata.getDataType();
   }
+
+  @Override
+  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+    throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet");
+  }
+
 }

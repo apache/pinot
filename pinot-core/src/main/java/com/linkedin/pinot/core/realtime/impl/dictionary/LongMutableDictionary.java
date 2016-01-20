@@ -122,6 +122,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
     return ((Long) getRawValueFromBiMap(dictionaryId)).toString();
   }
 
+
   @Override
   public boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
       boolean includeUpper) {

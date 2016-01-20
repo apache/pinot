@@ -126,6 +126,15 @@ public class IntMutableDictionary extends MutableDictionaryReader {
   }
 
   @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int dictId = dictionaryIds[iter];
+      outValues[outStartPos++] = getInt(dictId);
+    }
+  }
+
+  @Override
   public String getStringValue(int dictionaryId) {
     return ((Integer) getRawValueFromBiMap(dictionaryId)).toString();
   }

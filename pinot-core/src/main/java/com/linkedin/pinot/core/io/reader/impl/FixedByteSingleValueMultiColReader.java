@@ -295,4 +295,38 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   public boolean open() {
     return false;
   }
+
+  public void readIntValues(int[] rows, int col, int startPos, int limit, int[] values, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; iter++) {
+      values[outStartPos++] = getInt(rows[iter], col);
+    }
+  }
+
+  public void readLongValues(int[] rows, int col, int startPos, int limit, long[] values, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; iter++) {
+      values[outStartPos++] = getLong(rows[iter], col);
+    }
+  }
+  public void readFloatValues(int[] rows, int col, int startPos, int limit, float[] values, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; iter++) {
+      values[outStartPos++] = getFloat(rows[iter], col);
+    }
+  }
+
+  public void readDoubleValues(int[] rows, int col, int startPos, int limit, double[] values, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; iter++) {
+      values[outStartPos++] = getDouble(rows[iter], col);
+    }
+  }
+  public void readStringValues(int[] rows, int col, int startPos, int limit, String[] values, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; iter++) {
+      values[outStartPos++] = getString(rows[iter], col);
+    }
+  }
+
 }

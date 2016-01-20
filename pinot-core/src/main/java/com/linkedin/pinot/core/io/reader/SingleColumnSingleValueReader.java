@@ -67,4 +67,5 @@ public interface SingleColumnSingleValueReader extends DataFileReader {
    */
   byte[] getBytes(int row);
 
+  void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos);
 }

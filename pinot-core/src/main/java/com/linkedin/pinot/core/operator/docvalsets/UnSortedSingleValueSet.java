@@ -40,7 +40,11 @@ public final class UnSortedSingleValueSet implements BlockValSet {
 
   @Override
   public DataType getValueType() {
-    // TODO Auto-generated method stub
-    return null;
+    return this.columnMetadata.getDataType();
+  }
+
+  @Override
+  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+    sVReader.readValues(inDocIds, inStartPos, inDocIdsSize, outDictionaryIds, outStartPos);
   }
 }

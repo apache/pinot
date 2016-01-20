@@ -63,6 +63,11 @@ public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
+    throw new UnsupportedOperationException("not supported");
+  }
+
   public int getInt(int rowId, T context) {
     throw new UnsupportedOperationException();
   }

@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
 import java.io.File;
 import java.io.IOException;
-
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
 
 
 
@@ -58,4 +56,8 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
     return dataFileReader.getInt(row, 0);
   }
 
+  @Override
+  public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
+    dataFileReader.readValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+  }
 }

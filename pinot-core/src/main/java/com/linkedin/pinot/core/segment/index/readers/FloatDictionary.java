@@ -15,16 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-
-
-/**
- * Nov 14, 2014
- */
+import java.io.File;
+import java.io.IOException;
 
 public class FloatDictionary extends ImmutableDictionaryReader {
 

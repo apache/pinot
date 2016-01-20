@@ -15,23 +15,24 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import java.io.Serializable;
 import com.linkedin.pinot.common.Utils;
-import java.util.List;
-
-import java.util.Locale;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.Serializable;
+import java.util.List;
+import java.util.Locale;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,20 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   private static final Logger LOGGER = LoggerFactory.getLogger(SumAggregationFunction.class);
 
   private String _sumByColumn;
+  static final int VECTOR_SIZE = 1000;
+  private final ThreadLocal<int[]> dictionaryIds = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      return new int[VECTOR_SIZE];
+    }
+  };
+
+  private final ThreadLocal<double[]> documentValues = new ThreadLocal<double[]>() {
+    @Override
+    protected double[] initialValue() {
+      return new double[VECTOR_SIZE];
+    }
+  };
 
   public SumAggregationFunction() {
 
@@ -56,12 +71,59 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public Double aggregate(Block docIdSetBlock, Block[] block) {
+  public Double aggregate(Block docIdSetBlock, Block[] blocks) {
+    BlockDocIdSet blockDocIdSet = docIdSetBlock.getBlockDocIdSet();
+
+    // for queries with high selectivity (10s of millions), iterative
+    // approach to aggregation is quite slow. Hence switch to the
+    // vectorized version. Some of the interface calls in
+    // vectorizedAggregate are implemented only for ArrayBasedDocIdSet.
+    // Hence, the if-else below. I'm pretty sure this method
+    // is called for ArrayBasedDocIdSet only but don't want to take
+    // RuntimeException
+    assert blocks.length == 1;
+    if ( blockDocIdSet instanceof  ArrayBasedDocIdSet) {
+       return vectorizedAggregate((ArrayBasedDocIdSet) blockDocIdSet, blocks);
+    } else {
+      return iterativeAggregate(docIdSetBlock, blocks);
+    }
+  }
+
+
+  public Double vectorizedAggregate(ArrayBasedDocIdSet docIdSet, Block[] blocks) {
+    double ret = 0;
+    double tmp = 0;
+
+    Dictionary dictionaryReader = blocks[0].getMetadata().getDictionary();
+    BlockValSet blockValueSet = blocks[0].getBlockValueSet();
+
+    final int vectorSize = 1000;
+
+    int[] dictIds = dictionaryIds.get();
+    double[] values = documentValues.get();
+
+    int[] docIds = (int[]) docIdSet.getRaw();
+    int docIdLength = docIdSet.size();
+    int current = 0;
+    while (current < docIdLength) {
+      int pending = (docIdLength - current);
+      int batchLimit = (pending > vectorSize) ? vectorSize : pending;
+      blockValueSet.readIntValues(docIds, current, batchLimit, dictIds, 0);
+      dictionaryReader.readDoubleValues(dictIds, 0, batchLimit, values, 0);
+      for (int vi = 0; vi < batchLimit; vi++) {
+        ret += values[vi];
+      }
+      current += batchLimit;
+    }
+    return ret;
+  }
+
+  public Double iterativeAggregate(Block docIdSetBlock, Block[] blocks) {
     double ret = 0;
     int docId = 0;
-    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = blocks[0].getMetadata().getDictionary();
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blocks[0].getBlockValueSet().iterator();
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       if (blockValIterator.skipTo(docId)) {

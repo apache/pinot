@@ -217,7 +217,6 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
       rowSizeInBits += colSize;
     }
     totalSizeInBytes = (int) (((((long) rowSizeInBits) * rows) + 7) / 8);
-
   }
 
   /**
@@ -245,7 +244,7 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
   }
 
   /**
-   * @param row
+   * @param startRow
    * @param col
    * @return
    */
@@ -303,4 +302,10 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
     return true;
   }
 
+  public void readValues(int[] rows, int col, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
+    int endPos = rowStartPos + rowSize;
+    for (int ri = rowStartPos; ri < endPos; ++ri) {
+      values[valuesStartPos++] = getInt(rows[ri], col);
+    }
+  }
 }

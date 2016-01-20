@@ -319,4 +319,12 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
   public byte[] getBytes(int row) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
+    int endPos = rowStartPos + rowSize;
+    for (int ri = rowStartPos; ri < endPos; ++ri) {
+      values[valuesStartPos++] = getInt(rows[ri]);
+    }
+  }
 }

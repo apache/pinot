@@ -15,13 +15,14 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str.STRING_PAD_CHAR;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+
 
 /**
  * Nov 14, 2014
@@ -33,8 +34,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode)
       throws IOException {
-    super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(),
-        mode == ReadMode.mmap);
+    super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(), mode == ReadMode.mmap);
     lengthofMaxEntry = metadata.getStringColumnMaxLength();
   }
 
@@ -94,6 +94,32 @@ public class StringDictionary extends ImmutableDictionaryReader {
   public String toString(int dictionaryId) {
     return get(dictionaryId);
   }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to int");
+  }
+
+  @Override
+  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to long");
+  }
+
+  @Override
+  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to float");
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to double");
+  }
+  @Override
+  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
+    dataFileReader.readStringValues(dictionaryIds, 0/*column*/, startPos, limit, outValues, outStartPos);
+  }
+
+
 
   private String getString(int dictionaryId) {
     return dataFileReader.getString(dictionaryId, 0);

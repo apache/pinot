@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import java.io.File;
 import java.io.IOException;
-
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 
 /**
  * Nov 13, 2014
@@ -67,4 +65,8 @@ public class FixedByteSingleValueReader extends BaseSingleColumnSingleValueReade
     return dataFileReader.getInt(row, 0);
   }
 
+  @Override
+  public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
+    dataFileReader.readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+  }
 }

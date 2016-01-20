@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import java.io.File;
+import java.io.IOException;
 
 
 /**
@@ -77,6 +76,11 @@ public class IntDictionary extends ImmutableDictionaryReader {
   @Override
   public String toString(int dictionaryId) {
     return new Integer(getInt(dictionaryId)).toString();
+  }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    dataFileReader.readIntValues(dictionaryIds, 0 /*column*/, startPos, limit, outValues, outStartPos);
   }
 
   private int getInt(int dictionaryId) {

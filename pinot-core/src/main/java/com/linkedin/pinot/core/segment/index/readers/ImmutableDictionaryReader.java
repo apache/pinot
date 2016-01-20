@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import java.io.File;
+import java.io.IOException;
 
 
 /**
@@ -85,4 +84,32 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   public int length() {
     return rows;
   }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    dataFileReader.readIntValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+  }
+
+  @Override
+  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
+    dataFileReader.readLongValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+  }
+
+  @Override
+  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
+    dataFileReader.readFloatValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
+    dataFileReader.readDoubleValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+  }
+
+
+  @Override
+  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
+    dataFileReader.readStringValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+  }
+
+
 }

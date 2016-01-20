@@ -44,4 +44,13 @@ public final class RealtimeSingleValueSet implements BlockValSet {
   public DataType getValueType() {
     return dataType;
   }
+
+  @Override
+  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+    int endPos = inStartPos + inDocIdsSize;
+    for (int iter = inStartPos; iter < endPos; ++iter) {
+      int row = inDocIds[iter];
+      outDictionaryIds[outStartPos++] = reader.getInt(row);
+    }
+  }
 }

@@ -55,14 +55,14 @@ public class DoubleDictionary extends ImmutableDictionaryReader  {
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return dataFileReader.getDouble(dictionaryId,0);
+    return dataFileReader.getDouble(dictionaryId, 0);
   }
 
   @Override
   public String toString(int dictionaryId) {
     return Double.toString(getDoubleValue(dictionaryId));
   }
-  
+
   @Override
   public String getStringValue(int dictionaryId) {
     return Double.toString(getDoubleValue(dictionaryId));
@@ -77,5 +77,4 @@ public class DoubleDictionary extends ImmutableDictionaryReader  {
   public int getIntValue(int dictionaryId) {
     return (int) getDoubleValue(dictionaryId);
   }
-
 }

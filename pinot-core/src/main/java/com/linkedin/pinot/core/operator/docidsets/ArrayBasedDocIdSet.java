@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 
 public final class ArrayBasedDocIdSet implements FilterBlockDocIdSet {
@@ -38,7 +37,7 @@ public final class ArrayBasedDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public Object getRaw() {
-    throw new UnsupportedOperationException();
+    return _docIdArray;
   }
 
   @Override
@@ -59,5 +58,9 @@ public final class ArrayBasedDocIdSet implements FilterBlockDocIdSet {
   @Override
   public void setEndDocId(int endDocId) {
     _maxDocId  = Math.min(endDocId, _maxDocId);
+  }
+
+  public int size() {
+    return _searchableLength;
   }
 }

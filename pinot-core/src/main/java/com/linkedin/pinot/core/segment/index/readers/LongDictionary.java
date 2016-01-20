@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import java.io.File;
+import java.io.IOException;
 
 
 /**

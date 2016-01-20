@@ -45,4 +45,9 @@ public final class RealtimeMultiValueSet implements BlockValSet {
   public DataType getValueType() {
     return dataType;
   }
+
+  @Override
+  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+    throw new UnsupportedOperationException("Reading batch of multi-values in not implemented for realtime multivalue set");
+  }
 }
