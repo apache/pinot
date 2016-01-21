@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.Utils;
 *
 */
 public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
+  REQUEST_DESERIALIZATION,
   TOTAL_QUERY_TIME,
   SEGMENT_PRUNING,
   BUILD_QUERY_PLAN,

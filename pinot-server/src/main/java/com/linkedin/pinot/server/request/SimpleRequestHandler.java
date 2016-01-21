@@ -70,7 +70,7 @@ public class SimpleRequestHandler implements RequestHandler {
       final InstanceRequest queryRequest = new InstanceRequest();
       serDe.deserialize(queryRequest, byteArray);
       long deserRequestTime = System.nanoTime();
-      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.TOTAL_QUERY_TIME, deserRequestTime - queryStartTime);
+      _serverMetrics.addPhaseTiming(brokerRequest, ServerQueryPhase.REQUEST_DESERIALIZATION, deserRequestTime - queryStartTime);
       LOGGER.info("Processing requestId:{},numSegmentsToSearch={}", queryRequest.getRequestId(), queryRequest.getSearchSegmentsSize());
       LOGGER.debug("instance request : {}", queryRequest);
       brokerRequest = queryRequest.getQuery();
