@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.PinotSegmentRebalancer;
 
 
@@ -32,14 +31,17 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Table name to rebalance", forbids ={"-tenantName"})
+  @Option(name = "-tableName", required = false, metaVar = "<String>", usage = "Table name to rebalance (e.g. myTable_OFFLINE)", forbids ={"-tenantName"})
   private String _tableName;
 
-  @Option(name = "-tenantName", required = true, metaVar = "<string>", usage = "Name of the tenant. Note All tables belonging this tenant will be rebalanced", forbids ={"-tableName"})
+  @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of the tenant. Note All offline tables belonging this tenant will be rebalanced", forbids ={"-tableName"})
   private String _tenantName;
 
   @Option(name = "-force", required = true, metaVar = "<boolean>", usage = "Force run rebalance. Useful when a node(s) is down currently")
   private boolean _forceRun;
+
+  @Option(name = "-dryRun", required = false, metaVar = "<boolean>", usage = "Dry run")
+  private boolean _dryRun = true;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
@@ -51,8 +53,19 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public boolean execute() throws Exception {
-    PinotSegmentRebalancer rebalancer = new PinotSegmentRebalancer(_zkAddress, _clusterName);
-    rebalancer.rebalanceTable(_tableName, _tenantName);
+    PinotSegmentRebalancer rebalancer = new PinotSegmentRebalancer(_zkAddress, _clusterName, _dryRun);
+    if (_tenantName == null && _tableName == null) {
+      System.err.println("One of tenantName or tableName must be specified");
+      return false;
+    }
+    if (_tenantName != null) {
+      rebalancer.rebalanceTenantTables(_tenantName);
+    } else {
+      rebalancer.rebalanceTable(_tableName);
+    }
+    if (_dryRun) {
+      System.out.println("\n\nThat was a dryrun. Use -dryRun false to make it happen");
+    }
     return true;
   }
 
