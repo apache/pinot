@@ -61,6 +61,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private static final String SEGMENTS_PATH = "/SEGMENTS";
   private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN =
       ".*/SEGMENTS/.*_REALTIME|.*/SEGMENTS/.*_REALTIME/.*";
+  private static final String REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN = ".*/TABLE/.*REALTIME";
 
   private String _propertyStorePath;
   private String _tableConfigPath;
@@ -213,7 +214,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       refreshWatchers(path);
 
       if (isLeader()) {
-        if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+        if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN) ||
+            path.matches(REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN)) {
           assignRealtimeSegmentsToServerInstancesIfNecessary();
         }
       } else {
