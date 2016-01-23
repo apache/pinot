@@ -34,6 +34,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.build.timestamp.format>yyyy-MM-dd'T'HHmmss'Z'</maven.build.timestamp.format>
   </properties>
   <dependencies>
     <dependency>
@@ -102,4 +103,40 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>github-release-profile</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <property>
+          <name>doGitHubRelease</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>de.jutzig</groupId>
+            <artifactId>github-release-plugin</artifactId>
+            <version>1.1.1</version>
+            <configuration>
+              <description></description>
+              <releaseName>SNAPSHOT ${maven.build.timestamp}</releaseName>
+              <tag>SNAPSHOT-${maven.build.timestamp}</tag>
+              <repositoryId>linkedin/pinot</repositoryId>
+              <artifact>${project.build.directory}/pinot-${project.version}-pkg.zip</artifact>
+            </configuration>
+            <executions>
+              <execution>
+                <phase>install</phase>
+                <goals>
+                  <goal>release</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
