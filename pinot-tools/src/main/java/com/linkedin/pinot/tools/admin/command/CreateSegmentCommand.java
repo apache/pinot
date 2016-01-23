@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -69,7 +70,19 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-overwrite", required = false, metaVar = "<string>", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-enableStarTreeIndex", required = false, metaVar = "<string>", usage = "Enable Star Tree Index.")
+  boolean _enableStarTreeIndex = false;
+
+  @Option(name = "-starTreeIndexSpecFile", required = false, metaVar = "<string>",
+      usage = "Config file for star tree index")
+  private String _starTreeIndexSpecFile;
+
+  @Option(name = "-numThreads", required = false, metaVar = "<int>",
+      usage = "Parallelism while generating segments. default is 1")
+  int _numThreads = 1;
+
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   boolean _help = false;
 
   @Override
@@ -117,12 +130,27 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public CreateSegmentCommand setEnableStarTreeIndex(boolean enableStarTreeIndex) {
+    _enableStarTreeIndex = enableStarTreeIndex;
+    return this;
+  }
+
+  public CreateSegmentCommand setStarTreeIndexSpecFile(String file) {
+    _starTreeIndexSpecFile = file;
+    return this;
+  }
+
+  public CreateSegmentCommand setNumThreads(int numThreads) {
+    _numThreads = numThreads;
+    return this;
+  }
+
   @Override
   public String toString() {
-    return ("CreateSegment -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
-        " -format " + _format + " -readerConfigFile " + _recordReaderConfigFile +
-        " -tableName " + _tableName + " -segmentName " + _segmentName + " -outDir " + _outDir +
-        " -overwrite " + _overwrite);
+    return ("CreateSegment -schemaFile " + _schemaFile + " -dataDir " + _dataDir + " -format " + _format
+        + " -readerConfigFile " + _recordReaderConfigFile + " -tableName " + _tableName + " -segmentName "
+        + _segmentName + " -outDir " + _outDir + " -numThreads " + _numThreads + " -enableStarTreeIndex "
+        + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile + " -overwrite " + _overwrite);
   }
 
   @Override
@@ -187,8 +215,14 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       recordReaderConfig = null;
     }
 
-    ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    final StarTreeIndexSpec starTreeIndexSpec;
+    if (_starTreeIndexSpecFile != null) {
+      starTreeIndexSpec = new ObjectMapper().readValue(new File(_starTreeIndexSpecFile), StarTreeIndexSpec.class);
+    } else {
+      starTreeIndexSpec = null;
+    }
 
+    ExecutorService executor = Executors.newFixedThreadPool(_numThreads);
     int cnt = 0;
     for (final File file : files) {
       final int segCnt = cnt;
@@ -218,7 +252,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             } else {
               config.setTimeUnitForSegment(TimeUnit.DAYS);
             }
-
+            config.setCreateStarTreeIndex(_enableStarTreeIndex);
+            config.setStarTreeIndexSpec(starTreeIndexSpec);
             final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
             driver.init(config);
             driver.build();
@@ -228,7 +263,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
           }
         }
       });
-
       cnt += 1;
     }
 

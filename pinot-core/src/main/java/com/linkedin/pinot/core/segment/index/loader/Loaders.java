@@ -72,7 +72,7 @@ public class Loaders {
       // The star tree index (if available)
       StarTreeIndexNode starTreeRoot = null;
       if (metadata.hasStarTree()) {
-        File starTreeFile = new File(indexDir, V1Constants.STARTREE_FILE);
+        File starTreeFile = new File(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
         LOGGER.debug("Loading star tree index file {}", starTreeFile);
         starTreeRoot = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
       }

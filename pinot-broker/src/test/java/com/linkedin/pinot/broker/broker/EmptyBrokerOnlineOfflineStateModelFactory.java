@@ -46,22 +46,22 @@ public class EmptyBrokerOnlineOfflineStateModelFactory extends StateModelFactory
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-      LOGGER.info("EmptyBrokerOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+      LOGGER.debug("EmptyBrokerOnlineOfflineStateModel.onBecomeOnlineFromOffline() : {}", message);
     }
 
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
-      LOGGER.info("EmptyBrokerOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
+      LOGGER.debug("EmptyBrokerOnlineOfflineStateModel.onBecomeOfflineFromOnline() : {}", message);
     }
 
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      LOGGER.info("EmptyBrokerOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
+      LOGGER.debug("EmptyBrokerOnlineOfflineStateModel.onBecomeDroppedFromOffline() : {}", message);
     }
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-      LOGGER.info("EmptyBrokerOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
+      LOGGER.debug("EmptyBrokerOnlineOfflineStateModel.onBecomeDroppedFromOnline() : {}", message);
     }
   }
 

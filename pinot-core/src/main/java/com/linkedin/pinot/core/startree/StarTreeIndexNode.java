@@ -16,7 +16,9 @@
 package com.linkedin.pinot.core.startree;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 import java.io.*;
@@ -24,6 +26,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import org.json.JSONObject;
+
 
 public class StarTreeIndexNode implements Serializable {
   private static final long serialVersionUID = 1;
@@ -39,12 +44,13 @@ public class StarTreeIndexNode implements Serializable {
   private Map<Integer, StarTreeIndexNode> children;
   private StarTreeIndexNode parent;
   private int startDocumentId;
-  private int documentCount;
+  private int endDocumentId;
 
   /**
    * An element in the StarTreeIndex.
    */
-  public StarTreeIndexNode() {}
+  public StarTreeIndexNode() {
+  }
 
   public int getNodeId() {
     return nodeId;
@@ -86,6 +92,14 @@ public class StarTreeIndexNode implements Serializable {
     this.childDimensionName = childDimensionName;
   }
 
+  public int getStartDocumentId() {
+    return startDocumentId;
+  }
+
+  public void setStartDocumentId(int docStartId) {
+    this.startDocumentId = docStartId;
+  }
+
   public Map<Integer, StarTreeIndexNode> getChildren() {
     return children;
   }
@@ -106,25 +120,18 @@ public class StarTreeIndexNode implements Serializable {
     return children == null;
   }
 
-  public int getStartDocumentId() {
-    return startDocumentId;
+  public int getEndDocumentId() {
+    return endDocumentId;
   }
 
-  public void setStartDocumentId(int startDocumentId) {
-    this.startDocumentId = startDocumentId;
-  }
-
-  public int getDocumentCount() {
-    return documentCount;
-  }
-
-  public void setDocumentCount(int documentCount) {
-    this.documentCount = documentCount;
+  public void setEndDocumentId(int endDocumentId) {
+    this.endDocumentId = endDocumentId;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName, startDocumentId, documentCount);
+    return Objects.hashCode(nodeId, dimensionName, dimensionValue, childDimensionName, startDocumentId,
+        endDocumentId);
   }
 
   @Override
@@ -133,27 +140,21 @@ public class StarTreeIndexNode implements Serializable {
       return false;
     }
     StarTreeIndexNode n = (StarTreeIndexNode) o;
-    return Objects.equal(nodeId, n.getNodeId())
-        && Objects.equal(level, n.getLevel())
-        && Objects.equal(dimensionName, n.getDimensionName())
-        && Objects.equal(dimensionValue, n.getDimensionValue())
-        && Objects.equal(childDimensionName, n.getChildDimensionName())
-        && Objects.equal(children, n.getChildren())
+    return Objects.equal(nodeId, n.getNodeId()) && Objects.equal(level, n.getLevel())
+        && Objects.equal(dimensionName, n.getDimensionName()) && Objects.equal(dimensionValue, n.getDimensionValue())
+        && Objects.equal(childDimensionName, n.getChildDimensionName()) && Objects.equal(children, n.getChildren())
         && Objects.equal(startDocumentId, n.getStartDocumentId())
-        && Objects.equal(documentCount, n.getDocumentCount());
+        && Objects.equal(endDocumentId, n.getEndDocumentId());
   }
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this)
-        .add("nodeId", nodeId)
-        .add("level", level)
-        .add("dimensionName", dimensionName)
-        .add("dimensionValue", dimensionValue)
-        .add("childDimensionName", childDimensionName)
+    return Objects.toStringHelper(this).add("nodeId", nodeId).add("level", level).add("dimensionName", dimensionName)
+        .add("dimensionValue", dimensionValue).add("childDimensionName", childDimensionName)
         .add("childCount", children == null ? 0 : children.size())
         .add("startDocumentId", startDocumentId)
-        .add("documentCount", documentCount)
+        .add("endDocumentId", endDocumentId)
+        .add("documentCount", (endDocumentId - startDocumentId))
         .toString();
   }
 
@@ -261,24 +262,24 @@ public class StarTreeIndexNode implements Serializable {
     Object allValue;
     switch (spec.getDataType()) {
       case INT:
-        allValue = V1Constants.STARTREE_ALL_NUMBER.intValue();
+        allValue = spec.getDefaultNullValue();
         break;
       case LONG:
-        allValue = V1Constants.STARTREE_ALL_NUMBER.longValue();
+        allValue = spec.getDefaultNullValue();
         break;
       case FLOAT:
-        allValue = V1Constants.STARTREE_ALL_NUMBER.floatValue();
+        allValue = spec.getDefaultNullValue();
         break;
       case DOUBLE:
-        allValue = V1Constants.STARTREE_ALL_NUMBER.doubleValue();
+        allValue = spec.getDefaultNullValue();;
         break;
       case STRING:
       case BOOLEAN:
-        allValue = V1Constants.STARTREE_ALL;
+        allValue = spec.getDefaultNullValue();;
         break;
       default:
-        throw new UnsupportedOperationException("unsupported data type : " + spec.getDataType() + " : " + " for column : "
-            + spec.getName());
+        throw new UnsupportedOperationException(
+            "unsupported data type : " + spec.getDataType() + " : " + " for column : " + spec.getName());
     }
     return allValue;
   }

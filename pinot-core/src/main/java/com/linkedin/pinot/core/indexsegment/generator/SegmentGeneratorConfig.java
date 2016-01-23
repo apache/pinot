@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.indexsegment.generator;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.commons.lang.StringUtils;
@@ -43,6 +44,7 @@ public class SegmentGeneratorConfig {
    * For inverted Index : default
    */
   private boolean createInvertedIndex = false;
+  private boolean createStarTreeIndex = false;
   private List<String> invertedIndexCreationColumns = new ArrayList<String>();
 
   private String segmentNamePostfix = null;
@@ -57,6 +59,7 @@ public class SegmentGeneratorConfig {
   private String segmentEndTime = null;
   private FileFormat inputFileFormat = FileFormat.AVRO;
   private File inputDataFilePath = null;
+  private StarTreeIndexSpec starTreeIndexSpec;
 
   /*
    *
@@ -284,7 +287,24 @@ public class SegmentGeneratorConfig {
     return ret;
   }
 
+  public StarTreeIndexSpec getStarTreeIndexSpec() {
+    return starTreeIndexSpec;
+  }
+
+  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
+    this.starTreeIndexSpec = starTreeIndexSpec;
+  }
+
   public Schema getSchema() {
     return schema;
   }
+
+  public boolean isCreateStarTreeIndex() {
+    return createStarTreeIndex;
+  }
+
+  public void setCreateStarTreeIndex(boolean createStarTreeIndex) {
+    this.createStarTreeIndex = createStarTreeIndex;
+  }
+
 }

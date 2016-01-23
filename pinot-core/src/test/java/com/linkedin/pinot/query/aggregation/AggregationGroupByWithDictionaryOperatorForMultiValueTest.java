@@ -198,13 +198,13 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
 
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Combined Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Combined Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
   }
 
@@ -230,9 +230,9 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     LOGGER.info("running query: ");
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
-    LOGGER.info("Result 1: ");
+    LOGGER.debug("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Aggregation GroupBy Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Aggregation GroupBy Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     return block;
   }
@@ -260,7 +260,7 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     ////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
@@ -285,19 +285,19 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("CombinedResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("CombinedResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     final DataTable dataTable = block.getAggregationGroupByResultDataTable();
 
     final List<Map<String, Serializable>> results =
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(dataTable);
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
+      LOGGER.debug("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
     }
   }
 
@@ -376,8 +376,8 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
 
     assertBrokerResponse(numSegments, brokerResponse);
   }
@@ -394,14 +394,14 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("instanceResponse: {}", instanceResponse);
+    LOGGER.debug("instanceResponse: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
     assertEmptyBrokerResponse(brokerResponse);
   }
 
@@ -414,11 +414,11 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final List<double[]> aggregationResult = getAggregationResult(numSegments);
     final List<String[]> groupByResult = getGroupResult();
     for (int j = 0; j < _numAggregations; ++j) {
-      LOGGER.info("For aggregation function: {}", _aggregationInfos.get(j));
+      LOGGER.debug("For aggregation function: {}", _aggregationInfos.get(j));
       final double[] aggResult = aggregationResult.get(j);
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
-        LOGGER.info("Comparing group: {}", i);
+        LOGGER.debug("Comparing group: {}", i);
         Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(aggResult[i],
             brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i).getDouble("value")));
         if (groupResult.length < 2) {

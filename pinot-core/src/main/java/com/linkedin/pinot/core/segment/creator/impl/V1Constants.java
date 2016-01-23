@@ -25,15 +25,12 @@ import com.linkedin.pinot.common.data.FieldSpec;
 public class V1Constants {
   public static final String QUERY_RHS_DELIMITER = "\t\t";
   public static final String SEGMENT_CREATION_META = "creation.meta";
+  public static final String STAR_TREE_INDEX_DIR = "star-tree";
+  public static final String STAR_TREE_INDEX_FILE = "star-tree.bin";
   public static final String VERSIONS_FILE = "versions.vr";
   public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
   public static final String SEGMENT_PUSH_TIME = "segment.push.time";
   public static final String SEGMENT_REFRESH_TIME = "segment.refresh.time";
-
-  public static final String STARTREE_DIR = "startree";
-  public static final String STARTREE_FILE = "startree.ser";
-  public static final String STARTREE_ALL = "__ALL__";
-  public static final Number STARTREE_ALL_NUMBER = 0;
 
   public static class Numbers {
     // null representatives

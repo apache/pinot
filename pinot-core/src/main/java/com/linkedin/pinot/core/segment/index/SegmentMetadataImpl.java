@@ -69,6 +69,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
   private SegmentVersion _segmentVersion;
 
+  private StarTreeIndexSpec _starTreeIndexSpec;
+
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
     if (indexDir.isDirectory()) {
@@ -255,7 +257,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     Boolean starTreeEnabled = _segmentMetadataPropertiesConfiguration
         .getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
     if (starTreeEnabled) {
-      StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
+      _starTreeIndexSpec = new StarTreeIndexSpec();
 
       // Splits
       List<String> splitOrderList = new ArrayList<>();
@@ -267,7 +269,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           splitOrderList.add(split);
         }
       }
-      starTreeIndexSpec.setSplitOrder(splitOrderList);
+      _starTreeIndexSpec.setSplitOrder(splitOrderList);
 
       // Split excludes
       List<String> splitExcludesList = new ArrayList<>();
@@ -279,7 +281,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           splitExcludesList.add(splitExclude);
         }
       }
-      starTreeIndexSpec.setSplitExcludes(splitExcludesList);
+      _starTreeIndexSpec.setSplitExcludes(splitExcludesList);
 
       // Dimension excludes
       List<String> dimensionExcludesList = new ArrayList<>();
@@ -291,14 +293,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           dimensionExcludesList.add(dimensionExclude);
         }
       }
-      starTreeIndexSpec.setExcludedDimensions(dimensionExcludesList);
+      _starTreeIndexSpec.setExcludedDimensions(dimensionExcludesList);
 
       // Max leaf records
       int maxLeafRecords = Integer.valueOf((String) _segmentMetadataPropertiesConfiguration
           .getProperty(MetadataKeys.StarTree.MAX_LEAF_RECORDS));
-      starTreeIndexSpec.setMaxLeafRecords(maxLeafRecords);
+      _starTreeIndexSpec.setMaxLeafRecords(maxLeafRecords);
 
-      _schema.setStarTreeIndexSpec(starTreeIndexSpec);
     }
 
     _segmentName = _segmentMetadataPropertiesConfiguration
@@ -309,14 +310,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     for (final String column : _columnMetadataMap.keySet()) {
-      _schema.addSchema(column, _columnMetadataMap.get(column).toFieldSpec());
+      _schema.addField(column, _columnMetadataMap.get(column).toFieldSpec());
     }
 
     // Check that all the split dimensions are in the schema, if applicable
-    if (_schema.getStarTreeIndexSpec() != null) {
+    if (_starTreeIndexSpec != null) {
       // Split order
-      if (_schema.getStarTreeIndexSpec().getSplitOrder() != null) {
-        for (String dimension : _schema.getStarTreeIndexSpec().getSplitOrder()) {
+      if (_starTreeIndexSpec.getSplitOrder() != null) {
+        for (String dimension : _starTreeIndexSpec.getSplitOrder()) {
           if (!_schema.getDimensionNames().contains(dimension)) {
             throw new IllegalStateException(
                 "Split order dimension " + dimension + " not in schema " + _schema);
@@ -325,8 +326,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
       // Split excludes
-      if (_schema.getStarTreeIndexSpec().getSplitExcludes() != null) {
-        for (String dimension : _schema.getStarTreeIndexSpec().getSplitExcludes()) {
+      if (_starTreeIndexSpec.getSplitExcludes() != null) {
+        for (String dimension : _starTreeIndexSpec.getSplitExcludes()) {
           if (!_schema.getDimensionNames().contains(dimension)) {
             throw new IllegalStateException(
                 "Split exclude dimension " + dimension + " not in schema " + _schema);
@@ -335,8 +336,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
       // Excluded dimensions
-      if (_schema.getStarTreeIndexSpec().getExcludedDimensions() != null) {
-        for (String dimension : _schema.getStarTreeIndexSpec().getExcludedDimensions()) {
+      if (_starTreeIndexSpec.getExcludedDimensions() != null) {
+        for (String dimension : _starTreeIndexSpec.getExcludedDimensions()) {
           if (!_schema.getDimensionNames().contains(dimension)) {
             throw new IllegalStateException(
                 "Excluded dimension " + dimension + " not in schema " + _schema);
@@ -559,7 +560,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public boolean hasStarTree() {
-    return _schema.getStarTreeIndexSpec() != null;
+    return _starTreeIndexSpec != null;
   }
 
   @Override

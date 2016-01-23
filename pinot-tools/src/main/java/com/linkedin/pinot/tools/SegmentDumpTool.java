@@ -107,7 +107,7 @@ public class SegmentDumpTool {
 
     if (dumpStarTree) {
       System.out.println();
-      File starTreeFile = new File(segmentDir, V1Constants.STARTREE_FILE);
+      File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
       StarTreeIndexNode tree = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
       StarTreeIndexNode.printTree(tree, 0);
     }

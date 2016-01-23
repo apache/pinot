@@ -164,7 +164,7 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   @Override
   public boolean hasStarTree() {
-    return _schema.getStarTreeIndexSpec() != null;
+    return false;
   }
 
   @Override

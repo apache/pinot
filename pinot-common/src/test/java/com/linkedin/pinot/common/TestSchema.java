@@ -59,17 +59,4 @@ public class TestSchema {
     Schema newSchema = new ObjectMapper().readValue(schemaString, Schema.class);
 
   }
-
-  @Test
-  public void testSchemaWithStarTree() throws Exception {
-    InputStream inputStream = ClassLoader.getSystemResourceAsStream("data2.with-star-tree.schema");
-    Schema schema = new ObjectMapper().readValue(inputStream, Schema.class);
-    Assert.assertNotNull(schema.getStarTreeIndexSpec());
-
-    StarTreeIndexSpec indexSpec = new StarTreeIndexSpec();
-    indexSpec.setSplitOrder(Arrays.asList("dim2", "dim1", "dim3"));
-    indexSpec.setMaxLeafRecords(10000); // the known default
-
-    Assert.assertEquals(schema.getStarTreeIndexSpec(), indexSpec);
-  }
 }
