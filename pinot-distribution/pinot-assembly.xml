@@ -47,6 +47,13 @@
   </dependencySets>
   <fileSets>
     <fileSet>
+      <directory>${pinot.root}</directory>
+      <includes>
+        <include>LICENSE</include>
+      </includes>
+      <outputDirectory></outputDirectory>
+    </fileSet>
+    <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-controller/src/main/resources/webapp</directory>
       <outputDirectory>query_console</outputDirectory>
