@@ -77,8 +77,8 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener, Inst
     for (ExternalView externalView : externalViewList) {
       String resourceName = externalView.getResourceName();
       if (servingClusterList.contains(resourceName)) {
-        LOGGER.info("Trying to update ExternalView for data resource : " + resourceName + ", ExternalView: "
-            + externalView);
+        LOGGER.debug("Trying to update ExternalView for data resource : {}, ExternalView: {}",
+            resourceName, externalView);
         _helixExternalViewBasedRouting.markDataResourceOnline(
             resourceName,
             HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
@@ -101,7 +101,7 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener, Inst
         }
       }
     }
-    LOGGER.info("Current serving data resource : " + Arrays.toString(servingDataResourceSet.toArray(new String[0])));
+    LOGGER.debug("Current serving data resource : {}", Arrays.toString(servingDataResourceSet.toArray(new String[0])));
     return servingDataResourceSet;
   }
 
