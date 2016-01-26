@@ -267,8 +267,12 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           if (childNames != null && !childNames.isEmpty()) {
             for (String segmentName : childNames) {
               String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
-              LOGGER.info("Setting data change watch for real-time segment: {}", segmentPath);
-              _zkClient.subscribeDataChanges(segmentPath, this);
+              RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(
+                  _pinotHelixResourceManager.getPropertyStore(), abstractTableConfig.getTableName(), segmentName);
+              if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+                LOGGER.info("Setting data change watch for real-time segment currently being consumed: {}", segmentPath);
+                _zkClient.subscribeDataChanges(segmentPath, this);
+              }
             }
           }
         }
