@@ -171,6 +171,18 @@ public class ValidationMetrics {
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
 
+  public void updateTotalDocumentsGauge(final String resource, final long documentCount)
+  {
+    final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
+  }
+
+  public void updateSegmentCountGauge(final String resource, final long segmentCount)
+  {
+    final String fullGaugeName = makeGaugeName(resource, "SegmentCount");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
+  }
+
   private String makeGaugeName(final String resource, final String gaugeName) {
     return "pinot.controller." + resource + "." + gaugeName;
   }

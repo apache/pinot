@@ -171,8 +171,23 @@ public class ValidationManager {
       // Update the gauges that contain the delay between the current time and last segment end time
       _validationMetrics.updateOfflineSegmentDelayGauge(tableName, maxSegmentEndTime);
       _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
+
+      // Update the gauge to contain the total document count in the segments
+      _validationMetrics.updateTotalDocumentsGauge(tableName, computeTotalDocumentInSegments(segmentMetadataList));
+
+      // Update the gauge to contain the total number of segments for this table
+      _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
     }
     LOGGER.info("Validation completed");
+  }
+
+  public static long computeTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList)  {
+    long totalDocumentCount = 0;
+
+    for (SegmentMetadata segmentMetadata : segmentMetadataList) {
+      totalDocumentCount += segmentMetadata.getTotalDocs();
+    }
+    return totalDocumentCount;
   }
 
   /**

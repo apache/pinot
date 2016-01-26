@@ -120,6 +120,26 @@ public class ValidationManagerTest {
 
   }
 
+  @Test
+  public void testTotalDocumentCount() throws Exception {
+
+    // Create a bunch of dummy segments
+    String testTableName  = "TestTableTotalDocCountTest";
+    DummyMetadata metadata1 = new DummyMetadata(testTableName, 10);
+    DummyMetadata metadata2 = new DummyMetadata(testTableName, 20);
+    DummyMetadata metadata3 = new DummyMetadata(testTableName, 30);
+
+    // Add them to a list
+    List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
+    segmentMetadataList.add(metadata1);
+    segmentMetadataList.add(metadata2);
+    segmentMetadataList.add(metadata3);
+
+    Assert.assertEquals(ValidationManager.computeTotalDocumentInSegments(segmentMetadataList), 60);
+
+  }
+
+
   @AfterTest
   public void shutDown() {
     _pinotHelixResourceManager.stop();
@@ -256,6 +276,13 @@ public class ValidationManagerTest {
       _resourceName = resourceName;
       _segmentName = resourceName + "_" + System.currentTimeMillis();
       _crc = System.currentTimeMillis() + "";
+    }
+
+    public DummyMetadata(String resourceName, int totalDocsInSegment) {
+      _resourceName = resourceName;
+      _segmentName = resourceName + "_" + System.currentTimeMillis();
+      _crc = System.currentTimeMillis() + "";
+      _totalDocs = totalDocsInSegment;
     }
 
     @Override
