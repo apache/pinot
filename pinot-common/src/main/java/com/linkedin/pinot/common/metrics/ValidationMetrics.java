@@ -171,12 +171,24 @@ public class ValidationMetrics {
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
 
+  /**
+   * Updates the gauge for the last push time.
+   *
+   * @param resource The resource for which the gauge is updated
+   * @param documentCount Total document count for the give resource name / tablename
+   */
   public void updateTotalDocumentsGauge(final String resource, final long documentCount)
   {
     final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
   }
 
+  /**
+   * Updates the gauge for the last push time.
+   *
+   * @param resource The resource for which the gauge is updated
+   * @param segmentCount Total segment count for the give resource name / tablename
+   */
   public void updateSegmentCountGauge(final String resource, final long segmentCount)
   {
     final String fullGaugeName = makeGaugeName(resource, "SegmentCount");
