@@ -143,6 +143,10 @@ public class ValidationManager {
 
         List<Interval> missingIntervals = computeMissingIntervals(segmentIntervals, segmentMetadataList.get(0).getTimeGranularity());
         missingSegmentCount = missingIntervals.size();
+
+        for (Interval missingInterval : missingIntervals) {
+          LOGGER.warn("Missing data in table {} for time interval {}", tableName, missingInterval);
+        }
       }
 
       // Update the gauge that contains the number of missing segments
