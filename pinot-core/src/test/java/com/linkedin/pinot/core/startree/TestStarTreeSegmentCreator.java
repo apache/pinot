@@ -41,6 +41,7 @@ import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
+@Test(enabled = false)
 public class TestStarTreeSegmentCreator {
   private String testName;
   private File indexDir;
@@ -72,8 +73,8 @@ public class TestStarTreeSegmentCreator {
     }
   }
 
-//  @Test(enabled = false)
-  @Test(enabled = true)
+  @Test(enabled = false)
+//  @Test(enabled = true)
   public void testCreation() throws Exception {
     BasicConfigurator.configure();
 
