@@ -51,7 +51,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final int SEGMENT_COUNT = 12;
   public static final int QUERY_COUNT = 1000;
-  private static final int ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH = 20000;
+  protected static final int ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH = 20000;
   private KafkaServerStartable kafkaStarter;
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,

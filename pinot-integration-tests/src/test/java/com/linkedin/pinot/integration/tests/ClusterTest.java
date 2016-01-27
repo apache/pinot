@@ -128,7 +128,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
     FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas", schemaName,
-        new FileInputStream(schemaFile), schemaFile.length());
+        new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
+  }
+
+  protected void updateSchema(File schemaFile, String schemaName) throws Exception {
+    FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas/" + schemaName,
+        schemaName, new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.PUT);
   }
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeColumnType, int retentionTimeValue,

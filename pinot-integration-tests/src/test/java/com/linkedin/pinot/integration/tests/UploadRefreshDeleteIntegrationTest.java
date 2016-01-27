@@ -116,7 +116,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
     for (String segmentFileName : segmentTarDir.list()) {
       File file = new File(segmentTarDir, segmentFileName);
-      FileUploadUtils.sendFile("localhost", "8998", "segments", segmentFileName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendFile("localhost", "8998", "segments", segmentFileName, new FileInputStream(file), file.length(),
+          FileUploadUtils.SendFileMethod.POST);
     }
 
     avroFile.delete();

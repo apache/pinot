@@ -24,8 +24,10 @@ import java.io.InputStream;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
+import org.apache.commons.httpclient.methods.EntityEnclosingMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.multipart.FilePart;
 import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
@@ -42,14 +44,29 @@ public class FileUploadUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadUtils.class);
   private static final String SEGMENTS_PATH = "segments";
 
-  public static int sendFile(final String host, final String port, final String path,
-      final String fileName, final InputStream inputStream, final long lengthInBytes) {
+  public enum SendFileMethod {
+    POST {
+      public EntityEnclosingMethod forUri(String uri) {
+        return new PostMethod(uri);
+      }
+    },
+    PUT {
+      public EntityEnclosingMethod forUri(String uri) {
+        return new PutMethod(uri);
+      }
+    };
+
+    public abstract EntityEnclosingMethod forUri(String uri);
+  }
+
+  public static int sendFile(final String host, final String port, final String path, final String fileName,
+      final InputStream inputStream, final long lengthInBytes, SendFileMethod httpMethod) {
     HttpClient client = new HttpClient();
     try {
 
       client.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
       client.getParams().setSoTimeout(3600 * 1000); // One hour
-      PostMethod post = new PostMethod("http://" + host + ":" + port + "/" + path);
+      EntityEnclosingMethod method = httpMethod.forUri("http://" + host + ":" + port + "/" + path);
       Part[] parts = {
           new FilePart(fileName, new PartSource() {
             @Override
@@ -68,16 +85,16 @@ public class FileUploadUtils {
             }
           })
       };
-      post.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
-      client.executeMethod(post);
-      if (post.getStatusCode() >= 400) {
-        String errorString = "POST Status Code: " + post.getStatusCode() + "\n";
-        if (post.getResponseHeader("Error") != null) {
-          errorString += "ServletException: " + post.getResponseHeader("Error").getValue();
+      method.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
+      client.executeMethod(method);
+      if (method.getStatusCode() >= 400) {
+        String errorString = "POST Status Code: " + method.getStatusCode() + "\n";
+        if (method.getResponseHeader("Error") != null) {
+          errorString += "ServletException: " + method.getResponseHeader("Error").getValue();
         }
         throw new HttpException(errorString);
       }
-      return post.getStatusCode();
+      return method.getStatusCode();
     } catch (Exception e) {
       LOGGER.error("Caught exception while sending file", e);
       Utils.rethrowException(e);
@@ -87,7 +104,7 @@ public class FileUploadUtils {
 
   public static int sendSegmentFile(final String host, final String port, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
-    return sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes);
+    return sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes, SendFileMethod.POST);
   }
 
   public static long getFile(String url, File file) throws Exception {

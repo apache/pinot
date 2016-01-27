@@ -820,7 +820,7 @@ public class PinotHelixResourceManager {
    * @throws IllegalArgumentException
    * @throws IllegalAccessException
    */
-  public void addSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
+  public void addOrUpdateSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = Schema.toZNRecord(schema);
     String name = schema.getSchemaName();
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =

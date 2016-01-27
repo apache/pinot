@@ -117,7 +117,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     Schema s = Schema.fromFile(schemaFile);
 
     FileUploadUtils.sendFile(_controllerHost, _controllerPort, "schemas", s.getSchemaName(), new FileInputStream(
-        schemaFile), schemaFile.length());
+        schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
 
     return true;
   }
