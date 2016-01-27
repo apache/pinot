@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller;
 import java.io.File;
 import java.util.concurrent.Callable;
 
+import org.apache.helix.PreConnectCallback;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
@@ -26,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
@@ -107,7 +109,8 @@ public class ControllerStarter {
 
     MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
-    ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
+    final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
+
     controllerMetrics.addCallbackGauge(
             "helix.connected",
             new Callable<Long>() {
@@ -116,6 +119,7 @@ public class ControllerStarter {
                 return helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L;
               }
             });
+
     controllerMetrics.addCallbackGauge(
         "helix.leader", new Callable<Long>() {
               @Override
@@ -123,6 +127,13 @@ public class ControllerStarter {
                 return helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
               }
             });
+
+    helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
+          @Override
+          public void onPreConnect() {
+            controllerMetrics.addMeteredValue(null, ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          }
+        });
   }
 
   public void stop() {
