@@ -172,7 +172,7 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the last push time.
+   * Updates the gauge for the Total Document Count
    *
    * @param resource The resource for which the gauge is updated
    * @param documentCount Total document count for the give resource name / tablename
@@ -184,7 +184,7 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the last push time.
+   * Updates the gauge for the Total segment count
    *
    * @param resource The resource for which the gauge is updated
    * @param segmentCount Total segment count for the give resource name / tablename
