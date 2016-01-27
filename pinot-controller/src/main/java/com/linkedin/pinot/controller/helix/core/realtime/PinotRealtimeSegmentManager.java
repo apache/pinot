@@ -40,6 +40,8 @@ import java.util.Map;
 import java.util.Set;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
+import org.apache.helix.ControllerChangeListener;
+import org.apache.helix.NotificationContext;
 import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
@@ -63,6 +65,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN =
       ".*/SEGMENTS/.*_REALTIME|.*/SEGMENTS/.*_REALTIME/.*";
   private static final String REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN = ".*/TABLE/.*REALTIME";
+  private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
 
   private String _propertyStorePath;
   private String _tableConfigPath;
@@ -88,6 +91,14 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     // Subscribe to any data/child changes to property
     _zkClient.subscribeChildChanges(_tableConfigPath, this);
     _zkClient.subscribeDataChanges(_tableConfigPath, this);
+
+    // Subscribe to leadership changes
+    _pinotHelixResourceManager.getHelixZkManager().addControllerListener(new ControllerChangeListener() {
+      @Override
+      public void onControllerChange(NotificationContext changeContext) {
+        processPropertyStoreChange(CONTROLLER_LEADER_CHANGE);
+      }
+    });
 
     // Setup change listeners for already existing tables, if any.
     processPropertyStoreChange(_tableConfigPath);
@@ -216,12 +227,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
   private void processPropertyStoreChange(String path) {
     try {
-      LOGGER.info("Processing change notification for path:{}", path);
+      LOGGER.info("Processing change notification for path: {}", path);
       refreshWatchers(path);
 
       if (isLeader()) {
         if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN) ||
-            path.matches(REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN)) {
+            path.matches(REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN) ||
+            path.equals(CONTROLLER_LEADER_CHANGE)) {
           assignRealtimeSegmentsToServerInstancesIfNecessary();
         }
       } else {
