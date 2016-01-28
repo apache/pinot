@@ -109,6 +109,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           .addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
     }
 
+    _segmentMetadataPropertiesConfiguration.addProperty(
+        Segment.SEGMENT_TOTAL_DOCS, offlineSegmentZKMetadata.getTotalDocs());
+
     _crc = offlineSegmentZKMetadata.getCrc();
     _creationTime = offlineSegmentZKMetadata.getCreationTime();
     _pushTime = offlineSegmentZKMetadata.getPushTime();
@@ -143,6 +146,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _segmentMetadataPropertiesConfiguration
           .addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
     }
+
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalDocs());
 
     _crc = segmentMetadata.getCrc();
     _creationTime = segmentMetadata.getCreationTime();
