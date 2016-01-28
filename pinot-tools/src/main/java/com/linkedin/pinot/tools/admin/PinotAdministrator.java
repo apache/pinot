@@ -111,9 +111,7 @@ public class PinotAdministrator {
 
   public static void main(String[] args) throws Exception {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
-
     pinotAdministrator.execute(args);
-    System.exit(pinotAdministrator.getStatus() ? 0 : 1);
   }
 
   public void printUsage() {
