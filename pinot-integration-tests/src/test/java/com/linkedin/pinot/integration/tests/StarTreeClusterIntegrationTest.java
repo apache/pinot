@@ -237,8 +237,8 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     waitForExternalViewUpdate();
 
     // Wait until all docs are available, this is required because the broker routing tables may not be updated yet.
-    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 15000L);
-    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 15000L);
+    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 120000L);
+    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 120000L);
 
     // Initialize the query generator
     SegmentInfoProvider dictionaryReader = new SegmentInfoProvider(_tarredSegmentsDir.getAbsolutePath());
