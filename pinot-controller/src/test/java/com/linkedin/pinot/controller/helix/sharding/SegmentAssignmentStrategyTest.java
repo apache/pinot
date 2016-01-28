@@ -52,8 +52,8 @@ public class SegmentAssignmentStrategyTest {
   private ZkClient _zkClient;
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private final int _numServerInstance = 30;
-  private final int _numBrokerInstance = 5;
+  private final int _numServerInstance = 5;
+  private final int _numBrokerInstance = 1;
 
   @BeforeTest
   public void setup() throws Exception {
@@ -98,9 +98,8 @@ public class SegmentAssignmentStrategyTest {
     final int numReplicas = 2;
 
     // Adding table
-    String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_RANDOM, null, null, numReplicas,
-            "RandomAssignmentStrategy").toString();
+    String OfflineTableConfigJson = ControllerRequestBuilderUtil
+        .buildCreateOfflineTableJSON(TABLE_NAME_RANDOM, null, null, numReplicas, "RandomAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
@@ -114,9 +113,8 @@ public class SegmentAssignmentStrategyTest {
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      final ExternalView externalView =
-          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_RANDOM));
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_RANDOM));
       Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
       for (final String segmentId : externalView.getPartitionSet()) {
         Assert.assertEquals(externalView.getStateMap(segmentId).size(), numReplicas);
@@ -129,42 +127,42 @@ public class SegmentAssignmentStrategyTest {
   public void testBalanceNumSegmentAssignmentStrategy() throws Exception {
     final int numReplicas = 3;
     // Adding table
-    String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_BALANCED, null, null, numReplicas,
-            "BalanceNumSegmentAssignmentStrategy").toString();
+    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME_BALANCED, null,
+        null, numReplicas, "BalanceNumSegmentAssignmentStrategy").toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
     Thread.sleep(3000);
-    for (int i = 0; i < 100; ++i) {
+    int numSegments = 20;
+    for (int i = 0; i < numSegments; ++i) {
       addOneSegment(TABLE_NAME_BALANCED);
       Thread.sleep(2000);
-      final Set<String> taggedInstances =
-          _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
-      final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
-      for (final String instance : taggedInstances) {
-        instance2NumSegmentsMap.put(instance, 0);
-      }
-      final ExternalView externalView =
-          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_BALANCED));
-      for (final String segmentId : externalView.getPartitionSet()) {
-        for (final String instance : externalView.getStateMap(segmentId).keySet()) {
-          instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
-        }
-      }
-      final int totalSegments = (i + 1) * numReplicas;
-      final int minNumSegmentsPerInstance = totalSegments / _numServerInstance;
-      int maxNumSegmentsPerInstance = minNumSegmentsPerInstance;
-      if ((minNumSegmentsPerInstance * _numServerInstance) < totalSegments) {
-        maxNumSegmentsPerInstance = maxNumSegmentsPerInstance + 1;
-      }
-      for (final String instance : instance2NumSegmentsMap.keySet()) {
-        Assert.assertTrue(instance2NumSegmentsMap.get(instance) >= minNumSegmentsPerInstance);
-        Assert.assertTrue(instance2NumSegmentsMap.get(instance) <= maxNumSegmentsPerInstance);
+    }
+    final Set<String> taggedInstances =
+        _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
+    final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
+    for (final String instance : taggedInstances) {
+      instance2NumSegmentsMap.put(instance, 0);
+    }
+    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_BALANCED));
+    for (final String segmentId : externalView.getPartitionSet()) {
+      for (final String instance : externalView.getStateMap(segmentId).keySet()) {
+        instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
       }
     }
-
+    final int totalSegments = (numSegments) * numReplicas;
+    final int minNumSegmentsPerInstance = totalSegments / _numServerInstance;
+    int maxNumSegmentsPerInstance = minNumSegmentsPerInstance;
+    if ((minNumSegmentsPerInstance * _numServerInstance) < totalSegments) {
+      maxNumSegmentsPerInstance = maxNumSegmentsPerInstance + 1;
+    }
+    for (final String instance : instance2NumSegmentsMap.keySet()) {
+      Assert.assertTrue(instance2NumSegmentsMap.get(instance) >= minNumSegmentsPerInstance,
+          "expected >=" + minNumSegmentsPerInstance + " actual:" + instance2NumSegmentsMap.get(instance));
+      Assert.assertTrue(instance2NumSegmentsMap.get(instance) <= maxNumSegmentsPerInstance,
+          "expected <=" + maxNumSegmentsPerInstance + " actual:" + instance2NumSegmentsMap.get(instance));
+    }
     _helixAdmin.dropResource(HELIX_CLUSTER_NAME,
         TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_BALANCED));
   }
