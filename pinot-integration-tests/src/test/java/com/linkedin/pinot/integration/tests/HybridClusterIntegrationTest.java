@@ -187,7 +187,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait until the Pinot event count matches with the number of events in the Avro files
     int pinotRecordCount, h2RecordCount;
-    long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
+    long timeInFiveMinutes = System.currentTimeMillis() + 5 * 60 * 1000L;
 
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     statement.execute("select count(*) from mytable");
@@ -196,7 +196,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     h2RecordCount = rs.getInt(1);
     rs.close();
 
-    waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInTwoMinutes);
+    waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
   }
 
   /**

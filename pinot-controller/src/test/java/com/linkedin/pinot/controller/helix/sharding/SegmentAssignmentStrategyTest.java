@@ -107,7 +107,7 @@ public class SegmentAssignmentStrategyTest {
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
       addOneSegment(TABLE_NAME_RANDOM);
-      Thread.sleep(2000);
+      Thread.sleep(3000);
       final Set<String> taggedInstances =
           _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
