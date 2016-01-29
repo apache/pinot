@@ -34,6 +34,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
@@ -117,6 +118,8 @@ public class OfflineTableDataManagerTest {
 
   private IndexSegment makeIndexSegment(String name, int totalDocs) {
     IndexSegment indexSegment = mock(IndexSegment.class);
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(indexSegment.getSegmentName()).thenReturn(name);
     when(indexSegment.getSegmentMetadata().getTotalDocs()).thenReturn(totalDocs);
     doAnswer(new Answer() {
