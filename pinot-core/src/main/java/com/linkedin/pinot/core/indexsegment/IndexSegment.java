@@ -65,12 +65,6 @@ public interface IndexSegment {
    */
   public void destroy();
 
-  /**
-   * Total number of records inside the segment.
-   * @return
-   */
-  public int getTotalDocs();
-
   /** Returns the StarTree index structure, or null if it does not exist */
   StarTreeIndexNode getStarTreeRoot();
 }

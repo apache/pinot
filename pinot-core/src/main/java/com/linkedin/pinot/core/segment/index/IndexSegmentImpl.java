@@ -133,11 +133,6 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public int getTotalDocs() {
-    return segmentMetadata.getTotalDocs();
-  }
-
-  @Override
   public StarTreeIndexNode getStarTreeRoot() {
     return starTreeRoot;
   }

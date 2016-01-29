@@ -635,17 +635,23 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   public void setSegmentMetadata(RealtimeSegmentZKMetadata segmentMetadata) {
-    _segmentMetadata = new SegmentMetadataImpl(segmentMetadata);
+    _segmentMetadata = new SegmentMetadataImpl(segmentMetadata){
+      @Override
+      public int getTotalDocs() {
+        return docIdSearchableOffset + 1;
+      }
+    };
   }
 
   public void setSegmentMetadata(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
-    _segmentMetadata = new SegmentMetadataImpl(segmentMetadata, schema);
+    _segmentMetadata = new SegmentMetadataImpl(segmentMetadata, schema){
+      @Override
+      public int getTotalDocs() {
+        return docIdSearchableOffset + 1;
+      }
+    };
   }
 
-  @Override
-  public int getTotalDocs() {
-    return docIdSearchableOffset + 1;
-  }
 
   public boolean hasDictionary(String columnName) {
     return dictionaryMap.containsKey(columnName);

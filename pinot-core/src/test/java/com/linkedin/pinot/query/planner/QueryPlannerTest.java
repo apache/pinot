@@ -90,12 +90,6 @@ public class QueryPlannerTest {
         }
 
         @Override
-        public int getTotalDocs() {
-          // TODO Auto-generated method stub
-          return 0;
-        }
-
-        @Override
         public StarTreeIndexNode getStarTreeRoot() {
           return null;
         }

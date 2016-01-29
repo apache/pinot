@@ -49,7 +49,7 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    int totalRawDocs = _indexSegment.getTotalDocs() - _indexSegment.getSegmentMetadata().getTotalAggregateDocs();
+    int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
       if (_filterNode != null) {

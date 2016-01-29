@@ -157,7 +157,7 @@ public class OfflineTableDataManager implements TableDataManager {
     final String segmentName = indexSegmentToAdd.getSegmentName();
     LOGGER.info("Trying to add a new segment " + segmentName + " to table : " + _tableName);
     OfflineSegmentDataManager newSegmentManager = new OfflineSegmentDataManager(indexSegmentToAdd);
-    final int newNumDocs = indexSegmentToAdd.getTotalDocs();
+    final int newNumDocs = indexSegmentToAdd.getSegmentMetadata().getTotalDocs();
     OfflineSegmentDataManager oldSegmentManager;
     int refCnt = -1;
     try {
@@ -220,7 +220,7 @@ public class OfflineTableDataManager implements TableDataManager {
     LOGGER.info("Closing segment {} for table {}", segmentName, _tableName);
     _currentNumberOfSegments.dec();
     _numDeletedSegments.inc();
-    _currentNumberOfDocuments.dec(segmentDataManager.getSegment().getTotalDocs());
+    _currentNumberOfDocuments.dec(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs());
     segmentDataManager.getSegment().destroy();
     LOGGER.info("Segment {} for table {} has been closed", segmentName, _tableName);
   }

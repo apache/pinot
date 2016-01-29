@@ -230,7 +230,7 @@ public class RealtimeTableDataManager implements TableDataManager {
   private void markSegmentAsLoaded(String segmentId) {
     _currentNumberOfSegments.inc();
     if (_segmentsMap.containsKey(segmentId)) {
-      _currentNumberOfDocuments.inc(_segmentsMap.get(segmentId).getSegment().getTotalDocs());
+      _currentNumberOfDocuments.inc(_segmentsMap.get(segmentId).getSegment().getSegmentMetadata().getTotalDocs());
     }
     _loadingSegments.remove(segmentId);
     if (!_activeSegments.contains(segmentId)) {
@@ -257,7 +257,7 @@ public class RealtimeTableDataManager implements TableDataManager {
       }
       if (segment != null) {
         _currentNumberOfSegments.dec();
-        _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
+        _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
         _numDeletedSegments.inc();
         segment.getSegment().destroy();
       }
