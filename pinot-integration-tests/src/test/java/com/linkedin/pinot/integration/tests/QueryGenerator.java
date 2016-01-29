@@ -104,8 +104,20 @@ public class QueryGenerator {
             _columnNames.add(fieldName);
             _multivalueColumnCardinality.put(fieldName, 0);
             break;
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+            _columnNames.add(fieldName);
+            _columnToValues.put(fieldName, new TreeSet<String>());
+            _nonMultivalueNumericalColumnNames.add(fieldName);
+            break;
+          case RECORD:
+            LOGGER.warn("Ignoring field {} of type RECORD", fieldName);
+            break;
           default:
-            throw new AssertionError("Don't know how to handle fields of type " + fieldType);
+            LOGGER.warn("Ignoring field {} of type {}", fieldName, fieldType);
+            break;
         }
       }
     } catch (Exception e) {

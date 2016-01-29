@@ -81,13 +81,13 @@ import kafka.producer.ProducerConfig;
 
 
 /**
- * TODO Document me!
- *
+ * Shared implementation details of the cluster integration tests.
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
   private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
   private static final boolean BATCH_KAFKA_MESSAGES = true;
+  private static final int MAX_MESSAGES_PER_BATCH = 10000;
   private static final int MAX_MULTIVALUE_CARDINALITY = 5;
   protected static final boolean GATHER_FAILED_QUERIES = false;
   private int failedQueryCount = 0;
@@ -393,8 +393,28 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
             ++columnCount;
             break;
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+            String fieldTypeName = fieldType.getName();
+
+            if (fieldTypeName.equalsIgnoreCase("int")) {
+              fieldTypeName = "bigint";
+            }
+
+            columnNameAndType = field.name() + " " + fieldTypeName + " not null";
+
+            columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
+            ++columnCount;
+            break;
+          case RECORD:
+            // Ignore records
+            continue;
           default:
-            throw new AssertionError("Don't know how to handle field " + fieldName + " of type " + fieldType);
+            // Ignore other avro types
+            LOGGER.warn("Ignoring field {} of type {}", field.name(), field.schema());
+            continue;
         }
       }
 
@@ -469,6 +489,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(reader.getSchema());
         int recordCount = 0;
         List<KeyedMessage<String, byte[]>> messagesToWrite = new ArrayList<KeyedMessage<String, byte[]>>(10000);
+        int messagesInThisBatch = 0;
         for (GenericRecord genericRecord : reader) {
           outputStream.reset();
           datumWriter.write(genericRecord, binaryEncoder);
@@ -479,6 +500,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
           if (BATCH_KAFKA_MESSAGES) {
             messagesToWrite.add(data);
+            messagesInThisBatch++;
+            if (MAX_MESSAGES_PER_BATCH <= messagesInThisBatch) {
+              messagesInThisBatch = 0;
+              producer.send(messagesToWrite);
+              messagesToWrite.clear();
+            }
           } else {
             producer.send(data);
           }
@@ -520,9 +547,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       int recordCount = 0;
 
       int rowsRemaining = rowCount;
-      int rowsPerBatch = 10000;
+      int messagesInThisBatch = 0;
       while (rowsRemaining > 0) {
-        int rowsInThisBatch = Math.min(rowsRemaining, rowsPerBatch);
+        int rowsInThisBatch = Math.min(rowsRemaining, MAX_MESSAGES_PER_BATCH);
         List<KeyedMessage<String, byte[]>> messagesToWrite =
             new ArrayList<KeyedMessage<String, byte[]>>(rowsInThisBatch);
         GenericRecord genericRecord = new GenericData.Record(avroSchema);
@@ -538,6 +565,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
           if (BATCH_KAFKA_MESSAGES) {
             messagesToWrite.add(data);
+            messagesInThisBatch++;
+            if (MAX_MESSAGES_PER_BATCH <= messagesInThisBatch) {
+              messagesInThisBatch = 0;
+              producer.send(messagesToWrite);
+              messagesToWrite.clear();
+            }
           } else {
             producer.send(data);
           }
