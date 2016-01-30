@@ -30,6 +30,7 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -119,7 +120,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), resource));
     }
 
-    List<String> listOfSegmentsToAdd = new ArrayList<String>();
+    List<Pair<String, String>> listOfSegmentsToAddToInstances = new ArrayList<Pair<String, String>>();
 
     for (String resource : idealStateMap.keySet()) {
       IdealState state = idealStateMap.get(resource);
@@ -139,9 +140,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
-          String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime
-              .build(resource, instanceId, groupId, partitionId, String.valueOf(System.currentTimeMillis())));
+          listOfSegmentsToAddToInstances.add(new Pair<String, String>(
+                  SegmentNameBuilder.Realtime.build(groupId, SegmentNameBuilder.Realtime.ALL_PARTITIONS,
+                      String.valueOf(System.currentTimeMillis())), instanceId));
         }
       } else {
         // Add all server instances to the list of instances for which to assign a realtime segment
@@ -155,8 +156,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
               ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
                   SegmentNameBuilder.Realtime.extractTableName(partition), partition);
           if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-            String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(partition);
-            instancesToAssignRealtimeSegment.remove(instanceName);
+            instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
           }
         }
 
@@ -164,19 +164,19 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         for (String instanceId : instancesToAssignRealtimeSegment) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
-          String partitionId = instanceZKMetadata.getPartition(resource);
-          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime
-              .build(resource, instanceId, groupId, partitionId, String.valueOf(System.currentTimeMillis())));
+          listOfSegmentsToAddToInstances.add(new Pair<String, String>(
+                  SegmentNameBuilder.Realtime.build(groupId, SegmentNameBuilder.Realtime.ALL_PARTITIONS, String.valueOf(System.currentTimeMillis())), instanceId));
         }
       }
     }
 
-    LOGGER.info("Computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAdd.toArray()));
+    LOGGER.info("Computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAddToInstances.toArray()));
 
     // Add the new segments to the server instances
-    for (final String segmentId : listOfSegmentsToAdd) {
+    for (final Pair<String, String> segmentIdAndInstanceId : listOfSegmentsToAddToInstances) {
+      final String segmentId = segmentIdAndInstanceId.getFirst();
+      final String instanceName = segmentIdAndInstanceId.getSecond();
       String resourceName = SegmentNameBuilder.Realtime.extractTableName(segmentId);
-      final String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(segmentId);
 
       // Does the ideal state already contain this segment?
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {

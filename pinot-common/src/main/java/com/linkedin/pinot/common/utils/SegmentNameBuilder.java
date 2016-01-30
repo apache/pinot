@@ -25,6 +25,8 @@ import com.google.common.collect.Lists;
  */
 
 public class SegmentNameBuilder {
+  public static final String REALTIME_SUFFIX = "_REALTIME";
+  private static final int REALTIME_SUFFIX_LENGTH = REALTIME_SUFFIX.length();
 
   public static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue,
       String prefix) {
@@ -36,27 +38,47 @@ public class SegmentNameBuilder {
   }
 
   public static class Realtime {
-    public static String build(String tableName, String instanceName, String groupId,
-        String partitionId, String sequenceNumber) {
-      return StringUtils.join(
-          Lists.newArrayList(tableName, instanceName, groupId, partitionId, sequenceNumber), "__");
+    public static final String ALL_PARTITIONS = "ALL";
+
+    public static String build(String groupId, String partitionRange, String sequenceNumber) {
+      // old style name
+      //  return StringUtils.join(
+      //      Lists.newArrayList(tableName, instanceName, groupId, partitionName, sequenceNumber), "__");
+      
+      // shorter name: {groupId}__{partitionRange}__{sequenceNumber}
+      // groupId contains the realtime table name, amongst other things
+      // see com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details on the groupId
+      return StringUtils.join(Lists.newArrayList(groupId, partitionRange, sequenceNumber), "__");
     }
 
     public static String extractTableName(String segmentId) {
-      return segmentId.split("__")[0];
-    }
-
-    public static String extractInstanceName(String segmentId) {
-      return segmentId.split("__")[1];
+      if (!isOldStyleName(segmentId)) {
+        // Table name is the first part of the Kafka consumer group id
+        String groupId = extractGroupIdName(segmentId);
+        return groupId.substring(0, groupId.indexOf(REALTIME_SUFFIX) + REALTIME_SUFFIX_LENGTH);
+      } else {
+        return segmentId.split("__")[0];
+      }
     }
 
     public static String extractGroupIdName(String segmentId) {
-      return segmentId.split("__")[2];
+      if (!isOldStyleName(segmentId)) {
+        return segmentId.split("__")[0];
+      } else {
+        return segmentId.split("__")[2];
+      }
     }
 
-    public static String extractPartitionName(String segmentId) {
-      return segmentId.split("__")[3];
+    public static String extractPartitionRange(String segmentId) {
+      if (!isOldStyleName(segmentId)) {
+        return segmentId.split("__")[1];
+      } else {
+        return segmentId.split("__")[3];
+      }
     }
 
+    private static boolean isOldStyleName(String segmentId) {
+      return segmentId.split("__").length == 5;
+    }
   }
 }
