@@ -163,7 +163,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           segmentStatusTask.cancel();
           LOGGER.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
           LOGGER.info("Indexed " + realtimeSegment.getRawDocumentCount() + " raw events, current number of docs = "
-              + realtimeSegment.getSegmentMetadata().getTotalDocs());
+              + realtimeSegment.getSegmentMetadata().getTotalRawDocs());
           File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
           // lets convert the segment now
@@ -190,7 +190,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           metadaToOverrite.setStatus(Status.DONE);
           metadaToOverrite.setStartTime(startTime);
           metadaToOverrite.setEndTime(endTime);
-          metadaToOverrite.setTotalDocs(realtimeSegment.getSegmentMetadata().getTotalDocs());
+          metadaToOverrite.setTotalRawDocs(realtimeSegment.getSegmentMetadata().getTotalRawDocs());
           metadaToOverrite.setTimeUnit(timeUnit);
           notifier.notify(metadaToOverrite);
 
@@ -232,7 +232,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private void computeKeepIndexing() {
     if (keepIndexing) {
       LOGGER.debug("Current indexed " + realtimeSegment.getRawDocumentCount() + " raw events, success = "
-          + realtimeSegment.getSuccessIndexedCount() + " docs, total = " + realtimeSegment.getSegmentMetadata().getTotalDocs()
+          + realtimeSegment.getSuccessIndexedCount() + " docs, total = " + realtimeSegment.getSegmentMetadata().getTotalRawDocs()
           + " docs in realtime segment");
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
           || realtimeSegment.getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {

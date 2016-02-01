@@ -92,7 +92,7 @@ public class MAggregationOperator extends BaseOperator {
         new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
             aggregationResults);
     resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
     return resultBlock;
   }

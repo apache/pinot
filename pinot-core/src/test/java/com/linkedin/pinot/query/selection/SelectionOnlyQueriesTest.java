@@ -144,7 +144,7 @@ public class SelectionOnlyQueriesTest {
   @Test
   public void testSelectionIteration() {
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -178,7 +178,7 @@ public class SelectionOnlyQueriesTest {
     System.out.println("Test: InnerSegmentPlanMakerForSelectionNoFilter");
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
     final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
 
@@ -199,9 +199,9 @@ public class SelectionOnlyQueriesTest {
     System.out.println("Test: InnerSegmentPlanMakerForSelectionWithFilter");
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
     final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
 

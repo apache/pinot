@@ -189,7 +189,7 @@ public class ValidationManager {
     long totalDocumentCount = 0;
 
     for (SegmentMetadata segmentMetadata : segmentMetadataList) {
-      totalDocumentCount += segmentMetadata.getTotalDocs();
+      totalDocumentCount += segmentMetadata.getTotalRawDocs();
     }
     return totalDocumentCount;
   }

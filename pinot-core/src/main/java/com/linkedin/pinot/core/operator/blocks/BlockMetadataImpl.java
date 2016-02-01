@@ -56,17 +56,17 @@ public final class BlockMetadataImpl implements BlockMetadata {
 
   @Override
   public int getSize() {
-    return columnMetadata.getTotalDocs();
+    return columnMetadata.getTotalRawDocs();
   }
 
   @Override
   public int getLength() {
-    return columnMetadata.getTotalDocs();
+    return columnMetadata.getTotalRawDocs();
   }
 
   @Override
   public int getEndDocId() {
-    return columnMetadata.getTotalDocs() - 1;
+    return columnMetadata.getTotalRawDocs() - 1;
   }
 
   @Override

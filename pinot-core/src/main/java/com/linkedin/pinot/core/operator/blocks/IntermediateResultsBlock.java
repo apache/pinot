@@ -54,7 +54,7 @@ public class IntermediateResultsBlock implements Block {
   private long _requestId = -1;
   private List<ResponseStatistics> _segmentStatistics;
   private long _timeUsedMs;
-  private long _totalDocs;
+  private long _totalRawDocs;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
   private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
@@ -144,7 +144,7 @@ public class IntermediateResultsBlock implements Block {
     dataTable.getMetadata().put(REQUEST_ID, _requestId + "");
     dataTable.getMetadata().put(NUM_DOCS_SCANNED, _numDocsScanned + "");
     dataTable.getMetadata().put(TIME_USED_MS, _timeUsedMs + "");
-    dataTable.getMetadata().put(TOTAL_DOCS, _totalDocs + "");
+    dataTable.getMetadata().put(TOTAL_DOCS, _totalRawDocs + "");
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       for (int i = 0; i < _processingExceptions.size(); ++i) {
         dataTable.addException(_processingExceptions.get(i));
@@ -232,8 +232,8 @@ public class IntermediateResultsBlock implements Block {
     return _timeUsedMs;
   }
 
-  public long getTotalDocs() {
-    return _totalDocs;
+  public long getTotalRawDocs() {
+    return _totalRawDocs;
   }
 
   public void setExceptionsList(List<ProcessingException> processingExceptions) {
@@ -256,8 +256,8 @@ public class IntermediateResultsBlock implements Block {
     _timeUsedMs = timeUsedMs;
   }
 
-  public void setTotalDocs(long totalDocs) {
-    _totalDocs = totalDocs;
+  public void setTotalRawDocs(long totalRawDocs) {
+    _totalRawDocs = totalRawDocs;
   }
 
   public void setAggregationFunctions(List<AggregationFunction> aggregationFunctions) {

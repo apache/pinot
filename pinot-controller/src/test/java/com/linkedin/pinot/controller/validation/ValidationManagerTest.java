@@ -301,7 +301,7 @@ public class ValidationManagerTest {
     }
 
     @Override
-    public int getTotalDocs() {
+    public int getTotalRawDocs() {
       return _totalDocs;
     }
 

@@ -174,7 +174,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -202,7 +202,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -227,7 +227,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -261,7 +261,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -285,7 +285,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -332,7 +332,7 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
@@ -365,9 +365,9 @@ public class AggregationGroupByWithDictionaryOperatorTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());

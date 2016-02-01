@@ -65,7 +65,7 @@ class SegmentQueryProcessor {
     _tableName = _metadata.getTableName();
     _segmentName = _metadata.getName();
 
-    _totalDocs = _metadata.getTotalDocs();
+    _totalDocs = _metadata.getTotalRawDocs();
 
     _mvColumns = new HashSet<>();
     _mvColumnArrayMap = new HashMap<>();

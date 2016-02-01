@@ -177,7 +177,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -257,7 +257,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
 
     logJsonResult(brokerRequest, resultBlock);
   }
@@ -296,9 +296,9 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 5721);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
 
     logJsonResult(brokerRequest, resultBlock);
   }

@@ -54,7 +54,7 @@ public class CombineService {
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
     // Combine TotalDocs
-    mergedBlock.setTotalDocs(mergedBlock.getTotalDocs() + blockToMerge.getTotalDocs());
+    mergedBlock.setTotalRawDocs(mergedBlock.getTotalRawDocs() + blockToMerge.getTotalRawDocs());
     // Debug mode enable : Combine SegmentStatistics and TraceInfo
     if (brokerRequest.isEnableTrace()) {
       // mergedBlock.getSegmentStatistics().addAll(blockToMerge.getSegmentStatistics());

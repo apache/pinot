@@ -71,7 +71,7 @@ public interface SegmentMetadata {
   /**
    * @return
    */
-  public int getTotalDocs();
+  public int getTotalRawDocs();
 
   /**
    * @return

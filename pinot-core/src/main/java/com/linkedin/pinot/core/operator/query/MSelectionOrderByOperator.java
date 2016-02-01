@@ -110,7 +110,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
       resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
       resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
       resultBlock.setNumDocsScanned(numDocsScanned);
-      resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+      resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
       final long endTime = System.currentTimeMillis();
       resultBlock.setTimeUsedMs(endTime - startTime);
       return resultBlock;
@@ -125,7 +125,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
 
       resultBlock.setExceptionsList(processingExceptions);
       resultBlock.setNumDocsScanned(0);
-      resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+      resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
       resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
       return resultBlock;
     }

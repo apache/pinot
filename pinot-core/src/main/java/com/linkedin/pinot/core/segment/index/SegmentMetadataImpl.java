@@ -110,7 +110,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     _segmentMetadataPropertiesConfiguration.addProperty(
-        Segment.SEGMENT_TOTAL_DOCS, offlineSegmentZKMetadata.getTotalDocs());
+        Segment.SEGMENT_TOTAL_DOCS, offlineSegmentZKMetadata.getTotalRawDocs());
 
     _crc = offlineSegmentZKMetadata.getCrc();
     _creationTime = offlineSegmentZKMetadata.getCreationTime();
@@ -147,7 +147,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           .addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
     }
 
-    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalDocs());
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalRawDocs());
 
     _crc = segmentMetadata.getCrc();
     _creationTime = segmentMetadata.getCreationTime();
@@ -458,7 +458,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public int getTotalDocs() {
+  public int getTotalRawDocs() {
     return _segmentMetadataPropertiesConfiguration
         .getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
   }
@@ -482,7 +482,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public Map<String, String> toMap() {
     final Map<String, String> ret = new HashMap<String, String>();
     ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalRawDocs()));
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());

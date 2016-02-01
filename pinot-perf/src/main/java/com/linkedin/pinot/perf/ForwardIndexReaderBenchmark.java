@@ -298,13 +298,13 @@ public class ForwardIndexReaderBenchmark {
 
         String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column, segmentVersion);
         File fwdIndexFile = new File(indexDir, fwdIndexFileName);
-        multiValuedReadBenchMark(segmentVersion, fwdIndexFile, segmentMetadata.getTotalDocs(),
+        multiValuedReadBenchMark(segmentVersion, fwdIndexFile, segmentMetadata.getTotalRawDocs(),
             columnMetadata.getTotalNumberOfEntries(), columnMetadata.getMaxNumberOfMultiValues(),
             columnMetadata.getBitsPerElement());
       } else if (columnMetadata.isSingleValue() && !columnMetadata.isSorted()) {
         String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column, segmentVersion);
         File fwdIndexFile = new File(indexDir, fwdIndexFileName);
-        singleValuedReadBenchMark(segmentVersion, fwdIndexFile, segmentMetadata.getTotalDocs(),
+        singleValuedReadBenchMark(segmentVersion, fwdIndexFile, segmentMetadata.getTotalRawDocs(),
             columnMetadata.getBitsPerElement());
       }
     }

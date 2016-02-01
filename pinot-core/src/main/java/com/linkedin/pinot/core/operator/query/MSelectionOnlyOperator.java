@@ -100,7 +100,7 @@ public class MSelectionOnlyOperator extends BaseOperator {
     resultBlock.setSelectionResult(_rowEvents);
     resultBlock.setSelectionDataSchema(_dataSchema);
     resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final long endTime = System.currentTimeMillis();
     resultBlock.setTimeUsedMs(endTime - startTime);
     return resultBlock;

@@ -93,7 +93,7 @@ public abstract class ColumnIndexContainer {
         new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
     SingleColumnSingleValueReader fwdIndexReader =
-        new FixedBitSingleValueReader(fwdIndexFile, metadata.getTotalDocs(),
+        new FixedBitSingleValueReader(fwdIndexFile, metadata.getTotalRawDocs(),
             metadata.getBitsPerElement(), mode == ReadMode.mmap, metadata.hasNulls());
 
     BitmapInvertedIndexReader invertedIndex = null;
@@ -116,7 +116,7 @@ public abstract class ColumnIndexContainer {
         new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
     SingleColumnMultiValueReader<? extends ReaderContext> fwdIndexReader =
-        new FixedBitMultiValueReader(fwdIndexFile, metadata.getTotalDocs(),
+        new FixedBitMultiValueReader(fwdIndexFile, metadata.getTotalRawDocs(),
             metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement(), false,
             mode == ReadMode.mmap);
 
@@ -159,18 +159,18 @@ public abstract class ColumnIndexContainer {
 
     // creating inverted index for the column now
     InvertedIndexCreator creator =
-        new OffHeapBitmapInvertedIndexCreator(indexDir, metadata.getCardinality(), metadata.getTotalDocs(),
+        new OffHeapBitmapInvertedIndexCreator(indexDir, metadata.getCardinality(), metadata.getTotalRawDocs(),
             metadata.getTotalNumberOfEntries(), metadata.toFieldSpec());
     if (!metadata.isSingleValue()) {
       SingleColumnMultiValueReader mvFwdIndex = (SingleColumnMultiValueReader) fwdIndex;
       int[] dictIds = new int[metadata.getMaxNumberOfMultiValues()];
-      for (int i = 0; i < metadata.getTotalDocs(); i++) {
+      for (int i = 0; i < metadata.getTotalRawDocs(); i++) {
         int len = mvFwdIndex.getIntArray(i, dictIds);
         creator.add(i, dictIds, len);
       }
     } else {
       FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
-      for (int i = 0; i < metadata.getTotalDocs(); i++) {
+      for (int i = 0; i < metadata.getTotalRawDocs(); i++) {
         creator.add(i, svFwdIndex.getInt(i));
       }
     }

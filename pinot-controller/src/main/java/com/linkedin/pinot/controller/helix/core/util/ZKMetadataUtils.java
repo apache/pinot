@@ -42,7 +42,7 @@ public class ZKMetadataUtils {
       offlineSegmentZKMetadata.setEndTime(
           offlineSegmentZKMetadata.getTimeUnit().convert(segmentMetadata.getTimeInterval().getEndMillis(), TimeUnit.MILLISECONDS));
     }
-    offlineSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
+    offlineSegmentZKMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
     offlineSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     offlineSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
     return offlineSegmentZKMetadata;

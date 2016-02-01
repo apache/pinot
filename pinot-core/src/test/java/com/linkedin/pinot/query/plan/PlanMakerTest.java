@@ -239,7 +239,7 @@ public class PlanMakerTest {
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     //    System.out.println(resultBlock.getAggregationGroupByResult().get("0.0"));
     List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
     //    Assert.assertEquals(20000001L, resultBlock.getAggregationResult().get(0));
@@ -357,7 +357,7 @@ public class PlanMakerTest {
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
     for (int i = 0; i < combinedGroupByResult.size(); ++i) {
       System.out.println("function : " + brokerRequest.getAggregationsInfo().get(i));

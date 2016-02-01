@@ -121,7 +121,7 @@ public class OfflineTableDataManagerTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(indexSegment.getSegmentName()).thenReturn(name);
-    when(indexSegment.getSegmentMetadata().getTotalDocs()).thenReturn(totalDocs);
+    when(indexSegment.getSegmentMetadata().getTotalRawDocs()).thenReturn(totalDocs);
     doAnswer(new Answer() {
       @Override
       public Object answer(InvocationOnMock invocationOnMock)

@@ -42,7 +42,7 @@ public final class MultiValueIterator extends BlockMultiValIterator {
 
   @Override
   public boolean skipTo(int docId) {
-    if (docId >= columnMetadata.getTotalDocs()) {
+    if (docId >= columnMetadata.getTotalRawDocs()) {
       return false;
     }
     counter = docId;
@@ -51,7 +51,7 @@ public final class MultiValueIterator extends BlockMultiValIterator {
 
   @Override
   public int size() {
-    return columnMetadata.getTotalDocs();
+    return columnMetadata.getTotalRawDocs();
   }
 
   @Override
@@ -67,7 +67,7 @@ public final class MultiValueIterator extends BlockMultiValIterator {
 
   @Override
   public boolean hasNext() {
-    return (counter < columnMetadata.getTotalDocs());
+    return (counter < columnMetadata.getTotalRawDocs());
   }
 
   @Override

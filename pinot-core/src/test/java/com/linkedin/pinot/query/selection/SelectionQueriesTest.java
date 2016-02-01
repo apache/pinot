@@ -147,7 +147,7 @@ public class SelectionQueriesTest {
   @Test
   public void testSelectionIteration() {
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -178,7 +178,7 @@ public class SelectionQueriesTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
     JSONArray resultsJsonArray = getJsonArray(brokerRequest, resultBlock);
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
@@ -197,9 +197,9 @@ public class SelectionQueriesTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
     JSONArray resultsJsonArray = getJsonArray(brokerRequest, resultBlock);
     for (int i = 0; i < resultsJsonArray.length(); ++i) {

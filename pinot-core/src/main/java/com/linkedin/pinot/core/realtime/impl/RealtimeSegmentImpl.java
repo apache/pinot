@@ -637,7 +637,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public void setSegmentMetadata(RealtimeSegmentZKMetadata segmentMetadata) {
     _segmentMetadata = new SegmentMetadataImpl(segmentMetadata){
       @Override
-      public int getTotalDocs() {
+      public int getTotalRawDocs() {
         return docIdSearchableOffset + 1;
       }
     };
@@ -646,7 +646,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public void setSegmentMetadata(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
     _segmentMetadata = new SegmentMetadataImpl(segmentMetadata, schema){
       @Override
-      public int getTotalDocs() {
+      public int getTotalRawDocs() {
         return docIdSearchableOffset + 1;
       }
     };

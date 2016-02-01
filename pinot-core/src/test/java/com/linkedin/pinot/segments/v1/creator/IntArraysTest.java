@@ -98,13 +98,13 @@ public class IntArraysTest {
       if (metadataMap.get(column).isSingleValue()) {
         final SingleColumnSingleValueReader svHeapReader = (SingleColumnSingleValueReader) heapArray;
         final SingleColumnSingleValueReader mvMmapReader = (SingleColumnSingleValueReader) mmapArray;
-        for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
+        for (int i = 0; i < metadataMap.get(column).getTotalRawDocs(); i++) {
           Assert.assertEquals(mvMmapReader.getInt(i), svHeapReader.getInt(i));
         }
       } else {
         final SingleColumnMultiValueReader svHeapReader = (SingleColumnMultiValueReader) heapArray;
         final SingleColumnMultiValueReader mvMmapReader = (SingleColumnMultiValueReader) mmapArray;
-        for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
+        for (int i = 0; i < metadataMap.get(column).getTotalRawDocs(); i++) {
           final int[] i_1 = new int[1000];
           final int[] j_i = new int[1000];
           Assert.assertEquals(mvMmapReader.getIntArray(i, j_i), svHeapReader.getIntArray(i, i_1));

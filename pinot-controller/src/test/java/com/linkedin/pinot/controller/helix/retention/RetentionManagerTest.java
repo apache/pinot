@@ -398,7 +398,7 @@ public class RetentionManagerTest {
         final Map<String, String> ret = new HashMap<String, String>();
         ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS,
-            String.valueOf(getTotalDocs()));
+            String.valueOf(getTotalRawDocs()));
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
@@ -417,7 +417,7 @@ public class RetentionManagerTest {
       }
 
       @Override
-      public int getTotalDocs() {
+      public int getTotalRawDocs() {
         return 0;
       }
 

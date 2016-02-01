@@ -153,7 +153,7 @@ public class SelectionQueriesForMultiValueColumnTest {
   public void testSelectionIteration() throws Exception {
     setupSegment();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -186,7 +186,7 @@ public class SelectionQueriesForMultiValueColumnTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
     final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
@@ -244,9 +244,9 @@ public class SelectionQueriesForMultiValueColumnTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
 
     final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());

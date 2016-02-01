@@ -148,7 +148,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   public void testSelectionIteration() throws Exception {
     setupSegment();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -181,7 +181,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
@@ -229,9 +229,9 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());

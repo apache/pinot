@@ -281,7 +281,7 @@ public class RealtimeTableDataManagerTest {
     realtimeSegmentMetadata.setEndTime(-1);
     realtimeSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     realtimeSegmentMetadata.setStatus(Status.IN_PROGRESS);
-    realtimeSegmentMetadata.setTotalDocs(-1);
+    realtimeSegmentMetadata.setTotalRawDocs(-1);
     realtimeSegmentMetadata.setCrc(-1);
     realtimeSegmentMetadata.setCreationTime(1000);
     return realtimeSegmentMetadata;

@@ -183,7 +183,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -269,7 +269,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
     LOGGER.info("Result: {}", resultBlock.getAggregationGroupByResultDataTable());
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
@@ -302,10 +302,10 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorTest {
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
     LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
     LOGGER.info("Result: {}", resultBlock.getAggregationGroupByResultDataTable());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
