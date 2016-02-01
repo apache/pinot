@@ -53,7 +53,9 @@ import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
+
 public class RetentionManagerTest {
+
   private static File INDEXES_DIR =
       new File(FileUtils.getTempDirectory() + File.separator + "TestRetentionManagerList");
 
@@ -71,8 +73,7 @@ public class RetentionManagerTest {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private String _testTableName = "testTable";
-  private String _offlineTableName =
-      TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName);
+  private String _offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName);
 
   private RetentionManager _retentionManager;
 
@@ -81,19 +82,17 @@ public class RetentionManagerTest {
     ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
 
-    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME,
-        CONTROLLER_INSTANCE_NAME, null, 10000L, true);
+    _pinotHelixResourceManager =
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 10000L, true);
     _pinotHelixResourceManager.start();
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
-        ZK_STR, 2, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
-        ZK_STR, 2, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
 
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     _helixZkManager = _pinotHelixResourceManager.getHelixZkManager();
 
-    String OfflineTableConfigJson = ControllerRequestBuilderUtil
-        .buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
+    String OfflineTableConfigJson =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
   }
@@ -111,8 +110,7 @@ public class RetentionManagerTest {
 
   public void cleanupSegments() throws InterruptedException {
     _retentionManager.stop();
-    for (String segmentId : _pinotHelixResourceManager
-        .getAllSegmentsForResource(_offlineTableName)) {
+    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResource(_offlineTableName)) {
       _pinotHelixResourceManager.deleteSegment(_offlineTableName, segmentId);
     }
     while (_helixZkManager.getHelixPropertyStore()
@@ -138,8 +136,8 @@ public class RetentionManagerTest {
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long millsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     for (int i = 0; i < 10; ++i) {
-      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("1343001600000", "1343001600000",
-          TimeUnit.MILLISECONDS.toString());
+      SegmentMetadata segmentMetadata =
+          getTimeSegmentMetadataImpl("1343001600000", "1343001600000", TimeUnit.MILLISECONDS.toString());
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
@@ -149,24 +147,7 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 20);
-    Thread.sleep(8000);
-    LOGGER.info("Sleeping thread wakes up!");
-    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 10);
+    validate();
     cleanupSegments();
   }
 
@@ -195,25 +176,37 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 20);
-    Thread.sleep(8000);
-    LOGGER.info("Sleeping thread wakes up!");
-    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 10);
+    validate();
     cleanupSegments();
+  }
+
+  private void validate() throws InterruptedException {
+    int INCREMENTAL_WAIT_TIME = 5000;
+    int INITIAL_WAIT_TIME = 8000;
+    String segmentMetadaPathForTable = ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName);
+    int numSegmentsInMetadata = _helixZkManager.getHelixPropertyStore()
+        .getChildNames(segmentMetadaPathForTable, AccessOption.PERSISTENT).size();
+    Assert.assertEquals(numSegmentsInMetadata, 20);
+    Thread.sleep(INITIAL_WAIT_TIME);
+    LOGGER.info("Sleeping thread wakes up!");
+    int evSize = 0;
+    int isSize = 0;
+    numSegmentsInMetadata = 0;
+    long start = System.currentTimeMillis();
+    int MAX_WAIT_TIME = 2 * 60 * 1000; // 2 minutes
+    while (System.currentTimeMillis() - start < MAX_WAIT_TIME) {
+      evSize = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName).getPartitionSet().size();
+      isSize = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName).getPartitionSet().size();
+      numSegmentsInMetadata = _helixZkManager.getHelixPropertyStore()
+          .getChildNames(segmentMetadaPathForTable, AccessOption.PERSISTENT).size();
+      if (evSize == 10 && isSize == 10 && numSegmentsInMetadata == 10) {
+        break;
+      }
+      Thread.sleep(INCREMENTAL_WAIT_TIME);
+    }
+    Assert.assertEquals(evSize, 10);
+    Assert.assertEquals(isSize, 10);
+    Assert.assertEquals(numSegmentsInMetadata, 10);
   }
 
   /**
@@ -230,8 +223,7 @@ public class RetentionManagerTest {
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
     for (int i = 0; i < 10; ++i) {
-      SegmentMetadata segmentMetadata =
-          getTimeSegmentMetadataImpl("22383360", "22383360", TimeUnit.MINUTES.toString());
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("22383360", "22383360", TimeUnit.MINUTES.toString());
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
@@ -241,24 +233,7 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 20);
-    Thread.sleep(8000);
-    LOGGER.info("Sleeping thread wakes up!");
-    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 10);
+    validate();
     cleanupSegments();
   }
 
@@ -276,8 +251,7 @@ public class RetentionManagerTest {
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
     for (int i = 0; i < 10; ++i) {
-      SegmentMetadata segmentMetadata =
-          getTimeSegmentMetadataImpl("373056", "373056", TimeUnit.HOURS.toString());
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("373056", "373056", TimeUnit.HOURS.toString());
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
@@ -287,24 +261,7 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 20);
-    Thread.sleep(8000);
-    LOGGER.info("Sleeping thread wakes up!");
-    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 10);
+    validate();
     cleanupSegments();
   }
 
@@ -323,36 +280,17 @@ public class RetentionManagerTest {
     _retentionManager.start();
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     for (int i = 0; i < 10; ++i) {
-      SegmentMetadata segmentMetadata =
-          getTimeSegmentMetadataImpl("15544", "15544", TimeUnit.DAYS.toString());
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("15544", "15544", TimeUnit.DAYS.toString());
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
     for (int i = 0; i < 10; ++i) {
-      SegmentMetadata segmentMetadata =
-          getTimeSegmentMetadataImpl(theDayAfterTomorrowSinceEpoch + "",
-              theDayAfterTomorrowSinceEpoch + "", TimeUnit.DAYS.toString());
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(theDayAfterTomorrowSinceEpoch + "",
+          theDayAfterTomorrowSinceEpoch + "", TimeUnit.DAYS.toString());
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 20);
-    Thread.sleep(8000);
-    LOGGER.info("Sleeping thread wakes up!");
-    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName)
-        .getPartitionSet().size(), 10);
-    Assert
-        .assertEquals(_helixZkManager.getHelixPropertyStore()
-            .getChildNames(
-                ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
-                AccessOption.PERSISTENT)
-            .size(), 10);
+    validate();
     cleanupSegments();
   }
 
@@ -364,8 +302,7 @@ public class RetentionManagerTest {
         offlineSegmentZKMetadata);
 
     // put into idealStates
-    IdealState idealState =
-        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName);
+    IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName);
     idealState.setPartitionState(segmentMetadata.getName(), "Server_localhost_0", "ONLINE");
     idealState.setPartitionState(segmentMetadata.getName(), "Server_localhost_1", "ONLINE");
     _helixAdmin.setResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName, idealState);
@@ -375,8 +312,7 @@ public class RetentionManagerTest {
       final String timeUnit) {
     if (startTime == null || endTime == null || timeUnit == null) {
       long startTimeValue = System.currentTimeMillis();
-      return getTimeSegmentMetadataImpl(startTimeValue + "", startTimeValue + "",
-          TimeUnit.MILLISECONDS.toString());
+      return getTimeSegmentMetadataImpl(startTimeValue + "", startTimeValue + "", TimeUnit.MILLISECONDS.toString());
     }
 
     final long creationTime = System.currentTimeMillis();
@@ -397,13 +333,11 @@ public class RetentionManagerTest {
       public Map<String, String> toMap() {
         final Map<String, String> ret = new HashMap<String, String>();
         ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS,
-            String.valueOf(getTotalRawDocs()));
+        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalRawDocs()));
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME,
-            getIndexCreationTime() + "");
+        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, startTime);
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, endTime);
         ret.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit);
@@ -498,20 +432,17 @@ public class RetentionManagerTest {
 
       @Override
       public String getForwardIndexFileName(String column, String segmentVersion) {
-        throw new UnsupportedOperationException(
-            "getForwardIndexFileName not supported in " + this.getClass());
+        throw new UnsupportedOperationException("getForwardIndexFileName not supported in " + this.getClass());
       }
 
       @Override
       public String getDictionaryFileName(String column, String segmentVersion) {
-        throw new UnsupportedOperationException(
-            "getDictionaryFileName not supported in " + this.getClass());
+        throw new UnsupportedOperationException("getDictionaryFileName not supported in " + this.getClass());
       }
 
       @Override
       public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
-        throw new UnsupportedOperationException(
-            "getBitmapInvertedIndexFileName not supported in " + this.getClass());
+        throw new UnsupportedOperationException("getBitmapInvertedIndexFileName not supported in " + this.getClass());
       }
     };
     return segmentMetadata;
