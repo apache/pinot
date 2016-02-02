@@ -15,23 +15,21 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import com.linkedin.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.util.SortedRangeIntersection;
@@ -170,56 +168,63 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
         remainingIterators.add(docIdSet.iterator());
       }
     }
-    // handle sorted ranges
-    // TODO: will be nice to re-order sorted and bitmap index based on size
-    if (sortedRangeSets.size() > 0) {
-      List<IntPair> pairList;
-      pairList = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSets);
-      answer = new MutableRoaringBitmap();
-      for (IntPair pair : pairList) {
-        // end is exclusive
-        answer.add(pair.getLeft(), pair.getRight() + 1);
-      }
-    }
-    // handle bitmaps
-    if (childBitmaps.size() > 0) {
-      if (answer == null) {
-        answer = (MutableRoaringBitmap) childBitmaps.get(0).clone();
-        for (int i = 1; i < childBitmaps.size(); i++) {
-          answer.and(childBitmaps.get(i));
-        }
-      } else {
-        for (int i = 0; i < childBitmaps.size(); i++) {
-          answer.and(childBitmaps.get(i));
-        }
-      }
-    }
-    // if we don't have any index, we need to scan entire data set
-    if (answer == null) {
-      answer = new MutableRoaringBitmap();
-      // end is exclusive
-      answer.add(minDocId, maxDocId + 1);
-    }
-
-    // handle raw iterators
-    for (FilterBlockDocIdSet scanBasedDocIdSet : scanBasedDocIdSets) {
-      ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) scanBasedDocIdSet.iterator();
-      MutableRoaringBitmap scanAnswer = iterator.applyAnd(answer);
-      answer.and(scanAnswer);
-    }
-    long end = System.currentTimeMillis();
-    LOGGER.debug("Time to evaluate and Filter:{}", (end - start));
-    // if other iterators exists resort to iterator style intersection
-    BlockDocIdIterator answerDocIdIterator = new RangelessBitmapDocIdIterator(answer.getIntIterator());
-    if (remainingIterators.size() == 0) {
-      return answerDocIdIterator;
-    } else {
-      BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[remainingIterators.size() + 1];
-      docIdIterators[0] = answerDocIdIterator;
-      for (int i = 0; i < remainingIterators.size(); i++) {
-        docIdIterators[i + 1] = remainingIterators.get(i);
+    if (childBitmaps.size() == 0 && sortedRangeSets.size() == 0) {
+      // When one or more of the operands are operators themselves, then we don't have a sorted or
+      // bitmap index. In that case, just use the AndDocIdIterator to iterate over all of of the subtree.
+      BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[blockDocIdSets.size()];
+      for (int srcId = 0; srcId < blockDocIdSets.size(); srcId++) {
+        docIdIterators[srcId] = blockDocIdSets.get(srcId).iterator();
       }
       return new AndDocIdIterator(docIdIterators);
+    } else {
+      // handle sorted ranges
+      // TODO: will be nice to re-order sorted and bitmap index based on size
+      if (sortedRangeSets.size() > 0) {
+        List<IntPair> pairList;
+        pairList = SortedRangeIntersection.intersectSortedRangeSets(sortedRangeSets);
+        answer = new MutableRoaringBitmap();
+        for (IntPair pair : pairList) {
+          // end is exclusive
+          answer.add(pair.getLeft(), pair.getRight() + 1);
+        }
+      }
+      // handle bitmaps
+      if (childBitmaps.size() > 0) {
+        if (answer == null) {
+          answer = (MutableRoaringBitmap) childBitmaps.get(0).clone();
+          for (int i = 1; i < childBitmaps.size(); i++) {
+            answer.and(childBitmaps.get(i));
+          }
+        } else {
+          for (int i = 0; i < childBitmaps.size(); i++) {
+            answer.and(childBitmaps.get(i));
+          }
+        }
+      }
+
+      // At this point, we must have 'answer' to be non-null.
+      assert (answer != null) : "sortedRangeSets=" + sortedRangeSets.size() + ",childBitmaps=" + childBitmaps.size();
+
+      // handle raw iterators
+      for (FilterBlockDocIdSet scanBasedDocIdSet : scanBasedDocIdSets) {
+        ScanBasedDocIdIterator iterator = (ScanBasedDocIdIterator) scanBasedDocIdSet.iterator();
+        MutableRoaringBitmap scanAnswer = iterator.applyAnd(answer);
+        answer.and(scanAnswer);
+      }
+      long end = System.currentTimeMillis();
+      LOGGER.debug("Time to evaluate and Filter:{}", (end - start));
+      // if other iterators exists resort to iterator style intersection
+      BlockDocIdIterator answerDocIdIterator = new RangelessBitmapDocIdIterator(answer.getIntIterator());
+      if (remainingIterators.size() == 0) {
+        return answerDocIdIterator;
+      } else {
+        BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[remainingIterators.size() + 1];
+        docIdIterators[0] = answerDocIdIterator;
+        for (int i = 0; i < remainingIterators.size(); i++) {
+          docIdIterators[i + 1] = remainingIterators.get(i);
+        }
+        return new AndDocIdIterator(docIdIterators);
+      }
     }
   }
 

@@ -17,10 +17,11 @@ package com.linkedin.pinot.common.utils.request;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 
@@ -75,7 +76,53 @@ public class RequestUtils {
       root = buildFilterQuery(q.getId(), request.getFilterSubQueryMap().getFilterQueryMap());
     }
 
+//    flatten(root, null);
+
     return root;
+  }
+
+  /**
+   * Flatten the operators if parent and child have the same AND or OR operator.
+   * (e.g. AND( a, AND (b, c)) is the same as AND(a, b, c). This helps when we re-order
+   * operators for performance.
+   *
+   * It does so by looking at the operator of the 'parent' and 'node'. If they are same, and
+   * collapsible, then all the children of 'node' are moved one level up to be siblings of
+   * 'node', rendering 'node' childless. 'node' is then removed from 'parent's children list.
+   *
+   * @param node The node whose children are to be moved up one level if criteria is satisfied.
+   * @param parent Node's parent who will inherit node's children if criteria is satisfied.
+   */
+  private static void flatten(FilterQueryTree node, FilterQueryTree parent) {
+    if (node == null || node.getChildren() == null) {
+      return;
+    }
+    // Flatten all the children first.
+    List<FilterQueryTree> toFlatten = new ArrayList<>(node.getChildren().size());
+    for (FilterQueryTree child: node.getChildren()) {
+      if (child.getChildren() != null && !child.getChildren().isEmpty()) {
+        toFlatten.add(child);
+      }
+    }
+    for (FilterQueryTree child : toFlatten) {
+      flatten(child, node);
+    }
+    if (parent == null) {
+      return;
+    }
+    if (node.getOperator() == parent.getOperator() &&
+        (node.getOperator() == FilterOperator.OR || node.getOperator() == FilterOperator.AND)) {
+      // Move all of 'node's children one level up. If 'node' has no children left, remove it from parent's list.
+      List<FilterQueryTree> children = node.getChildren();
+      Iterator<FilterQueryTree> it = children.iterator();
+      while (it.hasNext()) {
+        parent.getChildren().add(it.next());
+        it.remove();
+      }
+      // 'node' is now childless
+      // Remove this node from its parent's list.
+      parent.getChildren().remove(node);
+    }
   }
 
   private static FilterQueryTree buildFilterQuery(Integer id, Map<Integer, FilterQuery> queryMap) {
