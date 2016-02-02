@@ -304,13 +304,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     FileUtils.moveFile(dataFile, segmentFile);
 
     PinotResourceManagerResponse response;
-    if (!validateSegmentTimeRange(metadata)) {
-      Interval interval = metadata.getTimeInterval();
-      Date startDate = new Date(interval.getStartMillis());
-      Date endDate = new Date(interval.getEndMillis());
-      LOGGER.error(
-          "Rejecting segment with invalid start or end time, start: {}, end: {}, (must be between Jan 01 1971, and Jan 01, 2071)",
-          startDate, endDate);
+    if (!isSegmentTimeValid(metadata)) {
       response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
     } else {
       response = _pinotHelixResourceManager
@@ -319,6 +313,37 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
 
     setStatus((response.isSuccessfull() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL));
     return new StringRepresentation(response.toJSON().toString());
+  }
+
+  /**
+   * Returns true if:
+   * - Segment does not have a start/end time, OR
+   * - The start/end time are in a valid range (Jan 01 1971 - Jan 01, 2071)
+   * @param metadata
+   * @return
+   */
+  private boolean isSegmentTimeValid(SegmentMetadata metadata) {
+    Interval interval = metadata.getTimeInterval();
+    if (interval == null) {
+      return true;
+    }
+
+    long startMillis = interval.getStartMillis();
+    long endMillis = interval.getEndMillis();
+
+    if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
+      Date startDate = new Date(interval.getStartMillis());
+      Date endDate = new Date(interval.getEndMillis());
+
+      Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
+      Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
+
+      LOGGER.error("Invalid start time '{}' or end time '{}' for segment, must be between '{}' and '{}'", startDate,
+          endDate, minDate, maxDate);
+      return false;
+    }
+
+    return true;
   }
 
   /**

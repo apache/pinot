@@ -25,9 +25,9 @@ import org.joda.time.DateTimeZone;
 public class TimeUtils {
   private static final Map<String, TimeUnit> TIME_UNIT_MAP = new HashMap<>();
 
-  private static final long SANITY_CHECK_MINIMUM_MILLIS =
+  private static final long VALID_MIN_TIME_MILLIS =
       new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
-  private static final long SANITY_CHECK_MAXIMUM_MILLIS =
+  private static final long VALID_MAX_TIME_MILLIS =
       new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
 
   static {
@@ -70,6 +70,22 @@ public class TimeUtils {
    * @return True if time value in valid range, false otherwise.
    */
   public static boolean timeValueInValidRange(long timeValueInMillis) {
-    return (SANITY_CHECK_MINIMUM_MILLIS <= timeValueInMillis && timeValueInMillis <= SANITY_CHECK_MAXIMUM_MILLIS);
+    return (VALID_MIN_TIME_MILLIS <= timeValueInMillis && timeValueInMillis <= VALID_MAX_TIME_MILLIS);
+  }
+
+  /**
+   * Return the minimum valid time in milliseconds.
+   * @return
+   */
+  public static long getValidMinTimeMillis() {
+    return VALID_MIN_TIME_MILLIS;
+  }
+
+  /**
+   * Returns the maximum valid time in milliseconds.
+   * @return
+   */
+  public static long getValidMaxTimeMillis() {
+    return VALID_MAX_TIME_MILLIS;
   }
 }
