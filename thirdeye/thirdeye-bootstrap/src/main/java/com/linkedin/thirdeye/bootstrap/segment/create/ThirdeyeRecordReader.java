@@ -67,8 +67,6 @@ public class ThirdeyeRecordReader extends BaseRecordReader {
   private Map<Long, List<Number>> _metricBuffer = null;
   private Iterator<Entry<Long, List<Number>>> _metricTimeSeriesIterator;
 
-  private ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
-
 
   public ThirdeyeRecordReader(String sequenceFileName, Schema schema, String starTreeConfigFileName) throws IOException {
     super();

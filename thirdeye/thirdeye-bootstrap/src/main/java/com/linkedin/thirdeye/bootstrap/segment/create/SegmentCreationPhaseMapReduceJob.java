@@ -49,7 +49,6 @@ public class SegmentCreationPhaseMapReduceJob {
     private String inputFilePath;
     private String outputPath;
     private String tableName;
-    private String postfix;
 
     private Path currentHdfsWorkDir;
     private String currentDiskWorkDir;
@@ -84,15 +83,7 @@ public class SegmentCreationPhaseMapReduceJob {
 
       outputPath = properties.get(SEGMENT_CREATION_OUTPUT_PATH.toString());
       tableName = properties.get(SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString());
-      postfix = properties.get("segment.name.postfix", null);
-      if (outputPath == null || tableName == null) {
-        throw new RuntimeException(
-            "Missing configs: " +
-                "\n\toutputPath: " +
-                properties.get("path.to.output") +
-                "\n\ttableName: " +
-                properties.get("segment.table.name"));
-      }
+
     }
 
     @Override
@@ -151,21 +142,14 @@ public class SegmentCreationPhaseMapReduceJob {
         dataPath.delete();
       }
       dataPath.mkdir();
-      final Path localAvroPath = new Path(dataPath + "/" + hdfsDataPath.getName());
-      fs.copyToLocalFile(hdfsDataPath, localAvroPath);
+      final Path localFilePath = new Path(dataPath + "/" + hdfsDataPath.getName());
+      fs.copyToLocalFile(hdfsDataPath, localFilePath);
 
       LOGGER.info("Data schema is : {}", schema);
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
       segmentGeneratorConfig.setTableName(tableName);
-
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
-
-      if (null != postfix) {
-        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", postfix, seqId));
-      } else {
-        segmentGeneratorConfig.setSegmentNamePostfix(seqId);
-      }
-
+      segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       segmentGeneratorConfig.setIndexOutputDir(localDiskSegmentDirectory);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -173,6 +157,7 @@ public class SegmentCreationPhaseMapReduceJob {
           new ThirdeyeRecordReader(segmentGeneratorConfig.getInputFilePath(), schema, properties.get(SEGMENT_CREATION_CONFIG_PATH.toString()));
       driver.init(segmentGeneratorConfig, thirdeyeRecordReader);
       driver.build();
+
       // Tar the segment directory into file.
       String segmentName = (new File(localDiskSegmentDirectory).listFiles()[0]).getName();
       String localSegmentPath = new File(localDiskSegmentDirectory, segmentName).getAbsolutePath();

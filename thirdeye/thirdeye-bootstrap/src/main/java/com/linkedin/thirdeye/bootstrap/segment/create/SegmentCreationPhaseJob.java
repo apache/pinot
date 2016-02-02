@@ -102,6 +102,7 @@ public class SegmentCreationPhaseJob extends Configured {
     String tableName = getAndSetConfiguration(configuration, SEGMENT_CREATION_SEGMENT_TABLE_NAME);
     LOGGER.info("Segment table name : {}", tableName);
 
+    // Create temporary directory
     if (fs.exists(new Path(stagingDir))) {
       LOGGER.warn("Found the temp folder, deleting it");
       fs.delete(new Path(stagingDir), true);
@@ -120,20 +121,19 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("size {}", inputDataFiles.size());
 
     try {
-    for (int seqId = 0; seqId < inputDataFiles.size(); ++seqId) {
-      FileStatus file = inputDataFiles.get(seqId);
-      String completeFilePath = " " + file.getPath().toString() + " " + seqId;
-      Path newOutPutFile = new Path((stagingDir + "/input/" + file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_') + ".txt"));
-      FSDataOutputStream stream = fs.create(newOutPutFile);
-      LOGGER.info("wrote {}", completeFilePath);
-      stream.writeUTF(completeFilePath);
-      stream.flush();
-      stream.close();
-    }
+      for (int seqId = 0; seqId < inputDataFiles.size(); ++seqId) {
+        FileStatus file = inputDataFiles.get(seqId);
+        String completeFilePath = " " + file.getPath().toString() + " " + seqId;
+        Path newOutPutFile = new Path((stagingDir + "/input/" + file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_') + ".txt"));
+        FSDataOutputStream stream = fs.create(newOutPutFile);
+        LOGGER.info("wrote {}", completeFilePath);
+        stream.writeUTF(completeFilePath);
+        stream.flush();
+        stream.close();
+      }
     } catch (Exception e) {
-      LOGGER.error("Exception ", e);
+      LOGGER.error("Exception while reading input files ", e);
     }
-
 
     job.setMapperClass(SegmentCreationPhaseMapReduceJob.SegmentCreationMapper.class);
 
@@ -164,7 +164,6 @@ public class SegmentCreationPhaseJob extends Configured {
       job.getConfiguration().set(key.toString(), props.getProperty(key.toString()));
     }
 
-    // Submit the job for execution.
     job.waitForCompletion(true);
     if (!job.isSuccessful()) {
       throw new RuntimeException("Job failed : " + job);
