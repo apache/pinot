@@ -25,7 +25,9 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_MR_CONF("thirdeye.mr.conf"),
   THIRDEYE_INPUT_CONVERTER_CLASS("thirdeye.input.converter.class"),
   THIRDEYE_TOPK("thirdeye.topk"),
-  THIRDEYE_NUM_PARTITIONS("thirdeye.num.partitions");
+  THIRDEYE_NUM_PARTITIONS("thirdeye.num.partitions"),
+  THIRDEYE_PINOT_CONTROLLER_HOSTS("thirdeye.pinot.controller.hosts"),
+  THIRDEYE_PINOT_CONTROLLER_PORT("thirdeye.pinot.controller.port");
 
   private final String propertyName;
 

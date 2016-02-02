@@ -47,6 +47,10 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob;
+import com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants;
+import com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseJob;
+import com.linkedin.thirdeye.bootstrap.segment.push.SegmentPushPhase;
+import com.linkedin.thirdeye.bootstrap.segment.push.SegmentPushPhaseConstants;
 import com.linkedin.thirdeye.bootstrap.startree.StarTreeJobUtils;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneJob;
@@ -144,6 +148,7 @@ public class ThirdEyeJob {
   private static final String ENCODING = "UTF-8";
   private static final String USAGE = "usage: phase_name job.properties";
   private static final String AVRO_SCHEMA = "schema.avsc";
+  private static final String PINOT_JSON_SCHEMA = "schema.json";
   private static final String TREE_FILE_FORMAT = ".bin";
   private static final String DEFAULT_CLEANUP_DAYS_AGO = "7";
   private static final String DEFAULT_CLEANUP_SKIP = "false";
@@ -305,6 +310,63 @@ public class ThirdEyeJob {
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(),
                 DEFAULT_CONVERTER_CLASS));
 
+        return config;
+      }
+    },
+    SEGMENT_CREATION {
+      @Override
+      Class<?> getKlazz() {
+        return SegmentCreationPhaseJob.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Generates pinot segments";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEMA_PATH.toString(),
+            getPinotSchemaPath(root, collection));
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH.toString(),
+            getConfigPath(root, collection));
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + AGGREGATION.getName());
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString(),
+            collection);
+
+        return config;
+      }
+    },
+    SEGMENT_PUSH {
+      @Override
+      Class<?> getKlazz() {
+        return SegmentPushPhase.class;
+      }
+
+      @Override
+      String getDescription() {
+        return "Pushes pinot segments to pinot controller";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection,
+          FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths)
+              throws Exception {
+        Properties config = new Properties();
+
+        config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_INPUT_PATH.toString(),
+            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
+        config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_HOSTS.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_HOSTS.getName()));
+        config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_PORT.getName()));
         return config;
       }
     },
@@ -828,6 +890,10 @@ public class ThirdEyeJob {
     String getSchemaPath(String root, String collection) {
       return getCollectionDir(root, collection) + File.separator + AVRO_SCHEMA;
     }
+
+    String getPinotSchemaPath(String root, String collection) {
+      return getCollectionDir(root, collection) + File.separator + PINOT_JSON_SCHEMA;
+    }
   }
 
   private static void usage() {
@@ -1144,6 +1210,8 @@ public class ThirdEyeJob {
     case WAIT:
     case ANALYSIS:
     case AGGREGATION:
+    case SEGMENT_CREATION:
+    case SEGMENT_PUSH:
     case TOPK_ROLLUP_PHASE1:
     case TOPK_ROLLUP_PHASE2:
     case TOPK_ROLLUP_PHASE3:
@@ -1402,10 +1470,12 @@ public class ThirdEyeJob {
       // Run the job
       Method runMethod = instance.getClass().getMethod("run");
       Job job = (Job) runMethod.invoke(instance);
-      JobStatus status = job.getStatus();
-      if (status.getState() != JobStatus.State.SUCCEEDED) {
-        throw new RuntimeException(
-            "Job " + job.getJobName() + " failed to execute: Ran with config:" + jobProperties);
+      if (job != null) {
+        JobStatus status = job.getStatus();
+        if (status.getState() != JobStatus.State.SUCCEEDED) {
+          throw new RuntimeException(
+              "Job " + job.getJobName() + " failed to execute: Ran with config:" + jobProperties);
+        }
       }
     }
 
