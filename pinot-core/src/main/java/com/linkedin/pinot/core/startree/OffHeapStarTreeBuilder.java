@@ -418,6 +418,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       boolean done = false;
 
       @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+      
+      @Override
       public boolean hasNext() {
         return !done;
       }
@@ -472,6 +477,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       @Override
       public boolean hasNext() {
         return iterator.hasNext();
+      }
+      
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
       }
 
       @Override

@@ -154,7 +154,7 @@ public class StarTreeDataTable {
       int prevValue = -1;
       int prevStart = 0;
       for (int i = 0; i < length; i++) {
-        int value = mappedByteBuffer.getInt(i * totalSizeInBytes + colIndex*4);
+        int value = mappedByteBuffer.getInt(i * totalSizeInBytes + colIndex * 4);
         if (prevValue != -1 && prevValue != value) {
           rangeMap.put(prevValue, new IntPair(prevStart, i));
           prevStart = i;
@@ -190,19 +190,24 @@ public class StarTreeDataTable {
         }
 
         @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Pair<byte[], byte[]> next() {
           byte[] dimBuff = new byte[dimensionSizeInBytes];
           byte[] metBuff = new byte[metricSizeInBytes];
           mappedByteBuffer.position(pointer * totalSizeInBytes);
           mappedByteBuffer.get(dimBuff);
-          if(metricSizeInBytes > 0){
+          if (metricSizeInBytes > 0) {
             mappedByteBuffer.get(metBuff);
           }
           pointer = pointer + 1;
           return Pair.of(dimBuff, metBuff);
         }
       };
-      
+
     } catch (IOException e) {
       throw e;
     } finally {
@@ -210,6 +215,5 @@ public class StarTreeDataTable {
     }
 
   }
-
 
 }
