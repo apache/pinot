@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.api.swagger.HttpVerb;
 import com.linkedin.pinot.controller.api.swagger.Parameter;
 import com.linkedin.pinot.controller.api.swagger.Paths;
@@ -32,6 +33,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
@@ -40,6 +42,7 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.Interval;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.restlet.data.MediaType;
@@ -300,12 +303,36 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     }
     FileUtils.moveFile(dataFile, segmentFile);
 
-    PinotResourceManagerResponse response =
-        _pinotHelixResourceManager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+    PinotResourceManagerResponse response;
+    if (!validateSegmentTimeRange(metadata)) {
+      Interval interval = metadata.getTimeInterval();
+      Date startDate = new Date(interval.getStartMillis());
+      Date endDate = new Date(interval.getEndMillis());
+      LOGGER.error(
+          "Rejecting segment with invalid start or end time, start: {}, end: {}, (must be between Jan 01 1971, and Jan 01, 2071)",
+          startDate, endDate);
+      response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
+    } else {
+      response = _pinotHelixResourceManager
+          .addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+    }
 
     setStatus((response.isSuccessfull() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL));
     return new StringRepresentation(response.toJSON().toString());
   }
+
+  /**
+   * Returns true if segment start and end time are between a valid range, or if
+   * segment does not have a time interval.
+   * The current valid range is between 1971 and 2071.
+   * @param metadata
+   * @return
+   */
+  private boolean validateSegmentTimeRange(SegmentMetadata metadata) {
+    Interval timeInterval = metadata.getTimeInterval();
+    return (timeInterval == null || (TimeUtils.timeValueInValidRange(timeInterval.getStartMillis())) && TimeUtils
+        .timeValueInValidRange(timeInterval.getEndMillis()));
+    }
 
   /**
    * URI Mappings:

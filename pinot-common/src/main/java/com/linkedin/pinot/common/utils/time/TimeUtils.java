@@ -18,10 +18,17 @@ package com.linkedin.pinot.common.utils.time;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 
 public class TimeUtils {
   private static final Map<String, TimeUnit> TIME_UNIT_MAP = new HashMap<>();
+
+  private static final long SANITY_CHECK_MINIMUM_MILLIS =
+      new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final long SANITY_CHECK_MAXIMUM_MILLIS =
+      new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
 
   static {
     for (TimeUnit timeUnit : TimeUnit.values()) {
@@ -53,5 +60,16 @@ public class TimeUtils {
     } else {
       return TIME_UNIT_MAP.get(timeUnitString.toUpperCase());
     }
+  }
+
+  /**
+   * Given a time value, returns true if the value is between a valid range, false otherwise
+   * The current valid range used is between beginning of 1971 and beginning of 2071.
+   *
+   * @param timeValueInMillis
+   * @return True if time value in valid range, false otherwise.
+   */
+  public static boolean timeValueInValidRange(long timeValueInMillis) {
+    return (SANITY_CHECK_MINIMUM_MILLIS <= timeValueInMillis && timeValueInMillis <= SANITY_CHECK_MAXIMUM_MILLIS);
   }
 }

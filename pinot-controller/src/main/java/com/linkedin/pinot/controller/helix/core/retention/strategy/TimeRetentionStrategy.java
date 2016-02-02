@@ -35,10 +35,6 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
  */
 public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
-
-  private static final long SANITY_CHECK_MINIMUM_MILLIS = new DateTime(1971, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
-  private static final long SANITY_CHECK_MAXIMUM_MILLIS = new DateTime(2071, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
-
   private Duration _retentionDuration;
 
   public TimeRetentionStrategy(String timeUnit, String timeValue) {
@@ -73,7 +69,7 @@ public class TimeRetentionStrategy implements RetentionStrategy {
       long endsMills = segmentTimeUnit.toMillis(segmentZKMetadata.getEndTime());
 
       // Check that the date in the segment is between 1971 and 2071, as a sanity check for misconfigured time units.
-      if (endsMills < SANITY_CHECK_MINIMUM_MILLIS || SANITY_CHECK_MAXIMUM_MILLIS < endsMills) {
+      if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getEndTime())) {
         LOGGER.warn("Skipping purge check for segment {}, timestamp {} {} fails sanity check.",
             segmentZKMetadata.getSegmentName(), segmentZKMetadata.getEndTime(), segmentZKMetadata.getTimeUnit());
         return false;
