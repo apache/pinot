@@ -180,13 +180,15 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
           break;
 
         case METRIC:
-          if (range.get(col) == null) {
+          if (!range.containsKey(col)) {
             range.put(col, new IntRange(1, 1000));
           }
           break;
 
         case TIME:
-          range.put(col, new IntRange(1, 1000));
+          if (!range.containsKey(col)) {
+            range.put(col, new IntRange(1, 1000));
+          }
           TimeFieldSpec tfs = (TimeFieldSpec) fs;
           timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
           break;
