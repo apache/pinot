@@ -45,6 +45,7 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -54,6 +55,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
@@ -129,7 +131,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
       driver.init(config);
       driver.build();
 
-      LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
+      LOGGER.debug("built at : {}", segmentDir.getAbsolutePath());
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
     }
   }
@@ -149,7 +151,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     driver.init(config);
     driver.build();
 
-    LOGGER.info("built at : {}", INDEX_DIR.getAbsolutePath());
+    LOGGER.debug("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
@@ -176,8 +178,9 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
   private IntermediateResultsBlock getIntermediateResultsBlock() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -255,9 +258,9 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     rootPlanNode.showTree("");
     final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
-    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
+    LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
 
     logJsonResult(brokerRequest, resultBlock);
   }
@@ -282,7 +285,7 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
 
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    LOGGER.info("Result: {}", jsonResult);
+    LOGGER.debug("Result: {}", jsonResult);
   }
 
   @Test
@@ -294,9 +297,9 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
-    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalRawDocs());
+    LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 5721);
     Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
 
@@ -315,14 +318,14 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("instanceResponse: {}", instanceResponse);
+    LOGGER.debug("instanceResponse: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -347,14 +350,14 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("instanceResponse: {}", instanceResponse);
+    LOGGER.debug("instanceResponse: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
     assertEmptyBrokerResponse(brokerResponse);
   }
 
@@ -368,11 +371,11 @@ public class AggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValueTest {
     final List<double[]> aggregationResult = getAggregationResult(numSegments);
     final List<String[]> groupByResult = getGroupResult();
     for (int j = 0; j < _numAggregations; ++j) {
-      LOGGER.info("For aggregation function: {}", _aggregationInfos.get(j));
+      LOGGER.debug("For aggregation function: {}", _aggregationInfos.get(j));
       final double[] aggResult = aggregationResult.get(j);
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
-        LOGGER.info("Comparing group: {}", i);
+        LOGGER.debug("Comparing group: {}", i);
         Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(aggResult[i],
             brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i).getDouble("value")));
         if (groupResult.length < 2) {

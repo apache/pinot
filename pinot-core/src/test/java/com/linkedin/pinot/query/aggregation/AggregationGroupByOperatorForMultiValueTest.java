@@ -46,6 +46,7 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -55,6 +56,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MDefaultAggregationFunctionGroupByOperator;
@@ -169,8 +171,10 @@ public class AggregationGroupByOperatorForMultiValueTest {
   public void testAggregationGroupBys() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -188,7 +192,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("AggregationResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("AggregationResult {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
   }
 
@@ -196,8 +200,9 @@ public class AggregationGroupByOperatorForMultiValueTest {
   public void testAggregationGroupBysWithCombine() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -216,13 +221,14 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
+    Operator filterOperator1 = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator1, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -240,12 +246,12 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
   }
 
@@ -253,8 +259,9 @@ public class AggregationGroupByOperatorForMultiValueTest {
   public void testAggregationGroupBysWithDataTableEncodeAndDecode() throws Exception {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -271,13 +278,15 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
+    Operator filterOperator1 = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator1, _indexSegment.getSegmentMetadata().getTotalRawDocs(), 5000);
+
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -294,12 +303,12 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Result {} : {}", i, block1.getAggregationGroupByOperatorResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
+      LOGGER.debug("Combine Result {} : {}", i, block.getAggregationGroupByOperatorResult().get(i));
     }
 
     final DataTable dataTable = block.getAggregationGroupByResultDataTable();
@@ -308,7 +317,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(dataTable);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
+      LOGGER.debug("Decode AggregationResult from DataTable {} : {}", i, results.get(i));
     }
   }
 
@@ -347,7 +356,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
     final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
-    LOGGER.info("Result: {}", jsonResult);
+    LOGGER.debug("Result: {}", jsonResult);
   }
 
   @Test
@@ -395,13 +404,13 @@ public class AggregationGroupByOperatorForMultiValueTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("instanceResponse: {}", instanceResponse);
+    LOGGER.debug("instanceResponse: {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.debug("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     return brokerResponse;
   }
@@ -422,11 +431,11 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final List<double[]> aggregationResult = getAggregationResult(numSegments);
     final List<String[]> groupByResult = getGroupResult();
     for (int j = 0; j < _numAggregations; ++j) {
-      LOGGER.info("For aggregation function: {}", _aggregationInfos.get(j));
+      LOGGER.debug("For aggregation function: {}", _aggregationInfos.get(j));
       final double[] aggResult = aggregationResult.get(j);
       final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
-        LOGGER.info("Comparing group: {}", i);
+        LOGGER.debug("Comparing group: {}", i);
         Assert.assertEquals(0, DoubleComparisonUtil.defaultDoubleCompare(aggResult[i],
             brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i).getDouble("value")));
         if (groupResult.length < 2) {
