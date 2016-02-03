@@ -42,6 +42,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
@@ -72,7 +73,7 @@ public class FilterPlanNode implements PlanNode {
     Operator ret = null;
 
     if (null == filterQueryTree) {
-      return null;
+      return new MatchEntireSegmentOperator(_segment.getSegmentMetadata().getTotalRawDocs());
     }
 
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();

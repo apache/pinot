@@ -40,11 +40,7 @@ public class DocIdSetPlanNode implements PlanNode {
     _maxDocPerAggregation = maxDocPerAggregation;
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    if (_brokerRequest.isSetFilterQuery()) {
-      _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
-    } else {
-      _filterNode = null;
-    }
+    _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
   }
 
   @Override
@@ -52,13 +48,7 @@ public class DocIdSetPlanNode implements PlanNode {
     int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
-      if (_filterNode != null) {
-        _projectOp =
-            new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs,
-                _maxDocPerAggregation);
-      } else {
-        _projectOp = new BReusableFilteredDocIdSetOperator(null, totalRawDocs, _maxDocPerAggregation);
-      }
+      _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerAggregation);
       long end = System.currentTimeMillis();
       LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;

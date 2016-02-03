@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
  */
 public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
-  private final Operator _filterOperators;
+  private final Operator _filterOperator;
   private final int _docSize;
   private BlockDocIdIterator _currentBlockDocIdIterator;
   private Block _currentBlock;
@@ -45,17 +45,17 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   private int _searchableDocIdSize = 0;
   boolean inited = false;
 
-  public BReusableFilteredDocIdSetOperator(Operator filterOperators, int docSize, int maxSizeOfdocIdSet) {
+  public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize, int maxSizeOfdocIdSet) {
     _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
     _docIdArray = new int[_maxSizeOfdocIdSet];
-    _filterOperators = filterOperators;
+    _filterOperator = filterOperator;
     _docSize = docSize;
 
   }
 
   @Override
   public boolean open() {
-    _filterOperators.open();
+    _filterOperator.open();
     return true;
   }
 
@@ -64,24 +64,14 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
     // [PINOT-2420] Handle limit 0 clause safely.
     // For limit 0, _docIdArray will be zero sized
-    if (_currentDoc == Constants.EOF ) {
+    if (_currentDoc == Constants.EOF) {
       return null;
     }
     if (!inited) {
       inited = true;
       _currentDoc = 0;
-      if (_filterOperators == null) {
-        _currentBlock = new MatchEntireSegmentDocIdSetBlock(_docSize);
-        _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
-        return _currentBlock;
-      } else {
-        _currentBlock = _filterOperators.nextBlock();
-      }
+      _currentBlock = _filterOperator.nextBlock();
       _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
-    }
-    if (_filterOperators == null) {
-      _currentBlock = null;
-      return _currentBlock;
     }
     _pos = 0;
     getNextDoc();
@@ -125,9 +115,10 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
     if (_currentDoc == Constants.EOF) {
       return _currentDoc;
     }
-    while ((_currentBlockDocIdIterator == null) || ((_currentDoc = _currentBlockDocIdIterator.next()) == Constants.EOF)) {
-      if (_filterOperators != null) {
-        _currentBlock = _filterOperators.nextBlock();
+    while ((_currentBlockDocIdIterator == null)
+        || ((_currentDoc = _currentBlockDocIdIterator.next()) == Constants.EOF)) {
+      if (_filterOperator != null) {
+        _currentBlock = _filterOperator.nextBlock();
       } else {
         if (_currentDoc == Constants.EOF) {
           _currentBlock = null;
@@ -143,9 +134,7 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
   @Override
   public boolean close() {
-    if(_filterOperators != null){
-      _filterOperators.close();
-    }
+    _filterOperator.close();
     return true;
   }
 
