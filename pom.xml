@@ -90,8 +90,11 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
-    <kafka.version>0.8.2.0</kafka.version>
     <helix.version>0.6.5</helix.version>
+    <!-- jfim: for Kafka 0.9.0.0, use zkclient 0.7 -->
+    <kafka.version>0.8.2.0</kafka.version>
+    <zkclient.version>0.3</zkclient.version>
+    <jackson.version>2.7.0</jackson.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms10G -Xmx10G</argLine>
   </properties>
@@ -236,7 +239,7 @@
       <dependency>
         <groupId>com.101tec</groupId>
         <artifactId>zkclient</artifactId>
-        <version>0.3</version>
+        <version>${zkclient.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.guava</groupId>
@@ -379,6 +382,17 @@
         <groupId>com.ning</groupId>
         <artifactId>async-http-client</artifactId>
         <version>1.9.22</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.yaml</groupId>
+        <artifactId>snakeyaml</artifactId>
+        <version>1.16</version>
       </dependency>
 
       <!-- Transitive dependencies with inconsistent version numbers -->

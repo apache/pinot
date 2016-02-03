@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils;
 
 import java.io.File;
+import java.security.Permission;
 import java.util.Properties;
 
 import kafka.admin.TopicCommand;
@@ -97,7 +98,28 @@ public class KafkaStarterUtils {
   }
 
   public static void createTopic(String kafkaTopic, String zkStr) {
-    TopicCommand
-        .main(new String[] { "--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic", kafkaTopic });
+    // jfim: Use Java security to trap System.exit in Kafka 0.9's TopicCommand
+    System.setSecurityManager(new SecurityManager() {
+      @Override
+      public void checkPermission(Permission perm) {
+        if (perm.getName().startsWith("exitVM")) {
+          throw new SecurityException("System.exit is disabled");
+        }
+      }
+
+      @Override
+      public void checkPermission(Permission perm, Object context) {
+        checkPermission(perm);
+      }
+    });
+
+    try {
+      TopicCommand.main(
+          new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic", kafkaTopic});
+    } catch (SecurityException ex) {
+      // Do nothing, this is caused by our security manager that disables System.exit
+    }
+
+    System.setSecurityManager(null);
   }
 }

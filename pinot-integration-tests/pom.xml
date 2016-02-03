@@ -61,7 +61,6 @@
     <dependency>
       <groupId>com.101tec</groupId>
       <artifactId>zkclient</artifactId>
-      <version>0.3</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
