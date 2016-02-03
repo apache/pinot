@@ -18,12 +18,9 @@ package com.linkedin.pinot.core.startree;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.lang3.tuple.Pair;
-
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.core.data.GenericRow;
+
 
 public interface StarTreeBuilder {
   /**
@@ -54,7 +51,7 @@ public interface StarTreeBuilder {
   /**
    * Returns the root node of the tree (after build).
    */
-  StarTreeIndexNode getTree();
+  StarTree getTree();
 
   /**
    * 
@@ -82,4 +79,8 @@ public interface StarTreeBuilder {
    * Returns the split order 
    */
   List<String> getSplitOrder();
+
+  Map<String, HashBiMap<Object, Integer>> getDictionaryMap();
+
+  HashBiMap<String, Integer> getDimensionNameToIndexMap();
 }

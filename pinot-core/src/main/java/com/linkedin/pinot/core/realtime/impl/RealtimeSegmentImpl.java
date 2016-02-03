@@ -59,6 +59,7 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 
@@ -658,7 +659,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public StarTreeIndexNode getStarTreeRoot() {
+  public StarTree getStarTree() {
     return null;
   }
 }

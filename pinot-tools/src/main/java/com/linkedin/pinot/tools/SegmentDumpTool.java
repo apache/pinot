@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
@@ -108,8 +109,8 @@ public class SegmentDumpTool {
     if (dumpStarTree) {
       System.out.println();
       File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-      StarTreeIndexNode tree = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
-      StarTreeIndexNode.printTree(tree, 0);
+      StarTree tree = StarTree.fromBytes(new FileInputStream(starTreeFile));
+      StarTreeIndexNode.printTree(tree.getRoot(), 0);
     }
   }
 

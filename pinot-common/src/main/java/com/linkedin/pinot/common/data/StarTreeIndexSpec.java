@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 public class StarTreeIndexSpec {
-  private static final Integer DEFAULT_MAX_LEAF_RECORDS = 10000; // TODO: determine a good number via experiment
+  public static final Integer DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
 
   /** The upper bound on the number of leaf records to be scanned for any query */
   private Integer maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;

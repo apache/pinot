@@ -15,25 +15,24 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -50,11 +49,14 @@ import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
+import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import com.linkedin.pinot.core.util.CrcUtils;
 
 
@@ -71,14 +73,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   SegmentPreIndexStatsCollector statsCollector;
   Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   SegmentCreator indexCreator;
+  SegmentIndexCreationInfo segementIndexCreationInfo;
   Schema dataSchema;
-  int totalDocs;
+  int totalDocs = 0;
+  int totalRawDocs = 0;
+  int totalAggDocs = 0;
   File tempIndexDir;
   String segmentName;
   long totalRecordReadTime = 0;
   long totalIndexTime = 0;
   long totalStatsCollectorTime = 0;
-  boolean isStarTree = false;
+  boolean createStarTree = false;
 
   private File starTreeTempDir;
 
@@ -89,7 +94,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
     this.config = config;
-    this.isStarTree = config.isCreateStarTreeIndex();
+    this.createStarTree = config.isCreateStarTreeIndex();
     // Initialize the record reader
     recordReader = reader;
     recordReader.init();
@@ -100,6 +105,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     statsCollector.init();
 
     // Initialize index creation
+    segementIndexCreationInfo = new SegmentIndexCreationInfo();
     indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
 
     // Check if has star tree
@@ -119,7 +125,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   @Override
   public void build() throws Exception {
-    if (isStarTree) {
+    if (createStarTree) {
       buildStarTree();
     } else {
       buildRaw();
@@ -133,7 +139,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (starTreeIndexSpec == null) {
       starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setExcludedDimensions(Lists.newArrayList(dataSchema.getTimeColumnName()));
-      starTreeIndexSpec.setMaxLeafRecords(10000);
+      starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
     }
     List<String> splitOrder = starTreeIndexSpec.getSplitOrder();
     if (splitOrder != null && !splitOrder.isEmpty()) {
@@ -158,6 +164,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       GenericRow row = recordReader.next();
       starTreeBuilder.append(row);
       statsCollector.collectRow(row);
+      totalRawDocs++;
       totalDocs++;
     }
     recordReader.close();
@@ -173,13 +180,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     while (aggregatedRowsIterator.hasNext()) {
       GenericRow genericRow = aggregatedRowsIterator.next();
       statsCollector.collectRow(genericRow);
+      totalAggDocs++;
       totalDocs++;
     }
     buildIndexCreationInfo();
     LOGGER.info("Collected stats for {} documents", totalDocs);
     long statCollectionFinishTime = System.currentTimeMillis();
     // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, indexCreationInfoMap, dataSchema, totalDocs, tempIndexDir);
+    indexCreator.init(config, segementIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
     //iterate over the data again,
     Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
@@ -189,10 +197,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       GenericRow genericRow = allRowsIterator.next();
       indexCreator.indexRow(genericRow);
     }
-    //copy the tree.bin
-    BufferedInputStream src = new BufferedInputStream(new FileInputStream(new File(starTreeTempDir, V1Constants.STAR_TREE_INDEX_FILE)));
-    BufferedOutputStream dest = new BufferedOutputStream(new FileOutputStream(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE)));
-    IOUtils.copyLarge(src, dest);
+
+    serializeTree(starTreeBuilder);
     //post creation
     handlePostCreation();
     long end = System.currentTimeMillis();
@@ -201,12 +207,64 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         end - statCollectionFinishTime);
   }
 
+  private void serializeTree(StarTreeBuilder starTreeBuilder) throws Exception {
+    //star tree was built using its own dictionary, we need to re-map dimension value id
+    Map<String, HashBiMap<Object, Integer>> dictionaryMap = starTreeBuilder.getDictionaryMap();
+    StarTree tree = starTreeBuilder.getTree();
+    HashBiMap<String, Integer> dimensionNameToIndexMap = starTreeBuilder.getDimensionNameToIndexMap();
+    StarTreeIndexNode node = tree.getRoot();
+    updateTree(node, dictionaryMap, dimensionNameToIndexMap);
+    tree.writeTree(new FileOutputStream(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE)));
+  }
+
+  /**
+   * Startree built its only dictionary that is different from the columnar segment dictionary. 
+   * This method updates the tree with new mapping
+   * @param node
+   * @param dictionaryMap
+   * @param dimensionNameToIndexMap
+   */
+  private void updateTree(StarTreeIndexNode node, Map<String, HashBiMap<Object, Integer>> dictionaryMap,
+      HashBiMap<String, Integer> dimensionNameToIndexMap) {
+    //current node needs to update only if its not star
+    if (node.getDimensionName() != StarTreeIndexNode.all()) {
+      String dimName = dimensionNameToIndexMap.inverse().get(node.getDimensionName());
+      int dimensionValue = node.getDimensionValue();
+      if (dimensionValue != StarTreeIndexNode.all()) {
+        int mappedDimValue =
+            Arrays.binarySearch((Object[]) indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray(),
+                dictionaryMap.get(dimName).inverse().get(dimensionValue));
+        node.setDimensionValue(mappedDimValue);
+      }
+    }
+    //update children map
+    Map<Integer, StarTreeIndexNode> children = node.getChildren();
+    Map<Integer, StarTreeIndexNode> newChildren = new HashMap<>();
+    if (children != null && !children.isEmpty()) {
+      String childDimName = dimensionNameToIndexMap.inverse().get(node.getChildDimensionName());
+      Object[] sortedUniqueElementsArray =
+          (Object[]) indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray();
+      for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
+        int childDimValue = entry.getKey();
+        int childMappedDimValue = StarTreeIndexNode.all();
+        if (childDimValue != StarTreeIndexNode.all()) {
+          childMappedDimValue = Arrays.binarySearch(sortedUniqueElementsArray,
+              dictionaryMap.get(childDimName).inverse().get(childDimValue));
+        }
+        newChildren.put(childMappedDimValue, entry.getValue());
+        updateTree(entry.getValue(), dictionaryMap, dimensionNameToIndexMap);
+      }
+      node.setChildren(newChildren);
+    }
+  }
+
   public void buildRaw() throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.info("Start building StatsCollector!");
     totalDocs = 0;
     while (recordReader.hasNext()) {
       totalDocs++;
+      totalRawDocs++;
       long start = System.currentTimeMillis();
       GenericRow row = recordReader.next();
       long stop = System.currentTimeMillis();
@@ -220,7 +278,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Collected stats for {} documents", totalDocs);
 
     // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, indexCreationInfoMap, dataSchema, totalDocs, tempIndexDir);
+    indexCreator.init(config, segementIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
     // Build the index
     recordReader.rewind();
@@ -343,6 +401,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
               statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }
+    segementIndexCreationInfo.setTotalDocs(totalDocs);
+    segementIndexCreationInfo.setTotalRawDocs(totalRawDocs);
+    segementIndexCreationInfo.setTotalAggDocs(totalAggDocs);
+    segementIndexCreationInfo.setStarTreeEnabled(createStarTree);
   }
 
   @Override

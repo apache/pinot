@@ -158,20 +158,6 @@ public class StarTreeIndexNode implements Serializable {
         .toString();
   }
 
-  /**
-   * Returns a Java-serialized StarTree structure of this node and all its sub-trees.
-   */
-  public byte[] toBytes() throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    writeTree(baos);
-    baos.close();
-    return baos.toByteArray();
-  }
-
-  public void writeTree(OutputStream outputStream) throws IOException {
-    ObjectOutputStream oos = new ObjectOutputStream(outputStream);
-    oos.writeObject(this);
-  }
 
   /**
    * Returns the dimension IDs, in order of tree level, to this node.
@@ -216,15 +202,6 @@ public class StarTreeIndexNode implements Serializable {
     return getMatchingNode(child, dimensions);
   }
 
-  /**
-   * De-serializes a StarTree structure generated with {@link #toBytes}.
-   */
-  public static StarTreeIndexNode fromBytes(InputStream inputStream) throws IOException, ClassNotFoundException {
-    ObjectInputStream ois = new ObjectInputStream(inputStream);
-    StarTreeIndexNode node = (StarTreeIndexNode) ois.readObject();
-    return node;
-  }
-
   public static int all() {
     return ALL;
   }
@@ -257,7 +234,6 @@ public class StarTreeIndexNode implements Serializable {
       }
     }
   }
-
   public static Object getAllValue(FieldSpec spec) {
     Object allValue;
     switch (spec.getDataType()) {

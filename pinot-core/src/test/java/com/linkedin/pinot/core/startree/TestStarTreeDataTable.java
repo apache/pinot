@@ -23,12 +23,15 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Random;
 
+import org.testng.annotations.Test;
+
 
 public class TestStarTreeDataTable {
-
+  @Test
   public void testSort() throws Exception {
     Random r = new Random();
     int ROWS = 10;
@@ -50,7 +53,13 @@ public class TestStarTreeDataTable {
     print(data);
     System.out.println("BEFORE SORTING: " + tempFile.length());
     int[][] input = read(tempFile, ROWS, COLS);
-    StarTreeDataTable sorter = new StarTreeDataTable(tempFile, COLS * (Integer.SIZE / 8), 0);
+
+    int[] sortOrder = new int[COLS];
+    for (int i = 0; i < COLS; i++) {
+      sortOrder[i] = i;
+    }
+    
+    StarTreeDataTable sorter = new StarTreeDataTable(tempFile, COLS * (Integer.SIZE / 8), 0, sortOrder);
     sorter.sort(0, ROWS);
     System.out.println("AFTER SORTING");
     int[][] output = read(tempFile, ROWS, COLS);

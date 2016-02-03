@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,18 +71,13 @@ public class Loaders {
       }
 
       // The star tree index (if available)
-      StarTreeIndexNode starTreeRoot = null;
+      StarTree starTree = null;
       if (metadata.hasStarTree()) {
         File starTreeFile = new File(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
         LOGGER.debug("Loading star tree index file {}", starTreeFile);
-        starTreeRoot = StarTreeIndexNode.fromBytes(new FileInputStream(starTreeFile));
+        starTree = StarTree.fromBytes(new FileInputStream(starTreeFile));
       }
-      return new IndexSegmentImpl(indexDir, metadata, indexContainerMap, starTreeRoot);
+      return new IndexSegmentImpl(indexDir, metadata, indexContainerMap, starTree);
     }
-  }
-  public static void main(String[] args) throws Exception {
-    File indexDir = new File("/home/kgopalak/pinot_perf/index_dir/scinPricing_OFFLINE/scinPricing_pricing_0");
-    ReadMode mode = ReadMode.heap;
-    Loaders.IndexSegment.load(indexDir, mode);
   }
 }

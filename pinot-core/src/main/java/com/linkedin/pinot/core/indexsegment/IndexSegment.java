@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.indexsegment;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 
@@ -66,5 +67,5 @@ public interface IndexSegment {
   public void destroy();
 
   /** Returns the StarTree index structure, or null if it does not exist */
-  StarTreeIndexNode getStarTreeRoot();
+  StarTree getStarTree();
 }

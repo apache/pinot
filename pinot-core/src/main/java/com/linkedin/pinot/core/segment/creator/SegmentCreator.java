@@ -43,8 +43,8 @@ public interface SegmentCreator {
    * @param outDir
    * @throws Exception
    */
-  void init(SegmentGeneratorConfig segmentCreationSpec, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema,
-      int totalDocs, File outDir) throws Exception;
+  void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir) throws Exception;
 
   /**
    * Adds a row to the index.

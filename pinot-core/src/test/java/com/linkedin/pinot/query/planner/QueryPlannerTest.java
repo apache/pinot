@@ -20,6 +20,7 @@ import static org.testng.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -90,7 +91,7 @@ public class QueryPlannerTest {
         }
 
         @Override
-        public StarTreeIndexNode getStarTreeRoot() {
+        public StarTree getStarTree() {
           return null;
         }
       });

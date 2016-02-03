@@ -107,6 +107,7 @@ public class V1Constants {
       public static final String TIME_INTERVAL = "segment.time.interval";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
+      public static final String SEGMENT_TOTAL_RAW_DOCS = "segment.total.raw.docs";
       public static final String SEGMENT_TOTAL_AGGREGATE_DOCS = "segment.total.aggregate.docs";
       public static final String SEGMENT_CRC = "segment.crc";
       public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
@@ -121,6 +122,8 @@ public class V1Constants {
     public static class Column {
       public static final String CARDINALITY = "cardinality";
       public static final String TOTAL_DOCS = "totalDocs";
+      public static final String TOTAL_RAW_DOCS = "totalRawDocs";
+      public static final String TOTAL_AGG_DOCS = "totalAggDocs";
       public static final String DATA_TYPE = "dataType";
       public static final String BITS_PER_ELEMENT = "bitsPerElement";
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";
