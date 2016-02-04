@@ -21,14 +21,14 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import org.apache.commons.lang.StringUtils;
-
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -196,14 +196,21 @@ public class SegmentGeneratorConfig {
     return recordReaderConfig;
   }
 
+  /**
+   * Returns a comma separated list of qualifying dimension name strings
+   * @param type FieldType to filter on
+   * @return
+   */
   private String getQualifyingDimensions(FieldType type) {
-    String dims = "";
+    List<String> dimensions = new ArrayList<>();
+
     for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
       if (spec.getFieldType() == type) {
-        dims += spec.getName() + ",";
+        dimensions.add(spec.getName());
       }
     }
-    return StringUtils.chomp(dims, ",");
+    Collections.sort(dimensions);
+    return StringUtils.join(dimensions, ",");
   }
 
   public void setIndexOutputDir(String dir) {
