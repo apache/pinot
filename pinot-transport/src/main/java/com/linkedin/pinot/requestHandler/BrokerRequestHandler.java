@@ -76,6 +76,7 @@ public class BrokerRequestHandler {
   private final BrokerMetrics _brokerMetrics;
   private final TimeBoundaryService _timeBoundaryService;
   private final long _brokerTimeOutMs;
+  private final BrokerRequestOptimizer _optimizer;
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
@@ -89,6 +90,7 @@ public class BrokerRequestHandler {
     _reduceService = reduceService;
     _brokerMetrics = brokerMetrics;
     _brokerTimeOutMs = brokerTimeOutMs;
+    _optimizer = new BrokerRequestOptimizer();
   }
 
   /**
@@ -152,7 +154,7 @@ public class BrokerRequestHandler {
       BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats,
       final long requestId) throws InterruptedException {
     request.getQuerySource().setTableName(matchedTableName);
-    return getDataTableFromBrokerRequest(request, null, scatterGatherStats, requestId);
+    return getDataTableFromBrokerRequest(_optimizer.optimize(request), null, scatterGatherStats, requestId);
   }
 
   private Object processFederatedBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection,
@@ -175,7 +177,7 @@ public class BrokerRequestHandler {
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName);
     offlineRequest.getQuerySource().setTableName(offlineTableName);
     attachTimeBoundary(hybridTableName, offlineRequest, true);
-    return offlineRequest;
+    return _optimizer.optimize(offlineRequest);
   }
 
   private BrokerRequest getRealtimeBrokerRequest(BrokerRequest request) {
@@ -184,7 +186,7 @@ public class BrokerRequestHandler {
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridTableName);
     realtimeRequest.getQuerySource().setTableName(realtimeTableName);
     attachTimeBoundary(hybridTableName, realtimeRequest, false);
-    return realtimeRequest;
+    return _optimizer.optimize(realtimeRequest);
   }
 
   private void attachTimeBoundary(String hybridTableName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
