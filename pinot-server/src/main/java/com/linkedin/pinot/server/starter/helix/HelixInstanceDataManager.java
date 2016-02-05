@@ -149,7 +149,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
-    LOGGER.info("Trying to add segment with name: " + segmentMetadata.getName());
+    LOGGER.info("Trying to add segment {} of table {}",segmentMetadata.getName(), segmentMetadata.getTableName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     String tableName = segmentMetadata.getTableName();
     if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
@@ -166,7 +166,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
     _tableDataManagerMap.get(tableName).addSegment(segmentMetadata);
-    LOGGER.info("Successfully added a segment : " + segmentMetadata.getName() + " in HelixInstanceDataManager");
+    LOGGER.info("Successfully added a segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
   }
 
   // Called for real-time segments only

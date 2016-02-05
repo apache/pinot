@@ -80,7 +80,7 @@ public class SegmentFetcherAndLoader {
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
 
-    LOGGER.info("Adding or replacing segment {} for table {}", segmentId, tableName, offlineSegmentZKMetadata);
+    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, offlineSegmentZKMetadata);
     try {
       SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
@@ -89,28 +89,30 @@ public class SegmentFetcherAndLoader {
       SegmentMetadata localSegmentMetadata = _dataManager.getSegmentMetadata(tableName, segmentId);
 
       if (localSegmentMetadata == null) {
-        LOGGER.info("Segment {} is not loaded in memory, checking disk", segmentId);
+        LOGGER.info("Segment {} of table {} is not loaded in memory, checking disk", segmentId, tableName);
         final String localSegmentDir = getSegmentLocalDirectory(tableName, segmentId);
         if (new File(localSegmentDir).exists()) {
-          LOGGER.info("Segment {} found on disk, attempting to load it", segmentId);
+          LOGGER.info("Segment {} of table {} found on disk, attempting to load it", segmentId, tableName);
           try {
             localSegmentMetadata = _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
-            LOGGER.info("Found segment {} crc {} on disk", segmentId, localSegmentMetadata.getCrc());
+            LOGGER.info("Found segment {} of table {} with crc {} on disk", segmentId, tableName, localSegmentMetadata.getCrc());
           } catch (Exception e) {
+            // The localSegmentDir should help us get the table name,
             LOGGER.error("Failed to load segment metadata from {}. Deleting it.", localSegmentDir, e);
             FileUtils.deleteQuietly(new File(localSegmentDir));
             localSegmentMetadata = null;
           }
           try {
-            if (!isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck)) {
-              LOGGER.info("Segment metadata same as before, loading {} (crc {}) from disk", segmentId, localSegmentMetadata.getCrc());
+            if (!isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck, segmentId, tableName)) {
+              LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentId,
+                  tableName, localSegmentMetadata.getCrc());
               AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
               _dataManager.addSegment(localSegmentMetadata, tableConfig);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
           } catch (Exception e) {
-            LOGGER.error("Failed to load {} from local, will try to reload it from controller!", segmentId, e);
+            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentId, tableName, e);
             FileUtils.deleteQuietly(new File(localSegmentDir));
             localSegmentMetadata = null;
           }
@@ -126,11 +128,11 @@ public class SegmentFetcherAndLoader {
       // If we get here, then either it is the case that we have the segment loaded in memory (and therefore present
       // in disk) or, we need to load from the server. In the former case, we still need to check if the metadata
       // that we have is different from that in zookeeper.
-      if (isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck)) {
+      if (isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck, segmentId, tableName)) {
         if (localSegmentMetadata == null) {
-          LOGGER .info("Loading new segment {} from controller", segmentId);
+          LOGGER .info("Loading new segment {} of table {} from controller", segmentId, tableName);
         } else {
-          LOGGER.info("Trying to refresh segment {} with new data.", segmentId);
+          LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentId, tableName);
         }
         int retryCount;
         int maxRetryCount = 1;
@@ -146,13 +148,13 @@ public class SegmentFetcherAndLoader {
             final SegmentMetadata segmentMetadata =
                 _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
             _dataManager.addSegment(segmentMetadata, tableConfig);
-            LOGGER.info("Downloaded segment {} crc {} from controller", segmentId, segmentMetadata.getCrc());
+            LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName, segmentMetadata.getCrc());
 
             // Successfully loaded the segment, break out of the retry loop
             break;
           } catch (Exception e) {
             long attemptDurationMillis = System.currentTimeMillis() - attemptStartTime;
-            LOGGER.warn("Caught exception while loading segment " + segmentId + ", attempt "
+            LOGGER.warn("Caught exception while loading segment " + segmentId + "(table " + tableName + "), attempt "
                 + (retryCount + 1) + " of " + maxRetryCount, e);
 
             // Do we need to wait for the next retry attempt?
@@ -165,7 +167,7 @@ public class SegmentFetcherAndLoader {
                   (long) ((_segmentLoadMinRetryDelayMs + attemptDurationMillis) * retryDurationMultiplier);
 
               LOGGER.warn("Waiting for " + TimeUnit.MILLISECONDS.toSeconds(waitTime)
-                  + " seconds to retry");
+                  + " seconds to retry(" + segmentId + " of table " + tableName);
               long waitEndTime = System.currentTimeMillis() + waitTime;
               while (System.currentTimeMillis() < waitEndTime) {
                 try {
@@ -179,29 +181,29 @@ public class SegmentFetcherAndLoader {
         }
         if (_segmentLoadMaxRetryCount <= retryCount) {
           String msg =
-              "Failed to download segment " + segmentId + " after " + retryCount + " retries";
+              "Failed to download segment " + segmentId + " (table " + tableName + " after " + retryCount + " retries";
           LOGGER.error(msg);
           throw new RuntimeException(msg);
         }
       } else {
-        LOGGER.info("Got already loaded segment {} crc {} again, will do nothing.", segmentId, localSegmentMetadata.getCrc());
+        LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentId, tableName, localSegmentMetadata.getCrc());
       }
     } catch (final Exception e) {
-      LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
+      LOGGER.error("Cannot load segment : " + segmentId + " for table " + tableName, e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
     }
   }
 
   private boolean isNewSegmentMetadata(SegmentMetadata segmentMetadataFromServer,
-      SegmentMetadata segmentMetadataForCheck) {
+      SegmentMetadata segmentMetadataForCheck, String segmentName, String tableName) {
     if (segmentMetadataFromServer == null || segmentMetadataForCheck == null) {
-      LOGGER.info("segmentMetadataForCheck = null? {}, segmentMetadataFromServer = null? {}",
-          segmentMetadataForCheck == null, segmentMetadataFromServer == null);
+      LOGGER.info("segmentMetadataForCheck = null? {}, segmentMetadataFromServer = null? {} for {} of table {}",
+          segmentMetadataForCheck == null, segmentMetadataFromServer == null, segmentName, tableName);
       return true;
     }
-    LOGGER.info("segmentMetadataForCheck.crc={},segmentMetadataFromServer.crc={}",
-        segmentMetadataForCheck.getCrc(), segmentMetadataFromServer.getCrc());
+    LOGGER.info("segmentMetadataForCheck.crc={},segmentMetadataFromServer.crc={} for {} of table {}",
+        segmentMetadataForCheck.getCrc(), segmentMetadataFromServer.getCrc(), segmentName, tableName);
     if ((!segmentMetadataFromServer.getCrc().equalsIgnoreCase("null"))
         && (segmentMetadataFromServer.getCrc().equals(segmentMetadataForCheck.getCrc()))) {
       return false;
@@ -224,9 +226,10 @@ public class SegmentFetcherAndLoader {
           final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
           LOGGER.info("Downloaded file from " + uri + " to " + tempFile
               + "; Http GET response content length: " + httpGetResponseContentLength
-              + ", Length of downloaded file : " + tempFile.length());
+              + ", Length of downloaded file : " + tempFile.length() + " for segment " + segmentId + " of table "
+              + tableName);
           LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to "
-              + tempSegmentFile);
+              + tempSegmentFile + " for table " + tableName);
           TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
           FileUtils.deleteQuietly(tempFile);
         } else {
@@ -235,22 +238,22 @@ public class SegmentFetcherAndLoader {
         final File segmentDir = new File(new File(_dataManager.getSegmentDataDirectory(), tableName), segmentId);
         Thread.sleep(1000);
         if (segmentDir.exists()) {
-          LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
+          LOGGER.info("Deleting the directory {} and recreating it again table {} ", segmentDir.getAbsolutePath(), tableName);
           FileUtils.deleteDirectory(segmentDir);
         }
         LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to "
-            + segmentDir.getAbsolutePath() + ". The segment id is - " + segmentId);
+            + segmentDir.getAbsolutePath() + " for " + segmentId + " of table " + tableName);
         FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
         FileUtils.deleteDirectory(tempSegmentFile);
         Thread.sleep(1000);
-        LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
+        LOGGER.info("Was able to succesfully rename the dir to match the segment {} for table {}", segmentId, tableName);
 
         new File(segmentDir, "finishedLoading").createNewFile();
         return segmentDir.getAbsolutePath();
       } catch (Exception e) {
         FileUtils.deleteQuietly(tempSegmentFile);
         FileUtils.deleteQuietly(tempFile);
-        LOGGER.error("Caught exception", e);
+        LOGGER.error("Caught exception downloading segment {} for table {}", segmentId, tableName, e);
         Utils.rethrowException(e);
         throw new AssertionError("Should not reach this");
       }
@@ -260,5 +263,4 @@ public class SegmentFetcherAndLoader {
   public String getSegmentLocalDirectory(String tableName, String segmentId) {
     return _dataManager.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
   }
-
 }
