@@ -18,6 +18,8 @@ package com.linkedin.thirdeye.bootstrap.segment.create;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_STARTREE_CONFIG;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,16 +36,21 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 
 public class SegmentCreationPhaseMapReduceJob {
 
   public static class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
     private static Logger LOGGER = LoggerFactory.getLogger(SegmentCreationPhaseMapReduceJob.class);
+    private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private Configuration properties;
 
     private String inputFilePath;
@@ -58,6 +65,9 @@ public class SegmentCreationPhaseMapReduceJob {
 
     private String localDiskSegmentDirectory;
     private String localDiskSegmentTarPath;
+
+    private StarTreeConfig starTreeConfig;
+    private Schema schema;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -83,6 +93,9 @@ public class SegmentCreationPhaseMapReduceJob {
 
       outputPath = properties.get(SEGMENT_CREATION_OUTPUT_PATH.toString());
       tableName = properties.get(SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString());
+
+      schema = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_DATA_SCHEMA.toString()), Schema.class);
+      starTreeConfig = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_STARTREE_CONFIG.toString()), StarTreeConfig.class);
 
     }
 
@@ -112,7 +125,6 @@ public class SegmentCreationPhaseMapReduceJob {
         throw new RuntimeException("Input to the mapper is malformed, please contact the pinot team");
       }
       inputFilePath = lineSplits[1].trim();
-      Schema schema = new ObjectMapper().readValue(context.getConfiguration().get("data.schema"), Schema.class);
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("input data file path : {}", inputFilePath);
@@ -151,6 +163,13 @@ public class SegmentCreationPhaseMapReduceJob {
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
       segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       segmentGeneratorConfig.setIndexOutputDir(localDiskSegmentDirectory);
+      segmentGeneratorConfig.setCreateStarTreeIndex(true);
+
+      StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
+      starTreeIndexSpec.setMaxLeafRecords(starTreeConfig.getSplit().getThreshold());
+      starTreeIndexSpec.setSplitOrder(starTreeConfig.getSplit().getOrder());
+      starTreeIndexSpec.setExcludedDimensions(Lists.newArrayList(starTreeConfig.getTime().getColumnName()));
+      segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       ThirdeyeRecordReader thirdeyeRecordReader =
@@ -159,7 +178,14 @@ public class SegmentCreationPhaseMapReduceJob {
       driver.build();
 
       // Tar the segment directory into file.
-      String segmentName = (new File(localDiskSegmentDirectory).listFiles()[0]).getName();
+      String segmentName = null;
+      File localDiskSegmentDirectoryFile = new File(localDiskSegmentDirectory);
+      for (File file : localDiskSegmentDirectoryFile.listFiles()) {
+        segmentName = file.getName();
+        if (segmentName.startsWith(tableName)) {
+          break;
+        }
+      }
       String localSegmentPath = new File(localDiskSegmentDirectory, segmentName).getAbsolutePath();
 
       String localTarPath = localDiskSegmentTarPath + "/" + segmentName + ".tar.gz";

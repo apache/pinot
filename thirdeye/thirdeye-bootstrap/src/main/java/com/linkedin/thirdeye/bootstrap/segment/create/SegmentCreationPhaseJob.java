@@ -20,10 +20,11 @@ import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhas
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_STARTREE_CONFIG;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -46,16 +47,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.bootstrap.util.ThirdeyePinotSchemaUtils;
 
 
 public class SegmentCreationPhaseJob extends Configured {
@@ -91,7 +85,8 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("Schema path : {}", schemaPath);
     String configPath = getAndSetConfiguration(configuration, SEGMENT_CREATION_CONFIG_PATH);
     LOGGER.info("Config path : {}", configPath);
-    Schema dataSchema = createSchema(configPath);
+    StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(new Path(configPath)));
+    Schema dataSchema = ThirdeyePinotSchemaUtils.createSchema(configPath);
     LOGGER.info("Data schema : {}", dataSchema);
     String inputSegmentDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_INPUT_PATH);
     LOGGER.info("Input path : {}", inputSegmentDir);
@@ -151,11 +146,11 @@ public class SegmentCreationPhaseJob extends Configured {
     FileOutputFormat.setOutputPath(job, new Path(stagingDir + "/output/"));
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
-    job.getConfiguration().set("data.schema", OBJECT_MAPPER.writeValueAsString(dataSchema));
+    job.getConfiguration().set(SEGMENT_CREATION_DATA_SCHEMA.toString(), OBJECT_MAPPER.writeValueAsString(dataSchema));
     if (!fs.exists(new Path(schemaPath))) {
       OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(fs.create(new Path(schemaPath), false), dataSchema);
     }
-
+    job.getConfiguration().set(SEGMENT_CREATION_STARTREE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(starTreeConfig));
 
     job.setMaxReduceAttempts(1);
     job.setMaxMapAttempts(0);
@@ -183,38 +178,6 @@ public class SegmentCreationPhaseJob extends Configured {
     return job;
   }
 
-  private Schema createSchema(String configPath) throws IOException {
-    FileSystem fs = FileSystem.get(new Configuration());
-
-    StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(new Path(configPath)));
-    LOGGER.info("{}", starTreeConfig);
-
-    Schema schema = new Schema();
-    for (DimensionSpec dimensionSpec : starTreeConfig.getDimensions()) {
-      FieldSpec spec = new DimensionFieldSpec();
-      spec.setName(dimensionSpec.getName());
-      spec.setDataType(DataType.STRING);
-      spec.setSingleValueField(true);
-      schema.addSchema(dimensionSpec.getName(), spec);
-    }
-    for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
-      FieldSpec spec = new MetricFieldSpec();
-      spec.setName(metricSpec.getName());
-      spec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
-      spec.setSingleValueField(true);
-      schema.addSchema(metricSpec.getName(), spec);
-    }
-    TimeGranularitySpec incoming =
-        new TimeGranularitySpec(DataType.LONG, starTreeConfig.getTime().getBucket().getUnit(), starTreeConfig.getTime().getColumnName());
-    TimeGranularitySpec outgoing =
-        new TimeGranularitySpec(DataType.LONG, starTreeConfig.getTime().getBucket().getUnit(), starTreeConfig.getTime().getColumnName());
-    schema.addSchema(starTreeConfig.getTime().getColumnName(),
-        new TimeFieldSpec(incoming, outgoing));
-
-    schema.setSchemaName(starTreeConfig.getCollection());
-
-    return schema;
-  }
 
 
   private String getAndSetConfiguration(Configuration configuration,

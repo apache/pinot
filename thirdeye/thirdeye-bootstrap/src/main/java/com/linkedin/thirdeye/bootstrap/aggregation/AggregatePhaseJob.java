@@ -236,6 +236,10 @@ public class AggregatePhaseJob extends Configured {
         dimensionStats.record(dimensionNames.get(i), key.getDimensionValues()[i]);
       }
       aggregationStats.record(out);
+
+      int numSplitRecords = out.getTimeWindowSet().size();
+      context.getCounter(AggregationCounter.NUMBER_OF_SPLIT_RECORDS).increment(numSplitRecords);
+
       byte[] serializedBytes = out.toBytes();
       context.write(aggregationKey, new BytesWritable(serializedBytes));
     }
@@ -334,6 +338,8 @@ public class AggregatePhaseJob extends Configured {
     if (counter.getValue() == 0) {
       throw new IllegalStateException("No input records in " + inputPathDir);
     }
+    counter = job.getCounters().findCounter(AggregationCounter.NUMBER_OF_SPLIT_RECORDS);
+    LOGGER.info(counter.getDisplayName() + " : " + counter.getValue());
 
     recordMetricSums(configuration, fs, job);
 
@@ -386,7 +392,8 @@ public class AggregatePhaseJob extends Configured {
   }
 
   public static enum AggregationCounter {
-    NUMBER_OF_RECORDS
+    NUMBER_OF_RECORDS,
+    NUMBER_OF_SPLIT_RECORDS
   }
 
 }
