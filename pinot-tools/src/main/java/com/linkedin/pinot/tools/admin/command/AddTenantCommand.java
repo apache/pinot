@@ -98,10 +98,12 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public boolean execute() throws Exception {
-    if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+    if (_controllerAddress == null) {
+      if (_controllerHost == null) {
+        _controllerHost = NetUtil.getHostAddress();
+      }
+      _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
     }
-    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
 
     if (!_exec) {
       LOGGER.warn("Dry Running Command: " + toString());
