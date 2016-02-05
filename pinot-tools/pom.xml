@@ -218,7 +218,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=quickstart-realtime-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j.configuration=conf/quickstart-realtime-log4j.properties</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
