@@ -147,9 +147,6 @@ public class SegmentCreationPhaseJob extends Configured {
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
     job.getConfiguration().set(SEGMENT_CREATION_DATA_SCHEMA.toString(), OBJECT_MAPPER.writeValueAsString(dataSchema));
-    if (!fs.exists(new Path(schemaPath))) {
-      OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(fs.create(new Path(schemaPath), false), dataSchema);
-    }
     job.getConfiguration().set(SEGMENT_CREATION_STARTREE_CONFIG.toString(), OBJECT_MAPPER.writeValueAsString(starTreeConfig));
 
     job.setMaxReduceAttempts(1);
