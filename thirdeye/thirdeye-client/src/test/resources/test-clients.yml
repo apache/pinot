@@ -1,0 +1,28 @@
+- name: pinotCacheDisabledConfig
+  factoryClassName: com.linkedin.thirdeye.client.factory.PinotThirdEyeClientFactory #abook (pinot/local)
+  cached: false
+  clientArgs: 
+    zkUrl: localhost/PinotCluster
+    controllerHost: localhost
+    controllerPort: 9000
+- name: defaultCacheEnabledConfig
+  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory #abook, default impl
+  clientArgs: 
+    host: localhost
+    port: 10000
+- name: customCacheConfigConfig
+  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory #ads
+  clientArgs: 
+    host: localhost
+    port: 10000
+  cacheConfig: 
+    expireAfterAccess: false
+    expirationTime: 180
+    expirationUnit: MINUTES
+    useCacheForExecuteMethod: false
+- name: cacheEnabledConfig
+  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory #pulitzer
+  cached: true
+  clientArgs: 
+    host: localhost
+    port: 10000

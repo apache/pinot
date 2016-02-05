@@ -32,7 +32,7 @@ import com.linkedin.thirdeye.client.util.SqlUtils;
 
 /**
  * Standard client for querying against ThirdEye server. It is strongly recommended to use
- * {@link CachedThirdEyeClient} or instantiate this class via {@link DefaultThirdEyeClientBuilder}
+ * {@link CachedThirdEyeClient} or instantiate this class via {@link DefaultThirdEyeClientFactory}
  * to improve performance.
  */
 public class DefaultThirdEyeClient implements ThirdEyeClient {
@@ -52,6 +52,7 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     LOG.info("Initializing client for {}:{}", hostname, port);
     this.httpHost = new HttpHost(hostname, port);
     // TODO currently no way to configure the CloseableHttpClient
+    // use pooled manager if more parallelism required.
     this.httpClient = HttpClients.createDefault();
     LOG.info("Created DefaultThirdEyeClient to {}", httpHost);
   }

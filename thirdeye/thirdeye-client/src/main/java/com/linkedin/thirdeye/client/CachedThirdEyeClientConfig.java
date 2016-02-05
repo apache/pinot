@@ -61,6 +61,24 @@ public class CachedThirdEyeClientConfig {
   }
 
   @Override
+  public int hashCode() {
+    return Objects.hashCode(expireAfterAccess, expirationTime, expirationUnit,
+        useCacheForExecuteMethod);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj instanceof CachedThirdEyeClientConfig)) {
+      return false;
+    }
+    CachedThirdEyeClientConfig other = (CachedThirdEyeClientConfig) obj;
+    return Objects.equal(other.expireAfterAccess, this.expireAfterAccess)
+        && Objects.equal(other.expirationTime, this.expirationTime)
+        && Objects.equal(other.expirationUnit, this.expirationUnit)
+        && Objects.equal(other.useCacheForExecuteMethod, this.useCacheForExecuteMethod);
+  }
+
+  @Override
   public String toString() {
     return Objects.toStringHelper(CachedThirdEyeClientConfig.class)
         .add("expireAfterAccess", expireAfterAccess).add("expirationTime", expirationTime)

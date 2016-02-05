@@ -12,32 +12,28 @@ import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 public class DataCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataCache.class);
 
-  private static final String ENCODING = "UTF-8";
+  private final ThirdEyeClient client;
 
-  private final ThirdEyeClientMap clientMap;
-
-  public DataCache(ThirdEyeClientMap clientMap) {
-    this.clientMap = clientMap;
+  public DataCache(ThirdEyeClient clientMap) {
+    this.client = clientMap;
   }
 
-  public CollectionSchema getCollectionSchema(String serverUri, String collection)
-      throws Exception {
-    ThirdEyeClient client = clientMap.get(serverUri);
+  public CollectionSchema getCollectionSchema(String collection) throws Exception {
     return CollectionSchema.fromStarTreeConfig(client.getStarTreeConfig(collection));
+
   }
 
-  public List<String> getCollections(String serverUri) throws Exception {
-    return clientMap.get(serverUri).getCollections();
+  public List<String> getCollections() throws Exception {
+    return client.getCollections();
   }
 
-  public List<SegmentDescriptor> getSegmentDescriptors(String serverUri, String collection)
-      throws Exception {
-    return clientMap.get(serverUri).getSegmentDescriptors(collection);
+  public List<SegmentDescriptor> getSegmentDescriptors(String collection) throws Exception {
+    return client.getSegmentDescriptors(collection);
 
   }
 
   public void clear() throws Exception {
-    clientMap.clear();
+    client.clear();
   }
 
 }

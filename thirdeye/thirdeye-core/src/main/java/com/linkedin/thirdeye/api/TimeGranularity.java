@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TimeGranularity {
   private int size;
@@ -29,5 +30,19 @@ public class TimeGranularity {
   @Override
   public String toString() {
     return size + "-" + unit;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(size, unit);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj instanceof TimeGranularity)) {
+      return false;
+    }
+    TimeGranularity other = (TimeGranularity) obj;
+    return Objects.equals(other.size, this.size) && Objects.equals(other.unit, this.unit);
   }
 }

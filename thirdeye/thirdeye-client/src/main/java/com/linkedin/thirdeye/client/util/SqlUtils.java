@@ -21,7 +21,7 @@ public class SqlUtils {
   private static final Joiner EQUALS = Joiner.on(" = ");
 
   public static String getThirdEyeSql(ThirdEyeRequest request) {
-    String metricFunction = request.getMetricFunction();
+    String metricFunction = request.getMetricFunction().getSqlFunction();
     String collection = request.getCollection();
     DateTime startTime = request.getStartTime();
     DateTime endTime = request.getEndTime();

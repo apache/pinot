@@ -54,13 +54,10 @@ public class ContributorDataProvider {
 
   private static final double MINIMUM_DIMENSION_VALUE_THRESHOLD = 0.01;
 
-  private final String serverUri;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
 
-  public ContributorDataProvider(String serverUri, QueryCache queryCache,
-      ObjectMapper objectMapper) {
-    this.serverUri = serverUri;
+  public ContributorDataProvider(QueryCache queryCache, ObjectMapper objectMapper) {
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
   }
@@ -94,9 +91,8 @@ public class ContributorDataProvider {
     LOGGER.info("Generated request for contributor baseline total: {}", baselineTotalReq);
     LOGGER.info("Generated request for contributor current total: {}", currentTotalReq);
     Future<QueryResult> baselineTotalResultFuture =
-        queryCache.getQueryResultAsync(serverUri, baselineTotalReq);
-    Future<QueryResult> currentTotalResultFuture =
-        queryCache.getQueryResultAsync(serverUri, currentTotalReq);
+        queryCache.getQueryResultAsync(baselineTotalReq);
+    Future<QueryResult> currentTotalResultFuture = queryCache.getQueryResultAsync(currentTotalReq);
 
     Map<String, Future<QueryResult>> baselineResultFutures = new HashMap<>();
     Map<String, Future<QueryResult>> currentResultFutures = new HashMap<>();
@@ -118,10 +114,8 @@ public class ContributorDataProvider {
             currentGroupByReq);
 
         // Query (in parallel)
-        baselineResultFutures.put(dimension,
-            queryCache.getQueryResultAsync(serverUri, baselineGroupByReq));
-        currentResultFutures.put(dimension,
-            queryCache.getQueryResultAsync(serverUri, currentGroupByReq));
+        baselineResultFutures.put(dimension, queryCache.getQueryResultAsync(baselineGroupByReq));
+        currentResultFutures.put(dimension, queryCache.getQueryResultAsync(currentGroupByReq));
 
       } else {
         LOGGER.warn(
@@ -459,7 +453,9 @@ public class ContributorDataProvider {
     }
     Number[] result = new Number[a.length];
     for (int i = 0; i < a.length; i++) {
-      result[i] = a[i].doubleValue() + b[i].doubleValue();
+      double aVal = (a[i] == null ? 0.0 : a[i].doubleValue());
+      double bVal = (b[i] == null ? 0.0 : b[i].doubleValue());
+      result[i] = aVal + bVal;
     }
     return result;
   }

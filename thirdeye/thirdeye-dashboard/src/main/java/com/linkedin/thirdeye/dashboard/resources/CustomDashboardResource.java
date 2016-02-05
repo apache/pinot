@@ -63,16 +63,14 @@ public class CustomDashboardResource {
   private static final TypeReference<List<String>> LIST_REF = new TypeReference<List<String>>() {
   };
   private final File customDashboardRoot;
-  private final String serverUri;
   private final QueryCache queryCache;
   private final DataCache dataCache;
   private final ConfigCache configCache;
   private final ObjectMapper objectMapper;
 
-  public CustomDashboardResource(File customDashboardRoot, String serverUri, QueryCache queryCache,
+  public CustomDashboardResource(File customDashboardRoot, QueryCache queryCache,
       DataCache dataCache, ConfigCache configCache) {
     this.customDashboardRoot = customDashboardRoot;
-    this.serverUri = serverUri;
     this.queryCache = queryCache;
     this.dataCache = dataCache;
     this.configCache = configCache;
@@ -260,10 +258,10 @@ public class CustomDashboardResource {
     ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
         .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
         .setDimensionValues(expandedDimensionValues).setGroupBy(groupBy).build();
-    QueryResult result = queryCache.getQueryResult(serverUri, req);
+    QueryResult result = queryCache.getQueryResult(req);
 
     // Get index of group by so we can extract values for labels
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     int groupByIdx = -1;
     for (int i = 0; i < schema.getDimensions().size(); i++) {
       if (schema.getDimensions().get(i).equals(groupBy)) {
@@ -364,8 +362,8 @@ public class CustomDashboardResource {
     LOG.info("Generated Req: {}", currentReq);
 
     // Query
-    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineReq);
-    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentReq);
+    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(baselineReq);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(currentReq);
 
     // Baseline data
     Map<Long, Number[]> baselineData = extractFunnelData(baselineResult.get());

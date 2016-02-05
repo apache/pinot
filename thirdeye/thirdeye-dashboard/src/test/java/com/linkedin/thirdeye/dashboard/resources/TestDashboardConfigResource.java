@@ -20,7 +20,6 @@ import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 
 public class TestDashboardConfigResource {
-  private static final String SERVER_URI = "ignored";
   private static final String COLLECTION = "ignored";
 
   private DataCache mockDataCache;
@@ -36,11 +35,10 @@ public class TestDashboardConfigResource {
     mockCollectionSchema = mock(CollectionSchema.class);
     mockQueryCache = mock(QueryCache.class);
 
-    when(mockDataCache.getCollectionSchema(SERVER_URI, COLLECTION))
-        .thenReturn(mockCollectionSchema);
+    when(mockDataCache.getCollectionSchema(COLLECTION)).thenReturn(mockCollectionSchema);
 
     testDashboardConfigResource =
-        new DashboardConfigResource(SERVER_URI, mockDataCache, mockQueryCache, objectMapper);
+        new DashboardConfigResource(mockDataCache, mockQueryCache, null, null, objectMapper);
   }
 
   @Test

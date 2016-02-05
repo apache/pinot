@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.dashboard;
 
-import io.dropwizard.Configuration;
-import io.dropwizard.client.HttpClientConfiguration;
-
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
@@ -14,11 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.api.AnomalyDatabaseConfig;
 import com.linkedin.thirdeye.dashboard.resources.CustomDashboardResource;
 
+import io.dropwizard.Configuration;
+import io.dropwizard.client.HttpClientConfiguration;
+
 public class ThirdEyeDashboardConfiguration extends Configuration {
   private static final Logger LOG = LoggerFactory.getLogger(CustomDashboardResource.class);
 
   @NotNull
-  private String serverUri; // TODO: Support talking to multiple servers
+  private String clientConfigRoot; // directory where all client configs are defined.
 
   private String feedbackEmailAddress;
 
@@ -39,16 +39,8 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
     return httpClient;
   }
 
-  public String getServerUri() {
-    return serverUri;
-  }
-
   public String getFeedbackEmailAddress() {
     return feedbackEmailAddress;
-  }
-
-  public void setServerUri(String serverUri) {
-    this.serverUri = serverUri;
   }
 
   public String getCustomDashboardRoot() {
@@ -83,6 +75,15 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
     this.funnelConfigRoot = funnelConfigRoot;
   }
 
+  public String getClientConfigRoot() {
+    return clientConfigRoot;
+  }
+
+  public void setClientConfigRoot(String clientConfigRoot) {
+    this.clientConfigRoot = clientConfigRoot;
+  }
+
+  @Override
   public String toString() {
     String ret = null;
     try {

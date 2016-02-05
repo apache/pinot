@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.client;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,12 +43,18 @@ public class ThirdEyeRawResponse {
     this.dimensions = dimensions;
   }
 
-  /** Key should be dimension key followed by timestamp. */
+  /**
+   * Key should be dimension key (JSON Array of dimension values) followed by timestamp (millis
+   * since epoch).
+   */
   public Map<String, Map<String, Number[]>> getData() {
     return data;
   }
 
-  /** Key should be dimension key followed by timestamp. */
+  /**
+   * Key should be dimension key (JSON Array of dimension values) followed by timestamp (millis
+   * since epoch).
+   */
   public void setData(Map<String, Map<String, Number[]>> data) {
     this.data = data;
   }
@@ -92,5 +100,40 @@ public class ThirdEyeRawResponse {
     }
 
     return converted;
+  }
+
+  /**
+   * Merges data of each response, assuming each response contains the same metrics and dimensions.
+   * Data for any conflicting time ranges is undefined.
+   */
+  public static ThirdEyeRawResponse merge(ThirdEyeRawResponse... responses) {
+    return merge(responses[0], Arrays.copyOfRange(responses, 1, responses.length));
+  }
+
+  /**
+   * Merges data of each response, assuming each response contains the same metrics and dimensions.
+   * Data for any conflicting time ranges is undefined.
+   */
+  public static ThirdEyeRawResponse merge(ThirdEyeRawResponse first,
+      ThirdEyeRawResponse... others) {
+    Map<String, Map<String, Number[]>> mergedData = new HashMap<>(first.getData());
+    for (ThirdEyeRawResponse next : others) {
+      for (Entry<String, Map<String, Number[]>> entry : next.getData().entrySet()) {
+        String key = entry.getKey();
+        Map<String, Number[]> value = entry.getValue();
+        if (mergedData.containsKey(key)) {
+          // merge results
+          mergedData.get(key).putAll(value);
+        } else {
+          mergedData.put(key, value);
+        }
+      }
+    }
+
+    ThirdEyeRawResponse resp = new ThirdEyeRawResponse();
+    resp.setMetrics(first.getMetrics());
+    resp.setDimensions(first.getDimensions());
+    resp.setData(mergedData);
+    return resp;
   }
 }

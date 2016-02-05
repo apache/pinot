@@ -12,9 +12,11 @@ import java.util.Set;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
  * Request object containing all information for a {@link ThirdEyeClient} to retrieve data. Request
@@ -24,7 +26,7 @@ public class ThirdEyeRequest {
   public static final String GROUP_BY_VALUE = "!";
 
   private final String collection;
-  private final String metricFunction;
+  private final ThirdEyeMetricFunction metricFunction;
   private final DateTime startTime;
   private final DateTime endTime;
   private final Multimap<String, String> dimensionValues;
@@ -51,8 +53,23 @@ public class ThirdEyeRequest {
     return collection;
   }
 
-  public String getMetricFunction() {
+  public ThirdEyeMetricFunction getMetricFunction() {
     return metricFunction;
+  }
+
+  @JsonIgnore
+  public List<String> getMetricNames() {
+    return metricFunction.getMetricNames();
+  }
+
+  @JsonIgnore
+  public List<String> getRawMetricNames() {
+    return metricFunction.getRawMetricNames();
+  }
+
+  @JsonIgnore
+  public TimeGranularity getTimeGranularity() {
+    return metricFunction.getTimeGranularity();
   }
 
   public DateTime getStartTime() {
@@ -100,7 +117,7 @@ public class ThirdEyeRequest {
 
   public static class ThirdEyeRequestBuilder {
     private String collection;
-    private String metricFunction;
+    private ThirdEyeMetricFunction metricFunction;
     private DateTime startTime;
     private DateTime endTime;
     private final Multimap<String, String> dimensionValues;
@@ -126,6 +143,10 @@ public class ThirdEyeRequest {
     }
 
     public ThirdEyeRequestBuilder setMetricFunction(String metricFunction) {
+      return setMetricFunction(ThirdEyeMetricFunction.fromStr(metricFunction));
+    }
+
+    public ThirdEyeRequestBuilder setMetricFunction(ThirdEyeMetricFunction metricFunction) {
       this.metricFunction = metricFunction;
       return this;
     }
@@ -219,6 +240,5 @@ public class ThirdEyeRequest {
       }
       return new ThirdEyeRequest(this);
     }
-
   }
 }

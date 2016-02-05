@@ -38,7 +38,6 @@ import com.linkedin.thirdeye.dashboard.util.UriUtils;
 public class FlotTimeSeriesResource {
   private static final String BASELINE_LABEL_PREFIX = "BASELINE_";
   private static final String ANOMALY_LABEL_PREFIX = "ANOMALY_";
-  private final String serverUri;
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
@@ -46,9 +45,8 @@ public class FlotTimeSeriesResource {
   private final AnomalyDatabaseConfig anomalyDatabase;
   private final boolean displayAnomalies;
 
-  public FlotTimeSeriesResource(String serverUri, DataCache dataCache, QueryCache queryCache,
+  public FlotTimeSeriesResource(DataCache dataCache, QueryCache queryCache,
       ObjectMapper objectMapper, ConfigCache configCache, AnomalyDatabaseConfig anomalyDatabase) {
-    this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
@@ -72,14 +70,14 @@ public class FlotTimeSeriesResource {
     if (dimensionGroupSpec != null) {
       reverseDimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     Multimap<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo);
     Multimap<String, String> expandedDimensionValues =
         ThirdEyeRequestUtils.expandDimensionGroups(dimensionValues, reverseDimensionGroups);
     ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
         .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
         .setDimensionValues(expandedDimensionValues).build();
-    QueryResult queryResult = queryCache.getQueryResult(serverUri, req).checkEmpty();
+    QueryResult queryResult = queryCache.getQueryResult(req).checkEmpty();
 
     List<FlotTimeSeries> allSeries =
         FlotTimeSeries.fromQueryResult(schema, objectMapper, queryResult);
@@ -104,7 +102,7 @@ public class FlotTimeSeriesResource {
     DateTime currentRangeStart = new DateTime(currentMillis - windowMillis);
     DateTime currentRangeEnd = new DateTime(currentMillis);
     Multimap<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo);
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
 
     // Dimension groups
     Map<String, Multimap<String, String>> reverseDimensionGroups = null;
@@ -124,9 +122,8 @@ public class FlotTimeSeriesResource {
         .setEndTime(currentRangeEnd).setDimensionValues(expandedDimensionValues).build();
 
     // Query (async)
-    Future<QueryResult> baselineResult =
-        queryCache.getQueryResultAsync(serverUri, baselineSeriesReq);
-    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentSeriesReq);
+    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(baselineSeriesReq);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(currentSeriesReq);
 
     // Query for anomalies
     List<AnomalyTableRow> anomalies = null;

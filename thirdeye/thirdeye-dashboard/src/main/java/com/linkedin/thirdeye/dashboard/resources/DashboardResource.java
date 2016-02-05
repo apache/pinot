@@ -61,7 +61,6 @@ public class DashboardResource {
 
   private static final Joiner PATH_JOINER = Joiner.on("/");
 
-  private final String serverUri;
   private final String feedbackEmailAddress;
   private final DataCache dataCache;
   private final QueryCache queryCache;
@@ -73,12 +72,11 @@ public class DashboardResource {
 
   private final ConfigCache configCache;
 
-  public DashboardResource(String serverUri, DataCache dataCache, String feedbackEmailAddress,
-      QueryCache queryCache, ObjectMapper objectMapper,
-      CustomDashboardResource customDashboardResource, ConfigCache configCache,
-      FunnelsDataProvider funnelResource, ContributorDataProvider contributorResource,
+  public DashboardResource(DataCache dataCache, String feedbackEmailAddress, QueryCache queryCache,
+      ObjectMapper objectMapper, CustomDashboardResource customDashboardResource,
+      ConfigCache configCache, FunnelsDataProvider funnelResource,
+      ContributorDataProvider contributorResource,
       DashboardConfigResource dashboardConfigResource) {
-    this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
@@ -98,9 +96,9 @@ public class DashboardResource {
   @GET
   @Path("/dashboard")
   public Response getLanding() throws Exception {
-    List<String> collections = dataCache.getCollections(serverUri);
-    if (collections.isEmpty()) {
-      throw new NotFoundException("No collections loaded into " + serverUri);
+    List<String> collections = dataCache.getCollections();
+    if (collections == null || collections.isEmpty()) {
+      throw new NotFoundException("No collections loaded!");
     }
     return Response.seeOther(URI.create("/dashboard/" + collections.get(0))).build();
   }
@@ -124,10 +122,10 @@ public class DashboardResource {
   @Path("/dashboard/{collection}")
   public Response getDashboardCollectionStart(@PathParam("collection") String collection)
       throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
 
     // Get segment metadata
-    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
+    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(collection);
     if (segments.isEmpty()) {
       throw new NotFoundException("No data loaded in server for " + collection);
     }
@@ -190,7 +188,7 @@ public class DashboardResource {
           throws Exception {
     // TODO check if this is being used outside of dashboard (not used on main page)
     // Get segment metadata
-    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
+    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(collection);
     if (segments.isEmpty()) {
       throw new NotFoundException("No data loaded in server for " + collection);
     }
@@ -240,7 +238,7 @@ public class DashboardResource {
     }
 
     // Get segment metadata
-    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
+    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(collection);
     if (segments.isEmpty()) {
       throw new NotFoundException("No data loaded in server for " + collection);
     }
@@ -315,7 +313,7 @@ public class DashboardResource {
       DimensionViewType dimensionViewType, Long baselineMillis, Long currentMillis,
       Multimap<String, String> selectedDimensions, String funnels, UriInfo uriInfo)
           throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
     LOGGER.info("Request uri: {}", uriInfo.getRequestUri());
@@ -350,7 +348,7 @@ public class DashboardResource {
           LOGGER.info("Generated request for heat map: {}", req);
 
           // Query (in parallel)
-          resultActualFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, req));
+          resultActualFutures.put(dimension, queryCache.getQueryResultAsync(req));
         }
       }
 

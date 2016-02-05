@@ -67,15 +67,13 @@ public class FunnelsDataProvider {
   private static final TypeReference<List<String>> LIST_REF = new TypeReference<List<String>>() {
   };
   private final File funnelsRoot;
-  private final String serverUri;
   private final QueryCache queryCache;
   private final DataCache dataCache;
   private final Map<String, CustomFunnelSpec> funnelSpecsMap;
 
-  public FunnelsDataProvider(File funnelsRoot, String serverUri, QueryCache queryCache,
-      DataCache dataCache) throws Exception {
+  public FunnelsDataProvider(File funnelsRoot, QueryCache queryCache, DataCache dataCache)
+      throws Exception {
     this.funnelsRoot = funnelsRoot;
-    this.serverUri = serverUri;
     this.queryCache = queryCache;
     this.dataCache = dataCache;
     this.funnelSpecsMap = new HashMap<String, CustomFunnelSpec>();
@@ -246,8 +244,8 @@ public class FunnelsDataProvider {
     LOG.info("Generated request for funnel current: {}", currentReq);
 
     // Query
-    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineReq);
-    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentReq);
+    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(baselineReq);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(currentReq);
 
     // Baseline data
     Map<Long, Number[]> baselineData =
@@ -387,7 +385,7 @@ public class FunnelsDataProvider {
   private List<String> getCollections() throws Exception {
     List<String> collections;
     try {
-      collections = dataCache.getCollections(serverUri);
+      collections = dataCache.getCollections();
     } catch (Exception e) {
       LOG.error("Unable to retrieve collections", e);
       collections = Collections.emptyList();
@@ -399,7 +397,7 @@ public class FunnelsDataProvider {
   private CollectionSchema getCollectionSchema(String collection) throws Exception {
     CollectionSchema result;
     try {
-      result = dataCache.getCollectionSchema(serverUri, collection);
+      result = dataCache.getCollectionSchema(collection);
     } catch (Exception e) {
       LOG.error("Unable to retrieve collection schema", e);
       result = null;

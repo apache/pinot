@@ -14,11 +14,9 @@ import com.linkedin.thirdeye.dashboard.util.DataCache;
 @Path("/metadata")
 @Produces(MediaType.APPLICATION_JSON)
 public class MetadataResource {
-  private final String serverUri;
   private final DataCache dataCache;
 
-  public MetadataResource(String serverUri, DataCache dataCache) {
-    this.serverUri = serverUri;
+  public MetadataResource(DataCache dataCache) {
     this.dataCache = dataCache;
   }
 
@@ -26,6 +24,6 @@ public class MetadataResource {
   @Path("/{collection}/segments")
   public List<SegmentDescriptor> getSegments(@PathParam("collection") String collection)
       throws Exception {
-    return dataCache.getSegmentDescriptors(serverUri, collection);
+    return dataCache.getSegmentDescriptors(collection);
   }
 }

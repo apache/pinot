@@ -1,13 +1,15 @@
 package com.linkedin.thirdeye.api;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryDefaultImpl;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Properties;
 
 public final class StarTreeConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -78,6 +80,15 @@ public final class StarTreeConfig {
     return dimensions;
   }
 
+  @JsonIgnore
+  public List<String> getDimensionNames() {
+    List<String> results = new ArrayList<>(dimensions.size());
+    for (DimensionSpec dimensionSpec : dimensions) {
+      results.add(dimensionSpec.getName());
+    }
+    return results;
+  }
+
   public String getAnomalyDetectionFunctionClass() {
     return anomalyDetectionFunctionClass;
   }
@@ -100,6 +111,15 @@ public final class StarTreeConfig {
 
   public List<MetricSpec> getMetrics() {
     return metrics;
+  }
+
+  @JsonIgnore
+  public List<String> getMetricNames() {
+    List<String> results = new ArrayList<>(metrics.size());
+    for (MetricSpec metricSpec : metrics) {
+      results.add(metricSpec.getName());
+    }
+    return results;
   }
 
   public TimeSpec getTime() {

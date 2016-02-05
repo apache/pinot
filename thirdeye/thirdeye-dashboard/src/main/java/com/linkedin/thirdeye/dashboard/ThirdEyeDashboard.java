@@ -6,7 +6,7 @@ import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
+import com.linkedin.thirdeye.client.CollectionMapThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.resources.CollectionConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.ContributorDataProvider;
 import com.linkedin.thirdeye.dashboard.resources.CustomDashboardResource;
@@ -19,7 +19,6 @@ import com.linkedin.thirdeye.dashboard.task.ClearCachesTask;
 import com.linkedin.thirdeye.dashboard.util.ConfigCache;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
-import com.linkedin.thirdeye.dashboard.util.ThirdEyeClientMap;
 
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
@@ -57,24 +56,26 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
     ExecutorService queryExecutor =
         environment.lifecycle().executorService("query_executor").build();
 
-    ConfigCache configCache = new ConfigCache();
-    ThirdEyeClientMap thirdEyeClientMap = new ThirdEyeClientMap(new DefaultThirdEyeClientFactory());
-    DataCache dataCache = new DataCache(thirdEyeClientMap);
-    QueryCache queryCache = new QueryCache(thirdEyeClientMap, queryExecutor);
+    String clientConfigFilePath = config.getClientConfigRoot();
+    CollectionMapThirdEyeClient clientMap =
+        CollectionMapThirdEyeClient.fromFolder(clientConfigFilePath);
+    DataCache dataCache = new DataCache(clientMap);
+    QueryCache queryCache = new QueryCache(clientMap, queryExecutor);
 
+    ConfigCache configCache = new ConfigCache();
     CustomDashboardResource customDashboardResource = null;
     if (config.getCustomDashboardRoot() != null) {
       File customDashboardDir = new File(config.getCustomDashboardRoot());
       configCache.setCustomDashboardRoot(customDashboardDir);
-      customDashboardResource = new CustomDashboardResource(customDashboardDir,
-          config.getServerUri(), queryCache, dataCache, configCache);
+      customDashboardResource =
+          new CustomDashboardResource(customDashboardDir, queryCache, dataCache, configCache);
       environment.jersey().register(customDashboardResource);
     }
 
     FunnelsDataProvider funnelsResource = null;
     if (config.getFunnelConfigRoot() != null) {
-      funnelsResource = new FunnelsDataProvider(new File(config.getFunnelConfigRoot()),
-          config.getServerUri(), queryCache, dataCache);
+      funnelsResource =
+          new FunnelsDataProvider(new File(config.getFunnelConfigRoot()), queryCache, dataCache);
       environment.jersey().register(funnelsResource);
     }
 
@@ -86,24 +87,23 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
       environment.jersey().register(collectionConfigResource);
     }
 
-    DashboardConfigResource dashboardConfigResource = new DashboardConfigResource(
-        config.getServerUri(), dataCache, queryCache, environment.getObjectMapper());
+    DashboardConfigResource dashboardConfigResource = new DashboardConfigResource(dataCache,
+        queryCache, clientMap, clientConfigFilePath, environment.getObjectMapper());
     environment.jersey().register(dashboardConfigResource);
 
-    ContributorDataProvider contributorResource = new ContributorDataProvider(config.getServerUri(),
-        queryCache, environment.getObjectMapper());
+    ContributorDataProvider contributorResource =
+        new ContributorDataProvider(queryCache, environment.getObjectMapper());
     environment.jersey().register(contributorResource);
 
     environment.jersey()
-        .register(new DashboardResource(config.getServerUri(), dataCache,
-            config.getFeedbackEmailAddress(), queryCache, environment.getObjectMapper(),
-            customDashboardResource, configCache, funnelsResource, contributorResource,
-            dashboardConfigResource));
+        .register(new DashboardResource(dataCache, config.getFeedbackEmailAddress(), queryCache,
+            environment.getObjectMapper(), customDashboardResource, configCache, funnelsResource,
+            contributorResource, dashboardConfigResource));
 
-    environment.jersey().register(new FlotTimeSeriesResource(config.getServerUri(), dataCache,
-        queryCache, environment.getObjectMapper(), configCache, config.getAnomalyDatabaseConfig()));
+    environment.jersey().register(new FlotTimeSeriesResource(dataCache, queryCache,
+        environment.getObjectMapper(), configCache, config.getAnomalyDatabaseConfig()));
 
-    environment.jersey().register(new MetadataResource(config.getServerUri(), dataCache));
+    environment.jersey().register(new MetadataResource(dataCache));
 
     environment.admin().addTask(new ClearCachesTask(dataCache, queryCache, configCache));
   }

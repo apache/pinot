@@ -30,7 +30,6 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
   private static final int DEFAULT_CACHE_DURATION = 5;
 
   private static final Logger LOG = LoggerFactory.getLogger(CachedThirdEyeClient.class);
-
   private final ThirdEyeClient client;
   private final CachedThirdEyeClientConfig config;
 
@@ -199,6 +198,11 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
       return client.getSegmentDescriptors(collection);
     }
 
+  }
+
+  @Override
+  public String toString() {
+    return String.format("Cached client(%s): %s", client, config);
   }
 
 }

@@ -16,12 +16,14 @@ import java.util.concurrent.Future;
 
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -35,8 +37,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.CollectionMapThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.util.ThirdEyeClientConfig;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
@@ -60,16 +64,19 @@ public class DashboardConfigResource {
       };
   private static final Joiner METRIC_FUNCTION_JOINER = Joiner.on(",");
 
-  private final String serverUri;
   private final DataCache dataCache;
   private final QueryCache queryCache;
   private final ObjectMapper objectMapper;
+  private final CollectionMapThirdEyeClient clientMap;
+  private final String clientConfigFolder;
 
-  public DashboardConfigResource(String serverUri, DataCache dataCache, QueryCache queryCache,
+  public DashboardConfigResource(DataCache dataCache, QueryCache queryCache,
+      CollectionMapThirdEyeClient clientMap, String clientConfigFilePath,
       ObjectMapper objectMapper) {
-    this.serverUri = serverUri;
     this.dataCache = dataCache;
     this.queryCache = queryCache;
+    this.clientMap = clientMap;
+    this.clientConfigFolder = clientConfigFilePath;
     this.objectMapper = objectMapper;
   }
 
@@ -88,7 +95,7 @@ public class DashboardConfigResource {
 
   public List<String> getDimensions(String collection,
       Multimap<String, String> selectedDimensionValues) throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     Set<String> selectedDimensions =
         (selectedDimensionValues == null ? null : selectedDimensionValues.keySet());
     if (CollectionUtils.isEmpty(selectedDimensions)) {
@@ -110,7 +117,7 @@ public class DashboardConfigResource {
   @Path("/dimensionAliases/{collection}")
   public Map<String, String> getDimensionAliases(@PathParam("collection") String collection)
       throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     Iterator<String> dimensionsIter = schema.getDimensions().iterator();
     Iterator<String> dimensionAliasesIter = schema.getDimensionAliases().iterator();
     Map<String, String> aliasMap = new TreeMap<>();
@@ -158,7 +165,7 @@ public class DashboardConfigResource {
   @GET
   @Path("/metrics/{collection}")
   public List<String> getMetrics(@PathParam("collection") String collection) throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     return schema.getMetrics();
   }
 
@@ -170,7 +177,7 @@ public class DashboardConfigResource {
   @Path("/metricAliases/{collection}")
   public Map<String, String> getMetricAliases(@PathParam("collection") String collection)
       throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     List<String> metricAliases = schema.getMetricAliases();
 
     Iterator<String> metricsIter = getMetrics(collection).iterator();
@@ -186,10 +193,11 @@ public class DashboardConfigResource {
   }
 
   public List<String> getMetricAliasesAsList(String collection) throws Exception {
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     return schema.getMetricAliases();
   }
 
+  // TODO pre-cache dimension values/write to file.
   // Ignored already selected dimensions
   private Map<String, Collection<String>> retrieveDimensionValues(String collection,
       long baselineMillis, long currentMillis, double contributionThreshold,
@@ -210,10 +218,10 @@ public class DashboardConfigResource {
       ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
           .setMetricFunction(dummyFunction).setStartTime(baseline).setEndTime(current)
           .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
-      LOGGER.info("Generated request for dimension retrieval {}: {}", serverUri, req);
+      LOGGER.info("Generated request for dimension retrieval: {}", req);
 
       // Query (in parallel)
-      resultFutures.put(dimension, queryCache.getQueryResultAsync(serverUri, req));
+      resultFutures.put(dimension, queryCache.getQueryResultAsync(req));
     }
 
     Map<String, Collection<String>> collectedDimensionValues = new HashMap<>();
@@ -373,7 +381,25 @@ public class DashboardConfigResource {
   @GET
   @Path("/collections/")
   public List<String> getCollections() throws Exception {
-    return dataCache.getCollections(serverUri);
+    return dataCache.getCollections();
+  }
+
+  /**
+   * Reloads client configurations.
+   * @throws Exception
+   */
+  @POST
+  @Path("/reloadClients")
+  public Response reloadClients() throws Exception {
+    LOGGER.info("Reloading client configurations from {}", clientConfigFolder);
+    clientMap.reloadFromFolder(clientConfigFolder);
+    return Response.ok().build();
+  }
+
+  @GET
+  @Path("/clientConfigs")
+  public List<ThirdEyeClientConfig> getClientConfigs() throws Exception {
+    return clientMap.getClientConfigs();
   }
 
 }
