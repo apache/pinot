@@ -47,10 +47,11 @@ public class TimeBoundaryServiceTest {
 
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   @BeforeTest
   public void beforeTest() {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
 
     _zkClient =
         new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
@@ -67,7 +68,7 @@ public class TimeBoundaryServiceTest {
   @AfterTest
   public void afterTest() {
     _zkClient.close();
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   @Test

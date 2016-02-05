@@ -55,10 +55,11 @@ public class ValidationManagerTest {
   private ZkClient _zkClient;
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   @BeforeTest
   public void setUp() throws Exception {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager =
@@ -144,7 +145,7 @@ public class ValidationManagerTest {
   public void shutDown() {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   @Test

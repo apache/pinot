@@ -61,10 +61,11 @@ public class HelixBrokerStarterTest {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private HelixBrokerStarter _helixBrokerStarter;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   @BeforeTest
   public void setUp() throws Exception {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     final String instanceId = "localhost_helixController";
     _pinotResourceManager =
@@ -106,7 +107,7 @@ public class HelixBrokerStarterTest {
   public void tearDown() {
     _pinotResourceManager.stop();
     _zkClient.close();
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   @Test

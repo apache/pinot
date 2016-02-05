@@ -76,10 +76,11 @@ public class RetentionManagerTest {
   private String _offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName);
 
   private RetentionManager _retentionManager;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   @BeforeTest
   public void setup() throws Exception {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager =
@@ -105,7 +106,7 @@ public class RetentionManagerTest {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
     _zkClient.close();
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   public void cleanupSegments() throws InterruptedException {

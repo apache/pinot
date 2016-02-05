@@ -56,6 +56,7 @@ public abstract class ControllerTest {
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixManager _helixZkManager;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public JSONObject postQuery(String query, String brokerBaseApiUrl, boolean usePql2Compiler) throws Exception {
     final JSONObject json = new JSONObject();
@@ -102,11 +103,11 @@ public abstract class ControllerTest {
   }
 
   protected void startZk() {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
   }
 
   protected void stopZk() {
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   /**

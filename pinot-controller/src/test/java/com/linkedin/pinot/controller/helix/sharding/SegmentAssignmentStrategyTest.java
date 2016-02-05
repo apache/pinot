@@ -54,10 +54,11 @@ public class SegmentAssignmentStrategyTest {
   private HelixAdmin _helixAdmin;
   private final int _numServerInstance = 5;
   private final int _numBrokerInstance = 1;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   @BeforeTest
   public void setup() throws Exception {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_SERVER);
     final String zkPath = "/" + HELIX_CLUSTER_NAME;
     if (_zkClient.exists(zkPath)) {
@@ -90,7 +91,7 @@ public class SegmentAssignmentStrategyTest {
   public void tearDown() {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   @Test
