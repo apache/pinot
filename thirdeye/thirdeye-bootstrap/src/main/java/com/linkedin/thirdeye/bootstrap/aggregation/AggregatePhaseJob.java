@@ -200,6 +200,7 @@ public class AggregatePhaseJob extends Configured {
     String dimensionStatsOutputDir;
     private FileSystem fileSystem;
     private DimensionStats dimensionStats;
+    int numRecordsFlattened = 0;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -237,14 +238,15 @@ public class AggregatePhaseJob extends Configured {
       }
       aggregationStats.record(out);
 
-      int numSplitRecords = out.getTimeWindowSet().size();
-      context.getCounter(AggregationCounter.NUMBER_OF_SPLIT_RECORDS).increment(numSplitRecords);
+      numRecordsFlattened += out.getTimeWindowSet().size();
 
       byte[] serializedBytes = out.toBytes();
       context.write(aggregationKey, new BytesWritable(serializedBytes));
     }
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
+
+      context.getCounter(AggregationCounter.NUMBER_OF_RECORDS_FLATTENED).increment(numRecordsFlattened);
       // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks
       // are used (gbrandt, 2015-08-27)
       // FSDataOutputStream dimensionStatsOutputStream =
@@ -338,7 +340,7 @@ public class AggregatePhaseJob extends Configured {
     if (counter.getValue() == 0) {
       throw new IllegalStateException("No input records in " + inputPathDir);
     }
-    counter = job.getCounters().findCounter(AggregationCounter.NUMBER_OF_SPLIT_RECORDS);
+    counter = job.getCounters().findCounter(AggregationCounter.NUMBER_OF_RECORDS_FLATTENED);
     LOGGER.info(counter.getDisplayName() + " : " + counter.getValue());
 
     recordMetricSums(configuration, fs, job);
@@ -393,7 +395,7 @@ public class AggregatePhaseJob extends Configured {
 
   public static enum AggregationCounter {
     NUMBER_OF_RECORDS,
-    NUMBER_OF_SPLIT_RECORDS
+    NUMBER_OF_RECORDS_FLATTENED
   }
 
 }

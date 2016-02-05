@@ -43,10 +43,10 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.bootstrap.util.ThirdeyePinotSchemaUtils;
