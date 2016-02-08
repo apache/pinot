@@ -7,9 +7,11 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TopKDimensionSpec;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,7 @@ public class TopKRollupPhaseTwoConfig {
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private List<TopKDimensionSpec> rollupDimensionConfig;
+  private Map<String, List<String>> dimensionExceptions;
 
   /**
    *
@@ -37,12 +40,13 @@ public class TopKRollupPhaseTwoConfig {
    * @param rollupDimensionConfig
    */
   public TopKRollupPhaseTwoConfig(List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, List<TopKDimensionSpec> rollupDimensionConfig) {
+      List<MetricType> metricTypes, List<TopKDimensionSpec> rollupDimensionConfig, Map<String, List<String>> dimensionExceptions) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.rollupDimensionConfig = rollupDimensionConfig;
+    this.dimensionExceptions = dimensionExceptions;
   }
 
   public List<String> getDimensionNames() {
@@ -59,6 +63,10 @@ public class TopKRollupPhaseTwoConfig {
 
   public List<TopKDimensionSpec> getRollupDimensionConfig() {
     return rollupDimensionConfig;
+  }
+
+  public Map<String, List<String>> getDimensionExceptions() {
+    return dimensionExceptions;
   }
 
   public static TopKRollupPhaseTwoConfig fromStarTreeConfig(StarTreeConfig config) {
@@ -80,7 +88,15 @@ public class TopKRollupPhaseTwoConfig {
       rollupDimensionConfig = config.getTopKRollup().getTopKDimensionSpec();
     }
 
+    Map<String, List<String>> dimensionExceptions = new HashMap<>();
+    Map<String, String> exceptions = config.getTopKRollup().getExceptions();
+    if (exceptions != null) {
+      for (Entry<String, String> entry : exceptions.entrySet()) {
+        dimensionExceptions.put(entry.getKey(), Arrays.asList(entry.getValue().split(",")));
+      }
+    }
+
     return new TopKRollupPhaseTwoConfig(dimensionNames, metricNames, metricTypes,
-        rollupDimensionConfig);
+        rollupDimensionConfig, dimensionExceptions);
   }
 }

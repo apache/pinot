@@ -6,15 +6,18 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 public class TopKRollupPhaseOneConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private Map<String, Double> metricThresholds;
+  private Map<String, List<String>> dimensionExceptions;
 
   /**
    *
@@ -30,12 +33,13 @@ public class TopKRollupPhaseOneConfig {
    * @param metricThresholds
    */
   public TopKRollupPhaseOneConfig(List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, Map<String, Double> metricThresholds) {
+      List<MetricType> metricTypes, Map<String, Double> metricThresholds, Map<String, List<String>> dimensionExceptions) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.metricThresholds = metricThresholds;
+    this.dimensionExceptions = dimensionExceptions;
   }
 
   public List<String> getDimensionNames() {
@@ -52,6 +56,10 @@ public class TopKRollupPhaseOneConfig {
 
   public Map<String, Double> getMetricThresholds() {
     return metricThresholds;
+  }
+
+  public Map<String, List<String>> getDimensionExceptions() {
+    return dimensionExceptions;
   }
 
   public static TopKRollupPhaseOneConfig fromStarTreeConfig(StarTreeConfig config) {
@@ -78,6 +86,14 @@ public class TopKRollupPhaseOneConfig {
       }
     }
 
-    return new TopKRollupPhaseOneConfig(dimensionNames, metricNames, metricTypes, metricThresholds);
+    Map<String, List<String>> dimensionExceptions = new HashMap<>();
+    Map<String, String> exceptions = config.getTopKRollup().getExceptions();
+    if (exceptions != null) {
+      for (Entry<String, String> entry : exceptions.entrySet()) {
+        dimensionExceptions.put(entry.getKey(), Arrays.asList(entry.getValue().split(",")));
+      }
+    }
+
+    return new TopKRollupPhaseOneConfig(dimensionNames, metricNames, metricTypes, metricThresholds, dimensionExceptions);
   }
 }

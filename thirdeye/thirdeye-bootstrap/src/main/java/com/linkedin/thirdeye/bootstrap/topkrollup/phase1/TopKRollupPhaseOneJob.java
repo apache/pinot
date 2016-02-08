@@ -14,17 +14,11 @@ import java.util.Properties;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroKey;
-import org.apache.avro.mapreduce.AvroJob;
-import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -41,9 +35,7 @@ import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.bootstrap.aggregation.MetricSums;
-import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
 
 /**
  * Map Input = Input from aggregation Key:(serialized dimension key), value:(serialized
@@ -136,6 +128,7 @@ public class TopKRollupPhaseOneJob extends Configured {
     private List<String> dimensionNames;
     private List<MetricType> metricTypes;
     private Map<String, Double> metricThresholds;
+    private Map<String, List<String>> dimensionExceptions;
     private MetricSchema metricSchema;
     BytesWritable keyWritable;
     BytesWritable valWritable;
@@ -156,6 +149,7 @@ public class TopKRollupPhaseOneJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         metricThresholds = config.getMetricThresholds();
+        dimensionExceptions = config.getDimensionExceptions();
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
 
@@ -185,6 +179,27 @@ public class TopKRollupPhaseOneJob extends Configured {
         aggregateSeries.aggregate(series);
       }
 
+      if (dimensionException(wrapper.getDimensionName(), wrapper.getDimensionValue())
+          || aboveThreshold(aggregateSeries, wrapper.getDimensionName(), wrapper.getDimensionValue())) {
+        LOGGER.info("Passed threshold");
+        valWritable.set(aggregateSeries.toBytes(), 0, aggregateSeries.toBytes().length);
+        context.write(topkRollupKey, valWritable);
+      }
+    }
+
+    private boolean dimensionException(String dimensionName, String dimensionValue) {
+
+      boolean dimensionException = false;
+      if (dimensionExceptions.get(dimensionName) != null
+          && dimensionExceptions.get(dimensionName).contains(dimensionValue)) {
+        LOGGER.info("Adding exception {} {}", dimensionName, dimensionValue);
+        dimensionException = true;
+      }
+      return dimensionException;
+    }
+
+    private boolean aboveThreshold(MetricTimeSeries aggregateSeries, String dimensionName, String dimensionValue) {
+
       Map<String, Long> metricValues = new HashMap<String, Long>();
       for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
         metricValues.put(metricSpec.getName(), 0L);
@@ -208,15 +223,11 @@ public class TopKRollupPhaseOneJob extends Configured {
         LOGGER.info("metricValue : {} metricSum : {}", metricValue, metricSum);
         if (metricValue < (metricThreshold / 100) * metricSum) {
           aboveThreshold = false;
+          LOGGER.info("Skipping {} {}", dimensionName, dimensionValue);
           break;
         }
       }
-
-      if (aboveThreshold) {
-        LOGGER.info("Passed threshold");
-        valWritable.set(aggregateSeries.toBytes(), 0, aggregateSeries.toBytes().length);
-        context.write(topkRollupKey, valWritable);
-      }
+      return aboveThreshold;
     }
 
     protected void cleanup(Context context) throws IOException, InterruptedException {

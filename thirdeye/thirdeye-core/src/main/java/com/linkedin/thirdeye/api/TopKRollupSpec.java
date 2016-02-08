@@ -7,6 +7,7 @@ public class TopKRollupSpec {
 
   Map<String, Double> threshold;
   List<TopKDimensionSpec> topKDimensionSpec;
+  Map<String, String> exceptions;
 
   public TopKRollupSpec() {
 
@@ -27,5 +28,15 @@ public class TopKRollupSpec {
   public void setTopKDimensionSpec(List<TopKDimensionSpec> topKDimensionSpec) {
     this.topKDimensionSpec = topKDimensionSpec;
   }
+
+  public Map<String, String> getExceptions() {
+    return exceptions;
+  }
+
+  public void setExceptions(Map<String, String> exceptions) {
+    this.exceptions = exceptions;
+  }
+
+
 
 }

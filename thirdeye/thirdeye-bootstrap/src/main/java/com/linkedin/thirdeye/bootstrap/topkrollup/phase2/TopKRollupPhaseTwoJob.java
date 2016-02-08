@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -130,6 +131,7 @@ public class TopKRollupPhaseTwoJob extends Configured {
     BytesWritable keyWritable;
     BytesWritable valWritable;
     TopKDimensionValues topKDimensionValues;
+    Map<String, List<String>> dimensionExceptions;
 
     FileSystem fileSystem;
     Configuration configuration;
@@ -151,6 +153,7 @@ public class TopKRollupPhaseTwoJob extends Configured {
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
         topKDimensionValues = new TopKDimensionValues();
+        dimensionExceptions = config.getDimensionExceptions();
 
       } catch (Exception e) {
         throw new IOException(e);
@@ -182,7 +185,7 @@ public class TopKRollupPhaseTwoJob extends Configured {
         }
       }
 
-      if (topkDimensionSpec == null || mapOutputValues.size() < topkDimensionSpec.getTop()) { // take
+      if (topkDimensionSpec == null || mapOutputValues.size() <= topkDimensionSpec.getTop()) { // take
                                                                                               // all
                                                                                               // dimensionValues
         LOGGER.info("Taking all dimension values");
@@ -218,13 +221,27 @@ public class TopKRollupPhaseTwoJob extends Configured {
         });
 
         // emit top k
-        for (int k = 0; k < topkDimensionSpec.getTop(); k++) {
+        int k = 0;
+        for ( ; k < topkDimensionSpec.getTop(); k++) {
           TopKRollupPhaseTwoMapOutputValue valueWrapper = mapOutputValues.get(k);
           String dimensionValue = valueWrapper.getDimensionValue();
           LOGGER.info("K : {} dimensionvalue : {}", k, dimensionValue);
           topKDimensionValues.addValue(dimensionName, dimensionValue);
-
         }
+
+        // Add dimension exceptions
+        List<String> dimensionExceptionsList = null;
+        if ((dimensionExceptionsList = dimensionExceptions.get(dimensionName)) != null) {
+          for ( ; k < mapOutputValues.size(); k++) {
+            TopKRollupPhaseTwoMapOutputValue valueWrapper = mapOutputValues.get(k);
+            String dimensionValue = valueWrapper.getDimensionValue();
+            if (dimensionExceptionsList.contains(dimensionValue)) {
+              LOGGER.info("K : {} Adding dimension exception : {}", k, dimensionValue);
+              topKDimensionValues.addValue(dimensionName, dimensionValue);
+            }
+          }
+        }
+
       }
     }
 
