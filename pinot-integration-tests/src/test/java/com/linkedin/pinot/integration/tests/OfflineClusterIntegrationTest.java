@@ -347,11 +347,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  @Override
-  protected String getHelixClusterName() {
-    return "OfflineClusterIntegrationTest";
-  }
-
   @AfterClass
   public void tearDown() throws Exception {
     stopBroker();

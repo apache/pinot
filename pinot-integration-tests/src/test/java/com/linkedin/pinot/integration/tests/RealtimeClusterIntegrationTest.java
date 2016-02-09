@@ -127,11 +127,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected String getHelixClusterName() {
-    return "RealtimeClusterIntegrationTest";
-  }
-
-  @Override
   @Test
   public void testHardcodedQuerySet() throws Exception {
     super.testHardcodedQuerySet();

@@ -228,5 +228,7 @@ public abstract class ControllerTest {
     return queryResp.toString();
   }
 
-  protected abstract String getHelixClusterName();
+  protected String getHelixClusterName() {
+    return this.getClass().getSimpleName();
+  }
 }

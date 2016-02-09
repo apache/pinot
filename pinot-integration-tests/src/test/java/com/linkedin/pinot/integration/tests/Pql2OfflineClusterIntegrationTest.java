@@ -43,11 +43,6 @@ public class Pql2OfflineClusterIntegrationTest extends OfflineClusterIntegration
   }
 
   @Override
-  protected String getHelixClusterName() {
-    return "OfflineClusterIntegrationTest";
-  }
-
-  @Override
   @Test(enabled = false) // jfim: This is disabled because the new parser exposes some bugs in the old one
   public void testMultipleQueries() throws Exception {
     super.testMultipleQueries();

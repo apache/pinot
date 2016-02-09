@@ -87,6 +87,6 @@ public class PinotFileUploadTest extends ControllerTest {
 
   @Override
   protected String getHelixClusterName() {
-    return "PinotFileUploadTest";
+    return HELIX_CLUSTER_NAME;
   }
 }

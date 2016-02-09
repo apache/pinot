@@ -277,11 +277,6 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @Override
-  protected String getHelixClusterName() {
-    return getClass().getSimpleName();
-  }
-
-  @Override
   protected int getGeneratedQueryCount() {
     return 0;
   }

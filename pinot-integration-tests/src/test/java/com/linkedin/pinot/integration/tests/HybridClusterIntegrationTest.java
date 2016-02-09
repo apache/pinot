@@ -75,11 +75,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private KafkaServerStartable kafkaStarter;
 
-  @Override
-  protected String getHelixClusterName() {
-    return "HybridClusterIntegrationTest";
-  }
-
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
