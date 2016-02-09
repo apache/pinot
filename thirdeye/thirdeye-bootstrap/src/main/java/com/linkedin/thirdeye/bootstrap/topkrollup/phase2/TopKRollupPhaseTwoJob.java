@@ -218,22 +218,16 @@ public class TopKRollupPhaseTwoJob extends Configured {
           }
         });
 
-        // emit top k
-        int k = 0;
-        for ( ; k < topkDimensionSpec.getTop(); k++) {
+        // emit topk and exceptions
+        List<String> dimensionExceptionsList = dimensionExceptions.get(dimensionName);
+        for (int k = 0; k < mapOutputValues.size(); k++) {
           TopKRollupPhaseTwoMapOutputValue valueWrapper = mapOutputValues.get(k);
           String dimensionValue = valueWrapper.getDimensionValue();
-          LOGGER.info("K : {} dimensionvalue : {}", k, dimensionValue);
-          topKDimensionValues.addValue(dimensionName, dimensionValue);
-        }
-
-        // Add dimension exceptions
-        List<String> dimensionExceptionsList = dimensionExceptions.get(dimensionName);
-        if (dimensionExceptionsList != null) {
-          for ( ; k < mapOutputValues.size(); k++) {
-            TopKRollupPhaseTwoMapOutputValue valueWrapper = mapOutputValues.get(k);
-            String dimensionValue = valueWrapper.getDimensionValue();
-            if (dimensionExceptionsList.contains(dimensionValue)) {
+          if (k < topkDimensionSpec.getTop()) {
+            LOGGER.info("K : {} dimensionvalue : {}", k, dimensionValue);
+            topKDimensionValues.addValue(dimensionName, dimensionValue);
+          } else {
+            if (dimensionExceptionsList != null && dimensionExceptionsList.contains(dimensionValue)) {
               LOGGER.info("K : {} Adding dimension exception : {}", k, dimensionValue);
               topKDimensionValues.addValue(dimensionName, dimensionValue);
             }
