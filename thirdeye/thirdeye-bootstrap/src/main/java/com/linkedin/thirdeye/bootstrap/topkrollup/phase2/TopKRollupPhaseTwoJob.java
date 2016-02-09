@@ -185,9 +185,7 @@ public class TopKRollupPhaseTwoJob extends Configured {
         }
       }
 
-      if (topkDimensionSpec == null || mapOutputValues.size() <= topkDimensionSpec.getTop()) { // take
-                                                                                              // all
-                                                                                              // dimensionValues
+      if (topkDimensionSpec == null || mapOutputValues.size() <= topkDimensionSpec.getTop()) {
         LOGGER.info("Taking all dimension values");
         for (TopKRollupPhaseTwoMapOutputValue mapOutput : mapOutputValues) {
           String dimensionValue = mapOutput.getDimensionValue();
@@ -230,8 +228,8 @@ public class TopKRollupPhaseTwoJob extends Configured {
         }
 
         // Add dimension exceptions
-        List<String> dimensionExceptionsList = null;
-        if ((dimensionExceptionsList = dimensionExceptions.get(dimensionName)) != null) {
+        List<String> dimensionExceptionsList = dimensionExceptions.get(dimensionName);
+        if (dimensionExceptionsList != null) {
           for ( ; k < mapOutputValues.size(); k++) {
             TopKRollupPhaseTwoMapOutputValue valueWrapper = mapOutputValues.get(k);
             String dimensionValue = valueWrapper.getDimensionValue();

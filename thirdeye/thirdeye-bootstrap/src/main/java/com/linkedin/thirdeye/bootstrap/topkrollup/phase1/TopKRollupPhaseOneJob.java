@@ -170,8 +170,9 @@ public class TopKRollupPhaseOneJob extends Configured {
 
       TopKRollupPhaseOneMapOutputKey wrapper =
           TopKRollupPhaseOneMapOutputKey.fromBytes(topkRollupKey.getBytes());
-      LOGGER.info("DimensionName {} DimensionValue {}", wrapper.getDimensionName(),
-          wrapper.getDimensionValue());
+      String dimensionName = wrapper.getDimensionName();
+      String dimensionValue = wrapper.getDimensionValue();
+      LOGGER.info("DimensionName {} DimensionValue {}", dimensionName, dimensionValue);
 
       MetricTimeSeries aggregateSeries = new MetricTimeSeries(metricSchema);
       for (BytesWritable writable : timeSeriesIterable) {
@@ -179,8 +180,8 @@ public class TopKRollupPhaseOneJob extends Configured {
         aggregateSeries.aggregate(series);
       }
 
-      if (dimensionException(wrapper.getDimensionName(), wrapper.getDimensionValue())
-          || aboveThreshold(aggregateSeries, wrapper.getDimensionName(), wrapper.getDimensionValue())) {
+      if (dimensionException(dimensionName, dimensionValue)
+          || aboveThreshold(aggregateSeries)) {
         LOGGER.info("Passed threshold");
         valWritable.set(aggregateSeries.toBytes(), 0, aggregateSeries.toBytes().length);
         context.write(topkRollupKey, valWritable);
@@ -190,15 +191,15 @@ public class TopKRollupPhaseOneJob extends Configured {
     private boolean dimensionException(String dimensionName, String dimensionValue) {
 
       boolean dimensionException = false;
-      if (dimensionExceptions.get(dimensionName) != null
-          && dimensionExceptions.get(dimensionName).contains(dimensionValue)) {
+      List<String> dimensionExceptionsList = dimensionExceptions.get(dimensionName);
+      if (dimensionExceptionsList != null && dimensionExceptionsList.contains(dimensionValue)) {
         LOGGER.info("Adding exception {} {}", dimensionName, dimensionValue);
         dimensionException = true;
       }
       return dimensionException;
     }
 
-    private boolean aboveThreshold(MetricTimeSeries aggregateSeries, String dimensionName, String dimensionValue) {
+    private boolean aboveThreshold(MetricTimeSeries aggregateSeries) {
 
       Map<String, Long> metricValues = new HashMap<String, Long>();
       for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
@@ -223,7 +224,6 @@ public class TopKRollupPhaseOneJob extends Configured {
         LOGGER.info("metricValue : {} metricSum : {}", metricValue, metricSum);
         if (metricValue < (metricThreshold / 100) * metricSum) {
           aboveThreshold = false;
-          LOGGER.info("Skipping {} {}", dimensionName, dimensionValue);
           break;
         }
       }
