@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import java.io.File;
@@ -87,29 +88,77 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
 
   @Override
   public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
-    dataFileReader.readIntValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.INT);
   }
 
   @Override
   public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
-    dataFileReader.readLongValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.LONG);
   }
 
   @Override
   public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
-    dataFileReader.readFloatValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.FLOAT);
   }
 
   @Override
   public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
-    dataFileReader.readDoubleValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.DOUBLE);
   }
-
 
   @Override
   public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
-    dataFileReader.readStringValues(dictionaryIds, 0, startPos, limit, outValues, outStartPos);
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.STRING);
   }
 
+  protected void readValues(int[] dictionaryIds, int startPos, int limit, Object values, int outStartPos, FieldSpec.DataType type) {
+    int endPos = startPos + limit;
+
+    switch (type) {
+
+      case INT: {
+        int[] outValues = (int[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getIntValue(dictId);
+        }
+
+      }
+      break;
+      case LONG: {
+        long[] outValues = (long[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getLongValue(dictId);
+        }
+      }
+      break;
+      case FLOAT: {
+        float[] outValues = (float[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getFloatValue(dictId);
+        }
+      }
+      break;
+      case DOUBLE: {
+        double[] outValues = (double[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getDoubleValue(dictId);
+        }
+      }
+      break;
+      case STRING: {
+        String[] outValues = (String[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getStringValue(dictId);
+        }
+      }
+      break;
+    }
+
+  }
 
 }
