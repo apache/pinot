@@ -94,7 +94,7 @@
     <!-- jfim: for Kafka 0.9.0.0, use zkclient 0.7 -->
     <kafka.version>0.8.2.0</kafka.version>
     <zkclient.version>0.3</zkclient.version>
-    <jackson.version>2.7.0</jackson.version>
+    <jackson.version>2.2.2</jackson.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms10G -Xmx10G</argLine>
   </properties>
