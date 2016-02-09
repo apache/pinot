@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -264,8 +266,9 @@ public class MCombineOperator extends BaseOperator {
   private void trimToSize(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
     AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-    aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
-
+    List<Map<String, Serializable>> trimmedResults =
+        aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
+    mergedBlock.setAggregationGroupByResult1(trimmedResults);
   }
 
   @Override
