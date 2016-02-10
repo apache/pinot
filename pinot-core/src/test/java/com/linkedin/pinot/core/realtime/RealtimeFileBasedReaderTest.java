@@ -119,7 +119,7 @@ public class RealtimeFileBasedReaderTest {
         BlockSingleValIterator realtimeValIterator =
             (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
 
-        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalRawDocs(), realtimeSegment.getAggregateDocumentCount());
+        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
         while (realtimeValIterator.hasNext()) {
           int offlineDicId = offlineValIterator.nextIntVal();
@@ -161,7 +161,7 @@ public class RealtimeFileBasedReaderTest {
         BlockSingleValIterator realtimeValIterator =
             (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
 
-        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalRawDocs(), realtimeSegment.getAggregateDocumentCount());
+        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
         while (realtimeValIterator.hasNext()) {
           int offlineDicId = offlineValIterator.nextIntVal();
@@ -197,7 +197,7 @@ public class RealtimeFileBasedReaderTest {
         BlockSingleValIterator realtimeValIterator =
             (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
 
-        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalRawDocs(), realtimeSegment.getAggregateDocumentCount());
+        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
         while (realtimeValIterator.hasNext()) {
           int offlineDicId = offlineValIterator.nextIntVal();
@@ -226,7 +226,7 @@ public class RealtimeFileBasedReaderTest {
 
         BlockMultiValIterator offlineValIterator = (BlockMultiValIterator) offlineBlock.getBlockValueSet().iterator();
         BlockMultiValIterator realtimeValIterator = (BlockMultiValIterator) realtimeBlock.getBlockValueSet().iterator();
-        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalRawDocs(), realtimeSegment.getAggregateDocumentCount());
+        Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
         while (realtimeValIterator.hasNext()) {
 

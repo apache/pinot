@@ -92,7 +92,7 @@ public class SegmentDumpTool {
     System.out.println();
 
 
-    for (int i = 0; i < indexSegment.getSegmentMetadata().getTotalRawDocs(); i++) {
+    for (int i = 0; i < indexSegment.getSegmentMetadata().getTotalDocs(); i++) {
       System.out.print(i);
       System.out.print("\t");
       for (String columnName : columnNames) {

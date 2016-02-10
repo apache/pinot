@@ -59,14 +59,14 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
         boolean signed = false;
         SingleColumnSingleValueReader v1Reader =
             new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(fwdIndexFile,
-                segmentMetadataImpl.getTotalRawDocs(), columnMetadata.getBitsPerElement(), true,
+                segmentMetadataImpl.getTotalDocs(), columnMetadata.getBitsPerElement(), true,
                 false);
         File convertedFwdIndexFile = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION + ".tmp");
          SingleColumnSingleValueWriter v2Writer =
-            new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitSingleValueWriter(convertedFwdIndexFile, segmentMetadataImpl.getTotalRawDocs(),
+            new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitSingleValueWriter(convertedFwdIndexFile, segmentMetadataImpl.getTotalDocs(),
                 columnMetadata.getBitsPerElement());
-        for (int row = 0; row < segmentMetadataImpl.getTotalRawDocs(); row++) {
+        for (int row = 0; row < segmentMetadataImpl.getTotalDocs(); row++) {
           int value = v1Reader.getInt(row);
           v2Writer.setInt(row, value);
         }
@@ -94,15 +94,15 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
         // index
         boolean signed = false;
         SingleColumnMultiValueReader v1Reader = new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(fwdIndexFile,
-            segmentMetadataImpl.getTotalRawDocs(), columnMetadata.getTotalNumberOfEntries(),
+            segmentMetadataImpl.getTotalDocs(), columnMetadata.getTotalNumberOfEntries(),
             columnMetadata.getBitsPerElement(), signed, false);
         File convertedFwdIndexFile = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION + ".tmp");
         SingleColumnMultiValueWriter v2Writer = new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitMultiValueWriter(convertedFwdIndexFile,
-            segmentMetadataImpl.getTotalRawDocs(), columnMetadata.getTotalNumberOfEntries(),
+            segmentMetadataImpl.getTotalDocs(), columnMetadata.getTotalNumberOfEntries(),
             columnMetadata.getBitsPerElement());
         int[] values = new int[columnMetadata.getMaxNumberOfMultiValues()];
-        for (int row = 0; row < segmentMetadataImpl.getTotalRawDocs(); row++) {
+        for (int row = 0; row < segmentMetadataImpl.getTotalDocs(); row++) {
           int length = v1Reader.getIntArray(row, values);
           int[] copy  = new int[length];
           System.arraycopy(values, 0, copy, 0, length);

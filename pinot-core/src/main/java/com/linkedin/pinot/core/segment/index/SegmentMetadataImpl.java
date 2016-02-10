@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.io.DataInputStream;
 import java.io.File;
@@ -359,14 +358,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public int getTotalRawDocs() {
+  public int getTotalDocs() {
     return _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
   }
 
   @Override
-  public int getTotalAggregateDocs() {
-    return _segmentMetadataPropertiesConfiguration
-        .getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_AGGREGATE_DOCS);
+  public int getTotalRawDocs() {
+    return _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS, getTotalDocs());
   }
 
   @Override
@@ -383,7 +381,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public Map<String, String> toMap() {
     final Map<String, String> ret = new HashMap<String, String>();
     ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalRawDocs()));
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());

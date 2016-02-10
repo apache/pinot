@@ -23,6 +23,7 @@ import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.data.Schema;
 
+
 /**
  * SegmentMetadata holds segment level management information and data
  * statistics.
@@ -71,12 +72,13 @@ public interface SegmentMetadata {
   /**
    * @return
    */
-  public int getTotalRawDocs();
+  public int getTotalDocs();
 
   /**
+   * 
    * @return
    */
-  public int getTotalAggregateDocs();
+  int getTotalRawDocs();
 
   /**
    * @return

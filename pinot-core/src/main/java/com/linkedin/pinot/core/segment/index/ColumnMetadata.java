@@ -98,12 +98,12 @@ public class ColumnMetadata {
     return totalRawDocs;
   }
 
-  public int getTotalAggreateDocs() {
-    return totalAggDocs;
-  }
-
   public int getTotalDocs() {
     return totalDocs;
+  }
+
+  public int getTotalAggreateDocs() {
+    return totalAggDocs;
   }
 
   public DataType getDataType() {

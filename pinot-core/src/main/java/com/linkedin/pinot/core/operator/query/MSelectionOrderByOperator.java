@@ -125,7 +125,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
 
       resultBlock.setExceptionsList(processingExceptions);
       resultBlock.setNumDocsScanned(0);
-      resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
+      resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
       resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
       return resultBlock;
     }

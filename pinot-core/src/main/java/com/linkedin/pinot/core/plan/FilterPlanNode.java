@@ -73,7 +73,7 @@ public class FilterPlanNode implements PlanNode {
     Operator ret = null;
 
     if (null == filterQueryTree) {
-      return new MatchEntireSegmentOperator(_segment.getSegmentMetadata().getTotalRawDocs());
+      return new MatchEntireSegmentOperator(_segment.getSegmentMetadata().getTotalDocs());
     }
 
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();

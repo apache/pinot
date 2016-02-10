@@ -285,7 +285,7 @@ public class RealtimeQueriesSentinelTest {
       e.printStackTrace();
     }
     System.out.println("Current raw events indexed: " + realtimeSegmentImpl.getRawDocumentCount() + ", totalDocs = "
-        + realtimeSegmentImpl.getSegmentMetadata().getTotalRawDocs());
+        + realtimeSegmentImpl.getSegmentMetadata().getTotalDocs());
     realtimeSegmentImpl.setSegmentName("testTable_testTable");
     realtimeSegmentImpl.setSegmentMetadata(getRealtimeSegmentZKMetadata());
     return realtimeSegmentImpl;

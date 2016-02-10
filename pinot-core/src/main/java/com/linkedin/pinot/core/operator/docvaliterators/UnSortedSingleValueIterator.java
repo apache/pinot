@@ -37,7 +37,7 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
 
   @Override
   public boolean skipTo(int docId) {
-    if (docId >= columnMetadata.getTotalRawDocs()) {
+    if (docId >= columnMetadata.getTotalDocs()) {
       return false;
     }
 
@@ -48,12 +48,12 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
 
   @Override
   public int size() {
-    return columnMetadata.getTotalRawDocs();
+    return columnMetadata.getTotalDocs();
   }
 
   @Override
   public int nextIntVal() {
-    if (counter >= columnMetadata.getTotalRawDocs()) {
+    if (counter >= columnMetadata.getTotalDocs()) {
       return Constants.EOF;
     }
 
@@ -74,7 +74,7 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
 
   @Override
   public boolean hasNext() {
-    return (counter < columnMetadata.getTotalRawDocs());
+    return (counter < columnMetadata.getTotalDocs());
   }
 
   @Override

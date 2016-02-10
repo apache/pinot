@@ -326,15 +326,10 @@ public class RetentionManagerTest {
           segmentTimeUnit.toMillis(Long.parseLong(endTime)));
 
       @Override
-      public int getTotalAggregateDocs() {
-        return 0;
-      }
-
-      @Override
       public Map<String, String> toMap() {
         final Map<String, String> ret = new HashMap<String, String>();
         ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalRawDocs()));
+        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
         ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
@@ -349,6 +344,11 @@ public class RetentionManagerTest {
       @Override
       public String getVersion() {
         return SegmentVersion.v1.toString();
+      }
+
+      @Override
+      public int getTotalDocs() {
+        return 0;
       }
 
       @Override

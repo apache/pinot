@@ -116,11 +116,11 @@ public class TestStarTreeIntegrationTest {
     BlockDocIdIterator rawDocIdIterator = rawOperator.nextBlock().getBlockDocIdSet().iterator();
     double[] expectedSums = computeSum(segment, rawDocIdIterator, metricNames);
     System.out.println("expectedSums=" + Arrays.toString(expectedSums));
-    boolean starTreeReady = false;
+    boolean starTreeReady = true;
     if (starTreeReady) {
       //dump contents
       Iterator<GenericRow> rowIterator =
-          ((IndexSegmentImpl) segment).iterator(0, segment.getSegmentMetadata().getTotalAggregateDocs());
+          ((IndexSegmentImpl) segment).iterator(0, segment.getSegmentMetadata().getTotalDocs());
       int counter = 0;
       while (rowIterator.hasNext()) {
 

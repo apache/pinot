@@ -302,6 +302,11 @@ public class ValidationManagerTest {
     }
 
     @Override
+    public int getTotalDocs() {
+      return _totalDocs;
+    }
+
+    @Override
     public int getTotalRawDocs() {
       return _totalDocs;
     }
@@ -379,11 +384,6 @@ public class ValidationManagerTest {
     @Override
     public boolean hasStarTree() {
       return false;
-    }
-
-    @Override
-    public int getTotalAggregateDocs() {
-      return 0;
     }
 
     @Override

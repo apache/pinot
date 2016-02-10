@@ -211,7 +211,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
           @Override
           public int getMaxDocId() {
-            return segment.getSegmentMetadata().getTotalRawDocs() + segment.getSegmentMetadata().getTotalAggregateDocs();
+            return segment.getSegmentMetadata().getTotalDocs();
           }
         };
       }

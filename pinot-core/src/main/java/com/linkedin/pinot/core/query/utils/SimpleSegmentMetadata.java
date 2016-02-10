@@ -113,13 +113,13 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public int getTotalRawDocs() {
+  public int getTotalDocs() {
     return (int) _size;
   }
 
   @Override
-  public int getTotalAggregateDocs() {
-    return 0;
+  public int getTotalRawDocs() {
+    return (int) _size;
   }
 
   @Override
