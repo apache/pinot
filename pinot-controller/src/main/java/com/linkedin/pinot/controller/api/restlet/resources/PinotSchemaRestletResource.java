@@ -3,7 +3,9 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.api.swagger.HttpVerb;
 import com.linkedin.pinot.controller.api.swagger.Parameter;
 import com.linkedin.pinot.controller.api.swagger.Paths;
@@ -61,6 +63,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while fetching schema ", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
@@ -115,6 +118,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
       return uploadNewSchema();
     } catch (final Exception e) {
       LOGGER.error("Caught exception in file upload", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
@@ -140,11 +144,13 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
         LOGGER.error("error adding schema ", e);
         LOGGER.error("Caught exception in file upload", e);
         setStatus(Status.SERVER_ERROR_INTERNAL);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     } else {
       // Some problem occurs, send back a simple line of text.
       LOGGER.warn("No file was uploaded");
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return new StringRepresentation("schema not added", MediaType.TEXT_PLAIN);
     }
@@ -156,6 +162,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
     final String schemaName = (String) getRequest().getAttributes().get(SCHEMA_NAME);
 
     if (schemaName == null) {
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return new StringRepresentation("No schema name specified in path", MediaType.TEXT_PLAIN);
     }
@@ -164,6 +171,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
       return uploadSchema(schemaName);
     } catch (final Exception e) {
       LOGGER.error("Caught exception in file upload", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
@@ -192,18 +200,21 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
               "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName()
                   + " as " + schemaName;
           LOGGER.warn(message);
+          ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
           setStatus(Status.SERVER_ERROR_INTERNAL);
           return new StringRepresentation(message, MediaType.TEXT_PLAIN);
         }
       } catch (Exception e) {
         LOGGER.error("error adding schema ", e);
         LOGGER.error("Caught exception in file upload", e);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     } else {
       // Some problem occurs, send back a simple line of text.
       LOGGER.warn("No file was uploaded");
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return new StringRepresentation("schema not added", MediaType.TEXT_PLAIN);
     }
@@ -251,6 +262,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
       result = deleteSchema(schemaName);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing delete request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       result = new StringRepresentation("Error: Caught Exception " + e.getStackTrace());
     }
@@ -295,6 +307,7 @@ public class PinotSchemaRestletResource extends PinotRestletResourceBase {
       return new StringRepresentation("Success: Deleted schema " + schemaName);
     } else {
       LOGGER.error("Error: could not delete schema {}", schemaName);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return new StringRepresentation("Error: Could not delete schema " + schemaName);
     }

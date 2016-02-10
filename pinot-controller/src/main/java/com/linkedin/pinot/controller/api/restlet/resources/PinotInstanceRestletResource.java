@@ -17,6 +17,8 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import java.util.List;
 
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -69,6 +71,7 @@ public class PinotInstanceRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing post request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -122,6 +125,7 @@ public class PinotInstanceRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing post request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

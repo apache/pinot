@@ -19,10 +19,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.api.swagger.HttpVerb;
 import com.linkedin.pinot.controller.api.swagger.Parameter;
 import com.linkedin.pinot.controller.api.swagger.Paths;
@@ -108,6 +110,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing get request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -264,11 +267,13 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
         LOGGER.warn("No file was uploaded");
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception in file upload", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     } finally {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
@@ -276,6 +281,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
           LOGGER.error("Caught exception in file upload", e);
+          ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
           setStatus(Status.SERVER_ERROR_INTERNAL);
         }
       }
@@ -311,7 +317,13 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
           .addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
     }
 
-    setStatus((response.isSuccessfull() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL));
+    if (response.isSuccessfull()) {
+      setStatus(Status.SUCCESS_OK);
+    } else {
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
+      }
+
     return new StringRepresentation(response.toJSON().toString());
   }
 
@@ -383,6 +395,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return rep;

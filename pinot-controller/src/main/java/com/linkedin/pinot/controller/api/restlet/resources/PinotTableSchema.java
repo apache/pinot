@@ -3,6 +3,8 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 import java.io.File;
 import java.io.IOException;
 
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
@@ -62,6 +64,7 @@ public class PinotTableSchema extends PinotRestletResourceBase {
             .toString());
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching schema for a realtime table : {} ", tableName, e);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
@@ -73,6 +76,7 @@ public class PinotTableSchema extends PinotRestletResourceBase {
             .toString());
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching schema for a offline table : {} ", tableName, e);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }

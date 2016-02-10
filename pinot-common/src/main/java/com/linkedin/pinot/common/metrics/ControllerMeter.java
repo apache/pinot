@@ -22,7 +22,8 @@ import com.linkedin.pinot.common.Utils;
  * Meters for the controller.
  */
 public enum ControllerMeter implements AbstractMetrics.Meter {
-  HELIX_ZOOKEEPER_RECONNECTS("reconnects", true);
+  HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
+  CONTROLLER_INTERNAL_ERROR("InternalError", true);
 
   private final String brokerMeterName;
   private final String unit;

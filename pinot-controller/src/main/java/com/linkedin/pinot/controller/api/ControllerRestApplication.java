@@ -15,11 +15,15 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotRestletResourceBase;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
 import com.linkedin.pinot.controller.api.swagger.Paths;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import it.unimi.dsi.fastutil.ints.IntComparators;
 
@@ -74,6 +78,8 @@ public class ControllerRestApplication extends Application {
   private static String CONSOLE_WEBAPP_ROOT_PATH;
 
   private static Router router;
+
+  public static ControllerMetrics metrics = new ControllerMetrics(new MetricsRegistry());
 
   public ControllerRestApplication(String queryConsolePath) {
     super();
