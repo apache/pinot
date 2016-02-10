@@ -156,6 +156,11 @@ public abstract class ClusterTest extends ControllerTest {
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName + "_OFFLINE"));
   }
 
+  protected void dropRealtimeTable(String tableName) throws Exception {
+    sendDeleteRequest(
+        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName + "_REALTIME"));
+  }
+
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;

@@ -112,37 +112,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
-    final CountDownLatch latch = new CountDownLatch(1);
-    HelixManager manager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
-            ZkStarter.DEFAULT_ZK_STR);
-    manager.connect();
-    manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
-      @Override
-      public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
-        for (ExternalView externalView : externalViewList) {
-          if (externalView.getId().contains("mytable")) {
-
-            Set<String> partitionSet = externalView.getPartitionSet();
-            if (partitionSet.size() == SEGMENT_COUNT) {
-              int onlinePartitionCount = 0;
-
-              for (String partitionId : partitionSet) {
-                Map<String, String> partitionStateMap = externalView.getStateMap(partitionId);
-                if (partitionStateMap.containsValue("ONLINE")) {
-                  onlinePartitionCount++;
-                }
-              }
-
-              if (onlinePartitionCount == SEGMENT_COUNT) {
-                System.out.println("Got " + SEGMENT_COUNT + " online tables, unlatching the main thread");
-                latch.countDown();
-              }
-            }
-          }
-        }
-      }
-    });
+    final CountDownLatch latch = setupSegmentCountCountDownLatch("mytable", SEGMENT_COUNT);
 
     // Upload the segments
     int i = 0;

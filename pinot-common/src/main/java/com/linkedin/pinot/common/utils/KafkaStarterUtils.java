@@ -38,7 +38,12 @@ public class KafkaStarterUtils {
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
   public static Properties getDefaultKafkaConfiguration() {
-    return new Properties();
+    final Properties configuration = new Properties();
+
+    // Enable topic deletion by default for integration tests
+    configureTopicDeletion(configuration, true);
+
+    return configuration;
   }
 
   public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr,
@@ -92,12 +97,22 @@ public class KafkaStarterUtils {
     configuration.put("port", Integer.toString(port));
   }
 
+  public static void configureTopicDeletion(Properties configuration, boolean topicDeletionEnabled) {
+    configuration.put("delete.topic.enable", Boolean.toString(topicDeletionEnabled));
+  }
+
   public static void stopServer(KafkaServerStartable serverStartable) {
     serverStartable.shutdown();
     FileUtils.deleteQuietly(new File(serverStartable.serverConfig().logDirs().apply(0)));
   }
 
   public static void createTopic(String kafkaTopic, String zkStr) {
+    invokeTopicCommand(
+        new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic",
+            kafkaTopic});
+  }
+
+  private static void invokeTopicCommand(String[] args) {
     // jfim: Use Java security to trap System.exit in Kafka 0.9's TopicCommand
     System.setSecurityManager(new SecurityManager() {
       @Override
@@ -114,12 +129,15 @@ public class KafkaStarterUtils {
     });
 
     try {
-      TopicCommand.main(
-          new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic", kafkaTopic});
+      TopicCommand.main(args);
     } catch (SecurityException ex) {
       // Do nothing, this is caused by our security manager that disables System.exit
     }
 
     System.setSecurityManager(null);
+  }
+
+  public static void deleteTopic(String kafkaTopic, String zkStr) {
+    invokeTopicCommand(new String[]{"--delete", "--zookeeper", zkStr, "--topic", kafkaTopic});
   }
 }

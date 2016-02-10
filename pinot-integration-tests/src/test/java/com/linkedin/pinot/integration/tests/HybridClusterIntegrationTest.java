@@ -17,7 +17,6 @@ package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -39,11 +38,8 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -63,15 +59,15 @@ import com.linkedin.pinot.util.TestUtils;
  */
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
-  private final File _tmpDir = new File("/tmp/HybridClusterIntegrationTest");
-  private final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
-  private final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
-  private static final String KAFKA_TOPIC = "hybrid-integration-test";
+  protected final File _tmpDir = new File("/tmp/HybridClusterIntegrationTest");
+  protected final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
+  protected final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
+  protected static final String KAFKA_TOPIC = "hybrid-integration-test";
 
-  private static final int SEGMENT_COUNT = 12;
-  private static final int QUERY_COUNT = 1000;
-  private static final int OFFLINE_SEGMENT_COUNT = 8;
-  private static final int REALTIME_SEGMENT_COUNT = 6;
+  protected static final int SEGMENT_COUNT = 12;
+  protected static final int QUERY_COUNT = 1000;
+  protected static final int OFFLINE_SEGMENT_COUNT = 8;
+  protected static final int REALTIME_SEGMENT_COUNT = 6;
 
   private KafkaServerStartable kafkaStarter;
 
@@ -90,23 +86,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     ensureDirectoryExistsAndIsEmpty(_segmentDir);
     ensureDirectoryExistsAndIsEmpty(_tarDir);
 
-    // Start Zk and Kafka
-    startZk();
-    kafkaStarter =
-        KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
-            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
-
-    // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
-
-    // Start the Pinot cluster
-    startController(true);
-    startBroker();
-    startServers(2);
-
-    // Create tenants
-    createBrokerTenant("TestTenant", 1);
-    createServerTenant("TestTenant", 1, 1);
+    // Start Zk, Kafka and Pinot
+    startHybridCluster();
 
     // Unpack the Avro files
     TarGzCompressionUtils.unTar(
@@ -127,15 +108,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
         avroFiles.get(0));
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
-    final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);
-    for (int i = 0; i < OFFLINE_SEGMENT_COUNT; i++) {
-      offlineAvroFiles.add(avroFiles.get(i));
-    }
-
-    final List<File> realtimeAvroFiles = new ArrayList<File>(REALTIME_SEGMENT_COUNT);
-    for (int i = SEGMENT_COUNT - REALTIME_SEGMENT_COUNT; i < SEGMENT_COUNT; i++) {
-      realtimeAvroFiles.add(avroFiles.get(i));
-    }
+    final List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
+    final List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -200,26 +174,51 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Wait until the Pinot event count matches with the number of events in the Avro files
     int pinotRecordCount, h2RecordCount;
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
+
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    do {
-      Thread.sleep(5000L);
+    statement.execute("select count(*) from mytable");
+    ResultSet rs = statement.getResultSet();
+    rs.first();
+    h2RecordCount = rs.getInt(1);
+    rs.close();
 
-      // Run the query
-      JSONObject response = postQuery("select count(*) from 'mytable'");
-      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-      String pinotValue = firstAggregationResult.getString("value");
-      pinotRecordCount = Integer.parseInt(pinotValue);
+    waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInTwoMinutes);
+  }
 
-      statement.execute("select count(*) from mytable");
-      ResultSet rs = statement.getResultSet();
-      rs.first();
-      h2RecordCount = rs.getInt(1);
-      rs.close();
-      LOGGER.info("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
-      Assert.assertTrue(System.currentTimeMillis() < timeInTwoMinutes, "Failed to read all records within two minutes");
-      TOTAL_DOCS = response.getLong("totalDocs");
-    } while (h2RecordCount != pinotRecordCount);
+  protected List<File> getRealtimeAvroFiles(List<File> avroFiles) {
+    final List<File> realtimeAvroFiles = new ArrayList<File>(REALTIME_SEGMENT_COUNT);
+    for (int i = SEGMENT_COUNT - REALTIME_SEGMENT_COUNT; i < SEGMENT_COUNT; i++) {
+      realtimeAvroFiles.add(avroFiles.get(i));
+    }
+    return realtimeAvroFiles;
+  }
+
+  protected List<File> getOfflineAvroFiles(List<File> avroFiles) {
+    final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);
+    for (int i = 0; i < OFFLINE_SEGMENT_COUNT; i++) {
+      offlineAvroFiles.add(avroFiles.get(i));
+    }
+    return offlineAvroFiles;
+  }
+
+  protected void startHybridCluster() throws Exception {
+    // Start Zk and Kafka
+    startZk();
+    kafkaStarter =
+        KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
+            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
+
+    // Create Kafka topic
+    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+
+    // Start the Pinot cluster
+    startController(true);
+    startBroker();
+    startServers(2);
+
+    // Create tenants
+    createBrokerTenant("TestTenant", 1);
+    createServerTenant("TestTenant", 1, 1);
   }
 
   @AfterClass

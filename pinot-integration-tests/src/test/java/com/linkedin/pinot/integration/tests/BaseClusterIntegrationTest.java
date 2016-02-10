@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -29,6 +33,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -36,8 +41,11 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.avro.Schema;
@@ -54,6 +62,14 @@ import org.apache.avro.util.Utf8;
 import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -662,24 +678,27 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
+  public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
       final File baseDirectory, final File segmentTarDir, final String tableName) {
     int segmentCount = avroFiles.size();
     LOGGER.info("Building " + segmentCount + " segments in parallel");
+    List<ListenableFutureTask<Pair<File, File>>> futureTasks = new ArrayList<ListenableFutureTask<Pair<File,File>>>();
+
     for (int i = 1; i <= segmentCount; ++i) {
       final int segmentIndex = i - 1;
       final int segmentNumber = i + baseSegmentIndex;
 
-      executor.execute(new Runnable() {
+      final ListenableFutureTask<Pair<File, File>> buildSegmentFutureTask =
+          ListenableFutureTask.<Pair<File, File>>create(new Callable<Pair<File, File>>() {
         @Override
-        public void run() {
+        public Pair<File, File> call() throws Exception {
           try {
             // Build segment
             LOGGER.info("Starting to build segment " + segmentNumber);
             File outputDir = new File(baseDirectory, "segment-" + segmentNumber);
-            final SegmentGeneratorConfig genConfig =
-                SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
-                    TimeUnit.DAYS, tableName);
+            final File inputAvroFile = avroFiles.get(segmentIndex);
+            final SegmentGeneratorConfig genConfig = SegmentTestUtils
+                .getSegmentGenSpecWithSchemAndProjectedColumns(inputAvroFile, outputDir, TimeUnit.DAYS, tableName);
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
 
@@ -689,15 +708,87 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
             // Tar segment
             String segmentName = outputDir.list()[0];
-            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName, new File(
-                segmentTarDir, segmentName).getAbsolutePath());
+            final File destinationSegmentFile = new File(segmentTarDir, segmentName);
+            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName,
+                destinationSegmentFile.getAbsolutePath());
             LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName);
+            return new ImmutablePair<File, File>(inputAvroFile, destinationSegmentFile);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
         }
       });
+
+      futureTasks.add(buildSegmentFutureTask);
+      executor.execute(buildSegmentFutureTask);
     }
+
+    ListenableFuture<List<Pair<File, File>>> pairListFuture = Futures.allAsList(futureTasks);
+    return Futures.transform(pairListFuture, new AsyncFunction<List<Pair<File, File>>, Map<File, File>>() {
+      @Override
+      public ListenableFuture<Map<File, File>> apply(List<Pair<File, File>> input) throws Exception {
+        Map<File, File> avroToSegmentMap = new HashMap<File, File>();
+        for (Pair<File, File> avroToSegmentPair : input) {
+          avroToSegmentMap.put(avroToSegmentPair.getLeft(), avroToSegmentPair.getRight());
+        }
+        return Futures.immediateFuture(avroToSegmentMap);
+      }
+    });
+  }
+
+  protected void waitForRecordCountToStabilizeToExpectedCount(int expectedRecordCount, long deadline) throws Exception {
+    int pinotRecordCount;
+
+    do {
+      Thread.sleep(5000L);
+
+      // Run the query
+      JSONObject response = postQuery("select count(*) from 'mytable'");
+      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
+      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
+      String pinotValue = firstAggregationResult.getString("value");
+      pinotRecordCount = Integer.parseInt(pinotValue);
+
+      LOGGER.info("Pinot record count: " + pinotRecordCount + "\tExpected count: " + expectedRecordCount);
+      Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
+      TOTAL_DOCS = response.getLong("totalDocs");
+    } while (expectedRecordCount != pinotRecordCount);
+  }
+
+  protected CountDownLatch setupSegmentCountCountDownLatch(final String tableName, final int expectedSegmentCount)
+      throws Exception {
+    final CountDownLatch latch = new CountDownLatch(1);
+    HelixManager manager =
+        HelixManagerFactory
+            .getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR, ZkStarter.DEFAULT_ZK_STR);
+    manager.connect();
+    manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
+      @Override
+      public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
+        for (ExternalView externalView : externalViewList) {
+          if (externalView.getId().contains(tableName)) {
+
+            Set<String> partitionSet = externalView.getPartitionSet();
+            if (partitionSet.size() == expectedSegmentCount) {
+              int onlinePartitionCount = 0;
+
+              for (String partitionId : partitionSet) {
+                Map<String, String> partitionStateMap = externalView.getStateMap(partitionId);
+                if (partitionStateMap.containsValue("ONLINE")) {
+                  onlinePartitionCount++;
+                }
+              }
+
+              if (onlinePartitionCount == expectedSegmentCount) {
+                System.out.println("Got " + expectedSegmentCount + " online tables, unlatching the main thread");
+                latch.countDown();
+              }
+            }
+          }
+        }
+      }
+    });
+    return latch;
   }
 
   public static void ensureDirectoryExistsAndIsEmpty(File tmpDir)

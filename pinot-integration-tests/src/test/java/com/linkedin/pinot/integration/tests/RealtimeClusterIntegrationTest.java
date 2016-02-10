@@ -27,11 +27,8 @@ import java.util.concurrent.TimeUnit;
 import kafka.server.KafkaServerStartable;
 
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -102,28 +99,15 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
         schemaFile, avroFiles.get(0));
 
     // Wait until the Pinot event count matches with the number of events in the Avro files
-    int pinotRecordCount, h2RecordCount;
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    do {
-      Thread.sleep(5000L);
+    statement.execute("select count(*) from mytable");
+    ResultSet rs = statement.getResultSet();
+    rs.first();
+    int h2RecordCount = rs.getInt(1);
+    rs.close();
 
-      // Run the query
-      JSONObject response = postQuery("select count(*) from 'mytable'");
-      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-      String pinotValue = firstAggregationResult.getString("value");
-      pinotRecordCount = Integer.parseInt(pinotValue);
-
-      statement.execute("select count(*) from mytable");
-      ResultSet rs = statement.getResultSet();
-      rs.first();
-      h2RecordCount = rs.getInt(1);
-      rs.close();
-      LOGGER.info("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
-      Assert.assertTrue(System.currentTimeMillis() < timeInTwoMinutes, "Failed to read all records within two minutes");
-      TOTAL_DOCS = response.getLong("totalDocs");
-    } while (h2RecordCount != pinotRecordCount);
+    waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInTwoMinutes);
   }
 
   @Override
