@@ -26,7 +26,6 @@ import java.util.Set;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,6 +165,11 @@ public class IndexSegmentImpl implements IndexSegment {
       @Override
       public boolean hasNext() {
         return docId < endDocId;
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
       }
 
       @Override
