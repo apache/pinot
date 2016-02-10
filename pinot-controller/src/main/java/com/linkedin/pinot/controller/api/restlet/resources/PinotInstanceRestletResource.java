@@ -125,7 +125,7 @@ public class PinotInstanceRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing post request", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INSTANCE_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

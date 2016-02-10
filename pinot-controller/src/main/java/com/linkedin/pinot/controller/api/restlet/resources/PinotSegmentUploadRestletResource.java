@@ -110,7 +110,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing get request", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -267,13 +267,13 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
         LOGGER.warn("No file was uploaded");
-        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception in file upload", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     } finally {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
@@ -281,7 +281,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
           LOGGER.error("Caught exception in file upload", e);
-          ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+          ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
           setStatus(Status.SERVER_ERROR_INTERNAL);
         }
       }
@@ -320,7 +320,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     if (response.isSuccessfull()) {
       setStatus(Status.SUCCESS_OK);
     } else {
-        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
 
@@ -395,7 +395,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_INTERNAL_ERROR, 1L);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_DELETE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return rep;

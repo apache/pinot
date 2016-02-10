@@ -23,7 +23,25 @@ import com.linkedin.pinot.common.Utils;
  */
 public enum ControllerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
-  CONTROLLER_INTERNAL_ERROR("InternalError", true);
+  CONTROLLER_INTERNAL_ERROR("InternalError", true),
+  CONTROLLER_INSTANCE_GET_ERROR("InstanceGetError", true),
+  CONTROLLER_SEGMENT_GET_ERROR("SegmentGetError", true),
+  CONTROLLER_SEGMENT_DELETE_ERROR("SegmentDeleteError", true),
+  CONTROLLER_SEGMENT_UPLOAD_ERROR("SegmentUploadError", true),
+  CONTROLLER_SCHEMA_GET_ERROR("SchemaGetError", true),
+  CONTROLLER_SCHEMA_DELETE_ERROR("SchemaDeleteError", true),
+  CONTROLLER_SCHEMA_UPLOAD_ERROR("SchemaUploadError", true),
+  CONTROLLER_TABLE_INDEXING_GET_ERROR("TableIndexingGetError", true),
+  CONTROLLER_TABLE_INSTANCES_GET_ERROR("TableInstancesGetError", true),
+  CONTROLLER_TABLE_ADD_ERROR("TableAddError", true),
+  CONTROLLER_TABLE_GET_ERROR("TableGetError", true),
+  CONTROLLER_TABLE_SCHEMA_GET_ERROR("TableSchemaGetError", true),
+  CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR("TableSchemaUpdateError", true),
+  CONTROLLER_TABLE_TENANT_UPDATE_ERROR("TableTenantUpdateError", true),
+  CONTROLLER_TABLE_TENANT_CREATE_ERROR("TableTenantCreateError", true),
+  CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
+  CONTROLLER_TABLE_TENANT_GET_ERROR("TableTenantGetError", true);
+
 
   private final String brokerMeterName;
   private final String unit;
