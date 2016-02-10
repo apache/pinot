@@ -128,7 +128,7 @@ public class BitmapDocIdSetTest {
 
       @Override
       public int getEndDocId() {
-        return numDocs;
+        return numDocs - 1;
       }
 
       @Override
@@ -143,7 +143,7 @@ public class BitmapDocIdSetTest {
         return null;
       }
     };
-    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet("testColumn", blockMetadata,0, numDocs -1,  bitmaps);
+    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet("testColumn", blockMetadata, 0, numDocs - 1, bitmaps);
     BlockDocIdIterator iterator = bitmapDocIdSet.iterator();
     int docId;
     TreeSet<Integer> result = new TreeSet<Integer>();
