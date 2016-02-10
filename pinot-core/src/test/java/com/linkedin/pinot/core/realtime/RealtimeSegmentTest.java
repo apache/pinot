@@ -105,8 +105,8 @@ public class RealtimeSegmentTest {
   @Test
   public void testMetricPredicate() throws Exception {
     DataSource ds1 = segment.getDataSource("count");
-
-    BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1);
+    
+    BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1, 0, segment.getRawDocumentCount());
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new EqPredicate("count", rhs);
@@ -133,7 +133,7 @@ public class RealtimeSegmentTest {
   public void testNoMatchFilteringMetricPredicate() throws Exception {
     DataSource ds1 = segment.getDataSource("count");
 
-    BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1);
+    BitmapBasedFilterOperator op = new BitmapBasedFilterOperator(ds1, 0, segment.getRawDocumentCount());
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new NEqPredicate("count", rhs);

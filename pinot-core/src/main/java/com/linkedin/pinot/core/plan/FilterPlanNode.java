@@ -73,7 +73,7 @@ public class FilterPlanNode implements PlanNode {
     Operator ret = null;
 
     if (null == filterQueryTree) {
-      return new MatchEntireSegmentOperator(_segment.getSegmentMetadata().getTotalDocs());
+      return new MatchEntireSegmentOperator(_segment.getSegmentMetadata().getTotalRawDocs());
     }
 
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
@@ -131,22 +131,23 @@ public class FilterPlanNode implements PlanNode {
       ds = _segment.getDataSource(column);
       DataSourceMetadata dataSourceMetadata = ds.getDataSourceMetadata();
       BaseFilterOperator baseFilterOperator;
-
+      int startDocId = 0;
+      int endDocId = _segment.getSegmentMetadata().getTotalRawDocs() - 1; //end is inclusive
       if (dataSourceMetadata.hasInvertedIndex()) {
         // jfim: ScanBasedFilterOperator is broken for realtime segments for now
         // range evaluation based on inv index is inefficient, so do this only if is NOT range.
         if (!filterType.equals(FilterOperator.RANGE) || _segment instanceof RealtimeSegment) {
           if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
             // if the column is sorted use sorted inverted index based implementation
-            baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
+            baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds, startDocId, endDocId);
           } else {
-            baseFilterOperator = new BitmapBasedFilterOperator(ds);
+            baseFilterOperator = new BitmapBasedFilterOperator(ds, startDocId, endDocId);
           }
         } else {
-          baseFilterOperator = new ScanBasedFilterOperator(ds);
+          baseFilterOperator = new ScanBasedFilterOperator(ds, startDocId, endDocId);
         }
       } else {
-        baseFilterOperator = new ScanBasedFilterOperator(ds);
+        baseFilterOperator = new ScanBasedFilterOperator(ds, startDocId, endDocId);
       }
       baseFilterOperator.setPredicate(predicate);
       ret = baseFilterOperator;

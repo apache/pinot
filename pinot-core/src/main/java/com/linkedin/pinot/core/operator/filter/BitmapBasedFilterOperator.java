@@ -37,8 +37,20 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private DataSource dataSource;
   private BitmapBlock bitmapBlock;
 
-  public BitmapBasedFilterOperator(DataSource dataSource) {
+  private int startDocId;
+
+  private int endDocId;
+
+  /**
+   * 
+   * @param dataSource
+   * @param startDocId inclusive
+   * @param endDocId inclusive
+   */
+  public BitmapBasedFilterOperator(DataSource dataSource, int startDocId, int endDocId) {
     this.dataSource = dataSource;
+    this.startDocId = startDocId;
+    this.endDocId = endDocId;
   }
 
   @Override
@@ -75,7 +87,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     for (int i = 0; i < dictionaryIds.length; i++) {
       bitmaps[i] = invertedIndex.getImmutable(dictionaryIds[i]);
     }
-    bitmapBlock = new BitmapBlock(dataSource.getOperatorName(), dataSourceBlock.getMetadata(), bitmaps, exclusion);
+    bitmapBlock = new BitmapBlock(dataSource.getOperatorName(), dataSourceBlock.getMetadata(), startDocId, endDocId, bitmaps, exclusion);
     return bitmapBlock;
   }
 

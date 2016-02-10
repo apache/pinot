@@ -24,6 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -48,8 +49,20 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   private SortedBlock sortedBlock;
 
-  public SortedInvertedIndexBasedFilterOperator(DataSource dataSource) {
+  private int startDocId;
+
+  private int endDocId;
+
+  /**
+   * 
+   * @param dataSource
+   * @param startDocId inclusive
+   * @param endDocId inclusive
+   */
+  public SortedInvertedIndexBasedFilterOperator(DataSource dataSource, int startDocId, int endDocId) {
     this.dataSource = dataSource;
+    this.startDocId = startDocId;
+    this.endDocId = endDocId;
   }
 
   @Override
@@ -67,10 +80,19 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     int[] dictionaryIds = evaluator.getMatchingDictionaryIds();
     for (int i = 0; i < dictionaryIds.length; i++) {
       IntPair pair = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
-      pairs.add(pair);
+      //ensure that the pair is between (startDoc,endDoc) else trim/skip it accordingly
+      if (startDocId <= pair.getLeft()  && pair.getRight() <= endDocId) {
+        pairs.add(pair);
+      } else {
+        int newStart = Math.max(pair.getLeft(), startDocId);
+        int newEnd = Math.min(pair.getRight(), endDocId);
+        if (newStart <= newEnd) {
+          pairs.add(Pairs.intPair(newStart, newEnd));
+        }
+      }
     }
     LOGGER.debug("Creating a Sorted Block with pairs: {}", pairs);
-    sortedBlock = new SortedBlock(dataSource.getOperatorName(),pairs);
+    sortedBlock = new SortedBlock(dataSource.getOperatorName(), pairs);
     return sortedBlock;
   }
 

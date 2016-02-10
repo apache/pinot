@@ -24,6 +24,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
+
 public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   int currentDocId = -1;
   BlockSingleValIterator valueIterator;
@@ -32,8 +33,8 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private PredicateEvaluator evaluator;
   private String datasourceName;
 
-  public SVScanDocIdIterator(String datasourceName, BlockValSet blockValSet,
-      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+  public SVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
+      PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.evaluator = evaluator;
     if (evaluator.alwaysFalse()) {
@@ -98,7 +99,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
-    while (valueIterator.hasNext() && currentDocId <= endDocId) {
+    while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       int dictIdForCurrentDoc = valueIterator.nextIntVal();
       if (evaluator.apply(dictIdForCurrentDoc)) {
@@ -128,12 +129,14 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       return result;
     }
     IntIterator intIterator = answer.getIntIterator();
-    int docId;
-    while (intIterator.hasNext()) {
+    int docId = -1;
+    while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();
-      valueIterator.skipTo(docId);
-      if (evaluator.apply(valueIterator.nextIntVal())) {
-        result.add(docId);
+      if (docId >= startDocId) {
+        valueIterator.skipTo(docId);
+        if (evaluator.apply(valueIterator.nextIntVal())) {
+          result.add(docId);
+        }
       }
     }
     return result;

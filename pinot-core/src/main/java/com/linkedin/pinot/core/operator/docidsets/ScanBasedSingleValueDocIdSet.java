@@ -26,24 +26,26 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private SVScanDocIdIterator blockValSetBlockDocIdIterator;
-  private BlockMetadata blockMetadata;
   private String datasourceName;
+  int startDocId;
+  int endDocId;
 
   public ScanBasedSingleValueDocIdSet(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
-    this.blockMetadata = blockMetadata;
     blockValSetBlockDocIdIterator = new SVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
+    setStartDocId(blockMetadata.getStartDocId());
+    setEndDocId(blockMetadata.getEndDocId());
   }
 
   @Override
   public int getMinDocId() {
-    return blockMetadata.getStartDocId();
+    return startDocId;
   }
 
   @Override
   public int getMaxDocId() {
-    return blockMetadata.getEndDocId();
+    return endDocId;
   }
 
   /**
@@ -52,6 +54,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
    */
   @Override
   public void setStartDocId(int startDocId) {
+    this.startDocId= startDocId;
     blockValSetBlockDocIdIterator.setStartDocId(startDocId);
   }
 
@@ -61,6 +64,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
    */
   @Override
   public void setEndDocId(int endDocId) {
+    this.endDocId = endDocId;
     blockValSetBlockDocIdIterator.setEndDocId(endDocId);
   }
 

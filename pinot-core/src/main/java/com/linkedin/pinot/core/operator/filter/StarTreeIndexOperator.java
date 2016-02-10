@@ -159,7 +159,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
                 answer.and(bitmap);
               }
             } else {
-              ScanBasedFilterOperator operator = new ScanBasedFilterOperator(dataSource, startDocId, endDocId -1);
+              ScanBasedFilterOperator operator = new ScanBasedFilterOperator(dataSource, startDocId, endDocId - 1);
               EqPredicate predicate = new EqPredicate(column, pathEntry.tree.getValue());
               operator.setPredicate(predicate);
               BlockDocIdIterator iterator = operator.getNextBlock().getBlockDocIdSet().iterator();

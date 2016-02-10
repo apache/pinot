@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
+
 public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   static final Logger LOGGER = LoggerFactory.getLogger(MVScanDocIdIterator.class);
 
@@ -40,8 +41,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private String datasourceName;
 
-  public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet,
-      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+  public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
+      PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.evaluator = evaluator;
     if (evaluator.alwaysFalse()) {
@@ -110,7 +111,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
-    while (valueIterator.hasNext() && currentDocId <= endDocId) {
+    while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       int length = valueIterator.nextIntVal(intArray);
       if (evaluator.apply(intArray, length)) {
@@ -139,13 +140,15 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       return result;
     }
     IntIterator intIterator = answer.getIntIterator();
-    int docId, length;
-    while (intIterator.hasNext()) {
+    int docId = -1, length;
+    while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();
-      valueIterator.skipTo(docId);
-      length = valueIterator.nextIntVal(intArray);
-      if (evaluator.apply(intArray, length)) {
-        result.add(docId);
+      if (docId >= startDocId) {
+        valueIterator.skipTo(docId);
+        length = valueIterator.nextIntVal(intArray);
+        if (evaluator.apply(intArray, length)) {
+          result.add(docId);
+        }
       }
     }
     return result;

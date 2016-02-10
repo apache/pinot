@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import java.util.List;
+
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -32,14 +34,18 @@ public class BitmapBlock extends BaseFilterBlock {
   private BlockMetadata blockMetadata;
   private boolean exclusion;
   private String datasourceName;
+  private int startDocId;
+  private int endDocId;
 
-  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps) {
-    this(datasourceName, blockMetadata, bitmaps, false);
+  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, int startDocId, int endDocId, ImmutableRoaringBitmap[] bitmaps) {
+    this(datasourceName, blockMetadata, startDocId, endDocId, bitmaps, false);
   }
 
-  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
+  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, int startDocId, int endDocId, ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
     this.datasourceName = datasourceName;
     this.blockMetadata = blockMetadata;
+    this.startDocId = startDocId;
+    this.endDocId = endDocId;
     this.bitmaps = bitmaps;
     this.exclusion = exclusion;
   }
@@ -56,7 +62,7 @@ public class BitmapBlock extends BaseFilterBlock {
 
   @Override
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    bitmapDocIdSet = new BitmapDocIdSet(datasourceName, blockMetadata, bitmaps, exclusion);
+    bitmapDocIdSet = new BitmapDocIdSet(datasourceName, blockMetadata, startDocId, endDocId, bitmaps, exclusion);
     return bitmapDocIdSet;
   }
 
