@@ -29,7 +29,7 @@ public class PerfBenchmarkTest {
   private static void setupCluster(String dataDir, String offlineTableName) throws Exception {
     LOGGER.info("Setting up cluster");
     PerfBenchmarkRunner.startComponents(true, true, true, false);
-    PerfBenchmarkRunner.startServerWithPreLoadedSegments(dataDir, offlineTableName, new ArrayList<String>());
+    PerfBenchmarkRunner.startServerWithPreLoadedSegments(dataDir, Lists.newArrayList(offlineTableName), new ArrayList<String>());
   }
 
   private static void runQueries(String queryFile) throws Exception {

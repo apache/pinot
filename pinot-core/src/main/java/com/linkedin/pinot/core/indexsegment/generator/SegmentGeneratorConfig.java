@@ -281,7 +281,7 @@ public class SegmentGeneratorConfig {
     if (path != null) {
       inputDataFilePath = new File(path);
       if (!inputDataFilePath.exists()) {
-        throw new RuntimeException("input path needs to exist");
+        throw new RuntimeException("input path needs to exist: " + inputDataFilePath);
       }
     }
   }

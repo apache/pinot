@@ -105,7 +105,7 @@ public class TestStarTreeIntegrationTest {
     ReadMode mode = ReadMode.heap;
     //query to test
     String[] metricNames = new String[] { "m1" };
-    String query = "select sum(m1) from T where d2='d2-v0'";
+    String query = "select sum(m1) from T";
     Pql2Compiler compiler = new Pql2Compiler();
     BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
 

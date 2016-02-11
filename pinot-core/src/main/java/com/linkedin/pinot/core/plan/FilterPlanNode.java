@@ -15,15 +15,17 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -32,12 +34,6 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.common.predicate.NotInPredicate;
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
@@ -46,6 +42,9 @@ import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
+import com.linkedin.pinot.core.realtime.RealtimeSegment;
+
 
 /**
  */
@@ -57,16 +56,23 @@ public class FilterPlanNode implements PlanNode {
   public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
     _segment = segment;
     _brokerRequest = brokerRequest;
+
   }
 
   @Override
   public Operator run() {
     long start = System.currentTimeMillis();
-    Operator constructPhysicalOperator =
-        constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
+    Operator operator;
+    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    if (_segment.getSegmentMetadata().hasStarTree() && isSimpleAggregation(_brokerRequest.getAggregationsInfo())
+        && isSimpleConjunction(filterQueryTree)) {
+      operator = new StarTreeIndexOperator(_segment, _brokerRequest);
+    } else {
+      operator = constructPhysicalOperator(filterQueryTree);
+    }
     long end = System.currentTimeMillis();
     LOGGER.debug("FilterPlanNode.run took:{}", (end - start));
-    return constructPhysicalOperator;
+    return operator;
   }
 
   private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
@@ -87,45 +93,22 @@ public class FilterPlanNode implements PlanNode {
       }
       final FilterOperator filterType = filterQueryTree.getOperator();
       switch (filterType) {
-      case AND:
-        reorder(operators);
-        ret = new AndOperator(operators);
-        break;
-      case OR:
-        reorder(operators);
-        ret = new OrOperator(operators);
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            "Not support filter type - " + filterType + " with children operators");
+        case AND:
+          reorder(operators);
+          ret = new AndOperator(operators);
+          break;
+        case OR:
+          reorder(operators);
+          ret = new OrOperator(operators);
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Not support filter type - " + filterType + " with children operators");
       }
     } else {
       final FilterOperator filterType = filterQueryTree.getOperator();
       final String column = filterQueryTree.getColumn();
-      Predicate predicate = null;
-      final List<String> value = filterQueryTree.getValue();
-      switch (filterType) {
-      case EQUALITY:
-        predicate = new EqPredicate(column, value);
-        break;
-      case RANGE:
-        predicate = new RangePredicate(column, value);
-        break;
-      case REGEX:
-        predicate = new RegexPredicate(column, value);
-        break;
-      case NOT:
-        predicate = new NEqPredicate(column, value);
-        break;
-      case NOT_IN:
-        predicate = new NotInPredicate(column, value);
-        break;
-      case IN:
-        predicate = new InPredicate(column, value);
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
-      }
+      Predicate predicate = Predicate.newPredicate(filterQueryTree);
 
       DataSource ds;
       ds = _segment.getDataSource(column);
@@ -188,10 +171,44 @@ public class FilterPlanNode implements PlanNode {
     Collections.sort(operators, comparator);
   }
 
+  /**
+   * Returns true if the filter query consists only of equality statements, conjoined by AND.
+   * <p>
+   * e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3
+   * </p>
+   */
+  private boolean isSimpleConjunction(FilterQueryTree tree) {
+    if (tree == null) {
+      return true;
+    }
+    if (tree.getChildren() == null) {
+      return FilterOperator.EQUALITY.equals(tree.getOperator()) && tree.getValue().size() == 1;
+    } else {
+      boolean res = FilterOperator.AND.equals(tree.getOperator());
+      for (FilterQueryTree subTree : tree.getChildren()) {
+        res &= isSimpleConjunction(subTree);
+      }
+      return res;
+    }
+  }
+
+  private boolean isSimpleAggregation(List<AggregationInfo> aggregationsInfo) {
+    if (aggregationsInfo == null || aggregationsInfo.isEmpty()) {
+      return false;
+    }
+    //we currently support only sum
+    for (AggregationInfo aggregationInfo : aggregationsInfo) {
+      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("sum")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   public void showTree(String prefix) {
-    final String treeStructure = prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n"
-        + prefix + "Argument 0: " + _brokerRequest.getFilterQuery();
+    final String treeStructure = prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
+        + _brokerRequest.getFilterQuery();
     LOGGER.debug(treeStructure);
   }
 }

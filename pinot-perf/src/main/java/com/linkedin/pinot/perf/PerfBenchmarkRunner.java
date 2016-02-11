@@ -24,6 +24,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
@@ -60,7 +61,8 @@ public class PerfBenchmarkRunner {
    * The segments are already extracted into a directory
    * @throws Exception
    */
-  public static void startServerWithPreLoadedSegments(String directory, String offlineTableName, List<String> invertedIndexColumns) throws Exception {
+  public static void startServerWithPreLoadedSegments(String directory, List<String> offlineTableNames,
+      List<String> invertedIndexColumns) throws Exception {
     LOGGER.info("Starting Server and uploading segments.");
     //create conf with default values
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
@@ -77,14 +79,16 @@ public class PerfBenchmarkRunner {
     driver.run();
 
     Set<String> tables = new HashSet<String>();
-    File[] segments = new File(directory, offlineTableName).listFiles();
-    for (File segmentDir : segments) {
-      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
-      if (!tables.contains(segmentMetadata.getTableName())) {
-        driver.configureTable(segmentMetadata.getTableName(), invertedIndexColumns);
-        tables.add(segmentMetadata.getTableName());
+    for (String offlineTableName : offlineTableNames) {
+      File[] segments = new File(directory, offlineTableName).listFiles();
+      for (File segmentDir : segments) {
+        SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
+        if (!tables.contains(segmentMetadata.getTableName())) {
+          driver.configureTable(segmentMetadata.getTableName(), invertedIndexColumns);
+          tables.add(segmentMetadata.getTableName());
+        }
+        driver.addSegment(segmentMetadata);
       }
-      driver.addSegment(segmentMetadata);
     }
   }
 
@@ -95,16 +99,17 @@ public class PerfBenchmarkRunner {
       }
 
       if (args[0].equalsIgnoreCase("startServerWithPreLoadedSegments") || args[0].equalsIgnoreCase("startAll")) {
-        String offlineTableName = args[1];
+        String offlineTableNames = args[1];
         String indexRootDirectory = args[2];
         List<String> invertedIndexColumns = new ArrayList<>();
-        if(args.length == 4){
+        if (args.length == 4) {
           String[] columns = args[3].split(",");
           for (int i = 0; i < columns.length; i++) {
             invertedIndexColumns.add(columns[i].trim());
           }
         }
-        startServerWithPreLoadedSegments(indexRootDirectory, offlineTableName, invertedIndexColumns);
+        startServerWithPreLoadedSegments(indexRootDirectory, Lists.newArrayList(offlineTableNames.split(",")),
+            invertedIndexColumns);
       }
 
     } else {

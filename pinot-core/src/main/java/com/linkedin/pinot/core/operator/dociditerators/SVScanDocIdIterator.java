@@ -37,6 +37,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.evaluator = evaluator;
+    valueIterator = (BlockSingleValIterator) blockValSet.iterator();
     if (evaluator.alwaysFalse()) {
       currentDocId = Constants.EOF;
       setStartDocId(Constants.EOF);
@@ -45,7 +46,6 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       setStartDocId(blockMetadata.getStartDocId());
       setEndDocId(blockMetadata.getEndDocId());
     }
-    valueIterator = (BlockSingleValIterator) blockValSet.iterator();
   }
 
   /**
@@ -53,6 +53,8 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
    * @param startDocId
    */
   public void setStartDocId(int startDocId) {
+    currentDocId = startDocId - 1;
+    valueIterator.skipTo(startDocId);
     this.startDocId = startDocId;
   }
 

@@ -50,8 +50,52 @@ public class PlainFieldExtractor implements FieldExtractor {
   public GenericRow transform(GenericRow row) {
     Map<String, Object> fieldMap = new HashMap<String, Object>();
     if (_schema.size() > 0) {
+
       for (String column : _schema.getColumnNames()) {
-        fieldMap.put(column, row.getValue(column));
+        Object value = row.getValue(column);
+        switch (_schema.getFieldSpecFor(column).getDataType()) {
+          case DOUBLE:
+            if (value instanceof Number) {
+              value = ((Number) value).doubleValue();
+            }
+            break;
+          case FLOAT:
+            if (value instanceof Number) {
+              value = ((Number) value).floatValue();
+            }
+            break;
+          case INT:
+            if (value instanceof Number) {
+              value = ((Number) value).intValue();
+            }
+            break;
+          case LONG:
+            if (value instanceof Number) {
+              value = ((Number) value).longValue();
+            }
+            break;
+          case SHORT:
+            if (value instanceof Number) {
+              value = ((Number) value).shortValue();
+            }
+            break;
+          case FLOAT_ARRAY:
+          case DOUBLE_ARRAY:
+          case LONG_ARRAY:
+          case OBJECT:
+          case INT_ARRAY:
+          case SHORT_ARRAY:
+          case STRING:
+          case STRING_ARRAY:
+          case BOOLEAN:
+          case BYTE:
+          case BYTE_ARRAY:
+          case CHAR:
+          case CHAR_ARRAY:
+          default:
+            break;
+        }
+        fieldMap.put(column, value);
       }
       row.init(fieldMap);
     }

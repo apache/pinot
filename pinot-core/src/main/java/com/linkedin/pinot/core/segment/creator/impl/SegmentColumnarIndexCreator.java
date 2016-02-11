@@ -119,7 +119,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     this.totalDocs = segmentIndexCreationInfo.getTotalDocs();
     this.totalAggDocs = segmentIndexCreationInfo.getTotalAggDocs();
     this.totalRawDocs = segmentIndexCreationInfo.getTotalRawDocs();
-    
+
     // Initialize and build dictionaries
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
@@ -169,27 +169,30 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void indexRow(GenericRow row) {
     for (final String column : dictionaryCreatorMap.keySet()) {
-
-      Object columnValueToIndex = row.getValue(column);
-      if(columnValueToIndex == null){
-        throw new RuntimeException("Null value for column:"+ column);
-      }
-      if (schema.getFieldSpecFor(column).isSingleValueField()) {
-        int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
-        ((SingleValueForwardIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
-
-        // TODO : {refactor inverted index addition}
-        if (invertedIndexCreatorMap.containsKey(column)) {
-          invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+      try {
+        Object columnValueToIndex = row.getValue(column);
+        if (columnValueToIndex == null) {
+          throw new RuntimeException("Null value for column:" + column);
         }
-      } else {
-        int[] dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
-        ((MultiValueForwardIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
+        if (schema.getFieldSpecFor(column).isSingleValueField()) {
+          int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
+          ((SingleValueForwardIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
 
-        // TODO : {refactor inverted index addition}
-        if (invertedIndexCreatorMap.containsKey(column)) {
-          invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+          // TODO : {refactor inverted index addition}
+          if (invertedIndexCreatorMap.containsKey(column)) {
+            invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+          }
+        } else {
+          int[] dictionaryIndex = dictionaryCreatorMap.get(column).indexOfMV(columnValueToIndex);
+          ((MultiValueForwardIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
+
+          // TODO : {refactor inverted index addition}
+          if (invertedIndexCreatorMap.containsKey(column)) {
+            invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
+          }
         }
+      } catch (Exception e) {
+        throw new RuntimeException("Exception while indexing column:"+ column, e);
       }
     }
     docIdCounter++;
@@ -255,8 +258,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, CARDINALITY),
           String.valueOf(uniqueValueCount));
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
-      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_RAW_DOCS), String.valueOf(totalRawDocs));
-      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_AGG_DOCS), String.valueOf(totalAggDocs));
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_RAW_DOCS),
+          String.valueOf(totalRawDocs));
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_AGG_DOCS),
+          String.valueOf(totalAggDocs));
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATA_TYPE),
           schema.getFieldSpecFor(column).getDataType().toString());
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT),
