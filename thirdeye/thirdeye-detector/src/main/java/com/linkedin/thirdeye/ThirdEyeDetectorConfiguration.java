@@ -11,11 +11,7 @@ import io.dropwizard.db.DataSourceFactory;
 public class ThirdEyeDetectorConfiguration extends Configuration {
   @Valid
   @NotNull
-  private String thirdEyeHost;
-
-  @Valid
-  @NotNull
-  private int thirdEyePort;
+  private String clientConfigRoot;
 
   @Valid
   @NotNull
@@ -30,20 +26,12 @@ public class ThirdEyeDetectorConfiguration extends Configuration {
     return database;
   }
 
-  public int getThirdEyePort() {
-    return thirdEyePort;
+  public String getClientConfigRoot() {
+    return clientConfigRoot;
   }
 
-  public void setThirdEyePort(int thirdEyePort) {
-    this.thirdEyePort = thirdEyePort;
-  }
-
-  public String getThirdEyeHost() {
-    return thirdEyeHost;
-  }
-
-  public void setThirdEyeHost(String thirdEyeHost) {
-    this.thirdEyeHost = thirdEyeHost;
+  public void setClientConfigRoot(String clientConfigRoot) {
+    this.clientConfigRoot = clientConfigRoot;
   }
 
   public String getFunctionConfigPath() {
