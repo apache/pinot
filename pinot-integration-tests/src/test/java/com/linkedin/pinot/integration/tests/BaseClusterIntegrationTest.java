@@ -708,11 +708,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
             // Tar segment
             String segmentName = outputDir.list()[0];
-            final File destinationSegmentFile = new File(segmentTarDir, segmentName);
-            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName,
-                destinationSegmentFile.getAbsolutePath());
+            final String tarGzPath = TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" +
+                    segmentName, new File(segmentTarDir, segmentName).getAbsolutePath());
             LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName);
-            return new ImmutablePair<File, File>(inputAvroFile, destinationSegmentFile);
+            return new ImmutablePair<File, File>(inputAvroFile, new File(tarGzPath));
           } catch (Exception e) {
             throw new RuntimeException(e);
           }

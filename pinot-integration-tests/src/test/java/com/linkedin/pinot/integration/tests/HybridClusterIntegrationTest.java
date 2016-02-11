@@ -53,8 +53,8 @@ import com.linkedin.pinot.util.TestUtils;
 
 
 /**
- * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
- * two month overlap).
+ * Hybrid cluster integration test that uploads 8 months of data as offline and 5 months of data as realtime (with a
+ * one month overlap).
  *
  */
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
@@ -67,7 +67,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected static final int SEGMENT_COUNT = 12;
   protected static final int QUERY_COUNT = 1000;
   protected static final int OFFLINE_SEGMENT_COUNT = 8;
-  protected static final int REALTIME_SEGMENT_COUNT = 6;
+  protected static final int REALTIME_SEGMENT_COUNT = 5;
 
   private KafkaServerStartable kafkaStarter;
 

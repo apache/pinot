@@ -152,7 +152,7 @@ public class QueryComparison {
     }
   }
 
-  private boolean compare(JSONObject clusterJson, JSONObject scanJson)
+  public static boolean compare(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     // If no records found, nothing to compare.
     if ((clusterJson.getInt(NUM_DOCS_SCANNED) == 0) && scanJson.getInt(NUM_DOCS_SCANNED) == 0) {
@@ -170,7 +170,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareAggregation(JSONObject clusterJson, JSONObject scanJson)
+  public static boolean compareAggregation(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     if ((clusterJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !scanJson.has(AGGREGATION_RESULTS)) {
       return true;
@@ -193,7 +193,7 @@ public class QueryComparison {
     return compareAggregationArrays(clusterAggregation, scanAggregation);
   }
 
-  private boolean compareAggregationArrays(JSONArray clusterAggregation, JSONArray scanAggregation)
+  private static boolean compareAggregationArrays(JSONArray clusterAggregation, JSONArray scanAggregation)
       throws JSONException {
     Map<String, Double> map = new HashMap<>();
 
@@ -229,7 +229,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareAggregationGroupBy(JSONObject clusterJson, JSONObject scanJson)
+  private static boolean compareAggregationGroupBy(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     JSONArray clusterGroupByResults = clusterJson.getJSONArray(AGGREGATION_RESULTS);
     JSONArray scanGroupByResults = scanJson.getJSONArray(AGGREGATION_RESULTS);
@@ -266,7 +266,7 @@ public class QueryComparison {
     return true;
   }
 
-  private List<Object> jsonArrayToList(JSONArray jsonArray)
+  private static List<Object> jsonArrayToList(JSONArray jsonArray)
       throws JSONException {
     List<Object> list = new ArrayList<>();
     for (int i = 0; i < jsonArray.length(); ++i) {
@@ -275,7 +275,7 @@ public class QueryComparison {
     return list;
   }
 
-  private boolean compareAggregationValues(JSONObject clusterAggr, JSONObject scanAggr)
+  private static boolean compareAggregationValues(JSONObject clusterAggr, JSONObject scanAggr)
       throws JSONException {
     JSONArray clusterResult = clusterAggr.getJSONArray(GROUP_BY_RESULT);
     JSONArray scanResult = scanAggr.getJSONArray(GROUP_BY_RESULT);
@@ -307,7 +307,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareGroupByColumns(JSONObject clusterAggr, JSONObject scanAggr)
+  private static boolean compareGroupByColumns(JSONObject clusterAggr, JSONObject scanAggr)
       throws JSONException {
     JSONArray clusterCols = clusterAggr.getJSONArray(GROUP_BY_COLUMNS);
     JSONArray scanCols = scanAggr.getJSONArray(GROUP_BY_COLUMNS);
@@ -318,7 +318,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareSelection(JSONObject clusterJson, JSONObject scanJson)
+  private static boolean compareSelection(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     if (!clusterJson.has(SELECTION_RESULTS) && !scanJson.has(SELECTION_RESULTS)) {
       return true;
@@ -337,7 +337,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareSelectionRows(JSONArray clusterRows, JSONArray scanRows)
+  private static boolean compareSelectionRows(JSONArray clusterRows, JSONArray scanRows)
       throws JSONException {
     int numClusterRows = clusterRows.length();
     int numScanRows = scanRows.length();
@@ -368,7 +368,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareAsString(String clusterString, String scanString) {
+  private static boolean compareAsString(String clusterString, String scanString) {
     return (clusterString.equals(scanString));
   }
 
@@ -385,7 +385,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareAsNumber(String clusterString, String scanString) {
+  private static boolean compareAsNumber(String clusterString, String scanString) {
     try {
       double clusterVal = Double.parseDouble(clusterString);
       double scanVal = Double.parseDouble(scanString);
@@ -395,7 +395,7 @@ public class QueryComparison {
     }
   }
 
-  private boolean compareLists(JSONArray clusterList, JSONArray scanList)
+  private static boolean compareLists(JSONArray clusterList, JSONArray scanList)
       throws JSONException {
     int clusterSize = clusterList.length();
     int scanSize = scanList.length();
@@ -418,7 +418,7 @@ public class QueryComparison {
     return true;
   }
 
-  private boolean compareNumDocsScanned(JSONObject clusterJson, JSONObject scanJson)
+  private static boolean compareNumDocsScanned(JSONObject clusterJson, JSONObject scanJson)
       throws JSONException {
     int clusterDocs = clusterJson.getInt(NUM_DOCS_SCANNED);
     int scanDocs = scanJson.getInt(NUM_DOCS_SCANNED);
