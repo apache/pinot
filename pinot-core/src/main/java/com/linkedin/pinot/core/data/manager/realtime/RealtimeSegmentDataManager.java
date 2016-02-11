@@ -138,15 +138,17 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         long exceptionSleepMillis = 50L;
 
         do {
+          GenericRow row = null;
           try {
-            GenericRow row = kafkaStreamProvider.next();
+            row = kafkaStreamProvider.next();
 
             if (row != null) {
               notFull = realtimeSegment.index(row);
               exceptionSleepMillis = 50L;
             }
           } catch (Exception e) {
-            LOGGER.warn("Caught exception while indexing row, sleeping for {} ms", exceptionSleepMillis, e);
+            LOGGER.warn("Caught exception while indexing row, sleeping for {} ms, row contents {}",
+                exceptionSleepMillis, row, e);
 
             // Sleep for a short time as to avoid filling the logs with exceptions too quickly
             Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
