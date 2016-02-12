@@ -56,7 +56,6 @@ public class FilterPlanNode implements PlanNode {
   public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
     _segment = segment;
     _brokerRequest = brokerRequest;
-
   }
 
   @Override
@@ -64,8 +63,8 @@ public class FilterPlanNode implements PlanNode {
     long start = System.currentTimeMillis();
     Operator operator;
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    if (_segment.getSegmentMetadata().hasStarTree() && isSimpleAggregation(_brokerRequest.getAggregationsInfo())
-        && isSimpleConjunction(filterQueryTree)) {
+    if (_segment.getSegmentMetadata().hasStarTree()
+        && RequestUtils.isFitForStarTreeIndex(filterQueryTree, _brokerRequest.getAggregationsInfo())) {
       operator = new StarTreeIndexOperator(_segment, _brokerRequest);
     } else {
       operator = constructPhysicalOperator(filterQueryTree);
@@ -169,40 +168,6 @@ public class FilterPlanNode implements PlanNode {
       }
     };
     Collections.sort(operators, comparator);
-  }
-
-  /**
-   * Returns true if the filter query consists only of equality statements, conjoined by AND.
-   * <p>
-   * e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3
-   * </p>
-   */
-  private boolean isSimpleConjunction(FilterQueryTree tree) {
-    if (tree == null) {
-      return true;
-    }
-    if (tree.getChildren() == null) {
-      return FilterOperator.EQUALITY.equals(tree.getOperator()) && tree.getValue().size() == 1;
-    } else {
-      boolean res = FilterOperator.AND.equals(tree.getOperator());
-      for (FilterQueryTree subTree : tree.getChildren()) {
-        res &= isSimpleConjunction(subTree);
-      }
-      return res;
-    }
-  }
-
-  private boolean isSimpleAggregation(List<AggregationInfo> aggregationsInfo) {
-    if (aggregationsInfo == null || aggregationsInfo.isEmpty()) {
-      return false;
-    }
-    //we currently support only sum
-    for (AggregationInfo aggregationInfo : aggregationsInfo) {
-      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("sum")) {
-        return false;
-      }
-    }
-    return true;
   }
 
   @Override

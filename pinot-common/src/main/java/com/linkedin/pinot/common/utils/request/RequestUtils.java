@@ -17,9 +17,14 @@ package com.linkedin.pinot.common.utils.request;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 
@@ -92,5 +97,45 @@ public class RequestUtils {
 
     FilterQueryTree q2 = new FilterQueryTree(id, q.getColumn(), q.getValue(), q.getOperator(), c);
     return q2;
+  }
+
+  /**
+   * Returns true if the filter query consists only of simple predicates, conjoined by AND.
+   * <p>
+   * e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3 AND d4 between t1,t2
+   * </p>
+   */
+  public static boolean isFitForStarTreeIndex(FilterQueryTree tree, List<AggregationInfo> aggregationsInfo) {
+    //if the filter tree has children, ensure that root is AND and all its children are leaves 
+    if (tree != null && tree.getChildren() != null && !tree.getChildren().isEmpty()) {
+      //ensure that its AND
+      if (tree.getOperator() != FilterOperator.AND) {
+        return false;
+      }
+      //ensure that children are not nested further and only one predicate per column
+      Set<String> predicateColumns = new HashSet<>();
+      for (FilterQueryTree child : tree.getChildren()) {
+        if (child.getChildren() != null && !child.getChildren().isEmpty()) {
+          //star tree index cannot support nested filter predicates
+          return false;
+        }
+        //only one predicate per column is supported
+        if (predicateColumns.contains(child.getColumn())) {
+          return false;
+        }
+        predicateColumns.add(child.getColumn());
+      }
+    }
+    //there should have some aggregation
+    if (aggregationsInfo == null || aggregationsInfo.isEmpty()) {
+      return false;
+    }
+    //we currently support only sum
+    for (AggregationInfo aggregationInfo : aggregationsInfo) {
+      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("sum")) {
+        return false;
+      }
+    }
+    return true;
   }
 }
