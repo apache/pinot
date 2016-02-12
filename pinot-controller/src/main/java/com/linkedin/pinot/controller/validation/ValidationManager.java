@@ -129,9 +129,9 @@ public class ValidationManager {
         for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
           SegmentMetadata segmentMetadata = new SegmentMetadataImpl(realtimeSegmentZKMetadata);
           segmentMetadataList.add(segmentMetadata);
-          // Update the gauge to contain the total document count in the segments
-          _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
         }
+        // Update the gauge to contain the total document count in the segments
+        _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
       } else {
         List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(propertyStore, tableName);
         for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
@@ -210,7 +210,7 @@ public class ValidationManager {
   public static long computeRealtimeTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList)  {
     long totalDocumentCount = 0;
 
-    String groupId = new String();
+    String groupId = "";
 
     for (SegmentMetadata segmentMetadata : segmentMetadataList) {
       String segmentName = segmentMetadata.getName();
@@ -220,7 +220,7 @@ public class ValidationManager {
         groupId = segmentGroupIdName;
       }
       // Discard all segments with different groupids as they are replicas
-      if (groupId.equals(segmentGroupIdName)) {
+      if (groupId.equals(segmentGroupIdName) && segmentMetadata.getTotalRawDocs() >= 0) {
         totalDocumentCount += segmentMetadata.getTotalRawDocs();
       }
     }

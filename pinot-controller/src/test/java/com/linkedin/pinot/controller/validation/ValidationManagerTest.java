@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import org.apache.helix.manager.zk.ZkClient;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -145,16 +146,17 @@ public class ValidationManagerTest {
 
     // Create a bunch of dummy segments
     String testTableName  = "TestTableTotalDocCountTest";
-    DummyMetadata metadata1 = new DummyMetadata(testTableName,
-            "TestTableTotalDocCountTest__InstanceName__groupid_1__0__1",10);
-    DummyMetadata metadata2 = new DummyMetadata(testTableName,
-            "TestTableTotalDocCountTest__InstanceName__groupid_1__0__2",20);
-    DummyMetadata metadata3 = new DummyMetadata(testTableName,
-            "TestTableTotalDocCountTest__InstanceName__groupid_1__0__3",30);
+    String segmentName1 = SegmentNameBuilder.Realtime.build("TestTableTotalDocCountTest", "InstanceName", "groupid_1","0","1");
+    String segmentName2 = SegmentNameBuilder.Realtime.build("TestTableTotalDocCountTest", "InstanceName", "groupid_1","0","2");
+    String segmentName3 = SegmentNameBuilder.Realtime.build("TestTableTotalDocCountTest", "InstanceName", "groupid_1","0","3");
+    String segmentName4 = SegmentNameBuilder.Realtime.build("TestTableTotalDocCountTest", "InstanceName", "groupid_2","0","3");
+
+    DummyMetadata metadata1 = new DummyMetadata(testTableName, segmentName1, 10);
+    DummyMetadata metadata2 = new DummyMetadata(testTableName, segmentName2, 20);
+    DummyMetadata metadata3 = new DummyMetadata(testTableName, segmentName3, 30);
 
     // This should get ignored in the count as it belongs to a different group id
-    DummyMetadata metadata4 = new DummyMetadata(testTableName,
-            "TestTableTotalDocCountTest__InstanceName__groupid_2__0__3",20);
+    DummyMetadata metadata4 = new DummyMetadata(testTableName, segmentName4, 20);
 
     // Add them to a list
     List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
