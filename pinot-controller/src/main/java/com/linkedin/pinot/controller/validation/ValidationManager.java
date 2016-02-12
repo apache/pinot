@@ -204,8 +204,6 @@ public class ValidationManager {
   public static long computeOfflineTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList)  {
     long totalDocumentCount = 0;
 
-    HashSet<String> segmentGroupIdNameSet = new HashSet<>();
-
     for (SegmentMetadata segmentMetadata : segmentMetadataList) {
       totalDocumentCount += segmentMetadata.getTotalRawDocs();
     }
