@@ -190,13 +190,10 @@ public class ValidationManager {
           _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
           // Update the gauge to contain the total document count in the segments
           _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList));
-
+          // Update the gauge to contain the total number of segments for this table
+          _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
         }
       }
-
-
-      // Update the gauge to contain the total number of segments for this table
-      _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
     }
     LOGGER.info("Validation completed");
   }
@@ -213,19 +210,19 @@ public class ValidationManager {
   public static long computeRealtimeTotalDocumentInSegments(List<SegmentMetadata> segmentMetadataList)  {
     long totalDocumentCount = 0;
 
-    HashSet<String> segmentGroupIdNameSet = new HashSet<>();
+    String groupId = new String();
 
     for (SegmentMetadata segmentMetadata : segmentMetadataList) {
-      String segmentId = segmentMetadata.getName();
-      String segmentGroupIdName = SegmentNameBuilder.Realtime.extractGroupIdName(segmentId);
+      String segmentName = segmentMetadata.getName();
+      String segmentGroupIdName = SegmentNameBuilder.Realtime.extractGroupIdName(segmentName);
 
-      // Skip the segment if we have already seen this groupid. It means that this is a replicate.
-      // Avoid double counting the replica
-      if (segmentGroupIdNameSet.contains(segmentGroupIdName)) {
-        continue;
+      if (groupId.isEmpty()) {
+        groupId = segmentGroupIdName;
       }
-      totalDocumentCount += segmentMetadata.getTotalRawDocs();
-      segmentGroupIdNameSet.add(segmentGroupIdName);
+      // Discard all segments with different groupids as they are replicas
+      if (groupId.equals(segmentGroupIdName)) {
+        totalDocumentCount += segmentMetadata.getTotalRawDocs();
+      }
     }
     return totalDocumentCount;
   }

@@ -122,7 +122,7 @@ public class ValidationManagerTest {
   }
 
   @Test
-  public void testTotalDocumentCount() throws Exception {
+  public void testTotalDocumentCountOffline() throws Exception {
 
     // Create a bunch of dummy segments
     String testTableName  = "TestTableTotalDocCountTest";
@@ -137,6 +137,33 @@ public class ValidationManagerTest {
     segmentMetadataList.add(metadata3);
 
     Assert.assertEquals(ValidationManager.computeOfflineTotalDocumentInSegments(segmentMetadataList), 60);
+
+  }
+
+  @Test
+  public void testTotalDocumentCountRealTime() throws Exception {
+
+    // Create a bunch of dummy segments
+    String testTableName  = "TestTableTotalDocCountTest";
+    DummyMetadata metadata1 = new DummyMetadata(testTableName,
+            "TestTableTotalDocCountTest__InstanceName__groupid_1__0__1",10);
+    DummyMetadata metadata2 = new DummyMetadata(testTableName,
+            "TestTableTotalDocCountTest__InstanceName__groupid_1__0__2",20);
+    DummyMetadata metadata3 = new DummyMetadata(testTableName,
+            "TestTableTotalDocCountTest__InstanceName__groupid_1__0__3",30);
+
+    // This should get ignored in the count as it belongs to a different group id
+    DummyMetadata metadata4 = new DummyMetadata(testTableName,
+            "TestTableTotalDocCountTest__InstanceName__groupid_2__0__3",20);
+
+    // Add them to a list
+    List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
+    segmentMetadataList.add(metadata1);
+    segmentMetadataList.add(metadata2);
+    segmentMetadataList.add(metadata3);
+    segmentMetadataList.add(metadata4);
+
+    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList), 60);
 
   }
 
@@ -282,6 +309,13 @@ public class ValidationManagerTest {
     public DummyMetadata(String resourceName, int totalDocsInSegment) {
       _resourceName = resourceName;
       _segmentName = resourceName + "_" + System.currentTimeMillis();
+      _crc = System.currentTimeMillis() + "";
+      _totalDocs = totalDocsInSegment;
+    }
+
+    public DummyMetadata(String resourceName, String segmentName, int totalDocsInSegment) {
+      _resourceName = resourceName;
+      _segmentName = segmentName;
       _crc = System.currentTimeMillis() + "";
       _totalDocs = totalDocsInSegment;
     }
