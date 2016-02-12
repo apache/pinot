@@ -295,9 +295,10 @@ public class RollupPhaseTwoJob extends Configured {
     LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
+    FileSystem fs = FileSystem.get(configuration);
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE2_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE2_CONFIG_PATH);
-    getAndSetConfiguration(configuration, ROLLUP_PHASE2_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, ROLLUP_PHASE2_OUTPUT_PATH));
     getAndSetConfiguration(configuration, ROLLUP_PHASE2_ANALYSIS_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
@@ -306,8 +307,10 @@ public class RollupPhaseTwoJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(ROLLUP_PHASE2_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
 

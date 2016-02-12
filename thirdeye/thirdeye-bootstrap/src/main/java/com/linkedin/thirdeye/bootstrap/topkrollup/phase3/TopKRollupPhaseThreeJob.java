@@ -231,9 +231,10 @@ public class TopKRollupPhaseThreeJob extends Configured {
 
     // topk_rollup_phase2 phase config
     Configuration configuration = job.getConfiguration();
+    FileSystem fs = FileSystem.get(configuration);
     String inputPathDir = getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE3_INPUT_PATH);
     getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE3_CONFIG_PATH);
-    getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE3_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, TOPK_ROLLUP_PHASE3_OUTPUT_PATH));
     getAndSetConfiguration(configuration, TOPK_DIMENSIONS_PATH);
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
@@ -242,8 +243,10 @@ public class TopKRollupPhaseThreeJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(TOPK_ROLLUP_PHASE3_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
 

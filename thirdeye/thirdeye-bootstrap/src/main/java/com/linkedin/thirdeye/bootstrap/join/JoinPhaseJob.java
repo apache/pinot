@@ -325,7 +325,11 @@ public class JoinPhaseJob extends Configured {
     OBJECT_MAPPER.writeValue(temp, schemaMap);
     job.getConfiguration().set("schema.json.mapping", temp.toString());
 
-    FileOutputFormat.setOutputPath(job, new Path(getAndCheck(JOIN_OUTPUT_PATH.toString())));
+    Path joinOutputPath = new Path(getAndCheck(JOIN_OUTPUT_PATH.toString()));
+    if (fs.exists(joinOutputPath)) {
+      fs.delete(joinOutputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, joinOutputPath);
 
     job.waitForCompletion(true);
 

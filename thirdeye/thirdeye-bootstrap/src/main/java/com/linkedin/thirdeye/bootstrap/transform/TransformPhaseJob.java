@@ -166,8 +166,11 @@ public class TransformPhaseJob extends Configured {
     Schema outputSchema = parser.parse(fs.open(new Path(outputSchemaPath)));
     LOGGER.info("{}", outputSchema);
 
-    String outputPathDir = getAndSetConfiguration(configuration, TRANSFORM_OUTPUT_PATH);
-    FileOutputFormat.setOutputPath(job, new Path(outputPathDir));
+    Path outputPath = new Path(getAndSetConfiguration(configuration, TRANSFORM_OUTPUT_PATH));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     // Set input schema, input path for every source
     String sources = getAndSetConfiguration(configuration, TRANSFORM_SOURCE_NAMES);

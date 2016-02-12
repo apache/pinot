@@ -257,10 +257,11 @@ public class StarTreeGenerationJob extends Configured {
     job.setNumReduceTasks(0);
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
+    FileSystem fs = FileSystem.get(configuration);
     String inputPathDir =
         getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH);
     getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH);
-    getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH));
     LOGGER.info("Running star tree generation job");
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
@@ -269,8 +270,10 @@ public class StarTreeGenerationJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
     LOGGER.info("Finished running star tree generation job");

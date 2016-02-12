@@ -216,6 +216,9 @@ public class CollectionsResource implements Managed {
 
     LOG.info("Received data for {} in {} to {}", collection, minTime, maxTime);
 
+    LOG.info("Deleting older segment for same date range, if exists");
+    dataUpdateManager.deleteData(collection, schedule, minTime, maxTime);
+
     dataUpdateManager.updateData(collection, schedule, minTime, maxTime, dataBytes);
 
     final String collectionName = collection;

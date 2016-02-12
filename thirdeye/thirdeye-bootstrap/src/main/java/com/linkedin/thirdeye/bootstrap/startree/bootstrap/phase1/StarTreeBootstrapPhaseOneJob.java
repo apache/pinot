@@ -493,9 +493,10 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     String inputPathDir = getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_INPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_GENERATION_OUTPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_CONFIG_PATH);
-    getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_OUTPUT_PATH));
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_COMPACTION);
+
     LOGGER.info("Input path dir: " + inputPathDir);
     FileInputFormat.setInputDirRecursive(job, true);
     for (String inputPath : inputPathDir.split(",")) {
@@ -515,8 +516,10 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       }
     }
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
 

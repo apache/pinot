@@ -151,9 +151,11 @@ public class RollupPhaseOneJob extends Configured {
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
+    FileSystem fs = FileSystem.get(configuration);
+
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE1_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE1_CONFIG_PATH);
-    getAndSetConfiguration(configuration, ROLLUP_PHASE1_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, ROLLUP_PHASE1_OUTPUT_PATH));
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
@@ -166,8 +168,10 @@ public class RollupPhaseOneJob extends Configured {
     MultipleOutputs.addNamedOutput(job, "belowThreshold", SequenceFileOutputFormat.class,
         BytesWritable.class, BytesWritable.class);
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
     Counters counters = job.getCounters();
@@ -178,17 +182,16 @@ public class RollupPhaseOneJob extends Configured {
 
     JobStatus status = job.getStatus();
     if (status.getState() == JobStatus.State.SUCCEEDED) {
-      FileSystem fileSystem = FileSystem.get(configuration);
       Path belowThresholdPath =
           new Path(new Path(getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "belowThreshold");
       Path aboveThresholdPath =
           new Path(new Path(getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "aboveThreshold");
 
-      if (!fileSystem.exists(belowThresholdPath)) {
-        fileSystem.mkdirs(belowThresholdPath);
+      if (!fs.exists(belowThresholdPath)) {
+        fs.mkdirs(belowThresholdPath);
       }
-      if (!fileSystem.exists(aboveThresholdPath)) {
-        fileSystem.mkdirs(aboveThresholdPath);
+      if (!fs.exists(aboveThresholdPath)) {
+        fs.mkdirs(aboveThresholdPath);
       }
     }
 

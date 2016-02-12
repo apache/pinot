@@ -162,9 +162,10 @@ public class RollupPhaseFourJob extends Configured {
 
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
+    FileSystem fs = FileSystem.get(configuration);
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE4_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE4_CONFIG_PATH);
-    getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH));
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
@@ -172,8 +173,10 @@ public class RollupPhaseFourJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
 

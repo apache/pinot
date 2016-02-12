@@ -306,9 +306,11 @@ public class ThirdEyeJob {
                 + StarTreeConstants.METRIC_SUMS_FOLDER + File.separator
                 + StarTreeConstants.METRIC_SUMS_FILE);
 
-        config.setProperty(AggregationJobConstants.AGG_CONVERTER_CLASS.toString(),
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(),
-                DEFAULT_CONVERTER_CLASS));
+        String converterClass = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(), DEFAULT_CONVERTER_CLASS);
+        if (converterClass.isEmpty()) {
+          converterClass = DEFAULT_CONVERTER_CLASS;
+        }
+        config.setProperty(AggregationJobConstants.AGG_CONVERTER_CLASS.toString(), converterClass);
 
         return config;
       }
@@ -732,10 +734,13 @@ public class ThirdEyeJob {
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_COMPACTION.getName(),
                 DEFAULT_THIRDEYE_COMPACTION));
 
+        String converterClass = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(),
+            DEFAULT_CONVERTER_CLASS);
+        if (converterClass.isEmpty()) {
+          converterClass = DEFAULT_CONVERTER_CLASS;
+        }
         config.setProperty(
-            StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString(),
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_INPUT_CONVERTER_CLASS.getName(),
-                DEFAULT_CONVERTER_CLASS));
+            StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONVERTER_CLASS.toString(), converterClass);
 
         return config;
       }
@@ -840,8 +845,8 @@ public class ThirdEyeJob {
             thirdeyeCleanupDaysAgo);
 
         String thirdeyeCleanupSkip = inputConfig.getProperty(
-            ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(), DEFAULT_CLEANUP_SKIP);
-        config.setProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_DAYSAGO.getName(),
+            ThirdEyeJobConstants.THIRDEYE_CLEANUP_SKIP.getName(), DEFAULT_CLEANUP_SKIP);
+        config.setProperty(ThirdEyeJobConstants.THIRDEYE_CLEANUP_SKIP.getName(),
             thirdeyeCleanupSkip);
 
         String schedule =
@@ -1020,6 +1025,9 @@ public class ThirdEyeJob {
     Path dataPath = new Path(bootstrapPhase2Output);
     String outputTarGzFile = metricIndexDir + "/data.tar.gz";
     Path outputTarGzFilePath = new Path(outputTarGzFile);
+    if (fileSystem.exists(outputTarGzFilePath)) {
+      fileSystem.delete(outputTarGzFilePath, false);
+    }
 
     LOGGER.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
     fileSystem.delete(new Path(dataPath, StarTreeConstants.METADATA_FILE_NAME), false);
@@ -1337,7 +1345,7 @@ public class ThirdEyeJob {
       String thirdeyeCheckCompletenessClass = inputConfig
           .getProperty(ThirdEyeJobConstants.THIRDEYE_CHECK_COMPLETENESS_CLASS.getName());
 
-      if (thirdeyeCheckCompletenessClass != null) {
+      if (thirdeyeCheckCompletenessClass != null && !thirdeyeCheckCompletenessClass.isEmpty()) {
 
         LOGGER.info("Initializing class {}", thirdeyeCheckCompletenessClass);
         Constructor<?> constructor = Class.forName(thirdeyeCheckCompletenessClass).getConstructor();
@@ -1512,7 +1520,7 @@ public class ThirdEyeJob {
   private void setMapreduceConfig(Configuration configuration) {
     String mapreduceConfig =
         inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_MR_CONF.getName());
-    if (mapreduceConfig != null) {
+    if (mapreduceConfig != null && !mapreduceConfig.isEmpty()) {
       String[] options = mapreduceConfig.split(",");
       for (String option : options) {
         String[] configs = option.split("=", 2);
