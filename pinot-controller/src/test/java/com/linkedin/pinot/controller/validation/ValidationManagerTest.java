@@ -136,7 +136,7 @@ public class ValidationManagerTest {
     segmentMetadataList.add(metadata2);
     segmentMetadataList.add(metadata3);
 
-    Assert.assertEquals(ValidationManager.computeTotalDocumentInSegments(segmentMetadataList), 60);
+    Assert.assertEquals(ValidationManager.computeOfflineTotalDocumentInSegments(segmentMetadataList), 60);
 
   }
 
