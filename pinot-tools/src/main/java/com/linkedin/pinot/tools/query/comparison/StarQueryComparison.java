@@ -113,6 +113,7 @@ public class StarQueryComparison {
   public static void main(String[] args) {
     if (args.length != 1) {
       LOGGER.info("Usage: <exec> <config_file_path>");
+      System.exit(1);
     }
 
     File configFile = new File(args[0]);

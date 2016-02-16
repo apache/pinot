@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -29,7 +30,7 @@ import java.util.Random;
  */
 public class StarTreeQueryGenerator {
 
-  private static final int MAX_NUM_PREDICATES = 5;
+  private static final int MAX_NUM_PREDICATES = 3;
   private static final int MAX_NUM_GROUP_BYS = 3;
 
   private static final String SELECT = "SELECT";
@@ -84,7 +85,7 @@ public class StarTreeQueryGenerator {
       aggregations.add(generateAggregation(_metricColumns.get(i)));
     }
 
-    return String.join(", ", aggregations);
+    return StringUtils.join(aggregations, ", ");
   }
 
   /**
@@ -102,7 +103,7 @@ public class StarTreeQueryGenerator {
     String value = "'" + valueArray.get(_random.nextInt(valueArray.size())) + "'";
     predicate.add(value);
 
-    return String.join(" ", predicate);
+    return StringUtils.join(predicate, " ");
   }
 
   /**
@@ -123,7 +124,7 @@ public class StarTreeQueryGenerator {
       predicates.add(generatePredicate(_dimensionColumns.get(i)));
     }
 
-    return WHERE + " " + String.join(" AND ", predicates);
+    return WHERE + " " + StringUtils.join(predicates, " AND ");
   }
 
   /**
@@ -145,7 +146,7 @@ public class StarTreeQueryGenerator {
       groupBys.add(_dimensionColumns.get(i));
     }
 
-    return GROUP_BY + " " + String.join(", ", groupBys);
+    return GROUP_BY + " " + StringUtils.join(groupBys, ", ");
   }
 
   /**
@@ -166,7 +167,7 @@ public class StarTreeQueryGenerator {
     components.add(predicates);
     components.add(groupBys);
 
-    return String.join(" ", components);
+    return StringUtils.join(components, " ");
   }
 
   /**
