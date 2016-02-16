@@ -43,6 +43,9 @@ public class KafkaStarterUtils {
     // Enable topic deletion by default for integration tests
     configureTopicDeletion(configuration, true);
 
+    // Set host name
+    configuration.put("host.name", "localhost");
+
     return configuration;
   }
 
