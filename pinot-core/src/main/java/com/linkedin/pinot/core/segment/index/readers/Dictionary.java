@@ -17,13 +17,13 @@ package com.linkedin.pinot.core.segment.index.readers;
 
 public interface Dictionary {
 
-  public static final int DEFAULT_NULL_INT_VALUE = 0;
-  public static final long DEFAULT_NULL_LONG_VALUE = 0L;
-  public static final float DEFAULT_NULL_FLOAT_VALUE = 0F;
-  public static final double DEFAULT_NULL_DOUBLE_VALUE = 0D;
-  public static final String DEFAULT_NULL_STRING_VALUE = "null";
+  int DEFAULT_NULL_INT_VALUE = 0;
+  long DEFAULT_NULL_LONG_VALUE = 0L;
+  float DEFAULT_NULL_FLOAT_VALUE = 0F;
+  double DEFAULT_NULL_DOUBLE_VALUE = 0D;
+  String DEFAULT_NULL_STRING_VALUE = "null";
 
-  public static final int NULL_VALUE_INDEX = -1;
+  int NULL_VALUE_INDEX = -1;
 
   int indexOf(Object rawValue);
 

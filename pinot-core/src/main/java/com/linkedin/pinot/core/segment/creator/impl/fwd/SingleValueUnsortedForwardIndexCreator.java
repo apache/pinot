@@ -22,10 +22,7 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
-import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;

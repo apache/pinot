@@ -40,27 +40,27 @@ public class IntDictionary extends ImmutableDictionaryReader {
       lookup = (Integer) rawValue;
     }
 
-    return intIndexOf(lookup.intValue());
+    return intIndexOf(lookup);
   }
 
   @Override
   public Integer get(int dictionaryId) {
-    return new Integer(getInt(dictionaryId));
+    return getInt(dictionaryId);
   }
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return new Long(getInt(dictionaryId));
+    return (long) getInt(dictionaryId);
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(getInt(dictionaryId));
+    return (double) getInt(dictionaryId);
   }
-  
+
   @Override
   public String getStringValue(int dictionaryId) {
-    return new Integer(getInt(dictionaryId)).toString();
+    return Integer.toString(getInt(dictionaryId));
   }
 
   @Override
@@ -75,7 +75,7 @@ public class IntDictionary extends ImmutableDictionaryReader {
 
   @Override
   public String toString(int dictionaryId) {
-    return new Integer(getInt(dictionaryId)).toString();
+    return Integer.toString(getInt(dictionaryId));
   }
 
   @Override

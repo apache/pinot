@@ -24,55 +24,55 @@ public interface ColumnStatistics {
      * @return Minimum value of the column
      * @throws Exception
      */
-    public Object getMinValue() throws Exception;
+    Object getMinValue() throws Exception;
 
     /**
      * @return Maximum value of the column
      * @throws Exception
      */
-    public Object getMaxValue() throws Exception;
+    Object getMaxValue() throws Exception;
 
     /**
      *
      * @return An array of elements that has the unique values for this column, sorted order.
      * @throws Exception
      */
-    public Object getUniqueValuesSet() throws Exception;
+    Object getUniqueValuesSet() throws Exception;
 
     /**
      *
      * @return The number of unique values of this column.
      * @throws Exception
      */
-    public int getCardinality() throws Exception;
+    int getCardinality() throws Exception;
 
     /**
      *
      * @return For string objects, returns the length of the longest string value. For others, returns -1.
      * @throws Exception
      */
-    public int getLengthOfLargestElement() throws Exception;
+    int getLengthOfLargestElement() throws Exception;
 
     /**
      *
      * @return The number of null values in the input for this column.
      */
-    public int getNumInputNullValues();
+    int getNumInputNullValues();
 
     /**
      *
      * @return total number of entries
      */
-    public int getTotalNumberOfEntries();
+    int getTotalNumberOfEntries();
 
     /**
      * @return For multi-valued columns, returns the max number of values in a single occurrence of the column, otherwise 0.
      */
-    public int getMaxNumberOfMultiValues();
+    int getMaxNumberOfMultiValues();
 
     /**
      * @note
      * @return Returns if any of the values have nulls in the segments.
      */
-    public abstract boolean hasNull();
+    boolean hasNull();
 }

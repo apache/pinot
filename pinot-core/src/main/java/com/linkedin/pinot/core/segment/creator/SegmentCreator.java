@@ -39,7 +39,6 @@ public interface SegmentCreator {
    * @param segmentCreationSpec
    * @param indexCreationInfoMap
    * @param schema
-   * @param totalDocs
    * @param outDir
    * @throws Exception
    */

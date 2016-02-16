@@ -111,10 +111,6 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     }
 
     min = sortedIntList[0];
-    if (sortedIntList.length == 0) {
-      max = sortedIntList[0];
-    } else {
-      max = sortedIntList[sortedIntList.length - 1];
-    }
+    max = sortedIntList[sortedIntList.length - 1];
   }
 }

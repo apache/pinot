@@ -113,11 +113,6 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     }
 
     min = sortedLongList[0];
-    if (sortedLongList.length == 0) {
-      max = sortedLongList[0];
-    } else {
-      max = sortedLongList[sortedLongList.length - 1];
-    }
-
+    max = sortedLongList[sortedLongList.length - 1];
   }
 }

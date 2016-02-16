@@ -18,13 +18,10 @@ package com.linkedin.pinot.core.segment.index;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.File;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,8 +100,7 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName) {
-    final DataSource d = new ColumnDataSourceImpl(indexContainerMap.get(columnName));
-    return d;
+    return new ColumnDataSourceImpl(indexContainerMap.get(columnName));
   }
 
   public DataSource getDataSource(String columnName, Predicate p) {

@@ -203,7 +203,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private void init() {
     String versionString = _segmentMetadataPropertiesConfiguration
-        .getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION.toString(), SegmentVersion.v1.toString());
+        .getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
     _segmentVersion = SegmentVersion.valueOf(versionString);
 
     final Iterator<String> metrics =
@@ -481,16 +481,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public String getDictionaryFileName(String column, String segmentVersion) {
-    StringBuilder fileNameBuilder = new StringBuilder(column);
-    fileNameBuilder.append(V1Constants.Dict.FILE_EXTENTION);
-    return fileNameBuilder.toString();
+    return column + V1Constants.Dict.FILE_EXTENTION;
   }
 
   @Override
   public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
-    StringBuilder fileNameBuilder = new StringBuilder(column);
-    fileNameBuilder.append(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
-    return fileNameBuilder.toString();
+    return column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
   }
 
 }

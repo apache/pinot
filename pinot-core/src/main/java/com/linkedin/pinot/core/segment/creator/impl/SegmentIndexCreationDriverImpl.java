@@ -15,23 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -58,6 +41,20 @@ import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import com.linkedin.pinot.core.util.CrcUtils;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -218,7 +215,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   /**
-   * Startree built its only dictionary that is different from the columnar segment dictionary. 
+   * Startree built its only dictionary that is different from the columnar segment dictionary.
    * This method updates the tree with new mapping
    * @param node
    * @param dictionaryMap
@@ -298,7 +295,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
-  private void handlePostCreation() throws Exception, ConfigurationException, IOException {
+  private void handlePostCreation() throws Exception {
     // Build the segment name, if necessary
     final String timeColumn = config.getTimeColumnName();
 

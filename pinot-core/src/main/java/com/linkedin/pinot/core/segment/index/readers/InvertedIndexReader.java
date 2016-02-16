@@ -29,14 +29,14 @@ public interface InvertedIndexReader {
    * @param idx the index
    * @return the immutable bitmap at the specified index.
    */
-  public ImmutableRoaringBitmap getImmutable(int idx);
+  ImmutableRoaringBitmap getImmutable(int idx);
 
   /**
    *
    * @param docId
    * @return
    */
-  public IntPair getMinMaxRangeFor(int docId);
+  IntPair getMinMaxRangeFor(int docId);
 
-  public void close() throws IOException;
+  void close() throws IOException;
 }

@@ -111,12 +111,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     }
 
     min = sortedFloatList[0];
-    if (sortedFloatList.length == 0) {
-      max = sortedFloatList[0];
-    } else {
-      max = sortedFloatList[sortedFloatList.length - 1];
-    }
-
+    max = sortedFloatList[sortedFloatList.length - 1];
   }
 
 }

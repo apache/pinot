@@ -36,11 +36,11 @@ public class DoubleDictionary extends ImmutableDictionaryReader  {
     Double lookup;
 
     if (rawValue instanceof String) {
-      lookup = new Double(Double.parseDouble((String)rawValue));
+      lookup = Double.parseDouble((String) rawValue);
     } else {
       lookup = (Double)rawValue;
     }
-    return doubleIndexOf(lookup.doubleValue());
+    return doubleIndexOf(lookup);
   }
 
   @Override

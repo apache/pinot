@@ -89,10 +89,7 @@ public abstract class AbstractColumnStatisticsCollector implements  ColumnStatis
   }
 
   public boolean isSorted() {
-    if (fieldSpec.isSingleValueField()) {
-      return isSorted;
-    }
-    return false;
+    return fieldSpec.isSingleValueField() && isSorted;
   }
 
   public int getNumInputNullValues() {

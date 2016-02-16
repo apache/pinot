@@ -35,16 +35,16 @@ public class LongDictionary extends ImmutableDictionaryReader {
   public int indexOf(Object rawValue) {
     Long lookup;
     if (rawValue instanceof String) {
-      lookup = new Long(Long.parseLong((String) rawValue));
+      lookup = Long.parseLong((String) rawValue);
     } else {
       lookup = (Long) rawValue;
     }
-    return longIndexOf(lookup.longValue());
+    return longIndexOf(lookup);
   }
 
   @Override
   public Long get(int dictionaryId) {
-    return new Long(getLong(dictionaryId));
+    return getLong(dictionaryId);
   }
 
   @Override
@@ -59,7 +59,7 @@ public class LongDictionary extends ImmutableDictionaryReader {
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return new Long(getLong(dictionaryId)).toString();
+    return Long.toString(getLong(dictionaryId));
   }
 
   @Override
@@ -74,7 +74,7 @@ public class LongDictionary extends ImmutableDictionaryReader {
 
   @Override
   public String toString(int dictionaryId) {
-    return new Long(getLong(dictionaryId)).toString();
+    return Long.toString(getLong(dictionaryId));
   }
 
   private long getLong(int dictionaryId) {
