@@ -49,6 +49,7 @@ public class QueryComparison {
   private static final String GROUP_BY_RESULT = "groupByResult";
   private static final String GROUP = "group";
   private static final String TIME_USED_MS = "timeUsedMs";
+  private static boolean _compareNumDocs = true;
 
   private File _segmentsDir;
   private File _queryFile;
@@ -106,28 +107,28 @@ public class QueryComparison {
       }
 
       try {
-        JSONObject scanJson;
+        JSONObject refJson;
 
         if (resultReader != null) {
-          scanJson = new JSONObject(resultReader.readLine());
+          refJson = new JSONObject(resultReader.readLine());
         } else {
-          QueryResponse scanResponse = scanBasedQueryProcessor.processQuery(query);
-          scanJson = new JSONObject(new ObjectMapper().writeValueAsString(scanResponse));
+          QueryResponse refResponse = scanBasedQueryProcessor.processQuery(query);
+          refJson = new JSONObject(new ObjectMapper().writeValueAsString(refResponse));
         }
 
-        String clusterResponse = _clusterStarter.query(query);
-        JSONObject clusterJson = new JSONObject(clusterResponse);
+        String flowResponse = _clusterStarter.query(query);
+        JSONObject flowJson = new JSONObject(flowResponse);
 
-        if (compare(clusterJson, scanJson)) {
+        if (compare(flowJson, refJson)) {
           ++passed;
-          LOGGER.info("Comparison PASSED: Id: {} Cluster Time: {} ms Scan Time: {} ms Docs Scanned: {}", total,
-              clusterJson.get(TIME_USED_MS), scanJson.get(TIME_USED_MS), clusterJson.get(NUM_DOCS_SCANNED));
-          LOGGER.debug("Cluster Result: {}", clusterJson);
-          LOGGER.debug("Scan Result: {}", scanJson);
+          LOGGER.info("Comparison PASSED: Id: {} Flow Time: {} ms Ref Time: {} ms Docs Scanned: {}", total,
+              flowJson.get(TIME_USED_MS), refJson.get(TIME_USED_MS), flowJson.get(NUM_DOCS_SCANNED));
+          LOGGER.debug("Flow Response: {}", flowJson);
+          LOGGER.debug("Ref Response: {}", refJson);
         } else {
           LOGGER.error("Comparison FAILED: {}", query);
-          LOGGER.info("Cluster Response: {}", clusterJson);
-          LOGGER.info("Scan Response: {}", scanJson);
+          LOGGER.info("Flow Response: {}", flowJson);
+          LOGGER.info("Ref Response: {}", refJson);
         }
       } catch (Exception e) {
         LOGGER.error("Exception caught while processing query: '{}'", query, e);
@@ -152,58 +153,59 @@ public class QueryComparison {
     }
   }
 
-  public static boolean compare(JSONObject clusterJson, JSONObject scanJson)
+  public static boolean compare(JSONObject flowJson, JSONObject refJson)
       throws JSONException {
     // If no records found, nothing to compare.
-    if ((clusterJson.getInt(NUM_DOCS_SCANNED) == 0) && scanJson.getInt(NUM_DOCS_SCANNED) == 0) {
+    if ((flowJson.getInt(NUM_DOCS_SCANNED) == 0) && refJson.getInt(NUM_DOCS_SCANNED) == 0) {
+      LOGGER.info("Empty results, nothing to compare.");
       return true;
     }
 
-    if (!compareSelection(clusterJson, scanJson)) {
+    if (!compareSelection(flowJson, refJson)) {
       return false;
     }
 
-    if (!compareAggregation(clusterJson, scanJson)) {
+    if (!compareAggregation(flowJson, refJson)) {
       return false;
     }
 
     return true;
   }
 
-  public static boolean compareAggregation(JSONObject clusterJson, JSONObject scanJson)
+  public static boolean compareAggregation(JSONObject flowJson, JSONObject refJson)
       throws JSONException {
-    if ((clusterJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !scanJson.has(AGGREGATION_RESULTS)) {
+    if ((flowJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !refJson.has(AGGREGATION_RESULTS)) {
       return true;
     }
 
-    if (!compareNumDocsScanned(clusterJson, scanJson)) {
+    if (_compareNumDocs && !compareNumDocsScanned(flowJson, refJson)) {
       return false;
     }
 
-    JSONArray clusterAggregation = clusterJson.getJSONArray(AGGREGATION_RESULTS);
-    if (clusterAggregation.length() == 0) {
+    JSONArray flowAggregation = flowJson.getJSONArray(AGGREGATION_RESULTS);
+    if (flowAggregation.length() == 0) {
       return true;
     }
 
-    if (clusterAggregation.getJSONObject(0).has(GROUP_BY_RESULT)) {
-      return compareAggregationGroupBy(clusterJson, scanJson);
+    if (flowAggregation.getJSONObject(0).has(GROUP_BY_RESULT)) {
+      return compareAggregationGroupBy(flowJson, refJson);
     }
 
-    JSONArray scanAggregation = scanJson.getJSONArray(AGGREGATION_RESULTS);
-    return compareAggregationArrays(clusterAggregation, scanAggregation);
+    JSONArray refAggregation = refJson.getJSONArray(AGGREGATION_RESULTS);
+    return compareAggregationArrays(flowAggregation, refAggregation);
   }
 
-  private static boolean compareAggregationArrays(JSONArray clusterAggregation, JSONArray scanAggregation)
+  private static boolean compareAggregationArrays(JSONArray flowAggregation, JSONArray refAggregation)
       throws JSONException {
     Map<String, Double> map = new HashMap<>();
 
-    for (int i = 0; i < scanAggregation.length(); ++i) {
-      JSONObject object = scanAggregation.getJSONObject(i);
+    for (int i = 0; i < refAggregation.length(); ++i) {
+      JSONObject object = refAggregation.getJSONObject(i);
       map.put(object.getString(FUNCTION).toLowerCase(), Double.valueOf(object.getString(VALUE)));
     }
 
-    for (int i = 0; i < clusterAggregation.length(); ++i) {
-      JSONObject object = clusterAggregation.getJSONObject(i);
+    for (int i = 0; i < flowAggregation.length(); ++i) {
+      JSONObject object = flowAggregation.getJSONObject(i);
       String function = object.getString(FUNCTION).toLowerCase();
       String valueString = object.getString(VALUE);
 
@@ -215,13 +217,13 @@ public class QueryComparison {
       Double value = Double.valueOf(valueString);
 
       if (!map.containsKey(function)) {
-        LOGGER.error("Scan result does not contain function {}", function);
+        LOGGER.error("Ref Response does not contain function {}", function);
         return false;
       }
 
-      Double scanValue = map.get(function);
-      if (!fuzzyEqual(value, scanValue)) {
-        LOGGER.error("Aggregation value mismatch for function {}, {}, {}", function, value, scanValue);
+      Double refValue = map.get(function);
+      if (!fuzzyEqual(value, refValue)) {
+        LOGGER.error("Aggregation value mismatch for function {}, {}, {}", function, value, refValue);
         return false;
       }
     }
@@ -229,37 +231,37 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareAggregationGroupBy(JSONObject clusterJson, JSONObject scanJson)
+  private static boolean compareAggregationGroupBy(JSONObject flowJson, JSONObject refJson)
       throws JSONException {
-    JSONArray clusterGroupByResults = clusterJson.getJSONArray(AGGREGATION_RESULTS);
-    JSONArray scanGroupByResults = scanJson.getJSONArray(AGGREGATION_RESULTS);
+    JSONArray flowGroupByResults = flowJson.getJSONArray(AGGREGATION_RESULTS);
+    JSONArray refGroupByResults = refJson.getJSONArray(AGGREGATION_RESULTS);
 
-    int numClusterGroupBy = clusterGroupByResults.length();
-    int numScanGroupBy = scanGroupByResults.length();
+    int numFlowGroupBy = flowGroupByResults.length();
+    int numRefGroupBy = refGroupByResults.length();
 
     // Build map based on function (function_column name) to match individual entries.
     Map<String, Integer> functionMap = new HashMap<>();
-    for (int i = 0; i < numScanGroupBy; ++i) {
-      JSONObject scanAggr = scanGroupByResults.getJSONObject(i);
-      String scanFunction = scanAggr.getString(FUNCTION).toLowerCase();
-      functionMap.put(scanFunction, i);
+    for (int i = 0; i < numRefGroupBy; ++i) {
+      JSONObject refAggr = refGroupByResults.getJSONObject(i);
+      String refFunction = refAggr.getString(FUNCTION).toLowerCase();
+      functionMap.put(refFunction, i);
     }
 
-    for (int i = 0; i < numClusterGroupBy; ++i) {
-      JSONObject clusterAggr = clusterGroupByResults.getJSONObject(i);
-      String clusterFunction = clusterAggr.getString(FUNCTION).toLowerCase();
+    for (int i = 0; i < numFlowGroupBy; ++i) {
+      JSONObject flowAggr = flowGroupByResults.getJSONObject(i);
+      String flowFunction = flowAggr.getString(FUNCTION).toLowerCase();
 
-      if (!functionMap.containsKey(clusterFunction)) {
-        LOGGER.error("Missing group by function in scan: {}", clusterFunction);
+      if (!functionMap.containsKey(flowFunction)) {
+        LOGGER.error("Missing group by function in ref response: {}", flowFunction);
         return false;
       }
 
-      JSONObject scanAggr = scanGroupByResults.getJSONObject(functionMap.get(clusterFunction));
-      if (!compareGroupByColumns(clusterAggr, scanAggr)) {
+      JSONObject refAggr = refGroupByResults.getJSONObject(functionMap.get(flowFunction));
+      if (!compareGroupByColumns(flowAggr, refAggr)) {
         return false;
       }
 
-      if (!compareAggregationValues(clusterAggr, scanAggr)) {
+      if (!compareAggregationValues(flowAggr, refAggr)) {
         return false;
       }
     }
@@ -275,31 +277,31 @@ public class QueryComparison {
     return list;
   }
 
-  private static boolean compareAggregationValues(JSONObject clusterAggr, JSONObject scanAggr)
+  private static boolean compareAggregationValues(JSONObject flowAggr, JSONObject refAggr)
       throws JSONException {
-    JSONArray clusterResult = clusterAggr.getJSONArray(GROUP_BY_RESULT);
-    JSONArray scanResult = scanAggr.getJSONArray(GROUP_BY_RESULT);
+    JSONArray flowResult = flowAggr.getJSONArray(GROUP_BY_RESULT);
+    JSONArray refResult = refAggr.getJSONArray(GROUP_BY_RESULT);
 
-    Map<GroupByOperator, Double> scanMap = new HashMap<>();
-    for (int i = 0; i < scanResult.length(); ++i) {
-      List<Object> group = jsonArrayToList(scanResult.getJSONObject(i).getJSONArray(GROUP));
+    Map<GroupByOperator, Double> refMap = new HashMap<>();
+    for (int i = 0; i < refResult.length(); ++i) {
+      List<Object> group = jsonArrayToList(refResult.getJSONObject(i).getJSONArray(GROUP));
       GroupByOperator groupByOperator = new GroupByOperator(group);
-      scanMap.put(groupByOperator, scanResult.getJSONObject(i).getDouble(VALUE));
+      refMap.put(groupByOperator, refResult.getJSONObject(i).getDouble(VALUE));
     }
 
-    for (int i = 0; i < clusterResult.length(); ++i) {
-      List<Object> group = jsonArrayToList(clusterResult.getJSONObject(i).getJSONArray(GROUP));
+    for (int i = 0; i < flowResult.length(); ++i) {
+      List<Object> group = jsonArrayToList(flowResult.getJSONObject(i).getJSONArray(GROUP));
       GroupByOperator groupByOperator = new GroupByOperator(group);
 
-      double clusterValue = clusterResult.getJSONObject(i).getDouble(VALUE);
-      if (!scanMap.containsKey(groupByOperator)) {
+      double flowValue = flowResult.getJSONObject(i).getDouble(VALUE);
+      if (!refMap.containsKey(groupByOperator)) {
         LOGGER.error("Missing group by value for group: {}", group);
         return false;
       }
 
-      double scanValue = scanMap.get(groupByOperator);
-      if (!fuzzyEqual(clusterValue, scanValue)) {
-        LOGGER.error("Aggregation group by value mis-match: Cluster: {}, Scan: {}", clusterValue, scanValue);
+      double refValue = refMap.get(groupByOperator);
+      if (!fuzzyEqual(flowValue, refValue)) {
+        LOGGER.error("Aggregation group by value mis-match: Flow: {}, Ref: {}", flowValue, refValue);
         return false;
       }
     }
@@ -307,59 +309,59 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareGroupByColumns(JSONObject clusterAggr, JSONObject scanAggr)
+  private static boolean compareGroupByColumns(JSONObject flowAggr, JSONObject refAggr)
       throws JSONException {
-    JSONArray clusterCols = clusterAggr.getJSONArray(GROUP_BY_COLUMNS);
-    JSONArray scanCols = scanAggr.getJSONArray(GROUP_BY_COLUMNS);
+    JSONArray flowCols = flowAggr.getJSONArray(GROUP_BY_COLUMNS);
+    JSONArray refCols = refAggr.getJSONArray(GROUP_BY_COLUMNS);
 
-    if (!compareLists(clusterCols, scanCols)) {
+    if (!compareLists(flowCols, refCols)) {
       return false;
     }
     return true;
   }
 
-  private static boolean compareSelection(JSONObject clusterJson, JSONObject scanJson)
+  private static boolean compareSelection(JSONObject flowJson, JSONObject refJson)
       throws JSONException {
-    if (!clusterJson.has(SELECTION_RESULTS) && !scanJson.has(SELECTION_RESULTS)) {
+    if (!flowJson.has(SELECTION_RESULTS) && !refJson.has(SELECTION_RESULTS)) {
       return true;
     }
 
-    JSONObject clusterSelection = clusterJson.getJSONObject(SELECTION_RESULTS);
-    JSONObject scanSelection = scanJson.getJSONObject(SELECTION_RESULTS);
+    JSONObject flowSelection = flowJson.getJSONObject(SELECTION_RESULTS);
+    JSONObject refSelection = refJson.getJSONObject(SELECTION_RESULTS);
 
-    if (!compareLists(clusterSelection.getJSONArray(COLUMNS), scanSelection.getJSONArray(COLUMNS))) {
+    if (!compareLists(flowSelection.getJSONArray(COLUMNS), refSelection.getJSONArray(COLUMNS))) {
       return false;
     }
 
-    if (!compareSelectionRows(clusterSelection.getJSONArray(RESULTS), scanSelection.getJSONArray(RESULTS))) {
+    if (!compareSelectionRows(flowSelection.getJSONArray(RESULTS), refSelection.getJSONArray(RESULTS))) {
       return false;
     }
     return true;
   }
 
-  private static boolean compareSelectionRows(JSONArray clusterRows, JSONArray scanRows)
+  private static boolean compareSelectionRows(JSONArray flowRows, JSONArray refRows)
       throws JSONException {
-    int numClusterRows = clusterRows.length();
-    int numScanRows = scanRows.length();
+    int numFlowRows = flowRows.length();
+    int numRefRows = refRows.length();
 
-    for (int i = 0; i < numClusterRows; ++i) {
-      JSONArray clusterRow = clusterRows.getJSONArray(i);
-      JSONArray scanRow = scanRows.getJSONArray(i);
+    for (int i = 0; i < numFlowRows; ++i) {
+      JSONArray flowRow = flowRows.getJSONArray(i);
+      JSONArray refRow = refRows.getJSONArray(i);
 
-      int numClusterCols = clusterRow.length();
-      int numScanCols = scanRow.length();
+      int numFlowCols = flowRow.length();
+      int numRefCols = refRow.length();
 
-      if (numClusterCols != numClusterCols) {
-        LOGGER.error("Number of columns mis-match: Cluster: {} Scan: {}", numClusterCols, numScanCols);
+      if (numFlowCols != numFlowCols) {
+        LOGGER.error("Number of columns mis-match: Flow: {} Ref: {}", numFlowCols, numRefCols);
         return false;
       }
 
-      for (int j = 0; j < numClusterCols; ++j) {
-        String clusterVal = clusterRow.getString(j);
-        String scanVal = scanRow.getString(j);
+      for (int j = 0; j < numFlowCols; ++j) {
+        String flowVal = flowRow.getString(j);
+        String refVal = refRow.getString(j);
 
-        if (!compareAsNumber(clusterVal, scanVal) && !compareAsString(clusterVal, scanVal)) {
-          LOGGER.error("Value mis-match: Cluster {} Scan: {}", clusterVal, scanVal);
+        if (!compareAsNumber(flowVal, refVal) && !compareAsString(flowVal, refVal)) {
+          LOGGER.error("Value mis-match: Flow {} Ref: {}", flowVal, refVal);
           return false;
         }
       }
@@ -368,8 +370,8 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareAsString(String clusterString, String scanString) {
-    return (clusterString.equals(scanString));
+  private static boolean compareAsString(String flowString, String refString) {
+    return (flowString.equals(refString));
   }
 
   private static boolean isNumeric(String str) {
@@ -385,32 +387,32 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareAsNumber(String clusterString, String scanString) {
+  private static boolean compareAsNumber(String flowString, String refString) {
     try {
-      double clusterVal = Double.parseDouble(clusterString);
-      double scanVal = Double.parseDouble(scanString);
-      return (fuzzyEqual(clusterVal, scanVal));
+      double flowVal = Double.parseDouble(flowString);
+      double refVal = Double.parseDouble(refString);
+      return (fuzzyEqual(flowVal, refVal));
     } catch (NumberFormatException nfe) {
       return true;
     }
   }
 
-  private static boolean compareLists(JSONArray clusterList, JSONArray scanList)
+  private static boolean compareLists(JSONArray flowList, JSONArray refList)
       throws JSONException {
-    int clusterSize = clusterList.length();
-    int scanSize = scanList.length();
+    int flowSize = flowList.length();
+    int refSize = refList.length();
 
-    if (clusterSize != scanSize) {
-      LOGGER.error("Number of columns mismatch: Cluster: {} Scan: {}", clusterSize, scanSize);
+    if (flowSize != refSize) {
+      LOGGER.error("Number of columns mismatch: Flow: {} Ref: {}", flowSize, refSize);
       return false;
     }
 
-    for (int i = 0; i < scanList.length(); ++i) {
-      String clusterColumn = clusterList.getString(i);
-      String scanColumn = scanList.getString(i);
+    for (int i = 0; i < refList.length(); ++i) {
+      String flowColumn = flowList.getString(i);
+      String refColumn = refList.getString(i);
 
-      if (!clusterColumn.equals(scanColumn)) {
-        LOGGER.error("Column name mis-match: Cluster: {} Scan: {}", clusterColumn, scanColumn);
+      if (!flowColumn.equals(refColumn)) {
+        LOGGER.error("Column name mis-match: Flow: {} Ref: {}", flowColumn, refColumn);
         return false;
       }
     }
@@ -418,13 +420,13 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareNumDocsScanned(JSONObject clusterJson, JSONObject scanJson)
+  private static boolean compareNumDocsScanned(JSONObject flowJson, JSONObject refJson)
       throws JSONException {
-    int clusterDocs = clusterJson.getInt(NUM_DOCS_SCANNED);
-    int scanDocs = scanJson.getInt(NUM_DOCS_SCANNED);
+    int flowDocs = flowJson.getInt(NUM_DOCS_SCANNED);
+    int refDocs = refJson.getInt(NUM_DOCS_SCANNED);
 
-    if (clusterDocs != scanDocs) {
-      LOGGER.error("Mis-match in number of docs scanned: Cluster: {} Scan: {}", clusterDocs, scanDocs);
+    if (flowDocs != refDocs) {
+      LOGGER.error("Mis-match in number of docs scanned: Flow: {} Ref: {}", flowDocs, refDocs);
       return false;
     }
 
@@ -464,5 +466,9 @@ public class QueryComparison {
     }
 
     System.exit(0);
+  }
+
+  public static void setCompareNumDocs(boolean value) {
+    _compareNumDocs = value;
   }
 }

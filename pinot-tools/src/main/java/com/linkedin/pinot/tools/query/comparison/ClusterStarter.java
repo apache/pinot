@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
+import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
 import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
@@ -27,7 +28,6 @@ import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
 import com.linkedin.pinot.tools.admin.command.StartServerCommand;
 import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
-import java.io.File;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -48,24 +48,44 @@ import static com.linkedin.pinot.tools.admin.command.AbstractBaseAdminCommand.se
 
 public class ClusterStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterStarter.class);
-  private final QueryComparisonConfig _config;
+
   private String _controllerPort;
   private String _brokerHost;
   private String _brokerPort;
   private String _serverPort;
   private String _zkAddress;
   private String _clusterName;
-  private final String _localhost;
+  private String _localhost;
 
-  private File _segmentDir;
+  private String _tableName;
+  private String _tableConfigFile;
+  private String _timeColumnName;
+  private String _timeUnit;
+
+  private String _inputDataDir;
+  private String _segmentName;
+  private String _schemaFileName;
+  private String _segmentDirName;
+
+  private boolean _startZookeeper;
+  private boolean _enableStarTreeIndex;
+
   private long TIMEOUT_IN_SECONDS = 200 * 1000;
+
+  ClusterStarter()
+      throws SocketException, UnknownHostException {
+    _startZookeeper = true;
+    _enableStarTreeIndex = false;
+    _localhost = NetUtil.getHostAddress();
+  }
 
   ClusterStarter(QueryComparisonConfig config)
       throws SocketException, UnknownHostException {
-    _config = config;
 
-    String segmentDir = config.getSegmentsDir();
-    _segmentDir = (segmentDir != null) ? new File(segmentDir) : null;
+    _segmentName = config.getSegmentName();
+    _schemaFileName = config.getSchemaFileName();
+    _inputDataDir = config.getInputDataDir();
+    _segmentDirName = config.getSegmentsDir();
 
     _localhost = NetUtil.getHostAddress();
 
@@ -76,11 +96,69 @@ public class ClusterStarter {
     _brokerHost = config.getBrokerHost();
     _brokerPort = config.getBrokerPort();
     _serverPort = config.getServerPort();
+    _startZookeeper = config.getStartZookeeper();
+
+    _tableName = config.getTableName();
+    _timeColumnName = config.getTimeColumnName();
+    _timeUnit = config.getTimeUnit();
+    _tableConfigFile = config.getTableConfigFile();
+
+    _enableStarTreeIndex = false;
+  }
+
+  public ClusterStarter setControllerPort(String controllerPort) {
+    _controllerPort = controllerPort;
+    return this;
+  }
+
+  public ClusterStarter setBrokerHost(String brokerHost) {
+    _brokerHost = brokerHost;
+    return this;
+  }
+
+  public ClusterStarter setBrokerPort(String brokerPort) {
+    _brokerPort = brokerPort;
+    return this;
+  }
+
+  public ClusterStarter setServerPort(String serverPort) {
+    _serverPort = serverPort;
+    return this;
+  }
+
+  public ClusterStarter setZkAddress(String zkAddress) {
+    _zkAddress = zkAddress;
+    return this;
+  }
+
+  public ClusterStarter setStartZookeeper(boolean startZookeeper) {
+    _startZookeeper = startZookeeper;
+    return this;
+  }
+
+  public ClusterStarter setClusterName(String clusterName) {
+    _clusterName = clusterName;
+    return this;
+  }
+
+  public ClusterStarter setSegmentDirName(String segmentDirName) {
+    _segmentDirName = segmentDirName;
+    return this;
+  }
+
+  public ClusterStarter setEnableStarTree(boolean value) {
+    _enableStarTreeIndex = value;
+    return this;
+  }
+
+  public ClusterStarter setTableName(String tableName) {
+    _tableName = tableName;
+    return this;
   }
 
   private void startZookeeper()
       throws IOException {
-    if (_config.getStartZookeeper()) {
+    if (_startZookeeper) {
       StartZookeeperCommand zkStarter = new StartZookeeperCommand();
       zkStarter.execute();
     }
@@ -116,23 +194,21 @@ public class ClusterStarter {
 
   private void addTable()
       throws Exception {
-    String tableConfigFile = _config.getTableConfigFile();
-    if (tableConfigFile != null) {
+    if (_tableConfigFile != null) {
       AddTableCommand addTableCommand =
-          new AddTableCommand().setControllerPort(_controllerPort).setFilePath(tableConfigFile).setExecute(true);
+          new AddTableCommand().setControllerPort(_controllerPort).setFilePath(_tableConfigFile).setExecute(true);
       addTableCommand.execute();
       return;
     }
 
-    String tableName = _config.getTableName();
-    if (tableName == null) {
+    if (_tableName == null) {
       LOGGER.error("Table info not specified in configuration, please specify either config file or table name");
       return;
     }
 
     String controllerAddress = "http://" + _localhost + ":" + _controllerPort;
     JSONObject request = ControllerRequestBuilder
-        .buildCreateOfflineTableJSON(tableName, "server", "broker", _config.getTimeColumnName(), _config.getTimeUnit(),
+        .buildCreateOfflineTableJSON(_tableName, "server", "broker", _timeColumnName, _timeUnit,
             "", "", 3, "BalanceNumSegmentAssignmentStrategy");
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), request.toString());
   }
@@ -140,10 +216,22 @@ public class ClusterStarter {
   private void uploadData()
       throws Exception {
     UploadSegmentCommand segmentUploader =
-        new UploadSegmentCommand().setSegmentDir(_segmentDir.getAbsolutePath()).setControllerHost(_localhost)
+        new UploadSegmentCommand().setSegmentDir(_segmentDirName).setControllerHost(_localhost)
             .setControllerPort(_controllerPort);
     segmentUploader.execute();
     waitForExternalViewUpdate();
+  }
+
+  private void createSegments()
+      throws Exception {
+    if (_inputDataDir != null) {
+      CreateSegmentCommand segmentCreator =
+          new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName)
+              .setTableName(_tableName).setSegmentName(_segmentName).setOutputDir(_segmentDirName).setOverwrite(true)
+              .setEnableStarTreeIndex(_enableStarTreeIndex);
+
+      segmentCreator.execute();
+    }
   }
 
   public void start()
@@ -153,6 +241,8 @@ public class ClusterStarter {
     startBroker();
     startServer();
     addTable();
+
+    createSegments();
     uploadData();
   }
 

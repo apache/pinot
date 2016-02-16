@@ -24,14 +24,27 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String CLUSTER_NAME = "cluster.name";
+
   private static final String ZOOKEEPER_ADDRESS = "zookeeper.address";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String BROKER_HOST = "broker.host";
   private static final String BROKER_PORT = "broker.port";
   private static final String SERVER_PORT = "server.port";
+
+  // Used if a reference cluster needs to be started for testing.
+  private static final String REF_CONTROLLER_PORT = "ref.controller.port";
+  private static final String REF_BROKER_HOST = "ref.broker.host";
+  private static final String REF_BROKER_PORT = "ref.broker.port";
+  private static final String REF_SERVER_PORT = "ref.server.port";
+
   private static final String TABLE_NAME = "table.name";
   private static final String TABLE_CONFIG_FILE = "table.config.file";
+
+  public static final String SEGMENT_NAME = "segment.name";
+  private static final String INPUT_DATA_DIR = "input.data.dir";
+  private static final String SCHEMA_FILE_NAME = "schema.file.name";
   private static final String SEGMENTS_DIR = "segments.dir";
+
   private static final String QUERY_FILE = "query.file";
   private static final String RESULT_FILE = "result.file";
   private static final String START_ZOOKEEPER = "start.zookeeper";
@@ -41,12 +54,21 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String TIME_UNIT = "time.unit";
   private static final String DEFAULT_CLUSTER_NAME = "QueryComparisonCluster";
   private static final String DEFAULT_ZOOKEEPER_ADDRESS = "localhost:2181";
+
   private static final String DEFAULT_CONTROLLER_PORT = "9000";
   private static final String DEFAULT_BROKER_HOST = "localhost";
   private static final String DEFAULT_BROKER_PORT = String.valueOf(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
-
   private static final String DEFAULT_SERVER_PORT = String.valueOf(CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
+
+  private static final String DEFAULT_REF_CONTROLLER_PORT = "10000";
+  private static final String DEFAULT_REF_BROKER_HOST = "localhost";
+  private static final String DEFAULT_REF_BROKER_PORT = "10001";
+  private static final String DEFAULT_REF_SERVER_PORT = "10002";
+
   private static final boolean DEFAULT_START_ZOOKEEPER = true;
+  private static final boolean DEFAULT_ENABLE_STAR_TREE = false;
+
+  public static final String DEFAULT_SEGMENT_NAME = "pinotSegment";
 
   private static final boolean DEFAULT_START_CLUSTER = true;
   private static final String DEFAULT_TIME_COLUMN_NAME = "daysSinceEpoch";
@@ -96,6 +118,25 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
     return (value != null) ? value : DEFAULT_SERVER_PORT;
   }
 
+  public String getRefControllerPort() {
+    String value =  (String) getProperty(REF_CONTROLLER_PORT);
+    return (value != null) ? value : DEFAULT_REF_CONTROLLER_PORT;
+  }
+
+  public String getRefBrokerHost() {
+    String value = (String) getProperty(REF_BROKER_HOST);
+    return (value != null) ? value : DEFAULT_REF_BROKER_HOST;
+  }
+  public String getRefBrokerPort() {
+    String value = (String) getProperty(REF_BROKER_PORT);
+    return (value != null) ? value : DEFAULT_REF_BROKER_PORT;
+  }
+
+  public String getRefServerPort() {
+    String value = (String) getProperty(REF_SERVER_PORT);
+    return (value != null) ? value : DEFAULT_REF_SERVER_PORT;
+  }
+
   public String getTableName() {
     return (String) getProperty(TABLE_NAME);
   }
@@ -104,8 +145,21 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
     return (String) getProperty(TABLE_CONFIG_FILE);
   }
 
+  public String getSegmentName() {
+    String value = (String) getProperty(SEGMENT_NAME);
+    return (value != null) ? value : DEFAULT_SEGMENT_NAME;
+  }
+
+  public String getInputDataDir()  {
+    return (String) getProperty(INPUT_DATA_DIR);
+  }
+
   public String getSegmentsDir() {
     return (String) getProperty(SEGMENTS_DIR);
+  }
+
+  public String getSchemaFileName() {
+    return (String) getProperty(SCHEMA_FILE_NAME);
   }
 
   public String getQueryFile() {
