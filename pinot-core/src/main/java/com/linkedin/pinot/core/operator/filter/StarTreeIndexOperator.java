@@ -91,8 +91,8 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       for (String groupByCol : groupBy.getColumns()) {
         //remove if there was a filter predicate set on this column in the query
         if (eligibleEqualityPredicatesMap.containsKey(groupByCol)) {
-          eligibleEqualityPredicatesMap.remove(groupByCol);
           inEligiblePredicatesMap.put(groupByCol, eligibleEqualityPredicatesMap.get(groupByCol));
+          eligibleEqualityPredicatesMap.remove(groupByCol);
         } else{
           //there is no predicate but we cannot lose this dimension while traversing
           inEligiblePredicatesMap.put(groupByCol, null);
@@ -204,7 +204,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     remainingPredicatesMap.putAll(nonEqualityPredicatesMap);
     for (String column : remainingPredicatesMap.keySet()) {
       PredicateEntry predicateEntry = remainingPredicatesMap.get(column);
-      //predicateEntry could be null if column appeared only in groupBy
+      //predicateEntry could be null if column appeared  only in groupBy
       if (predicateEntry != null) {
         BaseFilterOperator childOperator = createChildOperator(startDocId, endDocId - 1, column, predicateEntry);
         childOperators.add(childOperator);
