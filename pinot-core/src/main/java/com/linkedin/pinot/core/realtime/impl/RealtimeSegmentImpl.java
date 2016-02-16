@@ -24,16 +24,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Counter;
-import com.yammer.metrics.core.MetricName;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.roaringbitmap.IntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -61,6 +56,9 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.MetricName;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
@@ -430,7 +428,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
@@ -453,7 +451,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     long start = System.currentTimeMillis();
 
-    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValuesArr.length; i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
@@ -474,7 +472,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
@@ -495,7 +493,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
@@ -516,7 +514,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("dictionary len : {}, time to sort : {} ", dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();

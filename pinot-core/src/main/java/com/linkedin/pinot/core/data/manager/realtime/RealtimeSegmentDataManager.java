@@ -19,6 +19,8 @@ import java.io.File;
 import java.util.List;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.plist.PropertyListConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
@@ -43,13 +46,12 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderC
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 
-public class RealtimeSegmentDataManager implements SegmentDataManager {
+public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
   private final String segmentName;
   private final Schema schema;
-  private final ReadMode mode;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
   private final StreamProviderConfig kafkaStreamProviderConfig;
@@ -58,7 +60,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private final File resourceTmpDir;
   private final Object lock = new Object();
   private RealtimeSegmentImpl realtimeSegment;
-  private IndexSegment indexSegment;
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
@@ -71,10 +72,13 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
 
+  // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
+  // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
       RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
       final Schema schema) throws Exception {
+    super();
     this.schema = schema;
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig.getSortedColumn().isEmpty()) {
@@ -110,7 +114,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     if (!resourceTmpDir.exists()) {
       resourceTmpDir.mkdirs();
     }
-    this.mode = mode;
+//    this.mode = mode;
     // create and init stream provider
     this.kafkaStreamProvider = StreamProviderFactory.buildStreamProvider();
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig);
@@ -119,7 +123,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment());
     realtimeSegment.setSegmentName(segmentMetadata.getSegmentName());
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
-    indexSegment = realtimeSegment;
     notifier = realtimeResourceManager;
 
     segmentStatusTask = new TimerTask() {
@@ -184,7 +187,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           long endTime = realtimeSegment.getMaxTime();
 
           TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-          swap();
           RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
           metadaToOverrite.setTableName(segmentMetadata.getTableName());
           metadaToOverrite.setSegmentName(segmentMetadata.getSegmentName());
@@ -194,12 +196,37 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           metadaToOverrite.setEndTime(endTime);
           metadaToOverrite.setTotalRawDocs(realtimeSegment.getSegmentMetadata().getTotalDocs());
           metadaToOverrite.setTimeUnit(timeUnit);
-          notifier.notify(metadaToOverrite);
+          Configuration configuration = new PropertyListConfiguration();
+          configuration.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX, invertedIndexColumns);
+          IndexLoadingConfigMetadata configMetadata = new IndexLoadingConfigMetadata(configuration);
+          IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode, configMetadata);
+          notifier.notifySegmentCommitted(metadaToOverrite, segment);
 
-          kafkaStreamProvider.commit();
-          kafkaStreamProvider.shutdown();
-
-          realtimeSegment = null;
+          boolean commitSuccessful = false;
+          try {
+            kafkaStreamProvider.commit();
+            commitSuccessful = true;
+            kafkaStreamProvider.shutdown();
+          } catch (Throwable e) {
+            // We have already marked this segment as "DONE", so the controller will be giving us a new segment.
+            // The new segment manager will start consumption with the same kafka group Id. One of the two scenarios can
+            // happen:
+            // a. We committed kafka offset successfully.  In that case, the new segment manager will consume events from
+            //    the new check-point, but will get only half the events if we have not shut down this consumer correctly.
+            // b. Kafka commit failed. In this case, we have not yet shutdown the consumer, so both consumers will be active,
+            //    getting half the number of events.
+            // Manual action needs to be taken at this point.
+            // The server needs to be cleared of all segments, and consumption started afresh.
+            // It is enough to start consumption from latest (since there are other servers that may be
+            // serving recent data.
+            LOGGER.error("FATAL: Exception committing or shutting down consumer for segment {} table {}:commitSuccessful={}",
+                segmentName, segmentMetadata.getTableName(), commitSuccessful, e);
+            if (!commitSuccessful) {
+              kafkaStreamProvider.shutdown();
+            }
+            throw e;
+          }
+          LOGGER.info("Successfully closed and committed kafka for {}", segmentName);
         } catch (Exception e) {
           LOGGER.error("Caught exception in the realtime indexing thread", e);
         }
@@ -214,16 +241,9 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     LOGGER.debug("finished scheduling keepIndexing timer check");
   }
 
-  public void swap() throws Exception {
-    IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode);
-    synchronized (lock) {
-      indexSegment = segment;
-    }
-  }
-
   @Override
   public IndexSegment getSegment() {
-    return indexSegment;
+    return realtimeSegment;
   }
 
   @Override

@@ -106,7 +106,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     long totalNanos = System.nanoTime() - startTime;
 
     addPhaseTiming(request, phase, totalNanos);
-    LOGGER.info(" Phase:" + phase + " took " + TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
+    LOGGER.debug(" Phase: {} took {}ms", phase, TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
     return returnValue;
   }
 

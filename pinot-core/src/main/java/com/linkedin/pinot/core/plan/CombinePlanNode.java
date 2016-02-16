@@ -96,7 +96,7 @@ public class CombinePlanNode implements PlanNode {
     MCombineOperator mCombineOperator =
         new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
     long end = System.currentTimeMillis();
-    LOGGER.info("CombinePlanNode.run took: " + (end - start));
+    LOGGER.debug("CombinePlanNode.run took: " + (end - start));
     return mCombineOperator;
   }
 

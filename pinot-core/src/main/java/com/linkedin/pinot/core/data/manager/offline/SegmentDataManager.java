@@ -15,12 +15,30 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
-public interface SegmentDataManager {
+public abstract class SegmentDataManager {
 
-  public IndexSegment getSegment();
+  @VisibleForTesting
+  private final AtomicInteger _refcnt;
 
-  public String getSegmentName();
+  public SegmentDataManager() {
+    _refcnt = new AtomicInteger(1);
+  }
+
+  public int incrementRefCnt() {
+    return _refcnt.incrementAndGet();
+  }
+
+  public int decrementRefCnt() {
+    return _refcnt.decrementAndGet();
+  }
+
+
+  public abstract IndexSegment getSegment();
+
+  public abstract String getSegmentName();
 }
