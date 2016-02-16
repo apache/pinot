@@ -23,17 +23,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
@@ -44,12 +43,12 @@ import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 
 
 public class StarTreeIndexOperator extends BaseFilterOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexOperator.class);
 
   private IndexSegment segment;
   //predicates that can be applied on the star tree
@@ -93,7 +92,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
         if (eligibleEqualityPredicatesMap.containsKey(groupByCol)) {
           inEligiblePredicatesMap.put(groupByCol, eligibleEqualityPredicatesMap.get(groupByCol));
           eligibleEqualityPredicatesMap.remove(groupByCol);
-        } else{
+        } else {
           //there is no predicate but we cannot lose this dimension while traversing
           inEligiblePredicatesMap.put(groupByCol, null);
         }
@@ -132,21 +131,25 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+    long start, end;
     MutableRoaringBitmap finalResult = null;
     if (emptyResult) {
       finalResult = new MutableRoaringBitmap();
       final BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(finalResult.getIntIterator());
       return createBaseFilterBlock(bitmapDocIdIterator);
     }
+    start = System.currentTimeMillis();
     Queue<SearchEntry> matchedEntries = findMatchingLeafNodes();
     //iterate over the matching nodes. For each column, generate the list of ranges.
     List<Operator> matchingLeafOperators = new ArrayList<>();
+    int totalDocsToScan = 0;
     for (SearchEntry matchedEntry : matchedEntries) {
       Operator matchingLeafOperator;
       int startDocId = matchedEntry.starTreeIndexnode.getStartDocumentId();
       int endDocId = matchedEntry.starTreeIndexnode.getEndDocumentId();
 
       List<Operator> filterOperators = createFilterOperatorsForRemainingPredicates(matchedEntry);
+
       if (filterOperators.size() == 0) {
         matchingLeafOperator = createFilterOperator(startDocId, endDocId);
       } else if (filterOperators.size() == 1) {
@@ -155,15 +158,19 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
         matchingLeafOperator = new AndOperator(filterOperators);
       }
       matchingLeafOperators.add(matchingLeafOperator);
-
+      totalDocsToScan += (endDocId - startDocId);
+      LOGGER.debug("{}", matchedEntry.starTreeIndexnode);
     }
+    end = System.currentTimeMillis();
+    LOGGER.debug("Found {} matching leaves, took {} ms to create remaining filter operators. Total docs to scan:{}",
+        matchedEntries.size(), (end - start), totalDocsToScan);
 
     if (matchingLeafOperators.size() == 1) {
       BaseFilterOperator baseFilterOperator = (BaseFilterOperator) matchingLeafOperators.get(0);
       return baseFilterOperator.nextFilterBlock(blockId);
     } else {
-      OrOperator orOperator = new OrOperator(matchingLeafOperators);
-      return orOperator.nextFilterBlock(blockId);
+      CompositeOperator compositeOperator = new CompositeOperator(matchingLeafOperators);
+      return compositeOperator.nextFilterBlock(blockId);
     }
   }
 

@@ -116,36 +116,33 @@ public class TestStarTreeIntegrationTest {
     BlockDocIdIterator rawDocIdIterator = rawOperator.nextBlock().getBlockDocIdSet().iterator();
     double[] expectedSums = computeSum(segment, rawDocIdIterator, metricNames);
     System.out.println("expectedSums=" + Arrays.toString(expectedSums));
-    boolean starTreeReady = true;
-    if (starTreeReady) {
-      //dump contents
-      Iterator<GenericRow> rowIterator =
-          ((IndexSegmentImpl) segment).iterator(0, segment.getSegmentMetadata().getTotalDocs());
-      int counter = 0;
-      while (rowIterator.hasNext()) {
+    //dump contents
+    Iterator<GenericRow> rowIterator =
+        ((IndexSegmentImpl) segment).iterator(0, segment.getSegmentMetadata().getTotalDocs());
+    int counter = 0;
+    while (rowIterator.hasNext()) {
 
-        GenericRow genericRow = rowIterator.next();
-        StringBuilder sb = new StringBuilder().append(counter++).append(": \t");
-        for (String dimName : schema.getDimensionNames()) {
-          sb.append(dimName).append(":").append(genericRow.getValue(dimName)).append(", ");
-        }
-        if (schema.getTimeColumnName() != null) {
-          sb.append(schema.getTimeColumnName()).append(":").append(genericRow.getValue(schema.getTimeColumnName()))
-              .append(", ");
-        }
-        for (String metName : schema.getMetricNames()) {
-          sb.append(metName).append(":").append(genericRow.getValue(metName)).append(", ");
-        }
-        System.out.println(sb);
+      GenericRow genericRow = rowIterator.next();
+      StringBuilder sb = new StringBuilder().append(counter++).append(": \t");
+      for (String dimName : schema.getDimensionNames()) {
+        sb.append(dimName).append(":").append(genericRow.getValue(dimName)).append(", ");
       }
-
-      StarTreeIndexOperator starTreeOperator = new StarTreeIndexOperator(segment, brokerRequest);
-      starTreeOperator.open();
-      BlockDocIdIterator starTreeDocIdIterator = starTreeOperator.nextBlock().getBlockDocIdSet().iterator();
-
-      double[] actualSums = computeSum(segment, starTreeDocIdIterator, metricNames);
-      System.out.println("actualSums=" + Arrays.toString(actualSums));
+      if (schema.getTimeColumnName() != null) {
+        sb.append(schema.getTimeColumnName()).append(":").append(genericRow.getValue(schema.getTimeColumnName()))
+            .append(", ");
+      }
+      for (String metName : schema.getMetricNames()) {
+        sb.append(metName).append(":").append(genericRow.getValue(metName)).append(", ");
+      }
+      System.out.println(sb);
     }
+
+    StarTreeIndexOperator starTreeOperator = new StarTreeIndexOperator(segment, brokerRequest);
+    starTreeOperator.open();
+    BlockDocIdIterator starTreeDocIdIterator = starTreeOperator.nextBlock().getBlockDocIdSet().iterator();
+
+    double[] actualSums = computeSum(segment, starTreeDocIdIterator, metricNames);
+    System.out.println("actualSums=" + Arrays.toString(actualSums));
   }
 
   private double[] computeSum(IndexSegment segment, BlockDocIdIterator docIdIterator, String... metricNames) {
