@@ -116,7 +116,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable");
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);

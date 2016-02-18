@@ -172,6 +172,20 @@ public class QueryComparison {
     return true;
   }
 
+  /**
+   * Some clients (eg Star Tree) may have different num docs scanned, but produce the same result.
+   * This compare method will ignore comparing number of documents scanned.
+   * @param flowJson
+   * @param refJson
+   * @param compareNumDocs
+   * @return
+   */
+  public static boolean compare(JSONObject flowJson, JSONObject refJson, boolean compareNumDocs)
+      throws JSONException {
+    _compareNumDocs = false;
+    return compare(flowJson, refJson);
+  }
+
   public static boolean compareAggregation(JSONObject flowJson, JSONObject refJson)
       throws JSONException {
     if ((flowJson.getJSONArray(AGGREGATION_RESULTS).length() == 0) && !refJson.has(AGGREGATION_RESULTS)) {
@@ -466,9 +480,5 @@ public class QueryComparison {
     }
 
     System.exit(0);
-  }
-
-  public static void setCompareNumDocs(boolean value) {
-    _compareNumDocs = value;
   }
 }

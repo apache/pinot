@@ -106,6 +106,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final int MAX_MESSAGES_PER_BATCH = 10000;
   private static final int MAX_MULTIVALUE_CARDINALITY = 5;
   protected static final boolean GATHER_FAILED_QUERIES = false;
+  protected static final String PINOT_SCHEMA_FILE = "OnTimeSchema.json";
   private int failedQueryCount = 0;
   private int queryCount = 0;
 
@@ -603,8 +604,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
       outputStream.close();
       reader.close();
-      LOGGER.info("Finished writing " + recordCount + " records from " + avroFile.getName() + " into Kafka topic "
-          + kafkaTopic);
+      LOGGER.info(
+          "Finished writing " + recordCount + " records from " + avroFile.getName() + " into Kafka topic " + kafkaTopic);
       int totalRecordCount = totalAvroRecordWrittenCount.addAndGet(recordCount);
       LOGGER.info("Total records written so far " + totalRecordCount);
     } catch (Exception e) {
@@ -679,7 +680,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory, final File segmentTarDir, final String tableName) {
+      final File baseDirectory, final File segmentTarDir, final String tableName, final boolean createStarTreeIndex) {
     int segmentCount = avroFiles.size();
     LOGGER.info("Building " + segmentCount + " segments in parallel");
     List<ListenableFutureTask<Pair<File, File>>> futureTasks = new ArrayList<ListenableFutureTask<Pair<File,File>>>();
@@ -700,7 +701,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             final SegmentGeneratorConfig genConfig = SegmentTestUtils
                 .getSegmentGenSpecWithSchemAndProjectedColumns(inputAvroFile, outputDir, TimeUnit.DAYS, tableName);
 
+            if (createStarTreeIndex) {
+              final File pinotSchemaFile = new File(TestUtils.getFileFromResourceUrl(
+                  BaseClusterIntegrationTest.class.getClassLoader().getResource(PINOT_SCHEMA_FILE)));
+              com.linkedin.pinot.common.data.Schema pinotSchema =
+                  com.linkedin.pinot.common.data.Schema.fromFile(pinotSchemaFile);
+              genConfig.setSchema(pinotSchema);
+            }
+
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
+            genConfig.setCreateStarTreeIndex(createStarTreeIndex);
+            genConfig.setStarTreeIndexSpec(null);
 
             final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
             driver.init(genConfig);
@@ -821,7 +832,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  public List<File> unpackAvroData(File tmpDir, int segmentCount)
+  public static List<File> unpackAvroData(File tmpDir, int segmentCount)
       throws IOException, ArchiveException {
     TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
             RealtimeClusterIntegrationTest.class.getClassLoader()

@@ -314,4 +314,7 @@ public class SegmentGeneratorConfig {
     this.createStarTreeIndex = createStarTreeIndex;
   }
 
+  public void setSchema(Schema schema) {
+    this.schema = schema;
+  }
 }

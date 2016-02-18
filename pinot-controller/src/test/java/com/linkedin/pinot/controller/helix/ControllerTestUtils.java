@@ -29,6 +29,7 @@ public class ControllerTestUtils {
   public static final String DEFAULT_CONTROLLER_INSTANCE_NAME = "localhost_11984";
   public static final String DEFAULT_DATA_DIR = FileUtils.getTempDirectoryPath() + File.separator + "test-controller-" + System.currentTimeMillis();
   public static final String DEFAULT_CONTROLLER_API_PORT = "8998";
+  public static final String DEFAULT_CONTROLLER_HOST = "localhost";
 
   public static ControllerConf getDefaultControllerConfiguration() {
     final ControllerConf conf = new ControllerConf();

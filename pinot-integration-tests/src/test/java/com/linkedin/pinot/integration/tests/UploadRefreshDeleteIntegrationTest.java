@@ -110,7 +110,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     ensureDirectoryExistsAndIsEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.sameThreadExecutor();
     buildSegmentsFromAvro(Collections.singletonList(avroFile), executor, segmentIndex,
-        new File(_segmentsDir, segmentName), segmentTarDir, "mytable");
+        new File(_segmentsDir, segmentName), segmentTarDir, "mytable", false);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 

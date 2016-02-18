@@ -45,6 +45,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -198,6 +199,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     serializeTree(starTreeBuilder);
     //post creation
     handlePostCreation();
+    starTreeBuilder.cleanup();
     long end = System.currentTimeMillis();
     LOGGER.info("Total time:{} \n star tree build time:{} \n stat collection time:{} \n column index build time:{}",
         (end - start), (starTreeBuildFinishTime - start), statCollectionFinishTime - starTreeBuildFinishTime,
@@ -228,8 +230,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       String dimName = dimensionNameToIndexMap.inverse().get(node.getDimensionName());
       int dimensionValue = node.getDimensionValue();
       if (dimensionValue != StarTreeIndexNode.all()) {
-        int mappedDimValue =
-            Arrays.binarySearch((Object[]) indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray(),
+        Object[] objectArray = convertToObjectArray(indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray());
+        int mappedDimValue = Arrays.binarySearch(objectArray,
                 dictionaryMap.get(dimName).inverse().get(dimensionValue));
         node.setDimensionValue(mappedDimValue);
       }
@@ -240,7 +242,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (children != null && !children.isEmpty()) {
       String childDimName = dimensionNameToIndexMap.inverse().get(node.getChildDimensionName());
       Object[] sortedUniqueElementsArray =
-          (Object[]) indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray();
+          convertToObjectArray(indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray());
       for (Entry<Integer, StarTreeIndexNode> entry : children.entrySet()) {
         int childDimValue = entry.getKey();
         int childMappedDimValue = StarTreeIndexNode.all();
@@ -412,4 +414,28 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return segmentName;
   }
 
+  /**
+   * Given an object that is either an Object[] or a primitive array (eg int[]),
+   * convert it to an Object[]. Returns null if input is not an array.
+   *
+   * @param input
+   * @return
+   */
+  private Object[] convertToObjectArray(Object input) {
+    if (input instanceof Object[]) {
+      return (Object[]) input;
+
+    } else if (input.getClass().isArray()) {
+      int length = Array.getLength(input);
+      Object[] outputArray = new Object[length];
+
+      for (int i = 0; i < length; ++i) {
+        outputArray[i] = Array.get(input, i);
+      }
+      return outputArray;
+
+    } else {
+      return null;
+    }
+  }
 }

@@ -49,6 +49,11 @@ public interface StarTreeBuilder {
   void build() throws Exception;
 
   /**
+   * Clean up any temporary files/directories, called at the end.
+   */
+  void cleanup();
+
+  /**
    * Returns the root node of the tree (after build).
    */
   StarTree getTree();

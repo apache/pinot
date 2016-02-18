@@ -74,10 +74,10 @@ public class StarQueryComparison {
     _startTreeCluster.start();
     _refCluster.start();
 
-    SegmentDictionaryReader segmentDictionaryReader = new SegmentDictionaryReader(_segmentDirName);
+    SegmentInfoProvider segmentInfoProvider = new SegmentInfoProvider(_segmentDirName);
     StarTreeQueryGenerator
-        queryGenerator = new StarTreeQueryGenerator(_tableName, segmentDictionaryReader.getDimensionColumns(),
-        segmentDictionaryReader.getMetricColumns(), segmentDictionaryReader.getValues());
+        queryGenerator = new StarTreeQueryGenerator(_tableName, segmentInfoProvider.getDimensionColumns(),
+        segmentInfoProvider.getMetricColumns(), segmentInfoProvider.getColumnValuesMap());
 
     boolean ret = true;
     for (int i = 0; i < _numQueries; i++) {
@@ -87,8 +87,7 @@ public class StarQueryComparison {
       JSONObject refResponse = new JSONObject(_refCluster.query(query));
       JSONObject starTreeResponse = new JSONObject((_startTreeCluster.query(query)));
 
-      QueryComparison.setCompareNumDocs(false);
-      if (QueryComparison.compare(refResponse, starTreeResponse)) {
+      if (QueryComparison.compare(refResponse, starTreeResponse, false)) {
         LOGGER.error("Comparison PASSED: {}", query);
       } else {
         ret = false;

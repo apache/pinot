@@ -127,9 +127,9 @@ public class HybridClusterScanComparisonIntegrationTest extends HybridClusterInt
     // Create segments from Avro data
     ExecutorService executor = Executors.newCachedThreadPool();
     Future<Map<File, File>> offlineAvroToSegmentMapFuture =
-        buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _offlineTarDir, "mytable");
+        buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _offlineTarDir, "mytable", false);
     Future<Map<File, File>> realtimeAvroToSegmentMapFuture =
-        buildSegmentsFromAvro(realtimeAvroFiles, executor, 0, _segmentDir, _realtimeTarDir, "mytable");
+        buildSegmentsFromAvro(realtimeAvroFiles, executor, 0, _segmentDir, _realtimeTarDir, "mytable", false);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);

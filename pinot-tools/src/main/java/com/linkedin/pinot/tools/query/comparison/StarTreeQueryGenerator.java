@@ -52,7 +52,7 @@ public class StarTreeQueryGenerator {
   // Add more comparators here to generate them in the 'WHERE' clause.
   private final List<String> _comparators = Arrays.asList(new String[]{"="});
 
-  StarTreeQueryGenerator(String tableName, List<String> dimensionColumns, List<String> metricColumns,
+  public StarTreeQueryGenerator(String tableName, List<String> dimensionColumns, List<String> metricColumns,
       Map<String, List<String>> columnValues) {
     _tableName = tableName;
     _dimensionColumns = dimensionColumns;

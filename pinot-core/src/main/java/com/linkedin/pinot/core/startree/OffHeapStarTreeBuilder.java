@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.json.JSONObject;
@@ -615,6 +616,13 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         childJsons[index++] = childJson;
       }
       json.put("nodes", childJsons);
+    }
+  }
+
+  @Override
+  public void cleanup() {
+    if (outDir != null) {
+      FileUtils.deleteQuietly(outDir);
     }
   }
 

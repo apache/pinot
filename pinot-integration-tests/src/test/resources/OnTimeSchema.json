@@ -1,0 +1,507 @@
+{
+  "timeFieldSpec" : {
+    "dataType" : "INT",
+    "outgoingGranularitySpec" : {
+      "dataType" : "INT",
+      "name" : "DaysSinceEpoch",
+      "timeType" : "DAYS"
+    },
+    "singleValueField" : true,
+    "incomingGranularitySpec" : {
+      "dataType" : "INT",
+      "name" : "DaysSinceEpoch",
+      "timeType" : "DAYS"
+    },
+    "name" : "DaysSinceEpoch",
+    "fieldType" : "TIME",
+    "delimiter" : null,
+    "defaultNullValue" : -2147483648
+  },
+  "metricFieldSpecs" : [
+    {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "DepDelay",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "DepDelayMinutes",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "DepDel15",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "DepartureDelayGroups",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "ArrDelay",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "ArrDelayMinutes",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "ArrDel15",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }, {
+      "dataType" : "INT",
+      "defaultNullValue" : 0,
+      "singleValueField" : true,
+      "name" : "ArrivalDelayGroups",
+      "fieldType" : "METRIC",
+      "delimiter" : ","
+    }],
+  "dimensionFieldSpecs" : [ {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Year",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Quarter",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Month",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DayofMonth",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DayOfWeek",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "FlightDate",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "UniqueCarrier",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "AirlineID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "Carrier",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "TailNum",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "FlightNum",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "OriginAirportID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "OriginAirportSeqID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "OriginCityMarketID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "Origin",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "OriginCityName",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "OriginState",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "OriginStateFips",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "OriginStateName",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "OriginWac",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DestAirportID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DestAirportSeqID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DestCityMarketID",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "Dest",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "DestCityName",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "DestState",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DestStateFips",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "DestStateName",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DestWac",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "CRSDepTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DepTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "DepTimeBlk",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "TaxiOut",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "WheelsOff",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "WheelsOn",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "TaxiIn",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "CRSArrTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "ArrTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "ArrTimeBlk",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Cancelled",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "STRING",
+    "defaultNullValue" : "null",
+    "singleValueField" : true,
+    "name" : "CancellationCode",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Diverted",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "CRSElapsedTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "ActualElapsedTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "AirTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Flights",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "Distance",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DistanceGroup",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "CarrierDelay",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "WeatherDelay",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "NASDelay",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "SecurityDelay",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "LateAircraftDelay",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "FirstDepTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "TotalAddGTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "LongestAddGTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DivAirportLandings",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DivReachedDest",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DivActualElapsedTime",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DivArrDelay",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }, {
+    "dataType" : "INT",
+    "defaultNullValue" : -2147483648,
+    "singleValueField" : true,
+    "name" : "DivDistance",
+    "fieldType" : "DIMENSION",
+    "delimiter" : ","
+  }],
+  "schemaName" : null
+}
