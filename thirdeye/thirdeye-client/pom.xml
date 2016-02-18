@@ -25,12 +25,12 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-api</artifactId>
-      <version>0.016</version>
+      <version>${pinot.version}</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
-      <version>0.016</version>
+      <version>${pinot.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
