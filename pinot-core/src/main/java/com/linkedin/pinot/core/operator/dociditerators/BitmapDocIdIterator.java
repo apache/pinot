@@ -46,6 +46,7 @@ public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   public int next() {
     // Empty?
     if (currentDocId == Constants.EOF || !iterator.hasNext()) {
+      currentDocId = Constants.EOF;
       return Constants.EOF;
     }
 
