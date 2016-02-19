@@ -39,7 +39,7 @@ import org.apache.commons.io.FileUtils;
  */
 public class SegmentInfoProvider {
   static final String TMP_DIR = System.getProperty("java.io.tmpdir");
-  private static final String SEGMENT_DICTIONARY_READER = "segmentDictReader";
+  private static final String SEGMENT_INFO_PROVIDER = "segmentInfoProvider";
   private final String _segmentDirName;
 
   List<String> _dimensionColumns;
@@ -93,13 +93,14 @@ public class SegmentInfoProvider {
       Map<String, Set<String>> columnValuesMap)
       throws Exception {
     File segmentDir;
+    File tmpDir = null;
 
     if (segmentFile.isFile()) {
-      segmentDir = File.createTempFile(SEGMENT_DICTIONARY_READER, null, new File(TMP_DIR));
-      FileUtils.deleteQuietly(segmentDir);
-      segmentDir.mkdir();
-      TarGzCompressionUtils.unTar(segmentFile, segmentDir);
-      segmentDir = segmentDir.listFiles()[0];
+      tmpDir = File.createTempFile(SEGMENT_INFO_PROVIDER, null, new File(TMP_DIR));
+      FileUtils.deleteQuietly(tmpDir);
+      tmpDir.mkdir();
+      TarGzCompressionUtils.unTar(segmentFile, tmpDir);
+      segmentDir = tmpDir.listFiles()[0];
     } else {
       segmentDir = segmentFile;
     }
@@ -132,6 +133,10 @@ public class SegmentInfoProvider {
         values.add(dictionary.get(i).toString());
       }
       columnValuesMap.put(column, values);
+    }
+
+    if (tmpDir != null) {
+      FileUtils.deleteQuietly(tmpDir);
     }
   }
 

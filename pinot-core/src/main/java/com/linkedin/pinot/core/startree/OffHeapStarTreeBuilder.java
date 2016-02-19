@@ -123,7 +123,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (outDir == null) {
       outDir = new File(System.getProperty("java.io.tmpdir"), V1Constants.STAR_TREE_INDEX_DIR + "_" + DateTime.now());
     }
-    LOG.info("Index output directory:{}", outDir);
+    LOG.debug("Index output directory:{}", outDir);
 
     dimensionTypes = new ArrayList<>();
     dimensionNames = new ArrayList<>();
@@ -183,8 +183,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     this.starTreeRootIndexNode.setDimensionName(StarTreeIndexNode.all());
     this.starTreeRootIndexNode.setDimensionValue(StarTreeIndexNode.all());
     this.starTreeRootIndexNode.setLevel(0);
-    LOG.info("dimensionNames:{}", dimensionNames);
-    LOG.info("metricNames:{}", metricNames);
+    LOG.debug("dimensionNames:{}", dimensionNames);
+    LOG.debug("metricNames:{}", metricNames);
   }
 
   private Object getAllStarValue(DimensionFieldSpec spec) throws Exception {
@@ -286,26 +286,26 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (splitOrder == null || splitOrder.isEmpty()) {
       splitOrder = computeDefaultSplitOrder();
     }
-    LOG.info("Split order:{}", splitOrder);
+    LOG.debug("Split order:{}", splitOrder);
     long start = System.currentTimeMillis();
     dataBuffer.flush();
     sort(dataFile, 0, rawRecordCount);
     constructStarTree(starTreeRootIndexNode, 0, rawRecordCount, 0, dataFile);
     long end = System.currentTimeMillis();
-    LOG.info("Took {} ms to build star tree index. Original records:{} Materialized record:{}", (end - start),
+    LOG.debug("Took {} ms to build star tree index. Original records:{} Materialized record:{}", (end - start),
         rawRecordCount, aggRecordCount);
     starTree = new StarTree(starTreeRootIndexNode, dimensionNameToIndexMap);
     File treeBinary = new File(outDir, "star-tree.bin");
-    LOG.info("Saving tree binary at: {} ", treeBinary);
+    LOG.debug("Saving tree binary at: {} ", treeBinary);
     starTree.writeTree(new BufferedOutputStream(new FileOutputStream(treeBinary)));
     printTree(starTreeRootIndexNode, 0);
-    LOG.info("Finished build tree. out dir: {} ", outDir);
+    LOG.debug("Finished build tree. out dir: {} ", outDir);
     dataBuffer.close();
   }
 
   private void printTree(StarTreeIndexNode node, int level) {
     for (int i = 0; i < level; i++) {
-      LOG.info("  ");
+      LOG.debug("  ");
     }
     BiMap<Integer, String> inverse = dimensionNameToIndexMap.inverse();
     String dimName = "ALL";
@@ -322,7 +322,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
             .add("childCount", node.getChildren() == null ? 0 : node.getChildren().size())
             .add("startDocumentId", node.getStartDocumentId()).add("endDocumentId", node.getEndDocumentId())
             .add("documentCount", (node.getEndDocumentId() - node.getStartDocumentId())).toString();
-    LOG.info(formattedOutput);
+    LOG.debug(formattedOutput);
 
     if (!node.isLeaf()) {
       for (StarTreeIndexNode child : node.getChildren().values()) {
@@ -408,10 +408,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
     String splitDimensionName = splitOrder.get(level);
     Integer splitDimensionId = dimensionNameToIndexMap.get(splitDimensionName);
-    LOG.info("Building tree at level:{} using file:{} from startDoc:{} endDocId:{} splitting on dimension:{}", level,
+    LOG.debug("Building tree at level:{} using file:{} from startDoc:{} endDocId:{} splitting on dimension:{}", level,
         file.getName(), startDocId, endDocId, splitDimensionName);
     Map<Integer, IntPair> sortGroupBy = groupBy(startDocId, endDocId, splitDimensionId, file);
-    LOG.info("Group stats:{}", sortGroupBy);
+    LOG.debug("Group stats:{}", sortGroupBy);
     node.setChildDimensionName(splitDimensionId);
     node.setChildren(new HashMap<Integer, StarTreeIndexNode>());
     for (int childDimensionValue : sortGroupBy.keySet()) {
@@ -458,7 +458,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       rowsAdded++;
     }
     docsAdded += rowsAdded;
-    LOG.info("Added {} additional records at level {}", rowsAdded, level);
+    LOG.debug("Added {} additional records at level {}", rowsAdded, level);
     //flush
     dataBuffer.flush();
     if (rowsAdded >= maxLeafRecords) {

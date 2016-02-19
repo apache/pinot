@@ -85,7 +85,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     init();
     loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
     setTimeIntervalAndGranularity();
-    LOGGER.info("loaded metadata for {}", indexDir.getName());
+    LOGGER.debug("loaded metadata for {}", indexDir.getName());
   }
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {

@@ -89,8 +89,8 @@ public class V1Constants {
 
     public static class StarTree {
       public static final String STAR_TREE_ENABLED = "startree.enabled";
-      public static final String SPLIT_ORDER = "startree.split.order";
-      public static final String MAX_LEAF_RECORDS = "startree.max.leaf.records";
+      public static final String STAR_TREE_SPLIT_ORDER = "startree.split.order";
+      public static final String STAR_TREE_MAX_LEAF_RECORDS = "startree.max.leaf.records";
       public static final String SPLIT_EXCLUDES = "startree.split.excludes";
       public static final String EXCLUDED_DIMENSIONS = "startree.excluded.dimensions";
     }

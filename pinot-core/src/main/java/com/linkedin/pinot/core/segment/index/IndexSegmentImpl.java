@@ -63,7 +63,7 @@ public class IndexSegmentImpl implements IndexSegment {
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
     this.starTree = starTree;
-    LOGGER.info("successfully loaded the index segment : " + indexDir.getName());
+    LOGGER.debug("successfully loaded the index segment : " + indexDir.getName());
   }
 
   public ImmutableDictionaryReader getDictionaryFor(String column) {

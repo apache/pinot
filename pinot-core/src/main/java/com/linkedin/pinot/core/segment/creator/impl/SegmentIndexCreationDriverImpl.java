@@ -117,8 +117,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Create a temporary directory used in segment creation
     tempIndexDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
     starTreeTempDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
-    LOGGER.info("tempIndexDir:{}", tempIndexDir);
-    LOGGER.info("starTreeTempDir:{}", starTreeTempDir);
+    LOGGER.debug("tempIndexDir:{}", tempIndexDir);
+    LOGGER.debug("starTreeTempDir:{}", starTreeTempDir);
   }
 
   @Override
@@ -138,6 +138,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setExcludedDimensions(Lists.newArrayList(dataSchema.getTimeColumnName()));
       starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
+      config.setStarTreeIndexSpec(starTreeIndexSpec);
     }
     List<String> splitOrder = starTreeIndexSpec.getSplitOrder();
     if (splitOrder != null && !splitOrder.isEmpty()) {
@@ -194,6 +195,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     while (allRowsIterator.hasNext()) {
       GenericRow genericRow = allRowsIterator.next();
       indexCreator.indexRow(genericRow);
+    }
+
+    // If no splitOrder was specified in starTreeIndexSpec, set the order used by the starTreeBuilder.
+    // This is required so the splitOrder used by the builder can be written into the segment metadata.
+    if (splitOrder == null || splitOrder.isEmpty()) {
+      starTreeIndexSpec.setSplitOrder(starTreeBuilder.getSplitOrder());
     }
 
     serializeTree(starTreeBuilder);
@@ -259,7 +266,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void buildRaw() throws Exception {
     // Count the number of documents and gather per-column statistics
-    LOGGER.info("Start building StatsCollector!");
+    LOGGER.debug("Start building StatsCollector!");
     totalDocs = 0;
     while (recordReader.hasNext()) {
       totalDocs++;
