@@ -52,7 +52,7 @@ public class PinotTableSegmentConfigs extends PinotRestletResourceBase {
       return updateSegmentConfig(tableName, entity);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while updating segment config ", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }

@@ -96,7 +96,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while creating tenant ", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -137,7 +137,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while updating tenant ", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -200,7 +200,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_GET_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       LOGGER.error("Caught exception while fetching tenant ", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
@@ -315,7 +315,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while deleting tenant ", e);
-      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

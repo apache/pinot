@@ -79,12 +79,18 @@ public class ControllerRestApplication extends Application {
 
   private static Router router;
 
-  public static ControllerMetrics metrics = new ControllerMetrics(new MetricsRegistry());
+  private static ControllerMetrics metrics;
 
   public ControllerRestApplication(String queryConsolePath) {
     super();
     CONSOLE_WEBAPP_ROOT_PATH = queryConsolePath;
   }
+
+  public static void setControllerMetrics(ControllerMetrics controllerMetrics) {
+    metrics = controllerMetrics;
+  }
+
+  public static ControllerMetrics getControllerMetrics() { return metrics; }
 
   @Override
   public Restlet createInboundRoot() {
@@ -203,4 +209,5 @@ public class ControllerRestApplication extends Application {
   public static Router getRouter() {
     return router;
   }
+
 }

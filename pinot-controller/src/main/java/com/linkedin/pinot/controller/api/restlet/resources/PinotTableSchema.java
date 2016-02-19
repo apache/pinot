@@ -64,7 +64,7 @@ public class PinotTableSchema extends PinotRestletResourceBase {
             .toString());
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching schema for a realtime table : {} ", tableName, e);
-        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
+        ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
@@ -76,7 +76,7 @@ public class PinotTableSchema extends PinotRestletResourceBase {
             .toString());
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching schema for a offline table : {} ", tableName, e);
-        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
+        ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
