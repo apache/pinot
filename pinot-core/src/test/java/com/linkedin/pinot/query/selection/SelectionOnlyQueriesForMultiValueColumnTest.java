@@ -25,12 +25,14 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -57,7 +59,6 @@ import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -177,7 +178,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   public void testInnerSegmentPlanMakerForSelectionNoFilter() throws Exception {
     setupSegment();
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
@@ -225,7 +226,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
     setupSegment();
     final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
@@ -309,7 +310,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   }
 
   private List<SegmentDataManager> makeSegMgrList(List<IndexSegment> indexSegmentList) {
-    List<SegmentDataManager> segMgrList = new ArrayList(indexSegmentList.size());
+    List<SegmentDataManager> segMgrList = new ArrayList<SegmentDataManager>(indexSegmentList.size());
     for (IndexSegment segment : indexSegmentList) {
       segMgrList.add(new OfflineSegmentDataManager(segment));
     }
