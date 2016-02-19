@@ -59,9 +59,10 @@ import org.testng.annotations.Test;
  */
 public class StarTreeClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
+  private static final int TOTAL_EXPECTED_DOCS = 115545;
   private final String DEFAULT_TABLE_NAME = "myTable";
 
-  private final String DEFAULT_STAR_TREE_TABLE_NAME = "myStarTable";
+  private final String STAR_TREE_TABLE_NAME = "myStarTable";
   private final String TIME_COLUMN_NAME = "DaysSinceEpoch";
 
   private final String TIME_UNIT = "daysSinceEpoch";
@@ -77,6 +78,14 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
   private StarTreeQueryGenerator _queryGenerator;
   private File _queryFile;
 
+  /**
+   * Start the Pinot Cluster:
+   * - Zookeeper
+   * - One Controller
+   * - One Broker
+   * - Two Servers
+   * @throws Exception
+   */
   private void startCluster()
       throws Exception {
 
@@ -86,13 +95,28 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     startServers(2);
   }
 
+  /**
+   * Add the reference and star tree tables to the cluster.
+   *
+   * @throws Exception
+   */
   private void addOfflineTables()
       throws Exception {
     addOfflineTable(DEFAULT_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT, null, null);
-    addOfflineTable(DEFAULT_STAR_TREE_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT,
+    addOfflineTable(STAR_TREE_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT,
         null, null);
   }
 
+  /**
+   * Generate the reference and star tree indexes and upload to corresponding tables.
+   *
+   * @param avroFiles
+   * @param tableName
+   * @param starTree
+   * @throws IOException
+   * @throws ArchiveException
+   * @throws InterruptedException
+   */
   private void generateAndUploadSegments(List<File> avroFiles, String tableName, boolean starTree)
       throws IOException, ArchiveException, InterruptedException {
     BaseClusterIntegrationTest.ensureDirectoryExistsAndIsEmpty(_segmentsDir);
@@ -114,6 +138,30 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     }
   }
 
+  /**
+   * Waits for total docs to match the expected value in the given table.
+   * There may be delay between
+   * @param expectedRecordCount
+   * @param deadline
+   * @throws Exception
+   */
+  private void waitForTotalDocsToMatch(String tableName, int expectedRecordCount, long deadline) throws Exception {
+    int actualRecordCount;
+
+    do {
+      String query = "select count(*) from " + tableName;
+      JSONObject response = postQuery(query);
+      actualRecordCount = response.getInt("totalDocs");
+
+      LOGGER.info("Actual record count: " + actualRecordCount + "\tExpected count: " + expectedRecordCount);
+      Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
+      Thread.sleep(2000L);
+    } while (expectedRecordCount != actualRecordCount);
+  }
+
+  /**
+   * Wait for External View to be in sync with Ideal State.
+   */
   private void waitForExternalViewUpdate() {
     final ZKHelixAdmin helixAdmin = new ZKHelixAdmin(ZkStarter.DEFAULT_ZK_STR);
     ClusterStateVerifier.Verifier customVerifier = new ClusterStateVerifier.Verifier() {
@@ -164,7 +212,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
    * @param starQuery
    */
   private String convertToRefQuery(String starQuery) {
-    String refQuery = StringUtils.replace(starQuery, DEFAULT_STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME);
+    String refQuery = StringUtils.replace(starQuery, STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME);
     return (refQuery + " TOP 10000");
   }
 
@@ -180,10 +228,14 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
         BaseClusterIntegrationTest.class.getClassLoader().getResource("OnTimeStarTreeQueries.txt")));
 
     generateAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false);
-    generateAndUploadSegments(avroFiles, DEFAULT_STAR_TREE_TABLE_NAME, true);
+    generateAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true);
 
     // Ensure that External View is in sync with Ideal State.
     waitForExternalViewUpdate();
+
+    // Wait until all docs are available, this is required because the broker routing tables may not be updated yet.
+    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 10000L);
+    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 100000L);
 
     // Initialize the query generator
     SegmentInfoProvider dictionaryReader = new SegmentInfoProvider(_tarredSegmentsDir.getAbsolutePath());
@@ -193,7 +245,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     Map<String, List<String>> columnValuesMap = dictionaryReader.getColumnValuesMap();
 
     _queryGenerator =
-        new StarTreeQueryGenerator(DEFAULT_STAR_TREE_TABLE_NAME, dimensionColumns, metricColumns, columnValuesMap);
+        new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, dimensionColumns, metricColumns, columnValuesMap);
   }
 
   /**
