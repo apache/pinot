@@ -73,6 +73,7 @@ import com.linkedin.thirdeye.query.ThirdEyeRatioFunction;
 public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
+  public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
@@ -90,6 +91,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   private final LoadingCache<String, Schema> schemaCache;
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
+  private List<String> fixedCollections = null;
 
   protected PinotThirdEyeClient(Connection connection, String controllerHostName,
       int controllerPort) {
@@ -355,8 +357,21 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     return config;
   }
 
+  /**
+   * Hardcodes a set of collections. Note that this method assumes the schemas for
+   * these collections already exist.
+   */
+  public void setFixedCollections(List<String> collections) {
+    LOG.info("Setting fixed collections: {}", collections);
+    this.fixedCollections = collections;
+  }
+
   @Override
   public List<String> getCollections() throws Exception {
+    if (this.fixedCollections != null) {
+      // assume the fixed collections are correct.
+      return fixedCollections;
+    }
     HttpGet req = new HttpGet(TABLES_ENDPOINT);
     LOG.info("Retrieving collections: {}", req);
     CloseableHttpResponse res = controllerClient.execute(controllerHost, req);

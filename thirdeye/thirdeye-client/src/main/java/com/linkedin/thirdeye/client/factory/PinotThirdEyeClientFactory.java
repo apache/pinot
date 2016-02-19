@@ -2,7 +2,10 @@ package com.linkedin.thirdeye.client.factory;
 
 import static com.linkedin.thirdeye.client.PinotThirdEyeClient.CONTROLLER_HOST_PROPERTY_KEY;
 import static com.linkedin.thirdeye.client.PinotThirdEyeClient.CONTROLLER_PORT_PROPERTY_KEY;
+import static com.linkedin.thirdeye.client.PinotThirdEyeClient.FIXED_COLLECTIONS_PROPERTY_KEY;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.client.PinotThirdEyeClient;
@@ -28,7 +31,14 @@ public class PinotThirdEyeClientFactory extends BaseThirdEyeClientFactory {
     String controllerHost = props.getProperty(CONTROLLER_HOST_PROPERTY_KEY);
     int controllerPort = Integer.parseInt(props.getProperty(CONTROLLER_PORT_PROPERTY_KEY));
     String zkUrl = props.getProperty(ZK_URL_PROPERTY_KEY);
-    return PinotThirdEyeClient.fromZookeeper(getConfig(), controllerHost, controllerPort, zkUrl);
+    PinotThirdEyeClient client =
+        PinotThirdEyeClient.fromZookeeper(getConfig(), controllerHost, controllerPort, zkUrl);
+    if (props.containsKey(FIXED_COLLECTIONS_PROPERTY_KEY)) {
+      String collectionString = props.getProperty(FIXED_COLLECTIONS_PROPERTY_KEY);
+      List<String> collections = Arrays.asList(collectionString.split(","));
+      client.setFixedCollections(collections);
+    }
+    return client;
   }
 
 }
