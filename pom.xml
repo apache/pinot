@@ -95,6 +95,7 @@
     <kafka.version>0.8.2.0</kafka.version>
     <zkclient.version>0.3</zkclient.version>
     <jackson.version>2.2.2</jackson.version>
+    <async-http-client.version>1.9.21</jackson.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms10G -Xmx10G</argLine>
   </properties>
@@ -381,7 +382,7 @@
       <dependency>
         <groupId>com.ning</groupId>
         <artifactId>async-http-client</artifactId>
-        <version>1.9.22</version>
+        <version>${async-http-client.version}</version>
       </dependency>
 
       <dependency>
