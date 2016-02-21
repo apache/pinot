@@ -253,13 +253,21 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
    * - Get the result from star tree cluster
    * - Convert the query to reference query (change table name, add TOP 10000)
    * - Get the result from reference cluster
-   * - Compare the results and assert they match.
+   * - Compare the results and assert that result of star tree is contained in reference result.
+   *   NOTE: This method of testing is limited in that it cannot detect cases where a valid entry
+   *   is missing from star tree result (to be addressed in future).
    *
    * @param starQuery
+   * @param expectNonZeroDocsScanned
    */
-  public void testOneQuery(String starQuery) {
+  public void testOneQuery(String starQuery, boolean expectNonZeroDocsScanned) {
     try {
       JSONObject starResponse = postQuery(starQuery);
+      if (expectNonZeroDocsScanned) {
+        int numDocsScanned = starResponse.getInt("numDocsScanned");
+        String message = "Zero Docs Scanned for query: " + starQuery;
+        Assert.assertTrue((numDocsScanned > 0), message);
+      }
 
       String refQuery = convertToRefQuery(starQuery);
       JSONObject refResponse = postQuery(refQuery);
@@ -289,7 +297,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
   public void testGeneratedQueries() {
     for (int i = 0; i < 1000; ++i) {
       String starQuery = _queryGenerator.nextQuery();
-      testOneQuery(starQuery);
+      testOneQuery(starQuery, false);
     }
   }
 
@@ -299,7 +307,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile));
       String starQuery;
       while ((starQuery = queryReader.readLine()) != null) {
-        testOneQuery(starQuery);
+        testOneQuery(starQuery, true);
       }
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());

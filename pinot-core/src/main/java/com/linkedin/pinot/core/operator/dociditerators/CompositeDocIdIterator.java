@@ -19,56 +19,49 @@ import java.util.List;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public final class CompositeDocIdIterator implements BlockDocIdIterator {
   List<BlockDocIdIterator> docIdIterators;
+  BlockDocIdIterator currentItr = null;
   int blockIdx = 0;
-  BlockDocIdIterator itr = null;
+  int currentDocId = -1;
 
   /**
-   * @param compositeFilterBlockDocIdSet
+   * @param docIdIterators
    */
   public CompositeDocIdIterator(List<BlockDocIdIterator> docIdIterators) {
     this.docIdIterators = docIdIterators;
+    if (docIdIterators.isEmpty()) {
+      currentDocId = Constants.EOF;
+    }
   }
 
 
   @Override
   public int currentDocId() {
-    checkIterator();
-    return itr.currentDocId();
+    return currentDocId;
   }
 
   @Override
   public int next() {
-    checkIterator();
-    int next = itr.next();
-    while (next == Constants.EOF && blockIdx < docIdIterators.size()) {
-      checkIterator();
-      next = itr.next();
+    // Advance until we find a valid docId, or exhaust all iterators.
+    while (((currentItr == null) || ((currentDocId = currentItr.next()) == Constants.EOF)) &&
+        blockIdx < docIdIterators.size()) {
+      currentItr = docIdIterators.get(blockIdx++);
     }
-    return next;
+
+    return currentDocId;
   }
 
   @Override
   public int advance(int targetDocId) {
-    do {
-      // We loop here because we may be trying to advance to a target doc ID pas the current
-      // sub-segment
-      checkIterator();
-      itr.advance(targetDocId);
-    } while (itr.currentDocId() == Constants.EOF && blockIdx < docIdIterators.size());
-    return next();
-  }
-
-  void checkIterator() {
-    if (itr == null) {
-      itr = docIdIterators.get(blockIdx++);
+    if (targetDocId < currentDocId) {
+      throw new IllegalArgumentException("Trying to move backwards to docId " + targetDocId +
+          ", current position " + currentDocId);
     }
 
-    while (itr.currentDocId() == Constants.EOF && blockIdx < docIdIterators.size()) {
-      itr = docIdIterators.get(blockIdx++);
-    }
+    // Advance until we hit the targetDocId, or exhaust.
+    while (currentDocId < targetDocId && (next() != Constants.EOF));
+    return currentDocId;
   }
 }
