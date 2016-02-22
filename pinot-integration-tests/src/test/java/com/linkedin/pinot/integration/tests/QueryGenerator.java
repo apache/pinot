@@ -52,8 +52,10 @@ public class QueryGenerator {
   private List<String> _nonMultivalueColumnNames = new ArrayList<String>();
   private List<String> _nonMultivalueNumericalColumnNames = new ArrayList<String>();
   private Map<String, Integer> _multivalueColumnCardinality = new HashMap<String, Integer>();
-  private List<QueryGenerationStrategy> _queryGenerationStrategies = Arrays.asList(
-      new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
+  private List<QueryGenerationStrategy> _queryGenerationStrategies =
+      Collections.<QueryGenerationStrategy>singletonList(new AggregationQueryGenerationStrategy());
+     /* Arrays.asList(
+      new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy()); */
   private List<String> _booleanOperators = Arrays.asList("OR", "AND");
   private List<PredicateGenerator> _predicateGenerators = Arrays.asList(new ComparisonOperatorPredicateGenerator(),
       new InPredicateGenerator(), new BetweenPredicateGenerator());
@@ -96,7 +98,10 @@ public class QueryGenerator {
             _columnToValues.put(fieldName, new TreeSet<String>());
 
             // We assume here that we can only have strings and numerical values, no arrays, unions, etc.
-            if (unionTypes.get(0).getType() != Schema.Type.STRING) {
+            if (unionTypes.get(0).getType() == Schema.Type.ARRAY) {
+              _columnNames.add(fieldName);
+              _multivalueColumnCardinality.put(fieldName, 0);
+            } else if (unionTypes.get(0).getType() != Schema.Type.STRING) {
               _nonMultivalueNumericalColumnNames.add(fieldName);
             }
             break;

@@ -226,13 +226,14 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile) throws Exception {
+      String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile,
+      List<String> invertedIndexColumns) throws Exception {
     int retentionDays = 900;
     String retentionTimeUnit = "Days";
     addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, new ArrayList<String>());
+        kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, invertedIndexColumns);
     addOfflineTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant,
-        serverTenant);
+        serverTenant, invertedIndexColumns);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {

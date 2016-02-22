@@ -68,7 +68,6 @@ public abstract class ControllerTest {
     conn.setDoOutput(true);
     final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
     final String reqStr = json.toString();
-    System.out.println("reqStr = " + reqStr);
 
     writer.write(reqStr, 0, reqStr.length());
     writer.flush();
@@ -85,7 +84,6 @@ public abstract class ControllerTest {
     LOGGER.info(" Time take for Request : " + query + " in ms:" + (stop - start));
 
     final String res = sb.toString();
-    System.out.println("res = " + res);
     final JSONObject ret = new JSONObject(res);
     ret.put("totalTime", (stop - start));
 

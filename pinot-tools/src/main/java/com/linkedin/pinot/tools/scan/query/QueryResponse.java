@@ -16,9 +16,11 @@
 package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.core.query.utils.Pair;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.codehaus.jackson.annotate.JsonProperty;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 
@@ -254,6 +256,15 @@ public class QueryResponse {
     @JsonProperty("group")
     public List<String> getGroup() {
       return _group;
+    }
+  }
+
+  @Override
+  public String toString() {
+    try {
+      return new ObjectMapper().writeValueAsString(this);
+    } catch (IOException e) {
+      return null;
     }
   }
 }

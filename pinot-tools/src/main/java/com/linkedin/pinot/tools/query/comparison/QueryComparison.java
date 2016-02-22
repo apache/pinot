@@ -16,22 +16,24 @@
 
 package com.linkedin.pinot.tools.query.comparison;
 
-import com.linkedin.pinot.tools.scan.query.GroupByOperator;
-import com.linkedin.pinot.tools.scan.query.QueryResponse;
-import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.tools.scan.query.GroupByOperator;
+import com.linkedin.pinot.tools.scan.query.QueryResponse;
+import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
 
 
 public class QueryComparison {
@@ -188,22 +190,37 @@ public class QueryComparison {
     }
   }
 
-  public static boolean compare(JSONObject actualJson, JSONObject expectedJson)
+  public enum ComparisonStatus {
+    PASSED,
+    EMPTY,
+    FAILED
+  }
+
+  public static ComparisonStatus compareWithEmpty(JSONObject actualJson, JSONObject expectedJson)
       throws JSONException {
     // If no records found, nothing to compare.
     if ((actualJson.getInt(NUM_DOCS_SCANNED) == 0) && expectedJson.getInt(NUM_DOCS_SCANNED) == 0) {
       LOGGER.info("Empty results, nothing to compare.");
-      return true;
+      return ComparisonStatus.EMPTY;
     }
 
     if (!compareSelection(actualJson, expectedJson)) {
-      return false;
+      return ComparisonStatus.FAILED;
     }
 
     if (!compareAggregation(actualJson, expectedJson)) {
-      return false;
+      return ComparisonStatus.FAILED;
     }
 
+    return ComparisonStatus.PASSED;
+  }
+
+  public static boolean compare(JSONObject actualJson, JSONObject expectedJson)
+      throws JSONException {
+    ComparisonStatus comparisonStatus = compareWithEmpty(actualJson, expectedJson);
+    if (comparisonStatus.equals(ComparisonStatus.FAILED)) {
+      return false;
+    }
     return true;
   }
 
@@ -219,6 +236,10 @@ public class QueryComparison {
       throws JSONException {
     _compareNumDocs = compareNumDocs;
     return compare(actualJson, expectedJson);
+  }
+
+  public static void setCompareNumDocs(boolean compareNumDocs) {
+    _compareNumDocs = compareNumDocs;
   }
 
   public static boolean compareAggregation(JSONObject actualJson, JSONObject expectedJson)
@@ -363,7 +384,7 @@ public class QueryComparison {
     JSONArray actualCols = actualAggr.getJSONArray(GROUP_BY_COLUMNS);
     JSONArray expectedCols = expectedAggr.getJSONArray(GROUP_BY_COLUMNS);
 
-    if (!compareLists(actualCols, expectedCols)) {
+    if (!compareLists(actualCols, expectedCols, null)) {
       return false;
     }
     return true;
@@ -377,45 +398,53 @@ public class QueryComparison {
 
     JSONObject actualSelection = actualJson.getJSONObject(SELECTION_RESULTS);
     JSONObject expectedSelection = expectedJson.getJSONObject(SELECTION_RESULTS);
+    Map<Integer, Integer> expectedToActualColMap = new HashMap<Integer, Integer>(actualSelection.getJSONArray(COLUMNS).length());
 
-    if (!compareLists(actualSelection.getJSONArray(COLUMNS), expectedSelection.getJSONArray(COLUMNS))) {
+    if (!compareLists(actualSelection.getJSONArray(COLUMNS), expectedSelection.getJSONArray(COLUMNS), expectedToActualColMap)) {
       return false;
     }
 
-    if (!compareSelectionRows(actualSelection.getJSONArray(RESULTS), expectedSelection.getJSONArray(RESULTS))) {
+    if (!compareSelectionRows(actualSelection.getJSONArray(RESULTS), expectedSelection.getJSONArray(RESULTS),
+        expectedToActualColMap)) {
       return false;
     }
     return true;
   }
 
-  private static boolean compareSelectionRows(JSONArray actualRows, JSONArray expectedRows)
+  private static boolean compareSelectionRows(JSONArray actualRows, JSONArray expectedRows,
+      Map<Integer, Integer> expectedToActualColMap)
       throws JSONException {
-    int numActualRows = actualRows.length();
-
-    for (int i = 0; i < numActualRows; ++i) {
-      JSONArray actualRow = actualRows.getJSONArray(i);
-      JSONArray expectedRow = expectedRows.getJSONArray(i);
-
-      int numActualCols = actualRow.length();
-      int numExpectedCols = expectedRow.length();
-
-      if (numActualCols != numActualCols) {
-        LOGGER.error("Number of columns mis-match: actual: {} expected: {}", numActualCols, numExpectedCols);
+    final int numExpectedRows = expectedRows.length();
+    Set<String> expectedRowSet = new HashSet<String>(numExpectedRows);
+    for (int i = 0; i < numExpectedRows; i++) {
+      expectedRowSet.add(serializeRow(expectedRows.getJSONArray(i), null));
+    }
+    final int numActualRows = actualRows.length();
+    for (int i = 0; i < numActualRows; i++) {
+      if (expectedRowSet.contains(serializeRow(actualRows.getJSONArray(i), expectedToActualColMap))) {
+        continue;
+      } else {
         return false;
       }
+    }
+    return true;
+  }
 
-      for (int j = 0; j < numActualCols; ++j) {
-        String actualVal = actualRow.getString(j);
-        String expectedVal = expectedRow.getString(j);
-
-        if (!compareAsNumber(actualVal, expectedVal) && !compareAsString(actualVal, expectedVal)) {
-          LOGGER.error("Value mis-match: actual {} expected: {}", actualVal, expectedVal);
-          return false;
-        }
+  private static String serializeRow(JSONArray row, Map<Integer, Integer> expectedToActualColMap) throws JSONException {
+    StringBuilder sb = new StringBuilder();
+    final int numCols = row.length();
+    sb.append(numCols).append("_");
+    for (int i = 0; i < numCols; i++) {
+      // For comparison between v2 and v2, we can do string compares
+      // If floating point number discrepancies exist, then re-do this part to change the
+      // string to a double and to an int and then to a string to compare
+      if (expectedToActualColMap == null) {
+        sb.append(row.getString(i)).append("_");
+      } else {
+        sb.append(row.getString(expectedToActualColMap.get(i))).append("_");
       }
     }
-
-    return true;
+    return sb.toString();
   }
 
   private static boolean compareAsString(String actualString, String expectedString) {
@@ -445,7 +474,8 @@ public class QueryComparison {
     }
   }
 
-  private static boolean compareLists(JSONArray actualList, JSONArray expectedList)
+  private static boolean compareLists(JSONArray actualList, JSONArray expectedList,
+      Map<Integer, Integer> expectedToActualColMap)
       throws JSONException {
     int actualSize = actualList.length();
     int expectedSize = expectedList.length();
@@ -455,13 +485,31 @@ public class QueryComparison {
       return false;
     }
 
-    for (int i = 0; i < expectedList.length(); ++i) {
-      String actualColumn = actualList.getString(i);
-      String expectedColumn = expectedList.getString(i);
+    if (expectedToActualColMap == null) {
+      for (int i = 0; i < expectedList.length(); ++i) {
+        String actualColumn = actualList.getString(i);
+        String expectedColumn = expectedList.getString(i);
 
-      if (!actualColumn.equals(expectedColumn)) {
-        LOGGER.error("Column name mis-match: actual: {} expected: {}", actualColumn, expectedColumn);
-        return false;
+        if (!actualColumn.equals(expectedColumn)) {
+          LOGGER.error("Column name mis-match: actual: {} expected: {}", actualColumn, expectedColumn);
+          return false;
+        }
+      }
+    } else {
+      for (int i = 0; i < expectedList.length(); i++) {
+        boolean found = false;
+        final String expectedColumn = expectedList.getString(i);
+        for (int j = 0; j < actualList.length(); j++) {
+          if (expectedColumn.equals(actualList.getString(j))) {
+            expectedToActualColMap.put(i, j);
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          LOGGER.error("Column name " + expectedColumn + " not found in actual");
+          return false;
+        }
       }
     }
 

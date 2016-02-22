@@ -15,6 +15,16 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -30,16 +40,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 class SegmentQueryProcessor {
@@ -60,7 +60,7 @@ class SegmentQueryProcessor {
       throws Exception {
     _segmentDir = segmentDir;
 
-    _indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.heap);
+    _indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.mmap);
     _metadata = new SegmentMetadataImpl(_segmentDir);
     _tableName = _metadata.getTableName();
     _segmentName = _metadata.getName();
@@ -78,6 +78,11 @@ class SegmentQueryProcessor {
       }
       _mvColumnArrayMap.put(column, new int[columnMetadata.getMaxNumberOfMultiValues()]);
     }
+  }
+
+  public void close() {
+    _metadata.close();
+    _indexSegment.destroy();
   }
 
   public ResultTable process(BrokerRequest brokerRequest)
@@ -194,10 +199,11 @@ class SegmentQueryProcessor {
     }
 
     List<Integer> result = filterDocIds(childFilters.get(0), inputDocIds);
+    final FilterOperator operator = filterQueryTree.getOperator();
     for (int i = 1; i < childFilters.size(); ++i) {
-      FilterOperator operator = filterQueryTree.getOperator();
-      List<Integer> childResult = operator.equals(FilterOperator.AND) ? filterDocIds(childFilters.get(i), result)
-          : filterDocIds(childFilters.get(i), inputDocIds);
+//      List<Integer> childResult = operator.equals(FilterOperator.AND) ? filterDocIds(childFilters.get(i), result)
+//          : filterDocIds(childFilters.get(i), inputDocIds);
+      List<Integer> childResult = filterDocIds(childFilters.get(i), inputDocIds);
       result = combine(result, childResult, operator);
     }
     return result;

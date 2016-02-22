@@ -68,6 +68,7 @@ public class KafkaStarterUtils {
     configureZkConnectionString(configuration, zkStr);
     configureBrokerId(configuration, brokerId);
     configureKafkaLogDirectory(configuration, logDir);
+    configuration.put("zookeeper.session.timeout.ms", "60000");
     KafkaConfig config = new KafkaConfig(configuration);
 
     KafkaServerStartable serverStartable = new KafkaServerStartable(config);

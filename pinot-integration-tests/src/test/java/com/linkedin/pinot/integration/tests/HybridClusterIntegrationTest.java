@@ -28,9 +28,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import kafka.server.KafkaServerStartable;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
@@ -43,18 +40,18 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
+import kafka.server.KafkaServerStartable;
 
 
 /**
- * Hybrid cluster integration test that uploads 8 months of data as offline and 5 months of data as realtime (with a
- * one month overlap).
+ * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
+ * two month overlap).
  *
  */
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
@@ -63,20 +60,36 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
   protected final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
   protected static final String KAFKA_TOPIC = "hybrid-integration-test";
-
-  protected static final int SEGMENT_COUNT = 12;
   protected static final int QUERY_COUNT = 1000;
-  protected static final int OFFLINE_SEGMENT_COUNT = 8;
-  protected static final int REALTIME_SEGMENT_COUNT = 5;
+
+  private int segmentCount = 12;
+  private int offlineSegmentCount = 8;
+  private int realtimeSegmentCount = 6;
 
   private KafkaServerStartable kafkaStarter;
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
+      String kafkaTopic, File schemaFile, File avroFile, List<String> invertedIndexColumns) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile);
+        "TestTenant", "TestTenant", avroFile, invertedIndexColumns);
+  }
+
+  protected void setSegmentCount(int segmentCount) {
+    this.segmentCount = segmentCount;
+  }
+
+  protected void setOfflineSegmentCount(int offlineSegmentCount) {
+    this.offlineSegmentCount = offlineSegmentCount;
+  }
+
+  protected void setRealtimeSegmentCount(int realtimeSegmentCount) {
+    this.realtimeSegmentCount = realtimeSegmentCount;
+  }
+
+  protected int getOfflineSegmentCount() {
+    return offlineSegmentCount;
   }
 
   @BeforeClass
@@ -96,16 +109,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     _tmpDir.mkdirs();
 
-    final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
-    for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
-      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
-    }
+    final List<File> avroFiles = getAllAvroFiles();
 
     File schemaFile = getSchemaFile();
 
     // Create Pinot table
     setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
-        avroFiles.get(0));
+        avroFiles.get(0), null);
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
@@ -137,7 +147,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
           if (externalView.getId().contains("mytable")) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
-            if (partitionSet.size() == OFFLINE_SEGMENT_COUNT) {
+            if (partitionSet.size() == offlineSegmentCount) {
               int onlinePartitionCount = 0;
 
               for (String partitionId : partitionSet) {
@@ -147,8 +157,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
                 }
               }
 
-              if (onlinePartitionCount == OFFLINE_SEGMENT_COUNT) {
-                System.out.println("Got " + OFFLINE_SEGMENT_COUNT + " online tables, unlatching the main thread");
+              if (onlinePartitionCount == offlineSegmentCount) {
+                System.out.println("Got " + offlineSegmentCount + " online tables, unlatching the main thread");
                 latch.countDown();
               }
             }
@@ -185,17 +195,25 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInTwoMinutes);
   }
 
+  protected List<File> getAllAvroFiles() {
+    final List<File> avroFiles = new ArrayList<File>(segmentCount);
+    for (int segmentNumber = 1; segmentNumber <= segmentCount; ++segmentNumber) {
+      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
+    }
+    return avroFiles;
+  }
+
   protected List<File> getRealtimeAvroFiles(List<File> avroFiles) {
-    final List<File> realtimeAvroFiles = new ArrayList<File>(REALTIME_SEGMENT_COUNT);
-    for (int i = SEGMENT_COUNT - REALTIME_SEGMENT_COUNT; i < SEGMENT_COUNT; i++) {
+    final List<File> realtimeAvroFiles = new ArrayList<File>(realtimeSegmentCount);
+    for (int i = segmentCount - realtimeSegmentCount; i < segmentCount; i++) {
       realtimeAvroFiles.add(avroFiles.get(i));
     }
     return realtimeAvroFiles;
   }
 
   protected List<File> getOfflineAvroFiles(List<File> avroFiles) {
-    final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);
-    for (int i = 0; i < OFFLINE_SEGMENT_COUNT; i++) {
+    final List<File> offlineAvroFiles = new ArrayList<File>(offlineSegmentCount);
+    for (int i = 0; i < offlineSegmentCount; i++) {
       offlineAvroFiles.add(avroFiles.get(i));
     }
     return offlineAvroFiles;
@@ -232,6 +250,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     } catch (Exception e) {
       // Swallow ZK Exceptions.
     }
+    cleanup();
+  }
+
+  protected void cleanup() throws  Exception {
     FileUtils.deleteDirectory(_tmpDir);
   }
 

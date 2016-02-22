@@ -47,9 +47,12 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class SegmentTestUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTestUtils.class);
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
       String timeColumn, TimeUnit timeUnit, String tableName) throws FileNotFoundException,
@@ -118,6 +121,13 @@ public class SegmentTestUtils {
     Schema schema = new Schema();
 
     for (final Field field : dataStream.getSchema().getFields()) {
+      try {
+        getColumnType(field);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while converting Avro field {} of type {}, field will not be in schema.",
+            field.name(), field.schema().getType());
+        continue;
+      }
       final String columnName = field.name();
       final String pinotType = field.getProp("pinotType");
 

@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -587,6 +588,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               messagesInThisBatch = 0;
               producer.send(messagesToWrite);
               messagesToWrite.clear();
+              Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
             }
           } else {
             producer.send(data);
@@ -780,8 +782,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             .getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR, ZkStarter.DEFAULT_ZK_STR);
     manager.connect();
     manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
+      private boolean _hasBeenTriggered = false;
+
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
+        // Nothing to do?
+        if (_hasBeenTriggered) {
+          return;
+        }
+
         for (ExternalView externalView : externalViewList) {
           if (externalView.getId().contains(tableName)) {
 
@@ -799,6 +808,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               if (onlinePartitionCount == expectedSegmentCount) {
                 System.out.println("Got " + expectedSegmentCount + " online tables, unlatching the main thread");
                 latch.countDown();
+                _hasBeenTriggered = true;
               }
             }
           }

@@ -17,6 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.controller.helix.ControllerTest;
 
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -41,7 +42,6 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.server.util.SegmentTestUtils;
 import com.linkedin.pinot.tools.data.generator.DataGenerator;
 import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
 
@@ -108,10 +108,8 @@ public class FileBasedSentineTest extends ControllerTest {
     int counter = 0;
     for (final File avro : avroDataDir.listFiles()) {
       for (final String table : FileBasedServerBrokerStarters.TABLE_NAMES) {
-        final SegmentGeneratorConfig genConfig =
-            SegmentTestUtils
-                .getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
-                    TimeUnit.DAYS, table);
+        final SegmentGeneratorConfig genConfig = SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avro,
+            new File(bootstrapDir, "segment-" + counter), "daysSinceEpoch", TimeUnit.DAYS, table);
 
         final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
         driver.init(genConfig);

@@ -37,16 +37,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ScanBasedQueryProcessor {
+public class ScanBasedQueryProcessor implements Cloneable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedQueryProcessor.class);
 
   Map<File, SegmentQueryProcessor> _segmentQueryProcessorMap;
   private long _timeoutInSeconds = 10000;
+  private boolean _ownsQueryProcessors = false;
+
+  private ScanBasedQueryProcessor() {}
 
   public ScanBasedQueryProcessor(String segmentsDirName)
       throws Exception {
     File segmentsDir = new File(segmentsDirName);
     _segmentQueryProcessorMap = new HashMap<>();
+    _ownsQueryProcessors = true;
 
     for (File segmentFile : segmentsDir.listFiles()) {
       _segmentQueryProcessorMap.put(segmentFile, new SegmentQueryProcessor(segmentFile));
@@ -98,6 +102,22 @@ public class ScanBasedQueryProcessor {
     QueryResponse queryResponse = new QueryResponse(results);
 
     return queryResponse;
+  }
+
+  public void close() {
+    if (_ownsQueryProcessors) {
+      for (SegmentQueryProcessor segmentQueryProcessor : _segmentQueryProcessorMap.values()) {
+        segmentQueryProcessor.close();
+      }
+    }
+  }
+
+  @Override
+  public ScanBasedQueryProcessor clone() {
+    ScanBasedQueryProcessor copy = new ScanBasedQueryProcessor();
+    copy._segmentQueryProcessorMap = _segmentQueryProcessorMap;
+    copy._ownsQueryProcessors = false;
+    return copy;
   }
 
   private List<ResultTable> processSegments(final String query, final BrokerRequest brokerRequest)
