@@ -282,7 +282,16 @@ public class Pql2AstListener extends PQL2BaseListener {
   public void enterStringLiteral(@NotNull PQL2Parser.StringLiteralContext ctx) {
     String text = ctx.getText();
     int textLength = text.length();
-    pushNode(new StringLiteralAstNode(text.substring(1, textLength - 1)));
+
+    // String literals can be either 'foo' or "bar". We support quoting by doubling the beginning character, so that
+    // users can write 'Martha''s Vineyard' or """foo"""
+    if (text.charAt(0) == '\'') {
+      pushNode(new StringLiteralAstNode(text.substring(1, textLength - 1).replaceAll("''", "'")));
+    } else if (text.charAt(0) == '"') {
+      pushNode(new StringLiteralAstNode(text.substring(1, textLength - 1).replaceAll("\"\"", "\"")));
+    } else {
+      throw new Pql2CompilationException("String literal does not start with either '  or \"");
+    }
   }
 
   @Override
