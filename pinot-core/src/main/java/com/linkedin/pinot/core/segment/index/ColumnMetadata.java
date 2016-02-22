@@ -15,9 +15,12 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,10 +31,7 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 
-
-/**
- * Nov 12, 2014
- */
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
 public class ColumnMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnMetadata.class);
@@ -54,7 +54,212 @@ public class ColumnMetadata {
   private final boolean hasDictionary;
   private final int totalNumberOfEntries;
 
-  public ColumnMetadata(String columnName, int cardinality, int totalRawDocs, int totalAggDocs, int totalDocs, DataType dataType, int bitsPerElement,
+  public static ColumnMetadata fromPropertiesConfiguration(String column, PropertiesConfiguration config) {
+    Builder builder = new Builder();
+    builder.setColumnName(column);
+
+    int cardinality =
+        config.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY));
+    builder.setCardinality(cardinality);
+
+    int totalDocs=
+        config.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS));
+    builder.setTotalDocs(totalDocs);
+
+    final int totalRawDocs = config.getInt(
+        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_RAW_DOCS), totalDocs);
+    builder.setTotalRawDocs(totalRawDocs);
+
+    final int totalAggDocs = config
+        .getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_AGG_DOCS), 0);
+    builder.setTotalAggDocs(totalAggDocs);
+
+    final DataType dataType = DataType
+        .valueOf(config
+            .getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE)));
+    builder.setDataType(dataType);
+
+    final int bitsPerElement =
+        config.getInt(
+            V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT));
+    builder.setBitsPerElement(bitsPerElement);
+
+    final int stringColumnMaxLength =
+        config.getInt(
+            V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE));
+    builder.setStringColumnMaxLength(stringColumnMaxLength);
+
+    final FieldType fieldType = FieldType
+        .valueOf(config
+            .getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE))
+            .toUpperCase());
+    builder.setFieldType(fieldType);
+
+    final boolean isSorted =
+        config.getBoolean(V1Constants.MetadataKeys.Column
+            .getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SORTED));
+    builder.setIsSorted(isSorted);
+
+    final boolean hasInvertedIndex =
+        config.getBoolean(V1Constants.MetadataKeys.Column
+            .getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX));
+    builder.setHasInvertedIndex(hasInvertedIndex);
+
+    final boolean isSingleValue =
+        config.getBoolean(
+            V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
+    builder.setInSingleValue(isSingleValue);
+
+    final int maxNumberOfMultiValues =
+        config.getInt(
+            V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
+    builder.setMaxNumberOfMultiValues(maxNumberOfMultiValues);
+
+    final boolean hasNulls =
+        config.getBoolean(V1Constants.MetadataKeys.Column
+            .getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_NULL_VALUE));
+    builder.setContainsNulls(hasNulls);
+
+    TimeUnit segmentTimeUnit = TimeUnit.DAYS;
+    if (config
+        .containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
+      segmentTimeUnit = TimeUtils
+          .timeUnitFromString(config.getString(TIME_UNIT));
+    }
+    builder.setTimeunit(segmentTimeUnit);
+
+    final boolean hasDictionary =
+        config.getBoolean(V1Constants.MetadataKeys.Column
+            .getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), true);
+    builder.setHasDictionary(hasDictionary);
+
+    final int totalNumberOfEntries =
+        config.getInt(V1Constants.MetadataKeys.Column
+            .getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES));
+    builder.setTotalNumberOfEntries(totalNumberOfEntries);
+
+    return builder.build();
+  }
+
+  public static class Builder {
+    private String columnName;
+    private int cardinality;
+    private int totalDocs;
+    private DataType dataType;
+    private int bitsPerElement;
+    private int stringColumnMaxLength;
+    private FieldType fieldType;
+    private boolean isSorted;
+    private boolean hasInvertedIndex;
+    private boolean inSingleValue;
+    private int maxNumberOfMultiValues;
+    private boolean containsNulls;
+    private TimeUnit timeunit;
+    private boolean hasDictionary;
+    private int totalNumberOfEntries;
+    private int totalRawDocs;
+    private int totalAggDocs;
+
+    public Builder setColumnName(String columnName) {
+      this.columnName = columnName;
+      return this;
+    }
+
+    public Builder setCardinality(int cardinality) {
+      this.cardinality = cardinality;
+      return this;
+    }
+
+    public Builder setTotalDocs(int totalDocs) {
+      this.totalDocs = totalDocs;
+      return this;
+    }
+
+    public Builder setDataType(DataType dataType) {
+      this.dataType = dataType;
+      return this;
+    }
+
+    public Builder setBitsPerElement(int bitsPerElement) {
+      this.bitsPerElement = bitsPerElement;
+      return this;
+    }
+
+    public Builder setStringColumnMaxLength(int stringColumnMaxLength) {
+      this.stringColumnMaxLength = stringColumnMaxLength;
+      return this;
+    }
+
+    public Builder setFieldType(FieldType fieldType) {
+      this.fieldType = fieldType;
+      return this;
+    }
+
+    public Builder setIsSorted(boolean isSorted) {
+      this.isSorted = isSorted;
+      return this;
+    }
+
+    public Builder setHasInvertedIndex(boolean hasInvertedIndex) {
+      this.hasInvertedIndex = hasInvertedIndex;
+      return this;
+    }
+
+    public Builder setInSingleValue(boolean inSingleValue) {
+      this.inSingleValue = inSingleValue;
+      return this;
+    }
+
+    public Builder setMaxNumberOfMultiValues(int maxNumberOfMultiValues) {
+      this.maxNumberOfMultiValues = maxNumberOfMultiValues;
+      return this;
+    }
+
+    public Builder setContainsNulls(boolean containsNulls) {
+      this.containsNulls = containsNulls;
+      return this;
+    }
+
+    public Builder setTimeunit(TimeUnit timeunit) {
+      this.timeunit = timeunit;
+      return this;
+    }
+
+    public Builder setHasDictionary(boolean hasDictionary) {
+      this.hasDictionary = hasDictionary;
+      return this;
+    }
+
+    public Builder setTotalNumberOfEntries(int totalNumberOfEntries) {
+      this.totalNumberOfEntries = totalNumberOfEntries;
+      return this;
+    }
+
+    public Builder setTotalRawDocs(int totalRawDocs) {
+      this.totalRawDocs = totalRawDocs;
+      return this;
+    }
+
+    public Builder setTotalAggDocs(int totalAggDocs) {
+      this.totalAggDocs = totalAggDocs;
+      return this;
+    }
+
+    public ColumnMetadata build() {
+      return new ColumnMetadata(columnName, cardinality, totalRawDocs, totalAggDocs,totalDocs, dataType, bitsPerElement,
+      stringColumnMaxLength, fieldType, isSorted, hasInvertedIndex,
+      inSingleValue, maxNumberOfMultiValues, containsNulls, hasDictionary, timeunit,
+      totalNumberOfEntries);
+    }
+
+
+  }
+
+  public static  ColumnMetadata.Builder newBuilder() {
+    return new ColumnMetadata.Builder();
+  }
+
+  private ColumnMetadata(String columnName, int cardinality, int totalRawDocs, int totalAggDocs, int totalDocs, DataType dataType, int bitsPerElement,
       int stringColumnMaxLength, FieldType fieldType, boolean isSorted, boolean hasInvertedIndex,
       boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary, TimeUnit timeunit,
       int totalNumberOfEntries) {
@@ -134,6 +339,7 @@ public class ColumnMetadata {
     return inSingleValue;
   }
 
+  public TimeUnit getTimeunit() { return timeunit; }
   public FieldSpec toFieldSpec() {
     switch (fieldType) {
       case DIMENSION:

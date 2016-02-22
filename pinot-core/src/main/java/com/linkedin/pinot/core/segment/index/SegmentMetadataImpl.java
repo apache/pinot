@@ -15,15 +15,25 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.core.indexsegment.IndexType;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.joda.time.Duration;
@@ -31,24 +41,10 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
 
-
-/**
- * Nov 12, 2014
- */
 
 public class SegmentMetadataImpl implements SegmentMetadata {
 
@@ -257,56 +253,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private ColumnMetadata extractColumnMetadataFor(String column) {
-    final int cardinality = _segmentMetadataPropertiesConfiguration
-        .getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY));
-    final int totalDocs = _segmentMetadataPropertiesConfiguration
-        .getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS));
-    final int totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_RAW_DOCS), totalDocs);
-    final int totalAggDocs = _segmentMetadataPropertiesConfiguration
-        .getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_AGG_DOCS), 0);
-
-    final DataType dataType = DataType.valueOf(_segmentMetadataPropertiesConfiguration
-        .getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE)));
-    final int bitsPerElement = _segmentMetadataPropertiesConfiguration
-        .getInt(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT));
-    final int stringColumnMaxLength = _segmentMetadataPropertiesConfiguration.getInt(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE));
-
-    final FieldType fieldType = FieldType.valueOf(_segmentMetadataPropertiesConfiguration
-        .getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE))
-        .toUpperCase());
-
-    final boolean isSorted = _segmentMetadataPropertiesConfiguration
-        .getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SORTED));
-
-    final boolean hasInvertedIndex = _segmentMetadataPropertiesConfiguration.getBoolean(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX));
-
-    final boolean insSingleValue = _segmentMetadataPropertiesConfiguration.getBoolean(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
-
-    final int maxNumberOfMultiValues = _segmentMetadataPropertiesConfiguration.getInt(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
-
-    final boolean hasNulls = _segmentMetadataPropertiesConfiguration
-        .getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_NULL_VALUE));
-
-    TimeUnit segmentTimeUnit = TimeUnit.DAYS;
-    if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
-      segmentTimeUnit = TimeUtils.timeUnitFromString(_segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
-    }
-
-    final boolean hasDictionary = _segmentMetadataPropertiesConfiguration.getBoolean(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), true);
-
-    final int totalNumberOfEntries = _segmentMetadataPropertiesConfiguration.getInt(
-        V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES));
-
-    return new ColumnMetadata(column, cardinality, totalRawDocs, totalAggDocs, totalDocs, dataType, bitsPerElement,
-        stringColumnMaxLength, fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls,
-        hasDictionary, segmentTimeUnit, totalNumberOfEntries);
-
+    return ColumnMetadata.fromPropertiesConfiguration(column, _segmentMetadataPropertiesConfiguration);
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {
