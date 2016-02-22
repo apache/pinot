@@ -54,9 +54,41 @@ public class SegmentDictionaryCreator implements Closeable {
   public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir)
       throws IOException {
     rowCount = ArrayUtils.getLength(sortedList);
+
+    Object first = null;
+    Object last = null;
+
+    if (0 < rowCount) {
+      if (sortedList instanceof int[]) {
+        int[] intSortedList = (int[]) sortedList;
+        first = intSortedList[0];
+        last = intSortedList[rowCount - 1];
+      } else if (sortedList instanceof long[]) {
+        long[] longSortedList = (long[]) sortedList;
+        first = longSortedList[0];
+        last = longSortedList[rowCount - 1];
+      } else if (sortedList instanceof float[]) {
+        float[] floatSortedList = (float[]) sortedList;
+        first = floatSortedList[0];
+        last = floatSortedList[rowCount - 1];
+      } else if (sortedList instanceof double[]) {
+        double[] doubleSortedList = (double[]) sortedList;
+        first = doubleSortedList[0];
+        last = doubleSortedList[rowCount - 1];
+      } else if (sortedList instanceof String[]) {
+        String[] intSortedList = (String[]) sortedList;
+        first = intSortedList[0];
+        last = intSortedList[rowCount - 1];
+      } else if (sortedList instanceof Object[]) {
+        Object[] intSortedList = (Object[]) sortedList;
+        first = intSortedList[0];
+        last = intSortedList[rowCount - 1];
+      }
+    }
+
     LOGGER.info(
-        "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}",
-        spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField());
+        "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}, range = {} to {}",
+        spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField(), first, last);
     this.sortedList = sortedList;
     this.spec = spec;
     dictionaryFile = new File(indexDir, spec.getName() + ".dict");
