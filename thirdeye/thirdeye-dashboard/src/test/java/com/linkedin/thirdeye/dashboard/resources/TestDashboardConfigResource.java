@@ -38,7 +38,7 @@ public class TestDashboardConfigResource {
     when(mockDataCache.getCollectionSchema(COLLECTION)).thenReturn(mockCollectionSchema);
 
     testDashboardConfigResource =
-        new DashboardConfigResource(mockDataCache, mockQueryCache, null, null, objectMapper);
+        new DashboardConfigResource(mockDataCache, mockQueryCache, null, null, null, objectMapper);
   }
 
   @Test
