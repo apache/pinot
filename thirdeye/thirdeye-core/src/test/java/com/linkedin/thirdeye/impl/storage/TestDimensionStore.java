@@ -14,15 +14,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class TestDimensionStore
-{
+public class TestDimensionStore {
   private StarTreeConfig config;
   private DimensionDictionary dictionary;
   private DimensionStore dimensionStore;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
+  public void beforeClass() throws Exception {
     ObjectMapper objectMapper = new ObjectMapper();
     InputStream inputStream = ClassLoader.getSystemResourceAsStream("sample-dictionary.json");
     dictionary = objectMapper.readValue(inputStream, DimensionDictionary.class);
@@ -31,8 +29,7 @@ public class TestDimensionStore
 
     ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
 
-    for (DimensionKey key : generateKeys())
-    {
+    for (DimensionKey key : generateKeys()) {
       StorageUtils.addToDimensionStore(config, buffer, key, dictionary);
     }
 
@@ -42,18 +39,14 @@ public class TestDimensionStore
   }
 
   @Test
-  public void testGetDimensionKeys()
-  {
+  public void testGetDimensionKeys() {
     Assert.assertEquals(dimensionStore.getDimensionKeys(), generateKeys());
   }
 
   @Test
-  public void testFindMatchingKeys_allStar()
-  {
+  public void testFindMatchingKeys_allStar() {
     DimensionKey searchKey = new DimensionKey(new String[] {
-            StarTreeConstants.STAR,
-            StarTreeConstants.STAR,
-            StarTreeConstants.STAR
+        StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR
     });
 
     Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
@@ -62,12 +55,9 @@ public class TestDimensionStore
   }
 
   @Test
-  public void testFindMatchingKeys_someStar()
-  {
+  public void testFindMatchingKeys_someStar() {
     DimensionKey searchKey = new DimensionKey(new String[] {
-            "A0",
-            StarTreeConstants.STAR,
-            StarTreeConstants.STAR
+        "A0", StarTreeConstants.STAR, StarTreeConstants.STAR
     });
 
     Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
@@ -78,12 +68,9 @@ public class TestDimensionStore
   }
 
   @Test
-  public void testFindMatchingKeys_noStar()
-  {
+  public void testFindMatchingKeys_noStar() {
     DimensionKey searchKey = new DimensionKey(new String[] {
-            "A0",
-            "B0",
-            "C0"
+        "A0", "B0", "C0"
     });
 
     Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
@@ -94,12 +81,9 @@ public class TestDimensionStore
   }
 
   @Test
-  public void testFindMatchingKeys_leastOthers()
-  {
+  public void testFindMatchingKeys_leastOthers() {
     DimensionKey searchKey = new DimensionKey(new String[] {
-            "AX",
-            "BX",
-            "CX"
+        "AX", "BX", "CX"
     }); // expect "?", "BX", "CX"
 
     Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
@@ -109,40 +93,43 @@ public class TestDimensionStore
     checkLogicalOffsets(result);
   }
 
-  private void checkLogicalOffsets(Map<DimensionKey, Integer> result)
-  {
+  private void checkLogicalOffsets(Map<DimensionKey, Integer> result) {
     List<DimensionKey> keys = generateKeys();
 
-    for (int i = 0; i < keys.size(); i++)
-    {
-      if (result.containsKey(keys.get(i)))
-      {
+    for (int i = 0; i < keys.size(); i++) {
+      if (result.containsKey(keys.get(i))) {
         Assert.assertEquals(result.get(keys.get(i)), Integer.valueOf(i));
       }
     }
   }
 
-  private static List<DimensionKey> generateKeys()
-  {
+  private static List<DimensionKey> generateKeys() {
     List<DimensionKey> keys = new ArrayList<DimensionKey>();
 
-    for (int i = 0; i < 10; i++)
-    {
-      DimensionKey key = new DimensionKey(new String[]{
-              "A" + (i % 3),
-              "B" + (i % 6),
-              "C" + (i % 9)
+    for (int i = 0; i < 10; i++) {
+      DimensionKey key = new DimensionKey(new String[] {
+          "A" + (i % 3), "B" + (i % 6), "C" + (i % 9)
       });
 
       keys.add(key);
     }
 
     // Add some keys with others
-    keys.add(new DimensionKey(new String[]{"?", "?", "CX"}));
-    keys.add(new DimensionKey(new String[]{"?", "BX", "?"}));
-    keys.add(new DimensionKey(new String[]{"AX", "?", "?"}));
-    keys.add(new DimensionKey(new String[]{"?", "?", "?"}));
-    keys.add(new DimensionKey(new String[]{"?", "BX", "CX"}));
+    keys.add(new DimensionKey(new String[] {
+        "?", "?", "CX"
+    }));
+    keys.add(new DimensionKey(new String[] {
+        "?", "BX", "?"
+    }));
+    keys.add(new DimensionKey(new String[] {
+        "AX", "?", "?"
+    }));
+    keys.add(new DimensionKey(new String[] {
+        "?", "?", "?"
+    }));
+    keys.add(new DimensionKey(new String[] {
+        "?", "BX", "CX"
+    }));
 
     return keys;
   }

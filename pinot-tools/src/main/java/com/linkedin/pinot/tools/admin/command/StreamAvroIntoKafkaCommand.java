@@ -18,6 +18,7 @@ package com.linkedin.pinot.tools.admin.command;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -35,7 +36,7 @@ import kafka.producer.ProducerConfig;
 /**
  * Class for command to stream Avro data into Kafka.
  */
-public class StreamAvroIntoKafkaCommand extends AbstractBaseCommand implements Command {
+public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
 
   @Option(name="-avroFile", required=true, metaVar="<String>", usage="Avro file to stream.")

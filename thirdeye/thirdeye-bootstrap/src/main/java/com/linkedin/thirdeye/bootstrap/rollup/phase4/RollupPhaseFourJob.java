@@ -46,8 +46,8 @@ public class RollupPhaseFourJob extends Configured {
     this.props = props;
   }
 
-  public static class RollupPhaseFourMapper extends
-      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseFourMapper
+      extends Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseFourConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -83,9 +83,8 @@ public class RollupPhaseFourJob extends Configured {
     }
 
     @Override
-    public void map(BytesWritable rawDimensionKeyWritable,
-        BytesWritable rollupReduceOutputWritable, Context context) throws IOException,
-        InterruptedException {
+    public void map(BytesWritable rawDimensionKeyWritable, BytesWritable rollupReduceOutputWritable,
+        Context context) throws IOException, InterruptedException {
       // pass through, in the reduce we gather all possible roll up for a given
       // rawDimensionKey
       context.write(rawDimensionKeyWritable, rollupReduceOutputWritable);
@@ -98,8 +97,8 @@ public class RollupPhaseFourJob extends Configured {
 
   }
 
-  public static class RollupPhaseFourReducer extends
-      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class RollupPhaseFourReducer
+      extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseFourConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -126,7 +125,7 @@ public class RollupPhaseFourJob extends Configured {
     @Override
     public void reduce(BytesWritable rawDimensionKeyWritable,
         Iterable<BytesWritable> rollupMetricTimeSeriesWritable, Context context)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
       MetricTimeSeries aggMetricTimeSeries = new MetricTimeSeries(metricSchema);
       for (BytesWritable writable : rollupMetricTimeSeriesWritable) {
         MetricTimeSeries timeSeries;
@@ -163,9 +162,10 @@ public class RollupPhaseFourJob extends Configured {
 
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
+    FileSystem fs = FileSystem.get(configuration);
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE4_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE4_CONFIG_PATH);
-    getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH));
     LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOGGER.info("Adding input:" + inputPath);
@@ -173,8 +173,10 @@ public class RollupPhaseFourJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat
-        .setOutputPath(job, new Path(getAndCheck(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
 

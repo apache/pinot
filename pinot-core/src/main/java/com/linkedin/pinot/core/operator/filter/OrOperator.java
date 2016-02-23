@@ -21,12 +21,12 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.OrBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 
 public class OrOperator extends BaseFilterOperator {
@@ -64,7 +64,6 @@ public class OrOperator extends BaseFilterOperator {
     for (Operator operator : operators) {
       operator.close();
     }
-    LOGGER.info("Time spent in OrOperator operator:{} is {}", this, orBlock.orBlockDocIdSet.timeMeasure);
     return true;
   }
 }

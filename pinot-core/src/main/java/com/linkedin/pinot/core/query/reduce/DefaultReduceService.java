@@ -15,17 +15,6 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.query.ReduceService;
@@ -43,6 +32,16 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -191,7 +190,10 @@ public class DefaultReduceService implements ReduceService {
       Map<ServerInstance, DataTable> instanceResponseMap) {
     try {
       if (instanceResponseMap.size() > 0) {
-        DataTable dt = instanceResponseMap.values().iterator().next();
+        DataTable dt = chooseFirstNonEmptySchema(instanceResponseMap.values());
+        // best-effort to respond to the client instead of erroring out all requests
+        // if there are errors
+        removeConflictingResponses(dt.getDataSchema(), instanceResponseMap);
         if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
           SelectionOperatorService selectionService =
               new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
@@ -208,6 +210,38 @@ public class DefaultReduceService implements ReduceService {
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
     }
+  }
+
+  private void removeConflictingResponses(DataSchema masterSchema, Map<ServerInstance, DataTable> instanceResponseMap) {
+    Iterator<Map.Entry<ServerInstance, DataTable>> responseIter = instanceResponseMap.entrySet().iterator();
+    StringBuilder droppedServersSb = new StringBuilder();
+    int droppedCount = 0;
+    while (responseIter.hasNext()) {
+      Map.Entry<ServerInstance, DataTable> entry = responseIter.next();
+      DataTable entryTable = entry.getValue();
+      DataSchema entrySchema = entryTable.getDataSchema();
+      if (! masterSchema.equals(entrySchema)) {
+        if (entryTable.getNumberOfRows() > 0) {
+          ++droppedCount;
+          droppedServersSb.append(" " + entry.getKey());
+        }
+        responseIter.remove();
+      }
+    }
+    // to log once per query
+    if (droppedCount > 0) {
+      LOGGER.error("SCHEMA-MISMATCH: Dropping responses from servers: {}", droppedServersSb.toString());
+    }
+  }
+
+  private DataTable chooseFirstNonEmptySchema(Iterable<DataTable> dataTables) {
+    for (DataTable dt : dataTables) {
+      if (dt.getNumberOfRows() > 0) {
+        return dt;
+      }
+    }
+    Iterator<DataTable> it = dataTables.iterator();
+    return  it.hasNext() ? it.next() : null;
   }
 
   private List<JSONObject> reduceOnAggregationGroupByOperatorResults(

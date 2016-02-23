@@ -20,19 +20,21 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
-import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.selection.SelectionFetcher;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
@@ -79,15 +81,15 @@ public class MSelectionOnlyOperator extends BaseOperator {
     long numDocsScanned = 0;
     ProjectionBlock projectionBlock = null;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      int j = 0;
       for (int i = 0; i < _dataSchema.size(); ++i) {
-        _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
+        _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
+      SelectionFetcher selectionFetcher = new SelectionFetcher(_blocks, _dataSchema);
       BlockDocIdIterator blockDocIdIterator = projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator();
       int docId;
       while ((docId = blockDocIdIterator.next()) != Constants.EOF && _rowEvents.size() < _limitDocs) {
         numDocsScanned++;
-        _rowEvents.add(SelectionOperatorUtils.collectRowFromBlockValSets(docId, _blocks, _dataSchema));
+        _rowEvents.add(selectionFetcher.getRow(docId));
       }
       if (_rowEvents.size() == _limitDocs) {
         break;
@@ -98,7 +100,7 @@ public class MSelectionOnlyOperator extends BaseOperator {
     resultBlock.setSelectionResult(_rowEvents);
     resultBlock.setSelectionDataSchema(_dataSchema);
     resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
+    resultBlock.setTotalRawDocs(_indexSegment.getSegmentMetadata().getTotalRawDocs());
     final long endTime = System.currentTimeMillis();
     resultBlock.setTimeUsedMs(endTime - startTime);
     return resultBlock;

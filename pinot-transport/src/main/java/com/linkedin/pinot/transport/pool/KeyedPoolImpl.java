@@ -15,22 +15,6 @@
  */
 package com.linkedin.pinot.transport.pool;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.Cancellable;
@@ -38,12 +22,21 @@ import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.config.ConnectionPoolConfig;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.pool.AsyncPoolImpl.Strategy;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
@@ -133,9 +126,8 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
           String poolName = "Pool for (" + key + ")";
           AsyncPoolResourceManagerAdapter<K, T> rmAdapter =
               new AsyncPoolResourceManagerAdapter<K, T>(key, _resourceManager, _executorService, _metricRegistry);
-          pool =
-              new AsyncPoolImpl<T>(poolName, rmAdapter, _maxResourcesPerKey, _idleTimeoutMs, _timeoutExecutor,
-                  _executorService, _maxPendingCheckoutRequests, Strategy.LRU, _minResourcesPerKey, _metricRegistry);
+          pool = new AsyncPoolImpl<T>(poolName, rmAdapter, _maxResourcesPerKey, _idleTimeoutMs, _timeoutExecutor,
+              _executorService, _maxPendingCheckoutRequests, Strategy.LRU, _minResourcesPerKey, _metricRegistry);
           _keyedPool.put(key, pool);
           _poolStats.add(pool);
           _pooledResourceManagerMap.put(key, rmAdapter);
@@ -184,7 +176,8 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
 
       List<KeyedFuture<K, NoneType>> futureList = new ArrayList<KeyedFuture<K, NoneType>>();
       for (Entry<K, AsyncPool<T>> poolEntry : _keyedPool.entrySet()) {
-        AsyncResponseFuture<K, NoneType> shutdownFuture = new AsyncResponseFuture<K, NoneType>(poolEntry.getKey(), "Shutdown future for pool entry " + poolEntry.getKey());
+        AsyncResponseFuture<K, NoneType> shutdownFuture = new AsyncResponseFuture<K, NoneType>(poolEntry.getKey(),
+            "Shutdown future for pool entry " + poolEntry.getKey());
         poolEntry.getValue().shutdown(shutdownFuture);
         futureList.add(shutdownFuture);
         //Cancel waiters and notify them
@@ -215,5 +208,14 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
   @Override
   public PoolStats<Histogram> getStats() {
     return _poolStats;
+  }
+
+  @Override
+  public boolean validatePool(K key, boolean recreate) {
+    AsyncPool<T> pool = _keyedPool.get(key);
+    if (pool != null) {
+      return pool.validate(recreate);
+    }
+    return true;
   }
 }

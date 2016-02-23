@@ -36,6 +36,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 public abstract class AbstractTableConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractTableConfig.class);
+  private static final String TABLE_TYPE_REALTIME = "realtime";
 
   protected String tableName;
   protected String tableType;
@@ -68,7 +69,7 @@ public abstract class AbstractTableConfig {
 
     if (tableType.equals("offline")) {
       return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
-    } else if (tableType.equals("realtime")) {
+    } else if (tableType.equals(TABLE_TYPE_REALTIME)) {
       return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
     }
     throw new UnsupportedOperationException("unknown tableType : " + tableType);
@@ -147,6 +148,10 @@ public abstract class AbstractTableConfig {
 
   public String getTableType() {
     return tableType;
+  }
+
+  public boolean isRealTime() {
+    return tableType.equalsIgnoreCase(TABLE_TYPE_REALTIME);
   }
 
   public SegmentsValidationAndRetentionConfig getValidationConfig() {

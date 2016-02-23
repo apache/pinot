@@ -1,71 +1,101 @@
 package com.linkedin.thirdeye.dashboard.views;
 
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-import io.dropwizard.views.View;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 
-import java.util.List;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.dashboard.resources.DashboardConfigResource;
+
+import io.dropwizard.views.View;
 
 public class DashboardView extends View {
   private final String collection;
-  private final CollectionSchema collectionSchema;
+  private final List<String> dimensions;
+  private final List<String> unselectedDimensions;
+  private final Map<String, String> aliases;
+  private final List<String> metrics;
+  private final List<String> metricAliases;
+  private final Multimap<String, String> selectedDimensions;
   private final DateTime baselineTime;
   private final DateTime currentTime;
-  private final MetricView metricView;
   private final DimensionView dimensionView;
   private final DateTime earliestDataTime;
   private final DateTime latestDataTime;
   private final List<String> customDashboardNames;
   private final String feedbackEmailAddress;
   private final List<String> funnelNames;
-  private final List<FunnelHeatMapView> funnelViews;
 
-  public DashboardView(String collection,
-                       CollectionSchema collectionSchema,
-                       DateTime baselineTime,
-                       DateTime currentTime,
-                       MetricView metricView,
-                       DimensionView dimensionView,
-                       DateTime earliestDataTime,
-                       DateTime latestDataTime,
-                       List<String> customDashboardNames,
-                       String feedbackEmailAddress,
-                       List<String> allFunnelNames,
-                       List<FunnelHeatMapView> funnelViews) {
+  public DashboardView(String collection, Multimap<String, String> selectedDimensions,
+      DateTime baselineTime, DateTime currentTime, DimensionView dimensionView,
+      DateTime earliestDataTime, DateTime latestDataTime, List<String> customDashboardNames,
+      String feedbackEmailAddress, List<String> allFunnelNames,
+      DashboardConfigResource dashboardConfig) throws Exception {
     super("dashboard.ftl");
     this.collection = collection;
+    this.selectedDimensions = selectedDimensions;
     this.feedbackEmailAddress = feedbackEmailAddress;
-    this.collectionSchema = collectionSchema;
     this.baselineTime = baselineTime;
     this.currentTime = currentTime;
-    this.metricView = metricView;
     this.dimensionView = dimensionView;
     this.earliestDataTime = earliestDataTime;
     this.latestDataTime = latestDataTime;
     this.customDashboardNames = customDashboardNames;
     this.funnelNames = allFunnelNames;
-    this.funnelViews = funnelViews;
-  }
 
+    // TODO delete these values once the UI is decoupled.
+    this.dimensions = dashboardConfig.getAllDimensions(collection);
+    this.unselectedDimensions = dashboardConfig.getDimensions(collection, selectedDimensions);
+    this.aliases = dashboardConfig.getDimensionAliases(collection);
+    this.metrics = dashboardConfig.getMetrics(collection);
+    this.metricAliases = dashboardConfig.getMetricAliasesAsList(collection);
+  }
 
   public List<String> getFunnelNames() {
     return funnelNames;
-  }
-
-  public List<FunnelHeatMapView> getFunnelViews() {
-    return funnelViews;
   }
 
   public String getCollection() {
     return collection;
   }
 
-  public String getFeedbackEmailAddress() {
-        return feedbackEmailAddress;
+  public Map<String, String> getSelectedDimensions() {
+    Map<String, String> dimensions = new HashMap<>(selectedDimensions.size());
+    for (String key : selectedDimensions.keySet()) {
+      Collection<String> values = selectedDimensions.get(key);
+      String value = StringUtils.join(values, " OR ");
+      dimensions.put(key, value);
     }
 
-  public CollectionSchema getCollectionSchema() {
-    return collectionSchema;
+    return dimensions;
+  }
+
+  public List<String> getUnselectedDimensions() throws Exception {
+    return unselectedDimensions;
+  }
+
+  public String getFeedbackEmailAddress() {
+    return feedbackEmailAddress;
+  }
+
+  public List<String> getDimensions() {
+    return dimensions;
+  }
+
+  public Map<String, String> getDimensionAliases() {
+    return aliases;
+  }
+
+  public List<String> getMetrics() {
+    return metrics;
+  }
+
+  public List<String> getMetricAliases() {
+    return metricAliases;
   }
 
   public DateTime getBaselineTime() {
@@ -74,10 +104,6 @@ public class DashboardView extends View {
 
   public DateTime getCurrentTime() {
     return currentTime;
-  }
-
-  public MetricView getMetricView() {
-    return metricView;
   }
 
   public DimensionView getDimensionView() {
@@ -95,4 +121,5 @@ public class DashboardView extends View {
   public List<String> getCustomDashboardNames() {
     return customDashboardNames;
   }
+
 }

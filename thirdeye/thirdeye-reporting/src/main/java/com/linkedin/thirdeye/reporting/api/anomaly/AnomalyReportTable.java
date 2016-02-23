@@ -49,7 +49,8 @@ public class AnomalyReportTable {
   @Override
   public String toString() {
     return "AnomalyReportTable [dimensionSchema=" + dimensionSchema + ", topLevelViolationCount="
-        + topLevelViolationCount + ", totalViolationCount=" + totalViolationCount + ", reportRows=" + reportRows + "]";
+        + topLevelViolationCount + ", totalViolationCount=" + totalViolationCount + ", reportRows="
+        + reportRows + "]";
   }
 
 }

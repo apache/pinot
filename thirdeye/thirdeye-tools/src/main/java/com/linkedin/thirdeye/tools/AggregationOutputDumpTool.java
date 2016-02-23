@@ -22,7 +22,7 @@ public class AggregationOutputDumpTool {
     configuration.set("fs.default.name", "");
 
     Object val = properties.get("fs.defaultFS");
-    if(val!=null){
+    if (val != null) {
       configuration.set("fs.default.name", val.toString());
     }
 
@@ -41,12 +41,10 @@ public class AggregationOutputDumpTool {
 
   private static void processFile(Path path) throws Exception {
     System.out.println("Processing file:" + path);
-    SequenceFile.Reader reader = new SequenceFile.Reader(new Configuration(),
-        Reader.file(path));
+    SequenceFile.Reader reader = new SequenceFile.Reader(new Configuration(), Reader.file(path));
     System.out.println(reader.getKeyClass());
     System.out.println(reader.getValueClassName());
-    WritableComparable<?> key = (WritableComparable<?>) reader.getKeyClass()
-        .newInstance();
+    WritableComparable<?> key = (WritableComparable<?>) reader.getKeyClass().newInstance();
     Writable val = (Writable) reader.getValueClass().newInstance();
 
     while (reader.next(key, val)) {

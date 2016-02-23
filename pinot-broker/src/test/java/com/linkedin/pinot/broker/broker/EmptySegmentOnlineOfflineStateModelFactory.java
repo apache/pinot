@@ -29,7 +29,8 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
-    final EmptySegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new EmptySegmentOnlineOfflineStateModel();
+    final EmptySegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel =
+        new EmptySegmentOnlineOfflineStateModel();
     return SegmentOnlineOfflineStateModel;
   }
 
@@ -46,22 +47,22 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-      LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+      LOGGER.debug("EmptySegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : {}", message);
     }
 
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
-      LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
+      LOGGER.debug("EmptySegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : {}", message);
     }
 
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
+      LOGGER.debug("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : {}", message);
     }
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-      LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
+      LOGGER.debug("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : {}", message);
     }
   }
 

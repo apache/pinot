@@ -53,7 +53,7 @@ public class ContextualEventResource {
   @UnitOfWork
   @Path("/{startIsoTime}/{endIsoTime}")
   public List<ContextualEvent> find(@PathParam("startIsoTime") String startIsoTime,
-                                    @PathParam("endIsoTime") String endIsoTime) {
+      @PathParam("endIsoTime") String endIsoTime) {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startIsoTime);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endIsoTime);
     return dao.findAllByTime(startTime, endTime);

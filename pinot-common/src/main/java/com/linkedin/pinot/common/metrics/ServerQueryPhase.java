@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.Utils;
 *
 */
 public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
+  REQUEST_DESERIALIZATION,
   TOTAL_QUERY_TIME,
   SEGMENT_PRUNING,
   BUILD_QUERY_PLAN,
@@ -36,6 +37,7 @@ public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
     queryPhaseName = Utils.toCamelCase(name().toLowerCase());
   }
 
+  @Override
   public String getQueryPhaseName() {
     return queryPhaseName;
   }

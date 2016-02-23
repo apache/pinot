@@ -17,9 +17,12 @@ package com.linkedin.pinot.controller;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+
+import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
@@ -28,6 +31,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
+  private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
@@ -73,6 +77,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONTROLLER_VIP_HOST, vipHost);
   }
 
+  public void setControllerVipProtocol(String vipProtocol) {
+    setProperty(CONTROLLER_VIP_PROTOCOL, vipProtocol);
+  }
+
   public void setControllerPort(String port) {
     setProperty(CONTROLLER_PORT, port);
   }
@@ -106,7 +114,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
     // The set method converted comma separated string into ArrayList, so need to convert back to String here.
     if (zkAddressObj instanceof ArrayList) {
-      return String.join(",", (ArrayList) zkAddressObj);
+      List<String> zkAddressList = (ArrayList<String>) zkAddressObj;
+      String[] zkAddress =  zkAddressList.toArray(new String[0]);
+      return StringUtil.join(",", zkAddress);
     } else if (zkAddressObj instanceof String) {
       return (String) zkAddressObj;
     } else {
@@ -125,6 +135,13 @@ public class ControllerConf extends PropertiesConfiguration {
       return (String) getProperty(CONTROLLER_VIP_HOST);
     }
     return (String) getProperty(CONTROLLER_HOST);
+  }
+
+  public String getControllerVipProtocol() {
+    if (containsKey(CONTROLLER_VIP_PROTOCOL) && ((String) getProperty(CONTROLLER_VIP_PROTOCOL)).equals("https")) {
+      return "https";
+    }
+    return "http";
   }
 
   public int getRetentionControllerFrequencyInSeconds() {

@@ -29,9 +29,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
-{
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeRecordStoreLogBufferImpl.class);
+public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(StarTreeRecordStoreLogBufferImpl.class);
   private static final int STAR_VALUE = 0;
 
   private final UUID nodeId;
@@ -55,12 +55,8 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
   private ByteBuffer buffer;
 
-  public StarTreeRecordStoreLogBufferImpl(UUID nodeId,
-                                          StarTreeConfig config,
-                                          int bufferSize,
-                                          boolean useDirect,
-                                          double targetLoadFactor)
-  {
+  public StarTreeRecordStoreLogBufferImpl(UUID nodeId, StarTreeConfig config, int bufferSize,
+      boolean useDirect, double targetLoadFactor) {
     this.nodeId = nodeId;
     this.config = config;
     this.dimensionSpecs = config.getDimensions();
@@ -73,8 +69,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     this.recordCount = new AtomicInteger(0);
     this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
     int metricSize = 0;
-    for (MetricSpec spec : metricSpecs)
-    {
+    for (MetricSpec spec : metricSpecs) {
       metricSize += spec.getType().byteSize();
     }
     this.metricSize = metricSize;
@@ -82,8 +77,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     this.forwardIndex = new HashMap<String, Map<String, Integer>>();
     this.reverseIndex = new HashMap<String, Map<Integer, String>>();
 
-    for (DimensionSpec dimensionSpec : dimensionSpecs)
-    {
+    for (DimensionSpec dimensionSpec : dimensionSpecs) {
       Map<String, Integer> forward = new HashMap<String, Integer>();
       forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
       forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
@@ -100,29 +94,23 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public void update(StarTreeRecord record)
-  {
-    int entrySize = dimensionSpecs.size() * Integer.SIZE / 8
-            + Integer.SIZE / 8
-            + record.getMetricTimeSeries().getTimeWindowSet().size() * (Long.SIZE / 8 + metricSize);
+  public void update(StarTreeRecord record) {
+    int entrySize = dimensionSpecs.size() * Integer.SIZE / 8 + Integer.SIZE / 8
+        + record.getMetricTimeSeries().getTimeWindowSet().size() * (Long.SIZE / 8 + metricSize);
 
-    synchronized (sync)
-    {
+    synchronized (sync) {
       ByteBuffer buffer = getBuffer(entrySize);
       buffer.position(buffer.limit());
       buffer.limit(buffer.position() + entrySize);
       putRecord(buffer, record);
       recordCount.incrementAndGet();
 
-      for (Long time : record.getMetricTimeSeries().getTimeWindowSet())
-      {
-        if (minTime.get() == -1 || time < minTime.get())
-        {
+      for (Long time : record.getMetricTimeSeries().getTimeWindowSet()) {
+        if (minTime.get() == -1 || time < minTime.get()) {
           minTime.set(time);
         }
 
-        if (maxTime.get() == -1 || time > maxTime.get())
-        {
+        if (maxTime.get() == -1 || time > maxTime.get()) {
           maxTime.set(time);
         }
       }
@@ -130,48 +118,39 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public MetricTimeSeries getTimeSeries(StarTreeQuery query)
-  {
+  public MetricTimeSeries getTimeSeries(StarTreeQuery query) {
     // Check query
-    if (query.getTimeRange() == null)
-    {
+    if (query.getTimeRange() == null) {
       throw new IllegalArgumentException("Query must have time range " + query);
     }
 
-    synchronized (sync)
-    {
+    synchronized (sync) {
       MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
       ByteBuffer buffer = getBuffer();
 
       buffer.rewind();
 
-      while (buffer.position() < buffer.limit())
-      {
+      while (buffer.position() < buffer.limit()) {
         boolean matches = true;
 
         StarTreeRecord record = getRecord(buffer);
 
-        for (int i = 0; i < dimensionSpecs.size(); i++)
-        {
+        for (int i = 0; i < dimensionSpecs.size(); i++) {
           String recordValue = record.getDimensionKey().getDimensionValues()[i];
           String queryValue = query.getDimensionKey().getDimensionValues()[i];
 
-          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
-          {
+          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue)) {
             matches = false;
           }
         }
 
-        if (matches)
-        {
-          for (Long time : record.getMetricTimeSeries().getTimeWindowSet())
-          {
-            if (query.getTimeRange() == null || query.getTimeRange().contains(time))
-            {
-              for (MetricSpec metricSpec : metricSpecs)
-              {
-                timeSeries.increment(time, metricSpec.getName(), record.getMetricTimeSeries().get(time, metricSpec.getName()));
+        if (matches) {
+          for (Long time : record.getMetricTimeSeries().getTimeWindowSet()) {
+            if (query.getTimeRange() == null || query.getTimeRange().contains(time)) {
+              for (MetricSpec metricSpec : metricSpecs) {
+                timeSeries.increment(time, metricSpec.getName(),
+                    record.getMetricTimeSeries().get(time, metricSpec.getName()));
               }
             }
           }
@@ -183,16 +162,13 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public Iterator<StarTreeRecord> iterator()
-  {
-    synchronized (sync)
-    {
+  public Iterator<StarTreeRecord> iterator() {
+    synchronized (sync) {
       ByteBuffer buffer = getBuffer();
       compactBuffer(buffer);
       List<StarTreeRecord> records = new LinkedList<StarTreeRecord>();
       buffer.rewind();
-      while (buffer.position() < buffer.limit())
-      {
+      while (buffer.position() < buffer.limit()) {
         records.add(getRecord(buffer));
       }
       return records.iterator();
@@ -200,10 +176,8 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public void clear()
-  {
-    synchronized (sync)
-    {
+  public void clear() {
+    synchronized (sync) {
       buffer = createBuffer(bufferSize);
       buffer.limit(0);
       recordCount.set(0);
@@ -211,22 +185,19 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public void open() throws IOException
-  {
+  public void open() throws IOException {
     // Do nothing
   }
 
   @Override
-  public void close() throws IOException
-  {
+  public void close() throws IOException {
     synchronized (sync) {
       compactBuffer(getBuffer());
     }
   }
 
   @Override
-  public int getRecordCount()
-  {
+  public int getRecordCount() {
     synchronized (sync) {
       compactBuffer(getBuffer());
     }
@@ -239,13 +210,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public int getCardinality(String dimensionName)
-  {
-    synchronized (sync)
-    {
+  public int getCardinality(String dimensionName) {
+    synchronized (sync) {
       Map<String, Integer> valueIds = getForwardIndex().get(dimensionName);
-      if (valueIds == null)
-      {
+      if (valueIds == null) {
         return 0;
       }
       return valueIds.size();
@@ -253,24 +221,20 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public String getMaxCardinalityDimension()
-  {
+  public String getMaxCardinalityDimension() {
     return getMaxCardinalityDimension(null);
   }
 
   @Override
-  public String getMaxCardinalityDimension(Collection<String> blacklist)
-  {
-    synchronized (sync)
-    {
+  public String getMaxCardinalityDimension(Collection<String> blacklist) {
+    synchronized (sync) {
       String maxDimension = null;
       int maxCardinality = 0;
 
-      for (DimensionSpec dimensionSpec : dimensionSpecs)
-      {
+      for (DimensionSpec dimensionSpec : dimensionSpecs) {
         int cardinality = getCardinality(dimensionSpec.getName());
-        if (cardinality > maxCardinality && (blacklist == null || !blacklist.contains(dimensionSpec.getName())))
-        {
+        if (cardinality > maxCardinality
+            && (blacklist == null || !blacklist.contains(dimensionSpec.getName()))) {
           maxCardinality = cardinality;
           maxDimension = dimensionSpec.getName();
         }
@@ -280,15 +244,11 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     }
   }
 
-
   @Override
-  public Set<String> getDimensionValues(String dimensionName)
-  {
-    synchronized (sync)
-    {
+  public Set<String> getDimensionValues(String dimensionName) {
+    synchronized (sync) {
       Map<String, Integer> valueIds = getForwardIndex().get(dimensionName);
-      if (valueIds != null)
-      {
+      if (valueIds != null) {
         Set<String> values = new HashSet<String>(valueIds.keySet());
         values.remove(StarTreeConstants.STAR);
         return values;
@@ -298,42 +258,34 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public Number[] getMetricSums(StarTreeQuery query)
-  {
-    synchronized (sync)
-    {
+  public Number[] getMetricSums(StarTreeQuery query) {
+    synchronized (sync) {
       MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
       ByteBuffer buffer = getBuffer();
 
       buffer.rewind();
 
-      while (buffer.position() < buffer.limit())
-      {
+      while (buffer.position() < buffer.limit()) {
         StarTreeRecord record = getRecord(buffer);
 
         boolean matches = true;
 
-        for (int i = 0; i < dimensionSpecs.size(); i++)
-        {
+        for (int i = 0; i < dimensionSpecs.size(); i++) {
           String recordValue = record.getDimensionKey().getDimensionValues()[i];
           String queryValue = query.getDimensionKey().getDimensionValues()[i];
 
-          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
-          {
+          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue)) {
             matches = false;
           }
         }
 
-        if (matches)
-        {
-          for (Long time : record.getMetricTimeSeries().getTimeWindowSet())
-          {
-            if (query.getTimeRange() == null || query.getTimeRange().contains(time))
-            {
-              for (MetricSpec metricSpec : metricSpecs)
-              {
-                timeSeries.increment(time, metricSpec.getName(), record.getMetricTimeSeries().get(time, metricSpec.getName()));
+        if (matches) {
+          for (Long time : record.getMetricTimeSeries().getTimeWindowSet()) {
+            if (query.getTimeRange() == null || query.getTimeRange().contains(time)) {
+              for (MetricSpec metricSpec : metricSpecs) {
+                timeSeries.increment(time, metricSpec.getName(),
+                    record.getMetricTimeSeries().get(time, metricSpec.getName()));
               }
             }
           }
@@ -344,42 +296,33 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     }
   }
 
-  private ByteBuffer createBuffer(int size)
-  {
+  private ByteBuffer createBuffer(int size) {
     ByteBuffer buffer;
-    if (useDirect)
-    {
+    if (useDirect) {
       buffer = ByteBuffer.allocateDirect(size);
-    }
-    else
-    {
+    } else {
       buffer = ByteBuffer.allocate(size);
     }
     return buffer;
   }
 
-  private ByteBuffer getBuffer()
-  {
+  private ByteBuffer getBuffer() {
     return getBuffer(-1);
   }
 
-  private ByteBuffer getBuffer(int entrySize)
-  {
-    if (buffer == null)
-    {
+  private ByteBuffer getBuffer(int entrySize) {
+    if (buffer == null) {
       buffer = createBuffer(bufferSize);
       buffer.limit(0);
     }
 
-    if (entrySize >= 0 && buffer.limit() + entrySize > buffer.capacity())
-    {
+    if (entrySize >= 0 && buffer.limit() + entrySize > buffer.capacity()) {
       int oldLimit = buffer.limit();
       compactBuffer(buffer);
       int newLimit = buffer.limit();
       double loadFactor = (1.0 * newLimit) / oldLimit;
 
-      if (loadFactor > targetLoadFactor)
-      {
+      if (loadFactor > targetLoadFactor) {
         ByteBuffer expandedBuffer = createBuffer(buffer.capacity() + bufferSize);
         buffer.rewind();
         expandedBuffer.put(buffer);
@@ -388,16 +331,14 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         int newCapacity = expandedBuffer.capacity();
         buffer = expandedBuffer;
 
-        if (LOGGER.isDebugEnabled())
-        {
-          LOGGER.debug("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity, newCapacity);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity,
+              newCapacity);
         }
-      }
-      else
-      {
-        if (LOGGER.isDebugEnabled())
-        {
-          LOGGER.debug("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor, buffer.capacity());
+      } else {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor,
+              buffer.capacity());
         }
       }
     }
@@ -405,29 +346,22 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     return buffer;
   }
 
-  private void putRecord(ByteBuffer buffer, StarTreeRecord record)
-  {
-    for (int i = 0; i < dimensionSpecs.size(); i++)
-    {
+  private void putRecord(ByteBuffer buffer, StarTreeRecord record) {
+    for (int i = 0; i < dimensionSpecs.size(); i++) {
       DimensionSpec dimensionSpec = dimensionSpecs.get(i);
       String dimensionValue = record.getDimensionKey().getDimensionValues()[i];
 
-      if (StarTreeConstants.STAR.equals(dimensionValue))
-      {
+      if (StarTreeConstants.STAR.equals(dimensionValue)) {
         buffer.putInt(STAR_VALUE);
-      }
-      else
-      {
+      } else {
         Map<String, Integer> valueIds = getForwardIndex().get(dimensionSpec.getName());
-        if (valueIds == null)
-        {
+        if (valueIds == null) {
           valueIds = new HashMap<String, Integer>();
           getForwardIndex().put(dimensionSpec.getName(), valueIds);
         }
 
         Integer valueId = valueIds.get(dimensionValue);
-        if (valueId == null)
-        {
+        if (valueId == null) {
           valueId = nextValueId.getAndIncrement();
           valueIds.put(dimensionValue, valueId);
           reverseIndex.get(dimensionSpec.getName()).put(valueId, dimensionValue);
@@ -441,12 +375,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
     buffer.putInt(times.size());
 
-    for (Long time : times)
-    {
+    for (Long time : times) {
       buffer.putLong(time);
 
-      for (int i = 0; i < metricSpecs.size(); i++)
-      {
+      for (int i = 0; i < metricSpecs.size(); i++) {
         String metricName = metricSpecs.get(i).getName();
         Number value = record.getMetricTimeSeries().get(time, metricName);
         NumberUtils.addToBuffer(buffer, value, metricSpecs.get(i).getType());
@@ -454,14 +386,13 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     }
   }
 
-  private StarTreeRecord getRecord(ByteBuffer buffer)
-  {
+  private StarTreeRecord getRecord(ByteBuffer buffer) {
     StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
 
     String[] dimensionValues = new String[dimensionSpecs.size()];
-    for (int i = 0; i < dimensionSpecs.size(); i++)
-    {
-      String dimensionValue = reverseIndex.get(dimensionSpecs.get(i).getName()).get(buffer.getInt());
+    for (int i = 0; i < dimensionSpecs.size(); i++) {
+      String dimensionValue =
+          reverseIndex.get(dimensionSpecs.get(i).getName()).get(buffer.getInt());
       dimensionValues[i] = dimensionValue;
     }
     builder.setDimensionKey(new DimensionKey(dimensionValues));
@@ -470,12 +401,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
     int numTimes = buffer.getInt();
 
-    for (int i = 0; i < numTimes; i++)
-    {
+    for (int i = 0; i < numTimes; i++) {
       long time = buffer.getLong();
 
-      for (int j = 0; j < metricSpecs.size(); j++)
-      {
+      for (int j = 0; j < metricSpecs.size(); j++) {
         String metricName = metricSpecs.get(j).getName();
         Number value = NumberUtils.readFromBuffer(buffer, metricSpecs.get(j).getType());
         timeSeries.increment(time, metricName, value);
@@ -487,21 +416,20 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   /**
-   * Replaces entries in the buffer which share the same dimension + time combination with an aggregate.
+   * Replaces entries in the buffer which share the same dimension + time combination with an
+   * aggregate.
    */
-  protected void compactBuffer(ByteBuffer buffer)
-  {
+  protected void compactBuffer(ByteBuffer buffer) {
     Map<DimensionKey, StarTreeRecord> groupedRecords = new HashMap<DimensionKey, StarTreeRecord>();
 
     buffer.rewind();
-    while (buffer.position() < buffer.limit())
-    {
+    while (buffer.position() < buffer.limit()) {
       StarTreeRecord record = getRecord(buffer);
 
       StarTreeRecord group = groupedRecords.get(record.getDimensionKey());
-      if (group == null)
-      {
-        group = new StarTreeRecordImpl(config, record.getDimensionKey(), new MetricTimeSeries(metricSchema));
+      if (group == null) {
+        group = new StarTreeRecordImpl(config, record.getDimensionKey(),
+            new MetricTimeSeries(metricSchema));
         groupedRecords.put(group.getDimensionKey(), group);
       }
 
@@ -510,8 +438,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
     buffer.rewind();
 
-    for (StarTreeRecord group : groupedRecords.values())
-    {
+    for (StarTreeRecord group : groupedRecords.values()) {
       putRecord(buffer, group);
     }
 
@@ -521,20 +448,17 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public Long getMinTime()
-  {
+  public Long getMinTime() {
     return minTime.get();
   }
 
   @Override
-  public Long getMaxTime()
-  {
+  public Long getMaxTime() {
     return maxTime.get();
   }
 
   @Override
-  public Map<TimeRange, Integer> getTimeRangeCount()
-  {
+  public Map<TimeRange, Integer> getTimeRangeCount() {
     throw new UnsupportedOperationException();
   }
 
@@ -542,6 +466,5 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   public Map<String, Map<String, Integer>> getForwardIndex() {
     return forwardIndex;
   }
-
 
 }

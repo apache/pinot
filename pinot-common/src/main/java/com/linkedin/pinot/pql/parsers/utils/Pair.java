@@ -18,7 +18,7 @@ package com.linkedin.pinot.pql.parsers.utils;
 import java.io.Serializable;
 
 
-public class Pair<FIRST, SECOND> implements Serializable {
+public class Pair<FIRST extends Serializable, SECOND extends Serializable> implements Serializable {
   private FIRST first;
   private SECOND second;
 
@@ -43,5 +43,4 @@ public class Pair<FIRST, SECOND> implements Serializable {
     this.first = first;
     this.second = second;
   }
-
 }

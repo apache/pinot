@@ -15,15 +15,13 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.plan.AggregationGroupByImplementationType;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode;
-import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType;
 import com.linkedin.pinot.core.plan.AggregationPlanNode;
 import com.linkedin.pinot.core.plan.CombinePlanNode;
 import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
@@ -78,12 +76,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   @Override
-  public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
+  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
+      ExecutorService executorService, long timeOutMs) {
     final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
     final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
     rootNode.setPlanNode(combinePlanNode);
-    for (final IndexSegment indexSegment : indexSegmentList) {
-      combinePlanNode.addPlanNode(makeInnerSegmentPlan(indexSegment, brokerRequest));
+    for (final SegmentDataManager segmentDataManager : segmentDataManagers) {
+      combinePlanNode.addPlanNode(makeInnerSegmentPlan(segmentDataManager.getSegment(), brokerRequest));
     }
     return new GlobalPlanImplV0(rootNode);
   }

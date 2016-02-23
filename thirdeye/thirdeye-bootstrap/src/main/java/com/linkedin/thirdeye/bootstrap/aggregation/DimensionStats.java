@@ -9,8 +9,7 @@ import java.util.Set;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class DimensionStats
-{
+public class DimensionStats {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private Map<String, Set<String>> dimensionValues;
@@ -32,26 +31,24 @@ public class DimensionStats
     values.add(dimensionValue);
   }
 
-  public byte[] toBytes() throws IOException
-  {
+  public byte[] toBytes() throws IOException {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(this);
   }
 
-  public static DimensionStats fromBytes(byte[] bytes) throws IOException
-  {
+  public static DimensionStats fromBytes(byte[] bytes) throws IOException {
     return OBJECT_MAPPER.readValue(bytes, DimensionStats.class);
   }
 
   public void update(DimensionStats dimensionStats) {
-   for (Entry<String, Set<String>> entry : dimensionStats.getDimensionValues().entrySet()) {
-     Set<String> values = dimensionValues.get(entry.getKey());
-     if (values == null) {
-       values = new HashSet<String>();
-       dimensionValues.put(entry.getKey(), values);
-     }
-     values.addAll(entry.getValue());
+    for (Entry<String, Set<String>> entry : dimensionStats.getDimensionValues().entrySet()) {
+      Set<String> values = dimensionValues.get(entry.getKey());
+      if (values == null) {
+        values = new HashSet<String>();
+        dimensionValues.put(entry.getKey(), values);
+      }
+      values.addAll(entry.getValue());
 
-   }
+    }
 
   }
 }

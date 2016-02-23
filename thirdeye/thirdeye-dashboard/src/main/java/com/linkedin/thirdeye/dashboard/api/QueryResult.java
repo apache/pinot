@@ -1,16 +1,26 @@
 package com.linkedin.thirdeye.dashboard.api;
 
-import com.sun.jersey.api.NotFoundException;
-
 import java.util.List;
 import java.util.Map;
+
+import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
+import com.sun.jersey.api.NotFoundException;
 
 public class QueryResult {
   private Map<String, Map<String, Number[]>> data;
   private List<String> dimensions;
   private List<String> metrics;
 
-  public QueryResult() {}
+  public QueryResult() {
+  }
+
+  public static QueryResult fromThirdEyeResponse(ThirdEyeRawResponse response) {
+    QueryResult result = new QueryResult();
+    result.setData(response.getData());
+    result.setDimensions(response.getDimensions());
+    result.setMetrics(response.getMetrics());
+    return result;
+  }
 
   public Map<String, Map<String, Number[]>> getData() {
     return data;

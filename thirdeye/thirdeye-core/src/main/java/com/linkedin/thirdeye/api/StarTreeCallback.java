@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.api;
 
-public interface StarTreeCallback
-{
+public interface StarTreeCallback {
   void call(StarTreeNode node);
 }

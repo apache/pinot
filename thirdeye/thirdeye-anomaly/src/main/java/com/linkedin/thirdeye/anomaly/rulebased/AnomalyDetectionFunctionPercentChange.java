@@ -39,7 +39,8 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
   }
 
   @Override
-  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException {
+  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig)
+      throws IllegalFunctionException {
     super.init(starTreeConfig, functionConfig);
   }
 
@@ -56,10 +57,11 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,
-      List<AnomalyResult> anomalyHistory) {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series,
+      TimeRange timeInterval, List<AnomalyResult> anomalyHistory) {
     if (series.getSchema().getNames().contains(metricName) == false) {
-      throw new FunctionDidNotEvaluateException("'" + metricName + "' does not exist in the MetricTimeSeries");
+      throw new FunctionDidNotEvaluateException(
+          "'" + metricName + "' does not exist in the MetricTimeSeries");
     }
 
     List<AnomalyResult> results = new ArrayList<AnomalyResult>();
@@ -96,12 +98,13 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
         boolean isAnomaly;
         // percent delta determines the direction of the rule
         if (percentDelta < 0) {
-            isAnomaly = percentChange <= threshold;
+          isAnomaly = percentChange <= threshold;
         } else {
-            isAnomaly = percentChange >= threshold;
+          isAnomaly = percentChange >= threshold;
         }
 
-        results.add(new AnomalyResult(isAnomaly, timeWindow, percentChange, absoluteChange, properties));
+        results.add(
+            new AnomalyResult(isAnomaly, timeWindow, percentChange, absoluteChange, properties));
         pointsEvaluated++;
       }
     }
@@ -114,7 +117,8 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
   }
 
   public String toString() {
-    return String.format("%s change in %s exceeds %.2f%%", baselineTimePeriod.toString(), metricName, percentDelta);
+    return String.format("%s change in %s exceeds %.2f%%", baselineTimePeriod.toString(),
+        metricName, percentDelta);
   }
 
   public AnomalyDetectionFunction setDeltaTable(DimensionKeyMatchTable<Double> deltaTable) {
@@ -124,7 +128,8 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
 
   /**
    * @return
-   *  The threshold to use based on the best match table, or default if no match is found or no table is specified.
+   *         The threshold to use based on the best match table, or default if no match is found or
+   *         no table is specified.
    */
   private double getEffectiveThreshold(DimensionKey dimensionKey) {
     if (deltaTable != null) {
@@ -135,6 +140,5 @@ public class AnomalyDetectionFunctionPercentChange extends AnomalyDetectionFunct
     }
     return percentDelta;
   }
-
 
 }

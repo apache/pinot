@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -26,24 +28,24 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.linkedin.pinot.core.trace.TraceCallable;
-import com.linkedin.pinot.core.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
+import com.linkedin.pinot.core.util.trace.TraceCallable;
+import com.linkedin.pinot.core.util.trace.TraceRunnable;
 
 
 /**
@@ -73,10 +75,18 @@ public class MCombineOperator extends BaseOperator {
   private long _timeOutMs;
   //Make this configurable
   //These two control the parallelism on a per query basis, depending on the number of segments to process
-  private static int MAX_THREADS_PER_QUERY = 5;
+  private static int MIN_THREADS_PER_QUERY = 10;
+  private static int MAX_THREADS_PER_QUERY = 10;
   private static int MIN_SEGMENTS_PER_THREAD = 10;
 
   private IntermediateResultsBlock _mergedBlock;
+  
+  static {
+    int numCores = Runtime.getRuntime().availableProcessors();
+    MIN_THREADS_PER_QUERY = Math.max(1, (int)(numCores * .5));
+    //Dont have more than 10 threads per query
+    MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int)(numCores * .5));
+  }
 
   public MCombineOperator(List<Operator> retOperators, BrokerRequest brokerRequest) {
     _operators = retOperators;
@@ -112,8 +122,9 @@ public class MCombineOperator extends BaseOperator {
     final long startTime = System.currentTimeMillis();
     if (_isParallel) {
       final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
-      int numGroups = Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD);
-
+      int numGroups = Math.max(MIN_THREADS_PER_QUERY,Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD));
+      //ensure that the number of groups is not more than the number of segments
+      numGroups = Math.min(_operators.size(), numGroups);
       final List<List<Operator>> operatorGroups = new ArrayList<List<Operator>>(numGroups);
       for (int i = 0; i < numGroups; i++) {
         operatorGroups.add(new ArrayList<Operator>());
@@ -255,8 +266,9 @@ public class MCombineOperator extends BaseOperator {
   private void trimToSize(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
     AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-    aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
-
+    List<Map<String, Serializable>> trimmedResults =
+        aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
+    mergedBlock.setAggregationGroupByResult1(trimmedResults);
   }
 
   @Override

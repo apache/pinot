@@ -15,18 +15,12 @@
  */
 package com.linkedin.pinot.core.indexsegment.columnar;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import java.io.File;
 
 
 /**
@@ -55,5 +49,32 @@ public class ColumnarSegmentLoader {
   public static IndexSegment loadSegment(File indexDir, ReadMode readMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
     return Loaders.IndexSegment.load(indexDir, readMode, indexLoadingConfigMetadata);
   }
+
+  /*
+  // An sample test program to load and unload segments, useful for some load testing
+  public static void main(String args[]) throws Exception {
+    String name = "/tmp/somefile.tar.gz";
+    File segFile = new File(name);
+    String dirName = "/tmp/somedir";
+    File dir = new File(dirName);
+
+    final int port = 8862;
+    final String tableName = "myTable";
+    final String segmentName = "mySegment";
+    while (true) {
+      System.out.println("Fetching");
+      String url = "http://serverhost:" + port + "/segments/" + tableName + "/" + segmentName;
+      FileUploadUtils.getFile(url, segFile);
+      TarGzCompressionUtils.unTar(segFile, new File(dirName));
+      System.out.println("loading");
+      IndexSegment segment = ColumnarSegmentLoader.load(dir, ReadMode.heap);
+      System.out.println("Loaded");
+      segment.destroy();
+      segFile.delete();
+
+      FileUtils.deleteDirectory(dir);
+    }
+  }
+  */
 
 }

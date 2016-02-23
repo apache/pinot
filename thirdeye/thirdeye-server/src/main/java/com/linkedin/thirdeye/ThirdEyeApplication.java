@@ -33,88 +33,74 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
-
-public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
-{
+public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeApplication.class);
   private static final String DATA_TIME_LAG_MILLIS = "dataTimeLagMillis";
 
   @Override
-  public String getName()
-  {
+  public String getName() {
     return "thirdeye";
   }
 
   @Override
-  public void initialize(Bootstrap<Config> bootstrap)
-  {
+  public void initialize(Bootstrap<Config> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
-    bootstrap.addBundle(new AssetsBundle("/assets/stylesheets", "/assets/stylesheets", null, "stylesheets"));
-    bootstrap.addBundle(new AssetsBundle("/assets/javascripts", "/assets/javascripts", null, "javascripts"));
+    bootstrap.addBundle(
+        new AssetsBundle("/assets/stylesheets", "/assets/stylesheets", null, "stylesheets"));
+    bootstrap.addBundle(
+        new AssetsBundle("/assets/javascripts", "/assets/javascripts", null, "javascripts"));
     bootstrap.addBundle(new AssetsBundle("/assets/images", "/assets/images", null, "images"));
   }
 
   @Override
-  public void run(final Config config, Environment environment) throws Exception
-  {
+  public void run(final Config config, Environment environment) throws Exception {
     final File rootDir = new File(config.getRootDir());
 
-    if (!rootDir.exists())
-    {
+    if (!rootDir.exists()) {
       FileUtils.forceMkdir(rootDir);
     }
 
     ExecutorService parallelQueryExecutor =
-            environment.lifecycle()
-                       .executorService("parallel_query_executor")
-                       .minThreads(Runtime.getRuntime().availableProcessors() / 2)
-                       .maxThreads(Runtime.getRuntime().availableProcessors() / 2)
-                       .build();
+        environment.lifecycle().executorService("parallel_query_executor")
+            .minThreads(Runtime.getRuntime().availableProcessors() / 2)
+            .maxThreads(Runtime.getRuntime().availableProcessors() / 2).build();
 
-    ScheduledExecutorService anomalyDetectionTaskScheduler =
-            environment.lifecycle()
-                       .scheduledExecutorService("anomaly_detection_task_scheduler")
-                       .build();
+    ScheduledExecutorService anomalyDetectionTaskScheduler = environment.lifecycle()
+        .scheduledExecutorService("anomaly_detection_task_scheduler").build();
 
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
-    final DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir, config.isAutoExpire());
+    final DataUpdateManager dataUpdateManager =
+        new DataUpdateManager(rootDir, config.isAutoExpire());
 
-    final KafkaConsumerManager kafkaConsumerManager = new KafkaConsumerManager(
-        rootDir,
-        starTreeManager,
-        dataUpdateManager,
-        environment.metrics());
+    final KafkaConsumerManager kafkaConsumerManager = new KafkaConsumerManager(rootDir,
+        starTreeManager, dataUpdateManager, environment.metrics());
 
     final MetricRegistry metricRegistry = environment.metrics();
-    environment.lifecycle().manage(new Managed()
-    {
+    environment.lifecycle().manage(new Managed() {
       @Override
-      public void start() throws Exception
-      {
-        if (config.isAutoRestore())
-        {
+      public void start() throws Exception {
+        if (config.isAutoRestore()) {
           String[] collections = rootDir.list();
-          if (collections != null)
-          {
-            for (String collection : collections)
-            {
+          if (collections != null) {
+            for (String collection : collections) {
               final String collectionName = collection;
               starTreeManager.restore(rootDir, collection);
-              metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
+              metricRegistry.register(
+                  MetricRegistry.name(CollectionsResource.class, collection, DATA_TIME_LAG_MILLIS),
                   new Gauge<Long>() {
 
-                    @Override
-                    public Long getValue() {
+                @Override
+                public Long getValue() {
 
-                      return System.currentTimeMillis() - starTreeManager.getMaxDataTime(collectionName);
-                    }
-                  });
+                  return System.currentTimeMillis()
+                      - starTreeManager.getMaxDataTime(collectionName);
+                }
+              });
             }
           }
 
-          if (config.isAutoConsume())
-          {
+          if (config.isAutoConsume()) {
             kafkaConsumerManager.start();
             LOGGER.info("Started kafka consumer manager");
           }
@@ -122,29 +108,21 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
       }
 
       @Override
-      public void stop() throws Exception
-      {
-        try
-        {
+      public void stop() throws Exception {
+        try {
           kafkaConsumerManager.stop();
           LOGGER.info("Stopped kafka consumer manager");
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
           LOGGER.error("{}", e);
         }
 
-        try
-        {
+        try {
           Set<String> collections = new HashSet<String>(starTreeManager.getCollections());
-          for (String collection : collections)
-          {
+          for (String collection : collections) {
             starTreeManager.close(collection);
           }
           LOGGER.info("Closed star tree manager");
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
           LOGGER.error("{}", e);
         }
       }
@@ -152,15 +130,16 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     // Health checks
     environment.healthChecks().register(KafkaDataLagHealthCheck.NAME,
-                                        new KafkaDataLagHealthCheck(kafkaConsumerManager));
+        new KafkaDataLagHealthCheck(kafkaConsumerManager));
     environment.healthChecks().register(KafkaConsumerLagHealthCheck.NAME,
-                                        new KafkaConsumerLagHealthCheck(kafkaConsumerManager));
+        new KafkaConsumerLagHealthCheck(kafkaConsumerManager));
 
     // Resources
-    environment.jersey().register(new CollectionsResource(
-        starTreeManager, environment.metrics(), dataUpdateManager, rootDir));
+    environment.jersey().register(new CollectionsResource(starTreeManager, environment.metrics(),
+        dataUpdateManager, rootDir));
     environment.jersey().register(new AdminResource());
-    environment.jersey().register(new QueryResource(new ThirdEyeQueryExecutor(parallelQueryExecutor, starTreeManager)));
+    environment.jersey().register(
+        new QueryResource(new ThirdEyeQueryExecutor(parallelQueryExecutor, starTreeManager)));
 
     // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
@@ -169,8 +148,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ExpireTask(dataUpdateManager));
   }
 
-  public static class Config extends Configuration
-  {
+  public static class Config extends Configuration {
     @NotEmpty
     private String rootDir;
 
@@ -182,63 +160,52 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     private TimeGranularity anomalyDetectionInterval;
 
-    public void setRootDir(String rootDir)
-    {
+    public void setRootDir(String rootDir) {
       this.rootDir = rootDir;
     }
 
-    public void setAutoRestore(boolean autoRestore)
-    {
+    public void setAutoRestore(boolean autoRestore) {
       this.autoRestore = autoRestore;
     }
 
-    public void setAutoConsume(boolean autoConsume)
-    {
+    public void setAutoConsume(boolean autoConsume) {
       this.autoConsume = autoConsume;
     }
 
-    public void setAutoExpire(boolean autoExpire)
-    {
+    public void setAutoExpire(boolean autoExpire) {
       this.autoExpire = autoExpire;
     }
 
-    public void setAnomalyDetectionInterval(TimeGranularity anomalyDetectionInterval)
-    {
+    public void setAnomalyDetectionInterval(TimeGranularity anomalyDetectionInterval) {
       this.anomalyDetectionInterval = anomalyDetectionInterval;
     }
 
     @JsonProperty
-    public String getRootDir()
-    {
+    public String getRootDir() {
       return rootDir;
     }
 
     @JsonProperty
-    public boolean isAutoRestore()
-    {
+    public boolean isAutoRestore() {
       return autoRestore;
     }
 
-    public boolean isAutoConsume()
-    {
+    public boolean isAutoConsume() {
       return autoConsume;
     }
 
     @JsonProperty
-    public boolean isAutoExpire()
-    {
+    public boolean isAutoExpire() {
       return autoExpire;
     }
 
     @JsonProperty
-    public TimeGranularity getAnomalyDetectionInterval()
-    {
+    public TimeGranularity getAnomalyDetectionInterval() {
       return anomalyDetectionInterval;
     }
   }
 
-  public static void main(String[] args) throws Exception
-  {
+  public static void main(String[] args) throws Exception {
     new ThirdEyeApplication().run(args);
   }
 }

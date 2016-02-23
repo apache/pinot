@@ -14,58 +14,62 @@ import com.linkedin.thirdeye.api.TimeRange;
 public interface AnomalyDetectionFunction {
 
   /**
-   * Handle any initialization of the function. This is guaranteed to be called before any of the subsequent methods.
-   *
+   * Handle any initialization of the function. This is guaranteed to be called before any of the
+   * subsequent methods.
    * @param starTreeConfig
    * @param functionConfig
-   *  FunctionProperties object loaded from a properties string.
+   *          FunctionProperties object loaded from a properties string.
    * @throws IllegalFunctionException
    */
-  void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException;
+  void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig)
+      throws IllegalFunctionException;
 
   /**
    * @return
-   *  The minimum length of time needed to perform the anomaly detection function (null == all time). This can be
-   *  interpreted as the size of the training set extending from the beginning of the detection interval.
+   *         The minimum length of time needed to perform the anomaly detection function (null ==
+   *         all time). This can be
+   *         interpreted as the size of the training set extending from the beginning of the
+   *         detection interval.
    */
   TimeGranularity getTrainingWindowTimeGranularity();
 
   /**
    * @return
-   *  The granularity of data requested by the function (cannot be null)
+   *         The granularity of data requested by the function (cannot be null)
    */
   TimeGranularity getAggregationTimeGranularity();
 
   /**
    * @return
-   *  The smallest window of time that anomaly detection can run at (null indicates no restriction)
+   *         The smallest window of time that anomaly detection can run at (null indicates no
+   *         restriction)
    */
   TimeGranularity getMinimumMonitoringIntervalTimeGranularity();
 
   /**
    * @return
-   *  The metrics used by this function.
+   *         The metrics used by this function.
    */
   Set<String> getMetrics();
 
   /**
-   * Computes whether or not this dimension combination + metric time series contains anomalies in the
+   * Computes whether or not this dimension combination + metric time series contains anomalies in
+   * the
    * detection interval.
-   *
    * @param dimensionKey
-   *  The dimension combination associated with the series
+   *          The dimension combination associated with the series
    * @param series
-   *  The time series to be analyzed including the training data
+   *          The time series to be analyzed including the training data
    * @param monitoringWindow
-   *  The interval of time to produce anomalies for
+   *          The interval of time to produce anomalies for
    * @param anomalyHistory
-   *  A list of all previous anomaly results produced by this function
-   *
+   *          A list of all previous anomaly results produced by this function
    * @return
-   *  The list of anomalies in the series. Anomaly results with isAnomaly set to false or not in the detectionInterval
-   *  may be ignored by the driver.
+   *         The list of anomalies in the series. Anomaly results with isAnomaly set to false or not
+   *         in the detectionInterval
+   *         may be ignored by the driver.
    */
-  List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange monitoringWindow,
-      List<AnomalyResult> anomalyHistory);
+  List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series,
+      TimeRange monitoringWindow, List<AnomalyResult> anomalyHistory);
 
 }

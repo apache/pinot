@@ -7,7 +7,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import javax.ws.rs.core.MultivaluedMap;
@@ -130,13 +132,13 @@ public class ViewUtils {
    * @param currentEndMillis - end of the current time window. Note that this is not included in the
    *          result list.
    * @param baselineOffsetMillis - difference between baseline and current timestamps.
-   * @param intraPeriod - difference between start and end of current time window.
+   * @param timeWindowLength - difference between start and end of current time window in millis.
    */
   public static List<MetricDataRow> extractMetricDataRows(Map<Long, Number[]> baselineData,
-      Map<Long, Number[]> currentData, long currentEndMillis, long baselineOffsetMillis,
-      long intraPeriod) {
+      Map<Long, Number[]> currentData, long currentStartMillis, long timeWindowLength,
+      long baselineOffsetMillis) {
 
-    long currentStartMillis = currentEndMillis - intraPeriod;
+    long currentEndMillis = currentStartMillis + timeWindowLength;
 
     List<Long> sortedTimes = new ArrayList<>(currentData.keySet());
     // Reverse sorting in case currentData contains baselineData as well.
@@ -155,9 +157,8 @@ public class ViewUtils {
       Number[] baselineValues = baselineData.get(baseline);
       Number[] currentValues = currentData.get(current);
 
-      MetricDataRow row =
-          new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineValues,
-              new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
+      MetricDataRow row = new MetricDataRow(new DateTime(baseline).toDateTime(DateTimeZone.UTC),
+          baselineValues, new DateTime(current).toDateTime(DateTimeZone.UTC), currentValues);
       table.add(0, row);
     }
 
@@ -165,50 +166,104 @@ public class ViewUtils {
   }
 
   /**
-   * Computes cumulative values for the input rows. <tt>metricCount</tt> should be
-   * the number of values in each baseline/current dataset for each row.
+   * Returns a path to the shallowest nested metric function that takes in multiple arguments:
+   * <ul>
+   * <li>A(B(C)) --> A,B</li>
+   * <li>A(B(C), D) --> A</li>
+   * <li>A(B, C(D)) --> A</li>
+   * </ul>
+   * <br/>
+   * If envisioned as a tree, the last function returned is the topmost node that has more than one
+   * child.
    */
-  public static List<MetricDataRow> computeCumulativeRows(List<MetricDataRow> rows, int metricCount) {
+  public static List<String> getMetricFunctionLevels(String metricFunction) {
 
-    if (rows.isEmpty()) {
-      return Collections.emptyList();
-    }
-    List<MetricDataRow> cumulativeRows = new LinkedList<>();
-    Number[] cumulativeBaselineValues = new Number[metricCount];
-    Arrays.fill(cumulativeBaselineValues, 0.0);
-    Number[] cumulativeCurrentValues = new Number[metricCount];
-    Arrays.fill(cumulativeCurrentValues, 0.0);
-
-    for (MetricDataRow row : rows) {
-      Number[] baselineValues = row.getBaseline();
-      if (baselineValues != null) {
-        for (int i = 0; i < baselineValues.length; i++) {
-          cumulativeBaselineValues[i] =
-              cumulativeBaselineValues[i].doubleValue()
-                  + (baselineValues[i] == null ? 0.0 : baselineValues[i].doubleValue());
+    Stack<String> path = new Stack<>();
+    List<Boolean> validDepths = new ArrayList<>();
+    validDepths.add(true); // first level should always be valid
+    int currentDepth = 0;
+    StringBuilder sb = new StringBuilder();
+    for (char c : metricFunction.toCharArray()) {
+      switch (c) {
+      case '(':
+        if (currentDepth < validDepths.size() && validDepths.get(currentDepth)) {
+          path.push(sb.toString());
+          validDepths.add(true);
         }
-      }
-
-      Number[] currentValues = row.getCurrent();
-      if (currentValues != null) {
-        for (int i = 0; i < currentValues.length; i++) {
-          cumulativeCurrentValues[i] =
-              cumulativeCurrentValues[i].doubleValue()
-                  + (currentValues[i] == null ? 0.0 : currentValues[i].doubleValue());
+        currentDepth++;
+        sb.setLength(0);
+        break;
+      case ')':
+        currentDepth--;
+        break;
+      case ',':
+        if (currentDepth < validDepths.size()) {
+          validDepths.set(currentDepth, false);
+          // trim off any values no longer needed.
+          while (validDepths.size() > currentDepth + 1) {
+            validDepths.remove(currentDepth + 1);
+            path.pop();
+          }
         }
+
+        break;
+      default:
+        sb.append(c);
+        break;
       }
-
-      Number[] cumulativeBaselineValuesCopy =
-          Arrays.copyOf(cumulativeBaselineValues, cumulativeBaselineValues.length);
-      Number[] cumulativeCurrentValuesCopy =
-          Arrays.copyOf(cumulativeCurrentValues, cumulativeCurrentValues.length);
-
-      MetricDataRow cumulativeRow =
-          new MetricDataRow(row.getBaselineTime(), cumulativeBaselineValuesCopy,
-              row.getCurrentTime(), cumulativeCurrentValuesCopy);
-      cumulativeRows.add(cumulativeRow);
     }
-    return cumulativeRows;
+    return new ArrayList<>(path);
   }
 
+  /**
+   * Determines intra period (day/week/month) based on outermost metric function.
+   * @param metricFunction
+   * @return
+   * @throws NumberFormatException
+   */
+  public static IntraPeriod getIntraPeriod(String metricFunction) throws NumberFormatException {
+    Granularity granularity = getGranularity(metricFunction);
+    int aggregationWindow = Integer.parseInt(metricFunction.split("_")[1]);
+
+    IntraPeriod intraPeriod;
+    if (granularity == Granularity.HOURS) {
+      intraPeriod = IntraPeriod.DAY;
+    } else if (granularity == Granularity.DAYS && aggregationWindow == 1) {
+      intraPeriod = IntraPeriod.WEEK;
+    } else if (granularity == Granularity.DAYS) {
+      intraPeriod = IntraPeriod.MONTH;
+    } else {
+      throw new IllegalArgumentException("Unknown granularity: " + granularity);
+    }
+    return intraPeriod;
+  }
+
+  /** Derives hourly/daily granularity from metric function. */
+  public static Granularity getGranularity(String metricFunction) {
+    String timeUnit = metricFunction.split("_")[2];
+    if (timeUnit.startsWith(TimeUnit.HOURS.toString())) {
+      return Granularity.HOURS;
+    } else if (timeUnit.startsWith(TimeUnit.DAYS.toString())) {
+      return Granularity.DAYS;
+    } else {
+      throw new IllegalArgumentException("Unknown granularity: " + timeUnit);
+    }
+  }
+
+  public static DateTime standardizeDate(long inputMillis, IntraPeriod intraPeriod) {
+    return standardizeDate(new DateTime(inputMillis, DateTimeZone.UTC), intraPeriod);
+  }
+
+  // TODO configure to accept user input timezone for hourly data.
+  public static DateTime standardizeDate(DateTime input, IntraPeriod intraPeriod) {
+    DateTimeZone dateTZ;
+    if (IntraPeriod.DAY == intraPeriod) {
+      dateTZ = DateTimeZone.forID("America/Los_Angeles");
+    } else {
+      dateTZ = DateTimeZone.UTC;
+    }
+    input = input.toDateTime(dateTZ);
+    return new DateTime(input.getYear(), input.getMonthOfYear(), input.getDayOfMonth(), 0, 0,
+        dateTZ);
+  }
 }

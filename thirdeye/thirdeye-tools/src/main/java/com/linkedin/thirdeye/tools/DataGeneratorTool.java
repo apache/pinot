@@ -13,7 +13,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 public class DataGeneratorTool {
 
   private static String USAGE = "usage: [opts] starTreeConfigFile schemaFile outputDirectory";
-  public static DataGeneratorConfig config ;
+  public static DataGeneratorConfig config;
   DataGeneratorWriter writer;
 
   public static void main(String[] args) throws Exception {

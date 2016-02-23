@@ -16,12 +16,12 @@
 package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.block.query.AggregationResultBlock;
-import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.blocks.AggregationResultBlock;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 

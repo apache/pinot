@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -53,7 +53,7 @@ public class DataSourceUtils {
 
       @Override
       public Block getNextBlock(BlockId BlockId) {
-        return new SingleValueBlock(dictionary, values);
+        return new ArrayBasedSingleValueBlock(dictionary, values);
       }
 
       @Override

@@ -12,38 +12,33 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class DimensionStoreImmutableImpl implements DimensionStore
-{
+public class DimensionStoreImmutableImpl implements DimensionStore {
   private final StarTreeConfig config;
   private final ByteBuffer buffer;
   private final DimensionDictionary dictionary;
 
-  public DimensionStoreImmutableImpl(StarTreeConfig config, ByteBuffer buffer, DimensionDictionary dictionary)
-  {
+  public DimensionStoreImmutableImpl(StarTreeConfig config, ByteBuffer buffer,
+      DimensionDictionary dictionary) {
     this.config = config;
     this.buffer = buffer;
     this.dictionary = dictionary;
   }
 
   @Override
-  public DimensionDictionary getDictionary()
-  {
+  public DimensionDictionary getDictionary() {
     return dictionary;
   }
 
   @Override
-  public List<DimensionKey> getDimensionKeys()
-  {
+  public List<DimensionKey> getDimensionKeys() {
     List<DimensionKey> dimensionKeys = new ArrayList<DimensionKey>();
 
     ByteBuffer tmpBuffer = buffer.duplicate();
 
-    while (tmpBuffer.position() < tmpBuffer.limit())
-    {
+    while (tmpBuffer.position() < tmpBuffer.limit()) {
       String[] dimensionValues = new String[config.getDimensions().size()];
 
-      for (int i = 0; i < config.getDimensions().size(); i++)
-      {
+      for (int i = 0; i < config.getDimensions().size(); i++) {
         DimensionSpec dimensionSpec = config.getDimensions().get(i);
         Integer valueId = tmpBuffer.getInt();
         String dimensionValue = dictionary.getDimensionValue(dimensionSpec.getName(), valueId);
@@ -57,8 +52,7 @@ public class DimensionStoreImmutableImpl implements DimensionStore
   }
 
   @Override
-  public Map<DimensionKey, Integer> findMatchingKeys(DimensionKey dimensionKey)
-  {
+  public Map<DimensionKey, Integer> findMatchingKeys(DimensionKey dimensionKey) {
     Map<DimensionKey, Integer> matchingKeys = new HashMap<DimensionKey, Integer>();
 
     int[] translatedKey = dictionary.translate(config.getDimensions(), dimensionKey);
@@ -68,24 +62,20 @@ public class DimensionStoreImmutableImpl implements DimensionStore
 
     ByteBuffer tmpBuffer = buffer.duplicate();
 
-    while (tmpBuffer.position() < tmpBuffer.limit())
-    {
+    while (tmpBuffer.position() < tmpBuffer.limit()) {
       boolean matches = true;
 
-      for (int i = 0; i < config.getDimensions().size(); i++)
-      {
+      for (int i = 0; i < config.getDimensions().size(); i++) {
         Integer valueId = tmpBuffer.getInt();
 
         currentKey[i] = valueId;
 
-        if (translatedKey[i] != valueId && translatedKey[i] != StarTreeConstants.STAR_VALUE)
-        {
+        if (translatedKey[i] != valueId && translatedKey[i] != StarTreeConstants.STAR_VALUE) {
           matches = false;
         }
       }
 
-      if (matches)
-      {
+      if (matches) {
         matchingKeys.put(dictionary.translate(config.getDimensions(), currentKey), idx);
       }
 
@@ -93,8 +83,7 @@ public class DimensionStoreImmutableImpl implements DimensionStore
     }
 
     // If matching keys is empty, use record with least others!
-    if (matchingKeys.isEmpty())
-    {
+    if (matchingKeys.isEmpty()) {
       idx = 0;
       tmpBuffer.rewind();
 
@@ -102,32 +91,26 @@ public class DimensionStoreImmutableImpl implements DimensionStore
       int leastOthersIdx = -1;
       int[] leastOthersKey = null;
 
-      while (tmpBuffer.position() < tmpBuffer.limit())
-      {
+      while (tmpBuffer.position() < tmpBuffer.limit()) {
         boolean matches = true;
         int currentNumOthers = 0;
 
-        for (int i = 0; i < config.getDimensions().size(); i++)
-        {
+        for (int i = 0; i < config.getDimensions().size(); i++) {
           Integer valueId = tmpBuffer.getInt();
 
           currentKey[i] = valueId;
 
-          if (translatedKey[i] != valueId
-              && valueId != StarTreeConstants.STAR_VALUE
-              && valueId != StarTreeConstants.OTHER_VALUE)
-          {
+          if (translatedKey[i] != valueId && valueId != StarTreeConstants.STAR_VALUE
+              && valueId != StarTreeConstants.OTHER_VALUE) {
             matches = false;
           }
 
-          if (valueId == StarTreeConstants.OTHER_VALUE)
-          {
+          if (valueId == StarTreeConstants.OTHER_VALUE) {
             currentNumOthers++;
           }
         }
 
-        if (matches && currentNumOthers < leastNumOthers)
-        {
+        if (matches && currentNumOthers < leastNumOthers) {
           leastOthersKey = Arrays.copyOf(currentKey, currentKey.length);
           leastNumOthers = currentNumOthers;
           leastOthersIdx = idx;
@@ -136,12 +119,13 @@ public class DimensionStoreImmutableImpl implements DimensionStore
         idx++;
       }
 
-      if (leastOthersKey == null)
-      {
-        throw new IllegalStateException("Could not find alternative dimension combination for " + dimensionKey);
+      if (leastOthersKey == null) {
+        throw new IllegalStateException(
+            "Could not find alternative dimension combination for " + dimensionKey);
       }
 
-      matchingKeys.put(dictionary.translate(config.getDimensions(), leastOthersKey), leastOthersIdx);
+      matchingKeys.put(dictionary.translate(config.getDimensions(), leastOthersKey),
+          leastOthersIdx);
     }
 
     return matchingKeys;

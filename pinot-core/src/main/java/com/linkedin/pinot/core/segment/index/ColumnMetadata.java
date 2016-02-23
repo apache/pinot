@@ -38,6 +38,8 @@ public class ColumnMetadata {
 
   private final String columnName;
   private final int cardinality;
+  private final int totalRawDocs;
+  private final int totalAggDocs;
   private final int totalDocs;
   private final DataType dataType;
   private final int bitsPerElement;
@@ -52,13 +54,15 @@ public class ColumnMetadata {
   private final boolean hasDictionary;
   private final int totalNumberOfEntries;
 
-  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement,
+  public ColumnMetadata(String columnName, int cardinality, int totalRawDocs, int totalAggDocs, int totalDocs, DataType dataType, int bitsPerElement,
       int stringColumnMaxLength, FieldType fieldType, boolean isSorted, boolean hasInvertedIndex,
       boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary, TimeUnit timeunit,
       int totalNumberOfEntries) {
 
     this.columnName = columnName;
     this.cardinality = cardinality;
+    this.totalRawDocs = totalRawDocs;
+    this.totalAggDocs = totalAggDocs;
     this.totalDocs = totalDocs;
     this.dataType = dataType;
     this.bitsPerElement = bitsPerElement;
@@ -74,6 +78,10 @@ public class ColumnMetadata {
     this.totalNumberOfEntries = totalNumberOfEntries;
   }
 
+  public String getColumnName() {
+    return columnName;
+  }
+
   public int getTotalNumberOfEntries() {
     return totalNumberOfEntries;
   }
@@ -86,8 +94,16 @@ public class ColumnMetadata {
     return cardinality;
   }
 
+  public int getTotalRawDocs() {
+    return totalRawDocs;
+  }
+
   public int getTotalDocs() {
     return totalDocs;
+  }
+
+  public int getTotalAggreateDocs() {
+    return totalAggDocs;
   }
 
   public DataType getDataType() {

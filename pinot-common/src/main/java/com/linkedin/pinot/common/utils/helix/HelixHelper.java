@@ -214,7 +214,7 @@ public class HelixHelper {
     return accessor.getProperty(builder.idealStates(resourceName));
   }
 
-  public static ExternalView getExternalViewForResouce(HelixAdmin admin, String clusterName, String resourceName) {
+  public static ExternalView getExternalViewForResource(HelixAdmin admin, String clusterName, String resourceName) {
     return admin.getResourceExternalView(clusterName, resourceName);
   }
 
@@ -328,7 +328,7 @@ public class HelixHelper {
    * @param segmentName Name of the new segment to be added
    * @param getInstancesForSegment Callable returning list of instances where the segment should be uploaded.
    */
-  public static void addSegmentToIdealState(HelixManager helixManager, String tableName, final String segmentName,
+  public static void addSegmentToIdealState(HelixManager helixManager, final String tableName, final String segmentName,
       final Callable<List<String>> getInstancesForSegment) {
 
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
@@ -338,12 +338,16 @@ public class HelixHelper {
         try {
           targetInstances = getInstancesForSegment.call();
         } catch (Exception e) {
-          LOGGER.error("Unable to get new instances for segment uploading.");
+          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName);
           return null;
         }
 
-        for (final String instance : targetInstances) {
-          idealState.setPartitionState(segmentName, instance, ONLINE);
+        if (targetInstances == null || targetInstances.size() == 0) {
+          LOGGER.warn("No instances assigned for segment {}, table {}", segmentName, tableName);
+        } else {
+          for (final String instance : targetInstances) {
+            idealState.setPartitionState(segmentName, instance, ONLINE);
+          }
         }
 
         idealState.setNumPartitions(idealState.getNumPartitions() + 1);

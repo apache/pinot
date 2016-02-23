@@ -27,8 +27,7 @@ public class CollectionConfigResource {
   @POST
   @Path("/{collection}/dimension-groups")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response createDimensionGroups(
-      @PathParam("collection") String collection,
+  public Response createDimensionGroups(@PathParam("collection") String collection,
       byte[] dimensionGroupSpec) throws Exception {
     File collectionDir = new File(collectionConfigRoot, collection);
     File configFile = new File(collectionDir, GROUPS_FILE_NAME);
@@ -46,7 +45,8 @@ public class CollectionConfigResource {
 
   @DELETE
   @Path("/{collection}/dimension-groups")
-  public Response deleteDimensionGroups(@PathParam("collection") String collection) throws Exception {
+  public Response deleteDimensionGroups(@PathParam("collection") String collection)
+      throws Exception {
     File collectionDir = new File(collectionConfigRoot, collection);
     File configFile = new File(collectionDir, GROUPS_FILE_NAME);
     configCache.invalidateDimensionGroupSpec(collection);
@@ -56,7 +56,8 @@ public class CollectionConfigResource {
   private Response readConfigFile(File configFile) throws Exception {
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Check if exists
@@ -68,19 +69,22 @@ public class CollectionConfigResource {
       byte[] config = IOUtils.toByteArray(inputStream);
       return Response.ok(config, MediaType.APPLICATION_OCTET_STREAM).build();
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not read from " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not read from " + configFile).build();
     }
   }
 
   private Response writeConfigFile(File configFile, byte[] config) throws Exception {
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Do not overwrite existing
     if (configFile.exists()) {
-      return Response.status(Response.Status.CONFLICT).entity(GROUPS_FILE_NAME + " already exists").build();
+      return Response.status(Response.Status.CONFLICT).entity(GROUPS_FILE_NAME + " already exists")
+          .build();
     }
 
     // Create collection dir if it doesn't exist
@@ -94,7 +98,8 @@ public class CollectionConfigResource {
       IOUtils.copy(new ByteArrayInputStream(config), outputStream);
       LOG.info("Created {}", configFile);
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not write to " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not write to " + configFile).build();
     }
 
     return Response.ok().build();
@@ -103,7 +108,8 @@ public class CollectionConfigResource {
   private Response deleteConfigFile(File configFile) throws Exception {
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Check if exists
@@ -116,7 +122,8 @@ public class CollectionConfigResource {
       LOG.info("Deleted {}", configFile);
       return Response.noContent().build();
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not delete " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not delete " + configFile).build();
     }
   }
 }

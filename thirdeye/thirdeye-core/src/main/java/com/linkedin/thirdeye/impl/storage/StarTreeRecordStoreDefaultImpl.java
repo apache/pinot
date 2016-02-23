@@ -20,8 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
-{
+public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore {
   private final StarTreeConfig config;
   private final DimensionStore dimensionStore;
   private final MetricStore metricStore;
@@ -29,10 +28,8 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   private final int recordCount;
   private final Map<String, Set<String>> dimensionValues;
 
-  public StarTreeRecordStoreDefaultImpl(StarTreeConfig config,
-                                        DimensionStore dimensionStore,
-                                        MetricStore metricStore)
-  {
+  public StarTreeRecordStoreDefaultImpl(StarTreeConfig config, DimensionStore dimensionStore,
+      MetricStore metricStore) {
     this.config = config;
     this.dimensionStore = dimensionStore;
     this.metricStore = metricStore;
@@ -40,15 +37,12 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
 
     List<DimensionKey> dimensionKeys = dimensionStore.getDimensionKeys();
 
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionValues.put(dimensionSpec.getName(), new HashSet<String>());
     }
 
-    for (DimensionKey dimensionKey : dimensionKeys)
-    {
-      for (int i = 0; i < config.getDimensions().size(); i++)
-      {
+    for (DimensionKey dimensionKey : dimensionKeys) {
+      for (int i = 0; i < config.getDimensions().size(); i++) {
         String dimensionName = config.getDimensions().get(i).getName();
         dimensionValues.get(dimensionName).add(dimensionKey.getDimensionValues()[i]);
       }
@@ -58,96 +52,81 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   }
 
   @Override
-  public void update(StarTreeRecord record)
-  {
-    Map<DimensionKey, Integer> logicalOffsets = dimensionStore.findMatchingKeys(record.getDimensionKey());
-    for (Integer id : logicalOffsets.values())
-    {
+  public void update(StarTreeRecord record) {
+    Map<DimensionKey, Integer> logicalOffsets =
+        dimensionStore.findMatchingKeys(record.getDimensionKey());
+    for (Integer id : logicalOffsets.values()) {
       metricStore.update(id, record.getMetricTimeSeries());
     }
   }
 
   // n.b. only combinations, no metrics
   @Override
-  public Iterator<StarTreeRecord> iterator()
-  {
+  public Iterator<StarTreeRecord> iterator() {
     List<DimensionKey> dimensionKeys = dimensionStore.getDimensionKeys();
 
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>(dimensionKeys.size());
 
-    for (DimensionKey dimensionKey : dimensionKeys)
-    {
+    for (DimensionKey dimensionKey : dimensionKeys) {
       Map<DimensionKey, Integer> logicalOffsets = dimensionStore.findMatchingKeys(dimensionKey);
-      MetricTimeSeries timeSeries = metricStore.getTimeSeries(new ArrayList(logicalOffsets.values()), null);
-      records.add(new StarTreeRecordImpl.Builder()
-                          .setDimensionKey(dimensionKey)
-                          .setMetricTimeSeries(timeSeries)
-                          .build(config));
+      MetricTimeSeries timeSeries =
+          metricStore.getTimeSeries(new ArrayList(logicalOffsets.values()), null);
+      records.add(new StarTreeRecordImpl.Builder().setDimensionKey(dimensionKey)
+          .setMetricTimeSeries(timeSeries).build(config));
     }
 
     return records.iterator();
   }
 
   @Override
-  public void clear()
-  {
+  public void clear() {
     metricStore.clear();
   }
 
   @Override
-  public void open() throws IOException
-  {
+  public void open() throws IOException {
     // NOP (factory does this)
   }
 
   @Override
-  public void close() throws IOException
-  {
+  public void close() throws IOException {
     // NOP (factory does this)
   }
 
   @Override
-  public int getRecordCount()
-  {
+  public int getRecordCount() {
     return recordCount;
   }
 
   @Override
-  public int getRecordCountEstimate()
-  {
+  public int getRecordCountEstimate() {
     return recordCount;
   }
 
   @Override
-  public int getCardinality(String dimensionName)
-  {
+  public int getCardinality(String dimensionName) {
     Set<String> values = dimensionValues.get(dimensionName);
-    if (values == null)
-    {
+    if (values == null) {
       return 0;
     }
     return values.size();
   }
 
   @Override
-  public String getMaxCardinalityDimension()
-  {
+  public String getMaxCardinalityDimension() {
     return getMaxCardinalityDimension(null);
   }
 
   @Override
-  public String getMaxCardinalityDimension(Collection<String> blacklist)
-  {
+  public String getMaxCardinalityDimension(Collection<String> blacklist) {
     String maxDimensionName = null;
     Integer maxCardinality = null;
 
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       int cardinality = getCardinality(dimensionSpec.getName());
 
       if ((blacklist == null || !blacklist.contains(dimensionSpec.getName()))
-              && (maxCardinality == null || cardinality > maxCardinality))
-      {
+          && (maxCardinality == null || cardinality > maxCardinality)) {
         maxCardinality = cardinality;
         maxDimensionName = dimensionSpec.getName();
       }
@@ -157,50 +136,43 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   }
 
   @Override
-  public Set<String> getDimensionValues(String dimensionName)
-  {
+  public Set<String> getDimensionValues(String dimensionName) {
     return dimensionValues.get(dimensionName);
   }
 
   @Override
-  public Number[] getMetricSums(StarTreeQuery query)
-  {
+  public Number[] getMetricSums(StarTreeQuery query) {
     return doQuery(query).getMetricSums();
   }
 
   @Override
-  public Long getMinTime()
-  {
+  public Long getMinTime() {
     return metricStore.getMinTime();
   }
 
   @Override
-  public Long getMaxTime()
-  {
+  public Long getMaxTime() {
     return metricStore.getMaxTime();
   }
 
   @Override
-  public Map<TimeRange, Integer> getTimeRangeCount()
-  {
+  public Map<TimeRange, Integer> getTimeRangeCount() {
     return metricStore.getTimeRangeCount();
   }
 
   @Override
-  public MetricTimeSeries getTimeSeries(StarTreeQuery query)
-  {
+  public MetricTimeSeries getTimeSeries(StarTreeQuery query) {
     return doQuery(query);
   }
 
   @Override
-  public Map<String, Map<String, Integer>> getForwardIndex()
-  {
+  public Map<String, Map<String, Integer>> getForwardIndex() {
     return dimensionStore.getDictionary().getDictionary();
   }
 
-  private MetricTimeSeries doQuery(StarTreeQuery query)
-  {
-    Map<DimensionKey, Integer> logicalOffsets = dimensionStore.findMatchingKeys(query.getDimensionKey());
+  private MetricTimeSeries doQuery(StarTreeQuery query) {
+    Map<DimensionKey, Integer> logicalOffsets =
+        dimensionStore.findMatchingKeys(query.getDimensionKey());
     return metricStore.getTimeSeries(new ArrayList(logicalOffsets.values()), query.getTimeRange());
   }
 }

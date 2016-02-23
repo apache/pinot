@@ -6,8 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class DefaultTransformUDF implements TransformUDF {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(DefaultTransformUDF.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultTransformUDF.class);
 
   private Schema outputSchema;
 
@@ -25,7 +24,5 @@ public class DefaultTransformUDF implements TransformUDF {
     // Default implementation returns input record as is
     return record;
   }
-
-
 
 }

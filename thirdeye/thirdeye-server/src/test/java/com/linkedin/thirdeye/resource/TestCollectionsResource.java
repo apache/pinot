@@ -31,41 +31,46 @@ public class TestCollectionsResource {
   CollectionsResource testCollectionsResource;
 
   @BeforeMethod
-  public void beforeMethod() throws Exception
-  {
+  public void beforeMethod() throws Exception {
     mockMetricRegistry = mock(MetricRegistry.class);
     mockStarTreeManager = mock(StarTreeManager.class);
-    rootDir = new File(System.getProperty("java.io.tmpdir"), TestCollectionsResource.class.getName());
+    rootDir =
+        new File(System.getProperty("java.io.tmpdir"), TestCollectionsResource.class.getName());
 
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
-    try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
+    try {
+      FileUtils.forceMkdir(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
 
-    testCollectionsResource = new  CollectionsResource(mockStarTreeManager, mockMetricRegistry, new DataUpdateManager(rootDir, false), rootDir);
+    testCollectionsResource = new CollectionsResource(mockStarTreeManager, mockMetricRegistry,
+        new DataUpdateManager(rootDir, false), rootDir);
 
     collection = "dummy";
   }
 
   @AfterMethod
-  public void afterMethod() throws Exception
-  {
-    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
+  public void afterMethod() throws Exception {
+    try {
+      FileUtils.forceDelete(rootDir);
+    } catch (Exception e) {
+      /* ok */ }
   }
 
   @Test
-  public void testPostConfig() throws Exception
-  {
+  public void testPostConfig() throws Exception {
     byte[] configBytes = "Dummy config file".getBytes();
     Response postConfigResponse = testCollectionsResource.postConfig(collection, configBytes);
     Assert.assertEquals(postConfigResponse.getStatus(), Response.Status.OK.getStatusCode());
   }
 
-
   @Test(expectedExceptions = ConflictException.class)
-  public void testPostConfigOverwrite() throws Exception
-  {
+  public void testPostConfigOverwrite() throws Exception {
     File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
+    if (!collectionDir.exists()) {
       FileUtils.forceMkdir(collectionDir);
     }
 

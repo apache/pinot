@@ -16,7 +16,9 @@
 package com.linkedin.pinot.controller;
 
 import java.io.File;
+import java.util.concurrent.Callable;
 
+import org.apache.helix.PreConnectCallback;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
@@ -25,11 +27,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentsManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -49,7 +53,7 @@ public class ControllerStarter {
   private final RetentionManager retentionManager;
   private final ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
-  private final PinotRealtimeSegmentsManager realtimeSegmentsManager;
+  private final PinotRealtimeSegmentManager realtimeSegmentsManager;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -60,7 +64,7 @@ public class ControllerStarter {
     _metricsRegistry = new MetricsRegistry();
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
     validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
-    realtimeSegmentsManager = new PinotRealtimeSegmentsManager(helixResourceManager);
+    realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -105,6 +109,31 @@ public class ControllerStarter {
 
     MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
+
+    controllerMetrics.addCallbackGauge(
+            "helix.connected",
+            new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L;
+              }
+            });
+
+    controllerMetrics.addCallbackGauge(
+        "helix.leader", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
+              }
+            });
+
+    helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
+          @Override
+          public void onPreConnect() {
+            controllerMetrics.addMeteredValue(null, ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          }
+        });
   }
 
   public void stop() {
@@ -151,6 +180,7 @@ public class ControllerStarter {
     }
 
     conf.setControllerVipHost("localhost");
+    conf.setControllerVipProtocol("http");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setTenantIsolationEnabled(true);

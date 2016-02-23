@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.perf;
 
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -35,6 +34,8 @@ import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 
 
 @State(Scope.Benchmark)
@@ -80,8 +81,8 @@ public class BenchmarkFileRead {
     int columnSizeInBits = 3;
     boolean isMMap = true;
     boolean hasNulls = false;
-    FixedBitCompressedSVForwardIndexReader reader =
-        new FixedBitCompressedSVForwardIndexReader(file, rows, columnSizeInBits, isMMap, hasNulls);
+    FixedBitSingleValueReader reader =
+        new FixedBitSingleValueReader(file, rows, columnSizeInBits, isMMap, hasNulls);
     int[] result2 = new int[rows];
     for (int i = 0; i < rows; i++) {
       result2[i] = reader.getInt(i);

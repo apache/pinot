@@ -15,32 +15,39 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
-
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileStream;
@@ -52,7 +59,17 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -62,9 +79,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -74,18 +91,22 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import kafka.javaapi.producer.Producer;
+import kafka.producer.KeyedMessage;
+import kafka.producer.ProducerConfig;
 
 
 /**
- * TODO Document me!
- *
+ * Shared implementation details of the cluster integration tests.
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
   private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
   private static final boolean BATCH_KAFKA_MESSAGES = true;
+  private static final int MAX_MESSAGES_PER_BATCH = 10000;
   private static final int MAX_MULTIVALUE_CARDINALITY = 5;
   protected static final boolean GATHER_FAILED_QUERIES = false;
+  protected static final String PINOT_SCHEMA_FILE = "OnTimeSchema.json";
   private int failedQueryCount = 0;
   private int queryCount = 0;
 
@@ -287,6 +308,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
                       }
                     }
                   } else {
+                    if(!correctValues.containsKey(pinotKey)){
+                      LOGGER.error("actualValues from Pinot: " + actualValues);
+                      LOGGER.error("correct values from H2: " + correctValues);
+                    }
                     Assert.assertTrue(correctValues.containsKey(pinotKey), "Result group '" + pinotKey
                         + "' returned by Pinot was not returned by H2 for query " + pqlQuery);
                     Assert.assertEquals(
@@ -385,8 +410,28 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
             ++columnCount;
             break;
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+            String fieldTypeName = fieldType.getName();
+
+            if (fieldTypeName.equalsIgnoreCase("int")) {
+              fieldTypeName = "bigint";
+            }
+
+            columnNameAndType = field.name() + " " + fieldTypeName + " not null";
+
+            columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
+            ++columnCount;
+            break;
+          case RECORD:
+            // Ignore records
+            continue;
           default:
-            throw new AssertionError("Don't know how to handle field " + fieldName + " of type " + fieldType);
+            // Ignore other avro types
+            LOGGER.warn("Ignoring field {} of type {}", field.name(), field.schema());
+            continue;
         }
       }
 
@@ -461,6 +506,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(reader.getSchema());
         int recordCount = 0;
         List<KeyedMessage<String, byte[]>> messagesToWrite = new ArrayList<KeyedMessage<String, byte[]>>(10000);
+        int messagesInThisBatch = 0;
         for (GenericRecord genericRecord : reader) {
           outputStream.reset();
           datumWriter.write(genericRecord, binaryEncoder);
@@ -471,6 +517,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
           if (BATCH_KAFKA_MESSAGES) {
             messagesToWrite.add(data);
+            messagesInThisBatch++;
+            if (MAX_MESSAGES_PER_BATCH <= messagesInThisBatch) {
+              messagesInThisBatch = 0;
+              producer.send(messagesToWrite);
+              messagesToWrite.clear();
+            }
           } else {
             producer.send(data);
           }
@@ -494,26 +546,172 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory, final File segmentTarDir, final String tableName) {
+  public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic, int rowCount,
+      Random random) {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", kafkaBroker);
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    properties.put("request.required.acks", "1");
+
+    ProducerConfig producerConfig = new ProducerConfig(properties);
+    Producer<String, byte[]> producer = new Producer<String, byte[]>(producerConfig);
+    try {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536);
+      DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
+      BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
+      Schema avroSchema = reader.getSchema();
+      GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(avroSchema);
+      int recordCount = 0;
+
+      int rowsRemaining = rowCount;
+      int messagesInThisBatch = 0;
+      while (rowsRemaining > 0) {
+        int rowsInThisBatch = Math.min(rowsRemaining, MAX_MESSAGES_PER_BATCH);
+        List<KeyedMessage<String, byte[]>> messagesToWrite =
+            new ArrayList<KeyedMessage<String, byte[]>>(rowsInThisBatch);
+        GenericRecord genericRecord = new GenericData.Record(avroSchema);
+
+        for (int i = 0; i < rowsInThisBatch; ++i) {
+          generateRandomRecord(genericRecord, avroSchema, random);
+          outputStream.reset();
+          datumWriter.write(genericRecord, binaryEncoder);
+          binaryEncoder.flush();
+
+          byte[] bytes = outputStream.toByteArray();
+          KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(kafkaTopic, bytes);
+
+          if (BATCH_KAFKA_MESSAGES) {
+            messagesToWrite.add(data);
+            messagesInThisBatch++;
+            if (MAX_MESSAGES_PER_BATCH <= messagesInThisBatch) {
+              messagesInThisBatch = 0;
+              producer.send(messagesToWrite);
+              messagesToWrite.clear();
+            }
+          } else {
+            producer.send(data);
+          }
+          recordCount += 1;
+        }
+
+        if (BATCH_KAFKA_MESSAGES) {
+          producer.send(messagesToWrite);
+        }
+
+        System.out.println("rowsRemaining = " + rowsRemaining);
+        rowsRemaining -= rowsInThisBatch;
+      }
+
+      outputStream.close();
+      reader.close();
+      LOGGER.info(
+          "Finished writing " + recordCount + " records from " + avroFile.getName() + " into Kafka topic " + kafkaTopic);
+      int totalRecordCount = totalAvroRecordWrittenCount.addAndGet(recordCount);
+      LOGGER.info("Total records written so far " + totalRecordCount);
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void generateRandomRecord(GenericRecord genericRecord, Schema avroSchema, Random random) {
+    for (Schema.Field field : avroSchema.getFields()) {
+      Schema.Type fieldType = field.schema().getType();
+
+      // Non-nullable single value?
+      if (fieldType != Schema.Type.ARRAY && fieldType != Schema.Type.UNION) {
+        switch(fieldType) {
+          case INT:
+            genericRecord.put(field.name(), random.nextInt(100000));
+            break;
+          case LONG:
+            genericRecord.put(field.name(), random.nextLong() % 1000000L);
+            break;
+          case STRING:
+            genericRecord.put(field.name(), "potato" + random.nextInt(1000));
+            break;
+          default:
+            throw new RuntimeException("Unimplemented random record generation for field " + field);
+        }
+      } else if (fieldType == Schema.Type.UNION) { // Nullable field?
+        // Use first type of union to determine actual data type
+        switch(field.schema().getTypes().get(0).getType()) {
+          case INT:
+            genericRecord.put(field.name(), random.nextInt(100000));
+            break;
+          case LONG:
+            genericRecord.put(field.name(), random.nextLong() % 1000000L);
+            break;
+          case STRING:
+            genericRecord.put(field.name(), "potato" + random.nextInt(1000));
+            break;
+          default:
+            throw new RuntimeException("Unimplemented random record generation for field " + field);
+        }
+      } else {
+        // Multivalue field
+        final int MAX_MULTIVALUES = 5;
+        int multivalueCount = random.nextInt(MAX_MULTIVALUES);
+        List<Object> values = new ArrayList<>(multivalueCount);
+
+        switch(field.schema().getElementType().getType()) {
+          case INT:
+            for (int i = 0; i < multivalueCount; i++) {
+              values.add(random.nextInt(100000));
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < multivalueCount; i++) {
+              values.add(random.nextLong() % 1000000L);
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < multivalueCount; i++) {
+              values.add("potato" + random.nextInt(1000));
+            }
+            break;
+          default:
+            throw new RuntimeException("Unimplemented random record generation for field " + field);
+        }
+
+        genericRecord.put(field.name(), values);
+      }
+    }
+  }
+
+  public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
+      final File baseDirectory, final File segmentTarDir, final String tableName, final boolean createStarTreeIndex) {
     int segmentCount = avroFiles.size();
     LOGGER.info("Building " + segmentCount + " segments in parallel");
+    List<ListenableFutureTask<Pair<File, File>>> futureTasks = new ArrayList<ListenableFutureTask<Pair<File,File>>>();
+
     for (int i = 1; i <= segmentCount; ++i) {
       final int segmentIndex = i - 1;
       final int segmentNumber = i + baseSegmentIndex;
 
-      executor.execute(new Runnable() {
+      final ListenableFutureTask<Pair<File, File>> buildSegmentFutureTask =
+          ListenableFutureTask.<Pair<File, File>>create(new Callable<Pair<File, File>>() {
         @Override
-        public void run() {
+        public Pair<File, File> call() throws Exception {
           try {
             // Build segment
             LOGGER.info("Starting to build segment " + segmentNumber);
             File outputDir = new File(baseDirectory, "segment-" + segmentNumber);
-            final SegmentGeneratorConfig genConfig =
-                SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
-                    TimeUnit.DAYS, tableName);
+            final File inputAvroFile = avroFiles.get(segmentIndex);
+            final SegmentGeneratorConfig genConfig = SegmentTestUtils
+                .getSegmentGenSpecWithSchemAndProjectedColumns(inputAvroFile, outputDir, TimeUnit.DAYS, tableName);
+
+            if (createStarTreeIndex) {
+              final File pinotSchemaFile = new File(TestUtils.getFileFromResourceUrl(
+                  BaseClusterIntegrationTest.class.getClassLoader().getResource(PINOT_SCHEMA_FILE)));
+              com.linkedin.pinot.common.data.Schema pinotSchema =
+                  com.linkedin.pinot.common.data.Schema.fromFile(pinotSchemaFile);
+              genConfig.setSchema(pinotSchema);
+            }
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
+            genConfig.setCreateStarTreeIndex(createStarTreeIndex);
+            genConfig.setStarTreeIndexSpec(null);
 
             final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
             driver.init(genConfig);
@@ -521,15 +719,92 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
             // Tar segment
             String segmentName = outputDir.list()[0];
-            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName, new File(
-                segmentTarDir, segmentName).getAbsolutePath());
+            final String tarGzPath = TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" +
+                    segmentName, new File(segmentTarDir, segmentName).getAbsolutePath());
             LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName);
+            return new ImmutablePair<File, File>(inputAvroFile, new File(tarGzPath));
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
         }
       });
+
+      futureTasks.add(buildSegmentFutureTask);
+      executor.execute(buildSegmentFutureTask);
     }
+
+    ListenableFuture<List<Pair<File, File>>> pairListFuture = Futures.allAsList(futureTasks);
+    return Futures.transform(pairListFuture, new AsyncFunction<List<Pair<File, File>>, Map<File, File>>() {
+      @Override
+      public ListenableFuture<Map<File, File>> apply(List<Pair<File, File>> input) throws Exception {
+        Map<File, File> avroToSegmentMap = new HashMap<File, File>();
+        for (Pair<File, File> avroToSegmentPair : input) {
+          avroToSegmentMap.put(avroToSegmentPair.getLeft(), avroToSegmentPair.getRight());
+        }
+        return Futures.immediateFuture(avroToSegmentMap);
+      }
+    });
+  }
+
+  protected void waitForRecordCountToStabilizeToExpectedCount(int expectedRecordCount, long deadline) throws Exception {
+    int pinotRecordCount;
+
+    do {
+      Thread.sleep(5000L);
+
+      // Run the query
+      JSONObject response = postQuery("select count(*) from 'mytable'");
+      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
+      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
+      String pinotValue = firstAggregationResult.getString("value");
+      pinotRecordCount = Integer.parseInt(pinotValue);
+
+      LOGGER.info("Pinot record count: " + pinotRecordCount + "\tExpected count: " + expectedRecordCount);
+      Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
+      TOTAL_DOCS = response.getLong("totalDocs");
+    } while (expectedRecordCount != pinotRecordCount);
+  }
+
+  protected CountDownLatch setupSegmentCountCountDownLatch(final String tableName, final int expectedSegmentCount)
+      throws Exception {
+    final CountDownLatch latch = new CountDownLatch(1);
+    HelixManager manager =
+        HelixManagerFactory
+            .getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR, ZkStarter.DEFAULT_ZK_STR);
+    manager.connect();
+    manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
+      @Override
+      public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
+        for (ExternalView externalView : externalViewList) {
+          if (externalView.getId().contains(tableName)) {
+
+            Set<String> partitionSet = externalView.getPartitionSet();
+            if (partitionSet.size() == expectedSegmentCount) {
+              int onlinePartitionCount = 0;
+
+              for (String partitionId : partitionSet) {
+                Map<String, String> partitionStateMap = externalView.getStateMap(partitionId);
+                if (partitionStateMap.containsValue("ONLINE")) {
+                  onlinePartitionCount++;
+                }
+              }
+
+              if (onlinePartitionCount == expectedSegmentCount) {
+                System.out.println("Got " + expectedSegmentCount + " online tables, unlatching the main thread");
+                latch.countDown();
+              }
+            }
+          }
+        }
+      }
+    });
+    return latch;
+  }
+
+  public static void ensureDirectoryExistsAndIsEmpty(File tmpDir)
+      throws IOException {
+    FileUtils.deleteDirectory(tmpDir);
+    tmpDir.mkdirs();
   }
 
   @Test
@@ -555,6 +830,55 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         throw new RuntimeException(e.getMessage());
       }
     }
+  }
+
+  public static List<File> unpackAvroData(File tmpDir, int segmentCount)
+      throws IOException, ArchiveException {
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+            RealtimeClusterIntegrationTest.class.getClassLoader()
+                .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), tmpDir);
+
+    tmpDir.mkdirs();
+    final List<File> avroFiles = new ArrayList<File>(segmentCount);
+    for (int segmentNumber = 1; segmentNumber <= segmentCount; ++segmentNumber) {
+      avroFiles.add(new File(tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  public void setupH2AndInsertAvro(final List<File> avroFiles, ExecutorService executor)
+      throws ClassNotFoundException, SQLException {
+    Class.forName("org.h2.Driver");
+    _connection = DriverManager.getConnection("jdbc:h2:mem:");
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        createH2SchemaAndInsertAvroFiles(avroFiles, _connection);
+      }
+    });
+  }
+
+  public void setupQueryGenerator(final List<File> avroFiles, ExecutorService executor) {
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
+      }
+    });
+  }
+
+  public void pushAvroIntoKafka(final List<File> avroFiles, ExecutorService executor, final String kafkaTopic) {
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic);
+      }
+    });
+  }
+
+  public File getSchemaFile() {
+    return new File(OfflineClusterIntegrationTest.class.getClassLoader()
+        .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
   }
 
   @Test
@@ -672,9 +996,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected long getCurrentServingNumDocs() {
     ensurePinotConnectionIsCreated();
-    com.linkedin.pinot.client.ResultSet resultSet =
-        _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0").getResultSet(0);
-    return resultSet.getInt(0);
+    com.linkedin.pinot.client.ResultSetGroup resultSetGroup =
+        _pinotConnection.execute("SELECT COUNT(*) from mytable LIMIT 0");
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getInt(0);
+    }
+    return 0;
   }
 
   protected int getGeneratedQueryCount() {

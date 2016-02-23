@@ -3,6 +3,8 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 import java.io.File;
 import java.io.IOException;
 
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
@@ -40,6 +42,7 @@ public class PinotTableTenantConfigs extends PinotRestletResourceBase {
       return updateTenantConfig("dummy");
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating tenant config " , e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }

@@ -31,9 +31,11 @@ public class RangeIntGenerator implements Generator {
     _delta = _end - _start;
   }
 
+  @Override
   public void init() {
   }
 
+  @Override
   public Object next() {
     return (_start + _randGen.nextInt(_delta));
   }

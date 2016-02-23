@@ -47,16 +47,16 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeMultiValueBlock;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
+import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
+import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
+import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
+import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
+import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
-import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.SortedSingleValueBlock;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -207,6 +207,7 @@ public class SelectionOperatorUtils {
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
+  @Deprecated
   public static Serializable[] collectRowFromBlockValSets(int docId, Block[] blocks, DataSchema dataSchema) {
 
     final Serializable[] row = new Serializable[dataSchema.size()];

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
@@ -31,7 +32,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 
 
-public class PostQueryCommand extends AbstractBaseCommand implements Command {
+public class PostQueryCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
   @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
@@ -47,6 +48,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
       usage = "Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }
@@ -71,6 +73,11 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     return "Query the uploaded Pinot segments.";
   }
 
+  public PostQueryCommand setBrokerHost(String host) {
+    _brokerHost = host;
+    return this;
+  }
+  
   public PostQueryCommand setBrokerPort(String port) {
     _brokerPort = port;
     return this;
@@ -110,6 +117,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     return sb.toString();
   }
 
+  @Override
   public boolean execute() throws Exception {
     String result = run();
     LOGGER.info("Result: " + result);

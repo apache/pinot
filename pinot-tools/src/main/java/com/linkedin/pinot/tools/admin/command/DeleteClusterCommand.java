@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DeleteClusterCommand extends AbstractBaseCommand implements Command {
+public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteClusterCommand.class);
 
   @Option(name = "-clusterName", required = true, metaVar = "<String>", usage = "Pinot cluster name.")

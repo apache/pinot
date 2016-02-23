@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -48,17 +49,20 @@ import com.linkedin.pinot.common.utils.JsonAssert;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -84,7 +88,7 @@ public class SelectionQueriesForMultiValueColumnTest {
   public static IndexSegment _indexSegment = null;
   public Map<String, ColumnMetadata> _medataMap = null;
 
-  private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
+  private static List<SegmentDataManager> _indexSegmentList = new ArrayList<SegmentDataManager>();
 
   @BeforeClass
   public void setup() throws Exception {
@@ -144,15 +148,16 @@ public class SelectionQueriesForMultiValueColumnTest {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
   @Test
   public void testSelectionIteration() throws Exception {
     setupSegment();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -178,39 +183,20 @@ public class SelectionQueriesForMultiValueColumnTest {
   public void testInnerSegmentPlanMakerForSelectionNoFilter() throws Exception {
     setupSegment();
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
     final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
 
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final Collection<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
-    final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
-    System.out.println(jsonResult);
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column2");
-    Assert.assertEquals(columnJsonArray.getString(1), "column1");
-    Assert.assertEquals(columnJsonArray.getString(2), "column5");
-    Assert.assertEquals(columnJsonArray.getString(3), "column6");
-    Assert.assertEquals(columnJsonArray.getString(4), "column7");
-    Assert.assertEquals(columnJsonArray.getString(5), "count");
+    final JSONObject jsonResult = getJsonResult(resultBlock, selectionOperatorService);
+    assertColumnsInResult(jsonResult);
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
@@ -219,25 +205,20 @@ public class SelectionQueriesForMultiValueColumnTest {
     }
   }
 
-  @Test
-  public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
-    setupSegment();
-    final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
-    System.out.println(brokerRequest);
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
-    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
-    rootPlanNode.showTree("");
-    final MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
-    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
-    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
+  private void assertColumnsInResult(JSONObject jsonResult)
+      throws JSONException {
+    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
+    Assert.assertEquals(columnJsonArray.getString(0), "column2");
+    Assert.assertEquals(columnJsonArray.getString(1), "column1");
+    Assert.assertEquals(columnJsonArray.getString(2), "column5");
+    Assert.assertEquals(columnJsonArray.getString(3), "column6");
+    Assert.assertEquals(columnJsonArray.getString(4), "column7");
+    Assert.assertEquals(columnJsonArray.getString(5), "count");
+  }
 
-    final SelectionOperatorService selectionOperatorService =
-        new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
-
+  private JSONObject getJsonResult(IntermediateResultsBlock resultBlock,
+      SelectionOperatorService selectionOperatorService)
+      throws Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
@@ -252,13 +233,30 @@ public class SelectionQueriesForMultiValueColumnTest {
     final Collection<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JSONArray columnJsonArray = jsonResult.getJSONArray("columns");
-    Assert.assertEquals(columnJsonArray.getString(0), "column2");
-    Assert.assertEquals(columnJsonArray.getString(1), "column1");
-    Assert.assertEquals(columnJsonArray.getString(2), "column5");
-    Assert.assertEquals(columnJsonArray.getString(3), "column6");
-    Assert.assertEquals(columnJsonArray.getString(4), "column7");
-    Assert.assertEquals(columnJsonArray.getString(5), "count");
+    return jsonResult;
+  }
+
+  @Test
+  public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
+    setupSegment();
+    final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
+    System.out.println(brokerRequest);
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
+    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
+    rootPlanNode.showTree("");
+    final MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
+    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
+    Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
+
+    final SelectionOperatorService selectionOperatorService =
+        new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
+
+    final JSONObject jsonResult = getJsonResult(resultBlock, selectionOperatorService);
+    assertColumnsInResult(jsonResult);
 
     JSONArray resultsJsonArray = jsonResult.getJSONArray("results");
     for (int i = 0; i < resultsJsonArray.length(); ++i) {
@@ -320,7 +318,6 @@ public class SelectionQueriesForMultiValueColumnTest {
       JSONArray rowJsonArray = resultsJsonArray.getJSONArray(i);
       Assert.assertEquals(rowJsonArray.getString(0), "2147434110");
     }
-
   }
 
   private static Map<String, DataSource> getDataSourceMap() {

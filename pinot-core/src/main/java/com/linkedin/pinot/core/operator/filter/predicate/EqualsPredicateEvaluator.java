@@ -15,44 +15,71 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.Arrays;
-
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class EqualsPredicateEvaluator implements PredicateEvaluator {
 
-  private int[] equalsMatchDicId;
-  private int index;
+  private int[] matchingIds;
+  private int equalsMatchDictId;
+  private EqPredicate predicate;
 
   public EqualsPredicateEvaluator(EqPredicate predicate, Dictionary dictionary) {
-    index = dictionary.indexOf(predicate.getEqualsValue());
-    if (index >= 0) {
-      equalsMatchDicId = new int[1];
-      equalsMatchDicId[0] = index;
+    this.predicate = predicate;
+    equalsMatchDictId = dictionary.indexOf(predicate.getEqualsValue());
+    if (equalsMatchDictId >= 0) {
+      matchingIds = new int[1];
+      matchingIds[0] = equalsMatchDictId;
     } else {
-      equalsMatchDicId = new int[0];
+      matchingIds = new int[0];
     }
   }
 
   @Override
   public boolean apply(int dictionaryId) {
-    return (dictionaryId == index);
+    return (dictionaryId == equalsMatchDictId);
   }
 
   @Override
   public boolean apply(int[] dictionaryIds) {
-    if (index < 0) {
+    if (equalsMatchDictId < 0) {
       return false;
     }
-    Arrays.sort(dictionaryIds);
-    int i = Arrays.binarySearch(dictionaryIds, index);
-    return i >= 0;
+    //we cannot do binary search since the multivalue columns are not sorted in the raw segment
+    for (int dictId : dictionaryIds) {
+      if (dictId == equalsMatchDictId) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   @Override
-  public int[] getDictionaryIds() {
-    return equalsMatchDicId;
+  public int[] getMatchingDictionaryIds() {
+    return matchingIds;
   }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictId == equalsMatchDictId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public boolean alwaysFalse() {
+    return equalsMatchDictId < 0;
+  }
+
 }

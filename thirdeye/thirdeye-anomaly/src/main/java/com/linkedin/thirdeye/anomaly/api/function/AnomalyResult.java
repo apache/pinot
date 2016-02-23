@@ -7,8 +7,7 @@ import com.linkedin.thirdeye.anomaly.api.ResultProperties;
 /**
  * Result of AnomalyDetectionFunction analyze
  */
-public class AnomalyResult implements Comparable<AnomalyResult>
-{
+public class AnomalyResult implements Comparable<AnomalyResult> {
   /** Whether this time window is anomalous */
   private final boolean isAnomaly;
 
@@ -22,18 +21,18 @@ public class AnomalyResult implements Comparable<AnomalyResult>
   private double anomalyVolume;
 
   /**
-   * Additional data not fixed in anomaly table schema. The result of toString() is stored as the properties column.
+   * Additional data not fixed in anomaly table schema. The result of toString() is stored as the
+   * properties column.
    */
   private final ResultProperties properties;
 
-  public AnomalyResult(boolean isAnomaly, long timeWindow, double anomalyScore, double anomalyVolume)
-  {
+  public AnomalyResult(boolean isAnomaly, long timeWindow, double anomalyScore,
+      double anomalyVolume) {
     this(isAnomaly, timeWindow, anomalyScore, anomalyVolume, new ResultProperties());
   }
 
-  public AnomalyResult(boolean isAnomaly, long timeWindow, double anomalyScore, double anomalyVolume,
-      ResultProperties properties)
-  {
+  public AnomalyResult(boolean isAnomaly, long timeWindow, double anomalyScore,
+      double anomalyVolume, ResultProperties properties) {
     this.isAnomaly = isAnomaly;
     this.properties = properties;
     this.timeWindow = timeWindow;
@@ -41,8 +40,7 @@ public class AnomalyResult implements Comparable<AnomalyResult>
     this.anomalyVolume = anomalyVolume;
   }
 
-  public boolean isAnomaly()
-  {
+  public boolean isAnomaly() {
     return isAnomaly;
   }
 
@@ -58,8 +56,7 @@ public class AnomalyResult implements Comparable<AnomalyResult>
     return anomalyVolume;
   }
 
-  public ResultProperties getProperties()
-  {
+  public ResultProperties getProperties() {
     return properties;
   }
 

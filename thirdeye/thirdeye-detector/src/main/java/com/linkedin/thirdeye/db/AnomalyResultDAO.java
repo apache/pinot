@@ -31,44 +31,41 @@ public class AnomalyResultDAO extends AbstractDAO<AnomalyResult> {
     currentSession().delete(id);
   }
 
-  public List<AnomalyResult> findAllByCollectionAndTime(String collection, DateTime startTime, DateTime endTime) {
+  public List<AnomalyResult> findAllByCollectionAndTime(String collection, DateTime startTime,
+      DateTime endTime) {
     return list(namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionAndTime")
         .setParameter("collection", collection)
         .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
         .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis()));
   }
 
-  public List<AnomalyResult> findAllByCollectionTimeAndMetric(String collection, String metric, DateTime startTime, DateTime endTime) {
-    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndMetric")
-        .setParameter("collection", collection)
-        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("metric", metric));
+  public List<AnomalyResult> findAllByCollectionTimeAndMetric(String collection, String metric,
+      DateTime startTime, DateTime endTime) {
+    return list(
+        namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndMetric")
+            .setParameter("collection", collection)
+            .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("metric", metric));
   }
 
-  public List<AnomalyResult> findAllByCollectionTimeFunctionIdAndMetric(
-      String collection,
-      String metric,
-      long functionId,
-      DateTime startTime,
-      DateTime endTime) {
-    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric")
-        .setParameter("collection", collection)
-        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("functionId", functionId)
-        .setParameter("metric", metric));
+  public List<AnomalyResult> findAllByCollectionTimeFunctionIdAndMetric(String collection,
+      String metric, long functionId, DateTime startTime, DateTime endTime) {
+    return list(namedQuery(
+        "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric")
+            .setParameter("collection", collection)
+            .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("functionId", functionId).setParameter("metric", metric));
   }
 
-  public List<AnomalyResult> findAllByCollectionTimeAndFunction(
-      String collection,
-      DateTime startTime,
-      DateTime endTime,
-      long functionId) {
-    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFunction")
-        .setParameter("collection", collection)
-        .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
-        .setParameter("functionId", functionId));
+  public List<AnomalyResult> findAllByCollectionTimeAndFunction(String collection,
+      DateTime startTime, DateTime endTime, long functionId) {
+    return list(
+        namedQuery("com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFunction")
+            .setParameter("collection", collection)
+            .setParameter("startTimeUtc", startTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("endTimeUtc", endTime.toDateTime(DateTimeZone.UTC).getMillis())
+            .setParameter("functionId", functionId));
   }
 }

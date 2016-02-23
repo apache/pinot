@@ -56,7 +56,8 @@ public class DataTable {
 
   DataSchema schema;
 
-  static int VERSION = 1;
+  static int VERSION_1 = 1;
+  static int VERSION = VERSION_1;
 
   private Map<String, Map<Integer, String>> dictionary;
 
@@ -177,6 +178,14 @@ public class DataTable {
     final ByteBuffer input = ByteBuffer.wrap(buffer);
 
     final int version = input.getInt();
+    if (version == VERSION_1) {
+      decodeV1(input);
+      return;
+    }
+    throw new RuntimeException("Unknown version of DataTable encoding:" + version);
+  }
+
+  private void decodeV1(ByteBuffer input) {
     numRows = input.getInt();
     numCols = input.getInt();
     // READ dictionary
@@ -192,36 +201,54 @@ public class DataTable {
     final int variableDataLength = input.getInt();
 
     // READ DICTIONARY
-    final byte[] dictionaryBytes = new byte[dictionaryLength];
-    input.position(dictionaryStart);
-    input.get(dictionaryBytes);
-    dictionary = (Map<String, Map<Integer, String>>) deserializeDictionary(dictionaryBytes);
+
+    byte[] dictionaryBytes = null;
+    if (dictionaryLength != 0) {
+      dictionaryBytes = new byte[dictionaryLength];
+      input.position(dictionaryStart);
+      input.get(dictionaryBytes);
+      dictionary = (Map<String, Map<Integer, String>>) deserializeDictionary(dictionaryBytes);
+    } else {
+      dictionary = new HashMap<String, Map<Integer, String>>(1);
+    }
 
     // READ METADATA
-    final byte[] metadataBytes = new byte[metadataLength];
-    input.position(metadataStart);
-    input.get(metadataBytes);
-    metadata = (Map<String, String>) deserializeMetadata(metadataBytes);
+    byte[] metadataBytes;
+    if (metadataLength != 0) {
+      metadataBytes = new byte[metadataLength];
+      input.position(metadataStart);
+      input.get(metadataBytes);
+      metadata = (Map<String, String>) deserializeMetadata(metadataBytes);
+    } else {
+      metadata = new HashMap<String, String>();
+    }
 
     // READ SCHEMA
-    final byte[] schemaBytes = new byte[schemaLength];
-    input.position(schemaStart);
-    input.get(schemaBytes);
-    schema = DataSchema.fromBytes(schemaBytes);
-    columnOffsets = computeColumnOffsets(schema);
+    byte[] schemaBytes;
 
-    // READ FIXED SIZE DATA BYTES 
-    fixedSizeDataBytes = new byte[fixedDataLength];
-    input.position(fixedDataStart);
-    input.get(fixedSizeDataBytes);
-    fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
+    if (schemaLength != 0) {
+      schemaBytes = new byte[schemaLength];
+      input.position(schemaStart);
+      input.get(schemaBytes);
+      schema = DataSchema.fromBytes(schemaBytes);
+      columnOffsets = computeColumnOffsets(schema);
+    }
 
-    // READ VARIABLE SIZE DATA BYTES 
-    variableSizeDataBytes = new byte[variableDataLength];
-    input.position(variableDataStart);
-    input.get(variableSizeDataBytes);
-    variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+    // READ FIXED SIZE DATA BYTES
+    if (fixedDataLength != 0) {
+      fixedSizeDataBytes = new byte[fixedDataLength];
+      input.position(fixedDataStart);
+      input.get(fixedSizeDataBytes);
+      fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
+    }
 
+    // READ VARIABLE SIZE DATA BYTES
+    if (variableDataLength != 0) {
+      variableSizeDataBytes = new byte[variableDataLength];
+      input.position(variableDataStart);
+      input.get(variableSizeDataBytes);
+      variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+    }
   }
 
   public DataTable() {
@@ -237,7 +264,11 @@ public class DataTable {
    * @return
    * @throws Exception
    */
-  public byte[] toBytes() throws Exception {
+  public  byte[] toBytes() throws Exception {
+    return toBytes(VERSION_1);
+  }
+
+  private byte[] toBytes(int version) throws Exception {
     final byte[] dictionaryBytes = serializeDictionary();
     final byte[] metadataBytes = serializeMetadata();
     byte[] schemaBytes = new byte[0];
@@ -251,7 +282,7 @@ public class DataTable {
     // DICTIONARY, METADATA,
     // SCHEMA, DATATABLE, VARIABLE DATA BUFFER --> 4 + 4 + 4 + 5*8 = 52
     // bytes
-    out.writeInt(VERSION);
+    out.writeInt(version);
     out.writeInt(numRows);
     out.writeInt(numCols);
     // dictionary
@@ -333,7 +364,7 @@ public class DataTable {
         int valueLength = in.readInt();
         byte[] valueBytes = new byte[valueLength];
         in.read(valueBytes);
-        map.put(new String(keyBytes), new String(valueBytes));
+        map.put(new String(keyBytes, UTF8), new String(valueBytes, UTF8));
       }
     } catch (Exception e) {
       LOGGER.error("Exception while deserializing dictionary", e);
@@ -376,14 +407,14 @@ public class DataTable {
         temp = new byte[readLength];
         in.read(temp);
         Map<Integer, String> childMap = new HashMap<Integer, String>();
-        map.put(new String(temp), childMap);
+        map.put(new String(temp, UTF8), childMap);
         int childMapSize = in.readInt();
         for (int j = 0; j < childMapSize; j++) {
           Integer key = in.readInt();
           int valueLength = in.readInt();
           temp = new byte[valueLength];
           in.read(temp);
-          childMap.put(key, new String(temp));
+          childMap.put(key, new String(temp, UTF8));
         }
       }
     } catch (Exception e) {

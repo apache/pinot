@@ -24,11 +24,8 @@ public class EmailReportJobManager implements Managed {
   private final AtomicInteger applicationPort;
   private final Object sync;
 
-  public EmailReportJobManager(Scheduler quartzScheduler,
-                               EmailConfigurationDAO configurationDAO,
-                               AnomalyResultDAO resultDAO,
-                               SessionFactory sessionFactory,
-                               AtomicInteger applicationPort) {
+  public EmailReportJobManager(Scheduler quartzScheduler, EmailConfigurationDAO configurationDAO,
+      AnomalyResultDAO resultDAO, SessionFactory sessionFactory, AtomicInteger applicationPort) {
     this.quartzScheduler = quartzScheduler;
     this.configurationDAO = configurationDAO;
     this.sessionFactory = sessionFactory;
@@ -43,15 +40,10 @@ public class EmailReportJobManager implements Managed {
       EmailConfiguration emailConfig = configurationDAO.findById(id);
 
       String triggerKey = String.format("ad_hoc_email_trigger_%d", emailConfig.getId());
-      Trigger trigger = TriggerBuilder.newTrigger()
-          .withIdentity(triggerKey)
-          .startNow()
-          .build();
+      Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey).startNow().build();
 
       String jobKey = String.format("ad_hoc_email_job_%d", emailConfig.getId());
-      JobDetail job = JobBuilder.newJob(EmailReportJob.class)
-          .withIdentity(jobKey)
-          .build();
+      JobDetail job = JobBuilder.newJob(EmailReportJob.class).withIdentity(jobKey).build();
 
       job.getJobDataMap().put(EmailReportJob.RESULT_DAO, resultDAO);
       job.getJobDataMap().put(EmailReportJob.CONFIG, emailConfig);
@@ -70,15 +62,11 @@ public class EmailReportJobManager implements Managed {
       for (EmailConfiguration emailConfig : emailConfigs) {
         if (emailConfig.getIsActive()) {
           String triggerKey = String.format("email_trigger_%d", emailConfig.getId());
-          CronTrigger trigger = TriggerBuilder.newTrigger()
-              .withIdentity(triggerKey)
-              .withSchedule(CronScheduleBuilder.cronSchedule(emailConfig.getCron()))
-              .build();
+          CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
+              .withSchedule(CronScheduleBuilder.cronSchedule(emailConfig.getCron())).build();
 
           String jobKey = String.format("email_job_%d", emailConfig.getId());
-          JobDetail job = JobBuilder.newJob(EmailReportJob.class)
-              .withIdentity(jobKey)
-              .build();
+          JobDetail job = JobBuilder.newJob(EmailReportJob.class).withIdentity(jobKey).build();
 
           job.getJobDataMap().put(EmailReportJob.RESULT_DAO, resultDAO);
           job.getJobDataMap().put(EmailReportJob.CONFIG, emailConfig);

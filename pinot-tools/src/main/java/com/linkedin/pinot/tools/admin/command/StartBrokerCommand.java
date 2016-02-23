@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 
 import org.apache.commons.configuration.Configuration;
@@ -32,7 +33,7 @@ import com.linkedin.pinot.common.utils.NetUtil;
  * Class to implement StartBroker command.
  *
  */
-public class StartBrokerCommand extends AbstractBaseCommand implements Command {
+public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
 
   @Option(name = "-brokerHost", required = false, metaVar = "<String>", usage = "host name for controller.")

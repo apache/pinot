@@ -17,7 +17,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Configuration for anomaly database. It is mapped in from the configuration file.
  */
-@JsonIgnoreProperties({"dataSource"})
+@JsonIgnoreProperties({
+    "dataSource"
+})
 public class AnomalyDatabaseConfig {
 
   /** The database url */
@@ -41,23 +43,20 @@ public class AnomalyDatabaseConfig {
   /**
    * Default constructor needed for object mapper. Connection pooling is enabled.
    */
-  public AnomalyDatabaseConfig()
-  {
+  public AnomalyDatabaseConfig() {
     super();
   }
 
   /**
    * Create AnomalyDatabaseConfig.
-   *
    * @param url
    * @param functionTableName
    * @param anomalyTableName
    * @param user
    * @param password
    */
-  public AnomalyDatabaseConfig(String url, String functionTableName, String anomalyTableName, String user,
-      String password, boolean useConnectionPool)
-  {
+  public AnomalyDatabaseConfig(String url, String functionTableName, String anomalyTableName,
+      String user, String password, boolean useConnectionPool) {
     super();
     this.url = url;
     this.functionTableName = functionTableName;
@@ -111,7 +110,7 @@ public class AnomalyDatabaseConfig {
 
   /**
    * @return
-   *  the jdbc prefix for creating a connection
+   *         the jdbc prefix for creating a connection
    */
   @JsonIgnore
   public String getPrefix() {
@@ -123,7 +122,7 @@ public class AnomalyDatabaseConfig {
 
   /**
    * @return
-   *  A database connection from the pool.
+   *         A database connection from the pool.
    * @throws SQLException
    */
   @JsonIgnore
@@ -160,7 +159,7 @@ public class AnomalyDatabaseConfig {
   /**
    * Executes the sql for convenience when no result set is needed.
    * @param sql
-   *  Sql to execute.
+   *          Sql to execute.
    * @throws SQLException
    */
   public void runSQL(String sql) throws SQLException {

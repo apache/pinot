@@ -1,116 +1,39 @@
 package com.linkedin.thirdeye.dashboard.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Objects;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.util.EntityUtils;
-
-import java.net.URI;
-import java.net.URLEncoder;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.dashboard.api.QueryResult;
 
 public class QueryCache {
   private final ExecutorService executorService;
-  private final LoadingCache<QuerySpec, QueryResult> cache;
+  private final ThirdEyeClient client;
 
-  public QueryCache(HttpClient httpClient, ObjectMapper objectMapper, ExecutorService executorService) {
+  public QueryCache(ThirdEyeClient clientMap, ExecutorService executorService) {
     this.executorService = executorService;
-    this.cache = CacheBuilder.newBuilder()
-        .expireAfterWrite(1, TimeUnit.MINUTES)
-        .build(new QueryCacheLoader(httpClient, objectMapper));
+    this.client = clientMap;
   }
 
-  public void clear() {
-    cache.invalidateAll();
+  public QueryResult getQueryResult(ThirdEyeRequest request) throws Exception {
+    ThirdEyeRawResponse rawResponse = client.getRawResponse(request);
+    return QueryResult.fromThirdEyeResponse(rawResponse);
   }
 
-  public QueryResult getQueryResult(String serverUri, String sql) throws Exception {
-    return cache.get(new QuerySpec(serverUri, sql));
-  }
-
-  public Future<QueryResult> getQueryResultAsync(final String serverUri, final String sql) throws Exception {
+  public Future<QueryResult> getQueryResultAsync(final ThirdEyeRequest request) throws Exception {
     return executorService.submit(new Callable<QueryResult>() {
       @Override
       public QueryResult call() throws Exception {
-        return getQueryResult(serverUri, sql);
+        return getQueryResult(request);
       }
     });
   }
 
-  private static class QueryCacheLoader extends CacheLoader<QuerySpec, QueryResult> {
-    private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
-
-    QueryCacheLoader(HttpClient httpClient, ObjectMapper objectMapper) {
-      this.httpClient = httpClient;
-      this.objectMapper = objectMapper;
-    }
-
-    @Override
-    public QueryResult load(QuerySpec querySpec) throws Exception {
-      URI uri = URI.create(querySpec.getServerUri() + "/query/" + URLEncoder.encode(querySpec.getSql(), "UTF-8"));
-      HttpGet httpGet = new HttpGet(uri);
-      HttpResponse httpResponse = httpClient.execute(httpGet);
-
-      if (httpResponse.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException(httpResponse.getStatusLine().toString());
-      }
-
-      try {
-        return objectMapper.readValue(httpResponse.getEntity().getContent(), QueryResult.class);
-      } finally {
-        EntityUtils.consume(httpResponse.getEntity());
-      }
-    }
+  public void clear() throws Exception {
+    client.clear();
   }
 
-  private static class QuerySpec {
-    private final String serverUri;
-    private final String sql;
-
-    QuerySpec(String serverUri, String sql) {
-      this.serverUri = serverUri;
-      this.sql = sql;
-    }
-
-    public String getServerUri() {
-      return serverUri;
-    }
-
-    public String getSql() {
-      return sql;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hashCode(serverUri, sql);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof QuerySpec)) {
-        return false;
-      }
-      QuerySpec s = (QuerySpec) o;
-      return s.getSql().equals(sql) && s.getServerUri().equals(serverUri);
-    }
-
-    @Override
-    public String toString() {
-      return Objects.toStringHelper(QuerySpec.class)
-          .add("serverUri", serverUri)
-          .add("sql", sql)
-          .toString();
-    }
-  }
 }

@@ -3,7 +3,8 @@ package com.linkedin.thirdeye.reporting.api.anomaly;
 import org.apache.commons.math3.util.Pair;
 
 /**
- * This class models a histogram of the joint distribution of anomaly scores and another real-valued field.
+ * This class models a histogram of the joint distribution of anomaly scores and another real-valued
+ * field.
  */
 public class AnomalyResultDistribution {
 
@@ -17,18 +18,18 @@ public class AnomalyResultDistribution {
 
   /**
    * Create 2d distribution of anomaly scores
-   *
    * @param anomalyScoreNumBuckets
-   *  Number of buckets for AnomalyScore
+   *          Number of buckets for AnomalyScore
    * @param anomalyScoreRange
-   *  AnomalyScore range [start, end]
+   *          AnomalyScore range [start, end]
    * @param anomalyOtherNumBuckets
-   *  Number of buckets for AnomalyVolume
+   *          Number of buckets for AnomalyVolume
    * @param anomalyOtherRange (e.g.,
-   *  AnomalyOther range [start, end]
+   *          AnomalyOther range [start, end]
    */
-  public AnomalyResultDistribution(int anomalyScoreNumBuckets, Pair<Double, Double> anomalyScoreRange,
-      int anomalyOtherNumBuckets, Pair<Double, Double> anomalyOtherRange) {
+  public AnomalyResultDistribution(int anomalyScoreNumBuckets,
+      Pair<Double, Double> anomalyScoreRange, int anomalyOtherNumBuckets,
+      Pair<Double, Double> anomalyOtherRange) {
     super();
     this.anomalyScoreNumBuckets = anomalyScoreNumBuckets;
     this.anomalyScoreRange = anomalyScoreRange;
@@ -40,7 +41,6 @@ public class AnomalyResultDistribution {
 
   /**
    * Add a value to the joint distribution
-   *
    * @param anomalyScore
    * @param anomalyOther
    */
@@ -52,7 +52,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  An array of counts across the other axis
+   *         An array of counts across the other axis
    */
   public int[] getAnomalyOtherHistogram() {
     int[] result = new int[anomalyOtherNumBuckets];
@@ -67,7 +67,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  An array of counts across the score axis
+   *         An array of counts across the score axis
    */
   public int[] getAnomalyScoreHistogram() {
     int[] result = new int[anomalyScoreNumBuckets];
@@ -82,7 +82,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  The range of the score axis
+   *         The range of the score axis
    */
   public Pair<Double, Double> getAnomalyScoreRange() {
     return anomalyScoreRange;
@@ -90,7 +90,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  The range of the other axis
+   *         The range of the other axis
    */
   public Pair<Double, Double> getAnomalyOtherRange() {
     return anomalyOtherRange;
@@ -98,7 +98,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  Number of buckets on the score axis
+   *         Number of buckets on the score axis
    */
   public int getAnomalyScoreNumBuckets() {
     return anomalyScoreNumBuckets;
@@ -106,7 +106,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  Number of buckets on the other axis
+   *         Number of buckets on the other axis
    */
   public int getAnomalyOtherNumBuckets() {
     return anomalyOtherNumBuckets;
@@ -114,7 +114,7 @@ public class AnomalyResultDistribution {
 
   /**
    * @return
-   *  The internal histogram of counts.
+   *         The internal histogram of counts.
    */
   public int[][] getCounts() {
     return counts;
@@ -123,7 +123,8 @@ public class AnomalyResultDistribution {
   private int getAnomalyOtherBucketIndex(double anomalyVolume) {
     double anomalyVolumeBucketSize =
         (anomalyOtherRange.getSecond() - anomalyOtherRange.getFirst()) / anomalyOtherNumBuckets;
-    int anomalyVolumeIndex = (int) ((anomalyVolume - anomalyOtherRange.getFirst()) / anomalyVolumeBucketSize);
+    int anomalyVolumeIndex =
+        (int) ((anomalyVolume - anomalyOtherRange.getFirst()) / anomalyVolumeBucketSize);
     if (anomalyVolumeIndex < 0) {
       anomalyVolumeIndex = 0;
     } else if (anomalyVolumeIndex >= anomalyOtherNumBuckets) {
@@ -135,7 +136,8 @@ public class AnomalyResultDistribution {
   private int getAnomalyScoreBucketIndex(double anomalyScore) {
     double anomalyScoreBucketSize =
         (anomalyScoreRange.getSecond() - anomalyScoreRange.getFirst()) / anomalyScoreNumBuckets;
-    int anomalyScoreIndex = (int) ((anomalyScore - anomalyScoreRange.getFirst()) / anomalyScoreBucketSize);
+    int anomalyScoreIndex =
+        (int) ((anomalyScore - anomalyScoreRange.getFirst()) / anomalyScoreBucketSize);
     if (anomalyScoreIndex < 0) {
       anomalyScoreIndex = 0;
     } else if (anomalyScoreIndex >= anomalyScoreNumBuckets) {
@@ -154,6 +156,5 @@ public class AnomalyResultDistribution {
     }
     return sb.toString();
   }
-
 
 }

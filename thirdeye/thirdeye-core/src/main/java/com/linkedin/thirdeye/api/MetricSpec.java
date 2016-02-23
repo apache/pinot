@@ -2,23 +2,21 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class MetricSpec
-{
+public class MetricSpec {
   private String name;
   private String alias;
   private MetricType type;
 
-  public MetricSpec() {}
+  public MetricSpec() {
+  }
 
-  public MetricSpec(String name, MetricType type)
-  {
+  public MetricSpec(String name, MetricType type) {
     this.name = name;
     this.type = type;
   }
 
   @JsonProperty
-  public String getName()
-  {
+  public String getName() {
     return name;
   }
 
@@ -28,16 +26,13 @@ public class MetricSpec
   }
 
   @JsonProperty
-  public MetricType getType()
-  {
+  public MetricType getType() {
     return type;
   }
 
   @Override
-  public boolean equals(Object o)
-  {
-    if (!(o instanceof MetricSpec))
-    {
+  public boolean equals(Object o) {
+    if (!(o instanceof MetricSpec)) {
       return false;
     }
 

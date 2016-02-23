@@ -7,7 +7,8 @@ import java.util.concurrent.TimeUnit;
 public class TimeSpec {
   private static final TimeGranularity DEFAULT_TIME_INPUT = new TimeGranularity(1, TimeUnit.HOURS);
   private static final TimeGranularity DEFAULT_TIME_BUCKET = new TimeGranularity(1, TimeUnit.HOURS);
-  private static final TimeGranularity DEFAULT_TIME_RETENTION = new TimeGranularity(30, TimeUnit.DAYS);
+  private static final TimeGranularity DEFAULT_TIME_RETENTION =
+      new TimeGranularity(30, TimeUnit.DAYS);
 
   private String columnName;
   private TimeGranularity input = DEFAULT_TIME_INPUT;
@@ -18,10 +19,8 @@ public class TimeSpec {
   public TimeSpec() {
   }
 
-  public TimeSpec(String columnName,
-                  TimeGranularity input,
-                  TimeGranularity bucket,
-                  TimeGranularity retention) {
+  public TimeSpec(String columnName, TimeGranularity input, TimeGranularity bucket,
+      TimeGranularity retention) {
     this.columnName = columnName;
     this.input = input;
     this.bucket = bucket;

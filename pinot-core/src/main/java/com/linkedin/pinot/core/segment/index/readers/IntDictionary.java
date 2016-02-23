@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import java.io.File;
+import java.io.IOException;
 
 
 /**
@@ -41,32 +40,47 @@ public class IntDictionary extends ImmutableDictionaryReader {
       lookup = (Integer) rawValue;
     }
 
-    return intIndexOf(lookup.intValue());
+    return intIndexOf(lookup);
   }
 
   @Override
   public Integer get(int dictionaryId) {
-    return new Integer(getInt(dictionaryId));
+    return getInt(dictionaryId);
   }
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return new Long(getInt(dictionaryId));
+    return (long) getInt(dictionaryId);
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(getInt(dictionaryId));
+    return (double) getInt(dictionaryId);
   }
-  
+
   @Override
   public String getStringValue(int dictionaryId) {
-    return new Integer(getInt(dictionaryId)).toString();
+    return Integer.toString(getInt(dictionaryId));
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return (float) getInt(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return getInt(dictionaryId);
   }
 
   @Override
   public String toString(int dictionaryId) {
-    return new Integer(getInt(dictionaryId)).toString();
+    return Integer.toString(getInt(dictionaryId));
+  }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    dataFileReader.readIntValues(dictionaryIds, 0 /*column*/, startPos, limit, outValues, outStartPos);
   }
 
   private int getInt(int dictionaryId) {

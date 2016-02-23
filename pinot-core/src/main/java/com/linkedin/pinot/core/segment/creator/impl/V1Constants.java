@@ -25,16 +25,12 @@ import com.linkedin.pinot.common.data.FieldSpec;
 public class V1Constants {
   public static final String QUERY_RHS_DELIMITER = "\t\t";
   public static final String SEGMENT_CREATION_META = "creation.meta";
+  public static final String STAR_TREE_INDEX_DIR = "star-tree";
+  public static final String STAR_TREE_INDEX_FILE = "star-tree.bin";
   public static final String VERSIONS_FILE = "versions.vr";
-  public static final String VERSION = "segment,index.version";
   public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
   public static final String SEGMENT_PUSH_TIME = "segment.push.time";
   public static final String SEGMENT_REFRESH_TIME = "segment.refresh.time";
-
-  public static final String STARTREE_DIR = "startree";
-  public static final String STARTREE_FILE = "startree.ser";
-  public static final String STARTREE_ALL = "__ALL__";
-  public static final Number STARTREE_ALL_NUMBER = 0;
 
   public static class Numbers {
     // null representatives
@@ -93,14 +89,15 @@ public class V1Constants {
 
     public static class StarTree {
       public static final String STAR_TREE_ENABLED = "startree.enabled";
-      public static final String SPLIT_ORDER = "startree.split.order";
-      public static final String MAX_LEAF_RECORDS = "startree.max.leaf.records";
+      public static final String STAR_TREE_SPLIT_ORDER = "startree.split.order";
+      public static final String STAR_TREE_MAX_LEAF_RECORDS = "startree.max.leaf.records";
       public static final String SPLIT_EXCLUDES = "startree.split.excludes";
       public static final String EXCLUDED_DIMENSIONS = "startree.excluded.dimensions";
     }
 
     public static class Segment {
       public static final String SEGMENT_NAME = "segment.name";
+      public static final String SEGMENT_VERSION = "segment.index.version";
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
@@ -110,6 +107,7 @@ public class V1Constants {
       public static final String TIME_INTERVAL = "segment.time.interval";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
+      public static final String SEGMENT_TOTAL_RAW_DOCS = "segment.total.raw.docs";
       public static final String SEGMENT_TOTAL_AGGREGATE_DOCS = "segment.total.aggregate.docs";
       public static final String SEGMENT_CRC = "segment.crc";
       public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
@@ -124,6 +122,8 @@ public class V1Constants {
     public static class Column {
       public static final String CARDINALITY = "cardinality";
       public static final String TOTAL_DOCS = "totalDocs";
+      public static final String TOTAL_RAW_DOCS = "totalRawDocs";
+      public static final String TOTAL_AGG_DOCS = "totalAggDocs";
       public static final String DATA_TYPE = "dataType";
       public static final String BITS_PER_ELEMENT = "bitsPerElement";
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";

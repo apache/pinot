@@ -34,14 +34,15 @@ public class DeltaTable {
   private static final String COLUMN_NAME_DELTA = "delta";
 
   /**
-   * Create an empty match table in the database if one does not exist. Assumes all dimensions are equally wide
+   * Create an empty match table in the database if one does not exist. Assumes all dimensions are
+   * equally wide
    * and all columns are strings.
-   *
    * @param dbConfig
    * @param starTreeConfig
    * @param deltaTableName
    */
-  public static void create(AnomalyDatabaseConfig dbConfig, StarTreeConfig starTreeConfig, String deltaTableName) {
+  public static void create(AnomalyDatabaseConfig dbConfig, StarTreeConfig starTreeConfig,
+      String deltaTableName) {
     List<String> dimensionNames = new ArrayList<String>(starTreeConfig.getDimensions().size());
     for (DimensionSpec dimension : starTreeConfig.getDimensions()) {
       dimensionNames.add(dimension.getName());
@@ -53,7 +54,8 @@ public class DeltaTable {
     sb.append("CREATE TABLE IF NOT EXISTS ").append(deltaTableName).append("(\n");
     sb.append("delta DOUBLE NOT NULL,\n");
     for (String dimensionName : dimensionNames) {
-      sb.append(String.format("%s VARCHAR(%d) NOT NULL DEFAULT \"?\",\n", dimensionName, columnWidth));
+      sb.append(
+          String.format("%s VARCHAR(%d) NOT NULL DEFAULT \"?\",\n", dimensionName, columnWidth));
     }
     sb.append("PRIMARY KEY(").append(COMMA.join(dimensionNames)).append("));");
 
@@ -71,7 +73,7 @@ public class DeltaTable {
    * @param starTreeConfig
    * @param deltaTableName
    * @return
-   *  Loads a match table from the database
+   *         Loads a match table from the database
    * @throws IllegalFunctionException
    */
   public static DimensionKeyMatchTable<Double> load(AnomalyDatabaseConfig dbConfig,
@@ -85,7 +87,8 @@ public class DeltaTable {
       stmt = conn.createStatement();
       rs = stmt.executeQuery(buildDeltaTableQuery(deltaTableName));
 
-      DimensionKeyMatchTable<Double> result = new DimensionKeyMatchTable<>(starTreeConfig.getDimensions());
+      DimensionKeyMatchTable<Double> result =
+          new DimensionKeyMatchTable<>(starTreeConfig.getDimensions());
       List<DimensionSpec> dimensions = starTreeConfig.getDimensions();
       while (rs.next()) {
         double delta = rs.getDouble(COLUMN_NAME_DELTA);

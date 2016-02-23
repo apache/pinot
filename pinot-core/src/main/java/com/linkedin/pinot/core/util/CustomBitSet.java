@@ -53,6 +53,10 @@ public final class CustomBitSet implements Closeable {
     if (nrBytes < 1) {
       throw new IllegalArgumentException("CustomBitSet requires at least one byte of storage, asked for " + nrBytes);
     }
+    if (nrBytes * 8 >= Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("Requested bit set capacity is " + nrBytes
+          + " bytes, but number of bits exceeds the Integer.MAX_VALUE and since we use int data type to return position, we will overflow int.");
+    }
     if (buffer.capacity() < nrBytes) {
       throw new IllegalArgumentException("Requested bit set capacity is " + nrBytes +
           " bytes, but the underlying byte buffer has a capacity of " + buffer.capacity() +
@@ -124,11 +128,11 @@ public final class CustomBitSet implements Closeable {
     } else {
       int bytePosition = (int) (startBitIndex >>> 3);
       int startBitOffset = (int) (startBitIndex & 7);
-      long sum = startBitOffset + bitLength;
-      int endBitOffset = (int) ((8 - (sum & 7)) & 7);
+      int sum = startBitOffset + bitLength;
+      int endBitOffset = (8 - (sum & 7)) & 7;
 
       // int numberOfBytesUsed = (sum >>> 3) + ((sum & 7) != 0 ? 1 : 0);
-      int numberOfBytesUsed = (int) ((sum + 7) >>> 3);
+      int numberOfBytesUsed = (sum + 7) >>> 3;
       int i = -1;
 
       long number = 0;
@@ -153,6 +157,7 @@ public final class CustomBitSet implements Closeable {
     return dst;
   }
 
+  @Override
   public String toString() {
     byte[] array = toByteArray();
     StringBuilder sb = new StringBuilder();
@@ -170,11 +175,11 @@ public final class CustomBitSet implements Closeable {
    * @param n The
    * @return
    */
-  public long findNthBitSetAfter(long startBitIndex, int n) {
-    long searchStartBitIndex = startBitIndex + 1;
+  public int findNthBitSetAfter(int startBitIndex, int n) {
+    int searchStartBitIndex = startBitIndex + 1;
 
-    int bytePosition = (int)(searchStartBitIndex / 8);
-    int bitPosition = (int)(searchStartBitIndex % 8);
+    int bytePosition = (searchStartBitIndex / 8);
+    int bitPosition = (searchStartBitIndex % 8);
     if (bytePosition >= nrBytes) {
       return -1;
     }
@@ -200,7 +205,7 @@ public final class CustomBitSet implements Closeable {
       numberOfBitsOnInCurrentByte = bitCountArray[currentByte];
     }
 
-    long currentBitPosition = nextSetBit(bytePosition * 8);
+    int currentBitPosition = nextSetBit(bytePosition * 8);
     while (0 < numberOfBitsToSkip && currentBitPosition != -1) {
       currentBitPosition = nextSetBit(currentBitPosition + 1);
       numberOfBitsToSkip--;
@@ -214,9 +219,9 @@ public final class CustomBitSet implements Closeable {
    * @return The index of the first bit set at or after the given index, or -1 if there are no bits set after the search
    * index.
    */
-  public long nextSetBit(long index) {
-    int bytePosition = (int)(index / 8);
-    int bitPosition = (int)(index % 8);
+  public int nextSetBit(int index) {
+    int bytePosition = (index / 8);
+    int bitPosition = (index % 8);
 
     if (bytePosition >= nrBytes) {
       return -1;
@@ -255,11 +260,11 @@ public final class CustomBitSet implements Closeable {
    * @return The index of the first bit set after the given index, or -1 if there are no bits set after the search
    * index.
    */
-  public long nextSetBitAfter(long index) {
+  public int nextSetBitAfter(int index) {
     return nextSetBit(index + 1);
   }
 
-  public boolean isBitSet(long index) {
+  public boolean isBitSet(int index) {
     final int byteToCheck = (int)(index >>> 3);
     assert (byteToCheck < nrBytes);
     byte b = buf.get(byteToCheck);

@@ -19,15 +19,13 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class TestStarTreeNodeImpl
-{
+public class TestStarTreeNodeImpl {
   private StarTreeConfig config;
   private MetricSchema metricSchema;
   private StarTreeRecordStoreFactory recordStoreFactory;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
+  public void beforeClass() throws Exception {
     config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
     metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
     recordStoreFactory = new StarTreeRecordStoreFactoryLogBufferImpl();
@@ -35,34 +33,30 @@ public class TestStarTreeNodeImpl
   }
 
   @Test
-  public void testInducedSplit() throws Exception
-  {
+  public void testInducedSplit() throws Exception {
     StarTreeNode root = createRoot();
     root.init(config, recordStoreFactory);
 
-    for (int i = 0; i < 100; i++)
-    {
+    for (int i = 0; i < 100; i++) {
       MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
       ts.set(0, "M", 1);
 
       StarTreeRecordImpl.Builder b = new StarTreeRecordImpl.Builder()
-              .setDimensionKey(getDimensionKey("A" + (i % 4), "B" + (i % 8), "C" + (i % 16)))
-              .setMetricTimeSeries(ts);
+          .setDimensionKey(getDimensionKey("A" + (i % 4), "B" + (i % 8), "C" + (i % 16)))
+          .setMetricTimeSeries(ts);
       root.getRecordStore().update(b.build(config));
 
       StringBuilder sb = new StringBuilder();
-      sb.append("B").append(i % 8)
-        .append("C").append(i % 16);
+      sb.append("B").append(i % 8).append("C").append(i % 16);
     }
 
     MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
     ts.set(0, "M", 0);
 
     // Add an "other" value (this should not have explict, but should be in other node)
-    StarTreeRecord other = new StarTreeRecordImpl.Builder()
-            .setDimensionKey(getDimensionKey(StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER))
-            .setMetricTimeSeries(ts)
-            .build(config);
+    StarTreeRecord other = new StarTreeRecordImpl.Builder().setDimensionKey(
+        getDimensionKey(StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER))
+        .setMetricTimeSeries(ts).build(config);
     root.getRecordStore().update(other);
 
     // Split on A (should have 4 children: A0, A1, A2, A3)
@@ -74,8 +68,7 @@ public class TestStarTreeNodeImpl
 
     // Check children
     Set<String> childDimensionValues = new HashSet<String>();
-    for (StarTreeNode child : root.getChildren())
-    {
+    for (StarTreeNode child : root.getChildren()) {
       Assert.assertEquals(child.getDimensionName(), "A");
       Assert.assertTrue(child.isLeaf());
       childDimensionValues.add(child.getDimensionValue());
@@ -84,8 +77,7 @@ public class TestStarTreeNodeImpl
     Assert.assertEquals(childDimensionValues, expectedValues);
 
     // Check children by explicitly getting
-    for (int i = 0; i < 4; i++)
-    {
+    for (int i = 0; i < 4; i++) {
       Assert.assertNotNull(root.getChild("A" + i));
     }
 
@@ -93,21 +85,15 @@ public class TestStarTreeNodeImpl
     Assert.assertNull(root.getChild("A4"));
   }
 
-  private StarTreeNode createRoot()
-  {
-    return new StarTreeNodeImpl(
-            UUID.randomUUID(),
-            StarTreeConstants.STAR,
-            StarTreeConstants.STAR,
-            new ArrayList<String>(),
-            new HashMap<String, String>(),
-            new HashMap<String, StarTreeNode>(),
-            null,
-            null);
+  private StarTreeNode createRoot() {
+    return new StarTreeNodeImpl(UUID.randomUUID(), StarTreeConstants.STAR, StarTreeConstants.STAR,
+        new ArrayList<String>(), new HashMap<String, String>(), new HashMap<String, StarTreeNode>(),
+        null, null);
   }
 
-  private DimensionKey getDimensionKey(String a, String b, String c)
-  {
-    return new DimensionKey(new String[] {a, b, c});
+  private DimensionKey getDimensionKey(String a, String b, String c) {
+    return new DimensionKey(new String[] {
+        a, b, c
+    });
   }
 }

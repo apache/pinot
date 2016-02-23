@@ -28,9 +28,9 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 public class StarTreeGeneratorStandalone {
 
   public static void main(String[] args) throws Exception {
-	  
+
     Path path = new Path(args[0]);
-    
+
     StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(new File(args[1])));
 
     // set up star tree builder
@@ -39,27 +39,25 @@ public class StarTreeGeneratorStandalone {
     MetricSchema metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
 
     int maxRecordStoreEntries = config.getSplit().getThreshold();
-    StarTreeConfig genConfig =
-        new StarTreeConfig.Builder()
-            .setRecordStoreFactoryClass(
-                StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
-            .setCollection(collectionName) //
-            .setDimensions(config.getDimensions())//
-            .setMetrics(config.getMetrics()).setTime(config.getTime()) //
-            .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).setFixed(false).build();
+    StarTreeConfig genConfig = new StarTreeConfig.Builder()
+        .setRecordStoreFactoryClass(
+            StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
+        .setCollection(collectionName) //
+        .setDimensions(config.getDimensions())//
+        .setMetrics(config.getMetrics()).setTime(config.getTime()) //
+        .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).setFixed(false).build();
 
     StarTree starTree = new StarTreeImpl(genConfig);
     starTree.open();
 
-    
     SequenceFile.Reader reader = new SequenceFile.Reader(new Configuration(), Reader.file(path));
     System.out.println(reader.getKeyClass());
     System.out.println(reader.getValueClassName());
-    WritableComparable<?> key =(WritableComparable<?>) reader.getKeyClass().newInstance();
-    Writable val =(Writable) reader.getValueClass().newInstance();
+    WritableComparable<?> key = (WritableComparable<?>) reader.getKeyClass().newInstance();
+    Writable val = (Writable) reader.getValueClass().newInstance();
     MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
 
-    while(reader.next(key,val)){
+    while (reader.next(key, val)) {
       BytesWritable writable = (BytesWritable) key;
       DimensionKey dimensionKey = DimensionKey.fromBytes(writable.getBytes());
       StarTreeRecord record = new StarTreeRecordImpl(config, dimensionKey, emptyTimeSeries);

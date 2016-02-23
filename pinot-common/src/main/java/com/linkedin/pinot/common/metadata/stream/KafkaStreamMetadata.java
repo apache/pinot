@@ -36,6 +36,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
   private final String _zkBrokerUrl;
   private final String _decoderClass;
   private final Map<String, String> _decoderProperties = new HashMap<String, String>();
+  private final Map<String, String> _kafkaConsumerProperties = new HashMap<String, String>();
   private final Map<String, String> _streamConfigMap = new HashMap<String, String>();
 
   public KafkaStreamMetadata(Map<String, String> streamConfigMap) {
@@ -58,6 +59,11 @@ public class KafkaStreamMetadata implements StreamMetadata {
       if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
           CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
         _decoderProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key),
+            streamConfigMap.get(key));
+      }
+      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+          Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX))) {
+        _kafkaConsumerProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getConsumerPropertyKey(key),
             streamConfigMap.get(key));
       }
     }
@@ -86,6 +92,10 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
   public Map<String, String> getDecoderProperties() {
     return _decoderProperties;
+  }
+
+  public Map<String, String> getKafkaConsumerProperties() {
+    return _kafkaConsumerProperties;
   }
 
   @Override

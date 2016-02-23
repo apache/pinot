@@ -15,22 +15,31 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.File;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
+import com.linkedin.pinot.core.startree.StarTree;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
@@ -41,20 +50,20 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 public class IndexSegmentImpl implements IndexSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexSegmentImpl.class);
 
+  public static final SegmentVersion EXPECTED_SEGMENT_VERSION = SegmentVersion.v1;
+
   private final File indexDir;
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ColumnIndexContainer> indexContainerMap;
-  private final StarTreeIndexNode starTreeRoot;
+  private final StarTree starTree;
 
-  public IndexSegmentImpl(File indexDir,
-                          SegmentMetadataImpl segmentMetadata,
-                          Map<String, ColumnIndexContainer> columnIndexContainerMap,
-                          StarTreeIndexNode starTreeRoot) throws Exception {
+  public IndexSegmentImpl(File indexDir, SegmentMetadataImpl segmentMetadata,
+      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree) throws Exception {
     this.indexDir = indexDir;
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
-    this.starTreeRoot = starTreeRoot;
-    LOGGER.info("successfully loaded the index segment : " + indexDir.getName());
+    this.starTree = starTree;
+    LOGGER.debug("successfully loaded the index segment : " + indexDir.getName());
   }
 
   public ImmutableDictionaryReader getDictionaryFor(String column) {
@@ -91,8 +100,7 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName) {
-    final DataSource d = new ColumnDataSourceImpl(indexContainerMap.get(columnName));
-    return d;
+    return new ColumnDataSourceImpl(indexContainerMap.get(columnName));
   }
 
   public DataSource getDataSource(String columnName, Predicate p) {
@@ -130,12 +138,52 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public int getTotalDocs() {
-    return segmentMetadata.getTotalDocs();
+  public StarTree getStarTree() {
+    return starTree;
   }
 
-  @Override
-  public StarTreeIndexNode getStarTreeRoot() {
-    return starTreeRoot;
+  public Iterator<GenericRow> iterator(final int startDocId, final int endDocId) {
+    final Map<String, BlockSingleValIterator> singleValIteratorMap = new HashMap<>();
+    final Map<String, BlockMultiValIterator> multiValIteratorMap = new HashMap<>();
+    for (String column : getColumnNames()) {
+      DataSource dataSource = getDataSource(column);
+      BlockValIterator iterator = dataSource.getNextBlock().getBlockValueSet().iterator();
+      if (dataSource.getDataSourceMetadata().isSingleValue()) {
+        singleValIteratorMap.put(column, (BlockSingleValIterator) iterator);
+      } else {
+        multiValIteratorMap.put(column, (BlockMultiValIterator) iterator);
+      }
+    }
+
+    return new Iterator<GenericRow>() {
+      int docId = startDocId;
+
+      @Override
+      public boolean hasNext() {
+        return docId < endDocId;
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public GenericRow next() {
+        Map<String, Object> map = new HashMap<>();
+        for (String column : singleValIteratorMap.keySet()) {
+          int dictId = singleValIteratorMap.get(column).nextIntVal();
+          Dictionary dictionary = getDictionaryFor(column);
+          map.put(column, dictionary.get(dictId));
+        }
+        for (String column : multiValIteratorMap.keySet()) {
+          //TODO:handle multi value
+        }
+        GenericRow genericRow = new GenericRow();
+        genericRow.init(map);
+        docId++;
+        return genericRow;
+      }
+    };
   }
 }

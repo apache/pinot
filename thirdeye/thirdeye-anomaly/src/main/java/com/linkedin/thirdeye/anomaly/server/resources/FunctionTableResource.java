@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.anomaly.server.resources;
 
-import io.dropwizard.views.View;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -58,13 +56,18 @@ import com.linkedin.thirdeye.anomaly.util.ThirdEyeServerUtils;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.client.DefaultThirdEyeClientConfig;
-import com.linkedin.thirdeye.client.FlowControlledDefaultThirdEyeClient;
+import com.linkedin.thirdeye.client.CachedThirdEyeClientConfig;
+import com.linkedin.thirdeye.client.FlowControlledThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory;
+
+import io.dropwizard.views.View;
 
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
 public class FunctionTableResource {
+
+  private static final int MAX_PARALLEL_REQUESTS = 1;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionTableResource.class);
 
@@ -81,15 +84,17 @@ public class FunctionTableResource {
     collectionToConfigMap = new HashMap<>();
 
     for (ThirdEyeAnomalyDetectionConfiguration config : configs) {
-      DefaultThirdEyeClientConfig thirdEyeClientConfig = new DefaultThirdEyeClientConfig();
+      CachedThirdEyeClientConfig thirdEyeClientConfig = new CachedThirdEyeClientConfig();
       thirdEyeClientConfig.setExpirationTime(60);
       thirdEyeClientConfig.setExpirationUnit(TimeUnit.MINUTES);
       thirdEyeClientConfig.setExpireAfterAccess(false);
+      thirdEyeClientConfig.setUseCacheForExecuteMethod(true);
 
       collectionToConfigMap.put(config.getCollectionName(), config);
-      collectionToThirdEyeClient.put(config.getCollectionName(),
-          new FlowControlledDefaultThirdEyeClient(config.getThirdEyeServerHost(),
-              config.getThirdEyeServerPort(), thirdEyeClientConfig, 1));
+      ThirdEyeClient client = new DefaultThirdEyeClientFactory(thirdEyeClientConfig)
+          .getClient(config.getThirdEyeServerHost(), config.getThirdEyeServerPort());
+      client = new FlowControlledThirdEyeClient(client, MAX_PARALLEL_REQUESTS);
+      collectionToThirdEyeClient.put(config.getCollectionName(), client);
     }
   }
 
@@ -109,8 +114,8 @@ public class FunctionTableResource {
   @Path("/configuration/{collection}")
   public Response getConfigurationForCollection(@PathParam("collection") String collection)
       throws JsonProcessingException {
-    return Response.ok().header("Content-type", "application/json").entity(
-        MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(collectionToConfigMap.get(collection)))
+    return Response.ok().header("Content-type", "application/json").entity(MAPPER
+        .writerWithDefaultPrettyPrinter().writeValueAsString(collectionToConfigMap.get(collection)))
         .build();
   }
 
@@ -119,17 +124,16 @@ public class FunctionTableResource {
    */
   @GET
   @Path("/{collection}/functions")
-  public View getActiveView(
-      @PathParam("collection") String collection,
+  public View getActiveView(@PathParam("collection") String collection,
       @DefaultValue("false") @QueryParam("hideInactive") boolean hideInactive) throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
     switch (config.getMode()) {
-      case GENERIC:
-        return getActiveGenericView(config, hideInactive);
-      case RULEBASED:
-        return getActiveRuleBasedView(config, hideInactive);
-      default:
-        throw new IllegalStateException();
+    case GENERIC:
+      return getActiveGenericView(config, hideInactive);
+    case RULEBASED:
+      return getActiveRuleBasedView(config, hideInactive);
+    default:
+      throw new IllegalStateException();
     }
   }
 
@@ -141,18 +145,16 @@ public class FunctionTableResource {
   public View getAddView(@PathParam("collection") String collection) throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
     switch (config.getMode()) {
-      case GENERIC:
-        return new AddGenericView(config.getAnomalyDatabaseConfig().getUrl(),
-            config.getAnomalyDatabaseConfig().getFunctionTableName(),
-            config.getCollectionName(),
-            SLASH.join("", collection, "functions", "add"));
-      case RULEBASED:
-        return new AddRuleBasedView(config.getAnomalyDatabaseConfig().getUrl(),
-            config.getAnomalyDatabaseConfig().getFunctionTableName(),
-            config.getCollectionName(),
-            SLASH.join("", collection, "functions", "add"));
-      default:
-        throw new IllegalStateException();
+    case GENERIC:
+      return new AddGenericView(config.getAnomalyDatabaseConfig().getUrl(),
+          config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(),
+          SLASH.join("", collection, "functions", "add"));
+    case RULEBASED:
+      return new AddRuleBasedView(config.getAnomalyDatabaseConfig().getUrl(),
+          config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(),
+          SLASH.join("", collection, "functions", "add"));
+    default:
+      throw new IllegalStateException();
     }
   }
 
@@ -161,8 +163,7 @@ public class FunctionTableResource {
    */
   @POST
   @Path("/{collection}/functions/add")
-  public Response getAddPostView(
-      @PathParam("collection") String collection,
+  public Response getAddPostView(@PathParam("collection") String collection,
       MultivaluedMap<String, String> formParams) throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
 
@@ -171,18 +172,17 @@ public class FunctionTableResource {
 
     FunctionTableRow functionRow;
     switch (config.getMode()) {
-      case GENERIC:
-      {
-        functionRow = parseGenericFunctionForm(config, functionName, functionDescription, formParams);
-        break;
-      }
-      case RULEBASED:
-      {
-        functionRow = parseRuleBasedFunctionForm(config, functionName, functionDescription, formParams);
-        break;
-      }
-      default:
-        throw new IllegalStateException();
+    case GENERIC: {
+      functionRow = parseGenericFunctionForm(config, functionName, functionDescription, formParams);
+      break;
+    }
+    case RULEBASED: {
+      functionRow =
+          parseRuleBasedFunctionForm(config, functionName, functionDescription, formParams);
+      break;
+    }
+    default:
+      throw new IllegalStateException();
     }
 
     try {
@@ -192,29 +192,30 @@ public class FunctionTableResource {
       e.printStackTrace(new PrintWriter(sw));
       return Response.serverError().entity("An error occurred: " + sw.toString()).build();
     }
-    return Response.ok().entity(formResponseHtmlHelper("Success!", SLASH.join("", collection))).build();
+    return Response.ok().entity(formResponseHtmlHelper("Success!", SLASH.join("", collection)))
+        .build();
   }
-
 
   /**
    * Actyivate/deactivate the function.
    */
   @GET
   @Path("/{collection}/functions/{functionId}")
-  public Response getDeactivateFunction(
-      @PathParam("collection") String collection,
-      @PathParam("functionId") int functionId,
-      @QueryParam("activate") boolean activate) throws Exception {
+  public Response getDeactivateFunction(@PathParam("collection") String collection,
+      @PathParam("functionId") int functionId, @QueryParam("activate") boolean activate)
+          throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
     try {
       String sql;
       if (activate) {
-        sql = String.format(ResourceUtils.getResourceAsString(
-            "database/function/update-activate-function-template.sql"),
+        sql = String.format(
+            ResourceUtils
+                .getResourceAsString("database/function/update-activate-function-template.sql"),
             config.getAnomalyDatabaseConfig().getFunctionTableName(), functionId);
       } else {
-        sql = String.format(ResourceUtils.getResourceAsString(
-            "database/function/update-deactivate-function-template.sql"),
+        sql = String.format(
+            ResourceUtils
+                .getResourceAsString("database/function/update-deactivate-function-template.sql"),
             config.getAnomalyDatabaseConfig().getFunctionTableName(), functionId);
       }
       config.getAnomalyDatabaseConfig().runSQL(sql);
@@ -223,8 +224,9 @@ public class FunctionTableResource {
       e.printStackTrace(new PrintWriter(sw));
       return Response.serverError().entity("An error occurred: " + sw.toString()).build();
     }
-    return Response.ok().entity(formResponseHtmlHelper("Success! Function " + functionId + " marked as " +
-        ((activate) ? "active" : "inactive"), SLASH.join("", collection))).build();
+    return Response.ok().entity(formResponseHtmlHelper(
+        "Success! Function " + functionId + " marked as " + ((activate) ? "active" : "inactive"),
+        SLASH.join("", collection))).build();
   }
 
   /**
@@ -232,20 +234,17 @@ public class FunctionTableResource {
    */
   @GET
   @Path("/{collection}/rulebased/deltatable/{deltaTable}")
-  public DeltaTableView getDeltaTableView(
-      @PathParam("collection") String collection,
+  public DeltaTableView getDeltaTableView(@PathParam("collection") String collection,
       @PathParam("deltaTable") String deltaTableName) throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
 
-    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
-        config.getThirdEyeServerPort(), config.getCollectionName());
-    return new DeltaTableView(
-        starTreeConfig,
+    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(
+        config.getThirdEyeServerHost(), config.getThirdEyeServerPort(), config.getCollectionName());
+    return new DeltaTableView(starTreeConfig,
         DeltaTable.load(config.getAnomalyDatabaseConfig(), starTreeConfig, deltaTableName),
         SLASH.join("", collection, "rulebased", "deltatable", deltaTableName),
         config.getAnomalyDatabaseConfig().getUrl(),
-        config.getAnomalyDatabaseConfig().getFunctionTableName(),
-        config.getCollectionName());
+        config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName());
   }
 
   /**
@@ -253,10 +252,9 @@ public class FunctionTableResource {
    */
   @POST
   @Path("/{collection}/rulebased/deltatable/{deltaTable}")
-  public Response postDeltaTableformEntry(
-      @PathParam("collection") String collection,
-      @PathParam("deltaTable") String deltaTableName,
-      MultivaluedMap<String, String> formParams) throws Exception {
+  public Response postDeltaTableformEntry(@PathParam("collection") String collection,
+      @PathParam("deltaTable") String deltaTableName, MultivaluedMap<String, String> formParams)
+          throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
 
     List<String> columns = new ArrayList<String>(formParams.keySet());
@@ -266,9 +264,7 @@ public class FunctionTableResource {
     }
     String sql = String.format(
         ResourceUtils.getResourceAsString("database/rulebased/insert-update-delta-template.sql"),
-        deltaTableName,
-        COMMA.join(columns),
-        COMMA.join(values));
+        deltaTableName, COMMA.join(columns), COMMA.join(values));
 
     try {
       config.getAnomalyDatabaseConfig().runSQL(sql);
@@ -277,8 +273,7 @@ public class FunctionTableResource {
     }
 
     return Response.ok().entity(formResponseHtmlHelper("Success!",
-        SLASH.join("", collection, "rulebased", "deltatable", deltaTableName)))
-        .build();
+        SLASH.join("", collection, "rulebased", "deltatable", deltaTableName))).build();
   }
 
   /**
@@ -286,22 +281,18 @@ public class FunctionTableResource {
    */
   @GET
   @Path("/{collection}/functions/execute/{functionId}")
-  public ExecuteFunctionView getExecuteFunctionView(
-      @PathParam("collection") String collection,
+  public ExecuteFunctionView getExecuteFunctionView(@PathParam("collection") String collection,
       @PathParam("functionId") int functionId) throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
-    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
-        config.getThirdEyeServerPort(), config.getCollectionName());
+    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(
+        config.getThirdEyeServerHost(), config.getThirdEyeServerPort(), config.getCollectionName());
     List<String> dimensionNames = new LinkedList<>();
     for (DimensionSpec ds : starTreeConfig.getDimensions()) {
       dimensionNames.add(ds.getName());
     }
     return new ExecuteFunctionView(config.getAnomalyDatabaseConfig().getUrl(),
-        config.getAnomalyDatabaseConfig().getFunctionTableName(),
-        config.getCollectionName(),
-        functionId,
-        dimensionNames,
-        SLASH.join("", collection, "functions", "execute", functionId));
+        config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(),
+        functionId, dimensionNames, SLASH.join("", collection, "functions", "execute", functionId));
   }
 
   /**
@@ -310,10 +301,9 @@ public class FunctionTableResource {
    */
   @POST
   @Path("/{collection}/functions/execute/{functionId}")
-  public View getExecuteFunctionResults(
-      @PathParam("collection") String collection,
-      @PathParam("functionId") int functionId,
-      MultivaluedMap<String, String> formParams) throws Exception {
+  public View getExecuteFunctionResults(@PathParam("collection") String collection,
+      @PathParam("functionId") int functionId, MultivaluedMap<String, String> formParams)
+          throws Exception {
     ThirdEyeAnomalyDetectionConfiguration config = collectionToConfigMap.get(collection);
     ThirdEyeClient thirdEyeClient = collectionToThirdEyeClient.get(collection);
 
@@ -321,8 +311,8 @@ public class FunctionTableResource {
     long end = Long.valueOf(formParams.getFirst("EndTime"));
     TimeRange timeRange = new TimeRange(start, end);
 
-    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
-        config.getThirdEyeServerPort(), config.getCollectionName());
+    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(
+        config.getThirdEyeServerHost(), config.getThirdEyeServerPort(), config.getCollectionName());
 
     Map<String, String> fixedDimensionValues = new HashMap<String, String>();
     for (DimensionSpec ds : starTreeConfig.getDimensions()) {
@@ -334,8 +324,8 @@ public class FunctionTableResource {
 
     FunctionTableRow functionTableRow = null;
     for (FunctionTableRow f : FunctionTable.selectRows(
-        config.getAnomalyDatabaseConfig(),
-        config.getMode() == Mode.RULEBASED ? RuleBasedFunctionTableRow.class : GenericFunctionTableRow.class,
+        config.getAnomalyDatabaseConfig(), config.getMode() == Mode.RULEBASED
+            ? RuleBasedFunctionTableRow.class : GenericFunctionTableRow.class,
         config.getCollectionName())) {
       if (f.getFunctionId() == functionId) {
         functionTableRow = f;
@@ -344,40 +334,36 @@ public class FunctionTableResource {
 
     AnomalyDetectionFunctionFactory functionFactory;
     switch (config.getMode()) {
-      case GENERIC:
-      {
-        functionFactory = new GenericFunctionFactory();
-        break;
-      }
-      case RULEBASED:
-      {
-        functionFactory = new RuleBasedFunctionFactory();
-        break;
-      }
-      default:
-        throw new IllegalStateException();
+    case GENERIC: {
+      functionFactory = new GenericFunctionFactory();
+      break;
+    }
+    case RULEBASED: {
+      functionFactory = new RuleBasedFunctionFactory();
+      break;
+    }
+    default:
+      throw new IllegalStateException();
     }
 
-    AnomalyDetectionFunction function = functionFactory.getFunction(starTreeConfig, config.getAnomalyDatabaseConfig(),
-        functionTableRow);
+    AnomalyDetectionFunction function = functionFactory.getFunction(starTreeConfig,
+        config.getAnomalyDatabaseConfig(), functionTableRow);
 
-    AnomalyDetectionTaskInfo taskInfo = new AnomalyDetectionTaskInfo(functionTableRow.getFunctionName(),
-        functionTableRow.getFunctionId(), functionTableRow.getFunctionDescription(), timeRange);
+    AnomalyDetectionTaskInfo taskInfo =
+        new AnomalyDetectionTaskInfo(functionTableRow.getFunctionName(),
+            functionTableRow.getFunctionId(), functionTableRow.getFunctionDescription(), timeRange);
 
-    List<AnomalyResult> anomalies = new FixedDimensionAnomalyDetectionTask(starTreeConfig, taskInfo, function,
-        thirdEyeClient, fixedDimensionValues).call();
+    List<AnomalyResult> anomalies = new FixedDimensionAnomalyDetectionTask(starTreeConfig, taskInfo,
+        function, thirdEyeClient, fixedDimensionValues).call();
 
-    return new ExecuteFunctionResultView(
-        config.getAnomalyDatabaseConfig().getUrl(),
-        config.getAnomalyDatabaseConfig().getFunctionTableName(),
-        config.getCollectionName(), functionId, functionTableRow.getFunctionName(),
-        functionTableRow.getFunctionDescription(), anomalies);
+    return new ExecuteFunctionResultView(config.getAnomalyDatabaseConfig().getUrl(),
+        config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(),
+        functionId, functionTableRow.getFunctionName(), functionTableRow.getFunctionDescription(),
+        anomalies);
   }
 
   private RuleBasedFunctionTableRow parseRuleBasedFunctionForm(
-      ThirdEyeAnomalyDetectionConfiguration config,
-      String functionName,
-      String functionDescription,
+      ThirdEyeAnomalyDetectionConfiguration config, String functionName, String functionDescription,
       MultivaluedMap<String, String> formParams) throws IOException {
     RuleBasedFunctionTableRow functionRow = new RuleBasedFunctionTableRow();
     functionRow.setFunctionName(functionName);
@@ -393,17 +379,17 @@ public class FunctionTableResource {
     functionRow.setCronDefinition(formParams.getFirst("CronDefinition"));
     functionRow.setDeltaTableName(formParams.getFirst("DeltaTable"));
     if (functionRow.getDeltaTableName() != null && functionRow.getDeltaTableName().length() > 0) {
-      StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
-          config.getThirdEyeServerPort(), config.getCollectionName());
-      DeltaTable.create(config.getAnomalyDatabaseConfig(), starTreeConfig, functionRow.getDeltaTableName());
+      StarTreeConfig starTreeConfig =
+          ThirdEyeServerUtils.getStarTreeConfig(config.getThirdEyeServerHost(),
+              config.getThirdEyeServerPort(), config.getCollectionName());
+      DeltaTable.create(config.getAnomalyDatabaseConfig(), starTreeConfig,
+          functionRow.getDeltaTableName());
     }
     return functionRow;
   }
 
   private GenericFunctionTableRow parseGenericFunctionForm(
-      ThirdEyeAnomalyDetectionConfiguration config,
-      String functionName,
-      String functionDescription,
+      ThirdEyeAnomalyDetectionConfiguration config, String functionName, String functionDescription,
       MultivaluedMap<String, String> formParams) throws Exception {
     GenericFunctionTableRow functionRow = new GenericFunctionTableRow();
     functionRow.setFunctionName(functionName);
@@ -415,39 +401,35 @@ public class FunctionTableResource {
     return functionRow;
   }
 
-  private ActiveGenericView getActiveGenericView(
-      ThirdEyeAnomalyDetectionConfiguration config,
+  private ActiveGenericView getActiveGenericView(ThirdEyeAnomalyDetectionConfiguration config,
       boolean hideInactive) throws Exception {
     LOGGER.info("active functions for generic");
     List<GenericFunctionTableRow> rows;
     if (hideInactive) {
-      rows = FunctionTable.selectActiveRows(config.getAnomalyDatabaseConfig(), GenericFunctionTableRow.class,
-          config.getCollectionName());
+      rows = FunctionTable.selectActiveRows(config.getAnomalyDatabaseConfig(),
+          GenericFunctionTableRow.class, config.getCollectionName());
     } else {
-      rows = FunctionTable.selectRows(config.getAnomalyDatabaseConfig(), GenericFunctionTableRow.class,
-          config.getCollectionName());
+      rows = FunctionTable.selectRows(config.getAnomalyDatabaseConfig(),
+          GenericFunctionTableRow.class, config.getCollectionName());
     }
     return new ActiveGenericView(config.getAnomalyDatabaseConfig().getUrl(),
-        config.getAnomalyDatabaseConfig().getFunctionTableName(),
-        config.getCollectionName(), rows);
+        config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(), rows);
   }
 
-  private ActiveRuleBasedView getActiveRuleBasedView(
-      ThirdEyeAnomalyDetectionConfiguration config,
+  private ActiveRuleBasedView getActiveRuleBasedView(ThirdEyeAnomalyDetectionConfiguration config,
       boolean hideInactive) throws Exception {
     LOGGER.info("active functions for rulebased");
     List<RuleBasedFunctionTableRow> rows;
     if (hideInactive) {
-      rows = FunctionTable.selectActiveRows(config.getAnomalyDatabaseConfig(), RuleBasedFunctionTableRow.class,
-          config.getCollectionName());
+      rows = FunctionTable.selectActiveRows(config.getAnomalyDatabaseConfig(),
+          RuleBasedFunctionTableRow.class, config.getCollectionName());
     } else {
-      rows = FunctionTable.selectRows(config.getAnomalyDatabaseConfig(), RuleBasedFunctionTableRow.class,
-          config.getCollectionName());
+      rows = FunctionTable.selectRows(config.getAnomalyDatabaseConfig(),
+          RuleBasedFunctionTableRow.class, config.getCollectionName());
     }
 
     return new ActiveRuleBasedView(config.getAnomalyDatabaseConfig().getUrl(),
-        config.getAnomalyDatabaseConfig().getFunctionTableName(),
-        config.getCollectionName(), rows);
+        config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(), rows);
   }
 
   private static String formResponseHtmlHelper(String message, String resource) {

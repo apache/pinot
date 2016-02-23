@@ -15,12 +15,11 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public abstract class MutableDictionaryReader implements Dictionary {
@@ -45,6 +44,82 @@ public abstract class MutableDictionaryReader implements Dictionary {
   @Override
   public int length() {
     return dictionaryIdGenerator.get() + 1;
+  }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.INT);
+  }
+
+  @Override
+  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.LONG);
+  }
+
+  @Override
+  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.FLOAT);
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.DOUBLE);
+  }
+
+
+  @Override
+  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.STRING);
+  }
+
+  protected void readValues(int[] dictionaryIds, int startPos, int limit, Object values, int outStartPos, FieldSpec.DataType type) {
+    int endPos = startPos + limit;
+
+    switch (type) {
+
+      case INT: {
+        int[] outValues = (int[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getIntValue(dictId);
+        }
+
+      }
+      break;
+      case LONG: {
+        long[] outValues = (long[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getLongValue(dictId);
+        }
+      }
+      break;
+      case FLOAT: {
+        float[] outValues = (float[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getFloatValue(dictId);
+        }
+      }
+      break;
+      case DOUBLE: {
+        double[] outValues = (double[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getDoubleValue(dictId);
+        }
+      }
+      break;
+      case STRING: {
+        String[] outValues = (String[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getStringValue(dictId);
+        }
+      }
+      break;
+    }
+
   }
 
   protected Integer getIndexOfFromBiMap(Object val) {
@@ -89,6 +164,12 @@ public abstract class MutableDictionaryReader implements Dictionary {
 
   @Override
   public abstract double getDoubleValue(int dictionaryId);
+
+  @Override
+  public abstract int getIntValue(int dictionaryId);
+
+  @Override
+  public abstract float getFloatValue(int dictionaryId);
 
   @Override
   public abstract String toString(int dictionaryId);

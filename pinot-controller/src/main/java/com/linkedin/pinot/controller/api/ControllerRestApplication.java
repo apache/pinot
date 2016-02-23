@@ -15,10 +15,15 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotRestletResourceBase;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
 import com.linkedin.pinot.controller.api.swagger.Paths;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import it.unimi.dsi.fastutil.ints.IntComparators;
 
@@ -30,6 +35,7 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.ComparatorUtils;
 import org.restlet.Application;
+import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
 import org.restlet.Restlet;
@@ -37,6 +43,7 @@ import org.restlet.data.MediaType;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Directory;
 import org.restlet.resource.ServerResource;
+import org.restlet.routing.Filter;
 import org.restlet.routing.Redirector;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
@@ -69,7 +76,10 @@ public class ControllerRestApplication extends Application {
   private static final String ONE_HOUR_IN_MILLIS = Long.toString(3600L * 1000L);
 
   private static String CONSOLE_WEBAPP_ROOT_PATH;
-  public static Router router;
+
+  private static Router router;
+
+  public static ControllerMetrics metrics = new ControllerMetrics(new MetricsRegistry());
 
   public ControllerRestApplication(String queryConsolePath) {
     super();
@@ -174,7 +184,23 @@ public class ControllerRestApplication extends Application {
 
     for (String routePath : pathsOrderedByLength) {
       LOGGER.info("Attaching route {} -> {}", routePath, clazz.getSimpleName());
-      router.attach(routePath, clazz);
+      router.attach(routePath, new AddHeaderFilter(getContext(), createFinder(clazz)));
     }
+  }
+
+  private class AddHeaderFilter extends Filter {
+    public AddHeaderFilter(Context context, Restlet next) {
+      super(context, next);
+    }
+
+    @Override
+    protected int beforeHandle(Request request, Response response) {
+      PinotRestletResourceBase.addExtraHeaders(response);
+      return Filter.CONTINUE;
+    }
+  }
+
+  public static Router getRouter() {
+    return router;
   }
 }

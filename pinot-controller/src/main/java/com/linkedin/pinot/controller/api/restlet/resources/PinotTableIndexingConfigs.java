@@ -3,6 +3,8 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 import java.io.File;
 import java.io.IOException;
 
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
@@ -51,6 +53,7 @@ public class PinotTableIndexingConfigs extends PinotRestletResourceBase {
       return updateIndexingConfig(tableName, entity);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while updating indexing configs for table {}", tableName, e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_INDEXING_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }

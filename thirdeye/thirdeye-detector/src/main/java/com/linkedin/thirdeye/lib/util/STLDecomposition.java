@@ -8,12 +8,10 @@ import java.util.List;
 
 /**
  * Implementation of STL: A Seasonal-Trend Decomposition Procedure based on Loess.
- *
  * <p>
- *   Robert B. Cleveland et al., "STL: A Seasonal-Trend Decomposition Procedure based on Loess,"
- *   in Journal of Official Statistics Vol. 6 No. 1, 1990, pp. 3-73
+ * Robert B. Cleveland et al., "STL: A Seasonal-Trend Decomposition Procedure based on Loess,"
+ * in Journal of Official Statistics Vol. 6 No. 1, 1990, pp. 3-73
  * </p>
- *
  * @author Greg Brandt (gbrandt@linkedin.com)
  * @author Jieying Chen (jjchen@linkedin.com)
  * @author James Hong (jhong@linkedin.com)
@@ -25,16 +23,14 @@ public class STLDecomposition {
 
   /**
    * Constructs a configuration of STL function that can de-trend data.
-   *
    * <p>
-   *   n.b. The Java Loess implementation only does  linear local polynomial
-   *   regression, but R supports linear (degree=1), quadratic (degree=2), and
-   *   a strange degree=0 option.
+   * n.b. The Java Loess implementation only does linear local polynomial
+   * regression, but R supports linear (degree=1), quadratic (degree=2), and
+   * a strange degree=0 option.
    * </p>
-   *
    * <p>
-   *   Also, the Java Loess implementation accepts "bandwidth", the fraction of source points closest
-   *   to the current point, as opposed to integral values.
+   * Also, the Java Loess implementation accepts "bandwidth", the fraction of source points closest
+   * to the current point, as opposed to integral values.
    * </p>
    */
   public STLDecomposition(Config config) {
@@ -55,12 +51,15 @@ public class STLDecomposition {
     private double trendComponentBandwidth = 0.25;
     /** The smoothing parameter for the seasonal component, like n_s */
     private double seasonalComponentBandwidth = 1.0; // use all data points for seasonal
-    /** Whether the series is periodic, if this is true, then seasonalComponentBandwidth is ignored. */
+    /**
+     * Whether the series is periodic, if this is true, then seasonalComponentBandwidth is ignored.
+     */
     private boolean periodic = false;
     /** total length of time series */
     private int numberOfDataPoints;
 
-    public Config() {}
+    public Config() {
+    }
 
     public int getNumberOfObservations() {
       return numberOfObservations;
@@ -130,7 +129,8 @@ public class STLDecomposition {
       checkPeriodicity(numberOfObservations, numberOfDataPoints);
       // Check n_t, needs to be n_t >= 1.5 * n_p / (1 - 1.5/n_s)
       if (periodic) {
-        double t_window_span = (1.5 * (double)numberOfObservations)/ (1- 1.5/((double)numberOfDataPoints * 10 + 1)) / (double) numberOfDataPoints;
+        double t_window_span = (1.5 * (double) numberOfObservations)
+            / (1 - 1.5 / ((double) numberOfDataPoints * 10 + 1)) / (double) numberOfDataPoints;
         setTrendComponentBandwidth(t_window_span);
       }
     }
@@ -140,7 +140,8 @@ public class STLDecomposition {
         throw new IllegalArgumentException("Periodicity (numberOfObservations) must be >= 2");
       }
       if (numberOfDataPoints <= 2 * numberOfObservations) {
-        throw new IllegalArgumentException("numberOfDataPoints(total length) must contain at least 2 * Periodicity (numberOfObservations) points");
+        throw new IllegalArgumentException(
+            "numberOfDataPoints(total length) must contain at least 2 * Periodicity (numberOfObservations) points");
       }
       return numberOfObservations;
     }
@@ -148,9 +149,8 @@ public class STLDecomposition {
 
   /**
    * The STL decomposition of a time series.
-   *
    * <p>
-   *   getData() == getTrend() + getSeasonal() + getRemainder()
+   * getData() == getTrend() + getSeasonal() + getRemainder()
    * </p>
    */
   public class STLResult {
@@ -160,7 +160,8 @@ public class STLDecomposition {
     private final double[] seasonal;
     private final double[] remainder;
 
-    public STLResult(long[] times, double[] series, double[] trend, double[] seasonal, double[] remainder) {
+    public STLResult(long[] times, double[] series, double[] trend, double[] seasonal,
+        double[] remainder) {
       this.times = times;
       this.series = series;
       this.trend = trend;
@@ -205,7 +206,8 @@ public class STLDecomposition {
 
         // Get cycle sub-series with padding on either side
         int numberOfObservations = config.getNumberOfObservations();
-        CycleSubSeries cycle = new CycleSubSeries(times, series, robustness, detrend, numberOfObservations);
+        CycleSubSeries cycle =
+            new CycleSubSeries(times, series, robustness, detrend, numberOfObservations);
         cycle.compute();
         List<double[]> cycleSubseries = cycle.getCycleSubSeries();
         List<double[]> cycleTimes = cycle.getCycleTimes();
@@ -213,11 +215,8 @@ public class STLDecomposition {
 
         // Step 2: Cycle-subseries Smoothing
         for (int i = 0; i < cycleSubseries.size(); i++) {
-          double[] smoothed = loessSmooth(
-              cycleTimes.get(i),
-              cycleSubseries.get(i),
-              config.getSeasonalComponentBandwidth(),
-              cycleRobustnessWeights.get(i));
+          double[] smoothed = loessSmooth(cycleTimes.get(i), cycleSubseries.get(i),
+              config.getSeasonalComponentBandwidth(), cycleRobustnessWeights.get(i));
           cycleSubseries.set(i, smoothed);
         }
 
@@ -260,12 +259,12 @@ public class STLDecomposition {
 
     // TODO: The R code does cycle subseries weighted mean smoothing on seasonal component here
     /*
-     if (periodic) {
-        which.cycle <- cycle(x)
-        z$seasonal <- tapply(z$seasonal, which.cycle, mean)[which.cycle]
-     }
-     remainder <- as.vector(x) - z$seasonal - z$trend
-     y <- cbind(seasonal = z$seasonal, trend = z$trend, remainder = remainder)
+     * if (periodic) {
+     * which.cycle <- cycle(x)
+     * z$seasonal <- tapply(z$seasonal, which.cycle, mean)[which.cycle]
+     * }
+     * remainder <- as.vector(x) - z$seasonal - z$trend
+     * y <- cbind(seasonal = z$seasonal, trend = z$trend, remainder = remainder)
      */
 
     return new STLResult(times, series, trend, seasonal, remainder);
@@ -284,7 +283,8 @@ public class STLDecomposition {
     private final double[] robustness;
     private final double[] detrend;
 
-    CycleSubSeries(long[] times, double[] series, double[] robustness, double[] detrend, int numberOfObservations) {
+    CycleSubSeries(long[] times, double[] series, double[] robustness, double[] detrend,
+        int numberOfObservations) {
       this.times = times;
       this.series = series;
       this.robustness = robustness;
@@ -376,9 +376,9 @@ public class STLDecomposition {
 
   /**
    * @param weights
-   *  The weights to use for smoothing, if null, equal weights are assumed
+   *          The weights to use for smoothing, if null, equal weights are assumed
    * @return
-   *  Smoothed series
+   *         Smoothed series
    */
   private double[] loessSmooth(double[] series, double bandwidth, double[] weights) {
     double[] times = new double[series.length];
@@ -390,15 +390,17 @@ public class STLDecomposition {
 
   /**
    * @param weights
-   *  The weights to use for smoothing, if null, equal weights are assumed
+   *          The weights to use for smoothing, if null, equal weights are assumed
    * @return
-   *  Smoothed series
+   *         Smoothed series
    */
-  private double[] loessSmooth(double[] times, double[] series, double bandwidth, double[] weights) {
+  private double[] loessSmooth(double[] times, double[] series, double bandwidth,
+      double[] weights) {
     if (weights == null) {
       return new LoessInterpolator(bandwidth, LOESS_ROBUSTNESS_ITERATIONS).smooth(times, series);
     } else {
-      return new LoessInterpolator(bandwidth, LOESS_ROBUSTNESS_ITERATIONS).smooth(times, series, weights);
+      return new LoessInterpolator(bandwidth, LOESS_ROBUSTNESS_ITERATIONS).smooth(times, series,
+          weights);
     }
   }
 
@@ -408,7 +410,8 @@ public class STLDecomposition {
     double sumOfWeights = 0;
     for (int i = 0; i < series.length; i++) {
       double weight = (weights != null) ? weights[i] : 1; // equal weights if none specified
-      mean += weight * series[i];;
+      mean += weight * series[i];
+      ;
       sumOfWeights += weight;
     }
     // TODO: This is a hack to not have NaN values

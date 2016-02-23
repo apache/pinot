@@ -20,5 +20,5 @@ package com.linkedin.pinot.core.segment.creator;
  */
 
 public enum ForwardIndexType {
-  FIXED_BIT_COMPRESSED;
+  FIXED_BIT_COMPRESSED
 }

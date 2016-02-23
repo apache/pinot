@@ -70,15 +70,15 @@ public class TestUtils {
 
     if (estimate < testThreshold && actual < testThreshold) {
       double errorDiff = Math.abs(actual - estimate);
-      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in difference): " + errorDiff);
-      LOGGER.info("small value comparison ignored!");
+      LOGGER.debug("estimate: " + estimate + " actual: " + actual + " error (in difference): " + errorDiff);
+      LOGGER.debug("small value comparison ignored!");
       //Assert.assertEquals(error < 3, true);
     } else {
       double errorRate = 1;
       if (actual > 0) {
         errorRate = Math.abs((actual - estimate) / actual);
       }
-      LOGGER.info("estimate: " + estimate + " actual: " + actual + " error (in rate): " + errorRate);
+      LOGGER.debug("estimate: " + estimate + " actual: " + actual + " error (in rate): " + errorRate);
       Assert.assertEquals(errorRate < precision, true);
     }
   }

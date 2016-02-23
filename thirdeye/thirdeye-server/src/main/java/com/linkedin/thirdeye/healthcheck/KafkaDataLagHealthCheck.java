@@ -10,7 +10,8 @@ import java.util.concurrent.TimeUnit;
 public class KafkaDataLagHealthCheck extends HealthCheck {
   public static final String NAME = "kafkaDataLagCheck";
 
-  private static final long MINIMUM_ACCEPTABLE_DATA_LAG_MILLIS = TimeUnit.MILLISECONDS.convert(3, TimeUnit.HOURS);
+  private static final long MINIMUM_ACCEPTABLE_DATA_LAG_MILLIS =
+      TimeUnit.MILLISECONDS.convert(3, TimeUnit.HOURS);
 
   private final KafkaConsumerManager kafkaConsumerManager;
 
@@ -29,17 +30,11 @@ public class KafkaDataLagHealthCheck extends HealthCheck {
       long dataTimeMillis = entry.getValue().getDataTimeMillis().get();
 
       if (currentTimeMillis - dataTimeMillis > MINIMUM_ACCEPTABLE_DATA_LAG_MILLIS) {
-        errorMessage.append("collection=")
-            .append(entry.getKey())
-            .append(" currentTimeMillis=")
-            .append(currentTimeMillis)
-            .append(" dataTimeMillis=")
-            .append(dataTimeMillis)
-            .append(" difference of ")
-            .append(currentTimeMillis - dataTimeMillis)
+        errorMessage.append("collection=").append(entry.getKey()).append(" currentTimeMillis=")
+            .append(currentTimeMillis).append(" dataTimeMillis=").append(dataTimeMillis)
+            .append(" difference of ").append(currentTimeMillis - dataTimeMillis)
             .append(" is greater than acceptable data lag of ")
-            .append(MINIMUM_ACCEPTABLE_DATA_LAG_MILLIS)
-            .append("\n");
+            .append(MINIMUM_ACCEPTABLE_DATA_LAG_MILLIS).append("\n");
       }
     }
 

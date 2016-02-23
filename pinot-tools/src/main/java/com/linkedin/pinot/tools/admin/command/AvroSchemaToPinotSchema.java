@@ -18,6 +18,7 @@ package com.linkedin.pinot.tools.admin.command;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.tools.Command;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -34,7 +35,7 @@ import java.util.concurrent.TimeUnit;
  * automatically do this, the intention is to get most of the work done by this class, and require any
  * manual editing on top.
  */
-public class AvroSchemaToPinotSchema extends AbstractBaseCommand implements Command {
+public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
 
   @Option(name = "-avroSchemaFileName", required = false, forbids = {"-avroDataFileName"},
@@ -45,7 +46,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseCommand implements Comm
       metaVar = "<String>", usage = "Path to avro schema file.")
   String _avroDataFileName;
 
-  @Option(name = "-pinotSchemaFileName", required = true, metaVar = "<string>", usage = "Path to pinot schema file.")
+  @Option(name = "-pinotSchemaFileName", required = false, metaVar = "<string>", usage = "Path to pinot schema file.")
   String _pinotSchemaFileName;
 
   @Option(name = "-dimensions", required = false, metaVar = "<string>", usage = "Comma seperated dimension columns.")
@@ -77,10 +78,24 @@ public class AvroSchemaToPinotSchema extends AbstractBaseCommand implements Comm
       return false;
     }
 
-
     if (schema == null) {
       LOGGER.error("Error: Could not read avro schema from file.");
       return false;
+    }
+
+    String avroFileName = _avroSchemaFileName;
+    if (avroFileName == null) {
+      avroFileName = _avroDataFileName;
+    }
+
+    // Remove extension
+    String schemaName = avroFileName.replaceAll("\\..*", "");
+    schema.setSchemaName(schemaName);
+
+    if (_pinotSchemaFileName == null) {
+      _pinotSchemaFileName = schemaName + ".json";
+
+      LOGGER.info("Using {} as the Pinot schema file name", _pinotSchemaFileName);
     }
 
     ObjectMapper objectMapper = new ObjectMapper();

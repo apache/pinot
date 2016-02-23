@@ -18,22 +18,40 @@ package com.linkedin.pinot.core.operator.filter.predicate;
 public interface PredicateEvaluator {
 
   /**
-   *
    * @param dictionaryId
    * @return
    */
   public boolean apply(int dictionaryId);
 
   /**
-   *
    * @param dictionaryIds
    * @return
    */
   public boolean apply(int[] dictionaryIds);
 
   /**
-   *
+   * @param dictionaryIds
+   * @param length how many elements in the array should the predicate be evaluated against
    * @return
    */
-  public int[] getDictionaryIds();
+  public boolean apply(int[] dictionaryIds, int length);
+
+  /**
+   * @return matching dictionary Ids
+   */
+  public int[] getMatchingDictionaryIds();
+
+  /**
+   * @return not matching dictionary Ids, useful for NOT IN, IN etc
+   */
+  public int[] getNonMatchingDictionaryIds();
+
+  /**
+   * Will return true if the predicate is evaluated as false all the time. Useful to skip the
+   * segment. e.g if country=zm and segment contains no record for "zm" country we can skip the
+   * segment
+   * @return
+   */
+  public boolean alwaysFalse();
+
 }

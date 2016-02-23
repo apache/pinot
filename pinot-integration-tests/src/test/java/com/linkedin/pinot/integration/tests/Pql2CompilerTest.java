@@ -95,10 +95,11 @@ public class Pql2CompilerTest {
 
   @Test
   public void testHardcodedQueries() {
-    PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<>());
+    PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<String, String[]>());
     Pql2Compiler pql2Compiler = new Pql2Compiler();
 
     testQuery(pql1Compiler, pql2Compiler, "select count(*) from foo where x not in (1,2,3)");
+    testQuery(pql1Compiler, pql2Compiler, "SELECT LongestAddGTime, DepDelayMinutes FROM whatever  WHERE TotalAddGTime NOT IN ('13', '32', '60', '8', '4', '54', '13', '58') AND DestAirportSeqID NOT IN ('1014002', '1163805', '1387102', '1467903', '1349503', '1143302')  LIMIT 26");
   }
   
   @Test
@@ -114,7 +115,7 @@ public class Pql2CompilerTest {
       File avroFile = new File(tempDir, "On_Time_On_Time_Performance_2014_1.avro");
       QueryGenerator qg = new QueryGenerator(Collections.singletonList(avroFile), "whatever", "whatever");
 
-      PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<>());
+      PQLCompiler pql1Compiler = new PQLCompiler(new HashMap<String, String[]>());
       Pql2Compiler pql2Compiler = new Pql2Compiler();
 
       for (int i = 1; i <= 1000000; i++) {
@@ -342,25 +343,27 @@ public class Pql2CompilerTest {
             operatorsAreEqual &&
             valuesAreEqual;
 
-        // Compare sets if the op is IN
-        if (operatorsAreEqual && columnsAreEqual && leftQuery.getOperator() == FilterOperator.IN) {
-          Set<String> leftValues = new HashSet<>(Arrays.asList(leftQuery.getValue().get(0).split("\t\t")));
-          Set<String> rightValues = new HashSet<>(Arrays.asList(rightQuery.getValue().get(0).split("\t\t")));
-          fieldsAreEqual = leftValues.equals(rightValues);
-          if (!fieldsAreEqual) {
-            System.out.println("in clause not the same?");
-            System.out.println("leftValues = " + leftValues);
-            System.out.println("rightValues = " + rightValues);
-          }
-        }
-
         // NOT_IN and NOT are equivalent
-        if (!operatorsAreEqual && columnsAreEqual && valuesAreEqual) {
+        if (!operatorsAreEqual && columnsAreEqual) {
           if (
               (leftQuery.getOperator() == FilterOperator.NOT || leftQuery.getOperator() == FilterOperator.NOT_IN) &&
                   (rightQuery.getOperator() == FilterOperator.NOT || rightQuery.getOperator() == FilterOperator.NOT_IN)
               ) {
-            fieldsAreEqual = true;
+            operatorsAreEqual = true;
+          }
+        }
+
+        // Compare sets if the op is IN/NOT IN/NOT
+        if (operatorsAreEqual && columnsAreEqual &&
+            (leftQuery.getOperator() == FilterOperator.IN || leftQuery.getOperator() == FilterOperator.NOT_IN ||
+                leftQuery.getOperator() == FilterOperator.NOT)) {
+          Set<String> leftValues = new HashSet<>(Arrays.asList(leftQuery.getValue().get(0).split("\t\t")));
+          Set<String> rightValues = new HashSet<>(Arrays.asList(rightQuery.getValue().get(0).split("\t\t")));
+          fieldsAreEqual = leftValues.equals(rightValues);
+          if (!fieldsAreEqual) {
+            System.out.println("in/not in clause not the same?");
+            System.out.println("leftValues = " + leftValues);
+            System.out.println("rightValues = " + rightValues);
           }
         }
 

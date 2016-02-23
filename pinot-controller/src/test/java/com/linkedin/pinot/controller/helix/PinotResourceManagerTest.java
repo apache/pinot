@@ -54,10 +54,11 @@ public class PinotResourceManagerTest {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private int _numInstance;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   @BeforeTest
   public void setup() throws Exception {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_SERVER);
 
     final String instanceId = "localhost_helixController";
@@ -94,7 +95,7 @@ public class PinotResourceManagerTest {
   public void tearDown() {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   @Test

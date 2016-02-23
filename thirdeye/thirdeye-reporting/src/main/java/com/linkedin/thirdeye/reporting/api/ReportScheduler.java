@@ -20,7 +20,6 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class ReportScheduler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportScheduler.class);
@@ -31,7 +30,8 @@ public class ReportScheduler {
   private String serverUri;
   private String dashboardUri;
 
-  public ReportScheduler(File reportConfigFolder, String reportEmailTemplatePath, String serverUri, String dashboardUri) {
+  public ReportScheduler(File reportConfigFolder, String reportEmailTemplatePath, String serverUri,
+      String dashboardUri) {
     this.reportConfigFolder = reportConfigFolder;
     this.reportEmailTemplatePath = reportEmailTemplatePath;
     this.serverUri = serverUri;
@@ -55,7 +55,8 @@ public class ReportScheduler {
       for (File reportConfigFile : reportConfigFiles) {
         ReportConfig reportConfig = ReportConfig.decode(new FileInputStream(reportConfigFile));
         LOGGER.info("Config {}", reportConfig.encode());
-        LOGGER.info("Job data: ( reportConfigFile:{}, serverUri:{}, dashboardUri:{}, templatePath:{}",
+        LOGGER.info(
+            "Job data: ( reportConfigFile:{}, serverUri:{}, dashboardUri:{}, templatePath:{}",
             reportConfigFile, serverUri, dashboardUri, reportEmailTemplatePath);
 
         JobDataMap newJobDataMap = new JobDataMap();
@@ -64,17 +65,14 @@ public class ReportScheduler {
         newJobDataMap.put(ReportConstants.DASHBOARD_URI_KEY, dashboardUri);
         newJobDataMap.put(ReportConstants.TEMPLATE_PATH_KEY, reportEmailTemplatePath);
 
-        for (Entry<String, ScheduleSpec> entry :reportConfig.getSchedules().entrySet()) {
-          JobDetail job = JobBuilder.newJob(ReportGenerator.class)
-              .withDescription(entry.getKey())
-              .usingJobData(newJobDataMap)
-              .build();
-          Trigger trigger = TriggerBuilder.newTrigger()
-              .withDescription(entry.getKey())
-              .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron()))
-              .build();
+        for (Entry<String, ScheduleSpec> entry : reportConfig.getSchedules().entrySet()) {
+          JobDetail job = JobBuilder.newJob(ReportGenerator.class).withDescription(entry.getKey())
+              .usingJobData(newJobDataMap).build();
+          Trigger trigger = TriggerBuilder.newTrigger().withDescription(entry.getKey())
+              .withSchedule(CronScheduleBuilder.cronSchedule(entry.getValue().getCron())).build();
 
-          LOGGER.info("Scheduling job {} with trigger {}", job.getDescription(), entry.getValue().getCron());
+          LOGGER.info("Scheduling job {} with trigger {}", job.getDescription(),
+              entry.getValue().getCron());
           quartzScheduler.scheduleJob(job, trigger);
         }
       }

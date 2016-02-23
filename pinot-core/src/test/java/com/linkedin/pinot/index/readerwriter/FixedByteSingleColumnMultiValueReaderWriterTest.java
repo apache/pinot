@@ -23,8 +23,8 @@ import junit.framework.Assert;
 
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {

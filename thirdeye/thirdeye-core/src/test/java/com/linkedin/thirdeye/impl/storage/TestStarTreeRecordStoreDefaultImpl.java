@@ -27,8 +27,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class TestStarTreeRecordStoreDefaultImpl
-{
+public class TestStarTreeRecordStoreDefaultImpl {
   private StarTreeConfig config;
   private MetricSchema metricSchema;
   private DimensionDictionary dictionary;
@@ -37,8 +36,7 @@ public class TestStarTreeRecordStoreDefaultImpl
   private StarTreeRecordStore recordStore;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
+  public void beforeClass() throws Exception {
     ObjectMapper objectMapper = new ObjectMapper();
     InputStream inputStream = ClassLoader.getSystemResourceAsStream("sample-dictionary.json");
     dictionary = objectMapper.readValue(inputStream, DimensionDictionary.class);
@@ -48,8 +46,7 @@ public class TestStarTreeRecordStoreDefaultImpl
 
     // Dimensions
     ByteBuffer dimensionBuffer = ByteBuffer.allocate(1024 * 1024);
-    for (DimensionKey key : generateKeys())
-    {
+    for (DimensionKey key : generateKeys()) {
       StorageUtils.addToDimensionStore(config, dimensionBuffer, key, dictionary);
     }
     dimensionBuffer.flip();
@@ -57,9 +54,9 @@ public class TestStarTreeRecordStoreDefaultImpl
 
     // Metrics
     List<TimeRange> timeRanges = Arrays.asList(new TimeRange(0L, 3L), new TimeRange(4L, 7L));
-    ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
-    for (TimeRange timeRange : timeRanges)
-    {
+    ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers =
+        new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
+    for (TimeRange timeRange : timeRanges) {
       metricBuffers.put(timeRange, Arrays.asList(generateBuffer(timeRange)));
     }
     metricStore = new MetricStoreImmutableImpl(config, metricBuffers);
@@ -69,76 +66,65 @@ public class TestStarTreeRecordStoreDefaultImpl
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
-  public void testUpdate()
-  {
+  public void testUpdate() {
     MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
     ts.set(0, "M", 1);
 
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionKey(getDimensionKey("A0", "B0", "C0"))
-            .setMetricTimeSeries(ts)
-            .build(config);
+        .setDimensionKey(getDimensionKey("A0", "B0", "C0")).setMetricTimeSeries(ts).build(config);
 
     recordStore.update(record);
   }
 
   @Test
-  public void testGetRecordCount()
-  {
+  public void testGetRecordCount() {
     Assert.assertEquals(recordStore.getRecordCount(), 10);
   }
 
   @Test
-  public void testGetRecordCountEstimate()
-  {
+  public void testGetRecordCountEstimate() {
     Assert.assertEquals(recordStore.getRecordCountEstimate(), 10);
   }
 
   @Test
-  public void testGetCardinality()
-  {
+  public void testGetCardinality() {
     Assert.assertEquals(recordStore.getCardinality("A"), 3);
     Assert.assertEquals(recordStore.getCardinality("B"), 6);
     Assert.assertEquals(recordStore.getCardinality("C"), 9);
   }
 
   @Test
-  public void testGetMaxCardinalityDimension()
-  {
+  public void testGetMaxCardinalityDimension() {
     Assert.assertEquals(recordStore.getMaxCardinalityDimension(), "C");
   }
 
   @Test
-  public void testGetMaxCardinalityDimension_withBlacklist()
-  {
+  public void testGetMaxCardinalityDimension_withBlacklist() {
     Assert.assertEquals(recordStore.getMaxCardinalityDimension(Arrays.asList("C")), "B");
   }
 
   @Test
-  public void testGetDimensionValues()
-  {
-    Assert.assertEquals(recordStore.getDimensionValues("A"), new HashSet<String>(Arrays.asList("A0", "A1", "A2")));
+  public void testGetDimensionValues() {
+    Assert.assertEquals(recordStore.getDimensionValues("A"),
+        new HashSet<String>(Arrays.asList("A0", "A1", "A2")));
   }
 
   @Test
-  public void testGetMinTime()
-  {
+  public void testGetMinTime() {
     Assert.assertEquals(recordStore.getMinTime(), Long.valueOf(0L));
   }
 
   @Test
-  public void testGetMaxTime()
-  {
+  public void testGetMaxTime() {
     Assert.assertEquals(recordStore.getMaxTime(), Long.valueOf(7L));
   }
 
   @Test
-  public void testGetMetricSums_oneSegment_allStar()
-  {
+  public void testGetMetricSums_oneSegment_allStar() {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey(StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR))
-            .setTimeRange(new TimeRange(0L, 0L))
-            .build(config);
+        .setDimensionKey(
+            getDimensionKey(StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR))
+        .setTimeRange(new TimeRange(0L, 0L)).build(config);
 
     Number[] sums = recordStore.getMetricSums(query);
 
@@ -146,12 +132,11 @@ public class TestStarTreeRecordStoreDefaultImpl
   }
 
   @Test
-  public void testGetMetricSums_twoSegment_allStar()
-  {
+  public void testGetMetricSums_twoSegment_allStar() {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey(StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR))
-            .setTimeRange(new TimeRange(0L, 7L))
-            .build(config);
+        .setDimensionKey(
+            getDimensionKey(StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR))
+        .setTimeRange(new TimeRange(0L, 7L)).build(config);
 
     Number[] sums = recordStore.getMetricSums(query);
 
@@ -159,12 +144,10 @@ public class TestStarTreeRecordStoreDefaultImpl
   }
 
   @Test
-  public void testGetMetricSums_oneSegment_someStar()
-  {
+  public void testGetMetricSums_oneSegment_someStar() {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("A0", StarTreeConstants.STAR, StarTreeConstants.STAR))
-            .setTimeRange(new TimeRange(0L, 0L))
-            .build(config);
+        .setDimensionKey(getDimensionKey("A0", StarTreeConstants.STAR, StarTreeConstants.STAR))
+        .setTimeRange(new TimeRange(0L, 0L)).build(config);
 
     Number[] sums = recordStore.getMetricSums(query);
 
@@ -172,12 +155,10 @@ public class TestStarTreeRecordStoreDefaultImpl
   }
 
   @Test
-  public void testGetMetricSums_twoSegment_someStar()
-  {
+  public void testGetMetricSums_twoSegment_someStar() {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey("A0", StarTreeConstants.STAR, StarTreeConstants.STAR))
-            .setTimeRange(new TimeRange(0L, 7L))
-            .build(config);
+        .setDimensionKey(getDimensionKey("A0", StarTreeConstants.STAR, StarTreeConstants.STAR))
+        .setTimeRange(new TimeRange(0L, 7L)).build(config);
 
     Number[] sums = recordStore.getMetricSums(query);
 
@@ -185,33 +166,27 @@ public class TestStarTreeRecordStoreDefaultImpl
   }
 
   @Test
-  public void testGetTimeSeries_twoSegments_allStars()
-  {
+  public void testGetTimeSeries_twoSegments_allStars() {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionKey(getDimensionKey(StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR))
-            .setTimeRange(new TimeRange(0L, 7L))
-            .build(config);
+        .setDimensionKey(
+            getDimensionKey(StarTreeConstants.STAR, StarTreeConstants.STAR, StarTreeConstants.STAR))
+        .setTimeRange(new TimeRange(0L, 7L)).build(config);
 
     MetricTimeSeries timeSeries = recordStore.getTimeSeries(query);
 
     Assert.assertEquals(timeSeries.getTimeWindowSet().size(), 8);
 
-    for (Long time : timeSeries.getTimeWindowSet())
-    {
+    for (Long time : timeSeries.getTimeWindowSet()) {
       Assert.assertEquals(timeSeries.get(time, "M").intValue(), 10);
     }
   }
 
-  private static List<DimensionKey> generateKeys()
-  {
+  private static List<DimensionKey> generateKeys() {
     List<DimensionKey> keys = new ArrayList<DimensionKey>();
 
-    for (int i = 0; i < 10; i++)
-    {
-      DimensionKey key = new DimensionKey(new String[]{
-              "A" + (i % 3),
-              "B" + (i % 6),
-              "C" + (i % 9)
+    for (int i = 0; i < 10; i++) {
+      DimensionKey key = new DimensionKey(new String[] {
+          "A" + (i % 3), "B" + (i % 6), "C" + (i % 9)
       });
 
       keys.add(key);
@@ -220,21 +195,17 @@ public class TestStarTreeRecordStoreDefaultImpl
     return keys;
   }
 
-  private List<MetricTimeSeries> generateTimeSeries(TimeRange timeRange)
-  {
+  private List<MetricTimeSeries> generateTimeSeries(TimeRange timeRange) {
     List<MetricTimeSeries> result = new ArrayList<MetricTimeSeries>();
 
     MetricSchema metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
 
-    for (int i = 0; i < 10; i++)
-    {
+    for (int i = 0; i < 10; i++) {
       MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
       // four hours (see sample-config.yml retention)
-      for (long j = timeRange.getStart(); j <= timeRange.getEnd(); j++)
-      {
-        for (MetricSpec metricSpec : config.getMetrics())
-        {
+      for (long j = timeRange.getStart(); j <= timeRange.getEnd(); j++) {
+        for (MetricSpec metricSpec : config.getMetrics()) {
           timeSeries.set(j, metricSpec.getName(), 1);
         }
       }
@@ -245,8 +216,7 @@ public class TestStarTreeRecordStoreDefaultImpl
     return result;
   }
 
-  private ByteBuffer generateBuffer(TimeRange timeRange)
-  {
+  private ByteBuffer generateBuffer(TimeRange timeRange) {
     List<MetricTimeSeries> allSeries = generateTimeSeries(timeRange);
     // System.out.println(allSeries);
     ByteBuffer metricBuffer = VariableSizeBufferUtil.createMetricBuffer(config, allSeries);
@@ -255,13 +225,15 @@ public class TestStarTreeRecordStoreDefaultImpl
     return metricBuffer;
   }
 
-  private Number[] getSums(Number m)
-  {
-    return new Number[]{m};
+  private Number[] getSums(Number m) {
+    return new Number[] {
+        m
+    };
   }
 
-  private DimensionKey getDimensionKey(String a, String b, String c)
-  {
-    return new DimensionKey(new String[] {a, b, c});
+  private DimensionKey getDimensionKey(String a, String b, String c) {
+    return new DimensionKey(new String[] {
+        a, b, c
+    });
   }
 }

@@ -15,14 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 
-import org.apache.commons.lang.StringUtils;
-
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str.STRING_PAD_CHAR;
 
 
 /**
@@ -31,8 +30,10 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 public class StringDictionary extends ImmutableDictionaryReader {
   private final int lengthofMaxEntry;
+  private static Charset UTF_8 = Charset.forName("UTF-8");
 
-  public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode) throws IOException {
+  public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode)
+      throws IOException {
     super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(), mode == ReadMode.mmap);
     lengthofMaxEntry = metadata.getStringColumnMaxLength();
   }
@@ -44,7 +45,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
     final StringBuilder bld = new StringBuilder();
     bld.append(lookup);
     for (int i = 0; i < differenceInLength; i++) {
-      bld.append(V1Constants.Str.STRING_PAD_CHAR);
+      bld.append(STRING_PAD_CHAR);
     }
     return stringIndexOf(bld.toString());
   }
@@ -54,7 +55,14 @@ public class StringDictionary extends ImmutableDictionaryReader {
     if ((dictionaryId == -1) || (dictionaryId >= length())) {
       return "null";
     }
-    return StringUtils.remove(getString(dictionaryId), String.valueOf(V1Constants.Str.STRING_PAD_CHAR));
+    String val = getString(dictionaryId);
+    byte[] bytes = val.getBytes(UTF_8);
+    for (int i = 0; i < lengthofMaxEntry; i++) {
+      if (bytes[i] == STRING_PAD_CHAR) {
+        return new String(bytes, 0, i, UTF_8);
+      }
+    }
+    return val;
   }
 
   @Override
@@ -68,6 +76,16 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  public int getIntValue(int dictionaryId) {
+    throw new RuntimeException("cannot converted string to int");
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    throw new RuntimeException("cannot converted string to float");
+  }
+
+  @Override
   public String getStringValue(int dictionaryId) {
     return getString(dictionaryId);
   }
@@ -76,6 +94,32 @@ public class StringDictionary extends ImmutableDictionaryReader {
   public String toString(int dictionaryId) {
     return get(dictionaryId);
   }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to int");
+  }
+
+  @Override
+  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to long");
+  }
+
+  @Override
+  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to float");
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
+    throw new RuntimeException("Can not convert string to double");
+  }
+  @Override
+  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
+    dataFileReader.readStringValues(dictionaryIds, 0/*column*/, startPos, limit, outValues, outStartPos);
+  }
+
+
 
   private String getString(int dictionaryId) {
     return dataFileReader.getString(dictionaryId, 0);

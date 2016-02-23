@@ -16,6 +16,7 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Finder;
 import org.restlet.resource.Get;
 import org.restlet.resource.ServerResource;
+import org.restlet.routing.Filter;
 import org.restlet.routing.Route;
 import org.restlet.routing.Router;
 import org.restlet.routing.TemplateRoute;
@@ -46,7 +47,7 @@ public class SwaggerResource extends ServerResource {
 
       // Paths
       JSONObject paths = new JSONObject();
-      Router router = ControllerRestApplication.router;
+      Router router = ControllerRestApplication.getRouter();
       RouteList routeList = router.getRoutes();
 
       for (Route route : routeList) {
@@ -59,67 +60,15 @@ public class SwaggerResource extends ServerResource {
           Restlet routeTarget = templateRoute.getNext();
           if (routeTarget instanceof Finder) {
             Finder finder = (Finder) routeTarget;
-            Class<? extends ServerResource> targetClass = finder.getTargetClass();
-            for (Method method : targetClass.getDeclaredMethods()) {
-              String httpVerb = null;
-              Annotation annotationInstance = method.getAnnotation(HttpVerb.class);
-              if (annotationInstance != null) {
-                httpVerb = ((HttpVerb) annotationInstance).value().toLowerCase();
-              }
-
-              HashSet<String> methodPaths = new HashSet<String>();
-              annotationInstance = method.getAnnotation(Paths.class);
-              if (annotationInstance != null) {
-                methodPaths.addAll(Arrays.asList(((Paths) annotationInstance).value()));
-              }
-
-              if (httpVerb != null && methodPaths.contains(routePath) && !routePath.endsWith("/")) {
-                JSONObject operation = new JSONObject();
-                pathObject.put(httpVerb, operation);
-
-                annotationInstance = method.getAnnotation(Summary.class);
-                if (annotationInstance != null) {
-                  operation.put(Summary.class.getSimpleName().toLowerCase(), ((Summary) annotationInstance).value());
-                }
-
-                annotationInstance = method.getAnnotation(Description.class);
-                if (annotationInstance != null) {
-                  operation.put(Description.class.getSimpleName().toLowerCase(), ((Description) annotationInstance).value());
-                }
-
-                annotationInstance = method.getAnnotation(Tags.class);
-                if (annotationInstance != null) {
-                  operation.put(Tags.class.getSimpleName().toLowerCase(), ((Tags) annotationInstance).value());
-                }
-
-                operation.put("operationId", method.getName());
-
-                ArrayList<JSONObject> parameters = new ArrayList<JSONObject>();
-
-                for (Annotation[] annotations : method.getParameterAnnotations()) {
-                  if (annotations.length != 0) {
-                    JSONObject parameter = new JSONObject();
-                    for (Annotation annotation : annotations) {
-                      if (annotation instanceof Parameter) {
-                        Parameter parameterAnnotation = (Parameter) annotation;
-                        parameter.put("name", parameterAnnotation.name());
-                        parameter.put("in", parameterAnnotation.in());
-                        if (parameterAnnotation.description() != null) {
-                          parameter.put("description", parameterAnnotation.description());
-                        }
-                        parameter.put("type", "string");
-                        parameter.put("required", parameterAnnotation.required());
-                      }
-                    }
-
-                    if(parameter.keys().hasNext()) {
-                      parameters.add(parameter);
-                    }
-                  }
-                }
-
-                operation.put("parameters", parameters.toArray(new JSONObject[parameters.size()]));
-              }
+            generateSwaggerForFinder(pathObject, routePath, finder);
+          } else if (routeTarget instanceof Filter) {
+            do {
+              Filter filter = (Filter) routeTarget;
+              routeTarget = filter.getNext();
+            } while (routeTarget instanceof Filter);
+            if (routeTarget instanceof Finder) {
+              Finder finder = (Finder) routeTarget;
+              generateSwaggerForFinder(pathObject, routePath, finder);
             }
           }
 
@@ -156,6 +105,72 @@ public class SwaggerResource extends ServerResource {
       return representation;
     } catch (JSONException e) {
       return new StringRepresentation(e.toString());
+    }
+  }
+
+  private void generateSwaggerForFinder(JSONObject pathObject, String routePath, Finder finder)
+      throws JSONException {
+    Class<? extends ServerResource> targetClass = finder.getTargetClass();
+    for (Method method : targetClass.getDeclaredMethods()) {
+      String httpVerb = null;
+      Annotation annotationInstance = method.getAnnotation(HttpVerb.class);
+      if (annotationInstance != null) {
+        httpVerb = ((HttpVerb) annotationInstance).value().toLowerCase();
+      }
+
+      HashSet<String> methodPaths = new HashSet<String>();
+      annotationInstance = method.getAnnotation(Paths.class);
+      if (annotationInstance != null) {
+        methodPaths.addAll(Arrays.asList(((Paths) annotationInstance).value()));
+      }
+
+      if (httpVerb != null && methodPaths.contains(routePath) && !routePath.endsWith("/")) {
+        JSONObject operation = new JSONObject();
+        pathObject.put(httpVerb, operation);
+
+        annotationInstance = method.getAnnotation(Summary.class);
+        if (annotationInstance != null) {
+          operation.put(Summary.class.getSimpleName().toLowerCase(), ((Summary) annotationInstance).value());
+        }
+
+        annotationInstance = method.getAnnotation(Description.class);
+        if (annotationInstance != null) {
+          operation.put(Description.class.getSimpleName().toLowerCase(), ((Description) annotationInstance).value());
+        }
+
+        annotationInstance = method.getAnnotation(Tags.class);
+        if (annotationInstance != null) {
+          operation.put(Tags.class.getSimpleName().toLowerCase(), ((Tags) annotationInstance).value());
+        }
+
+        operation.put("operationId", method.getName());
+
+        ArrayList<JSONObject> parameters = new ArrayList<JSONObject>();
+
+        for (Annotation[] annotations : method.getParameterAnnotations()) {
+          if (annotations.length != 0) {
+            JSONObject parameter = new JSONObject();
+            for (Annotation annotation : annotations) {
+              if (annotation instanceof Parameter) {
+                Parameter parameterAnnotation = (Parameter) annotation;
+                parameter.put("name", parameterAnnotation.name());
+                parameter.put("in", parameterAnnotation.in());
+                if (parameterAnnotation.description() != null) {
+                  parameter.put("description", parameterAnnotation.description());
+                }
+                parameter.put("type", "string");
+                parameter.put("required", parameterAnnotation.required());
+              }
+            }
+
+            if(parameter.keys().hasNext()) {
+              parameters.add(parameter);
+            }
+          }
+        }
+
+        operation.put("parameters", parameters.toArray(new JSONObject[parameters.size()]));
+      }
     }
   }
 

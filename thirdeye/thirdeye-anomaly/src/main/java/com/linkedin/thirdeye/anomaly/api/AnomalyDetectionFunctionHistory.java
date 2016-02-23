@@ -13,15 +13,15 @@ public interface AnomalyDetectionFunctionHistory {
 
   /**
    * @param queryTimeRange
-   *  The range of time to get anomaly result history.
+   *          The range of time to get anomaly result history.
    */
   public void init(TimeRange queryTimeRange);
 
   /**
    * @param dimensionKey
-   *  The combination of dimensions to query history.
+   *          The combination of dimensions to query history.
    * @return
-   *  The list of previously reported anomalies for the dimension key.
+   *         The list of previously reported anomalies for the dimension key.
    */
   public List<AnomalyResult> getHistoryForDimensionKey(DimensionKey dimensionKey);
 

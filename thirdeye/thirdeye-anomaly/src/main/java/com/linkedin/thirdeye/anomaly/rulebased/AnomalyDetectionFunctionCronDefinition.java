@@ -25,20 +25,22 @@ import com.linkedin.thirdeye.api.TimeRange;
 /**
  * Uses quartz job scheduler cron expression format.
  */
-public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunctionAbstractWrapper {
+public class AnomalyDetectionFunctionCronDefinition
+    extends AnomalyDetectionFunctionAbstractWrapper {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionFunctionCronDefinition.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(AnomalyDetectionFunctionCronDefinition.class);
 
   private final TimeZone evalTimeZone;;
 
   private final CronExpression cronExpression;
 
-  public AnomalyDetectionFunctionCronDefinition(AnomalyDetectionFunction childFunc, String cronString)
-      throws IllegalFunctionException {
+  public AnomalyDetectionFunctionCronDefinition(AnomalyDetectionFunction childFunc,
+      String cronString) throws IllegalFunctionException {
     super(childFunc);
 
     /*
-     *  Use local timezone of the system.
+     * Use local timezone of the system.
      */
     evalTimeZone = TimeZone.getDefault();
 
@@ -51,7 +53,8 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
   }
 
   @Override
-  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException {
+  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig)
+      throws IllegalFunctionException {
     super.init(starTreeConfig, functionConfig);
   }
 
@@ -61,15 +64,16 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series, TimeRange timeInterval,
-      List<AnomalyResult> anomalyHistory) {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries series,
+      TimeRange timeInterval, List<AnomalyResult> anomalyHistory) {
     List<AnomalyResult> timeFilteredResults = new ArrayList<AnomalyResult>();
-    List<AnomalyResult> intermediateResults = childFunc.analyze(dimensionKey, series, timeInterval, anomalyHistory);
+    List<AnomalyResult> intermediateResults =
+        childFunc.analyze(dimensionKey, series, timeInterval, anomalyHistory);
 
     // remove results that do not match the cron expression
     for (AnomalyResult intermediateResult : intermediateResults) {
       DateTime resultDtUTC = new DateTime(intermediateResult.getTimeWindow(), DateTimeZone.UTC);
-      DateTime resultDtEvalTz= resultDtUTC.withZone(DateTimeZone.forTimeZone(evalTimeZone));
+      DateTime resultDtEvalTz = resultDtUTC.withZone(DateTimeZone.forTimeZone(evalTimeZone));
       Date dateEvalTz = resultDtEvalTz.toDate();
       if (cronExpression.isSatisfiedBy(dateEvalTz)) {
         timeFilteredResults.add(intermediateResult);
@@ -79,7 +83,8 @@ public class AnomalyDetectionFunctionCronDefinition extends AnomalyDetectionFunc
   }
 
   public String toString() {
-    return String.format("%s for cron def '%s' ", childFunc.toString(), cronExpression.getCronExpression());
+    return String.format("%s for cron def '%s' ", childFunc.toString(),
+        cronExpression.getCronExpression());
   }
 
 }

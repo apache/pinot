@@ -31,13 +31,22 @@ public interface SegmentIndexCreationDriver {
    *
    * @param config The configuration to use when building an index segment
    */
-  public void init(SegmentGeneratorConfig config) throws Exception;
+  void init(SegmentGeneratorConfig config) throws Exception;
 
   /**
    * Builds an index segment and writes it to disk. The index segment creation extracts data from the input files,
    * profiles each column and then builds indices based on the profiling information gathered.
    */
-  public void build() throws Exception;
+  void build() throws Exception;
 
-  public String getSegmentName() ;
+  String getSegmentName() ;
+
+  /**
+   *  Get the stats collector for a column
+   *
+   * @param columnName
+   * @return AbstractColumnStatisticsCollector for the column.
+   * @throws Exception
+   */
+  ColumnStatistics getColumnStatisticsCollector(final String columnName) throws Exception;
 }

@@ -27,12 +27,14 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
+import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 

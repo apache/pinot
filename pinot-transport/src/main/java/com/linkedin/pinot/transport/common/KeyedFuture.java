@@ -52,6 +52,12 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
   public String getName();
 
   /**
+   * Returns the duration between when the future was created and when its result was available.
+   * @return
+   */
+  public long getDurationMillis();
+
+  /**
    * Blocking call. Similar to {@link Future#get()} But returns any one of the keyed
    * response. Useful when we know the only one response is expected.
    * @return

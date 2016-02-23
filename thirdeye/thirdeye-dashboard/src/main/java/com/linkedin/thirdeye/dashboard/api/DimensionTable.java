@@ -10,11 +10,8 @@ public class DimensionTable {
   private final String dimensionAlias;
   private final List<DimensionTableRow> rows;
 
-  public DimensionTable(List<String> metricNames,
-                        Map<String, String> metricAliases,
-                        String dimensionName,
-                        String dimensionAlias,
-                        List<DimensionTableRow> rows) {
+  public DimensionTable(List<String> metricNames, Map<String, String> metricAliases,
+      String dimensionName, String dimensionAlias, List<DimensionTableRow> rows) {
     this.metricNames = metricNames;
     this.metricAliases = metricAliases;
     this.dimensionName = dimensionName;

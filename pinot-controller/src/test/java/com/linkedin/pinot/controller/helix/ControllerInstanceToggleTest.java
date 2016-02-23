@@ -105,7 +105,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
       resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i);
-      LOGGER.info("Current running server instance: " + instanceSet.size());
+      LOGGER.trace("Current running server instance: " + instanceSet.size());
     }
 
     // Enable Instance
@@ -120,7 +120,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
       resourceExternalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName + "_OFFLINE");
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i);
-      LOGGER.info("Current running server instance: " + instanceSet.size());
+      LOGGER.trace("Current running server instance: " + instanceSet.size());
     }
 
     // Disable BrokerInstance
@@ -136,7 +136,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i);
-      LOGGER.info("Current running broker instance: " + instanceSet.size());
+      LOGGER.trace("Current running broker instance: " + instanceSet.size());
     }
 
     // Enable BrokerInstance
@@ -152,7 +152,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
       Assert.assertEquals(instanceSet.size(), i);
-      LOGGER.info("Current running broker instance: " + instanceSet.size());
+      LOGGER.trace("Current running broker instance: " + instanceSet.size());
     }
     // Delete table
     sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName));

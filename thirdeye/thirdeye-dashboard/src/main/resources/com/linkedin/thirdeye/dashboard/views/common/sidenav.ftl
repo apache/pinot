@@ -21,19 +21,19 @@
 
                 <div class="uk-form-row">
                     <label class="uk-form-label">Metric(s)</label>
-                    <#list collectionSchema.metrics as metric>
+                    <#list metrics as metric>
                         <label>
                             <input class="sidenav-metric" type="checkbox" value="${metric}"/>
-                            ${collectionSchema.metricAliases[metric_index]!metric}
+                            ${metricAliases[metric_index]!metric}
                         </label>
                         <br/>
                     </#list>
 
                     <div id="sidenav-derived-metrics">
                         <label class="uk-form-label">Derived Metric(s)
-                          <button id="sidenav-derived-metrics-add" class="uk-button uk-button-mini">
-                              <i class="uk-icon-plus-circle"></i>
-                          </button>
+                            <button id="sidenav-derived-metrics-add" class="uk-button uk-button-mini">
+                                <i class="uk-icon-plus-circle"></i>
+                            </button>
                         </label>
                         <div id="sidenav-derived-metrics-list"></div>
                     </div>
@@ -69,7 +69,7 @@
                 <div class="uk-form-row">
                     <div class="uk-form-icon">
                         <i class="uk-icon-calendar"></i>
-                        <input id="sidenav-date" type="text" data-uk-datepicker="{format:'YYYY-MM-DD'}" />
+                        <input id="sidenav-date" type="text" data-uk-datepicker="{weekstart:0,format:'YYYY-MM-DD'}" />
                     </div>
                 </div>
 

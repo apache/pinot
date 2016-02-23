@@ -15,23 +15,22 @@
  */
 package com.linkedin.pinot.routing;
 
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
@@ -59,33 +58,61 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
       return;
     }
-    Set<String> offlineSegmentsServing = externalView.getPartitionSet();
-    AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
 
-    TimeUnit tableTimeUnit = getTimeUnitFromString(offlineTableConfig.getValidationConfig().getTimeType());
-    if (!offlineSegmentsServing.isEmpty() && tableTimeUnit != null) {
-      long maxTimeValue = -1;
-      for (String segmentId : offlineSegmentsServing) {
-        try {
-          long endTime = -1;
-          OfflineSegmentZKMetadata offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
-          if (offlineSegmentZKMetadata.getEndTime() > 0) {
-            if (offlineSegmentZKMetadata.getTimeUnit() != null) {
-              endTime = tableTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
-            } else {
-              endTime = offlineSegmentZKMetadata.getEndTime();
-            }
-          }
-          maxTimeValue = Math.max(maxTimeValue, endTime);
-        } catch (Exception e) {
-          LOGGER.error("Error during convert end time for segment - " + segmentId + ", exceptions: " + e);
-        }
-      }
-      TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
-      timeBoundaryInfo.setTimeColumn(offlineTableConfig.getValidationConfig().getTimeColumnName());
-      timeBoundaryInfo.setTimeValue(Long.toString(maxTimeValue));
-      _timeBoundaryInfoMap.put(tableName, timeBoundaryInfo);
+    Set<String> offlineSegmentsServing = externalView.getPartitionSet();
+    if (offlineSegmentsServing.isEmpty()) {
+      LOGGER.info("Skipping updating time boundary service for table '{}' with no offline segments.", tableName);
+      return;
     }
+
+    AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    String timeType = offlineTableConfig.getValidationConfig().getTimeType();
+    TimeUnit tableTimeUnit = getTimeUnitFromString(timeType);
+    if (tableTimeUnit == null) {
+      LOGGER.info("Skipping updating time boundary service for table '{}' with null timeUnit, config time type: {}.",
+          tableName, timeType);
+      return;
+    }
+
+    // Bulk reading all segment zk-metadata at once is more efficient than reading one at a time.
+    List<OfflineSegmentZKMetadata> segmentZKMetadataList =
+        ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableName);
+
+    long maxTimeValue = computeMaxSegmentEndTimeForTable(segmentZKMetadataList, tableTimeUnit);
+    TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
+    timeBoundaryInfo.setTimeColumn(offlineTableConfig.getValidationConfig().getTimeColumnName());
+
+    timeBoundaryInfo.setTimeValue(Long.toString(maxTimeValue));
+    _timeBoundaryInfoMap.put(tableName, timeBoundaryInfo);
+
+    LOGGER.info("Updated time boundary service for table '{}', maxTime: {}", tableName, maxTimeValue);
+  }
+
+  /**
+   * Compute maximum end time across a list of segment zk-metadata.
+   *
+   * @param segmentZKMetadataList List of Segment zk metadata for which to compute the max end time.
+   * @param tableTimeUnit Time Unit for table
+   * @return Max end time across all segments.
+   */
+  private long computeMaxSegmentEndTimeForTable(List<OfflineSegmentZKMetadata> segmentZKMetadataList,
+      TimeUnit tableTimeUnit) {
+    long maxTimeValue = -1;
+
+    for (OfflineSegmentZKMetadata metadata : segmentZKMetadataList) {
+      long endTime = metadata.getEndTime();
+      if (endTime <= 0) {
+        continue;
+      }
+
+      // Convert all segment times to table's time unit, before comparison.
+      TimeUnit segmentTimeUnit = metadata.getTimeUnit();
+      if (segmentTimeUnit != null) {
+        endTime = tableTimeUnit.convert(endTime, segmentTimeUnit);
+      }
+      maxTimeValue = Math.max(maxTimeValue, endTime);
+    }
+    return maxTimeValue;
   }
 
   private TimeUnit getTimeUnitFromString(String timeTypeString) {
@@ -121,12 +148,10 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
   @Override
   public void remove(String tableName) {
     _timeBoundaryInfoMap.remove(tableName);
-
   }
 
   @Override
   public TimeBoundaryInfo getTimeBoundaryInfoFor(String table) {
     return _timeBoundaryInfoMap.get(table);
   }
-
 }

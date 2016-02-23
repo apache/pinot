@@ -45,6 +45,11 @@ public class BalancedRandomRoutingTableBuilderTest {
     externalView.setState("segment_3", "Server_1.2.3.5_2345", "ONLINE");
     externalView.setState("segment_3", "Server_1.2.3.6_3456", "ONLINE");
 
+    // Create configs for above instances.
+    instanceConfigList.add(new InstanceConfig("Server_1.2.3.4_1234"));
+    instanceConfigList.add(new InstanceConfig("Server_1.2.3.5_2345"));
+    instanceConfigList.add(new InstanceConfig("Server_1.2.3.6_3456"));
+
     // Build routing table
     List<ServerToSegmentSetMap> routingTable =
         routingTableBuilder.computeRoutingTableFromExternalView("dummy", externalView, instanceConfigList);

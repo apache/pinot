@@ -23,11 +23,12 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  *
  */
-public class OfflineSegmentDataManager implements SegmentDataManager {
+public class OfflineSegmentDataManager extends SegmentDataManager {
 
   private final IndexSegment _indexSegment;
 
   public OfflineSegmentDataManager(IndexSegment indexSegment) {
+    super();
     _indexSegment = indexSegment;
   }
 

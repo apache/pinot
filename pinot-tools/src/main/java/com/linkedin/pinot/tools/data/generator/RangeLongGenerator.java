@@ -32,9 +32,11 @@ public class RangeLongGenerator implements Generator {
     _delta = _end - _start;
   }
 
+  @Override
   public void init() {
   }
 
+  @Override
   public Object next() {
     return (_start + (Math.abs(_randGen.nextLong()) % _delta));
   }

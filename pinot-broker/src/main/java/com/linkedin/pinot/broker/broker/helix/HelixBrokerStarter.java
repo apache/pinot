@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -27,6 +28,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -40,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
@@ -92,6 +95,7 @@ public class HelixBrokerStarter {
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
+    setupHelixSystemProperties();
     RoutingTableBuilder defaultOfflineRoutingTableBuilder =
         getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY));
     RoutingTableBuilder defaultRealtimeRoutingTableBuilder =
@@ -127,6 +131,29 @@ public class HelixBrokerStarter {
     _helixManager.addInstanceConfigChangeListener(_helixBrokerRoutingTable);
     _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
 
+    _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
+        "helix.connected", new Callable<Long>() {
+          @Override
+          public Long call() throws Exception {
+            return _helixManager.isConnected() ? 1L : 0L;
+          }
+        });
+
+    _helixManager.addPreConnectCallback(
+        new PreConnectCallback() {
+          @Override
+          public void onPreConnect() {
+            _brokerServerBuilder.getBrokerMetrics()
+            .addMeteredValue(null, BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          }
+        });
+  }
+
+  private void setupHelixSystemProperties() {
+    final String helixFlappingTimeWindowPropName = "helixmanager.flappingTimeWindow";
+    System.setProperty(helixFlappingTimeWindowPropName,
+        _pinotHelixProperties.getString(DefaultHelixBrokerConfig.HELIX_FLAPPING_TIME_WINDOW_NAME,
+            DefaultHelixBrokerConfig.DEFAULT_HELIX_FLAPPING_TIMEIWINDWOW_MS));
   }
 
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
@@ -221,7 +248,7 @@ public class HelixBrokerStarter {
     Configuration configuration = new PropertiesConfiguration();
     int port = 5001;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-    configuration.addProperty("pinot.broker.time.out", 500 * 1000L);
+    configuration.addProperty("pinot.broker.timeoutMs", 500 * 1000L);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
         new HelixBrokerStarter("quickstart", "localhost:2122", configuration);

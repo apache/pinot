@@ -26,7 +26,8 @@ public class DimensionKeySeries {
 
   @Override
   public String toString() {
-    return "DimensionKeySeries [dimensionKey=" + dimensionKey + ", contributionEstimate=" + contributionEstimate + "]";
+    return "DimensionKeySeries [dimensionKey=" + dimensionKey + ", contributionEstimate="
+        + contributionEstimate + "]";
   }
 
 }

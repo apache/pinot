@@ -15,17 +15,16 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FileInputStream;
-
 import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 
 
 /**
@@ -33,8 +32,10 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
  *
  *
  */
-public class UploadSegmentCommand extends AbstractBaseCommand implements Command {
+public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
+  private static final String SEGMENT_UPLOADER = "segmentUploader";
+  private static final String TAR_GZIP = ".tar.gz";
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
@@ -49,6 +50,7 @@ public class UploadSegmentCommand extends AbstractBaseCommand implements Command
       usage = "Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }
@@ -95,25 +97,39 @@ public class UploadSegmentCommand extends AbstractBaseCommand implements Command
       _controllerHost = NetUtil.getHostAddress();
     }
 
-    LOGGER.info("Executing command: " + toString());
-    File dir = new File(_segmentDir);
-    File[] files = dir.listFiles();
+    // Create a temp working directory.
+    File tmpDir = File.createTempFile(SEGMENT_UPLOADER, null, FileUtils.getTempDirectory());
+    FileUtils.deleteQuietly(tmpDir);
+    tmpDir.mkdir();
 
-    for (File file : files) {
-      if (!file.isDirectory()) {
-        continue;
+    try {
+      LOGGER.info("Executing command: " + toString());
+      File dir = new File(_segmentDir);
+      File[] files = dir.listFiles();
+
+      for (File file : files) {
+        File tgzFile = file;
+
+        if (file.isDirectory()) {
+          LOGGER.info("Compressing segment {}", file.getName());
+
+          String srcDir = file.getAbsolutePath();
+          String tgzFileName = TarGzCompressionUtils
+              .createTarGzOfDirectory(srcDir, tmpDir.getAbsolutePath() + File.separator + file.getName() + TAR_GZIP);
+          tgzFile = new File(tgzFileName);
+        }
+
+        LOGGER.info("Uploading segment {}", tgzFile.getName());
+        FileUploadUtils
+            .sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(), new FileInputStream(tgzFile),
+                tgzFile.length());
       }
-
-      String srcDir = file.getAbsolutePath();
-
-      String outFile = TarGzCompressionUtils.createTarGzOfDirectory(srcDir);
-      File tgzFile = new File(outFile);
-      FileUploadUtils.sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(),
-          new FileInputStream(tgzFile), tgzFile.length());
-
-      FileUtils.deleteQuietly(tgzFile);
+    } catch (Exception e) {
+      LOGGER.error("Exception caught while uploading segment {}", _segmentDir, e);
+    } finally {
+      // Delete the temporary working directory.
+      FileUtils.deleteQuietly(tmpDir);
     }
-
     return true;
   }
 }

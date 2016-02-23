@@ -16,56 +16,140 @@
 package com.linkedin.pinot.perf;
 
 import java.io.File;
+import java.io.FilenameFilter;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.log4j.Level;
 import org.json.JSONObject;
 
 import com.linkedin.pinot.common.client.request.RequestConverter;
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
-
 /**
  * Allows us to benchmark filter operator in isolation
  * USAGE FilterOperatorBenchmark &lt;IndexRootDir&gt; &lt;Query&gt;
- *
  */
 public class FilterOperatorBenchmark {
+  static {
+    org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
+  }
+
   public static void main(String[] args) throws Exception {
     String rootDir = args[0];
     File[] segmentDirs = new File(rootDir).listFiles();
     String query = args[1];
-    for (File indexSegmentDir : segmentDirs) {
+    AtomicInteger totalDocsMatched = new AtomicInteger(0);
+    PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());
+    JSONObject jsonObject = compiler.compile(query);
+    BrokerRequest brokerRequest = RequestConverter.fromJSON(jsonObject);
+    List<Callable<Void>> segmentProcessors = new ArrayList<>();
+    long[] timesSpent = new long[segmentDirs.length];
+    for (int i = 0; i < segmentDirs.length; i++) {
+      File indexSegmentDir = segmentDirs[i];
+      System.out.println("Loading " + indexSegmentDir.getName());
+      Configuration tableDataManagerConfig = new PropertiesConfiguration();
+      List<String> invertedColumns = new ArrayList<>();
+      FilenameFilter filter = new FilenameFilter() {
 
-      IndexSegmentImpl indexSegmentImpl = (IndexSegmentImpl) Loaders.IndexSegment.load(indexSegmentDir, ReadMode.heap);
-      PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());
-      JSONObject jsonObject = compiler.compile(query);
-      BrokerRequest brokerRequest = RequestConverter.fromJSON(jsonObject);
-      int runCount = 0;
-      while (runCount < 2) {
-        FilterPlanNode planNode = new FilterPlanNode(indexSegmentImpl, brokerRequest);
-        Operator operator = planNode.run();
-        operator.open();
-        Block block = operator.nextBlock();
-        BlockDocIdIterator iterator = block.getBlockDocIdSet().iterator();
-        int docId;
-        int count = 0;
-        while ((docId = iterator.next()) != Constants.EOF) {
-          //System.out.println(docId);
-          count = count + 1;
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.endsWith(".bitmap.inv");
         }
-        System.out.println("Matched Count" + count);
-        operator.close();
-        runCount = runCount + 1;
+      };
+      String[] indexFiles = indexSegmentDir.list(filter);
+      for (String indexFileName : indexFiles) {
+        invertedColumns.add(indexFileName.replace(".bitmap.inv", ""));
       }
+      tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX,
+          invertedColumns);
+      IndexLoadingConfigMetadata indexLoadingConfigMetadata =
+          new IndexLoadingConfigMetadata(tableDataManagerConfig);
+      IndexSegmentImpl indexSegmentImpl = (IndexSegmentImpl) Loaders.IndexSegment
+          .load(indexSegmentDir, ReadMode.heap, indexLoadingConfigMetadata);
+      segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest, 
+          totalDocsMatched, timesSpent));
     }
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    for (int run = 0; run < 5; run++) {
+      System.out.println("START RUN:"+ run );
+      totalDocsMatched.set(0);
+      long start = System.currentTimeMillis();
+      List<Future<Void>> futures = executorService.invokeAll(segmentProcessors);
+      for (int i = 0; i < futures.size(); i++) {
+        futures.get(i).get();
+      }
+      long end = System.currentTimeMillis();
+      System.out.println("Total docs matched:" + totalDocsMatched + " took:" + (end - start));
+      System.out.println("Times spent:" + Arrays.toString(timesSpent));
+      System.out.println("END RUN:"+ run );
+    }
+    System.exit(0);
+  }
+
+  public static class SegmentProcessor implements Callable<Void> {
+    private IndexSegment indexSegmentImpl;
+    private BrokerRequest brokerRequest;
+    AtomicInteger totalDocsMatched;
+    private long[] timesSpent;
+    private int id;
+
+    public SegmentProcessor(int id, IndexSegment indexSegmentImpl, BrokerRequest brokerRequest,
+         AtomicInteger totalDocsMatched, long[] timesSpent) {
+      super();
+      this.id = id;
+      this.indexSegmentImpl = indexSegmentImpl;
+      this.brokerRequest = brokerRequest;
+      this.totalDocsMatched = totalDocsMatched;
+      this.timesSpent = timesSpent;
+    }
+
+    int[] docIds = new int[10000];
+    int[] dictIds = new int[10000];
+    long[] values = new long[10000];
+
+    public Void call() {
+      long start, end;
+      start = System.currentTimeMillis();
+      FilterPlanNode planNode = new FilterPlanNode(indexSegmentImpl, brokerRequest);
+      Operator filterOperator = planNode.run();
+      filterOperator.open();
+      Block block = filterOperator.nextBlock();
+      BlockDocIdSet filteredDocIdSet = block.getBlockDocIdSet();
+      BlockDocIdIterator iterator = filteredDocIdSet.iterator();
+      int docId;
+      int matchedCount = 0;
+      while ((docId = iterator.next()) != Constants.EOF) {
+        matchedCount = matchedCount + 1;
+      }
+      end = System.currentTimeMillis();
+      timesSpent[id] = (end - start);
+      filterOperator.close();
+      totalDocsMatched.addAndGet(matchedCount);
+      return null;
+    }
+
   }
 }

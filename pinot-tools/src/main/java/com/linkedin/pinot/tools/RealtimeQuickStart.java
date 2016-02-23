@@ -35,6 +35,7 @@ import kafka.server.KafkaServerStartable;
 
 public class RealtimeQuickStart {
   private File _quickStartDataDir;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public void execute() throws JSONException, Exception {
     _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
@@ -56,7 +57,7 @@ public class RealtimeQuickStart {
 
     printStatus(color.CYAN, "Starting Kafka");
 
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
 
     final KafkaServerStartable kafkaStarter =
         KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
@@ -128,7 +129,7 @@ public class RealtimeQuickStart {
           runner.stop();
           runner.clean();
           KafkaStarterUtils.stopServer(kafkaStarter);
-          ZkStarter.stopLocalZkServer();
+          ZkStarter.stopLocalZkServer(_zookeeperInstance);
         } catch (Exception e) {
           e.printStackTrace();
         }

@@ -15,16 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-
-
-/**
- * Nov 14, 2014
- */
+import java.io.File;
+import java.io.IOException;
 
 public class FloatDictionary extends ImmutableDictionaryReader {
 
@@ -37,16 +31,16 @@ public class FloatDictionary extends ImmutableDictionaryReader {
     Float lookup ;
 
     if (rawValue instanceof String) {
-      lookup = new Float(Float.parseFloat((String)rawValue));
+      lookup = Float.parseFloat((String) rawValue);
     } else {
       lookup = (Float) rawValue;
     }
-    return floatIndexOf(lookup.floatValue());
+    return floatIndexOf(lookup);
   }
 
   @Override
   public Float get(int dictionaryId) {
-    return new Float(getFloat(dictionaryId));
+    return getFloat(dictionaryId);
   }
 
   @Override
@@ -56,23 +50,33 @@ public class FloatDictionary extends ImmutableDictionaryReader {
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(getFloat(dictionaryId));
+    return (double) getFloat(dictionaryId);
   }
 
   @Override
   public String toString(int dictionaryId) {
-    return new Float(getFloat(dictionaryId)).toString();
+    return Float.toString(getFloat(dictionaryId));
   }
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return new Float(getFloat(dictionaryId)).toString();
+    return Float.toString(getFloat(dictionaryId));
+  }
+
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return getFloat(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return (int) getFloat(dictionaryId);
   }
 
   public float getFloat(int dictionaryId) {
     return dataFileReader.getFloat(dictionaryId, 0);
   }
 
-  
+
 
 }

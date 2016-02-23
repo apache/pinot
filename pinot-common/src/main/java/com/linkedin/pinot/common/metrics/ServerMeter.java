@@ -26,7 +26,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
-  QUERY_EXECUTION_EXCEPTIONS("exceptions", false);
+  QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
+  HELIX_ZOOKEEPER_RECONNECTS("reconnects", true);
 
   private final String meterName;
   private final String unit;
@@ -38,10 +39,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
     this.meterName = Utils.toCamelCase(name().toLowerCase());
   }
 
+  @Override
   public String getMeterName() {
     return meterName;
   }
 
+  @Override
   public String getUnit() {
     return unit;
   }
@@ -51,6 +54,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    *
    * @return true if the metric is global
    */
+  @Override
   public boolean isGlobal() {
     return global;
   }

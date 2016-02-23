@@ -72,6 +72,14 @@
       <artifactId>tyrus-standalone-client</artifactId>
       <version>1.5</version>
     </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -81,13 +89,72 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
-              <name>pinot-admin</name>
+              <mainClass>com.linkedin.pinot.tools.PinotToolLauncher</mainClass>
+              <name>pinot-tools</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
+                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
+              <name>pinot-admin</name>
+              <jvmSettings>
+                <initialMemorySize>10G</initialMemorySize>
+                <maxMemorySize>30G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j.configuration=conf/pinot-admin-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
+              <name>scan-query</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>20G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
+                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
+              <name>query-comparator</name>
+              <jvmSettings>
+                <initialMemorySize>10G</initialMemorySize>
+                <maxMemorySize>30G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
+                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.tools.query.comparison.StarQueryComparison</mainClass>
+              <name>star-query-comparator</name>
+              <jvmSettings>
+                <initialMemorySize>10G</initialMemorySize>
+                <maxMemorySize>30G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
+                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.tools.query.comparison.StatsGenerator</mainClass>
+              <name>stats-generator</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -163,7 +230,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=quickstart-realtime-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j.configuration=conf/quickstart-realtime-log4j.properties</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -184,6 +251,19 @@
           <platforms>
             <platform>unix</platform>
           </platforms>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
+            </manifest>
+          </archive>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
         </configuration>
       </plugin>
     </plugins>

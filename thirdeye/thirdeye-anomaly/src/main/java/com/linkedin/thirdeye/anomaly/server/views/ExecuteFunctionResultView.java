@@ -17,13 +17,8 @@ public class ExecuteFunctionResultView extends AbstractView {
   private final String functionDescription;
   private final List<AnomalyResultPrintable> anomalies;
 
-  public ExecuteFunctionResultView(
-      String database,
-      String functionTableName,
-      String collection,
-      int functionId,
-      String functionName,
-      String functionDescription,
+  public ExecuteFunctionResultView(String database, String functionTableName, String collection,
+      int functionId, String functionName, String functionDescription,
       List<AnomalyResult> anomalies) throws IOException {
     super("execute-function-result-view.ftl", database, functionTableName, collection);
     this.anomalies = new ArrayList<AnomalyResultPrintable>(anomalies.size());

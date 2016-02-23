@@ -18,6 +18,15 @@ package com.linkedin.pinot.core.common;
 import java.util.Arrays;
 import java.util.List;
 
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
+import com.linkedin.pinot.core.common.predicate.InPredicate;
+import com.linkedin.pinot.core.common.predicate.NEqPredicate;
+import com.linkedin.pinot.core.common.predicate.NotInPredicate;
+import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.common.predicate.RegexPredicate;
+
 
 public abstract class Predicate {
 
@@ -58,4 +67,35 @@ public abstract class Predicate {
         + "\n";
   }
 
+  public static Predicate newPredicate(FilterQueryTree filterQueryTree) {
+    assert (filterQueryTree.getChildren() == null) || filterQueryTree.getChildren().isEmpty();
+    final FilterOperator filterType = filterQueryTree.getOperator();
+    final String column = filterQueryTree.getColumn();
+    final List<String> value = filterQueryTree.getValue();
+
+    Predicate predicate = null;
+    switch (filterType) {
+    case EQUALITY:
+      predicate = new EqPredicate(column, value);
+      break;
+    case RANGE:
+      predicate = new RangePredicate(column, value);
+      break;
+    case REGEX:
+      predicate = new RegexPredicate(column, value);
+      break;
+    case NOT:
+      predicate = new NEqPredicate(column, value);
+      break;
+    case NOT_IN:
+      predicate = new NotInPredicate(column, value);
+      break;
+    case IN:
+      predicate = new InPredicate(column, value);
+      break;
+    default:
+      throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
+    }
+    return predicate;
+  }
 }

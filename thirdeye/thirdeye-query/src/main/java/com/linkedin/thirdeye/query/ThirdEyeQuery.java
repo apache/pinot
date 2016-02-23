@@ -30,16 +30,10 @@ public class ThirdEyeQuery {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(ThirdEyeQuery.class)
-        .add("collection", collection)
-        .add("metricNames", metricNames)
-        .add("start", start)
-        .add("end", end)
-        .add("dimensionValues", dimensionValues)
-        .add("groupByColumns", groupByColumns)
-        .add("functions", functions)
-        .add("derivedMetrics", derivedMetrics)
-        .toString();
+    return Objects.toStringHelper(ThirdEyeQuery.class).add("collection", collection)
+        .add("metricNames", metricNames).add("start", start).add("end", end)
+        .add("dimensionValues", dimensionValues).add("groupByColumns", groupByColumns)
+        .add("functions", functions).add("derivedMetrics", derivedMetrics).toString();
   }
 
   // Setters
@@ -137,10 +131,8 @@ public class ThirdEyeQuery {
     return collector;
   }
 
-  private void getDimensionCombinations(List<DimensionSpec> dimensions,
-                                        String[] current,
-                                        List<String[]> collector,
-                                        int dimensionIndex) {
+  private void getDimensionCombinations(List<DimensionSpec> dimensions, String[] current,
+      List<String[]> collector, int dimensionIndex) {
     // Check if we have non-null value for each of current
     boolean allSelected = true;
     for (String value : current) {

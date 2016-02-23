@@ -147,9 +147,4 @@ public class FileBasedSentineTest extends ControllerTest {
   public void test1() {
 
   }
-
-  @Override
-  protected String getHelixClusterName() {
-    return "FileBasedSentineTest";
-  }
 }

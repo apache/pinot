@@ -25,6 +25,8 @@ import org.slf4j.LoggerFactory;
 public class TableCustomConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentsValidationAndRetentionConfig.class);
 
+  public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
+
   private Map<String, String> customConfigs;
 
   public Map<String, String> getCustomConfigs() {

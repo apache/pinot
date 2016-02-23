@@ -7,12 +7,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
- * This class represents configurations specific to a collection. It is mapped in from the configuration file.
+ * This class represents configurations specific to a collection. It is mapped in from the
+ * configuration file.
  */
 public class AnomalyDetectionDriverConfig {
 
   /**
-   * Metric with which to estimate the contribution of a dimension key, and also to apply the threshold for
+   * Metric with which to estimate the contribution of a dimension key, and also to apply the
+   * threshold for
    * exploration
    */
   private String contributionEstimateMetric;
@@ -20,7 +22,9 @@ public class AnomalyDetectionDriverConfig {
   /** Minimum proportion that a series from a dimension key must contribute to be evaluated. */
   private double contributionMinProportion = 0.005;
 
-  /** The maximum number of dimensions that the driver will attempt to group by during exploration. */
+  /**
+   * The maximum number of dimensions that the driver will attempt to group by during exploration.
+   */
   private int maxExplorationDepth = 1;
 
   /**
@@ -30,7 +34,8 @@ public class AnomalyDetectionDriverConfig {
   private List<String> dimensionPrecedence;
 
   /**
-   * Prune exploration based on feedback to reduce computation costs and raising redundant anomalies.
+   * Prune exploration based on feedback to reduce computation costs and raising redundant
+   * anomalies.
    * TODO: This field is ignored.
    */
   private boolean pruneExplortaionUsingFeedback = false;
@@ -91,6 +96,5 @@ public class AnomalyDetectionDriverConfig {
   public void setDriverTimeWindow(TimeGranularity driverTimeWindow) {
     this.driverTimeWindow = driverTimeWindow;
   }
-
 
 }

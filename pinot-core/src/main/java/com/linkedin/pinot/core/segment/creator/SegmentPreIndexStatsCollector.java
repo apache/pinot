@@ -23,11 +23,11 @@ import com.linkedin.pinot.core.data.GenericRow;
 
 public interface SegmentPreIndexStatsCollector {
 
-  public void init();
+  void init();
 
-  public void build() throws Exception;
+  void build() throws Exception;
 
-  public AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception;
+  AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception;
 
   void collectRow(GenericRow row) throws Exception;
 

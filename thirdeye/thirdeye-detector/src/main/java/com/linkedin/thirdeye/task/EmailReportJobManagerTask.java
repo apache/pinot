@@ -20,7 +20,8 @@ public class EmailReportJobManagerTask extends Task {
   }
 
   @Override
-  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter) throws Exception {
+  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter)
+      throws Exception {
     final String action = params.get("action").asList().get(0);
     new HibernateSessionWrapper<Void>(sessionFactory).execute(new Callable<Void>() {
       @Override

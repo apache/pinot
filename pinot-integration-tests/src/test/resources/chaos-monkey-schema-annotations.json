@@ -7,8 +7,8 @@
   {
     "column" : "days",
     "range" : true,
-    "rangeStart" : 100,
-    "rangeEnd"   : 200
+    "rangeStart" : 1000,
+    "rangeEnd"   : 2000
   },
   {
     "column" : "percent",

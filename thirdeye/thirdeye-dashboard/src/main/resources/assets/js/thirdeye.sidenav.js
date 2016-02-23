@@ -18,7 +18,7 @@ $(document).ready(function() {
             cellObj.prop( "checked", true );
         });
     }
-    
+
     // Derived metrics
     var addDerivedMetric = function(event) {
         if (event) {
@@ -43,7 +43,7 @@ $(document).ready(function() {
             controls.remove()
         })
         controls.append(badge)
-        
+
         // Function type select
         var select = $("<select></select>", { class: "derived-metric-type" })
         controls.append(select)
@@ -153,30 +153,30 @@ $(document).ready(function() {
       var primitiveMetrics = []
       var derivedMetrics = []
       $.each(metricFunctionObj.args, function(i, arg) {
-        if (typeof(arg) === 'string') {
-            primitiveMetrics.push(arg.replace(/'/g, ""))
-        } else {
-            derivedMetrics.push(arg)
-        }
+          if (typeof(arg) === 'string') {
+              primitiveMetrics.push(arg.replace(/'/g, ""))
+          } else {
+              derivedMetrics.push(arg)
+          }
       })
 
-      // Rest can be assumed to be plain args or derived metrics
+        // Rest can be assumed to be plain args or derived metrics
       $(".sidenav-metric").each(function(i, checkbox) {
         var checkboxObj = $(checkbox)
-        if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
+          if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
           checkboxObj.attr("checked", "checked")
         }
       })
 
       // Add derived metrics
       $.each(derivedMetrics, function(i, derivedMetric) {
-        addDerivedMetric() // appends a new element to list
-        var metricElements = $("#sidenav-derived-metrics-list .uk-form-row")
-        var metricElement = $(metricElements[metricElements.length - 1])
-        metricElement.find(".derived-metric-type").val(derivedMetric.name)
-        $.each(derivedMetric.args, function(j, arg) {
+                  addDerivedMetric() // appends a new element to list
+      var metricElements = $("#sidenav-derived-metrics-list .uk-form-row")
+      var metricElement = $(metricElements[metricElements.length - 1])
+      metricElement.find(".derived-metric-type").val(derivedMetric.name)
+      $.each(derivedMetric.args, function(j, arg) {
             metricElement.find('#' + derivedMetric.name + '-arg' + j).val(arg.replace(/'/g, ""))
-        })
+      })
       })
     }
 
@@ -242,7 +242,7 @@ $(document).ready(function() {
             var type = $(row).find(".derived-metric-type").find(":selected").val()
             var args = []
             $(row).find(".derived-metric-arg").each(function(j, arg) {
-                args.push("'" + $(arg).find(":selected").val() + "'")
+                    args.push("'" + $(arg).find(":selected").val() + "'")
             })
             metrics.push(type + '(' + args.join(',') + ')')
         });

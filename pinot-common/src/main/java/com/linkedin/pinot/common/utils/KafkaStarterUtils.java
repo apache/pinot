@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils;
 
 import java.io.File;
+import java.security.Permission;
 import java.util.Properties;
 
 import kafka.admin.TopicCommand;
@@ -37,7 +38,12 @@ public class KafkaStarterUtils {
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
   public static Properties getDefaultKafkaConfiguration() {
-    return new Properties();
+    final Properties configuration = new Properties();
+
+    // Enable topic deletion by default for integration tests
+    configureTopicDeletion(configuration, true);
+
+    return configuration;
   }
 
   public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr,
@@ -55,10 +61,10 @@ public class KafkaStarterUtils {
     File logDir = new File("/tmp/kafka-" + Double.toHexString(Math.random()));
     logDir.mkdirs();
 
-    configuration.put("port", Integer.toString(port));
-    configuration.put("zookeeper.connect", zkStr);
-    configuration.put("broker.id", Integer.toString(brokerId));
-    configuration.put("log.dirs", logDir.getAbsolutePath());
+    configureKafkaPort(configuration, port);
+    configureZkConnectionString(configuration, zkStr);
+    configureBrokerId(configuration, brokerId);
+    configureKafkaLogDirectory(configuration, logDir);
     KafkaConfig config = new KafkaConfig(configuration);
 
     KafkaServerStartable serverStartable = new KafkaServerStartable(config);
@@ -67,13 +73,71 @@ public class KafkaStarterUtils {
     return serverStartable;
   }
 
+  public static void configureSegmentSizeBytes(Properties properties, int segmentSize) {
+    properties.put("log.segment.bytes", Integer.toString(segmentSize));
+  }
+
+  public static void configureLogRetentionSizeBytes(Properties properties, int logRetentionSizeBytes) {
+    properties.put("log.retention.bytes", Integer.toString(logRetentionSizeBytes));
+  }
+
+  public static void configureKafkaLogDirectory(Properties configuration, File logDir) {
+    configuration.put("log.dirs", logDir.getAbsolutePath());
+  }
+
+  public static void configureBrokerId(Properties configuration, int brokerId) {
+    configuration.put("broker.id", Integer.toString(brokerId));
+  }
+
+  public static void configureZkConnectionString(Properties configuration, String zkStr) {
+    configuration.put("zookeeper.connect", zkStr);
+  }
+
+  public static void configureKafkaPort(Properties configuration, int port) {
+    configuration.put("port", Integer.toString(port));
+  }
+
+  public static void configureTopicDeletion(Properties configuration, boolean topicDeletionEnabled) {
+    configuration.put("delete.topic.enable", Boolean.toString(topicDeletionEnabled));
+  }
+
   public static void stopServer(KafkaServerStartable serverStartable) {
     serverStartable.shutdown();
     FileUtils.deleteQuietly(new File(serverStartable.serverConfig().logDirs().apply(0)));
   }
 
   public static void createTopic(String kafkaTopic, String zkStr) {
-    TopicCommand
-        .main(new String[] { "--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic", kafkaTopic });
+    invokeTopicCommand(
+        new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", "10", "--topic",
+            kafkaTopic});
+  }
+
+  private static void invokeTopicCommand(String[] args) {
+    // jfim: Use Java security to trap System.exit in Kafka 0.9's TopicCommand
+    System.setSecurityManager(new SecurityManager() {
+      @Override
+      public void checkPermission(Permission perm) {
+        if (perm.getName().startsWith("exitVM")) {
+          throw new SecurityException("System.exit is disabled");
+        }
+      }
+
+      @Override
+      public void checkPermission(Permission perm, Object context) {
+        checkPermission(perm);
+      }
+    });
+
+    try {
+      TopicCommand.main(args);
+    } catch (SecurityException ex) {
+      // Do nothing, this is caused by our security manager that disables System.exit
+    }
+
+    System.setSecurityManager(null);
+  }
+
+  public static void deleteTopic(String kafkaTopic, String zkStr) {
+    invokeTopicCommand(new String[]{"--delete", "--zookeeper", zkStr, "--topic", kafkaTopic});
   }
 }

@@ -15,11 +15,19 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import java.net.ConnectException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -33,16 +41,6 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 
 
 /**
@@ -86,6 +84,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   private volatile long _lastRequestTimeoutMS;
   private volatile long _lastRequestId;
   private volatile Throwable _lastError;
+  private volatile boolean _selfClose = false;
 
   // COnnection Id generator
   private static final AtomicLong _connIdGen = new AtomicLong(0);
@@ -106,6 +105,14 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   private void init() {
     _bootstrap = new Bootstrap();
     _bootstrap.group(_eventGroup).channel(NioSocketChannel.class).handler(new ChannelHandlerInitializer(_handler));
+  }
+
+  protected void setSelfClose(boolean selfClose) {
+    _selfClose = selfClose;
+  }
+
+  protected boolean isSelfClose() {
+    return _selfClose;
   }
 
   /**
@@ -140,7 +147,12 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
     } catch (Exception ie) {
-      LOGGER.error("Got exception when connecting to server :" + _server, ie);
+      if (ie instanceof ConnectException && ie.getMessage() != null && ie.getMessage().startsWith("Connection refused")) {
+        // Most common case when a server is down. Don't print the entire stack and fill the logs.
+        LOGGER.error("Could not connect to server {}:{}", _server, ie.getMessage());
+      } else {
+        LOGGER.error("Got exception when connecting to server {}", _server, ie);
+      }
     }
     return false;
   }
@@ -152,7 +164,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   private void setChannel(Channel channel) {
     _channel = channel;
     _channelSet.countDown();
-    LOGGER.info("Setting channel for connection id (" + _connId + "). Is channel null ? " + (null == _channel));
+    LOGGER.info("Setting channel for connection id ({}) to server {}. Is channel null? {}",_connId, _server, (null == _channel));
   }
 
   @Override
@@ -238,6 +250,12 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     }
   }
 
+  // Having a toString method here is useful when logging stuff from AsyncPoolImpl
+  @Override
+  public String toString() {
+    return "Server:" + _server + ",State:" + _connState;
+  }
+
   /**
    * Channel Handler for incoming response.
    *
@@ -293,7 +311,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-      LOGGER.error("Got exception in the channel !", cause);
+      LOGGER.error("Got exception in the channel to {}", _server, cause);
       closeOnError(ctx, cause);
     }
 
@@ -330,7 +348,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
          * completes, we will let the sendRequest to checkin/destroy the connection.
          */
         if ((null != _requestCallback) && (_connState == State.REQUEST_SENT)) {
-          LOGGER.info("Discarding the connection !!");
+          LOGGER.info("Discarding the connection to {}", _server);
           _requestCallback.onError(cause);
         }
 
@@ -369,9 +387,10 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
   @Override
   public void close() throws InterruptedException {
-    LOGGER.info("Client channel close() called. Closing client channel !!");
+    LOGGER.info("Closing client channel to {}", _server);
     if (null != _channel) {
       _channel.close().sync();
+      setSelfClose(true);
     }
   }
 

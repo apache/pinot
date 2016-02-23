@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.common.request.helper;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -35,9 +38,8 @@ public class ControllerRequestBuilder {
 
   public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
       int offlineInstances, int realtimeInstances) throws JSONException {
-    Tenant tenant =
-        new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
-            .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
+    Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
+        .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
     return tenant.toJSON();
   }
 
@@ -50,6 +52,14 @@ public class ControllerRequestBuilder {
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy) throws JSONException {
+    List<String> invertedIndexColumns = Collections.emptyList();
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
+        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, invertedIndexColumns);
+  }
+
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
+      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+      String segmentAssignmentStrategy, List<String> invertedIndexColumns) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -65,9 +75,6 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
-    JSONArray invertedIndexColumns = new JSONArray();
-    invertedIndexColumns.put("column1");
-    invertedIndexColumns.put("column2");
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
     tableIndexConfig.put("loadMode", "HEAP");
     tableIndexConfig.put("lazyLoad", "false");
@@ -80,6 +87,7 @@ public class ControllerRequestBuilder {
     JSONObject metadata = new JSONObject();
     JSONObject customConfigs = new JSONObject();
     customConfigs.put("d2Name", "xlntBetaPinot");
+    customConfigs.put("messageBasedRefresh", "true");
     metadata.put("customConfigs", customConfigs);
     creationRequest.put("metadata", metadata);
     return creationRequest;
@@ -88,6 +96,15 @@ public class ControllerRequestBuilder {
   public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName) throws JSONException {
+    List<String> invertedIndexColumns = Collections.emptyList();
+    return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType, retentionTimeUnit,
+        retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName, invertedIndexColumns);
+  }
+
+  public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
+      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+      String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, List<String> invertedIndexColumns)
+          throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -103,9 +120,6 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
-    JSONArray invertedIndexColumns = new JSONArray();
-    invertedIndexColumns.put("column1");
-    invertedIndexColumns.put("column2");
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
     tableIndexConfig.put("loadMode", "HEAP");
     tableIndexConfig.put("lazyLoad", "false");

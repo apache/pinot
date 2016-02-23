@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -48,7 +49,7 @@ import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
  * Class to implement GenerateData command.
  *
  */
-public class GenerateDataCommand extends AbstractBaseCommand implements Command {
+public class GenerateDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenerateDataCommand.class);
 
   @Option(name = "-numRecords", required = true, metaVar = "<int>", usage = "Number of records to generate.")
@@ -72,6 +73,7 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
   @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }
@@ -178,13 +180,15 @@ public class GenerateDataCommand extends AbstractBaseCommand implements Command 
           break;
 
         case METRIC:
-          if (range.get(col) == null) {
+          if (!range.containsKey(col)) {
             range.put(col, new IntRange(1, 1000));
           }
           break;
 
         case TIME:
-          range.put(col, new IntRange(1, 1000));
+          if (!range.containsKey(col)) {
+            range.put(col, new IntRange(1, 1000));
+          }
           TimeFieldSpec tfs = (TimeFieldSpec) fs;
           timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
           break;

@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.transport.common.routing;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
@@ -33,10 +23,19 @@ import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTabl
 import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.slf4j.Logger;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class RoutingTableTest {
-
+  private static Logger LOGGER = org.slf4j.LoggerFactory.getLogger(RoutingTableTest.class);
   @Test
   public void testHelixExternalViewBasedRoutingTable() {
     RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
@@ -48,12 +47,13 @@ public class RoutingTableTest {
     externalView.setState("segment1", "dataServer_instance_2", "ONLINE");
     externalView.setState("segment2", "dataServer_instance_2", "ONLINE");
     externalView.setState("segment2", "dataServer_instance_0", "ONLINE");
-    routingTable.markDataResourceOnline("testResource0_OFFLINE", externalView, new ArrayList<InstanceConfig>());
+    List<InstanceConfig> instanceConfigs = generateInstanceConfigs("dataServer_instance", 0, 2);
+    routingTable.markDataResourceOnline("testResource0_OFFLINE", externalView, instanceConfigs);
     ExternalView externalView1 = new ExternalView("testResource1_OFFLINE");
     externalView1.setState("segment10", "dataServer_instance_0", "ONLINE");
     externalView1.setState("segment11", "dataServer_instance_1", "ONLINE");
     externalView1.setState("segment12", "dataServer_instance_2", "ONLINE");
-    routingTable.markDataResourceOnline("testResource1_OFFLINE", externalView1, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource1_OFFLINE", externalView1, instanceConfigs);
     ExternalView externalView2 = new ExternalView("testResource2_OFFLINE");
     externalView2.setState("segment20", "dataServer_instance_0", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_0", "ONLINE");
@@ -64,7 +64,7 @@ public class RoutingTableTest {
     externalView2.setState("segment20", "dataServer_instance_2", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_2", "ONLINE");
     externalView2.setState("segment22", "dataServer_instance_2", "ONLINE");
-    routingTable.markDataResourceOnline("testResource2_OFFLINE", externalView2, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource2_OFFLINE", externalView2, instanceConfigs);
 
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource0_OFFLINE", "[segment0, segment1, segment2]", 3);
@@ -83,16 +83,16 @@ public class RoutingTableTest {
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
-      System.out.println(serverInstance);
+      LOGGER.trace(serverInstance.toString());
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      System.out.println(segmentIdSet.toString());
+      LOGGER.trace(segmentIdSet.toString());
       selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
     Arrays.sort(selectedSegmentArray);
     Assert.assertEquals(selectedSegments.size(), expectedNumSegment);
     Assert.assertEquals(Arrays.toString(selectedSegmentArray), expectedSegmentList);
-    System.out.println("********************************");
+    LOGGER.trace("********************************");
   }
 
   @Test
@@ -101,77 +101,80 @@ public class RoutingTableTest {
 
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, routingStrategy, null, null);
     ExternalView externalView = new ExternalView("testResource0_REALTIME");
-    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "0", "0"),
+    externalView.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "0"),
         "dataServer_instance_0", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "1", "1"),
+    externalView.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "1"),
         "dataServer_instance_1", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "0", "2"),
+    externalView.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "2"),
         "dataServer_instance_2", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "1", "3"),
+    externalView.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "3"),
         "dataServer_instance_3", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "0", "4"),
+    externalView.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "4"),
         "dataServer_instance_4", "ONLINE");
-    externalView.setState(SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5"),
+    externalView.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "5"),
         "dataServer_instance_5", "ONLINE");
-    routingTable.markDataResourceOnline("testResource0_REALTIME", externalView, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource0_REALTIME", externalView,
+        generateInstanceConfigs("dataServer_instance", 0, 5));
     ExternalView externalView1 = new ExternalView("testResource1_REALTIME");
-    externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10"),
+    externalView1.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "10"),
         "dataServer_instance_10", "ONLINE");
-    externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "1", "11"),
+    externalView1.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "11"),
         "dataServer_instance_11", "ONLINE");
-    externalView1.setState(SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12"),
+    externalView1.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "12"),
         "dataServer_instance_12", "ONLINE");
-    routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource1_REALTIME", externalView1,
+        generateInstanceConfigs("dataServer_instance", 10, 12));
     ExternalView externalView2 = new ExternalView("testResource2_REALTIME");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "20"),
         "dataServer_instance_20", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "1", "21"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "21"),
         "dataServer_instance_21", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "2", "22"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "22"),
         "dataServer_instance_22", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "0", "23"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "23"),
         "dataServer_instance_23", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "1", "24"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "24"),
         "dataServer_instance_24", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "2", "25"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "25"),
         "dataServer_instance_25", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "0", "26"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "26"),
         "dataServer_instance_26", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "1", "27"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "27"),
         "dataServer_instance_27", "ONLINE");
-    externalView2.setState(SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28"),
+    externalView2.setState(SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "28"),
         "dataServer_instance_28", "ONLINE");
-    routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2, new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline("testResource2_REALTIME", externalView2,
+        generateInstanceConfigs("dataServer_instance", 20, 28));
 
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(
           routingTable,
           "testResource0_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "0", "0")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "0", "1", "1") + "]", "["
-              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "0", "2")
+          new String[] { "[" + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "0")
+              + ", " + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "1") + "]", "["
+              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "2")
               + ", "
-              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "1", "1", "3") + "]", "["
-              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "0", "4") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource0_REALTIME", "instance", "2", "1", "5") + "]" }, 2);
+              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "3") + "]", "["
+              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "4") + ", "
+              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "5") + "]" }, 2);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource1_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "0", "10")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "1", "11") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource1_REALTIME", "instance", "0", "2", "12") + "]" }, 3);
+          new String[] { "[" + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "10")
+              + ", " + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "11") + ", "
+              + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "12") + "]" }, 3);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource2_REALTIME",
-          new String[] { "[" + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "0", "20")
-              + ", " + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "1", "21") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "0", "2", "22") + "]", "["
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "0", "23") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "1", "24") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "1", "2", "25") + "]", "["
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "0", "26") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "1", "27") + ", "
-              + SegmentNameBuilder.Realtime.build("testResource2_REALTIME", "instance", "2", "2", "28") + "]" }, 3);
+          new String[] { "[" + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "20")
+              + ", " + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "21") + ", "
+              + SegmentNameBuilder.Realtime.build("0", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "22") + "]", "["
+              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "23") + ", "
+              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "24") + ", "
+              + SegmentNameBuilder.Realtime.build("1", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "25") + "]", "["
+              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "26") + ", "
+              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "27") + ", "
+              + SegmentNameBuilder.Realtime.build("2", SegmentNameBuilder.Realtime.ALL_PARTITIONS, "28") + "]" }, 3);
     }
   }
 
@@ -181,9 +184,9 @@ public class RoutingTableTest {
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
-      System.out.println(serverInstance);
+      LOGGER.trace(serverInstance.toString());
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      System.out.println(segmentIdSet.toString());
+      LOGGER.trace(segmentIdSet.toString());
       selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
@@ -196,7 +199,25 @@ public class RoutingTableTest {
       }
     }
     Assert.assertTrue(matchedExpectedLists);
-    System.out.println("********************************");
+    LOGGER.trace("********************************");
   }
 
+  /**
+   * Helper method to generate instance config lists. Instance names are generated as prefix_i, where
+   * i ranges from start to end.
+   *
+   * @param prefix Instance name prefix
+   * @param start Start index
+   * @param end End index
+   * @return
+   */
+  private List<InstanceConfig> generateInstanceConfigs(String prefix, int start, int end) {
+    List<InstanceConfig> configs = new ArrayList<>();
+
+    for (int i = start; i <= end; ++i) {
+      String instance = prefix + "_" + i;
+      configs.add(new InstanceConfig(instance));
+    }
+    return configs;
+  }
 }

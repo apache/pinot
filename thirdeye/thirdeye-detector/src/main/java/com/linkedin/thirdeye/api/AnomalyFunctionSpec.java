@@ -16,16 +16,9 @@ import java.util.concurrent.TimeUnit;
 @Entity
 @Table(name = "anomaly_functions")
 @NamedQueries({
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAll",
-        query = "SELECT af FROM AnomalyFunctionSpec af"),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection",
-        query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive",
-        query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id"
-    )
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAll", query = "SELECT af FROM AnomalyFunctionSpec af"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection", query = "SELECT af FROM AnomalyFunctionSpec af WHERE af.collection = :collection"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive", query = "UPDATE AnomalyFunctionSpec set isActive = :isActive WHERE id = :id")
 })
 public class AnomalyFunctionSpec {
   @Id
@@ -68,7 +61,8 @@ public class AnomalyFunctionSpec {
   @Column(name = "explore_dimensions", nullable = true)
   private String exploreDimensions;
 
-  public AnomalyFunctionSpec() {}
+  public AnomalyFunctionSpec() {
+  }
 
   public long getId() {
     return id;
@@ -180,12 +174,9 @@ public class AnomalyFunctionSpec {
       return false;
     }
     AnomalyFunctionSpec af = (AnomalyFunctionSpec) o;
-    return Objects.equals(id, af.getId())
-        && Objects.equals(collection, af.getCollection())
-        && Objects.equals(metric, af.getMetric())
-        && Objects.equals(type, af.getType())
-        && Objects.equals(isActive, af.getIsActive())
-        && Objects.equals(cron, af.getCron())
+    return Objects.equals(id, af.getId()) && Objects.equals(collection, af.getCollection())
+        && Objects.equals(metric, af.getMetric()) && Objects.equals(type, af.getType())
+        && Objects.equals(isActive, af.getIsActive()) && Objects.equals(cron, af.getCron())
         && Objects.equals(properties, af.getProperties())
         && Objects.equals(bucketSize, af.getBucketSize())
         && Objects.equals(bucketUnit, af.getBucketUnit())
@@ -197,37 +188,16 @@ public class AnomalyFunctionSpec {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id,
-        collection,
-        metric,
-        type,
-        isActive,
-        cron,
-        properties,
-        bucketSize,
-        bucketUnit,
-        windowSize,
-        windowUnit,
-        windowDelay,
-        exploreDimensions);
+    return Objects.hash(id, collection, metric, type, isActive, cron, properties, bucketSize,
+        bucketUnit, windowSize, windowUnit, windowDelay, exploreDimensions);
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("id", id)
-        .add("collection", collection)
-        .add("metric", metric)
-        .add("type", type)
-        .add("isActive", isActive)
-        .add("cron", cron)
-        .add("properties", properties)
-        .add("bucketSize", bucketSize)
-        .add("bucketUnit", bucketUnit)
-        .add("windowSize", windowSize)
-        .add("windowUnit", windowUnit)
-        .add("windowDelay", windowDelay)
-        .add("exploreDimensions", exploreDimensions)
-        .toString();
+    return MoreObjects.toStringHelper(this).add("id", id).add("collection", collection)
+        .add("metric", metric).add("type", type).add("isActive", isActive).add("cron", cron)
+        .add("properties", properties).add("bucketSize", bucketSize).add("bucketUnit", bucketUnit)
+        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("windowDelay", windowDelay)
+        .add("exploreDimensions", exploreDimensions).toString();
   }
 }

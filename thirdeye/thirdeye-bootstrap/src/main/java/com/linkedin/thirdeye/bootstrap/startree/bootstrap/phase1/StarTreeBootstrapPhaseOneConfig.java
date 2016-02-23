@@ -25,10 +25,10 @@ public class StarTreeBootstrapPhaseOneConfig {
 
   }
 
-  public StarTreeBootstrapPhaseOneConfig(String collectionName,
-      List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, String timeColumnName, String timeUnit, int inputTimeUnitSize,
-      String aggregationGranularity, int aggregationGranularitySize ,int numTimeBuckets) {
+  public StarTreeBootstrapPhaseOneConfig(String collectionName, List<String> dimensionNames,
+      List<String> metricNames, List<MetricType> metricTypes, String timeColumnName,
+      String timeUnit, int inputTimeUnitSize, String aggregationGranularity,
+      int aggregationGranularitySize, int numTimeBuckets) {
     super();
     this.collectionName = collectionName;
     this.dimensionNames = dimensionNames;
@@ -42,13 +42,9 @@ public class StarTreeBootstrapPhaseOneConfig {
     this.numTimeBuckets = numTimeBuckets;
   }
 
-
-
   public String getCollectionName() {
     return collectionName;
   }
-
-
 
   public List<String> getDimensionNames() {
     return dimensionNames;
@@ -90,35 +86,26 @@ public class StarTreeBootstrapPhaseOneConfig {
     this.numTimeBuckets = numTimeBuckets;
   }
 
-  public static StarTreeBootstrapPhaseOneConfig fromStarTreeConfig(StarTreeConfig config)
-  {
+  public static StarTreeBootstrapPhaseOneConfig fromStarTreeConfig(StarTreeConfig config) {
     int numTimeBuckets = (int) config.getTime().getBucket().getUnit().convert(
-            config.getTime().getRetention().getSize(),
-            config.getTime().getRetention().getUnit());
+        config.getTime().getRetention().getSize(), config.getTime().getRetention().getUnit());
 
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
+    for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
-    return new StarTreeBootstrapPhaseOneConfig(config.getCollection(),
-                                               dimensionNames,
-                                               metricNames,
-                                               metricTypes,
-                                               config.getTime().getColumnName(),
-                                               config.getTime().getInput().getUnit().toString(),
-                                               config.getTime().getInput().getSize(),
-                                               config.getTime().getBucket().getUnit().toString(),
-                                               config.getTime().getBucket().getSize(),
-                                               numTimeBuckets);
+    return new StarTreeBootstrapPhaseOneConfig(config.getCollection(), dimensionNames, metricNames,
+        metricTypes, config.getTime().getColumnName(),
+        config.getTime().getInput().getUnit().toString(), config.getTime().getInput().getSize(),
+        config.getTime().getBucket().getUnit().toString(), config.getTime().getBucket().getSize(),
+        numTimeBuckets);
   }
 }

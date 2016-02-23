@@ -16,6 +16,8 @@
 package com.linkedin.pinot.tools.admin.command;
 
 
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 
@@ -33,7 +35,7 @@ import com.google.common.io.Files;
  *
  *
  */
-public class StartZookeeperCommand extends AbstractBaseCommand implements Command {
+public class StartZookeeperCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
 
   @Option(name="-zkPort", required=false, metaVar="<int>", usage="Port to start zookeeper server on.")
@@ -41,15 +43,6 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
 
   @Option(name="-dataDir", required=false, metaVar="<string>", usage="Directory for zookeper data.")
   private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
-
-  @Option(name="-logDir", required=false, metaVar="<string>", usage="Directory for zookeeper logs.")
-  private String _logDir = TMP_DIR + "PinotAdmin/zkLog";
-
-  @Option(name="-tickTime", required=false, metaVar="<int>", usage="Tick time for zookeeper.")
-  private int _tickTime = 30000;
-
-  @Option(name="-minSessionTimeout", required=false, metaVar="<int>", usage="Min session timeout.")
-  private int _minSessionTimeout = 60000;
 
   @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
   private boolean _help = false;
@@ -66,8 +59,7 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
 
   @Override
   public String toString() {
-    return ("StartZookeeper -zkPort " + _zkPort + " -dataDir " + _dataDir +
-        " -logDir " + _logDir + " -tickTime " + _tickTime + " -minSessionTimeout " + _minSessionTimeout);
+    return ("StartZookeeper -zkPort " + _zkPort + " -dataDir " + _dataDir);
 
   }
 
@@ -97,28 +89,12 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
     return this;
   }
 
-  StartZookeeperCommand setTickTime(int tickTime) {
-    _tickTime = tickTime;
-    return this;
-  }
-
-  StartZookeeperCommand setMinSessionTimeout(int timeOut) {
-    _minSessionTimeout = timeOut;
-    return this;
-  }
-
-  StartZookeeperCommand setLogDir(String logDir) {
-    _logDir = logDir;
-    return this;
-  }
-
-  private ZkServer _zkServer;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private File _tmpdir;
 
-  public void init(int zkPort, String dataDir, String logDir) {
+  public void init(int zkPort, String dataDir) {
     _zkPort = zkPort;
     _dataDir = dataDir;
-    _logDir = logDir;
   }
 
   @Override
@@ -136,12 +112,9 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
       }
     };
 
-    ZkServer zkServer =
-        new ZkServer(datadir.getAbsolutePath(), logdir.getAbsolutePath(),
-            _defaultNameSpace, _zkPort, _tickTime, _minSessionTimeout);
-    zkServer.start();
+    _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, datadir.getAbsolutePath());
 
-    LOGGER.info("Start zookeeper at localhost:" + zkServer.getPort() + " in thread "
+    LOGGER.info("Start zookeeper at localhost:" + _zkPort + " in thread "
         + Thread.currentThread().getName());
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".zooKeeper.pid");
@@ -158,7 +131,7 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
   }
 
   public boolean stop() {
-    _zkServer.shutdown();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
     return true;
   }
 

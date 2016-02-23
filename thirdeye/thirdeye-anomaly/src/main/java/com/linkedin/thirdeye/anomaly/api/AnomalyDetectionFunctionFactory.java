@@ -12,18 +12,19 @@ public abstract class AnomalyDetectionFunctionFactory {
 
   /**
    * @return
-   *  The class representing the function's representation in the anomaly database.
+   *         The class representing the function's representation in the anomaly database.
    */
   public abstract Class<? extends FunctionTableRow> getFunctionRowClass();
 
   /**
    * @return
-   *  A compiled AnomalyDetectionFunction.
+   *         A compiled AnomalyDetectionFunction.
    * @throws IllegalFunctionException
-   *  When illegal configuration parameters are passed to init.
+   *           When illegal configuration parameters are passed to init.
    * @throws Exception
    */
-  public abstract AnomalyDetectionFunction getFunction(StarTreeConfig starTreeConfig, AnomalyDatabaseConfig dbconfig,
-      FunctionTableRow functionTableRow) throws IllegalFunctionException, Exception;
+  public abstract AnomalyDetectionFunction getFunction(StarTreeConfig starTreeConfig,
+      AnomalyDatabaseConfig dbconfig, FunctionTableRow functionTableRow)
+          throws IllegalFunctionException, Exception;
 
 }

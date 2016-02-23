@@ -12,8 +12,6 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 
 public class BootstrapPhaseMapOutputValue {
 
-
-
   /**
    * DimensionKey representing the leaf record
    */
@@ -58,8 +56,8 @@ public class BootstrapPhaseMapOutputValue {
     return baos.toByteArray();
   }
 
-  public static BootstrapPhaseMapOutputValue fromBytes(byte[] buffer,
-      MetricSchema schema) throws IOException{
+  public static BootstrapPhaseMapOutputValue fromBytes(byte[] buffer, MetricSchema schema)
+      throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
     int length;
     byte[] bytes;

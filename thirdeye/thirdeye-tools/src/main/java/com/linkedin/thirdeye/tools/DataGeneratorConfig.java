@@ -12,32 +12,32 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public class DataGeneratorConfig {
 
-   String minTime;
-   String maxTime;
-   long startTime;
-   long endTime;
+  String minTime;
+  String maxTime;
+  long startTime;
+  long endTime;
 
-   String cardinality;
-   long numRecords;
-   int numFiles;
-   long numRecordsPerFile;
-   int numRecordsPerTimeUnit;
-   int[] dimensionCardinality;
+  String cardinality;
+  long numRecords;
+  int numFiles;
+  long numRecordsPerFile;
+  int numRecordsPerTimeUnit;
+  int[] dimensionCardinality;
 
-   StarTreeConfig starTreeConfig;
-   File schemaFile;
-   File outputDataDirectory;
+  StarTreeConfig starTreeConfig;
+  File schemaFile;
+  File outputDataDirectory;
 
   public void setOptions() {
     // Default to a year
     if (minTime == null || maxTime == null) {
       DateTime d = new DateTime();
-      endTime = d.getMillis()  ;
+      endTime = d.getMillis();
       startTime = d.minusYears(1).getMillis();
     } else {
-       DateTimeFormatter parser = ISODateTimeFormat.dateHourMinuteSecond();
-       startTime = parser.parseDateTime(minTime).getMillis();
-       endTime = parser.parseDateTime(maxTime).getMillis();
+      DateTimeFormatter parser = ISODateTimeFormat.dateHourMinuteSecond();
+      startTime = parser.parseDateTime(minTime).getMillis();
+      endTime = parser.parseDateTime(maxTime).getMillis();
     }
     TimeUnit inputTimeUnit = starTreeConfig.getTime().getBucket().getUnit();
     int inputTimeBucketSize = starTreeConfig.getTime().getBucket().getSize();
@@ -61,10 +61,10 @@ public class DataGeneratorConfig {
     // Default to 100 records per time unit
     if (numRecords == 0) {
       numRecordsPerTimeUnit = 100;
-      numRecords = (endTime - startTime + 1)*numRecordsPerTimeUnit;
+      numRecords = (endTime - startTime + 1) * numRecordsPerTimeUnit;
     } else {
       if (numRecords > (endTime - startTime + 1))
-        numRecordsPerTimeUnit = (int) (numRecords / (endTime - startTime + 1)) ;
+        numRecordsPerTimeUnit = (int) (numRecords / (endTime - startTime + 1));
       else
         numRecordsPerTimeUnit = 1;
     }
@@ -139,8 +139,5 @@ public class DataGeneratorConfig {
   public void setOutputDataDirectory(File outputDataDirectory) {
     this.outputDataDirectory = outputDataDirectory;
   }
-
-
-
 
 }

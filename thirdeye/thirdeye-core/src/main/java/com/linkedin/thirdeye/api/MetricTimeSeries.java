@@ -18,20 +18,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
  * @author kgopalak
- *
  */
 public class MetricTimeSeries {
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(MetricTimeSeries.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MetricTimeSeries.class);
 
   Map<Long, ByteBuffer> timeseries;
 
   private MetricSchema schema;
 
   /**
-   *
    * @param schema
    */
   public MetricTimeSeries(MetricSchema schema) {
@@ -39,13 +35,11 @@ public class MetricTimeSeries {
     this.schema = schema;
   }
 
-  public MetricSchema getSchema()
-  {
+  public MetricSchema getSchema() {
     return schema;
   }
 
   /**
-   *
    * @param timeWindow
    * @param value
    */
@@ -136,8 +130,8 @@ public class MetricTimeSeries {
         newValue = oldValue.doubleValue() + delta.doubleValue();
         break;
       default:
-        throw new UnsupportedOperationException("unknown metricType:"
-            + metricType + " for column:" + name);
+        throw new UnsupportedOperationException(
+            "unknown metricType:" + metricType + " for column:" + name);
       }
     } else {
       newValue = delta;
@@ -157,18 +151,14 @@ public class MetricTimeSeries {
 
   /**
    * @param series
-   *  A time series whose values should be reflected in this time series
+   *          A time series whose values should be reflected in this time series
    * @param timeRange
-   *  Only include values from series that are in this time range
+   *          Only include values from series that are in this time range
    */
-  public void aggregate(MetricTimeSeries series, TimeRange timeRange)
-  {
-    for (long timeWindow : series.timeseries.keySet())
-    {
-      if (timeRange.contains(timeWindow))
-      {
-        for (int i = 0; i < schema.getNumMetrics(); i++)
-        {
+  public void aggregate(MetricTimeSeries series, TimeRange timeRange) {
+    for (long timeWindow : series.timeseries.keySet()) {
+      if (timeRange.contains(timeWindow)) {
+        for (int i = 0; i < schema.getNumMetrics(); i++) {
           String metricName = schema.getMetricName(i);
           Number delta = series.get(timeWindow, metricName);
           increment(timeWindow, metricName, delta);
@@ -177,8 +167,7 @@ public class MetricTimeSeries {
     }
   }
 
-  public static MetricTimeSeries fromBytes(byte[] buf, MetricSchema schema)
-      throws IOException {
+  public static MetricTimeSeries fromBytes(byte[] buf, MetricSchema schema) throws IOException {
     MetricTimeSeries series = new MetricTimeSeries(schema);
     DataInput in = new DataInputStream(new ByteArrayInputStream(buf));
     int numTimeWindows = in.readInt();
@@ -193,7 +182,6 @@ public class MetricTimeSeries {
   }
 
   /**
-   *
    * @return
    */
   public Set<Long> getTimeWindowSet() {
@@ -239,42 +227,37 @@ public class MetricTimeSeries {
     return sb.toString();
   }
 
-  public Number[] getMetricSums()
-  {
+  public Number[] getMetricSums() {
     Number[] result = new Number[schema.getNumMetrics()];
 
-    for (int i = 0; i < schema.getNumMetrics(); i++)
-    {
+    for (int i = 0; i < schema.getNumMetrics(); i++) {
       result[i] = 0;
     }
 
-    for (Long time : timeseries.keySet())
-    {
-      for (int i = 0; i < schema.getNumMetrics(); i++)
-      {
+    for (Long time : timeseries.keySet()) {
+      for (int i = 0; i < schema.getNumMetrics(); i++) {
         String metricName = schema.getMetricName(i);
         MetricType metricType = schema.getMetricType(i);
         Number metricValue = get(time, metricName);
 
-        switch (metricType)
-        {
-          case INT:
-            result[i] = result[i].intValue() + metricValue.intValue();
-            break;
-          case SHORT:
-            result[i] = result[i].shortValue() + metricValue.shortValue();
-            break;
-          case LONG:
-            result[i] = result[i].longValue() + metricValue.longValue();
-            break;
-          case FLOAT:
-            result[i] = result[i].floatValue() + metricValue.floatValue();
-            break;
-          case DOUBLE:
-            result[i] = result[i].doubleValue() + metricValue.doubleValue();
-            break;
-          default:
-            throw new IllegalStateException();
+        switch (metricType) {
+        case INT:
+          result[i] = result[i].intValue() + metricValue.intValue();
+          break;
+        case SHORT:
+          result[i] = result[i].shortValue() + metricValue.shortValue();
+          break;
+        case LONG:
+          result[i] = result[i].longValue() + metricValue.longValue();
+          break;
+        case FLOAT:
+          result[i] = result[i].floatValue() + metricValue.floatValue();
+          break;
+        case DOUBLE:
+          result[i] = result[i].doubleValue() + metricValue.doubleValue();
+          break;
+        default:
+          throw new IllegalStateException();
         }
       }
     }
@@ -283,21 +266,19 @@ public class MetricTimeSeries {
   }
 
   @Override
-  public int hashCode()
-  {
+  public int hashCode() {
     return timeseries.keySet().hashCode() + 13 * schema.hashCode();
   }
 
   @Override
-  public boolean equals(Object o)
-  {
-    if (!(o instanceof MetricTimeSeries))
-    {
+  public boolean equals(Object o) {
+    if (!(o instanceof MetricTimeSeries)) {
       return false;
     }
 
     MetricTimeSeries ts = (MetricTimeSeries) o;
 
-    return getTimeWindowSet().equals(ts.getTimeWindowSet()) && Arrays.equals(getMetricSums(), ts.getMetricSums());
+    return getTimeWindowSet().equals(ts.getTimeWindowSet())
+        && Arrays.equals(getMetricSums(), ts.getMetricSums());
   }
 }

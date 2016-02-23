@@ -56,6 +56,7 @@ public interface RealtimeSegment extends MutableIndexSegment {
    * when to convert this segment to immutable.
    * @return
    */
+  @Override
   public int getAggregateDocumentCount();
 
   /**

@@ -18,21 +18,22 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
 public class RollupPhaseTwoReduceOutputTest {
   @Test
   public void simple() throws IOException {
-    List<String> names = Lists.newArrayList("metric1", "metric2", "metric3",
-        "metric4", "metric5");
-    String[] rawDimensionValues = new String[] { "dim1", "dim2", "dim3",
-        "dim4", "dim5", "dim6", "dim7", "dim8" };
-    String[] rollupDimensionValues = new String[] { "dim1", "?", "dim3",
-        "dim4", "dim5", "dim6", "?", "dim8" };
+    List<String> names = Lists.newArrayList("metric1", "metric2", "metric3", "metric4", "metric5");
+    String[] rawDimensionValues = new String[] {
+        "dim1", "dim2", "dim3", "dim4", "dim5", "dim6", "dim7", "dim8"
+    };
+    String[] rollupDimensionValues = new String[] {
+        "dim1", "?", "dim3", "dim4", "dim5", "dim6", "?", "dim8"
+    };
     DimensionKey rawDimensionKey = new DimensionKey(rawDimensionValues);
 
     DimensionKey rollupDimensionKey = new DimensionKey(rollupDimensionValues);
-    List<MetricType> types = Lists.newArrayList(MetricType.INT, MetricType.INT,
-        MetricType.INT, MetricType.INT, MetricType.INT);
+    List<MetricType> types = Lists.newArrayList(MetricType.INT, MetricType.INT, MetricType.INT,
+        MetricType.INT, MetricType.INT);
     MetricSchema schema = new MetricSchema(names, types);
 
-    long startHourSinceEpoch = TimeUnit.HOURS.convert(
-        System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    long startHourSinceEpoch =
+        TimeUnit.HOURS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     Random rand = new Random();
     int NUM_TIME_WINDOWS = 100;
 
@@ -61,16 +62,13 @@ public class RollupPhaseTwoReduceOutputTest {
       }
     }
 
-    RollupPhaseTwoReduceOutput oldValue = new RollupPhaseTwoReduceOutput(
-        rollupDimensionKey, rollUpSeries, rawDimensionKey, rawSeries);
+    RollupPhaseTwoReduceOutput oldValue = new RollupPhaseTwoReduceOutput(rollupDimensionKey,
+        rollUpSeries, rawDimensionKey, rawSeries);
 
     byte[] bytes = oldValue.toBytes();
-    RollupPhaseTwoReduceOutput newValue = RollupPhaseTwoReduceOutput.fromBytes(
-        bytes, schema);
-    Assert.assertEquals(oldValue.getRollupDimensionKey(),
-        newValue.getRollupDimensionKey());
-    Assert.assertEquals(oldValue.getRawDimensionKey(),
-        newValue.getRawDimensionKey());
+    RollupPhaseTwoReduceOutput newValue = RollupPhaseTwoReduceOutput.fromBytes(bytes, schema);
+    Assert.assertEquals(oldValue.getRollupDimensionKey(), newValue.getRollupDimensionKey());
+    Assert.assertEquals(oldValue.getRawDimensionKey(), newValue.getRawDimensionKey());
 
     Assert.assertEquals(oldValue.getRawTimeSeries().getTimeWindowSet(),
         newValue.getRawTimeSeries().getTimeWindowSet());

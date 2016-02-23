@@ -15,93 +15,37 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
-    import java.util.HashMap;
-    import java.util.List;
-    import java.util.Map;
-    import java.util.concurrent.ExecutorService;
-
-    import com.linkedin.pinot.common.request.AggregationInfo;
-    import com.linkedin.pinot.common.request.BrokerRequest;
-    import com.linkedin.pinot.common.request.FilterOperator;
-    import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-    import com.linkedin.pinot.common.utils.request.RequestUtils;
-    import com.linkedin.pinot.core.indexsegment.IndexSegment;
-    import com.linkedin.pinot.core.plan.*;
-    import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType;
-    import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
-    import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.plan.Plan;
+import com.linkedin.pinot.core.plan.PlanNode;
+import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 
 
 /**
  * Make the huge plan, root is always ResultPlanNode, the child of it is a huge
  * plan node which will take the segment and query, then do everything.
- *
- *
  */
 public class InstancePlanMakerImplV3 implements PlanMaker {
 
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
 
-    if (brokerRequest.isSetAggregationsInfo()) {
-      if (!brokerRequest.isSetGroupBy()) {
-        // Only Aggregation
-        if (indexSegment.getSegmentMetadata().hasStarTree() && isConjunctiveAggregateQuery(brokerRequest)) {
-          return new StarTreeAggregationPlanNode(indexSegment, brokerRequest);
-        } else {
-          return new RawAggregationPlanNode(indexSegment, brokerRequest);
-        }
-      } else {
-        // Aggregation GroupBy
-        PlanNode aggregationGroupByPlanNode;
-        if (indexSegment instanceof IndexSegmentImpl) {
-          if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
-            // Optimization if can use Long as key for group by, as opposed to string
-//            aggregationGroupByPlanNode =
-//                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.Dictionary);
-            if (indexSegment.getSegmentMetadata().hasStarTree() && isConjunctiveAggregateQuery(brokerRequest)) {
-              aggregationGroupByPlanNode = new StarTreeAggregationGroupByOperatorPlanNode(
-                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.Dictionary);
-            } else {
-              aggregationGroupByPlanNode = new RawAggregationGroupByOperatorPlanNode(
-                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.Dictionary);
-            }
-          } else {
-//            aggregationGroupByPlanNode =
-//                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.DictionaryAndTrie);
-            if (indexSegment.getSegmentMetadata().hasStarTree() && isConjunctiveAggregateQuery(brokerRequest)) {
-              aggregationGroupByPlanNode = new StarTreeAggregationGroupByOperatorPlanNode(
-                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.DictionaryAndTrie);
-            } else {
-              aggregationGroupByPlanNode = new RawAggregationGroupByOperatorPlanNode(
-                  indexSegment, brokerRequest, BaseAggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType.DictionaryAndTrie);
-            }
-          }
-        } else {
-          // This is used for real-time segment when the buffer is not yet ready to be flushed
-          aggregationGroupByPlanNode =
-              new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.NoDictionary);
-        }
-        return aggregationGroupByPlanNode;
-      }
-    }
-    // Only Selection
-    if (brokerRequest.isSetSelections()) {
-      final PlanNode selectionPlanNode = new SelectionPlanNode(indexSegment, brokerRequest);
-      return selectionPlanNode;
-    }
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
   }
 
   @Override
-  public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
-    final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
-    final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
-    rootNode.setPlanNode(combinePlanNode);
-    for (final IndexSegment indexSegment : indexSegmentList) {
-      combinePlanNode.addPlanNode(makeInnerSegmentPlan(indexSegment, brokerRequest));
-    }
-    return new GlobalPlanImplV0(rootNode);
+  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
+      ExecutorService executorService, long timeOutMs) {
+    throw new UnsupportedOperationException("The query contains no aggregation or selection!");
   }
 
   private boolean isGroupKeyFitForLong(IndexSegment indexSegment, BrokerRequest brokerRequest) {
@@ -135,9 +79,8 @@ public class InstancePlanMakerImplV3 implements PlanMaker {
 
   /**
    * Returns true if the filter query consists only of equality statements, conjoined by AND.
-   *
    * <p>
-   *   e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3
+   * e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3
    * </p>
    */
   private boolean isSimpleConjunction(FilterQueryTree tree) {

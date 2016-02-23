@@ -63,24 +63,30 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     super.init(spec);
     Properties props = getProperties();
     this.seasonal = Integer.valueOf(props.getProperty(SEASONAL, PROP_DEFAULT_SEASONAL));
-    this.maxWindowLength = Integer.valueOf(props.getProperty(MAX_WINDOW_LENGTH, PROP_DEFAULT_MAX_WINDOW_LEN));
-    this.numSimulations = Integer.valueOf(props.getProperty(NUM_SIMULATIONS, PROP_DEFAULT_NUM_SIMULATIONS));
-    this.minWindowLength = Integer.valueOf(props.getProperty(MIN_WINDOW_LENGTH, PROP_DEFAULT_MIN_WINDOW_LEN));
-    this.pValueThreshold = Double.valueOf(props.getProperty(P_VALUE_THRESHOLD, PROP_DEFAULT_P_VALUE_THRESHOLD));
+    this.maxWindowLength =
+        Integer.valueOf(props.getProperty(MAX_WINDOW_LENGTH, PROP_DEFAULT_MAX_WINDOW_LEN));
+    this.numSimulations =
+        Integer.valueOf(props.getProperty(NUM_SIMULATIONS, PROP_DEFAULT_NUM_SIMULATIONS));
+    this.minWindowLength =
+        Integer.valueOf(props.getProperty(MIN_WINDOW_LENGTH, PROP_DEFAULT_MIN_WINDOW_LEN));
+    this.pValueThreshold =
+        Double.valueOf(props.getProperty(P_VALUE_THRESHOLD, PROP_DEFAULT_P_VALUE_THRESHOLD));
     this.pattern = ScanStatistics.Pattern.valueOf(props.getProperty(PATTERN));
-    this.minIncrement = Integer.valueOf(props.getProperty(MIN_INCREMENT, PROP_DEFAULT_MIN_INCREMENT));
+    this.minIncrement =
+        Integer.valueOf(props.getProperty(MIN_INCREMENT, PROP_DEFAULT_MIN_INCREMENT));
     this.bootstrap = Boolean.valueOf(props.getProperty(BOOTSTRAP, PROP_DEFAULT_BOOTSTRAP));
-    this.stlTrendBandwidth = Double.valueOf(props.getProperty(STL_TREND_BANDWIDTH, PROP_DEFAULT_STL_TREND_BANDWIDTH));
-    this.monitoringWindow = Integer.valueOf(props.getProperty(MONITORING_WINDOW, PROP_DEFAULT_MONITORING_WINDOW_SIZE));
-    this.notEqualEpsilon = Double.valueOf(props.getProperty(NOT_EQUAL_EPSILON, PROP_DEFAULT_DOUBLE_NOT_EQUAL_EPSILON));
+    this.stlTrendBandwidth =
+        Double.valueOf(props.getProperty(STL_TREND_BANDWIDTH, PROP_DEFAULT_STL_TREND_BANDWIDTH));
+    this.monitoringWindow =
+        Integer.valueOf(props.getProperty(MONITORING_WINDOW, PROP_DEFAULT_MONITORING_WINDOW_SIZE));
+    this.notEqualEpsilon =
+        Double.valueOf(props.getProperty(NOT_EQUAL_EPSILON, PROP_DEFAULT_DOUBLE_NOT_EQUAL_EPSILON));
   }
 
   @Override
-  public List<AnomalyResult> analyze(DimensionKey dimensionKey,
-                                     MetricTimeSeries timeSeries,
-                                     DateTime windowStart,
-                                     DateTime windowEnd,
-                                     List<AnomalyResult> knownAnomalies) throws Exception {
+  public List<AnomalyResult> analyze(DimensionKey dimensionKey, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<AnomalyResult> knownAnomalies)
+          throws Exception {
     long bucketMillis = getSpec().getBucketUnit().toMillis(getSpec().getBucketSize());
     String metric = getSpec().getMetric();
 
@@ -93,8 +99,8 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     averageValue /= numBuckets;
 
     // convert the data to arrays
-    Pair<long[], double[]> arraysFromSeries = MetricTimeSeriesUtils.toArray(timeSeries, metric, bucketMillis,
-        null, Double.NaN);
+    Pair<long[], double[]> arraysFromSeries =
+        MetricTimeSeriesUtils.toArray(timeSeries, metric, bucketMillis, null, Double.NaN);
     long[] timestamps = arraysFromSeries.getFirst();
     double[] observations = arraysFromSeries.getSecond();
     removeMissingValuesByAveragingNeighbors(observations);
@@ -102,19 +108,14 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     // call stl library
     double[] observationsMinusSeasonality = removeSeasonality(timestamps, observations, seasonal);
 
-    int effectiveMaxWindowLength = (int) ((windowEnd.getMillis() - windowStart.getMillis()) / bucketMillis);
+    int effectiveMaxWindowLength =
+        (int) ((windowEnd.getMillis() - windowStart.getMillis()) / bucketMillis);
     effectiveMaxWindowLength = Math.min(effectiveMaxWindowLength, maxWindowLength);
 
     // instantiate model
-    ScanStatistics scanStatistics = new ScanStatistics(
-        numSimulations,
-        minWindowLength,
-        effectiveMaxWindowLength,
-        pValueThreshold,
-        pattern,
-        minIncrement,
-        bootstrap,
-        notEqualEpsilon);
+    ScanStatistics scanStatistics =
+        new ScanStatistics(numSimulations, minWindowLength, effectiveMaxWindowLength,
+            pValueThreshold, pattern, minIncrement, bootstrap, notEqualEpsilon);
     LOGGER.info("Created {}", scanStatistics);
 
     int totalNumBuckets = observationsMinusSeasonality.length;
@@ -130,18 +131,22 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     double[] trainingData = Arrays.copyOfRange(observationsMinusSeasonality, 0, numTrain);
     long[] trainingTimestamps = Arrays.copyOfRange(timestamps, 0, numTrain);
 
-    double[] trainingDataWithOutAnomalies = removeAnomalies(trainingTimestamps, trainingData, anomalousTimestamps);
+    double[] trainingDataWithOutAnomalies =
+        removeAnomalies(trainingTimestamps, trainingData, anomalousTimestamps);
 
     double[] monitoringData = Arrays.copyOfRange(observationsMinusSeasonality, numTrain,
         observationsMinusSeasonality.length);
     double[] monitoringDataOrig = Arrays.copyOfRange(observations, numTrain, observations.length);
-    long[] monitoringTimestamps = Arrays.copyOfRange(timestamps, numTrain, observationsMinusSeasonality.length);
+    long[] monitoringTimestamps =
+        Arrays.copyOfRange(timestamps, numTrain, observationsMinusSeasonality.length);
 
     // get anomalous interval if any
     LOGGER.info("detecting anomalies using scan statistics");
     long startTime = System.nanoTime();
-    Range<Integer> anomalousInterval = scanStatistics.getInterval(trainingDataWithOutAnomalies, monitoringData);
-    LOGGER.info("scan statistics took {} seconds", TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
+    Range<Integer> anomalousInterval =
+        scanStatistics.getInterval(trainingDataWithOutAnomalies, monitoringData);
+    LOGGER.info("scan statistics took {} seconds",
+        TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startTime));
 
     if (anomalousInterval != null) {
       LOGGER.info("found interval : {}", anomalousInterval);
@@ -150,33 +155,28 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     // convert interval result to points
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
     if (anomalousInterval != null) {
-      anomalyResults = getAnomalyResultsForBoundsOnly(
-          dimensionKey,
-          monitoringDataOrig,
-          monitoringTimestamps,
-          anomalousInterval,
-          averageValue);
+      anomalyResults = getAnomalyResultsForBoundsOnly(dimensionKey, monitoringDataOrig,
+          monitoringTimestamps, anomalousInterval, averageValue);
     }
     return anomalyResults;
   }
 
   /**
    * @return
-   *  Only anomaly results for the start and end of the interval.
+   *         Only anomaly results for the start and end of the interval.
    */
-  private List<AnomalyResult> getAnomalyResultsForBoundsOnly(
-      DimensionKey dimensionKey,
-      double[] monitoringData,
-      long[] monitoringTimestamps,
-      Range<Integer> anomalousInterval,
+  private List<AnomalyResult> getAnomalyResultsForBoundsOnly(DimensionKey dimensionKey,
+      double[] monitoringData, long[] monitoringTimestamps, Range<Integer> anomalousInterval,
       double averageValue) {
     long startTimeUtc = monitoringTimestamps[anomalousInterval.lowerEndpoint()];
     long endTimeUtc = monitoringTimestamps[anomalousInterval.upperEndpoint() - 1 /* inclusive */];
 
     List<AnomalyResult> anomalyResults = new ArrayList<AnomalyResult>();
     Properties startProperties = new Properties();
-    startProperties.setProperty("anomalyStart", new DateTime(startTimeUtc, DateTimeZone.UTC).toString());
-    startProperties.setProperty("anomalyEnd", new DateTime(endTimeUtc, DateTimeZone.UTC).toString());
+    startProperties.setProperty("anomalyStart",
+        new DateTime(startTimeUtc, DateTimeZone.UTC).toString());
+    startProperties.setProperty("anomalyEnd",
+        new DateTime(endTimeUtc, DateTimeZone.UTC).toString());
     startProperties.setProperty("bound", "START");
 
     AnomalyResult startResult = new AnomalyResult();
@@ -196,9 +196,10 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
 
   /**
    * @return
-   *  The data with anomalies removed. Timestamps will no longer match this array.
+   *         The data with anomalies removed. Timestamps will no longer match this array.
    */
-  private double[] removeAnomalies(long[] timestamps, double[] data, Set<Long> anomalousTimestamps) {
+  private double[] removeAnomalies(long[] timestamps, double[] data,
+      Set<Long> anomalousTimestamps) {
     int collapsedIdx = 0;
     double[] dataWithAnomaliesRemoved = new double[timestamps.length];
     for (int i = 0; i < timestamps.length; i++) {
@@ -214,11 +215,11 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
 
   /**
    * @param arr
-   *  The array whose NaN values will be removed
-   *
-   * Note, the first data point cannot be a hole by construction from the conversion of MetricTimeSeries with
-   * (min, max) times.
-   * (TODO): linear interpolation for missing data later.
+   *          The array whose NaN values will be removed
+   *          Note, the first data point cannot be a hole by construction from the conversion of
+   *          MetricTimeSeries with
+   *          (min, max) times.
+   *          (TODO): linear interpolation for missing data later.
    */
   public static void removeMissingValuesByAveragingNeighbors(double[] arr) {
     for (int i = 0; i < arr.length; i++) {
@@ -242,15 +243,18 @@ public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
     STLDecomposition.Config config = new STLDecomposition.Config();
     config.setNumberOfObservations(seasonality);
     /*
-     * InnerLoopPasses set to 1 and RobustnessIterations set to 15 matches the stl using robust option in R implementation
+     * InnerLoopPasses set to 1 and RobustnessIterations set to 15 matches the stl using robust
+     * option in R implementation
      * For reference: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html
      */
     config.setNumberOfInnerLoopPasses(1);
     config.setNumberOfRobustnessIterations(15);
 
     /*
-     * There isn't a particularly good reason to use these exact values other than that the results closely match the
-     * stl R library results. It would appear than setting these anywhere between [0.5, 1.0} produces similar results.
+     * There isn't a particularly good reason to use these exact values other than that the results
+     * closely match the
+     * stl R library results. It would appear than setting these anywhere between [0.5, 1.0}
+     * produces similar results.
      */
     config.setLowPassFilterBandwidth(0.5);
     config.setTrendComponentBandwidth(stlTrendBandwidth); // default is 0.5

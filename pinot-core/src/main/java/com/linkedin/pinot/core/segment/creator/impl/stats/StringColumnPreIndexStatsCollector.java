@@ -127,12 +127,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     }
 
     min = sortedStringList[0];
-    if (sortedStringList.length == 0) {
-      max = sortedStringList[0];
-    } else {
-      max = sortedStringList[sortedStringList.length - 1];
-    }
-
+    max = sortedStringList[sortedStringList.length - 1];
   }
 
 }

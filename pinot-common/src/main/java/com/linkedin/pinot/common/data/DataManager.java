@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.common.data;
 
-import org.apache.commons.configuration.Configuration;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import org.apache.commons.configuration.Configuration;
 
 
 public interface DataManager {
@@ -29,8 +27,6 @@ public interface DataManager {
   void start();
 
   void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig) throws Exception;
-
-  void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception;
 
   void removeSegment(String segmentName);
 

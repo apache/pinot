@@ -65,8 +65,8 @@ import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
-public class StarTreeIndexViewer extends JPanel implements
-    TreeSelectionListener, TreeWillExpandListener {
+public class StarTreeIndexViewer extends JPanel
+    implements TreeSelectionListener, TreeWillExpandListener {
   private JEditorPane htmlPane;
   private JTree tree;
   private URL helpURL;
@@ -85,8 +85,8 @@ public class StarTreeIndexViewer extends JPanel implements
   private final String dataDir;
   private final int numTimeBuckets;
 
-  public StarTreeIndexViewer(StarTreeConfig config, StarTree starTree,
-      String dataDir, int numTimeBuckets) {
+  public StarTreeIndexViewer(StarTreeConfig config, StarTree starTree, String dataDir,
+      int numTimeBuckets) {
     super(new GridLayout(1, 0));
     _config = config;
     _starTree = starTree;
@@ -99,8 +99,7 @@ public class StarTreeIndexViewer extends JPanel implements
 
     // Create a tree that allows one selection at a time.
     tree = new JTree(top);
-    tree.getSelectionModel().setSelectionMode(
-        TreeSelectionModel.SINGLE_TREE_SELECTION);
+    tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 
     // Listen for when the selection changes.
     tree.addTreeSelectionListener(this);
@@ -138,8 +137,7 @@ public class StarTreeIndexViewer extends JPanel implements
 
   /** Required by TreeSelectionListener interface. */
   public void valueChanged(TreeSelectionEvent e) {
-    DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree
-        .getLastSelectedPathComponent();
+    DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
 
     if (node == null)
       return;
@@ -156,16 +154,14 @@ public class StarTreeIndexViewer extends JPanel implements
       StringBuffer sb = new StringBuffer("<html><table border=1>");
 
       String nodeId = nodeInfo._node.getId().toString();
-      Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
-          .readForwardIndex(nodeId, dataDir);
-      Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils
-          .toReverseIndex(forwardIndex);
+      Map<String, Map<String, Integer>> forwardIndex =
+          StarTreePersistanceUtil.readForwardIndex(nodeId, dataDir);
+      Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils.toReverseIndex(forwardIndex);
       int numMetrics = _config.getMetrics().size();
 
       int numDimensions = _config.getDimensions().size();
-      Map<int[], Map<Long, Number[]>> leafRecords = StarTreePersistanceUtil
-          .readLeafRecords(dataDir, nodeId, numDimensions, numMetrics, _config.getMetrics(),
-              numTimeBuckets);
+      Map<int[], Map<Long, Number[]>> leafRecords = StarTreePersistanceUtil.readLeafRecords(dataDir,
+          nodeId, numDimensions, numMetrics, _config.getMetrics(), numTimeBuckets);
       int numColumns = numDimensions + numMetrics + 1;
       int rowId = 0;
       Number[] emptyMetrics = new Number[numMetrics];
@@ -175,8 +171,7 @@ public class StarTreeIndexViewer extends JPanel implements
         sb.append("<tr>");
         for (int i = 0; i < numDimensions; i++) {
           sb.append("<td>");
-          sb.append(reverseIndex.get(_config.getDimensions().get(i)).get(
-              dimArr[i]));
+          sb.append(reverseIndex.get(_config.getDimensions().get(i)).get(dimArr[i]));
           sb.append("</td>");
         }
         sb.append("<td colspan=" + (numMetrics + 1) + ">");
@@ -187,8 +182,7 @@ public class StarTreeIndexViewer extends JPanel implements
           for (Entry<Long, Number[]> timeSeriesEntry : timeSeries.entrySet()) {
             Number[] metrics = timeSeriesEntry.getValue();
 
-            if (timeSeriesEntry.getKey() > 0
-                && !Arrays.equals(emptyMetrics, metrics)) {
+            if (timeSeriesEntry.getKey() > 0 && !Arrays.equals(emptyMetrics, metrics)) {
               sb.append("<tr>");
               sb.append("<td colspan=" + (numDimensions) + ">");
               sb.append("<td>");
@@ -202,7 +196,7 @@ public class StarTreeIndexViewer extends JPanel implements
               sb.append("</tr>");
               count++;
             }
-            if(count >0){
+            if (count > 0) {
               break;
             }
           }
@@ -237,8 +231,7 @@ public class StarTreeIndexViewer extends JPanel implements
 
   private DefaultMutableTreeNode createNodes() {
     Queue<DefaultMutableTreeNode> q = new LinkedList<DefaultMutableTreeNode>();
-    DefaultMutableTreeNode top = new DefaultMutableTreeNode(new NodeInfo(
-        _starTree.getRoot()));
+    DefaultMutableTreeNode top = new DefaultMutableTreeNode(new NodeInfo(_starTree.getRoot()));
     q.add(top);
     while (!q.isEmpty()) {
       DefaultMutableTreeNode parent = q.remove();
@@ -249,15 +242,13 @@ public class StarTreeIndexViewer extends JPanel implements
       }
       Collection<StarTreeNode> childSet = indexNode.getChildren();
       for (StarTreeNode node : childSet) {
-        DefaultMutableTreeNode child = new DefaultMutableTreeNode(new NodeInfo(
-            node));
+        DefaultMutableTreeNode child = new DefaultMutableTreeNode(new NodeInfo(node));
         q.add(child);
         parent.add(child);
       }
       StarTreeNode starChildNode = indexNode.getStarNode();
       if (starChildNode != null) {
-        DefaultMutableTreeNode child = new DefaultMutableTreeNode(new NodeInfo(
-            starChildNode));
+        DefaultMutableTreeNode child = new DefaultMutableTreeNode(new NodeInfo(starChildNode));
         q.add(child);
         parent.add(child);
       }
@@ -268,11 +259,10 @@ public class StarTreeIndexViewer extends JPanel implements
   /**
    * Create the GUI and show it. For thread safety, this method should be
    * invoked from the event dispatch thread.
-   *
    * @param dataDirectory
    */
-  public static void createAndShowGUI(StarTreeConfig config, StarTree index,
-      String dataDirectory, int numTimeBuckets) {
+  public static void createAndShowGUI(StarTreeConfig config, StarTree index, String dataDirectory,
+      int numTimeBuckets) {
     if (useSystemLookAndFeel) {
       try {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -286,8 +276,7 @@ public class StarTreeIndexViewer extends JPanel implements
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
     // Add content to the window.
-    frame.add(new StarTreeIndexViewer(config, index, dataDirectory,
-        numTimeBuckets));
+    frame.add(new StarTreeIndexViewer(config, index, dataDirectory, numTimeBuckets));
 
     // Display the window.
     frame.pack();
@@ -298,34 +287,31 @@ public class StarTreeIndexViewer extends JPanel implements
     String config = args[0];
     String pathToTreeBinary = args[1];
     final String dataDirectory = args[2];
-    //final int numTimeBuckets = Integer.parseInt(args[3]);
+    // final int numTimeBuckets = Integer.parseInt(args[3]);
     final int numTimeBuckets = 10;
     final StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(config));
 
-    StarTreeNode starTreeRootNode = StarTreePersistanceUtil
-        .loadStarTree(new FileInputStream(pathToTreeBinary));
+    StarTreeNode starTreeRootNode =
+        StarTreePersistanceUtil.loadStarTree(new FileInputStream(pathToTreeBinary));
     final StarTree starTree = new StarTreeImpl(starTreeConfig);
 
     // Schedule a job for the event dispatch thread:
     // creating and showing this application's GUI.
     javax.swing.SwingUtilities.invokeLater(new Runnable() {
       public void run() {
-        createAndShowGUI(starTreeConfig, starTree, dataDirectory,
-            numTimeBuckets);
+        createAndShowGUI(starTreeConfig, starTree, dataDirectory, numTimeBuckets);
       }
     });
   }
 
   @Override
-  public void treeWillCollapse(TreeExpansionEvent event)
-      throws ExpandVetoException {
+  public void treeWillCollapse(TreeExpansionEvent event) throws ExpandVetoException {
     System.out.println("Collapsing" + event.getPath());
 
   }
 
   @Override
-  public void treeWillExpand(TreeExpansionEvent event)
-      throws ExpandVetoException {
+  public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException {
     System.out.println("Expnding:" + event.getPath());
   }
 }

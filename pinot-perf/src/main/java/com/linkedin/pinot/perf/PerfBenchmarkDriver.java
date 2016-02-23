@@ -15,38 +15,6 @@
  */
 package com.linkedin.pinot.perf;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLConnection;
-import java.sql.Timestamp;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.tools.ClusterStateVerifier;
-import org.apache.helix.tools.ClusterStateVerifier.Verifier;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
-
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.Tenant;
@@ -61,6 +29,32 @@ import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.tools.ClusterStateVerifier;
+import org.apache.helix.tools.ClusterStateVerifier.Verifier;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 
 public class PerfBenchmarkDriver {
@@ -234,6 +228,7 @@ public class PerfBenchmarkDriver {
     }
     ControllerConf conf = getControllerConf();
     controllerStarter = new ControllerStarter(conf);
+    LOGGER.info("Starting controller at port: " + conf.getControllerPort());
     controllerStarter.start();
   }
 
@@ -244,7 +239,9 @@ public class PerfBenchmarkDriver {
     conf.setControllerHost(controllerHost);
     conf.setControllerPort(String.valueOf(controllerPort));
     conf.setDataDir(controllerDataDir);
+    conf.setTenantIsolationEnabled(false);
     conf.setControllerVipHost("localhost");
+    conf.setControllerVipProtocol("http");
     return conf;
   }
 
@@ -258,12 +255,17 @@ public class PerfBenchmarkDriver {
   }
 
   public void configureTable(String tableName) throws Exception {
+    configureTable(tableName, new ArrayList<String>());
+  }
+
+  public void configureTable(String tableName, List<String> invertedIndexColumns) throws Exception {
+
     //TODO:Get these from configuration
     int numInstances = 1;
     int numReplicas = 1;
     String segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
-    String brokerTenantName = "testBrokerTenant";
-    String serverTenantName = "testServerTenant";
+    String brokerTenantName = "DefaultTenant";
+    String serverTenantName = "DefaultTenant";
     // create broker tenant
     Tenant brokerTenant =
         new TenantBuilder(brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(numInstances).build();
@@ -271,19 +273,20 @@ public class PerfBenchmarkDriver {
     helixResourceManager.start();
     helixResourceManager.createBrokerTenant(brokerTenant);
     // create server tenant
-    Tenant serverTenant =
-        new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
-            .setOfflineInstances(numInstances).build();
+    Tenant serverTenant = new TenantBuilder(serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(numInstances)
+        .setOfflineInstances(numInstances).build();
     helixResourceManager.createServerTenant(serverTenant);
     // upload schema
 
     // create table
-    String jsonString =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName, brokerTenantName,
-            numReplicas, segmentAssignmentStrategy).toString();
+    String jsonString = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, serverTenantName,
+        brokerTenantName, numReplicas, segmentAssignmentStrategy).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
     offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
+    if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
+      offlineTableConfig.getIndexingConfig().setInvertedIndexColumns(invertedIndexColumns);
+    }
     helixResourceManager.addTable(offlineTableConfig);
   }
 
@@ -302,8 +305,8 @@ public class PerfBenchmarkDriver {
     File[] listFiles = file.listFiles();
     for (File indexFile : listFiles) {
       LOGGER.info("Uploading index segment " + indexFile.getAbsolutePath());
-      FileUploadUtils.sendSegmentFile(controllerHost, "" + controllerPort, indexFile.getName(), new FileInputStream(
-          indexFile), indexFile.length());
+      FileUploadUtils.sendSegmentFile(controllerHost, "" + controllerPort, indexFile.getName(),
+          new FileInputStream(indexFile), indexFile.length());
     }
   }
 

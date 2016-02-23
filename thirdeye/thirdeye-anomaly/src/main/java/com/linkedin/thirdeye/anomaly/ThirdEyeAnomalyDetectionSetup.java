@@ -23,7 +23,8 @@ import com.linkedin.thirdeye.anomaly.util.ThirdEyeServerUtils;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 /**
- * This class does everything required to get started with thirdeye-anomaly, creating config files and populating the
+ * This class does everything required to get started with thirdeye-anomaly, creating config files
+ * and populating the
  * database.
  */
 public class ThirdEyeAnomalyDetectionSetup {
@@ -33,16 +34,16 @@ public class ThirdEyeAnomalyDetectionSetup {
    */
   public void setup() throws Exception {
     Scanner userInput = new Scanner(System.in);
-    System.out.println(
-        "Welcome to thirdeye-anomaly setup. This process will guide "
-            + "you through the process of generating base configuration "
-            + "templates and database tables.");
+    System.out.println("Welcome to thirdeye-anomaly setup. This process will guide "
+        + "you through the process of generating base configuration "
+        + "templates and database tables.");
 
     ThirdEyeAnomalyDetectionConfiguration topLevelConfig = getTopLevelConfig(userInput);
 
     // get the star tree config (for sanity checking + automated config)
-    StarTreeConfig starTreeConfig = ThirdEyeServerUtils.getStarTreeConfig(topLevelConfig.getThirdEyeServerHost(),
-        topLevelConfig.getThirdEyeServerPort(), topLevelConfig.getCollectionName());
+    StarTreeConfig starTreeConfig =
+        ThirdEyeServerUtils.getStarTreeConfig(topLevelConfig.getThirdEyeServerHost(),
+            topLevelConfig.getThirdEyeServerPort(), topLevelConfig.getCollectionName());
 
     topLevelConfig.setAnomalyDatabaseConfig(getDatabaseConfig(userInput));
     topLevelConfig.setDriverConfig(getDriverConfig(userInput, starTreeConfig));
@@ -61,23 +62,21 @@ public class ThirdEyeAnomalyDetectionSetup {
     String pathName = promptForInput("Enter a filename (config.yml)", userInput);
     File configFile = new File(pathName);
     File parent = configFile.getParentFile();
-    if(parent != null && !parent.exists() && !parent.mkdirs()){
+    if (parent != null && !parent.exists() && !parent.mkdirs()) {
       throw new IllegalStateException("Couldn't create dir: " + parent);
     }
     yamlFactory.createGenerator(new FileOutputStream(configFile)).writeObject(topLevelConfig);
 
     // create tables and insert default function configuration into the database
     switch (topLevelConfig.getMode()) {
-      case GENERIC:
-      {
-        initializeGenericAnomalyDatabase(topLevelConfig, userInput, starTreeConfig);
-        break;
-      }
-      case RULEBASED:
-      {
-        initializeRuleBasedAnomalyDatabase(topLevelConfig, userInput, starTreeConfig);
-        break;
-      }
+    case GENERIC: {
+      initializeGenericAnomalyDatabase(topLevelConfig, userInput, starTreeConfig);
+      break;
+    }
+    case RULEBASED: {
+      initializeRuleBasedAnomalyDatabase(topLevelConfig, userInput, starTreeConfig);
+      break;
+    }
     }
 
     printSectionTitle("Congratulations, you are done!");
@@ -90,20 +89,17 @@ public class ThirdEyeAnomalyDetectionSetup {
   /**
    * Print instructions for getting anomaly results to show in the thirdeye-dashboard
    */
-  private void printDashboardMessage(AnomalyDatabaseConfig anomalyDatabaseConfig, ObjectMapper mapper)
-      throws JsonProcessingException {
+  private void printDashboardMessage(AnomalyDatabaseConfig anomalyDatabaseConfig,
+      ObjectMapper mapper) throws JsonProcessingException {
     System.out.println();
     System.out.println("If you would like anomalies to be shown in the thirdeye-dashboard,\n"
         + "you will need to add the following to your dashboard config.yml");
     System.out.println();
 
-    String[] lines = mapper.writeValueAsString(
-        new AnomalyDatabaseConfig(anomalyDatabaseConfig.getUrl(),
-            null,
-            anomalyDatabaseConfig.getAnomalyTableName(),
-            anomalyDatabaseConfig.getUser(),
-            anomalyDatabaseConfig.getPassword(),
-            true)).split("\n");
+    String[] lines =
+        mapper.writeValueAsString(new AnomalyDatabaseConfig(anomalyDatabaseConfig.getUrl(), null,
+            anomalyDatabaseConfig.getAnomalyTableName(), anomalyDatabaseConfig.getUser(),
+            anomalyDatabaseConfig.getPassword(), true)).split("\n");
 
     System.out.println("anomalyDatabaseConfig:");
     // 0-th line is '---'
@@ -120,7 +116,8 @@ public class ThirdEyeAnomalyDetectionSetup {
     printSectionTitle("basic mysql setup");
 
     if (promptForYN("Create the function table?", userInput)) {
-      String sql = String.format(ResourceUtils.getResourceAsString("database/rulebased/create-rule-table.sql"),
+      String sql = String.format(
+          ResourceUtils.getResourceAsString("database/rulebased/create-rule-table.sql"),
           config.getAnomalyDatabaseConfig().getFunctionTableName());
       try {
         config.getAnomalyDatabaseConfig().runSQL(sql);
@@ -146,12 +143,13 @@ public class ThirdEyeAnomalyDetectionSetup {
   /**
    * Set up generic anomaly detection tables along with default kalman algorithm.
    */
-  private void initializeGenericAnomalyDatabase(ThirdEyeAnomalyDetectionConfiguration config, Scanner userInput,
-      StarTreeConfig starTreeConfig) throws IOException {
+  private void initializeGenericAnomalyDatabase(ThirdEyeAnomalyDetectionConfiguration config,
+      Scanner userInput, StarTreeConfig starTreeConfig) throws IOException {
     printSectionTitle("basic mysql setup");
 
     if (promptForYN("Create the function table?", userInput)) {
-      String sql = String.format(ResourceUtils.getResourceAsString("database/generic/create-function-table.sql"),
+      String sql = String.format(
+          ResourceUtils.getResourceAsString("database/generic/create-function-table.sql"),
           config.getAnomalyDatabaseConfig().getFunctionTableName());
       try {
         config.getAnomalyDatabaseConfig().runSQL(sql);
@@ -176,10 +174,9 @@ public class ThirdEyeAnomalyDetectionSetup {
 
       printSectionTitle("inserting functions");
       for (String metric : metrics) {
-        String sql = String.format(ResourceUtils.getResourceAsString(
-            "database/generic/insert-kalman-filter-default.sql"),
-            config.getAnomalyDatabaseConfig().getFunctionTableName(),
-            config.getCollectionName(),
+        String sql = String.format(
+            ResourceUtils.getResourceAsString("database/generic/insert-kalman-filter-default.sql"),
+            config.getAnomalyDatabaseConfig().getFunctionTableName(), config.getCollectionName(),
             metric.trim());
         System.out.println(sql);
         try {
@@ -195,13 +192,11 @@ public class ThirdEyeAnomalyDetectionSetup {
 
       printSectionTitle("inserting functions");
       for (String metric : metrics) {
-        String sqlUp = String.format(ResourceUtils.getResourceAsString(
-            "database/generic/insert-scan-statistics-default.sql"),
-            config.getAnomalyDatabaseConfig().getFunctionTableName(),
-            "UP",
-            config.getCollectionName(),
-            metric.trim(),
-            "UP");
+        String sqlUp = String.format(
+            ResourceUtils
+                .getResourceAsString("database/generic/insert-scan-statistics-default.sql"),
+            config.getAnomalyDatabaseConfig().getFunctionTableName(), "UP",
+            config.getCollectionName(), metric.trim(), "UP");
         System.out.println(sqlUp);
         try {
           config.getAnomalyDatabaseConfig().runSQL(sqlUp);
@@ -209,13 +204,11 @@ public class ThirdEyeAnomalyDetectionSetup {
           e.printStackTrace();
         }
 
-        String sqlDown = String.format(ResourceUtils.getResourceAsString(
-            "database/generic/insert-scan-statistics-default.sql"),
-            config.getAnomalyDatabaseConfig().getFunctionTableName(),
-            "DOWN",
-            config.getCollectionName(),
-            metric.trim(),
-            "DOWN");
+        String sqlDown = String.format(
+            ResourceUtils
+                .getResourceAsString("database/generic/insert-scan-statistics-default.sql"),
+            config.getAnomalyDatabaseConfig().getFunctionTableName(), "DOWN",
+            config.getCollectionName(), metric.trim(), "DOWN");
         System.out.println(sqlDown);
         try {
           config.getAnomalyDatabaseConfig().runSQL(sqlDown);
@@ -230,12 +223,12 @@ public class ThirdEyeAnomalyDetectionSetup {
    * @param userInput
    * @param starTreeConfig
    * @return
-   *  Metrics to use for a function.
+   *         Metrics to use for a function.
    */
   private List<String> getMetricsForFunction(Scanner userInput, StarTreeConfig starTreeConfig) {
-    String metricsString = promptForInput(
-        "Metrics you want to analyze (delimited by ',', e.g., \"m1,m2,m3\").\n" +
-        "If empty, then all metrics will be monitored.", userInput);
+    String metricsString =
+        promptForInput("Metrics you want to analyze (delimited by ',', e.g., \"m1,m2,m3\").\n"
+            + "If empty, then all metrics will be monitored.", userInput);
 
     List<String> validMetrics = MetricSpecUtils.getMetricNames(starTreeConfig.getMetrics());
 
@@ -248,7 +241,8 @@ public class ThirdEyeAnomalyDetectionSetup {
       metrics = Arrays.asList(metricsString.split(","));
       for (String metric : metrics) {
         if (!validMetrics.contains(metric)) {
-          System.err.println("'" + metric + "' is not a valid metric in " + starTreeConfig.getCollection());
+          System.err.println(
+              "'" + metric + "' is not a valid metric in " + starTreeConfig.getCollection());
           System.exit(1);
         }
       }
@@ -259,14 +253,17 @@ public class ThirdEyeAnomalyDetectionSetup {
   /**
    * @param userInput
    * @return
-   *  Top level thirdeye-anomaly settings
+   *         Top level thirdeye-anomaly settings
    */
   private ThirdEyeAnomalyDetectionConfiguration getTopLevelConfig(Scanner userInput) {
     printSectionTitle("thirdeye-anomaly");
-    Mode mode = Mode.valueOf(promptForInput("Mode of anomaly detection? (GENERIC or RULEBASED)",userInput).toUpperCase());
+    Mode mode =
+        Mode.valueOf(promptForInput("Mode of anomaly detection? (GENERIC or RULEBASED)", userInput)
+            .toUpperCase());
     String collection = promptForInput("What is the collection name?", userInput);
     String host = promptForInput("What is the thirdeye-server's hostname?", userInput);
-    Short port = Short.valueOf(promptForInput("What is the thirdeye-server's applicationPort?", userInput));
+    Short port =
+        Short.valueOf(promptForInput("What is the thirdeye-server's applicationPort?", userInput));
     ThirdEyeAnomalyDetectionConfiguration baseConfig = new ThirdEyeAnomalyDetectionConfiguration();
     baseConfig.setMode(mode);
     baseConfig.setCollectionName(collection);
@@ -278,22 +275,27 @@ public class ThirdEyeAnomalyDetectionSetup {
   /**
    * @param userInput
    * @return
-   *  Driver settings
+   *         Driver settings
    */
-  private AnomalyDetectionDriverConfig getDriverConfig(Scanner userInput, StarTreeConfig starTreeConfig) {
+  private AnomalyDetectionDriverConfig getDriverConfig(Scanner userInput,
+      StarTreeConfig starTreeConfig) {
     printSectionTitle("driver configuration");
-    System.out.println("These settings determine how thirdeye-anomaly will explore various dimension combinations.");
+    System.out.println(
+        "These settings determine how thirdeye-anomaly will explore various dimension combinations.");
 
-    String contributionEstimateMetric = promptForInput("What metric to use to estimate the importance of "
-        + "a dimension combination?", userInput);
-    int maxExplorationDepth = Integer.valueOf(promptForInput("How many dimensions should the driver attempt to "
-        + "fix/group by? (recommend 1)", userInput));
+    String contributionEstimateMetric = promptForInput(
+        "What metric to use to estimate the importance of " + "a dimension combination?",
+        userInput);
+    int maxExplorationDepth = Integer.valueOf(promptForInput(
+        "How many dimensions should the driver attempt to " + "fix/group by? (recommend 1)",
+        userInput));
     String[] dimensionPrecedence = promptForInput(
         "Enter the precedence of dimensions (delimited by ',') that the driver should explore (not aliases!).\n"
-        + "For efficiency, we recommend listing dimensions with high cardinality first.(e.g., \"d1,d2,d3\")\n",
+            + "For efficiency, we recommend listing dimensions with high cardinality first.(e.g., \"d1,d2,d3\")\n",
         userInput).split(",");
 
-    List<String> validDimensions = DimensionSpecUtils.getDimensionNames(starTreeConfig.getDimensions());
+    List<String> validDimensions =
+        DimensionSpecUtils.getDimensionNames(starTreeConfig.getDimensions());
     for (int i = 0; i < dimensionPrecedence.length; i++) {
       dimensionPrecedence[i] = dimensionPrecedence[i].trim();
       if (!validDimensions.contains(dimensionPrecedence[i])) {
@@ -313,23 +315,24 @@ public class ThirdEyeAnomalyDetectionSetup {
   /**
    * @param userInput
    * @return
-   *  Anomaly database settings
+   *         Anomaly database settings
    */
   private AnomalyDatabaseConfig getDatabaseConfig(Scanner userInput) {
     printSectionTitle("anomaly database");
-    System.out.println("thirdeye-anomaly uses a mysql database to store function definitions and publish"
-        + " anomaly output.");
+    System.out
+        .println("thirdeye-anomaly uses a mysql database to store function definitions and publish"
+            + " anomaly output.");
 
     String url = promptForInput("What is your database? (e.g., localhost/thirdeye)", userInput);
     String user = promptForInput("  username", userInput);
     String password = promptForInput("  password", userInput);
-    String functionTableName = promptForInput("Specify a table to store function definitions (e.g., ads_functions)",
-        userInput);
-    String anomalyTableName = promptForInput("Specify a table to publish anomalies to (e.g., anomaly)",
-        userInput);
+    String functionTableName = promptForInput(
+        "Specify a table to store function definitions (e.g., ads_functions)", userInput);
+    String anomalyTableName =
+        promptForInput("Specify a table to publish anomalies to (e.g., anomaly)", userInput);
 
-    AnomalyDatabaseConfig dbConfig = new AnomalyDatabaseConfig(url, functionTableName, anomalyTableName, user,
-        password, true);
+    AnomalyDatabaseConfig dbConfig =
+        new AnomalyDatabaseConfig(url, functionTableName, anomalyTableName, user, password, true);
     return dbConfig;
   }
 

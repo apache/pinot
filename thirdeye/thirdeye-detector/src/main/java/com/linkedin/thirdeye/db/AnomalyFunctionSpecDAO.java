@@ -20,10 +20,8 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   }
 
   public void toggleActive(Long id, boolean isActive) {
-    namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive")
-        .setParameter("id", id)
-        .setParameter("isActive", isActive)
-        .executeUpdate();
+    namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#toggleActive").setParameter("id", id)
+        .setParameter("isActive", isActive).executeUpdate();
   }
 
   public void delete(Long id) {
@@ -37,6 +35,7 @@ public class AnomalyFunctionSpecDAO extends AbstractDAO<AnomalyFunctionSpec> {
   }
 
   public List<AnomalyFunctionSpec> findAllByCollection(String collection) {
-    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection").setParameter("collection", collection));
+    return list(namedQuery("com.linkedin.thirdeye.api.AnomalyFunctionSpec#findAllByCollection")
+        .setParameter("collection", collection));
   }
 }

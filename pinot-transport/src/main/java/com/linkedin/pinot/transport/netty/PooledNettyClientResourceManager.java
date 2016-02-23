@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.Timer;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.PooledResourceManager;
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.Timer;
 
 
 public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, NettyClientConnection> {
@@ -52,13 +50,19 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   public NettyClientConnection create(ServerInstance key) {
     NettyClientConnection conn = new PooledClientConnection(_pool, key, _eventLoop, _timer, _metrics);
     conn.connect();
+    // At this point, we have already waited for a connection to complete. Whether it succeeds or fails,
+    // we should return the object to the pool. It is possible to return null if the connection attempt
+    // fails (i.e. we get back a false return above), but then the pool starts to initiate new connections
+    // to the host to maintain the minimum pool size. We don't want to DOS the server continuously
+    // trying to create new connections. A connection is always validated before the pool returns it
+    // from the idle list to the user.
     return conn;
   }
 
   @Override
   public boolean destroy(ServerInstance key, boolean isBad, NettyClientConnection resource) {
 
-    LOGGER.info("Destroying client connection to server :" + key);
+    LOGGER.info("Destroying client connection to server :" + key + " isBad:"+ isBad);
     boolean closed = false;
     try {
       resource.close();
@@ -105,7 +109,11 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
     @Override
     public void onError(Throwable arg0) {
-      LOGGER.error("Got error for the netty client connection. Destroying the connection", arg0);
+      if (isSelfClose()) {
+        LOGGER.info("Got notified on self-close to {}", _server );
+      } else {
+        LOGGER.error("Destroying connection {} due to error", _server, arg0);
+      }
       /**
        * We got error. Time to discard this connection.
        */

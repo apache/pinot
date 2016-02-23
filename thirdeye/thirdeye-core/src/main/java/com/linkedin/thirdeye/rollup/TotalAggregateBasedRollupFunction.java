@@ -10,20 +10,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- *
  * @author kgopalak
- *
  */
-public class TotalAggregateBasedRollupFunction implements RollupThresholdFunction
-{
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(TotalAggregateBasedRollupFunction.class);
+public class TotalAggregateBasedRollupFunction implements RollupThresholdFunction {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(TotalAggregateBasedRollupFunction.class);
   private String metricName;
   private int totalAggregateThreshold;
-  public TotalAggregateBasedRollupFunction(Map<String, String> params){
+
+  public TotalAggregateBasedRollupFunction(Map<String, String> params) {
     this.metricName = params.get("metricName");
     this.totalAggregateThreshold = Integer.parseInt(params.get("threshold"));
   }
+
   /**
    *
    */
@@ -37,11 +36,11 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunctio
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("sum = " + sum);
     }
-    return sum  >= totalAggregateThreshold;
+    return sum >= totalAggregateThreshold;
   }
 
   @Override
-  public TimeGranularity getRollupAggregationGranularity(){
+  public TimeGranularity getRollupAggregationGranularity() {
     return null;
   }
 

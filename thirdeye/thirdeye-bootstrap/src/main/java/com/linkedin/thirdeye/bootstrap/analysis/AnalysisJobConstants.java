@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.analysis;
 
-public enum AnalysisJobConstants
-{
+public enum AnalysisJobConstants {
   ANALYSIS_INPUT_AVRO_SCHEMA("analysis.input.avro.schema"),
   ANALYSIS_INPUT_PATH("analysis.input.path"),
   ANALYSIS_CONFIG_PATH("analysis.config.path"),

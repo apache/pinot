@@ -18,6 +18,8 @@ package com.linkedin.pinot.controller.helix;
 import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 
+import java.util.List;
+
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -27,6 +29,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
@@ -61,11 +64,13 @@ public class ControllerRequestBuilderUtil {
     return ret;
   }
 
-  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances) throws Exception {
+  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
+      int numInstances) throws Exception {
     addFakeBrokerInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false);
   }
 
-  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances, boolean isSingleTenant) throws Exception {
+  public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
+      int numInstances, boolean isSingleTenant) throws Exception {
     for (int i = 0; i < numInstances; ++i) {
       final String brokerId = "Broker_localhost_" + i;
       final HelixManager helixZkManager =
@@ -76,7 +81,8 @@ public class ControllerRequestBuilderUtil {
           stateModelFactory);
       helixZkManager.connect();
       if (isSingleTenant) {
-        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
+            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       } else {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
       }
@@ -84,11 +90,13 @@ public class ControllerRequestBuilderUtil {
     }
   }
 
-  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances) throws Exception {
+  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
+      int numInstances) throws Exception {
     addFakeDataInstancesToAutoJoinHelixCluster(helixClusterName, zkServer, numInstances, false);
   }
 
-  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer, int numInstances, boolean isSingleTenant) throws Exception {
+  public static void addFakeDataInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
+      int numInstances, boolean isSingleTenant) throws Exception {
     for (int i = 0; i < numInstances; ++i) {
       final String instanceId = "Server_localhost_" + i;
 
@@ -112,17 +120,15 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
       throws JSONException {
-    Tenant tenant =
-        new TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numberOfInstances)
-            .setOfflineInstances(0).setRealtimeInstances(0).build();
+    Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numberOfInstances)
+        .setOfflineInstances(0).setRealtimeInstances(0).build();
     return tenant.toJSON();
   }
 
   public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
       int offlineInstances, int realtimeInstances) throws JSONException {
-    Tenant tenant =
-        new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
-            .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
+    Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.SERVER).setTotalInstances(numberOfInstances)
+        .setOfflineInstances(offlineInstances).setRealtimeInstances(realtimeInstances).build();
     return tenant.toJSON();
   }
 
@@ -135,6 +141,15 @@ public class ControllerRequestBuilderUtil {
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy) throws JSONException {
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
+        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy,
+        Lists.newArrayList("coulmn1", "column2"));
+
+  }
+
+  public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
+      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+      String segmentAssignmentStrategy, List<String> invertedIndexColumnList) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -151,8 +166,9 @@ public class ControllerRequestBuilderUtil {
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
     JSONArray invertedIndexColumns = new JSONArray();
-    invertedIndexColumns.put("column1");
-    invertedIndexColumns.put("column2");
+    for(String columnToIndex:invertedIndexColumnList){
+      invertedIndexColumns.put(columnToIndex);
+    }
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
     tableIndexConfig.put("loadMode", "HEAP");
     tableIndexConfig.put("lazyLoad", "false");
@@ -176,7 +192,7 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       int numReplicas, String segmentAssignmentStrategy) throws JSONException {
-    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "daysSinceEpoch", "DAYS",
-        "700", numReplicas, segmentAssignmentStrategy);
+    return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, "timeColumnName", "daysSinceEpoch",
+        "DAYS", "700", numReplicas, segmentAssignmentStrategy);
   }
 }

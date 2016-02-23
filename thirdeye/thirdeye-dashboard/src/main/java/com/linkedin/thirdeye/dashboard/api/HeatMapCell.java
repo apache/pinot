@@ -14,7 +14,7 @@ public class HeatMapCell {
   private final ObjectMapper objectMapper;
   private final String value;
   private final List<Number> stats = new ArrayList<>();
-  private final Map<String,Number> statsMap = new HashMap<>();
+  private final Map<String, Number> statsMap = new HashMap<>();
 
   public HeatMapCell(ObjectMapper objectMapper, String value) {
     this.objectMapper = objectMapper;
@@ -28,8 +28,8 @@ public class HeatMapCell {
   public List<Number> getStats() {
     return stats;
   }
-  
-  public Map<String,Number> getStatsMap(){
+
+  public Map<String, Number> getStatsMap() {
     return statsMap;
   }
 
@@ -44,9 +44,7 @@ public class HeatMapCell {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(HeatMapCell.class)
-        .add("value", value)
-        .add("stats", stats)
+    return Objects.toStringHelper(HeatMapCell.class).add("value", value).add("stats", stats)
         .toString();
   }
 }

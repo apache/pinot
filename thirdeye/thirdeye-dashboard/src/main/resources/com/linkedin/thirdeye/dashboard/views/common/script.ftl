@@ -13,4 +13,5 @@
 <script src="/assets/js/uikit/components/sortable.min.js"></script>
 <script src="/assets/js/uikit/components/form-select.min.js"></script>
 <script src="/assets/js/flot/jquery.flot.js"></script>
+<script src="/assets/js/handelbars/handelbars-v4.0.4.js"></script>
 <script src="/assets/js/thirdeye.js"></script>

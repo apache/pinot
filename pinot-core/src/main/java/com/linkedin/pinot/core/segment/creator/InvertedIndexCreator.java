@@ -28,11 +28,16 @@ import java.io.IOException;
  */
 
 public interface InvertedIndexCreator {
-  public void add(int docId, int dictionaryId);
 
-  public void add(int docIds, Object dictionaryIds);
+  //public void add(int docId, Object dictionaryId);
 
-  public long totalTimeTakeSoFar();
+  void add(int docId, int dictionaryId);
 
-  public void seal() throws IOException;
+  void add(int docIds, int[] dictionaryIds);
+
+  void add(int docIds, int[] dictionaryIds, int length);
+
+  long totalTimeTakeSoFar();
+
+  void seal() throws IOException;
 }

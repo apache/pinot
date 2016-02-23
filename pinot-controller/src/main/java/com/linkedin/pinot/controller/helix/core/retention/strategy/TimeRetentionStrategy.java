@@ -17,6 +17,8 @@ package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +35,9 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
  */
 public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
-
   private Duration _retentionDuration;
 
-  public TimeRetentionStrategy(String timeUnit, String timeValue) throws Exception {
+  public TimeRetentionStrategy(String timeUnit, String timeValue) {
     long retentionMillis = TimeUtils.toMillis(timeUnit, timeValue);
     if (retentionMillis == Long.MIN_VALUE) {
       LOGGER.error("Failed to set retention duration, timeUnit: {}, timeValue: {}", timeUnit, timeValue);
@@ -64,8 +65,17 @@ public class TimeRetentionStrategy implements RetentionStrategy {
       if (segmentTimeUnit == null) {
         return false;
       }
-      long endsMills = segmentTimeUnit.toMillis(segmentZKMetadata.getEndTime());
-      Duration segmentTimeUntilNow = new Duration(endsMills, System.currentTimeMillis());
+
+      long endsMillis = segmentTimeUnit.toMillis(segmentZKMetadata.getEndTime());
+
+      // Check that the date in the segment is between 1971 and 2071, as a sanity check for misconfigured time units.
+      if (!TimeUtils.timeValueInValidRange(endsMillis)) {
+        LOGGER.warn("Skipping purge check for segment {}, timestamp {} {} fails sanity check.",
+            segmentZKMetadata.getSegmentName(), segmentZKMetadata.getEndTime(), segmentZKMetadata.getTimeUnit());
+        return false;
+      }
+
+      Duration segmentTimeUntilNow = new Duration(endsMillis, System.currentTimeMillis());
       if (_retentionDuration.isShorterThan(segmentTimeUntilNow)) {
         return true;
       }

@@ -15,9 +15,12 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.core.data.GenericRow;
+
 
 public interface StarTreeBuilder {
   /**
@@ -29,48 +32,38 @@ public interface StarTreeBuilder {
    *  The maximum number of records that can exist at a leaf, if there are still split dimensions available.
    * @param table
    *  The temporary table to store dimensional data.
+   * @throws Exception 
    */
-  void init(List<Integer> splitOrder, int maxLeafRecords, StarTreeTable table);
+  void init(StarTreeBuilderConfig config) throws Exception;
 
   /**
    * Adds a possibly non-unique dimension combination to the StarTree table.
+   * @throws Exception 
    */
-  void append(StarTreeTableRow row);
+  void append(GenericRow row) throws Exception;
 
   /**
    * Builds the StarTree, called after all calls to append (after build);
+   * @throws Exception 
    */
-  void build();
+  void build() throws Exception;
+
+  /**
+   * Clean up any temporary files/directories, called at the end.
+   */
+  void cleanup();
 
   /**
    * Returns the root node of the tree (after build).
    */
-  StarTreeIndexNode getTree();
+  StarTree getTree();
 
   /**
-   * Returns the leaf record table (after build).
+   * 
+   * @return
+   * @throws Exception 
    */
-  StarTreeTable getTable();
-
-  /**
-   * Returns the record ID range in the StarTree table for a node (after build).
-   */
-  StarTreeTableRange getDocumentIdRange(int nodeId);
-
-  /**
-   * Returns the adjusted document ID range.
-   *
-   * <p>
-   *   If a node contains aggregates in its path, then the return value signifies the range of documents
-   *   within a contiguous table of only aggregates.
-   * </p>
-   *
-   * <p>
-   *   If a node does not contain aggregates in its path, then the return value signifies the range of
-   *   documents within a contiguous table of only raw values.
-   * </p>
-   */
-  StarTreeTableRange getAggregateAdjustedDocumentIdRange(int nodeId);
+  Iterator<GenericRow> iterator(int startDocId, int endDocId) throws Exception;
 
   /**
    * Returns the total number of non-aggregate dimension combinations.
@@ -88,7 +81,11 @@ public interface StarTreeBuilder {
   int getMaxLeafRecords();
 
   /**
-   * Returns the split order from init.
+   * Returns the split order 
    */
-  List<Integer> getSplitOrder();
+  List<String> getSplitOrder();
+
+  Map<String, HashBiMap<Object, Integer>> getDictionaryMap();
+
+  HashBiMap<String, Integer> getDimensionNameToIndexMap();
 }

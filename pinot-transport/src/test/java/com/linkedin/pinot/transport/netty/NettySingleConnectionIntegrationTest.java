@@ -15,25 +15,35 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.common.AsyncResponseFuture;
+import com.linkedin.pinot.transport.common.Callback;
+import com.linkedin.pinot.transport.common.Cancellable;
+import com.linkedin.pinot.transport.common.NoneType;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
+import com.linkedin.pinot.transport.metrics.PoolStats;
+import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import com.linkedin.pinot.transport.pool.AsyncPool;
+import com.linkedin.pinot.transport.pool.AsyncPoolImpl;
+import com.linkedin.pinot.transport.pool.AsyncPoolResourceManagerAdapter;
+import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timer;
-
 import java.util.concurrent.CountDownLatch;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 
 public class NettySingleConnectionIntegrationTest {
@@ -49,17 +59,10 @@ public class NettySingleConnectionIntegrationTest {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     Timer timer = new HashedWheelTimer();
 
-    String response = "dummy response";
-    int port = 9089;
-    MyRequestHandler handler = new MyRequestHandler(response, null);
-    MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn, "ServerMain");
-    serverThread.start();
+    MyServer server = new MyServer();
     Thread.sleep(1000);
-    ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
+    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, timer, metric);
     try {
       LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
@@ -74,36 +77,113 @@ public class NettySingleConnectionIntegrationTest {
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);
-      Assert.assertEquals(gotResponse, response, "Response Check at client");
-      Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
+      Assert.assertEquals(gotResponse, server.getResponseStr(), "Response Check at client");
+      Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
       System.out.println(metric);
     } finally {
       if (null != clientConn) {
         clientConn.close();
       }
 
-      if (null != serverConn) {
-        serverConn.shutdownGracefully();
+      if (null != server.getServerConn()) {
+        server.getServerConn().shutdownGracefully();
       }
+    }
+  }
+
+  /*
+   * WARNING: This test has potential failures due to timing.
+   */
+  @Test
+  public void testValidatePool() throws Exception {
+    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
+    Timer timer = new HashedWheelTimer();
+
+    MyServer server = new MyServer();
+    Thread.sleep(1000);
+    final String serverName = "SomeServer"; // used as a key to pool. Can be anything.
+    ServerInstance serverInstance = server.getServerInstance();
+    MetricsRegistry metricsRegistry = new MetricsRegistry();
+
+    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
+    PooledNettyClientResourceManager resourceManager = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), metric);
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    ScheduledExecutorService timeoutExecutor = new ScheduledThreadPoolExecutor(5);
+    AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection> rmAdapter =
+        new AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
+    AsyncPool pool = new AsyncPoolImpl<NettyClientConnection>(serverName, rmAdapter,
+     /*maxSize=*/5, /*idleTimeoutMs=*/100000, timeoutExecutor,
+        executorService, /*maxWaiters=*/10, AsyncPoolImpl.Strategy.LRU, /*minSize=*/2, metricsRegistry);
+    pool.start();
+
+    Callback<NoneType> callback;
+
+    callback = new Callback<NoneType>() {
+      @Override
+      public void onSuccess(NoneType arg0) {
+      }
+
+      @Override
+      public void onError(Throwable arg0) {
+        Assert.fail("Shutdown error");
+      }
+    };
+
+
+    boolean serverShutdown = false;
+    try {
+      PoolStats stats;
+      /* Validate with no connection in pool */
+      Thread.sleep(3000);   // Give the pool enough time to create connections (in this case, 2 connections minSize)
+      System.out.println("Validating with no used objects in the pool");
+      pool.validate(false);
+      stats = pool.getStats(); // System.out.println(stats);
+      Assert.assertEquals(2, stats.getPoolSize());
+      Assert.assertEquals(0, stats.getTotalBadDestroyed());
+      /* checkout one connection, it should not destroy anything */
+      AsyncResponseFuture<ServerInstance, NettyClientConnection> future = new AsyncResponseFuture<ServerInstance, NettyClientConnection>(serverInstance, "Future for " + serverName);
+      Cancellable cancellable = pool.get(future);
+      future.setCancellable(cancellable);
+      NettyClientConnection conn = future.getOne();
+      stats = pool.getStats(); // System.out.println(stats);
+      System.out.println("Validating with one used object in the pool");
+      pool.validate(false);
+      Assert.assertEquals(2, stats.getPoolSize());
+      Assert.assertEquals(0, stats.getTotalBadDestroyed());
+      Assert.assertEquals(1, stats.getCheckedOut());
+
+      // Now stop the server, so that the checked out connection is invalidated.
+      server.getServerConn().shutdownGracefully();
+      serverShutdown = true;;
+      Thread.sleep(2000); // Wait for the client channel to be closed.
+      pool.validate(false);
+      Thread.sleep(5000); // Wait for the callback into AsyncPoolImpl after the destroy thread completes destroying the connection
+      System.out.println("Validating with one used object in the pool, after server shutdown");
+      stats = pool.getStats(); // System.out.println(stats);
+      Assert.assertEquals(2, stats.getPoolSize());
+      Assert.assertEquals(1, stats.getTotalBadDestroyed());
+      Assert.assertEquals(1, stats.getCheckedOut());
+
+
+    } finally {
+      if (!serverShutdown) {
+        server.getServerConn().shutdownGracefully();
+      }
+      pool.shutdown(callback);
+      executorService.shutdown();
+      timeoutExecutor.shutdown();
     }
   }
 
   @Test
   public void testCancelOutstandingRequest() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    String response = "dummy response";
-    int port = 9089;
     CountDownLatch latch = new CountDownLatch(1);
-    MyRequestHandler handler = new MyRequestHandler(response, latch);
-    MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn, "ServerMain");
-    serverThread.start();
+    MyServer server = new MyServer();
     Thread.sleep(1000);
-    ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
+        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
@@ -118,25 +198,18 @@ public class NettySingleConnectionIntegrationTest {
     Assert.assertNull(serverResp);
     Assert.assertTrue(serverRespFuture.isCancelled(), "Is Cancelled");
     clientConn.close();
-    serverConn.shutdownGracefully();
+    server.getServerConn().shutdownGracefully();
   }
 
   @Test
   public void testConcurrentRequestDispatchError() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    String response = "dummy response";
-    int port = 9089;
     CountDownLatch latch = new CountDownLatch(1);
-    MyRequestHandler handler = new MyRequestHandler(response, latch);
-    MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn, "ServerMain");
-    serverThread.start();
+    MyServer server = new MyServer();
     Thread.sleep(1000);
-    ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
+        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
@@ -158,10 +231,10 @@ public class NettySingleConnectionIntegrationTest {
     byte[] b2 = new byte[serverResp.readableBytes()];
     serverResp.readBytes(b2);
     String gotResponse = new String(b2);
-    Assert.assertEquals(gotResponse, response, "Response Check at client");
-    Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
+    Assert.assertEquals(gotResponse, server.getResponseStr(), "Response Check at client");
+    Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
     clientConn.close();
-    serverConn.shutdownGracefully();
+    server.getServerConn().shutdownGracefully();
     Assert.assertTrue(gotException, "GotException ");
   }
 
@@ -181,19 +254,13 @@ public class NettySingleConnectionIntegrationTest {
    */
   public void testSingleLargeRequestResponse() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    String response_prefix = "response_";
-    String response = generatePayload(response_prefix, 1024 * 1024 * 2);
-    int port = 9089;
-    MyRequestHandler handler = new MyRequestHandler(response, null);
-    MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn, "ServerMain");
-    serverThread.start();
+    final String response_prefix = "response_";
+    final String response = generatePayload(response_prefix, 1024 * 1024 * 2);
+    MyServer server = new MyServer(response);
     Thread.sleep(1000);
-    ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
+        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
     try {
       LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
@@ -210,13 +277,13 @@ public class NettySingleConnectionIntegrationTest {
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);
       Assert.assertEquals(gotResponse, response, "Response Check at client");
-      Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
+      Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
     } finally {
       if (null != clientConn) {
         clientConn.close();
       }
-      if (null != serverConn) {
-        serverConn.shutdownGracefully();
+      if (null != server.getServerConn()) {
+        server.getServerConn().shutdownGracefully();
       }
     }
   }
@@ -228,17 +295,11 @@ public class NettySingleConnectionIntegrationTest {
    */
   public void test10KSmallRequestResponses() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    int port = 9089;
-    MyRequestHandler handler = new MyRequestHandler(null, null);
-    MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn, "ServerMain");
-    serverThread.start();
+    MyServer server = new MyServer(null);
     Thread.sleep(1000);
-    ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
+        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
     try {
       LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
@@ -248,7 +309,7 @@ public class NettySingleConnectionIntegrationTest {
       for (int i = 0; i < 10000; i++) {
         String request = "dummy request :" + i;
         String response = "dummy response :" + i;
-        handler.setResponse(response);
+        server.getHandler().setResponse(response);
         LOGGER.info("Sending the request (" + request + ")");
         ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
         LOGGER.info("Request  sent !!");
@@ -261,15 +322,15 @@ public class NettySingleConnectionIntegrationTest {
         serverResp.readBytes(b2);
         String gotResponse = new String(b2);
         Assert.assertEquals(gotResponse, response, "Response Check at client");
-        Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
+        Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
       }
     } finally {
       if (null != clientConn) {
         clientConn.close();
       }
 
-      if (null != serverConn) {
-        serverConn.shutdownGracefully();
+      if (null != server.getServerConn()) {
+        server.getServerConn().shutdownGracefully();
       }
     }
   }
@@ -283,17 +344,10 @@ public class NettySingleConnectionIntegrationTest {
   //@Test
   public void test100LargeRequestResponses() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    int port = 9089;
-    MyRequestHandler handler = new MyRequestHandler(null, null);
-    MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn, "ServerMain");
-    serverThread.start();
-    Thread.sleep(1000);
-    ServerInstance server = new ServerInstance("localhost", port);
+    MyServer server = new MyServer(null);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
+        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
     LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOGGER.info("Client connected !!");
@@ -305,7 +359,7 @@ public class NettySingleConnectionIntegrationTest {
         String request = generatePayload(request_prefix, 1024 * 1024 * 20);
         String response_prefix = "response_";
         String response = generatePayload(response_prefix, 1024 * 1024 * 20);
-        handler.setResponse(response);
+        server.getHandler().setResponse(response);
         //LOG.info("Sending the request (" + request + ")");
         ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
         //LOG.info("Request  sent !!");
@@ -314,15 +368,15 @@ public class NettySingleConnectionIntegrationTest {
         serverResp.readBytes(b2);
         String gotResponse = new String(b2);
         Assert.assertEquals(gotResponse, response, "Response Check at client");
-        Assert.assertEquals(handler.getRequest(), request, "Request Check at server");
+        Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
       }
     } finally {
       if (null != clientConn) {
         clientConn.close();
       }
 
-      if (null != serverConn) {
-        serverConn.shutdownGracefully();
+      if (null != server.getServerConn()) {
+        server.getServerConn().shutdownGracefully();
       }
     }
   }
@@ -378,6 +432,40 @@ public class NettySingleConnectionIntegrationTest {
 
     public void setResponse(String response) {
       _response = response;
+    }
+  }
+
+  private static class MyServer {
+    private final int _port = 9089;
+    private final String _responseStr;
+    private final MyRequestHandler _handler;
+    private final NettyTCPServer _serverConn;
+    private final ServerInstance _serverInstance;
+
+    public MyServer(String responseStr) {
+      _responseStr = responseStr;
+      _handler = new MyRequestHandler(_responseStr, null);
+      MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(_handler);
+      _serverConn = new NettyTCPServer(_port, handlerFactory, null);
+      Thread serverThread = new Thread(_serverConn, "ServerMain");
+      serverThread.start();
+      _serverInstance = new ServerInstance("localhost", _port);
+    }
+    public MyServer() {
+      this("dummy response");
+    }
+
+    public MyRequestHandler getHandler() {
+      return _handler;
+    }
+    public NettyTCPServer getServerConn() {
+      return _serverConn;
+    }
+    public ServerInstance getServerInstance() {
+      return _serverInstance;
+    }
+    public final String getResponseStr() {
+      return _responseStr;
     }
   }
 }

@@ -104,8 +104,20 @@ public class QueryGenerator {
             _columnNames.add(fieldName);
             _multivalueColumnCardinality.put(fieldName, 0);
             break;
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+            _columnNames.add(fieldName);
+            _columnToValues.put(fieldName, new TreeSet<String>());
+            _nonMultivalueNumericalColumnNames.add(fieldName);
+            break;
+          case RECORD:
+            LOGGER.warn("Ignoring field {} of type RECORD", fieldName);
+            break;
           default:
-            throw new AssertionError("Don't know how to handle fields of type " + fieldType);
+            LOGGER.warn("Ignoring field {} of type {}", fieldName, fieldType);
+            break;
         }
       }
     } catch (Exception e) {
@@ -577,9 +589,17 @@ public class QueryGenerator {
       String pqlInValues = StringUtil.join(", ", pqlInValueList.toArray(new String[pqlInValueList.size()]));
       String h2InValues = StringUtil.join(", ", h2InValueList.toArray(new String[h2InValueList.size()]));
 
-      return new StringQueryFragment(
-          columnName + " IN (" + pqlInValues + ")",
-          columnName + " IN (" + h2InValues + ")");
+      boolean notIn = RANDOM.nextBoolean();
+
+      if (notIn) {
+        return new StringQueryFragment(
+            columnName + " NOT IN (" + pqlInValues + ")",
+            columnName + " NOT IN (" + h2InValues + ")");
+      } else {
+        return new StringQueryFragment(
+            columnName + " IN (" + pqlInValues + ")",
+            columnName + " IN (" + h2InValues + ")");
+      }
     }
   }
 

@@ -41,7 +41,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _endTime = -1;
   private TimeUnit _timeUnit = null;
   private String _indexVersion = null;
-  private long _totalDocs = -1;
+  private long _totalRawDocs = -1;
   private long _crc = -1;
   private long _creationTime = -1;
 
@@ -59,7 +59,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
       _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     }
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
-    _totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
+    _totalRawDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
     _crc = znRecord.getLongField(CommonConstants.Segment.CRC, -1);
     _creationTime = znRecord.getLongField(CommonConstants.Segment.CREATION_TIME, -1);
   }
@@ -120,12 +120,12 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = segmentType;
   }
 
-  public long getTotalDocs() {
-    return _totalDocs;
+  public long getTotalRawDocs() {
+    return _totalRawDocs;
   }
 
-  public void setTotalDocs(long totalDocs) {
-    _totalDocs = totalDocs;
+  public void setTotalRawDocs(long totalRawDocs) {
+    _totalRawDocs = totalRawDocs;
   }
 
   public long getCrc() {
@@ -162,7 +162,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         isEqual(_startTime, metadata._startTime) &&
         isEqual(_endTime, metadata._endTime) &&
         isEqual(_segmentType, metadata._segmentType) &&
-        isEqual(_totalDocs, metadata._totalDocs) &&
+        isEqual(_totalRawDocs, metadata._totalRawDocs) &&
         isEqual(_crc, metadata._crc) &&
         isEqual(_creationTime, metadata._creationTime);
   }
@@ -176,7 +176,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _endTime);
     result = hashCodeOf(result, _timeUnit);
     result = hashCodeOf(result, _indexVersion);
-    result = hashCodeOf(result, _totalDocs);
+    result = hashCodeOf(result, _totalRawDocs);
     result = hashCodeOf(result, _crc);
     result = hashCodeOf(result, _creationTime);
     return result;
@@ -197,7 +197,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     znRecord.setLongField(CommonConstants.Segment.END_TIME, _endTime);
 
     znRecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, _indexVersion);
-    znRecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, _totalDocs);
+    znRecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, _totalRawDocs);
     znRecord.setLongField(CommonConstants.Segment.CRC, _crc);
     znRecord.setLongField(CommonConstants.Segment.CREATION_TIME, _creationTime);
     return znRecord;
@@ -217,7 +217,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     configMap.put(CommonConstants.Segment.END_TIME, Long.toString(_endTime));
 
     configMap.put(CommonConstants.Segment.INDEX_VERSION, _indexVersion);
-    configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalDocs));
+    configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalRawDocs));
     configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
     configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
     return configMap;

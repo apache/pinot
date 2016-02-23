@@ -20,20 +20,20 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class SingleValueSortedForwardIndexCreator implements SingleValueForwardIndexCreator, Closeable {
-  private FixedByteWidthRowColDataFileWriter indexWriter;
+  private FixedByteSingleValueMultiColWriter indexWriter;
   private int[] mins;
   private int[] maxs;
   private int cardinality;
 
   public SingleValueSortedForwardIndexCreator(File indexDir, int cardinality, FieldSpec spec) throws Exception {
     File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
-    indexWriter = new FixedByteWidthRowColDataFileWriter(indexFile, cardinality, 2, new int[] { 4, 4 });
+    indexWriter = new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[] { 4, 4 });
     mins = new int[cardinality];
     maxs = new int[cardinality];
 

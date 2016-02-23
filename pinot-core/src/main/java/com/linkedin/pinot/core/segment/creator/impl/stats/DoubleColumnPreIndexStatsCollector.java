@@ -110,27 +110,6 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
     }
 
     min = sortedDoubleList[0];
-    if (sortedDoubleList.length == 0) {
-      max = sortedDoubleList[0];
-    } else {
-      max = sortedDoubleList[sortedDoubleList.length - 1];
-    }
-
-  }
-
-  public static void main(String[] args) {
-    int a = 1;
-    float b = 2;
-    long c = 3;
-    double d = 4;
-    Integer a1 = 1;
-    Float b1 = (float) 2;
-    Long c1 = (long) 3;
-    Double d1 = (double) 4;
-    System.out.println((Integer) a1);
-    System.out.println(((Number) ((Object) a1)).doubleValue());
-    System.out.println(((Number) ((Object) b1)).doubleValue());
-    System.out.println(((Number) ((Object) a1)).doubleValue());
-
+    max = sortedDoubleList[sortedDoubleList.length - 1];
   }
 }

@@ -16,6 +16,9 @@
 package com.linkedin.pinot.core.realtime.converter;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
@@ -35,16 +38,13 @@ public class RealtimeSegmentConverter {
   private String tableName;
   private String segmentName;
   private String sortedColumn;
+  private List<String> invertedIndexColumns;
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn) {
-    realtimeSegmentImpl = realtimeSegment;
-    this.outputPath = outputPath;
+      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns) {
     if (new File(outputPath).exists()) {
-      throw new IllegalAccessError("path already exists");
+      throw new IllegalAccessError("path already exists:" + outputPath);
     }
-    this.tableName = tableName;
-    this.segmentName = segmentName;
     TimeFieldSpec original = schema.getTimeFieldSpec();
     TimeGranularitySpec incoming = original.getIncomingGranularitySpec();
     // incoming.setDataType(DataType.LONG);
@@ -60,8 +60,18 @@ public class RealtimeSegmentConverter {
     }
 
     newSchema.addSchema(newTimeSpec.getName(), newTimeSpec);
+    this.realtimeSegmentImpl = realtimeSegment;
+    this.outputPath = outputPath;
+    this.invertedIndexColumns = invertedIndexColumns;
     this.dataSchema = newSchema;
     this.sortedColumn = sortedColumn;
+    this.tableName = tableName;
+    this.segmentName = segmentName;
+  }
+
+  public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
+      String tableName, String segmentName, String sortedColumn) {
+    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>());
   }
 
   public void build() throws Exception {
@@ -75,9 +85,12 @@ public class RealtimeSegmentConverter {
     }
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(dataSchema);
     genConfig.setInputFilePath(null);
-
+    if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
+      for (String column : invertedIndexColumns) {
+        genConfig.createInvertedIndexForColumn(column);
+      }
+    }
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName());
-
     genConfig.setTimeUnitForSegment(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     genConfig.setSegmentVersion(SegmentVersion.v1);
     genConfig.setTableName(tableName);

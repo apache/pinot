@@ -1,23 +1,32 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.base.Joiner;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
-import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardSpec;
-import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardComponentSpec;
-import com.linkedin.thirdeye.dashboard.util.*;
-import com.linkedin.thirdeye.dashboard.views.CustomDashboardView;
-import com.linkedin.thirdeye.dashboard.views.CustomFunnelTabularView;
-import com.linkedin.thirdeye.dashboard.views.CustomTimeSeriesView;
-import com.sun.jersey.core.util.MultivaluedMapImpl;
-import io.dropwizard.views.View;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Future;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math3.util.Pair;
@@ -25,32 +34,43 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.*;
-import javax.ws.rs.core.*;
-import java.io.*;
-import java.util.*;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.ThirdEyeRequest;
+import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
+import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.DimensionGroupSpec;
+import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardComponentSpec;
+import com.linkedin.thirdeye.dashboard.api.custom.CustomDashboardSpec;
+import com.linkedin.thirdeye.dashboard.util.ConfigCache;
+import com.linkedin.thirdeye.dashboard.util.DataCache;
+import com.linkedin.thirdeye.dashboard.util.QueryCache;
+import com.linkedin.thirdeye.dashboard.views.CustomDashboardView;
+import com.linkedin.thirdeye.dashboard.views.CustomFunnelTabularView;
+import com.linkedin.thirdeye.dashboard.views.CustomTimeSeriesView;
+
+import io.dropwizard.views.View;
 
 @Path("/custom-dashboard")
 public class CustomDashboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(CustomDashboardResource.class);
   private static final Joiner METRIC_FUNCTION_JOINER = Joiner.on(",");
-  private static final TypeReference<List<String>> LIST_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> LIST_REF = new TypeReference<List<String>>() {
+  };
   private final File customDashboardRoot;
-  private final String serverUri;
   private final QueryCache queryCache;
   private final DataCache dataCache;
   private final ConfigCache configCache;
   private final ObjectMapper objectMapper;
 
-  public CustomDashboardResource(File customDashboardRoot,
-                                 String serverUri,
-                                 QueryCache queryCache,
-                                 DataCache dataCache,
-                                 ConfigCache configCache) {
+  public CustomDashboardResource(File customDashboardRoot, QueryCache queryCache,
+      DataCache dataCache, ConfigCache configCache) {
     this.customDashboardRoot = customDashboardRoot;
-    this.serverUri = serverUri;
     this.queryCache = queryCache;
     this.dataCache = dataCache;
     this.configCache = configCache;
@@ -77,20 +97,21 @@ public class CustomDashboardResource {
   @POST
   @Path("/config/{collection}/{name}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response post(
-      @PathParam("collection") String collection,
-      @PathParam("name") String name, byte[] config) throws Exception {
+  public Response post(@PathParam("collection") String collection, @PathParam("name") String name,
+      byte[] config) throws Exception {
     File collectionDir = new File(customDashboardRoot, collection);
     File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Do not overwrite existing
     if (configFile.exists()) {
-      return Response.status(Response.Status.CONFLICT).entity("Config already exists for " + name).build();
+      return Response.status(Response.Status.CONFLICT).entity("Config already exists for " + name)
+          .build();
     }
 
     // Create collection dir if it doesn't exist
@@ -104,7 +125,8 @@ public class CustomDashboardResource {
       IOUtils.copy(new ByteArrayInputStream(config), outputStream);
       LOG.info("Created custom dashboard {} for collection {}", name, collection);
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not write to " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not write to " + configFile).build();
     }
 
     return Response.ok().build();
@@ -119,7 +141,8 @@ public class CustomDashboardResource {
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Check if exists
@@ -131,19 +154,22 @@ public class CustomDashboardResource {
       byte[] config = IOUtils.toByteArray(inputStream);
       return Response.ok(config, MediaType.APPLICATION_OCTET_STREAM).build();
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not read from " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not read from " + configFile).build();
     }
   }
 
   @DELETE
   @Path("/config/{collection}/{name}")
-  public Response delete(@PathParam("collection") String collection, @PathParam("name") String name) {
+  public Response delete(@PathParam("collection") String collection,
+      @PathParam("name") String name) {
     File collectionDir = new File(customDashboardRoot, collection);
     File configFile = new File(collectionDir, name);
 
     // Paths should never be relative
     if (!configFile.isAbsolute()) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Path is not absolute: " + configFile).build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Path is not absolute: " + configFile).build();
     }
 
     // Check if exists
@@ -157,7 +183,8 @@ public class CustomDashboardResource {
       LOG.info("Deleted custom dashboard {} for collection {}", name, collection);
       return Response.noContent().build();
     } catch (Exception e) {
-      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Could not delete " + configFile).build();
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Could not delete " + configFile).build();
     }
   }
 
@@ -165,21 +192,18 @@ public class CustomDashboardResource {
 
   @GET
   @Path("/dashboard/{collection}/{name}/{year}/{month}/{day}")
-  public CustomDashboardView getCustomDashboard(
-      @PathParam("collection") String collection,
-      @PathParam("name") String name,
-      @PathParam("year") Integer year,
-      @PathParam("month") Integer month,
-      @PathParam("day") Integer day) throws Exception {
+  public CustomDashboardView getCustomDashboard(@PathParam("collection") String collection,
+      @PathParam("name") String name, @PathParam("year") Integer year,
+      @PathParam("month") Integer month, @PathParam("day") Integer day) throws Exception {
     CustomDashboardSpec spec = configCache.getCustomDashboardSpec(collection, name);
 
     // Get funnel views
     List<Pair<CustomDashboardComponentSpec, View>> views = new ArrayList<>();
     for (CustomDashboardComponentSpec componentSpec : spec.getComponents()) {
-      MultivaluedMap<String, String> dimensionValues = new MultivaluedMapImpl();
+      Multimap<String, String> dimensionValues = LinkedListMultimap.create();
       if (componentSpec.getDimensions() != null) {
         for (Map.Entry<String, List<String>> entry : componentSpec.getDimensions().entrySet()) {
-          dimensionValues.put(entry.getKey(), entry.getValue());
+          dimensionValues.putAll(entry.getKey(), entry.getValue());
         }
       }
 
@@ -188,14 +212,15 @@ public class CustomDashboardResource {
 
       View view = null;
       switch (componentSpec.getType()) {
-        case FUNNEL:
-          view = getCustomFunnelTabularView(collection, year, month, day, metrics, dimensionValues);
-          break;
-        case TIME_SERIES:
-          view = getCustomTimeSeriesView(collection, year, month, day, metrics, dimensionValues, groupBy);
-          break;
-        default:
-          throw new IllegalStateException("Invalid funnel spec " + componentSpec.getType());
+      case FUNNEL:
+        view = getCustomFunnelTabularView(collection, year, month, day, metrics, dimensionValues);
+        break;
+      case TIME_SERIES:
+        view = getCustomTimeSeriesView(collection, year, month, day, metrics, dimensionValues,
+            groupBy);
+        break;
+      default:
+        throw new IllegalStateException("Invalid funnel spec " + componentSpec.getType());
       }
 
       if (view != null) {
@@ -206,38 +231,37 @@ public class CustomDashboardResource {
     return new CustomDashboardView(name, views);
   }
 
-  private CustomTimeSeriesView getCustomTimeSeriesView(
-      String collection,
-      Integer year,
-      Integer month,
-      Integer day,
-      List<String> metricList,
-      MultivaluedMap<String, String> queryParams,
+  private CustomTimeSeriesView getCustomTimeSeriesView(String collection, Integer year,
+      Integer month, Integer day, List<String> metricList, Multimap<String, String> queryParams,
       String groupBy) throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
     DateTime current = new DateTime(year, month, day, 0, 0);
     DateTime baseline = current.minusWeeks(1);
-    MultivaluedMap<String, String> dimensionValues = queryParams;
+    Multimap<String, String> dimensionValues = queryParams;
 
     if (groupBy != null) {
       if (dimensionValues.containsKey(groupBy)) {
         throw new IllegalArgumentException("Cannot group by fixed dimension");
       }
-      dimensionValues.put(groupBy, Arrays.asList("!"));
     }
 
     // Query
-    Map<String, Map<String, List<String>>> dimensionGroups = null;
+    Map<String, Multimap<String, String>> dimensionGroups = null;
     DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
     if (dimensionGroupSpec != null) {
       dimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
-    String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues, dimensionGroups);
-    QueryResult result = queryCache.getQueryResult(serverUri, sql);
+    Multimap<String, String> expandedDimensionValues =
+        ThirdEyeRequestUtils.expandDimensionGroups(dimensionValues, dimensionGroups);
+
+    ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
+        .setDimensionValues(expandedDimensionValues).setGroupBy(groupBy).build();
+    QueryResult result = queryCache.getQueryResult(req);
 
     // Get index of group by so we can extract values for labels
-    CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
+    CollectionSchema schema = dataCache.getCollectionSchema(collection);
     int groupByIdx = -1;
     for (int i = 0; i < schema.getDimensions().size(); i++) {
       if (schema.getDimensions().get(i).equals(groupBy)) {
@@ -297,7 +321,9 @@ public class CustomDashboardResource {
       List<Number[]> series = new ArrayList<>();
       for (Long time : times) {
         Number value = seriesMap.get(time);
-        series.add(new Number[] { time, value == null ? 0 : value });
+        series.add(new Number[] {
+            time, value == null ? 0 : value
+        });
       }
       allSeries.put(chosenValue, series);
     }
@@ -305,13 +331,9 @@ public class CustomDashboardResource {
     return new CustomTimeSeriesView(allSeries);
   }
 
-  private CustomFunnelTabularView getCustomFunnelTabularView(
-      String collection,
-      Integer year,
-      Integer month,
-      Integer day,
-      List<String> metricList,
-      MultivaluedMap<String, String> queryParams) throws Exception {
+  private CustomFunnelTabularView getCustomFunnelTabularView(String collection, Integer year,
+      Integer month, Integer day, List<String> metricList, Multimap<String, String> queryParams)
+          throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
 
@@ -320,22 +342,28 @@ public class CustomDashboardResource {
     DateTime baselineEnd = currentEnd.minusWeeks(1);
     DateTime baselineStart = baselineEnd.minusDays(1);
 
-    // Dimension groups
-    Map<String, Map<String, List<String>>> dimensionGroups = null;
+    Map<String, Multimap<String, String>> dimensionGroups = null;
     DimensionGroupSpec dimensionGroupSpec = configCache.getDimensionGroupSpec(collection);
     if (dimensionGroupSpec != null) {
       dimensionGroups = dimensionGroupSpec.getReverseMapping();
     }
 
-    // SQL
-    String baselineSql = SqlUtils.getSql(metricFunction, collection, baselineStart, baselineEnd, queryParams, dimensionGroups);
-    String currentSql = SqlUtils.getSql(metricFunction, collection, currentStart, currentEnd, queryParams, dimensionGroups);
-    LOG.info("Generated SQL: {}", baselineSql);
-    LOG.info("Generated SQL: {}", currentSql);
+    Multimap<String, String> expandedDimensionValues =
+        ThirdEyeRequestUtils.expandDimensionGroups(queryParams, dimensionGroups);
+
+    // Requests
+    ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(baselineStart).setEndTime(baselineEnd)
+        .setDimensionValues(expandedDimensionValues).build();
+    ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
+        .setMetricFunction(metricFunction).setStartTime(currentStart).setEndTime(currentEnd)
+        .setDimensionValues(expandedDimensionValues).build();
+    LOG.info("Generated Req: {}", baselineReq);
+    LOG.info("Generated Req: {}", currentReq);
 
     // Query
-    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(serverUri, baselineSql);
-    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(serverUri, currentSql);
+    Future<QueryResult> baselineResult = queryCache.getQueryResultAsync(baselineReq);
+    Future<QueryResult> currentResult = queryCache.getQueryResultAsync(currentReq);
 
     // Baseline data
     Map<Long, Number[]> baselineData = extractFunnelData(baselineResult.get());
@@ -357,10 +385,12 @@ public class CustomDashboardResource {
         // Compute percent change
         Number[] change = new Number[baselineValues.length];
         for (int i = 0; i < baselineValues.length; i++) {
-          if (baselineValues[i] == null || currentValues[i] == null || baselineValues[i].doubleValue() == 0.0) {
+          if (baselineValues[i] == null || currentValues[i] == null
+              || baselineValues[i].doubleValue() == 0.0) {
             change[i] = null; // i.e. N/A, or cannot compute ratio to baseline
           } else {
-            change[i] = (currentValues[i].doubleValue() - baselineValues[i].doubleValue()) / baselineValues[i].doubleValue();
+            change[i] = (currentValues[i].doubleValue() - baselineValues[i].doubleValue())
+                / baselineValues[i].doubleValue();
           }
         }
 
@@ -409,7 +439,8 @@ public class CustomDashboardResource {
           Response.Status.BAD_REQUEST);
     }
 
-    Map.Entry<String, Map<String, Number[]>> first = queryResult.getData().entrySet().iterator().next();
+    Map.Entry<String, Map<String, Number[]>> first =
+        queryResult.getData().entrySet().iterator().next();
 
     for (Map.Entry<String, Number[]> entry : first.getValue().entrySet()) {
       data.put(Long.valueOf(entry.getKey()), entry.getValue());

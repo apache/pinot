@@ -32,7 +32,8 @@ public class ThirdEyeRatioFunction implements ThirdEyeFunction {
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query,
+      MetricTimeSeries timeSeries) {
     List<String> metricNames = new ArrayList<>(timeSeries.getSchema().getNames());
     List<MetricType> metricTypes = new ArrayList<>(timeSeries.getSchema().getTypes());
 

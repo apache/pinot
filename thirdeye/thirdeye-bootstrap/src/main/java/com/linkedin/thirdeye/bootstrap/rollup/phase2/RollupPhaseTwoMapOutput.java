@@ -18,8 +18,8 @@ public class RollupPhaseTwoMapOutput {
 
   DimensionKey rollupDimensionKey;
 
-  public RollupPhaseTwoMapOutput(DimensionKey rollupDimensionKey,
-      DimensionKey rawDimensionKey, MetricTimeSeries rawTimeSeries) {
+  public RollupPhaseTwoMapOutput(DimensionKey rollupDimensionKey, DimensionKey rawDimensionKey,
+      MetricTimeSeries rawTimeSeries) {
     this.rollupDimensionKey = rollupDimensionKey;
     this.rawTimeSeries = rawTimeSeries;
     this.rawDimensionKey = rawDimensionKey;
@@ -32,9 +32,11 @@ public class RollupPhaseTwoMapOutput {
   public DimensionKey getRawDimensionKey() {
     return rollupDimensionKey;
   }
+
   public DimensionKey getRollupDimensionKey() {
     return rollupDimensionKey;
   }
+
   /**
    * FORMAT <br>
    * <timeseries length><timeseries byte> <br>
@@ -65,23 +67,23 @@ public class RollupPhaseTwoMapOutput {
     return baos.toByteArray();
   }
 
-  public static RollupPhaseTwoMapOutput fromBytes(byte[] buffer,
-      MetricSchema schema) throws IOException {
+  public static RollupPhaseTwoMapOutput fromBytes(byte[] buffer, MetricSchema schema)
+      throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
     int length;
     byte[] bytes;
     // rollup dimension Key
-     length = dis.readInt();
+    length = dis.readInt();
     bytes = new byte[length];
     dis.read(bytes);
     DimensionKey rollupDimensionKey = DimensionKey.fromBytes(bytes);
     // raw dimension Key
-     length = dis.readInt();
-     bytes = new byte[length];
+    length = dis.readInt();
+    bytes = new byte[length];
     dis.read(bytes);
     DimensionKey rawDimensionKey = DimensionKey.fromBytes(bytes);
     // read raw timeseries
-    length= dis.readInt();
+    length = dis.readInt();
     bytes = new byte[length];
     dis.read(bytes);
     MetricTimeSeries timeSeries;

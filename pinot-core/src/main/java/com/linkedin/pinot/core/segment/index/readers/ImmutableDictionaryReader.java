@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import java.io.File;
 import java.io.IOException;
-
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
-import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 
 /**
@@ -28,15 +28,15 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 public abstract class ImmutableDictionaryReader implements Dictionary {
 
-  protected final FixedByteWidthRowColDataFileReader dataFileReader;
+  protected final FixedByteSingleValueMultiColReader dataFileReader;
   private final ByteBufferBinarySearchUtil fileSearcher;
   private final int rows;
 
   protected ImmutableDictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
     if (isMmap) {
-      dataFileReader = FixedByteWidthRowColDataFileReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
+      dataFileReader = FixedByteSingleValueMultiColReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
     } else {
-      dataFileReader = FixedByteWidthRowColDataFileReader.forHeap(dictFile, rows, 1, new int[] { columnSize });
+      dataFileReader = FixedByteSingleValueMultiColReader.forHeap(dictFile, rows, 1, new int[] { columnSize });
     }
     this.rows = rows;
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);
@@ -85,4 +85,80 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   public int length() {
     return rows;
   }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.INT);
+  }
+
+  @Override
+  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.LONG);
+  }
+
+  @Override
+  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.FLOAT);
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.DOUBLE);
+  }
+
+  @Override
+  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
+    readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.STRING);
+  }
+
+  protected void readValues(int[] dictionaryIds, int startPos, int limit, Object values, int outStartPos, FieldSpec.DataType type) {
+    int endPos = startPos + limit;
+
+    switch (type) {
+
+      case INT: {
+        int[] outValues = (int[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getIntValue(dictId);
+        }
+
+      }
+      break;
+      case LONG: {
+        long[] outValues = (long[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getLongValue(dictId);
+        }
+      }
+      break;
+      case FLOAT: {
+        float[] outValues = (float[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getFloatValue(dictId);
+        }
+      }
+      break;
+      case DOUBLE: {
+        double[] outValues = (double[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getDoubleValue(dictId);
+        }
+      }
+      break;
+      case STRING: {
+        String[] outValues = (String[]) values;
+        for (int iter = startPos; iter < endPos; ++iter) {
+          int dictId = dictionaryIds[iter];
+          outValues[outStartPos++] = getStringValue(dictId);
+        }
+      }
+      break;
+    }
+
+  }
+
 }

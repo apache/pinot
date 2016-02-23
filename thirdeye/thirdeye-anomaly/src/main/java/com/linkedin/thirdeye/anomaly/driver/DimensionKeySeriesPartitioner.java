@@ -7,7 +7,6 @@ import java.util.Random;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 
-
 /**
  *
  */
@@ -50,7 +49,7 @@ public class DimensionKeySeriesPartitioner {
 
   /**
    * @return
-   *  Resource partitions.
+   *         Resource partitions.
    */
   public Multimap<Integer, DimensionKeySeries> partition() {
     int[] partitionMapping = getPartitionMapping();

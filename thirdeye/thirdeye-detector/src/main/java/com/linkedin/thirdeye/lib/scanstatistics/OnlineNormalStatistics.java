@@ -28,7 +28,7 @@ public class OnlineNormalStatistics {
 
   /**
    * @return
-   *  A copy of the object.
+   *         A copy of the object.
    */
   public OnlineNormalStatistics copy() {
     OnlineNormalStatistics copy = new OnlineNormalStatistics();

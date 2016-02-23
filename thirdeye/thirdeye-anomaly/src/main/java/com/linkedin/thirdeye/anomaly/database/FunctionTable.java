@@ -25,14 +25,15 @@ public class FunctionTable {
    * @param dbConfig
    * @param rowClass
    * @return
-   *  A list of rows in the function table referenced in dbConfig
+   *         A list of rows in the function table referenced in dbConfig
    * @throws InstantiationException
    * @throws IllegalAccessException
    * @throws IOException
    * @throws SQLException
    */
-  public static <T extends FunctionTableRow> List<T> selectActiveRows(AnomalyDatabaseConfig dbConfig, Class<T> rowClass,
-      String collection) throws InstantiationException, IllegalAccessException, IOException, SQLException {
+  public static <T extends FunctionTableRow> List<T> selectActiveRows(
+      AnomalyDatabaseConfig dbConfig, Class<T> rowClass, String collection)
+          throws InstantiationException, IllegalAccessException, IOException, SQLException {
 
     List<T> functionTableRows = new LinkedList<>();
 
@@ -43,9 +44,9 @@ public class FunctionTable {
       conn = dbConfig.getConnection();
       stmt = conn.createStatement();
       String sql = String.format(
-          ResourceUtils.getResourceAsString("database/function/select-function-table-template-active.sql"),
-          dbConfig.getFunctionTableName(),
-          collection);
+          ResourceUtils
+              .getResourceAsString("database/function/select-function-table-template-active.sql"),
+          dbConfig.getFunctionTableName(), collection);
       rs = stmt.executeQuery(sql);
 
       while (rs.next()) {
@@ -76,8 +77,9 @@ public class FunctionTable {
     }
   }
 
-  public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig, Class<T> rowClass,
-      String collection) throws InstantiationException, IllegalAccessException, IOException, SQLException {
+  public static <T extends FunctionTableRow> List<T> selectRows(AnomalyDatabaseConfig dbConfig,
+      Class<T> rowClass, String collection)
+          throws InstantiationException, IllegalAccessException, IOException, SQLException {
 
     List<T> functionTableRows = new LinkedList<>();
 
@@ -89,8 +91,7 @@ public class FunctionTable {
       stmt = conn.createStatement();
       String sql = String.format(
           ResourceUtils.getResourceAsString("database/function/select-function-table-template.sql"),
-          dbConfig.getFunctionTableName(),
-          collection);
+          dbConfig.getFunctionTableName(), collection);
       rs = stmt.executeQuery(sql);
 
       while (rs.next()) {

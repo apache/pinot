@@ -44,7 +44,7 @@ public class InstanceResponsePlanNode implements PlanNode {
     long start = System.currentTimeMillis();
     UResultOperator uResultOperator = new UResultOperator(_planNode.run());
     long end = System.currentTimeMillis();
-    LOGGER.info("InstanceResponsePlanNode.run took: " + (end - start));
+    LOGGER.debug("InstanceResponsePlanNode.run took: " + (end - start));
     return uResultOperator;
   }
 

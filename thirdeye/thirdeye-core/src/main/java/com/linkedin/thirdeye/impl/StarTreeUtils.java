@@ -29,29 +29,25 @@ public class StarTreeUtils {
   }
 
   public static List<StarTreeQuery> filterQueries(StarTreeConfig config,
-                                                  List<StarTreeQuery> queries,
-                                                  Map<String, List<String>> filter)
-  {
+      List<StarTreeQuery> queries, Map<String, List<String>> filter) {
     List<StarTreeQuery> filteredQueries = new ArrayList<StarTreeQuery>(queries.size());
 
-    for (StarTreeQuery query : queries)
-    {
+    for (StarTreeQuery query : queries) {
       boolean matches = true;
 
-      for (Map.Entry<String, List<String>> entry : filter.entrySet())
-      {
+      for (Map.Entry<String, List<String>> entry : filter.entrySet()) {
         String dimensionName = entry.getKey();
-        String dimensionValue = query.getDimensionKey().getDimensionValue(config.getDimensions(), dimensionName);
+        String dimensionValue =
+            query.getDimensionKey().getDimensionValue(config.getDimensions(), dimensionName);
 
-        if (!entry.getValue().contains(StarTreeConstants.ALL) && !entry.getValue().contains(dimensionValue))
-        {
+        if (!entry.getValue().contains(StarTreeConstants.ALL)
+            && !entry.getValue().contains(dimensionValue)) {
           matches = false;
           break;
         }
       }
 
-      if (matches)
-      {
+      if (matches) {
         filteredQueries.add(query);
       }
     }
@@ -59,17 +55,13 @@ public class StarTreeUtils {
     return filteredQueries;
   }
 
-  public static List<StarTreeQuery> expandQueries(StarTree starTree,
-                                                  StarTreeQuery baseQuery)
-  {
+  public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery) {
     Set<String> dimensionsToExpand = new HashSet<String>();
 
     List<DimensionSpec> dimensionSpecs = starTree.getConfig().getDimensions();
 
-    for (int i = 0; i < dimensionSpecs.size(); i++)
-    {
-      if (StarTreeConstants.ALL.equals(baseQuery.getDimensionKey().getDimensionValues()[i]))
-      {
+    for (int i = 0; i < dimensionSpecs.size(); i++) {
+      if (StarTreeConstants.ALL.equals(baseQuery.getDimensionKey().getDimensionValues()[i])) {
         dimensionsToExpand.add(dimensionSpecs.get(i).getName());
       }
     }
@@ -78,38 +70,32 @@ public class StarTreeUtils {
     queries.add(baseQuery);
 
     // Expand "!" (all) dimension values into multiple queries
-    for (String dimensionName : dimensionsToExpand)
-    {
+    for (String dimensionName : dimensionsToExpand) {
       // For each existing getAggregate, add a new one with these
       List<StarTreeQuery> expandedQueries = new ArrayList<StarTreeQuery>();
-      for (StarTreeQuery query : queries)
-      {
-        Map<String, Collection<String>> dimensionValues = new HashMap<String, Collection<String>>(dimensionSpecs.size());
+      for (StarTreeQuery query : queries) {
+        Map<String, Collection<String>> dimensionValues =
+            new HashMap<String, Collection<String>>(dimensionSpecs.size());
 
-        for (int i = 0; i < dimensionSpecs.size(); i++)
-        {
+        for (int i = 0; i < dimensionSpecs.size(); i++) {
           dimensionValues.put(dimensionSpecs.get(i).getName(),
               Collections.singletonList(query.getDimensionKey().getDimensionValues()[i]));
         }
 
         Set<String> values = starTree.getDimensionValues(dimensionName, dimensionValues);
 
-        for (String value : values)
-        {
+        for (String value : values) {
           // Create new key
           String[] newValues = new String[dimensionSpecs.size()];
-          for (int i = 0; i < dimensionSpecs.size(); i++)
-          {
-            newValues[i] = dimensionSpecs.get(i).getName().equals(dimensionName)
-                    ? value
-                    : query.getDimensionKey().getDimensionValues()[i];
+          for (int i = 0; i < dimensionSpecs.size(); i++) {
+            newValues[i] = dimensionSpecs.get(i).getName().equals(dimensionName) ? value
+                : query.getDimensionKey().getDimensionValues()[i];
           }
 
           // Copy original getAggregate with new value
-          expandedQueries.add(new StarTreeQueryImpl.Builder()
-                                      .setDimensionKey(new DimensionKey(newValues))
-                                      .setTimeRange(query.getTimeRange())
-                                      .build(starTree.getConfig()));
+          expandedQueries
+              .add(new StarTreeQueryImpl.Builder().setDimensionKey(new DimensionKey(newValues))
+                  .setTimeRange(query.getTimeRange()).build(starTree.getConfig()));
         }
       }
 
@@ -120,8 +106,7 @@ public class StarTreeUtils {
     return queries;
   }
 
-  public static int printNode(PrintWriter printWriter, StarTreeNode node,
-      int level) {
+  public static int printNode(PrintWriter printWriter, StarTreeNode node, int level) {
     int rawRecords = 0;
     StringBuilder sb = new StringBuilder();
 
@@ -129,9 +114,8 @@ public class StarTreeUtils {
       sb.append("\t");
     }
 
-    sb.append("START:").append(node.getDimensionName()).append(":")
-        .append(node.getDimensionValue()).append("(").append(node.getId())
-        .append(")").append("(depth:").append(level).append(")");
+    sb.append("START:").append(node.getDimensionName()).append(":").append(node.getDimensionValue())
+        .append("(").append(node.getId()).append(")").append("(depth:").append(level).append(")");
 
     printWriter.println(sb.toString());
 
@@ -148,8 +132,7 @@ public class StarTreeUtils {
     for (int i = 0; i < level; i++) {
       sb.append("\t");
     }
-    sb.append(String.format("END:%s count:%s", node.getDimensionName(),
-        rawRecords));
+    sb.append(String.format("END:%s count:%s", node.getDimensionName(), rawRecords));
     printWriter.println(sb.toString());
     return rawRecords;
   }
@@ -157,7 +140,6 @@ public class StarTreeUtils {
   /**
    * Traverses the star tree and computes all the leaf nodes. The leafNodes
    * structure is filled with all startreeNodes in the leaf.
-   *
    * @param leafNodes
    * @param node
    */
@@ -176,19 +158,18 @@ public class StarTreeUtils {
   }
 
   /**
-   *
    * @param forwardIndex
    * @return
    */
   public static Map<String, Map<Integer, String>> toReverseIndex(
       Map<String, Map<String, Integer>> forwardIndex) {
-    Map<String, Map<Integer, String>> reverseForwardIndex = new HashMap<String, Map<Integer, String>>();
+    Map<String, Map<Integer, String>> reverseForwardIndex =
+        new HashMap<String, Map<Integer, String>>();
     for (String dimensionName : forwardIndex.keySet()) {
       Map<String, Integer> map = forwardIndex.get(dimensionName);
       reverseForwardIndex.put(dimensionName, new HashMap<Integer, String>());
       for (Entry<String, Integer> entry : map.entrySet()) {
-        reverseForwardIndex.get(dimensionName).put(entry.getValue(),
-            entry.getKey());
+        reverseForwardIndex.get(dimensionName).put(entry.getValue(), entry.getKey());
       }
     }
     return reverseForwardIndex;
@@ -202,22 +183,18 @@ public class StarTreeUtils {
   /**
    * converts the raw integer id to string representation using the reverse
    * forward Index
-   *
    * @param reverseForwardIndex
    * @param leafRecord
    * @return
    */
-  public static String[] convertToStringValue(
-      Map<String, Map<Integer, String>> reverseForwardIndex, int[] leafRecord,
-      List<String> dimensionNames) {
+  public static String[] convertToStringValue(Map<String, Map<Integer, String>> reverseForwardIndex,
+      int[] leafRecord, List<String> dimensionNames) {
     String[] ret = new String[leafRecord.length];
     for (int i = 0; i < leafRecord.length; i++) {
-      ret[i] = reverseForwardIndex.get(dimensionNames.get(i))
-          .get(leafRecord[i]);
+      ret[i] = reverseForwardIndex.get(dimensionNames.get(i)).get(leafRecord[i]);
     }
     return ret;
   }
-
 
   public static int getDepth(StarTreeNode root) {
     if (root == null) {

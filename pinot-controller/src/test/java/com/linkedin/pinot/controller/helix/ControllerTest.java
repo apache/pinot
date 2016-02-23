@@ -25,7 +25,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
-import com.linkedin.pinot.core.trace.TraceContext;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -39,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.core.util.trace.TraceContext;
 
 
 /**
@@ -56,6 +56,7 @@ public abstract class ControllerTest {
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixManager _helixZkManager;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public JSONObject postQuery(String query, String brokerBaseApiUrl, boolean usePql2Compiler) throws Exception {
     final JSONObject json = new JSONObject();
@@ -102,19 +103,20 @@ public abstract class ControllerTest {
   }
 
   protected void startZk() {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
   }
 
   protected void stopZk() {
-    ZkStarter.stopLocalZkServer();
+    ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
   /**
    * Starts a controller instance.
    */
-  protected void startController() {
+  protected void startController(boolean useTenantIsolation) {
     assert _controllerStarter == null;
     ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
+    config.setTenantIsolationEnabled(!useTenantIsolation);
 
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     if (_zkClient.exists("/" + getHelixClusterName())) {
@@ -123,6 +125,10 @@ public abstract class ControllerTest {
     _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, config);
     _helixAdmin = _controllerStarter.getHelixResourceManager().getHelixAdmin();
     _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
+  }
+
+  protected void startController() {
+    startController(false);
   }
 
   /**
@@ -222,5 +228,7 @@ public abstract class ControllerTest {
     return queryResp.toString();
   }
 
-  protected abstract String getHelixClusterName();
+  protected String getHelixClusterName() {
+    return this.getClass().getSimpleName();
+  }
 }

@@ -10,7 +10,9 @@ public class OnlineNormalStatisticsTest {
 
   @Test
   public void simpleArray() {
-    double[] testArray = {1, 2};
+    double[] testArray = {
+        1, 2
+    };
     testCorrectness(testArray);
   }
 

@@ -18,14 +18,12 @@ public class AvroTestUtil {
    * @param metrics
    * @return
    */
-  public static Schema createSchemaFor(String schemaName, String[] dimensions,
-      String[] metrics) {
+  public static Schema createSchemaFor(String schemaName, String[] dimensions, String[] metrics) {
     FieldAssembler<Schema> fields;
     RecordBuilder<Schema> record = SchemaBuilder.record(schemaName);
     fields = record.namespace("com.linkedin.thirdeye.join").fields();
     for (String dimension : dimensions) {
-      fields = fields.name(dimension).type().nullable().stringType()
-          .noDefault();
+      fields = fields.name(dimension).type().nullable().stringType().noDefault();
     }
     for (String metric : metrics) {
       fields = fields.name(metric).type().nullable().longType().longDefault(0);
@@ -37,14 +35,12 @@ public class AvroTestUtil {
   /**
    * Generates a generic record with random values. Assumes all dimensions are
    * string type and metrics are long
-   * 
    * @param schema
    * @param dimensions
    * @param metrics
    * @return
    */
-  public static Record generateDummyRecord(Schema schema, String[] dimensions,
-      String[] metrics) {
+  public static Record generateDummyRecord(Schema schema, String[] dimensions, String[] metrics) {
     System.out.println(schema);
     Random r = new Random();
     GenericRecordBuilder genericRecordBuilder = new GenericRecordBuilder(schema);

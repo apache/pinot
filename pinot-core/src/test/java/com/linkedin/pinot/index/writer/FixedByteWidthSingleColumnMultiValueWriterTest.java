@@ -24,8 +24,8 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.writer.impl.FixedByteSkipListSCMVWriter;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthSingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteMultiValueWriter;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteSkipListMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 
@@ -48,7 +48,7 @@ public class FixedByteWidthSingleColumnMultiValueWriterTest {
       totalNumValues += numValues;
     }
 
-    FixedByteWidthSingleColumnMultiValueWriter writer = new FixedByteWidthSingleColumnMultiValueWriter(
+    FixedByteMultiValueWriter writer = new FixedByteMultiValueWriter(
         file, rows, totalNumValues, 4);
     for (int i = 0; i < rows; i++) {
       writer.setIntArray(i, data[i]);

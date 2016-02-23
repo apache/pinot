@@ -21,7 +21,6 @@ public class RollupPhaseTwoReduceOutput {
   DimensionKey rawDimensionKey;
 
   /**
-   *
    * @param rollupDimensionKey
    * @param rolledupTimeSeries
    * @param rawTimeSeries
@@ -83,8 +82,8 @@ public class RollupPhaseTwoReduceOutput {
     return baos.toByteArray();
   }
 
-  public static RollupPhaseTwoReduceOutput fromBytes(byte[] buffer,
-      MetricSchema schema) throws IOException {
+  public static RollupPhaseTwoReduceOutput fromBytes(byte[] buffer, MetricSchema schema)
+      throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
     int length;
     byte[] bytes;
@@ -114,7 +113,7 @@ public class RollupPhaseTwoReduceOutput {
     MetricTimeSeries rawTimeSeries;
     rawTimeSeries = MetricTimeSeries.fromBytes(bytes, schema);
 
-    return new RollupPhaseTwoReduceOutput(rollupDimensionKey, rollupTimeSeries,
-        rawDimensionKey, rawTimeSeries);
+    return new RollupPhaseTwoReduceOutput(rollupDimensionKey, rollupTimeSeries, rawDimensionKey,
+        rawTimeSeries);
   }
 }

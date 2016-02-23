@@ -16,8 +16,8 @@ public class AnomalyDetectionTaskInfo {
    */
   private final TimeRange timeRange;
 
-  public AnomalyDetectionTaskInfo(String functionName, int functionId, String functionDescription, TimeRange timeRange)
-  {
+  public AnomalyDetectionTaskInfo(String functionName, int functionId, String functionDescription,
+      TimeRange timeRange) {
     super();
     this.functionName = functionName;
     this.functionId = functionId;
@@ -46,9 +46,9 @@ public class AnomalyDetectionTaskInfo {
 
   /**
    * @param partitionId
-   *  The partition index corresponding to this task. Valid range is [0, numPartitions).
+   *          The partition index corresponding to this task. Valid range is [0, numPartitions).
    * @param numPartitions
-   *  The total number of partitions
+   *          The total number of partitions
    */
   public void setPartitionConfig(int partitionId, int numPartitions) {
     this.numPartitions = numPartitions;
@@ -65,14 +65,12 @@ public class AnomalyDetectionTaskInfo {
 
   /**
    * for logging debug info
-   *
    * {@inheritDoc}
    * @see java.lang.Object#toString()
    */
   @Override
   public String toString() {
-    return "AnomalyDetectionTaskInfo [functionName=" + functionName + ", functionId=" + functionId +
-        ", functionDescription=" + functionDescription + ", timeRange=" + timeRange + "]";
+    return "AnomalyDetectionTaskInfo [functionName=" + functionName + ", functionId=" + functionId
+        + ", functionDescription=" + functionDescription + ", timeRange=" + timeRange + "]";
   }
 }
-

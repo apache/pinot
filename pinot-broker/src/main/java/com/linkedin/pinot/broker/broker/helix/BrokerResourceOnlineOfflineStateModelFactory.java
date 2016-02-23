@@ -77,7 +77,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
         _helixExternalViewBasedRouting.markDataResourceOnline(
             resourceName,
-            HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(),
+            HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
                 _helixManager.getClusterName(), resourceName), instanceConfigList);
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
@@ -124,5 +124,13 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         throw new AssertionError("Should not reach this");
       }
     }
+
+    @Transition(from = "ERROR", to = "OFFLINE")
+    public void onBecomeOfflineFromError(Message message, NotificationContext context) {
+      LOGGER.info("Resetting the state for broker resource:{} from ERROR to OFFLINE", message.getPartitionName());
+    }
+
   }
+  
+
 }

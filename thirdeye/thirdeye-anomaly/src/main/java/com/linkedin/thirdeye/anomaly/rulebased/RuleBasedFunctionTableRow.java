@@ -27,7 +27,7 @@ public final class RuleBasedFunctionTableRow extends FunctionTableRow {
   /** Default threshold to apply */
   private double delta;
 
-  /** The granularity at which data is to be provided to the function*/
+  /** The granularity at which data is to be provided to the function */
   private TimeUnit aggregateUnit;
   private int aggregateSize;
 

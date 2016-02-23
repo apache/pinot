@@ -36,7 +36,8 @@ public class DimensionKeyMatchTable<V> {
   /**
    * @param key
    * @return
-   *  The value associated with the best matching dimension key or null if there are no matches.
+   *         The value associated with the best matching dimension key or null if there are no
+   *         matches.
    */
   public V get(DimensionKey key) {
     int bestMatchDegree = 0;

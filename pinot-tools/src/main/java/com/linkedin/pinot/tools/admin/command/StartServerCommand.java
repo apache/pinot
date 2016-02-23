@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 
 import org.apache.commons.configuration.Configuration;
@@ -32,7 +33,7 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
  * Class to implement StartServer command.
  *
  */
-public class StartServerCommand extends AbstractBaseCommand implements Command {
+public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
 
   @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "host name for controller.")
@@ -62,6 +63,7 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
       usage = "Print this message.")
   private boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }

@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.Utils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -26,21 +26,25 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
@@ -96,15 +100,67 @@ public class HelixServerStarter {
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);
+
+    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(),
+        new ColumnarSegmentMetadataLoader(), zkPropertyStore, pinotHelixProperties, _instanceId);
+
+    // Register state model factory
     final StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(helixClusterName, _instanceId,
-            _serverInstance.getInstanceDataManager(), new ColumnarSegmentMetadataLoader(), pinotHelixProperties,
-            zkPropertyStore);
+            _serverInstance.getInstanceDataManager(),  zkPropertyStore, fetcherAndLoader);
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
     setShuttingDownStatus(false);
+
+    // Register message handler factory
+    SegmentMessageHandlerFactory messageHandlerFactory = new SegmentMessageHandlerFactory(fetcherAndLoader);
+    _helixManager.getMessagingService().registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
+        messageHandlerFactory);
+
+    _serverInstance.getServerMetrics()
+        .addCallbackGauge("helix.connected", 
+            new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return _helixManager.isConnected() ? 1L : 0L;
+              }
+            });
+
+    _helixManager.addPreConnectCallback(
+        new PreConnectCallback() {
+          
+          @Override
+          public void onPreConnect() {
+            _serverInstance.getServerMetrics().addMeteredValue(null,
+                ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          }
+        });
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.directByteBufferUsage", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return MmapUtils.getDirectByteBufferUsage();
+              }
+            });
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.mmapBufferUsage", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return MmapUtils.getMmapBufferUsage();
+              }
+         });
+
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.mmapBufferCount", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return MmapUtils.getMmapBufferCount();
+              }
+            });
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {
@@ -135,6 +191,8 @@ public class HelixServerStarter {
     Utils.logVersions();
 
     _serverConf = getInstanceServerConfig(moreConfigurations);
+    setupHelixSystemProperties(moreConfigurations);
+
     if (_serverInstance == null) {
       LOGGER.info("Trying to create a new ServerInstance!");
       _serverInstance = new ServerInstance();
@@ -147,6 +205,12 @@ public class HelixServerStarter {
 
   private ServerConf getInstanceServerConfig(Configuration moreConfigurations) {
     return DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(moreConfigurations);
+  }
+
+  private void setupHelixSystemProperties(Configuration conf) {
+    System.setProperty("helixmanager.flappingTimeWindow",
+        conf.getString(CommonConstants.Server.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
+            CommonConstants.Server.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS));
   }
 
   public void stop() {
@@ -172,6 +236,17 @@ public class HelixServerStarter {
   }
 
   public static void main(String[] args) throws Exception {
+    /*
+    // Another way to start a server via IDE
+    final int port = 3800;
+    final String serverFQDN = "server.host.foo";
+    final String server = "Server_" + serverFQDN + "_" + port;
+    final Configuration configuration = new PropertiesConfiguration();
+    configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
+    configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
+    configuration.addProperty("instanceId",  server);
+    final HelixServerStarter pinotHelixStarter = new HelixServerStarter("pinotDevDeploy", "localhost:2181", configuration);
+    */
     startDefault();
   }
 }

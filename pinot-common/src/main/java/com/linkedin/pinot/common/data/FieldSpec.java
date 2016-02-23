@@ -209,7 +209,8 @@ public abstract class FieldSpec {
     STRING_ARRAY;
 
     public boolean isNumber() {
-      return (this == BYTE) || (this == SHORT) || (this == INT) || (this == LONG) || (this == FLOAT) || (this == DOUBLE);
+      return (this == BYTE) || (this == SHORT) || (this == INT) || (this == LONG) || (this == FLOAT)
+          || (this == DOUBLE);
     }
 
     public boolean isInteger() {
@@ -241,6 +242,29 @@ public abstract class FieldSpec {
       }
 
       throw new UnsupportedOperationException(type.toString());
+    }
+
+    /**
+     * return the number of bytes
+     * @return
+     */
+    public int size() {
+      switch (this) {
+        case BYTE:
+          return 1;
+        case SHORT:
+          return 2;
+        case INT:
+          return 4;
+        case LONG:
+          return 8;
+        case FLOAT:
+          return 4;
+        case DOUBLE:
+          return 8;
+        default:
+          throw new UnsupportedOperationException("Cant get number of bytes for :" + this);
+      }
     }
 
     public JSONObject toJSONSchemaFor(String column) throws JSONException {
@@ -331,7 +355,8 @@ public abstract class FieldSpec {
           case STRING_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_STRING;
           default:
-            throw new UnsupportedOperationException("Unknown default null value for dimension/time column of data type " + dataType);
+            throw new UnsupportedOperationException(
+                "Unknown default null value for dimension/time column of data type " + dataType);
         }
       default:
         throw new UnsupportedOperationException("Not supported data type for null value - " + dataType);

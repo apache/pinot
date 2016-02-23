@@ -19,19 +19,22 @@ import java.io.File;
 import java.io.RandomAccessFile;
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class FixedBitWidthRowColDataFileWriterTest {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthRowColDataFileWriterTest.class);
   @Test
   public void testSingleColUnsigned() throws Exception {
     int maxBits = 1;
     while (maxBits < 32) {
-      System.out.println("START test maxBits:" + maxBits);
+      LOGGER.debug("START test maxBits:" + maxBits);
       final String fileName = getClass().getName() + "_single_col_fixed_bit_"
           + maxBits + ".dat";
       final File file = new File(fileName);
@@ -39,7 +42,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
       final int rows = 100;
       final int cols = 1;
       final int[] columnSizesInBits = new int[] { maxBits };
-      final FixedBitWidthRowColDataFileWriter writer = new FixedBitWidthRowColDataFileWriter(
+      final FixedBitSingleValueMultiColWriter writer = new FixedBitSingleValueMultiColWriter(
           file, rows, cols, columnSizesInBits);
       final int[] data = new int[rows];
       final Random r = new Random();
@@ -57,7 +60,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
           }
         }
       }
-      System.out.println("bits expected:" + rows * cols * maxBits
+      LOGGER.debug("bits expected:" + rows * cols * maxBits
           + " bytes expected:" + (rows * cols * maxBits + 7) / 8);
 
       writer.close();
@@ -71,12 +74,12 @@ public class FixedBitWidthRowColDataFileWriterTest {
         System.err.println("byteArray length:" + temp.length + "   from file:"
             + b.length);
       }
-      System.out.println("byteArray length:" + byteArray.length
+      LOGGER.trace("byteArray length:" + byteArray.length
           + "   from file:" + b.length);
       Assert.assertEquals(byteArray.length, b.length);
       Assert.assertEquals(byteArray, b);
       raf.close();
-      System.out.println("END test maxBits:" + maxBits);
+      LOGGER.trace("END test maxBits:" + maxBits);
       maxBits = maxBits + 1;
       file.delete();
       set.close();
@@ -87,7 +90,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
   public void testSingleColSigned() throws Exception {
     int maxBits = 1;
     while (maxBits < 32) {
-      System.out.println("START test maxBits:" + maxBits);
+      LOGGER.trace("START test maxBits:" + maxBits);
       final String fileName = getClass().getName() + "_single_col_fixed_bit_"
           + maxBits + ".dat";
       final File file = new File(fileName);
@@ -95,7 +98,7 @@ public class FixedBitWidthRowColDataFileWriterTest {
       final int rows = 100;
       final int cols = 1;
       final int[] columnSizesInBits = new int[] { maxBits };
-      final FixedBitWidthRowColDataFileWriter writer = new FixedBitWidthRowColDataFileWriter(
+      final FixedBitSingleValueMultiColWriter writer = new FixedBitSingleValueMultiColWriter(
           file, rows, cols, columnSizesInBits, new boolean[] { true });
       final int[] data = new int[rows];
       final Random r = new Random();
@@ -119,12 +122,12 @@ public class FixedBitWidthRowColDataFileWriterTest {
           }
         }
       }
-      System.out.println("bits expected:" + rows * cols * maxBits
+      LOGGER.trace("bits expected:" + rows * cols * maxBits
           + " bytes expected:" + (rows * cols * maxBits + 7) / 8);
 
       writer.close();
       final RandomAccessFile raf = new RandomAccessFile(file, "r");
-      System.out.println("file size:" + raf.length());
+      LOGGER.trace("file size:" + raf.length());
       final byte[] b = new byte[(int) raf.length()];
       raf.read(b);
       final byte[] byteArray = set.toByteArray();
@@ -133,12 +136,12 @@ public class FixedBitWidthRowColDataFileWriterTest {
         System.err.println("byteArray length:" + temp.length + "   from file:"
             + b.length);
       }
-      System.out.println("byteArray length:" + byteArray.length
+      LOGGER.trace("byteArray length:" + byteArray.length
           + "   from file:" + b.length);
       Assert.assertEquals(byteArray.length, b.length);
       Assert.assertEquals(byteArray, b);
       raf.close();
-      System.out.println("END test maxBits:" + maxBits);
+      LOGGER.trace("END test maxBits:" + maxBits);
       maxBits = maxBits + 1;
       file.delete();
       set.close();

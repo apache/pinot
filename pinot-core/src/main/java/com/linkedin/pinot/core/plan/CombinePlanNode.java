@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.linkedin.pinot.core.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +29,7 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MCombineOperator;
+import com.linkedin.pinot.core.util.trace.TraceRunnable;
 
 
 /**
@@ -96,7 +96,7 @@ public class CombinePlanNode implements PlanNode {
     MCombineOperator mCombineOperator =
         new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
     long end = System.currentTimeMillis();
-    LOGGER.info("CombinePlanNode.run took: " + (end - start));
+    LOGGER.debug("CombinePlanNode.run took: " + (end - start));
     return mCombineOperator;
   }
 

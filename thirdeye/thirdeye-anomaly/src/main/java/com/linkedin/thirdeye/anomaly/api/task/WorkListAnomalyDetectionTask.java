@@ -26,15 +26,18 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 
 /**
- * This implementation executes a work list of dimensionKeySeries, which are pairs of a dimensionKey and a contribution estimate.
+ * This implementation executes a work list of dimensionKeySeries, which are pairs of a dimensionKey
+ * and a contribution estimate.
  */
-public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTask implements Runnable {
+public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTask
+    implements Runnable {
 
   /**
    * Shared thread pool for evaluating anomalies
    */
-  private static final ExecutorService SHARED_EXECUTORS = Executors.newFixedThreadPool(
-      Runtime.getRuntime().availableProcessors(), new ThreadFactoryBuilder().setDaemon(true).build());
+  private static final ExecutorService SHARED_EXECUTORS =
+      Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(),
+          new ThreadFactoryBuilder().setDaemon(true).build());
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkListAnomalyDetectionTask.class);
 
@@ -43,31 +46,26 @@ public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTa
 
   /**
    * @param starTreeConfig
-   *  Configuration for the star-tree
+   *          Configuration for the star-tree
    * @param driverConfig
-   *  Configuration for the driver
+   *          Configuration for the driver
    * @param taskInfo
-   *  Information identifying the task
+   *          Information identifying the task
    * @param function
-   *  Anomaly detection function to execute
+   *          Anomaly detection function to execute
    * @param handler
-   *  Handler for any anomaly results
+   *          Handler for any anomaly results
    * @param functionHistory
-   *  A history of all anomaly results produced by this function
+   *          A history of all anomaly results produced by this function
    * @param thirdEyeClient
-   *  The client to use to request data
+   *          The client to use to request data
    * @param dimensionKeySeries
-   *  List of dimensionKey and meta-info pairs.
+   *          List of dimensionKey and meta-info pairs.
    */
-  public WorkListAnomalyDetectionTask(
-      StarTreeConfig starTreeConfig,
-      AnomalyDetectionTaskInfo taskInfo,
-      AnomalyDetectionFunction function,
-      AnomalyResultHandler handler,
-      AnomalyDetectionFunctionHistory functionHistory,
-      ThirdEyeClient thirdEyeClient,
-      List<DimensionKeySeries> dimensionKeySeries)
-  {
+  public WorkListAnomalyDetectionTask(StarTreeConfig starTreeConfig,
+      AnomalyDetectionTaskInfo taskInfo, AnomalyDetectionFunction function,
+      AnomalyResultHandler handler, AnomalyDetectionFunctionHistory functionHistory,
+      ThirdEyeClient thirdEyeClient, List<DimensionKeySeries> dimensionKeySeries) {
     super(starTreeConfig, taskInfo, function, functionHistory, thirdEyeClient);
     this.handler = handler;
     this.dimensionKeySeries = dimensionKeySeries;
@@ -88,9 +86,11 @@ public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTa
         public void run() {
           try {
             LOGGER.info("analyzing {}", dimensionKeySeries);
-            runFunctionForSeries(dimensionKeySeries.getDimensionKey(), dimensionKeySeries.getContributionEstimate());
+            runFunctionForSeries(dimensionKeySeries.getDimensionKey(),
+                dimensionKeySeries.getContributionEstimate());
           } catch (Exception e) {
-            LOGGER.error("problem failed to complete {} for {}", getTaskInfo(), dimensionKeySeries, e);
+            LOGGER.error("problem failed to complete {} for {}", getTaskInfo(), dimensionKeySeries,
+                e);
           }
         }
       }));
@@ -111,12 +111,13 @@ public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTa
 
   /**
    * @param dimensionKey
-   *  The specific dimension combination to run
+   *          The specific dimension combination to run
    * @param contributionProportion
-   *  The estimated proportion that this dimension contributes to the overall metric
+   *          The estimated proportion that this dimension contributes to the overall metric
    * @throws Exception
    */
-  private void runFunctionForSeries(DimensionKey dimensionKey, double contributionProportion) throws Exception {
+  private void runFunctionForSeries(DimensionKey dimensionKey, double contributionProportion)
+      throws Exception {
     Map<String, String> fixedDimensionValues = new HashMap<String, String>();
     List<DimensionSpec> dimensionSpecs = getStarTreeConfig().getDimensions();
     for (int i = 0; i < dimensionSpecs.size(); i++) {
@@ -133,7 +134,8 @@ public class WorkListAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTa
     Entry<DimensionKey, MetricTimeSeries> entry = dataset.entrySet().iterator().next();
 
     for (AnomalyResult anomaly : analyze(entry.getKey(), entry.getValue())) {
-      handler.handle(getTaskInfo(), dimensionKey, contributionProportion, getFunction().getMetrics(), anomaly);
+      handler.handle(getTaskInfo(), dimensionKey, contributionProportion,
+          getFunction().getMetrics(), anomaly);
     }
   }
 

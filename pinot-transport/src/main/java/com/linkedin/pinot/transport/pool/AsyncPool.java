@@ -110,8 +110,16 @@ public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
    */
   void shutdown(Callback<NoneType> callback);
 
+  /**
+   * validate all objects in the pool, recreate invalid objects if recreate=true 
+   * @param recreate
+   */
+  boolean validate(boolean recreate);
+
   public interface Lifecycle<T> {
     void create(Callback<T> callback);
+
+    boolean validate(T obj);
 
     boolean validateGet(T obj);
 
@@ -120,5 +128,6 @@ public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
     void destroy(T obj, boolean error, Callback<T> callback);
 
     PoolStats.LifecycleStats<Histogram> getStats();
+
   }
 }

@@ -25,8 +25,7 @@ public class JoinPhaseConfig {
     this.joinSpec = joinSpec;
   }
 
-  public static JoinPhaseConfig load(FSDataInputStream inputstream)
-      throws IOException {
+  public static JoinPhaseConfig load(FSDataInputStream inputstream) throws IOException {
     return new ObjectMapper().readValue(inputstream, JoinPhaseConfig.class);
   }
 

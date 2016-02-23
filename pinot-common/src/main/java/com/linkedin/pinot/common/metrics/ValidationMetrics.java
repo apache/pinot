@@ -95,7 +95,7 @@ public class ValidationMetrics {
   }
 
   private interface GaugeFactory<T> {
-    public Gauge<T> buildGauge(final String key);
+    Gauge<T> buildGauge(final String key);
   }
 
   private class StoredValueGaugeFactory implements GaugeFactory<Long> {
@@ -169,6 +169,30 @@ public class ValidationMetrics {
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastPushTimeMillis);
     final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
+  }
+
+  /**
+   * Updates the gauge for the Total Document Count
+   *
+   * @param resource The resource for which the gauge is updated
+   * @param documentCount Total document count for the give resource name / tablename
+   */
+  public void updateTotalDocumentsGauge(final String resource, final long documentCount)
+  {
+    final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
+  }
+
+  /**
+   * Updates the gauge for the Total segment count
+   *
+   * @param resource The resource for which the gauge is updated
+   * @param segmentCount Total segment count for the give resource name / tablename
+   */
+  public void updateSegmentCountGauge(final String resource, final long segmentCount)
+  {
+    final String fullGaugeName = makeGaugeName(resource, "SegmentCount");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
   }
 
   private String makeGaugeName(final String resource, final String gaugeName) {

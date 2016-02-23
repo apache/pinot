@@ -17,24 +17,23 @@ package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
-import java.util.Arrays;
-
+import com.linkedin.pinot.core.operator.dociditerators.MVScanDocIdIterator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private BlockMetadata blockMetadata;
-  private BlockValSetBlockDocIdIterator blockValSetBlockDocIdIterator;
+  private MVScanDocIdIterator blockValSetBlockDocIdIterator;
+  private String datasourceName;
 
-  public ScanBasedMultiValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, int... dictIds) {
+  public ScanBasedMultiValueDocIdSet(String datasourceName, BlockValSet blockValSet,
+      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+    this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator = new BlockValSetBlockDocIdIterator(blockValSet, blockMetadata, dictIds);
+    blockValSetBlockDocIdIterator =
+        new MVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
   }
 
   @Override
@@ -51,14 +50,17 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
    * After setting the startDocId, next calls will always return from &gt;=startDocId
    * @param startDocId
    */
+  @Override
   public void setStartDocId(int startDocId) {
     blockValSetBlockDocIdIterator.setStartDocId(startDocId);
   }
 
   /**
-   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
+   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds
+   * endDocId
    * @param endDocId
    */
+  @Override
   public void setEndDocId(int endDocId) {
     blockValSetBlockDocIdIterator.setEndDocId(endDocId);
   }
@@ -67,95 +69,6 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   public BlockDocIdIterator iterator() {
     return blockValSetBlockDocIdIterator;
   }
-
-  public static class BlockValSetBlockDocIdIterator implements BlockDocIdIterator {
-    BlockMultiValIterator valueIterator;
-    int currentDocId = -1;
-    private IntSet dictIdSet;
-    final int[] intArray;
-    private int startDocId;
-    private int endDocId;
-
-    public BlockValSetBlockDocIdIterator(BlockValSet blockValSet, BlockMetadata blockMetadata, int[] dictIds) {
-      if (dictIds.length > 0) {
-        this.dictIdSet = new IntOpenHashSet(dictIds);
-        this.intArray = new int[blockMetadata.getMaxNumberOfMultiValues()];
-        Arrays.fill(intArray, 0);
-        setStartDocId(blockMetadata.getStartDocId());
-        setEndDocId(blockMetadata.getEndDocId());
-      } else {
-        this.dictIdSet = null;
-        this.intArray = new int[0];
-        setStartDocId(Constants.EOF);
-        setEndDocId(Constants.EOF);
-        currentDocId = Constants.EOF;
-      }
-      valueIterator = (BlockMultiValIterator) blockValSet.iterator();
-    }
-
-    /**
-     * After setting the startDocId, next calls will always return from &gt;=startDocId
-     * @param startDocId
-     */
-    public void setStartDocId(int startDocId) {
-      this.startDocId = startDocId;
-    }
-
-    /**
-     * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds endDocId
-     * @param endDocId
-     */
-    public void setEndDocId(int endDocId) {
-      this.endDocId = endDocId;
-    }
-
-    @Override
-    public int advance(int targetDocId) {
-      if (currentDocId == Constants.EOF) {
-        return currentDocId;
-      }
-      if (targetDocId < startDocId) {
-        targetDocId = startDocId;
-      } else if (targetDocId > endDocId) {
-        currentDocId = Constants.EOF;
-      }
-      if (currentDocId >= targetDocId) {
-        return currentDocId;
-      } else {
-        currentDocId = targetDocId - 1;
-        valueIterator.skipTo(targetDocId);
-        return next();
-      }
-    }
-
-    @Override
-    public int next() {
-      if (currentDocId == Constants.EOF) {
-        return currentDocId;
-      }
-      while (valueIterator.hasNext() && currentDocId <= endDocId) {
-        currentDocId = currentDocId + 1;
-        int length = valueIterator.nextIntVal(intArray);
-        boolean found = false;
-        for (int i = 0; i < length; i++) {
-          if (dictIdSet.contains(intArray[i])) {
-            found = true;
-            break;
-          }
-        }
-        if (found) {
-          return currentDocId;
-        }
-      }
-      currentDocId = Constants.EOF;
-      return Constants.EOF;
-    }
-
-    @Override
-    public int currentDocId() {
-      return currentDocId;
-    }
-  };
 
   @Override
   public <T> T getRaw() {

@@ -27,9 +27,6 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 public interface InstanceDataManager extends DataManager {
   TableDataManager getTableDataManager(String tableName);
 
-  @Override
-  void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception;
-
   void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception;
 

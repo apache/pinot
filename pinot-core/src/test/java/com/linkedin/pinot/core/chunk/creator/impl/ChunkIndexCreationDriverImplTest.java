@@ -15,18 +15,6 @@
  */
 package com.linkedin.pinot.core.chunk.creator.impl;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.io.FileUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -47,6 +35,17 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.LoggerFactory;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
@@ -54,6 +53,8 @@ import com.linkedin.pinot.util.TestUtils;
  */
 
 public class ChunkIndexCreationDriverImplTest {
+
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ChunkIndexCreationDriverImplTest.class);
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(ChunkIndexCreationDriverImplTest.class.toString());
@@ -88,13 +89,14 @@ public class ChunkIndexCreationDriverImplTest {
   public void test2() throws Exception {
     final IndexSegmentImpl segment =
         (IndexSegmentImpl) Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-
+    System.out.println("INdex dir:" + INDEX_DIR);
     final DataSource ds = segment.getDataSource("column1");
     final Block bl = ds.nextBlock();
     final BlockValSet valSet = bl.getBlockValueSet();
     final BlockSingleValIterator it = (BlockSingleValIterator) valSet.iterator();
+    // TODO: FIXME - load segment with known data and verify that it exists
     while (it.hasNext()) {
-      System.out.println(it.nextIntVal());
+      LOGGER.trace(Integer.toString(it.nextIntVal()));
     }
   }
 
@@ -114,7 +116,7 @@ public class ChunkIndexCreationDriverImplTest {
     while (it.hasNext()) {
       final int[] entry = new int[maxValue];
       it.nextIntVal(entry);
-      System.out.println(Arrays.toString(entry));
+      LOGGER.trace(Arrays.toString(entry));
     }
   }
 

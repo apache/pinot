@@ -18,7 +18,6 @@ package com.linkedin.pinot.integration.tests;
 import java.io.File;
 import java.io.FileInputStream;
 import java.sql.DriverManager;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -70,9 +68,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void createTable() throws Exception {
-    File schemaFile =
-        new File(OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+    File schemaFile = getSchemaFile();
 
     // Create a table
     setUpTable(schemaFile, 1, 1);
@@ -83,90 +79,40 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     addOfflineTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", null, null);
   }
 
+  protected void dropTable() throws Exception {
+    dropOfflineTable("mytable");
+  }
+
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
-    FileUtils.deleteDirectory(_tmpDir);
-    FileUtils.deleteDirectory(_segmentDir);
-    FileUtils.deleteDirectory(_tarDir);
-    _tmpDir.mkdirs();
-    _segmentDir.mkdirs();
-    _tarDir.mkdirs();
+    ensureDirectoryExistsAndIsEmpty(_tmpDir);
+    ensureDirectoryExistsAndIsEmpty(_segmentDir);
+    ensureDirectoryExistsAndIsEmpty(_tarDir);
 
     // Start the cluster
     startCluster();
 
     // Unpack the Avro files
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
-
-    _tmpDir.mkdirs();
-
-    final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
-    for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
-      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
-    }
+    final List<File> avroFiles = unpackAvroData(_tmpDir, SEGMENT_COUNT);
 
     createTable();
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
-    Class.forName("org.h2.Driver");
-    _connection = DriverManager.getConnection("jdbc:h2:mem:");
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        createH2SchemaAndInsertAvroFiles(avroFiles, _connection);
-      }
-    });
+    setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable");
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false);
 
     // Initialize query generator
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
-      }
-    });
+    setupQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
-    final CountDownLatch latch = new CountDownLatch(1);
-    HelixManager manager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
-            ZkStarter.DEFAULT_ZK_STR);
-    manager.connect();
-    manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
-      @Override
-      public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
-        for (ExternalView externalView : externalViewList) {
-          if (externalView.getId().contains("mytable")) {
-
-            Set<String> partitionSet = externalView.getPartitionSet();
-            if (partitionSet.size() == SEGMENT_COUNT) {
-              int onlinePartitionCount = 0;
-
-              for (String partitionId : partitionSet) {
-                Map<String, String> partitionStateMap = externalView.getStateMap(partitionId);
-                if (partitionStateMap.containsValue("ONLINE")) {
-                  onlinePartitionCount++;
-                }
-              }
-
-              if (onlinePartitionCount == SEGMENT_COUNT) {
-                System.out.println("Got " + SEGMENT_COUNT + " online tables, unlatching the main thread");
-                latch.countDown();
-              }
-            }
-          }
-        }
-      }
-    });
+    final CountDownLatch latch = setupSegmentCountCountDownLatch("mytable", SEGMENT_COUNT);
 
     // Upload the segments
     int i = 0;
@@ -189,7 +135,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
         Assert.fail("Segments were not completely loaded within two minutes");
       }
     }
-
   }
 
   @Override
@@ -210,6 +155,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     super.testGeneratedQueries();
   }
 
+  @Override
+  @Test
+  public void testGeneratedQueriesWithMultivalues() throws Exception {
+    super.testGeneratedQueriesWithMultivalues();
+  }
+
+  /**
+   * NOTE:
+   * If you are copying a failed query to test in isolation, you might have to do the following for group by queries
+   * -- remove limit, pinot sets default limit to 10, we get all values from H2 to ensure that pinot results valid results
+   * -- Add the group by column name in the select clause. Pinot does not care but H2 requires it. e.g select col1,sum(col2) from T group by col1
+   * If you forget this, you will see this test fail all the time and have no clue whats going on :)
+   * @throws Exception
+   */
   @Test
   public void testSingleQuery() throws Exception {
     String query;
@@ -356,11 +315,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
         hasWhere = !hasWhere;
       }
     }
-  }
-
-  @Override
-  protected String getHelixClusterName() {
-    return "OfflineClusterIntegrationTest";
   }
 
   @AfterClass

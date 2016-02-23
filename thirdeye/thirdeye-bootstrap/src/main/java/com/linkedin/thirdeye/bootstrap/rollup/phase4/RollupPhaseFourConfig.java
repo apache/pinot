@@ -19,14 +19,12 @@ public class RollupPhaseFourConfig {
   }
 
   /**
-   *
    * @param dimensionNames
    * @param metricNames
    * @param metricTypes
    */
-  public RollupPhaseFourConfig(List<String> dimensionNames,
-      List<String> metricNames, List<MetricType> metricTypes,
-      List<String> rollupOrder) {
+  public RollupPhaseFourConfig(List<String> dimensionNames, List<String> metricNames,
+      List<MetricType> metricTypes, List<String> rollupOrder) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -44,29 +42,25 @@ public class RollupPhaseFourConfig {
   public List<MetricType> getMetricTypes() {
     return metricTypes;
   }
+
   public List<String> getRollupOrder() {
     return rollupOrder;
   }
 
-  public static RollupPhaseFourConfig fromStarTreeConfig(StarTreeConfig config)
-  {
+  public static RollupPhaseFourConfig fromStarTreeConfig(StarTreeConfig config) {
     List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
     List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
-    for (MetricSpec spec : config.getMetrics())
-    {
+    for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions())
-    {
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
 
-    return new RollupPhaseFourConfig(dimensionNames,
-                                     metricNames,
-                                     metricTypes,
-                                     config.getRollup().getOrder());
+    return new RollupPhaseFourConfig(dimensionNames, metricNames, metricTypes,
+        config.getRollup().getOrder());
   }
 }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -41,7 +43,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
  * Class to implement CreateSegment command.
  *
  */
-public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
+public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
   @Option(name = "-dataDir", required = true, metaVar = "<string>", usage = "Directory containing the data.")
@@ -68,9 +70,22 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Option(name = "-overwrite", required = false, metaVar = "<string>", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-enableStarTreeIndex", required = false, metaVar = "<string>", usage = "Enable Star Tree Index.")
+  boolean _enableStarTreeIndex = false;
+
+  @Option(name = "-starTreeIndexSpecFile", required = false, metaVar = "<string>",
+      usage = "Config file for star tree index")
+  private String _starTreeIndexSpecFile;
+
+  @Option(name = "-numThreads", required = false, metaVar = "<int>",
+      usage = "Parallelism while generating segments. default is 1")
+  int _numThreads = 1;
+
+  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+      usage = "Print this message.")
   boolean _help = false;
 
+  @Override
   public boolean getHelp() {
     return _help;
   }
@@ -115,12 +130,27 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     return this;
   }
 
+  public CreateSegmentCommand setEnableStarTreeIndex(boolean enableStarTreeIndex) {
+    _enableStarTreeIndex = enableStarTreeIndex;
+    return this;
+  }
+
+  public CreateSegmentCommand setStarTreeIndexSpecFile(String file) {
+    _starTreeIndexSpecFile = file;
+    return this;
+  }
+
+  public CreateSegmentCommand setNumThreads(int numThreads) {
+    _numThreads = numThreads;
+    return this;
+  }
+
   @Override
   public String toString() {
-    return ("CreateSegment -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
-        " -format " + _format + " -readerConfigFile " + _recordReaderConfigFile +
-        " -tableName " + _tableName + " -segmentName " + _segmentName + " -outDir " + _outDir +
-        " -overwrite " + _overwrite);
+    return ("CreateSegment -schemaFile " + _schemaFile + " -dataDir " + _dataDir + " -format " + _format
+        + " -readerConfigFile " + _recordReaderConfigFile + " -tableName " + _tableName + " -segmentName "
+        + _segmentName + " -outDir " + _outDir + " -numThreads " + _numThreads + " -enableStarTreeIndex "
+        + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile + " -overwrite " + _overwrite);
   }
 
   @Override
@@ -185,8 +215,14 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       recordReaderConfig = null;
     }
 
-    ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    final StarTreeIndexSpec starTreeIndexSpec;
+    if (_starTreeIndexSpecFile != null) {
+      starTreeIndexSpec = new ObjectMapper().readValue(new File(_starTreeIndexSpecFile), StarTreeIndexSpec.class);
+    } else {
+      starTreeIndexSpec = null;
+    }
 
+    ExecutorService executor = Executors.newFixedThreadPool(_numThreads);
     int cnt = 0;
     for (final File file : files) {
       final int segCnt = cnt;
@@ -216,7 +252,8 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
             } else {
               config.setTimeUnitForSegment(TimeUnit.DAYS);
             }
-
+            config.setCreateStarTreeIndex(_enableStarTreeIndex);
+            config.setStarTreeIndexSpec(starTreeIndexSpec);
             final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
             driver.init(config);
             driver.build();
@@ -226,7 +263,6 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
           }
         }
       });
-
       cnt += 1;
     }
 

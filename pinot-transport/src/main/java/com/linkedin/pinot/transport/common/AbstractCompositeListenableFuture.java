@@ -174,9 +174,11 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * @param name Name of the future which got completed
    * @param responses Response
    * @param error Error
+   * @param durationMillis
    * @return true if processing done
    */
-  protected abstract boolean processFutureResult(String name, Map<K, T> responses, Map<K, Throwable> error);
+  protected abstract boolean processFutureResult(String name, Map<K, T> responses, Map<K, Throwable> error,
+      long durationMillis);
 
   protected void addResponseFutureListener(KeyedFuture<K, T> future) {
     future.addListener(new ResponseFutureListener(future), null); // no need for separate Executors
@@ -194,7 +196,6 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
 
     @Override
     public void run() {
-
       LOGGER.debug("Running Future Listener for underlying future for {}", _future.getName());
       try {
         _futureLock.lock();
@@ -216,7 +217,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
 
       // Since the future is done, it is safe to look at error results
       Map<K, Throwable> error = _future.getError();
-      boolean done = processFutureResult(_future.getName(), response, error);
+      boolean done = processFutureResult(_future.getName(), response, error, _future.getDurationMillis());
 
       if (done) {
         setDone(State.DONE);

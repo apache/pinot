@@ -1,44 +1,44 @@
 package com.linkedin.thirdeye;
 
-import io.dropwizard.Configuration;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.dropwizard.db.DataSourceFactory;
-import org.hibernate.validator.constraints.*;
-
 import javax.validation.Valid;
-import javax.validation.constraints.*;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.dropwizard.Configuration;
+import io.dropwizard.db.DataSourceFactory;
 
 public class ThirdEyeDetectorConfiguration extends Configuration {
   @Valid
   @NotNull
-  private String thirdEyeHost;
+  private String clientConfigRoot;
 
   @Valid
   @NotNull
-  private int thirdEyePort;
+  private String functionConfigPath;
 
   @Valid
   @NotNull
-  private DataSourceFactory database = new DataSourceFactory();
+  private final DataSourceFactory database = new DataSourceFactory();
 
   @JsonProperty("database")
   public DataSourceFactory getDatabase() {
     return database;
   }
 
-  public int getThirdEyePort() {
-    return thirdEyePort;
+  public String getClientConfigRoot() {
+    return clientConfigRoot;
   }
 
-  public void setThirdEyePort(int thirdEyePort) {
-    this.thirdEyePort = thirdEyePort;
+  public void setClientConfigRoot(String clientConfigRoot) {
+    this.clientConfigRoot = clientConfigRoot;
   }
 
-  public String getThirdEyeHost() {
-    return thirdEyeHost;
+  public String getFunctionConfigPath() {
+    return functionConfigPath;
   }
 
-  public void setThirdEyeHost(String thirdEyeHost) {
-    this.thirdEyeHost = thirdEyeHost;
+  public void setFunctionConfigPath(String functionConfigPath) {
+    this.functionConfigPath = functionConfigPath;
   }
 }

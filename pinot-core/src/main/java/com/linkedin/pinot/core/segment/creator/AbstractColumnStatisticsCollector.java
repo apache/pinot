@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  *
  */
 
-public abstract class AbstractColumnStatisticsCollector {
+public abstract class AbstractColumnStatisticsCollector implements  ColumnStatistics {
 
   private Object previousValue = null;
   protected final FieldSpec fieldSpec;
@@ -46,6 +46,7 @@ public abstract class AbstractColumnStatisticsCollector {
   private int numberOfChanges = 0;
   protected int totalNumberOfEntries = 0;
   protected int maxNumberOfMultiValues = 0;
+  private int numInputNullValues = 0;  // Number of rows in which this column was null in the input.
 
   public void updateTotalNumberOfEntries(Object[] entries) {
     totalNumberOfEntries += entries.length;
@@ -88,11 +89,17 @@ public abstract class AbstractColumnStatisticsCollector {
   }
 
   public boolean isSorted() {
-    if (fieldSpec.isSingleValueField()) {
-      return isSorted;
-    }
-    return false;
+    return fieldSpec.isSingleValueField() && isSorted;
   }
+
+  public int getNumInputNullValues() {
+    return numInputNullValues;
+  }
+
+  public void setNumInputNullValues(int numInputNullValues) {
+    this.numInputNullValues = numInputNullValues;
+  }
+
 
   public abstract void collect(Object entry);
 

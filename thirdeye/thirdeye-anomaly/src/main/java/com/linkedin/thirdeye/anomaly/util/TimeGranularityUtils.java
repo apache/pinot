@@ -13,7 +13,7 @@ public class TimeGranularityUtils {
   /**
    * @param tg
    * @return
-   *  The number of milliseconds of the time granularity representation
+   *         The number of milliseconds of the time granularity representation
    */
   public static long toMillis(TimeGranularity tg) {
     return tg.getUnit().toMillis(tg.getSize());
@@ -23,7 +23,7 @@ public class TimeGranularityUtils {
    * @param timeWindow
    * @param tg
    * @return
-   *  New timeWindow representing the date truncated by time granularity
+   *         New timeWindow representing the date truncated by time granularity
    */
   public static long truncateBy(long timeWindow, TimeGranularity tg) {
     DateTime dt = new DateTime(timeWindow, DateTimeZone.UTC);
@@ -32,6 +32,7 @@ public class TimeGranularityUtils {
     return dt.withMillisOfDay(millisOfDay).getMillis();
   }
 
-  private TimeGranularityUtils() {}
+  private TimeGranularityUtils() {
+  }
 
 }

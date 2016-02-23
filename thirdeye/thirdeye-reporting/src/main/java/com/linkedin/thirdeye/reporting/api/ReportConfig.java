@@ -34,53 +34,37 @@ public class ReportConfig {
   private String timezone;
   private String dashboardUri;
 
-
   public ReportConfig() {
 
   }
-
-
 
   public String getDashboardUri() {
     return dashboardUri;
   }
 
-
-
   public void setDashboardUri(String dashboardUri) {
     this.dashboardUri = dashboardUri;
   }
-
-
 
   public String getStartTimeString() {
     return startTimeString;
   }
 
-
-
   public void setStartTimeString(String startTimeString) {
     this.startTimeString = startTimeString;
   }
-
-
 
   public String getEndTimeString() {
     return endTimeString;
   }
 
-
-
   public void setEndTimeString(String endTimeString) {
     this.endTimeString = endTimeString;
   }
 
-
-
   public DBSpec getDbconfig() {
     return dbconfig;
   }
-
 
   public void setDbconfig(DBSpec dbconfig) {
     this.dbconfig = dbconfig;
@@ -102,7 +86,6 @@ public class ReportConfig {
     this.startTime = startTime;
   }
 
-
   public AliasSpec getAliases() {
     return aliases;
   }
@@ -119,7 +102,6 @@ public class ReportConfig {
     return schedules;
   }
 
-
   public List<TableSpec> getTables() {
     return tables;
   }
@@ -132,14 +114,11 @@ public class ReportConfig {
     this.timezone = timezone;
   }
 
-
-  public static ReportConfig decode(InputStream inputStream) throws IOException
-  {
+  public static ReportConfig decode(InputStream inputStream) throws IOException {
     return OBJECT_MAPPER.readValue(inputStream, ReportConfig.class);
   }
 
-  public String encode() throws IOException
-  {
+  public String encode() throws IOException {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 

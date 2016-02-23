@@ -1,11 +1,10 @@
 package com.linkedin.thirdeye.dashboard.api.funnel;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 
 public class CustomFunnelSpec {
 
@@ -25,12 +24,11 @@ public class CustomFunnelSpec {
   }
 
   public void setFunnels(List<FunnelSpec> funnels) {
-    this.funnelSpecMap = new HashMap<String, FunnelSpec>();
+    this.funnelSpecMap = new LinkedHashMap<String, FunnelSpec>();
     for (FunnelSpec spec : funnels) {
       funnelSpecMap.put(spec.getName(), spec);
     }
   }
-
 
   public String toString() {
     String ret = null;

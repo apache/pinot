@@ -40,6 +40,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   public static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
+  public static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
   private org.apache.avro.Schema defaultAvroSchema;
   private Map<String, org.apache.avro.Schema> md5ToAvroSchemaMap;
 
@@ -56,7 +57,14 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     schemaRegistryBaseUrl = props.get(SCHEMA_REGISTRY_REST_URL);
     StringUtils.chomp(schemaRegistryBaseUrl, "/");
     kafkaTopicName = topicName;
-    defaultAvroSchema = fetchSchema(new URL(schemaRegistryBaseUrl + "/latest_with_type=" + kafkaTopicName));
+
+    String avroSchemaName = kafkaTopicName;
+    if(props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null &&
+        !props.get(SCHEMA_REGISTRY_SCHEMA_NAME).isEmpty()) {
+      avroSchemaName = props.get(SCHEMA_REGISTRY_SCHEMA_NAME);
+    }
+
+    defaultAvroSchema = fetchSchema(new URL(schemaRegistryBaseUrl + "/latest_with_type=" + avroSchemaName));
     this.avroRecordConvetrer = new AvroRecordToPinotRowGenerator(indexingSchema);
     this.decoderFactory = new DecoderFactory();
     md5ToAvroSchemaMap = new HashMap<String, org.apache.avro.Schema>();

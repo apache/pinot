@@ -23,6 +23,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <pinot.version>0.016</pinot.version>
     </properties>
 
     <build>

@@ -15,26 +15,26 @@
  */
 package com.linkedin.pinot.core.segment.index.column;
 
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
+import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
 public class SortedSVColumnIndexContainer extends ColumnIndexContainer {
 
   private final String column;
   private final ColumnMetadata columnMetadata;
-  private final FixedByteWidthRowColDataFileReader indexFileReader;
+  private final FixedByteSingleValueMultiColReader indexFileReader;
   private final ImmutableDictionaryReader dictionaryReader;
   private final InvertedIndexReader invertedIndexReader;
   private final SortedForwardIndexReader forwardIndexReader;
 
   public SortedSVColumnIndexContainer(String column, ColumnMetadata columnMetadata,
-      FixedByteWidthRowColDataFileReader indexFileReader, ImmutableDictionaryReader dictionaryReader) {
+      FixedByteSingleValueMultiColReader indexFileReader, ImmutableDictionaryReader dictionaryReader) {
     this.column = column;
     this.columnMetadata = columnMetadata;
     this.indexFileReader = indexFileReader;

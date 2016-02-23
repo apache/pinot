@@ -19,11 +19,16 @@ import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-public class RangeOfflineDictionaryPredicateEvaluator extends AbstractPredicateEvaluator {
+public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvaluator {
+
+  private int[] matchingIds;
+  private RangePredicate predicate;
+  private int rangeStartIndex = 0;
+  private int rangeEndIndex = 0;
+  int matchingSize;
 
   public RangeOfflineDictionaryPredicateEvaluator(RangePredicate predicate, ImmutableDictionaryReader dictionary) {
-    int rangeStartIndex = 0;
-    int rangeEndIndex = 0;
+    this.predicate = predicate;
 
     final boolean incLower = predicate.includeLowerBoundary();
     final boolean incUpper = predicate.includeUpperBoundary();
@@ -53,17 +58,60 @@ public class RangeOfflineDictionaryPredicateEvaluator extends AbstractPredicateE
       rangeEndIndex -= 1;
     }
 
-    int size = (rangeEndIndex - rangeStartIndex) + 1;
-    if (size < 0) {
-      size = 0;
+    matchingSize = (rangeEndIndex - rangeStartIndex) + 1;
+    if (matchingSize < 0) {
+      matchingSize = 0;
     }
+  }
 
-    matchingIds = new int[size];
-
-    int counter = 0;
-    for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-      matchingIds[counter++] = i;
+  @Override
+  public boolean apply(int dictionaryId) {
+    if (dictionaryId >=  rangeStartIndex && dictionaryId <= rangeEndIndex) {
+      return true;
     }
+    return false;
+  }
 
+  @Override
+  public boolean apply(int[] dictionaryIds) {
+    for (int dictId : dictionaryIds) {
+      if (dictId >= rangeStartIndex && dictId <= rangeEndIndex) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public int[] getMatchingDictionaryIds() {
+    if (matchingIds == null) {
+      matchingIds = new int[matchingSize];
+      int counter = 0;
+      for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+        matchingIds[counter++] = i;
+      }
+    }
+    return matchingIds;
+  }
+
+  @Override
+  public int[] getNonMatchingDictionaryIds() {
+    throw new UnsupportedOperationException("Returning non matching values is expensive for predicateType:" + predicate.getType() );
+  }
+
+  @Override
+  public boolean apply(int[] dictionaryIds, int length) {
+    for (int i = 0; i < length; i++) {
+      int dictId = dictionaryIds[i];
+      if (dictId >= rangeStartIndex && dictId <= rangeEndIndex) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public boolean alwaysFalse() {
+    return ((rangeEndIndex - rangeStartIndex) + 1) <= 0;
   }
 }

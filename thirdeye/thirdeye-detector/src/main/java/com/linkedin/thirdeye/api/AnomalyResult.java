@@ -13,40 +13,23 @@ import java.util.Properties;
 @Entity
 @Table(name = "anomaly_results")
 @NamedQueries({
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyResult#findAll",
-        query = "SELECT r FROM AnomalyResult r"),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollection",
-        query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection"),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionAndTime",
-        query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " +
-            "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) " +
-            "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"
-    ),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFunction",
-        query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " +
-            "AND r.functionId = :functionId " +
-            "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) " +
-            "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"
-    ),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndMetric",
-        query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " +
-            "AND r.metric = :metric " +
-            "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) " +
-            "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"
-    ),
-    @NamedQuery(
-    name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric",
-    query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection " +
-        "AND r.functionId = :functionId " +
-        "AND r.metric = :metric " +
-        "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) " +
-        "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"
-    ),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAll", query = "SELECT r FROM AnomalyResult r"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollection", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionAndTime", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndFunction", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+        + "AND r.functionId = :functionId "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeAndMetric", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+        + "AND r.metric = :metric "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyResult#findAllByCollectionTimeFunctionIdAndMetric", query = "SELECT r FROM AnomalyResult r WHERE r.collection = :collection "
+        + "AND r.functionId = :functionId " + "AND r.metric = :metric "
+        + "AND ((r.startTimeUtc >= :startTimeUtc AND r.startTimeUtc <= :endTimeUtc) "
+        + "OR (r.endTimeUtc >= :startTimeUtc AND r.endTimeUtc <= :endTimeUtc))"),
 })
 public class AnomalyResult implements Comparable<AnomalyResult> {
   private static Joiner SEMICOLON = Joiner.on(";");
@@ -89,7 +72,8 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
   @Column(name = "properties", nullable = true)
   private String properties;
 
-  public AnomalyResult() {}
+  public AnomalyResult() {
+  }
 
   public long getId() {
     return id;
@@ -189,20 +173,11 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("id", id)
-        .add("functionId", functionId)
-        .add("functionType", functionType)
-        .add("functionProperties", functionProperties)
-        .add("collection", collection)
-        .add("startTimeUtc", startTimeUtc)
-        .add("endTimeUtc", endTimeUtc)
-        .add("dimensions", dimensions)
-        .add("metric", metric)
-        .add("score", score)
-        .add("weight", weight)
-        .add("properties", properties)
-        .toString();
+    return MoreObjects.toStringHelper(this).add("id", id).add("functionId", functionId)
+        .add("functionType", functionType).add("functionProperties", functionProperties)
+        .add("collection", collection).add("startTimeUtc", startTimeUtc)
+        .add("endTimeUtc", endTimeUtc).add("dimensions", dimensions).add("metric", metric)
+        .add("score", score).add("weight", weight).add("properties", properties).toString();
   }
 
   @Override
@@ -217,27 +192,15 @@ public class AnomalyResult implements Comparable<AnomalyResult> {
         && Objects.equals(collection, r.getCollection())
         && Objects.equals(startTimeUtc, r.getStartTimeUtc())
         && Objects.equals(endTimeUtc, r.getEndTimeUtc())
-        && Objects.equals(dimensions, r.getDimensions())
-        && Objects.equals(metric, r.getMetric())
-        && Objects.equals(score, r.getScore())
-        && Objects.equals(weight, r.getWeight())
+        && Objects.equals(dimensions, r.getDimensions()) && Objects.equals(metric, r.getMetric())
+        && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
         && Objects.equals(properties, r.getProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        functionId,
-        functionType,
-        functionProperties,
-        collection,
-        startTimeUtc,
-        endTimeUtc,
-        dimensions,
-        metric,
-        score,
-        weight,
-        properties);
+    return Objects.hash(functionId, functionType, functionProperties, collection, startTimeUtc,
+        endTimeUtc, dimensions, metric, score, weight, properties);
   }
 
   @Override

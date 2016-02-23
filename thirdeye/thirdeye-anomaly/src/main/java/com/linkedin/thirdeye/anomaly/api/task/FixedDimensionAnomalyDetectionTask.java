@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
  * Run anomaly detection on a fixed dimension combination
  */
 public class FixedDimensionAnomalyDetectionTask extends AbstractBaseAnomalyDetectionTask
-  implements Callable<List<AnomalyResult>> {
+    implements Callable<List<AnomalyResult>> {
 
   private final Map<String, String> fixedDimensionValues;
 
@@ -28,14 +28,11 @@ public class FixedDimensionAnomalyDetectionTask extends AbstractBaseAnomalyDetec
    * @param thirdEyeClient
    * @param dimensionValues
    */
-  public FixedDimensionAnomalyDetectionTask(
-      StarTreeConfig starTreeConfig,
-      AnomalyDetectionTaskInfo taskInfo,
-      AnomalyDetectionFunction function,
-      ThirdEyeClient thirdEyeClient,
-      Map<String, String> fixedDimensionValues)
-  {
-    super(starTreeConfig, taskInfo, function, AnomalyDetectionFunctionHistoryNoOp.sharedInstance(), thirdEyeClient);
+  public FixedDimensionAnomalyDetectionTask(StarTreeConfig starTreeConfig,
+      AnomalyDetectionTaskInfo taskInfo, AnomalyDetectionFunction function,
+      ThirdEyeClient thirdEyeClient, Map<String, String> fixedDimensionValues) {
+    super(starTreeConfig, taskInfo, function, AnomalyDetectionFunctionHistoryNoOp.sharedInstance(),
+        thirdEyeClient);
     this.fixedDimensionValues = fixedDimensionValues;
   }
 

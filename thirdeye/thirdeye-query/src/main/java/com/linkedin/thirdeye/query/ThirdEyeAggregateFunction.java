@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 
 import java.util.*;
 
-public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
+public class ThirdEyeAggregateFunction implements ThirdEyeFunction {
   private final TimeGranularity window;
 
   public ThirdEyeAggregateFunction(TimeGranularity window) {
@@ -18,16 +18,19 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
-    MetricTimeSeries aggregate = ThirdEyeFunctionUtils.copyBlankSeriesSame(timeSeries.getSchema().getNames(), timeSeries.getSchema());
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query,
+      MetricTimeSeries timeSeries) {
+    MetricTimeSeries aggregate = ThirdEyeFunctionUtils
+        .copyBlankSeriesSame(timeSeries.getSchema().getNames(), timeSeries.getSchema());
 
     if (timeSeries.getTimeWindowSet().isEmpty()) {
       return aggregate;
     }
 
     // Convert window to collection time
-    long collectionWindow = config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
-        / config.getTime().getBucket().getSize();
+    long collectionWindow =
+        config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
+            / config.getTime().getBucket().getSize();
 
     if (collectionWindow == 0) {
       throw new IllegalArgumentException("Minimum aggregation granularity is "

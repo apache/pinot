@@ -15,22 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
-import it.unimi.dsi.fastutil.PriorityQueue;
-import it.unimi.dsi.fastutil.objects.ObjectArrayPriorityQueue;
-
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
@@ -38,7 +23,19 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import com.linkedin.pinot.core.query.utils.Pair;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -48,14 +45,25 @@ import com.linkedin.pinot.core.query.utils.Pair;
  */
 public class AggregationGroupByOperatorService {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregationGroupByOperatorService.class);
+  private static final String MIN_PREFIX = "min_";
   private final List<String> _groupByColumns;
   private final int _groupByTopN;
+  private final int _trimThreshold;
+  private final int _trimSize;
   private final List<AggregationFunction> _aggregationFunctionList;
 
   public AggregationGroupByOperatorService(List<AggregationInfo> aggregationInfos, GroupBy groupByQuery) {
     _aggregationFunctionList = AggregationFunctionFactory.getAggregationFunction(aggregationInfos);
     _groupByColumns = groupByQuery.getColumns();
     _groupByTopN = (int) groupByQuery.getTopN();
+
+    // _minTrimSize is the larger of _groupByTopN or 1000.
+    // _trimThreshold determines whether or not results should be trimmed and is 20 times of _minTrimSize.
+    // If result size is < _trimThreshold, return the results without sorting or trimming.
+    // Else, sort the results, and trim the result set size to 5 times of _minTrimSize.
+    int minTrimSize = Math.max(_groupByTopN, 1000);
+    _trimThreshold = minTrimSize * 20;
+    _trimSize = minTrimSize * 5;
   }
 
   public static List<Map<String, Serializable>> transformDataTableToGroupByResult(DataTable dataTable) {
@@ -124,28 +132,24 @@ public class AggregationGroupByOperatorService {
 
         int groupSize = _groupByColumns.size();
         Map<String, Serializable> reducedGroupByResult = finalAggregationResult.get(i);
+        AggregationFunction aggregationFunction = _aggregationFunctionList.get(i);
+
         if (!reducedGroupByResult.isEmpty()) {
+          boolean reverseOrder = aggregationFunction.getFunctionName().startsWith(MIN_PREFIX);
 
-          PriorityQueue priorityQueue =
-              getPriorityQueue(_aggregationFunctionList.get(i), reducedGroupByResult.values().iterator().next());
-          if (priorityQueue != null) {
+          MinMaxPriorityQueue<ImmutablePair<Serializable, String>> minMaxPriorityQueue =
+              getMinMaxPriorityQueue(reducedGroupByResult.values().iterator().next(), _groupByTopN, reverseOrder);
+
+          if (minMaxPriorityQueue != null) {
+            // The MinMaxPriorityQueue will only add TOP N
             for (String groupedKey : reducedGroupByResult.keySet()) {
-              priorityQueue.enqueue(new Pair(reducedGroupByResult.get(groupedKey), groupedKey));
-              if (priorityQueue.size() == (_groupByTopN + 1)) {
-                priorityQueue.dequeue();
-              }
+              minMaxPriorityQueue.add(new ImmutablePair(reducedGroupByResult.get(groupedKey), groupedKey));
             }
 
-            int realGroupSize = _groupByTopN;
-            if (priorityQueue.size() < _groupByTopN) {
-              realGroupSize = priorityQueue.size();
-            }
-            for (int j = 0; j < realGroupSize; ++j) {
+            ImmutablePair res;
+            while ((res = (ImmutablePair) minMaxPriorityQueue.pollFirst()) != null) {
               JSONObject groupByResultObject = new JSONObject();
-              Pair res = (Pair) priorityQueue.dequeue();
-              groupByResultObject.put(
-                  "group",
-                  new JSONArray(((String) res.getSecond()).split(
+              groupByResultObject.put("group", new JSONArray(((String) res.getRight()).split(
                       GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
               //          if (res.getFirst() instanceof Number) {
               //            groupByResultObject.put("value", df.format(res.getFirst()));
@@ -153,15 +157,14 @@ public class AggregationGroupByOperatorService {
               //            groupByResultObject.put("value", res.getFirst());
               //          }
               //          groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
-              groupByResultObject.put("value",
-                  _aggregationFunctionList.get(i).render((Serializable) res.getFirst()).get("value"));
-              groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
+              groupByResultObject.put("value", aggregationFunction.render((Serializable) res.getLeft()).get("value"));
+              groupByResultsArray.put(groupByResultObject);
             }
           }
         }
 
         JSONObject result = new JSONObject();
-        result.put("function", _aggregationFunctionList.get(i).getFunctionName());
+        result.put("function", aggregationFunction.getFunctionName());
         result.put("groupByResult", groupByResultsArray);
         result.put("groupByColumns", new JSONArray(_groupByColumns));
         retJsonResultList.add(result);
@@ -174,81 +177,107 @@ public class AggregationGroupByOperatorService {
     }
   }
 
-  public void trimToSize(List<Map<String, Serializable>> aggregationGroupByResultList) {
-    if (aggregationGroupByResultList == null) {
-      return;
+  /**
+   * Given a list of group by results, trim each one of them to desired size.
+   * Desired size is computed to be five times that of the TOP N in the query.
+   *
+   * @param aggregationGroupByResultList List of trimmed group by results.
+   * @return
+   */
+  public List<Map<String, Serializable>> trimToSize(List<Map<String, Serializable>> aggregationGroupByResultList) {
+    if (aggregationGroupByResultList == null || aggregationGroupByResultList.isEmpty()) {
+      return aggregationGroupByResultList;
     }
 
+    List<Map<String, Serializable>> trimmedResults = new ArrayList<>();
     for (int i = 0; i < aggregationGroupByResultList.size(); ++i) {
-      if (aggregationGroupByResultList.get(i).size() > (_groupByTopN * 20)) {
-        trimToSize(_aggregationFunctionList.get(i), aggregationGroupByResultList.get(i), _groupByTopN * 5);
+      if (aggregationGroupByResultList.get(i).size() > _trimThreshold) {
+        trimmedResults
+            .add(trimToSize(_aggregationFunctionList.get(i), aggregationGroupByResultList.get(i), _trimSize));
+      } else {
+        trimmedResults.add(aggregationGroupByResultList.get(i));
       }
     }
+
+    return trimmedResults;
   }
 
-  private void trimToSize(AggregationFunction aggregationFunction, Map<String, Serializable> aggregationGroupByResult,
-      int trimSize) {
-    PriorityQueue priorityQueue =
-        getPriorityQueue(aggregationFunction, aggregationGroupByResult.values().iterator().next());
-    if (priorityQueue == null) {
-      return;
+  /**
+   * Given a group by result, return a group by result trimmed to provided size.
+   * Sorting ordering is determined based on aggregation function.
+   *
+   * @param aggregationFunction
+   * @param aggregationGroupByResult
+   * @param trimSize
+   * @return
+   */
+  private Map<String, Serializable> trimToSize(AggregationFunction aggregationFunction,
+      Map<String, Serializable> aggregationGroupByResult, int trimSize) {
+
+    boolean reverseOrder = aggregationFunction.getFunctionName().startsWith(MIN_PREFIX);
+    MinMaxPriorityQueue<ImmutablePair<Serializable, String>> minMaxPriorityQueue =
+        getMinMaxPriorityQueue(aggregationGroupByResult.values().iterator().next(), trimSize, reverseOrder);
+
+    if (minMaxPriorityQueue == null) {
+      return aggregationGroupByResult;
     }
+
+    // The MinMaxPriorityQueue will add only the TOP N elements.
     for (String groupedKey : aggregationGroupByResult.keySet()) {
-      priorityQueue.enqueue(new Pair(aggregationGroupByResult.get(groupedKey), groupedKey));
-      if (priorityQueue.size() == (_groupByTopN + 1)) {
-        priorityQueue.dequeue();
-      }
+      minMaxPriorityQueue.add(new ImmutablePair(aggregationGroupByResult.get(groupedKey), groupedKey));
     }
 
-    for (int i = 0; i < (priorityQueue.size() - trimSize); ++i) {
-      Pair res = (Pair) priorityQueue.dequeue();
-      aggregationGroupByResult.remove(res.getSecond());
+    Map<String, Serializable> trimmedResult = new HashMap<>();
+    ImmutablePair<Serializable, String> pair;
+    while ((pair = (ImmutablePair) minMaxPriorityQueue.pollFirst()) != null) {
+      trimmedResult.put(pair.getRight(), pair.getLeft());
     }
+    return trimmedResult;
   }
 
-  private PriorityQueue getPriorityQueue(AggregationFunction aggregationFunction, Serializable sampleValue) {
-    if (sampleValue instanceof Comparable) {
-      if (aggregationFunction.getFunctionName().startsWith("min_")) {
-        return new customPriorityQueue().getGroupedValuePairPriorityQueue((Comparable) sampleValue, true);
-      } else {
-        return new customPriorityQueue().getGroupedValuePairPriorityQueue((Comparable) sampleValue, false);
-      }
+  /**
+   * Returns a MinMaxPriorityQueue with the given size limit, and ordering.
+   * Will return null if the value to be inserted is not an instance of comparable.
+   *
+   * @param sampleObject To determine if the object is Comparable.
+   * @param maxSize The max size for the heap.
+   * @param reverseOrder True if sorting order to be reversed.
+   * @return
+   */
+  MinMaxPriorityQueue<ImmutablePair<Serializable, String>> getMinMaxPriorityQueue(Serializable sampleObject,
+      int maxSize, boolean reverseOrder) {
+    if (!(sampleObject instanceof Comparable)) {
+      return null;
     }
-    return null;
+
+    Comparator<ImmutablePair<Serializable, String>> comparator =
+        new GroupByResultComparator<ImmutablePair<Serializable, String>>().newComparator(reverseOrder);
+
+    MinMaxPriorityQueue.Builder<ImmutablePair<Serializable, String>> minMaxPriorityQueueBuilder =
+        MinMaxPriorityQueue.orderedBy(comparator).maximumSize(maxSize);
+
+    return minMaxPriorityQueueBuilder.create();
   }
 
-  class customPriorityQueue<T extends Comparable> {
-    private PriorityQueue getGroupedValuePairPriorityQueue(T object, boolean isMinPriorityQueue) {
-      if (isMinPriorityQueue) {
-        return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
-          @Override
-          public int compare(Object o1, Object o2) {
-            if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) < 0) {
-              return 1;
-            } else {
-              if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) > 0) {
-                return -1;
-              }
-            }
-            return 0;
-          }
-        });
-      } else {
-        return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
-          @Override
-          public int compare(Object o1, Object o2) {
-            if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) < 0) {
-              return -1;
-            } else {
-              if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) > 0) {
-                return 1;
-              }
-            }
-            return 0;
-          }
-        });
-      }
-    }
+  /**
+   * This class provides custom comparator to compare two groups of a groupByResult.
+   * @param <T>
+   */
+  class GroupByResultComparator<T extends Comparable & Serializable> {
 
+    Comparator<T> newComparator(final boolean reverseOrder) {
+      return new Comparator() {
+        @Override
+        public int compare(Object o1, Object o2) {
+          int cmp = ((ImmutablePair<T, String>) o1).getLeft().compareTo(((ImmutablePair<T, String>) o2).getLeft());
+          if (cmp < 0) {
+            return ((reverseOrder) ? -1 : 1);
+          } else if (cmp > 0) {
+            return ((reverseOrder) ? 1 : -1);
+          }
+          return 0;
+        }
+      };
+    }
   }
 }

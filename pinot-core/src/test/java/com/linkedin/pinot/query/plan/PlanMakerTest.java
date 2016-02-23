@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.query.plan;
 
-import static org.testng.Assert.assertEquals;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
@@ -31,7 +28,6 @@ import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,7 +35,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -53,17 +48,18 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV1;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
@@ -72,6 +68,8 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import static org.testng.Assert.assertEquals;
 
 
 public class PlanMakerTest {
@@ -240,7 +238,7 @@ public class PlanMakerTest {
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     //    System.out.println(resultBlock.getAggregationGroupByResult().get("0.0"));
     List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
     //    Assert.assertEquals(20000001L, resultBlock.getAggregationResult().get(0));
@@ -358,7 +356,7 @@ public class PlanMakerTest {
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
     for (int i = 0; i < combinedGroupByResult.size(); ++i) {
       System.out.println("function : " + brokerRequest.getAggregationsInfo().get(i));
@@ -375,12 +373,20 @@ public class PlanMakerTest {
     brokerRequest.setSelections(null);
     brokerRequest.setSelectionsIsSet(false);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
+  }
+
+  private List<SegmentDataManager> makeSegMgrList(List<IndexSegment> indexSegmentList) {
+    List<SegmentDataManager> segMgrList = new ArrayList(indexSegmentList.size());
+    for (IndexSegment segment : indexSegmentList) {
+      segMgrList.add(new OfflineSegmentDataManager(segment));
+    }
+    return segMgrList;
   }
 
   @Test
@@ -388,7 +394,7 @@ public class PlanMakerTest {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -416,10 +422,10 @@ public class PlanMakerTest {
 
   @Test
   public void testInterSegmentAggregationGroupByPlanMakerAndRun() {
-    PlanMaker instancePlanMaker = new InstancePlanMakerImplV1();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -549,11 +555,11 @@ public class PlanMakerTest {
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(20);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -588,11 +594,11 @@ public class PlanMakerTest {
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(20);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    globalPlan = instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();

@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-
 /**
  * Simple code to run queries against a server
  * USAGE: QueryRunner confFile query numberOfTimesToRun
@@ -40,7 +39,8 @@ import org.yaml.snakeyaml.Yaml;
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
-  public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile) throws Exception {
+  public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile)
+      throws Exception {
     final PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
 
     final List<String> queries = IOUtils.readLines(new FileInputStream(new File(queryFile)));
@@ -90,14 +90,15 @@ public class QueryRunner {
       totalClientTime += response.getLong("totalTime");
 
       if ((numQueries > 0) && (numQueries % 1000) == 0) {
-        LOGGER.info("Processed  {} queries, Total Query time: {} ms Total Client side time : {} ms.", numQueries,
-            totalQueryTime, totalClientTime);
+        LOGGER.info(
+            "Processed  {} queries, Total Query time: {} ms Total Client side time : {} ms.",
+            numQueries, totalQueryTime, totalClientTime);
       }
 
       ++numQueries;
     }
-    LOGGER.info("Processed  {} queries, Total Query time: {} Total Client side time : {}.", numQueries,
-        totalQueryTime, totalClientTime);
+    LOGGER.info("Processed  {} queries, Total Query time: {} Total Client side time : {}.",
+        numQueries, totalQueryTime, totalClientTime);
     fileReader.close();
   }
 
@@ -112,11 +113,40 @@ public class QueryRunner {
     return response;
   }
 
+  /*
+   * USAGE: QueryRunner <queryFile> <brokerHost(optional. default=localhost)> <brokerPort (optional.
+   * default=8099)> <mode(optional.(single-threaded(optional)|multi-threaded))>)
+   */
+
   public static void main(String[] args) throws Exception {
-    String confFile = args[0];
-    String queryFile = args[1];
-    PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(confFile));
-    //since its only to run queries, we should ensure no services get started
+
+    String queryFile = null;
+    if (args.length >= 1) {
+      queryFile = args[0];
+    } else {
+      System.out.println(
+          "QueryRunner <queryFile> <brokerHost(optional. default=localhost)> <brokerPort (optional. default=8099)> <mode(optional.(single-threaded(optional)|multi-threaded))>)");
+      System.exit(1);
+    }
+
+    String brokerHost = null;
+    String brokerPort = null;
+    if (args.length >= 3) {
+      brokerHost = args[1];
+      brokerPort = args[2];
+    }
+    boolean multiThreaded = false;
+    if (args.length >= 4) {
+      if ("multi-threaded".equals(args[3])) {
+        multiThreaded = true;
+      }
+    }
+    PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
+    // since its only to run queries, we should ensure no services get started
+    if (brokerHost != null) {
+      conf.setBrokerHost(brokerHost);
+      conf.setBrokerPort(Integer.parseInt(brokerPort));
+    }
     conf.setStartBroker(false);
     conf.setStartController(false);
     conf.setStartServer(false);
@@ -124,7 +154,11 @@ public class QueryRunner {
     conf.setUploadIndexes(false);
     conf.setRunQueries(true);
     conf.setConfigureResources(false);
-    multiThreadedQueryRunner(conf, queryFile);
+    if (multiThreaded) {
+      multiThreadedQueryRunner(conf, queryFile);
+    } else {
+      singleThreadedQueryRunner(conf, queryFile);
+    }
 
   }
 }

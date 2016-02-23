@@ -185,11 +185,17 @@ public class ZKMetadataProvider {
   }
 
   public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean isSingleTenantCluster) {
-    if (!propertyStore.exists(constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY), AccessOption.PERSISTENT)) {
-      ZNRecord znRecord = new ZNRecord(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
-      znRecord.setBooleanField(CLUSTER_TENANT_ISOLATION_ENABLED_KEY, isSingleTenantCluster);
-      propertyStore.set(constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY), znRecord, AccessOption.PERSISTENT);
+    final ZNRecord znRecord;
+    final String path = constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
+
+    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
+      znRecord = new ZNRecord(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
+    } else {
+      znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
     }
+
+    znRecord.setBooleanField(CLUSTER_TENANT_ISOLATION_ENABLED_KEY, isSingleTenantCluster);
+    propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
   }
 
   public static Boolean getClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore) {

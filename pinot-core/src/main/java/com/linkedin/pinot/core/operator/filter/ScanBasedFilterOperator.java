@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.filter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -26,8 +25,9 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -41,15 +41,18 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   private DataSource dataSource;
   private Integer startDocId;
   private Integer endDocId;
+  private String name;
 
-  public ScanBasedFilterOperator(DataSource dataSource) {
-    this(dataSource, null, null);
-  }
-
+  /**
+   * @param dataSource
+   * @param startDocId inclusive
+   * @param endDocId inclusive
+   */
   public ScanBasedFilterOperator(DataSource dataSource, Integer startDocId, Integer endDocId) {
     this.dataSource = dataSource;
     this.startDocId = startDocId;
     this.endDocId = endDocId;
+    this.name = ScanBasedFilterOperator.class.getName() + "[" + dataSource.getOperatorName() + "]";
   }
 
   @Override
@@ -69,9 +72,10 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     BlockMetadata blockMetadata = nextBlock.getMetadata();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     if (dataSourceMetadata.isSingleValue()) {
-      docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
+      docIdSet =
+          new ScanBasedSingleValueDocIdSet(dataSource.getOperatorName(), blockValueSet, blockMetadata, evaluator);
     } else {
-      docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, evaluator.getDictionaryIds());
+      docIdSet = new ScanBasedMultiValueDocIdSet(dataSource.getOperatorName(), blockValueSet, blockMetadata, evaluator);
     }
 
     if (startDocId != null) {
@@ -81,7 +85,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     if (endDocId != null) {
       docIdSet.setEndDocId(endDocId);
     }
-
     return new ScanBlock(docIdSet);
   }
 
@@ -109,8 +112,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
       throw new UnsupportedOperationException("applypredicate not supported in " + this.getClass());
     }
 
-
-
     @Override
     public BlockValSet getBlockValueSet() {
       throw new UnsupportedOperationException("getBlockValueSet not supported in " + this.getClass());
@@ -133,4 +134,8 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
 
   }
 
+  @Override
+  public String toString() {
+    return ScanBasedFilterOperator.class.getName() + "-" + name;
+  }
 }

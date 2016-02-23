@@ -17,6 +17,7 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -24,7 +25,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +60,8 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
 
   // Composite Response
   private final ConcurrentMap<K, V> _delayedResponseMap;
+
+  private final ConcurrentMap<String, Long> _responseTimeMap = new ConcurrentHashMap<>(10);
 
   // Exception in case of error
   private final ConcurrentMap<K, Throwable> _errorMap;
@@ -153,13 +155,36 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
+  public long getDurationMillis() {
+    // The duration for a composite future (if it is called), may be defined as the max of all the durations of
+    // the individual futures that have completed. Typically, we are interested in getting the individual completion
+    // times, however.
+    long maxDuration = -1;
+    for (Map.Entry<String, Long> entry:_responseTimeMap.entrySet()) {
+      if (entry.getValue() > maxDuration) {
+        maxDuration = entry.getValue();
+      }
+    }
+    return maxDuration;
+  }
+
+  @Override
   public Map<K, V> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
     _latch.await(timeout, unit);
     return _delayedResponseMap;
   }
 
+  /**
+   * This method must be called after the 'get' is called, so that all response times are recorded.
+   * For now, this method has not been added to the interface.
+   * @return A map of response times of each response in _delayedResponseMap.
+   */
+  public Map<String, Long> getResponseTimes() {
+    return Collections.unmodifiableMap(_responseTimeMap);
+  }
   @Override
-  protected boolean processFutureResult(String name, Map<K, V> response, Map<K, Throwable> error) {
+  protected boolean processFutureResult(String name, Map<K, V> response, Map<K, Throwable> error, long durationMillis) {
+    // Get the response time and create another map that can be invoked to get the end time when responses were received for each server.
     boolean ret = false;
     if (null != response) {
       LOGGER.debug("Response from {} is {}", name, response);
@@ -172,6 +197,8 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
         ret = true; // We are done as we got an error
       }
     }
+    // TODO May be limit the number of entries here to 10? We don't want to create too much garbage on the broker.
+    _responseTimeMap.put(name, durationMillis);
     return ret;
   }
 

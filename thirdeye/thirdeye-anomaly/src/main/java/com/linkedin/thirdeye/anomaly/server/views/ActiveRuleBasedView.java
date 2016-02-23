@@ -11,10 +11,7 @@ public class ActiveRuleBasedView extends AbstractView {
 
   private final List<RuleBasedFunctionTableRow> functions;
 
-  public ActiveRuleBasedView(
-      String database,
-      String functionTable,
-      String collection,
+  public ActiveRuleBasedView(String database, String functionTable, String collection,
       List<RuleBasedFunctionTableRow> functions) {
     super("active-rulebased-view.ftl", database, functionTable, collection);
     this.functions = functions;

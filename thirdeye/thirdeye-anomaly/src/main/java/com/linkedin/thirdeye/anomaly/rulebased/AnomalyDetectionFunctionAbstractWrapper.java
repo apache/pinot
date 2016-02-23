@@ -19,7 +19,8 @@ public abstract class AnomalyDetectionFunctionAbstractWrapper implements Anomaly
    * @param childFunc
    * @throws IllegalFunctionException
    */
-  public AnomalyDetectionFunctionAbstractWrapper(AnomalyDetectionFunction childFunc) throws IllegalFunctionException {
+  public AnomalyDetectionFunctionAbstractWrapper(AnomalyDetectionFunction childFunc)
+      throws IllegalFunctionException {
     if (childFunc == null) {
       throw new IllegalFunctionException("nested child function cannot be null");
     }
@@ -27,7 +28,8 @@ public abstract class AnomalyDetectionFunctionAbstractWrapper implements Anomaly
   }
 
   @Override
-  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig) throws IllegalFunctionException {
+  public void init(StarTreeConfig starTreeConfig, FunctionProperties functionConfig)
+      throws IllegalFunctionException {
     childFunc.init(starTreeConfig, functionConfig);
   }
 

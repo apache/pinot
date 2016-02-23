@@ -22,6 +22,8 @@ import java.util.Map;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
+
 
 public class TimeInvertedIndex implements RealtimeInvertedIndex {
 
@@ -50,7 +52,7 @@ public class TimeInvertedIndex implements RealtimeInvertedIndex {
   }
 
   @Override
-  public int[] getMinMaxRangeFor(int docId) {
+  public IntPair getMinMaxRangeFor(int docId) {
     throw new UnsupportedOperationException("");
   }
 

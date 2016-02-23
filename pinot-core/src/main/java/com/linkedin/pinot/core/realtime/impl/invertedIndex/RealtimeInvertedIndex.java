@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.realtime.impl.invertedIndex;
 
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 public interface RealtimeInvertedIndex extends InvertedIndexReader {

@@ -64,6 +64,8 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
 
   // For  debug
   private final String _ctxt;
+  private final long _startTime;
+  private long _endTime;
 
   /**
    * Response Future State
@@ -86,6 +88,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     _state = State.PENDING;
     _cancellable = new NoopCancellable();
     _ctxt = ctxt;
+    _startTime = System.currentTimeMillis();
   }
 
   public AsyncResponseFuture(K key, Throwable t, String ctxt) {
@@ -93,6 +96,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     _state = State.DONE;
     _error = t;
     _ctxt = ctxt;
+    _startTime = System.currentTimeMillis();
   }
 
   public void setCancellable(Cancellable cancellable) {
@@ -191,6 +195,18 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     return _delayedResponse;
   }
 
+  /**
+   * Get the duration between the time this future was created (approximately the time when the request was sent)
+   * and the time when the response was received.
+   * @return
+   */
+  public long getDurationMillis() {
+    if (_endTime > 0) {
+      return _endTime - _startTime;
+    }
+    return -1L;
+  }
+
   @Override
   public T getOne(long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
@@ -254,6 +270,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
    */
   private void setDone(State state) {
     LOGGER.debug("{} Setting state to : {}, Current State : {}", _ctxt, state, _state);
+    _endTime = System.currentTimeMillis();
     try {
       _futureLock.lock();
       _state = state;
@@ -307,7 +324,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
 
   @Override
   public String getName() {
-    return "Future for (" + _key + ")";
+    return _key.toString();
   }
 
   public State getState() {

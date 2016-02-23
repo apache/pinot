@@ -16,22 +16,25 @@
 package com.linkedin.pinot.perf;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import org.apache.commons.configuration.ConfigurationException;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -40,10 +43,54 @@ import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 
 public class BitmapPerformanceBenchmark {
 
+  public static void iterationSpeed(String indexSegmentDir, String column) throws Exception {
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(indexSegmentDir));
+    Map<String, BitmapInvertedIndexReader> bitMapIndexMap = new HashMap<String, BitmapInvertedIndexReader>();
+    Map<String, Integer> cardinalityMap = new HashMap<String, Integer>();
+    Map<String, ImmutableDictionaryReader> dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
+    File bitMapIndexFile = new File(indexSegmentDir, column + ".bitmap.inv");
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+    int cardinality = columnMetadata.getCardinality();
+    cardinalityMap.put(column, cardinality);
+    //System.out.println(column + "\t\t\t" + cardinality + "  \t" + columnMetadata.getDataType());
+    BitmapInvertedIndexReader bitmapInvertedIndex = new BitmapInvertedIndexReader(bitMapIndexFile, cardinality, true);
+    File dictionaryFile = new File(indexSegmentDir + "/" + column + ".dict");
+    ColumnIndexContainer container =
+        ColumnIndexContainer.init(column, dictionaryFile.getParentFile(), columnMetadata, null, ReadMode.heap);
+    ImmutableDictionaryReader dictionary = container.getDictionary();
+    dictionaryMap.put(column, dictionary);
+    // System.out.println(column + ":\t" + MemoryUtil.deepMemoryUsageOf(bitmapInvertedIndex));
+    bitMapIndexMap.put(column, bitmapInvertedIndex);
+    int dictId = dictionary.indexOf("na.us");
+    ImmutableRoaringBitmap immutable = bitmapInvertedIndex.getImmutable(dictId);
+    Iterator<Integer> iterator = immutable.iterator();
+    int count = 0;
+    long start = System.currentTimeMillis();
+    while (iterator.hasNext()){
+      iterator.next();
+      count = count + 1;
+    }
+    long end = System.currentTimeMillis();
+    System.out.println(" matched: " + count  + " Time to iterate:"+ (end-start));
+    
+  }
+
+  public static void andSpeed(String indexSegmentDir) {
+
+  }
+
   public static void main(String[] args) throws Exception {
-    String explodedIndexSegmentDir = args[0];
-    File[] listFiles = new File(explodedIndexSegmentDir).listFiles();
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(explodedIndexSegmentDir));
+    File indexDir = new File("/home/kgopalak/pinot_perf/index_dir/scinPricing_OFFLINE");
+    File[] segmentDirs = indexDir.listFiles();
+    for(File indexSegmentDir:segmentDirs){
+      iterationSpeed(indexSegmentDir.getAbsolutePath(), "dimension_geo");
+    }
+  }
+
+  public static void benchmarkIntersetionAndUnion(String indexSegmentDir)
+      throws ConfigurationException, IOException, Exception {
+    File[] listFiles = new File(indexSegmentDir).listFiles();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(indexSegmentDir));
     Map<String, BitmapInvertedIndexReader> bitMapIndexMap = new HashMap<String, BitmapInvertedIndexReader>();
     Map<String, Integer> cardinalityMap = new HashMap<String, Integer>();
     Map<String, ImmutableDictionaryReader> dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
@@ -57,10 +104,9 @@ public class BitmapPerformanceBenchmark {
       cardinalityMap.put(column, cardinality);
       System.out.println(column + "\t\t\t" + cardinality + "  \t" + columnMetadata.getDataType());
       BitmapInvertedIndexReader bitmapInvertedIndex = new BitmapInvertedIndexReader(file, cardinality, true);
-      File dictionaryFile = new File(explodedIndexSegmentDir + "/" + column + ".dict");
+      File dictionaryFile = new File(indexSegmentDir + "/" + column + ".dict");
       ColumnIndexContainer container =
-          ColumnIndexContainer.init(column, dictionaryFile.getParentFile(),
-              columnMetadata, null, ReadMode.heap);
+          ColumnIndexContainer.init(column, dictionaryFile.getParentFile(), columnMetadata, null, ReadMode.heap);
       ImmutableDictionaryReader dictionary = container.getDictionary();
       if (columnMetadata.getDataType() == DataType.INT) {
         System.out.println("BitmapPerformanceBenchmark.main()");
@@ -79,7 +125,8 @@ public class BitmapPerformanceBenchmark {
     int MAX_DIMENSIONS_IN_WHERE_CLAUSE = 3;
     Random random = new Random();
     for (int numDimensions = 1; numDimensions <= MAX_DIMENSIONS_IN_WHERE_CLAUSE; numDimensions++) {
-      for (int numValuesPerDimension = 1; numValuesPerDimension <= MAX_DIMENSIONS_PER_DIMENSION; numValuesPerDimension++) {
+      for (int numValuesPerDimension =
+          1; numValuesPerDimension <= MAX_DIMENSIONS_PER_DIMENSION; numValuesPerDimension++) {
         int runCount = 0;
         while (runCount < NUM_TEST) {
           Collections.shuffle(dimensionNamesList);

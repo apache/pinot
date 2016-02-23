@@ -15,13 +15,21 @@
  */
 package com.linkedin.pinot.transport.common.routing;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
@@ -31,13 +39,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 public class RandomRoutingTableTest {
@@ -54,7 +55,8 @@ public class RandomRoutingTableTest {
     RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(routingStrategy, null, null, null);
     ExternalView externalView = new ExternalView(externalViewRecord);
-    routingTable.markDataResourceOnline(tableName, externalView, new ArrayList<InstanceConfig>());
+
+    routingTable.markDataResourceOnline(tableName, externalView, getInstanceConfigs(externalView));
 
     double[] globalArrays = new double[9];
 
@@ -84,4 +86,25 @@ public class RandomRoutingTableTest {
         + new Mean().evaluate(globalArrays));
   }
 
+  /**
+   * Returns a list of configs containing all instances in the external view.
+   * @param externalView From which to extract the instance list from.
+   * @return Instance Config list
+   */
+  private List<InstanceConfig> getInstanceConfigs(ExternalView externalView) {
+    List<InstanceConfig> instanceConfigList = new ArrayList<>();
+    Set<String> instanceSet = new HashSet<>();
+
+    // Collect all unique instances
+    for (String partitionName : externalView.getPartitionSet()) {
+      for (String instance : externalView.getStateMap(partitionName).keySet()) {
+        if (!instanceSet.contains(instance)) {
+          instanceConfigList.add(new InstanceConfig(instance));
+          instanceSet.add(instance);
+        }
+      }
+    }
+
+    return instanceConfigList;
+  }
 }

@@ -17,7 +17,8 @@ public class TestThirdEyeRatioFunction {
   @BeforeClass
   public void beforeClass() throws Exception {
     config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("test-config.yml"));
-    metricSchema = new MetricSchema(ImmutableList.of("L", "D"), ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
+    metricSchema = new MetricSchema(ImmutableList.of("L", "D"),
+        ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
     timeSeries = new MetricTimeSeries(metricSchema);
     for (int i = 0; i < 16; i++) {
       timeSeries.increment(i, "L", 1);
@@ -27,7 +28,8 @@ public class TestThirdEyeRatioFunction {
 
   @Test
   public void testValid_simple() {
-    MetricTimeSeries derived = new ThirdEyeRatioFunction(ImmutableList.of("L", "D")).apply(config, null, timeSeries);
+    MetricTimeSeries derived =
+        new ThirdEyeRatioFunction(ImmutableList.of("L", "D")).apply(config, null, timeSeries);
     Assert.assertEquals(derived.getSchema().getNumMetrics(), 3); // contains originals
     for (int i = 0; i < 16; i++) {
       Assert.assertEquals(derived.get(i, "RATIO(L,D)").doubleValue(), 0.25);

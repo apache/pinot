@@ -25,14 +25,12 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
@@ -45,17 +43,20 @@ import com.linkedin.pinot.common.utils.JsonAssert;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -79,7 +80,7 @@ public class SelectionOnlyQueriesTest {
   public static IndexSegment _indexSegment;
   public Map<String, ColumnMetadata> _medataMap;
 
-  private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
+  private static List<SegmentDataManager> _indexSegmentList = new ArrayList<SegmentDataManager>();
 
   @BeforeClass
   public void setup() throws Exception {
@@ -137,14 +138,15 @@ public class SelectionOnlyQueriesTest {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
   @Test
   public void testSelectionIteration() {
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -170,7 +172,7 @@ public class SelectionOnlyQueriesTest {
   @Test
   public void testInnerSegmentPlanMakerForSelectionNoFilter() throws Exception {
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
@@ -178,27 +180,9 @@ public class SelectionOnlyQueriesTest {
     System.out.println("Test: InnerSegmentPlanMakerForSelectionNoFilter");
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final Collection<Serializable[]> reducedResults =
-        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
-    DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
-    System.out.println(jsonResult);
+    final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
 
     JsonAssert
         .assertEqualsIgnoreOrder(
@@ -209,7 +193,7 @@ public class SelectionOnlyQueriesTest {
   @Test
   public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
     final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
@@ -217,10 +201,20 @@ public class SelectionOnlyQueriesTest {
     System.out.println("Test: InnerSegmentPlanMakerForSelectionWithFilter");
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
+    final JSONObject jsonResult = getJsonObject(brokerRequest, resultBlock);
+
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            jsonResult.toString(),
+            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"U\",\"GF\",\"8310347835142446717\"],[\"U\",\"WI\",\"6240989492723764727\"],[\"U\",\"xk\",\"6240989492723764727\"],[\"U\",\"Ld\",\"6240989492723764727\"],[\"U\",\"Zi\",\"8637957270245933828\"],[\"U\",\"RI\",\"8637957270245933828\"],[\"U\",\"ai\",\"6240989492723764727\"],[\"U\",\"Ot\",\"6240989492723764727\"],[\"U\",\"ZW\",\"8637957270245933828\"],[\"U\",\"iL\",\"8310347835142446717\"]]}");
+  }
+
+  private JSONObject getJsonObject(BrokerRequest brokerRequest, IntermediateResultsBlock resultBlock)
+      throws Exception {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
@@ -238,13 +232,10 @@ public class SelectionOnlyQueriesTest {
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
-    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
 
+    final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
-    JsonAssert
-        .assertEqualsIgnoreOrder(
-            jsonResult.toString(),
-            "{\"columns\":[\"column11\",\"column12\",\"met_impressionCount\"],\"results\":[[\"U\",\"GF\",\"8310347835142446717\"],[\"U\",\"WI\",\"6240989492723764727\"],[\"U\",\"xk\",\"6240989492723764727\"],[\"U\",\"Ld\",\"6240989492723764727\"],[\"U\",\"Zi\",\"8637957270245933828\"],[\"U\",\"RI\",\"8637957270245933828\"],[\"U\",\"ai\",\"6240989492723764727\"],[\"U\",\"Ot\",\"6240989492723764727\"],[\"U\",\"ZW\",\"8637957270245933828\"],[\"U\",\"iL\",\"8310347835142446717\"]]}");
+    return jsonResult;
   }
 
   @Test

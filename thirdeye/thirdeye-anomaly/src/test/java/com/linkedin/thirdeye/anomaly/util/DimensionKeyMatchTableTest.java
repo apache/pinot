@@ -21,14 +21,28 @@ public class DimensionKeyMatchTableTest {
     dimensionSpecs.add(new DimensionSpec("B"));
 
     DimensionKeyMatchTable<Integer> matchTable = new DimensionKeyMatchTable<>(dimensionSpecs);
-    matchTable.put(new DimensionKey(new String[]{"*","*"}), 1);
-    matchTable.put(new DimensionKey(new String[]{"?","*"}), 2);
-    matchTable.put(new DimensionKey(new String[]{"*","?"}), 3);
+    matchTable.put(new DimensionKey(new String[] {
+        "*", "*"
+    }), 1);
+    matchTable.put(new DimensionKey(new String[] {
+        "?", "*"
+    }), 2);
+    matchTable.put(new DimensionKey(new String[] {
+        "*", "?"
+    }), 3);
 
-    Assert.assertTrue(matchTable.get(new DimensionKey(new String[]{"*","*"})) == 1);
-    Assert.assertTrue(matchTable.get(new DimensionKey(new String[]{"a","*"})) == 2);
-    Assert.assertTrue(matchTable.get(new DimensionKey(new String[]{"*","b"})) == 3);
-    Assert.assertTrue(matchTable.get(new DimensionKey(new String[]{"z","z"})) == null);
+    Assert.assertTrue(matchTable.get(new DimensionKey(new String[] {
+        "*", "*"
+    })) == 1);
+    Assert.assertTrue(matchTable.get(new DimensionKey(new String[] {
+        "a", "*"
+    })) == 2);
+    Assert.assertTrue(matchTable.get(new DimensionKey(new String[] {
+        "*", "b"
+    })) == 3);
+    Assert.assertTrue(matchTable.get(new DimensionKey(new String[] {
+        "z", "z"
+    })) == null);
   }
 
 }

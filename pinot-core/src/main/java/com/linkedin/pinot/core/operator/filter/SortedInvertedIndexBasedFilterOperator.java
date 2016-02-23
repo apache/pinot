@@ -24,19 +24,20 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.common.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
+import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -48,8 +49,20 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   private SortedBlock sortedBlock;
 
-  public SortedInvertedIndexBasedFilterOperator(DataSource dataSource) {
+  private int startDocId;
+
+  private int endDocId;
+
+  /**
+   * 
+   * @param dataSource
+   * @param startDocId inclusive
+   * @param endDocId inclusive
+   */
+  public SortedInvertedIndexBasedFilterOperator(DataSource dataSource, int startDocId, int endDocId) {
     this.dataSource = dataSource;
+    this.startDocId = startDocId;
+    this.endDocId = endDocId;
   }
 
   @Override
@@ -62,32 +75,40 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
     Dictionary dictionary = dataSource.getDictionary();
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
+    List<IntPair> pairs = new ArrayList<IntPair>();
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
-    int[] dictionaryIds = evaluator.getDictionaryIds();
-    Arrays.sort(dictionaryIds);
+    int[] dictionaryIds = evaluator.getMatchingDictionaryIds();
     for (int i = 0; i < dictionaryIds.length; i++) {
-      int[] minMax = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
-      pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
+      IntPair pair = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
+      //ensure that the pair is between (startDoc,endDoc) else trim/skip it accordingly
+      if (startDocId <= pair.getLeft()  && pair.getRight() <= endDocId) {
+        pairs.add(pair);
+      } else {
+        int newStart = Math.max(pair.getLeft(), startDocId);
+        int newEnd = Math.min(pair.getRight(), endDocId);
+        if (newStart <= newEnd) {
+          pairs.add(Pairs.intPair(newStart, newEnd));
+        }
+      }
     }
     LOGGER.debug("Creating a Sorted Block with pairs: {}", pairs);
-    sortedBlock = new SortedBlock(pairs);
+    sortedBlock = new SortedBlock(dataSource.getOperatorName(), pairs);
     return sortedBlock;
   }
 
   @Override
   public boolean close() {
-    LOGGER.info("Time spent in SortedInvertedIndexBasedFilterOperator operator:{} is {}", this,
-        sortedBlock.sortedDocIdSet.timeMeasure);
     return true;
   }
 
   public static class SortedBlock extends BaseFilterBlock {
 
-    private List<Pair<Integer, Integer>> pairs;
+    private List<IntPair> pairs;
     private SortedDocIdSet sortedDocIdSet;
+    private String datasourceName;
 
-    public SortedBlock(List<Pair<Integer, Integer>> pairs) {
+    public SortedBlock(String datasourceName, List<IntPair> pairs) {
+      this.datasourceName = datasourceName;
       this.pairs = pairs;
     }
 
@@ -103,7 +124,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
     @Override
     public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-      sortedDocIdSet = new SortedDocIdSet(pairs);
+      sortedDocIdSet = new SortedDocIdSet(datasourceName, pairs);
       return sortedDocIdSet;
     }
 

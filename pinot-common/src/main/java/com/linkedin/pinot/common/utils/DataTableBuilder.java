@@ -16,7 +16,7 @@
 package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
-
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -25,14 +25,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -644,6 +641,29 @@ public class DataTableBuilder {
       }
       sb.append("]");
       return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object right) {
+      if (EqualityUtils.isSameReference(this, right)) {
+        return true;
+      }
+
+      if (EqualityUtils.isNullOrNotSameClass(this, right)) {
+        return false;
+      }
+
+      DataSchema that = (DataSchema) right;
+
+      return EqualityUtils.isEqual(this.columnNames, that.columnNames) &&
+          EqualityUtils.isEqual(this.columnTypes, that.columnTypes);
+    }
+
+    @Override
+    public int hashCode() {
+      int hashCode = EqualityUtils.hashCodeOf(columnNames);
+      hashCode = EqualityUtils.hashCodeOf(hashCode, columnTypes);
+      return hashCode;
     }
   }
 

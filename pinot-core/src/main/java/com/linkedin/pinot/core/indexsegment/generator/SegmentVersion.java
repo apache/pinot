@@ -16,5 +16,6 @@
 package com.linkedin.pinot.core.indexsegment.generator;
 
 public enum SegmentVersion {
-  v1;
+  v1,
+  v2;//Changed the forward index format to use bitpacking library instead of custombitset format.
 }

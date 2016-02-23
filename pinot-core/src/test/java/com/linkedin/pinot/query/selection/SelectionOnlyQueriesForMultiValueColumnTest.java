@@ -45,17 +45,20 @@ import com.linkedin.pinot.common.utils.JsonAssert;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -147,8 +150,9 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   @Test
   public void testSelectionIteration() throws Exception {
     setupSegment();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -174,14 +178,14 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   public void testInnerSegmentPlanMakerForSelectionNoFilter() throws Exception {
     setupSegment();
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
@@ -222,16 +226,16 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
   public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
     setupSegment();
     final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     final MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
-    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    System.out.println("TotalDocs : " + resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 100000);
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
@@ -275,7 +279,7 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
-        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+        instancePlanMaker.makeInterSegmentPlan(makeSegMgrList(_indexSegmentList), brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -303,6 +307,14 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
                 + "[\"890282370\",\"890662862\",\"AKXcXcIqsqOJFsdwxZ\",[\"2147483647\"],[\"2147483647\"],\"890662862\"],"
                 + "[\"972569181\",\"1458119540\",\"EOFxevm\",[\"593959\"],[\"225\"],\"890662862\"]]}");
 
+  }
+
+  private List<SegmentDataManager> makeSegMgrList(List<IndexSegment> indexSegmentList) {
+    List<SegmentDataManager> segMgrList = new ArrayList<SegmentDataManager>(indexSegmentList.size());
+    for (IndexSegment segment : indexSegmentList) {
+      segMgrList.add(new OfflineSegmentDataManager(segment));
+    }
+    return segMgrList;
   }
 
   private static Map<String, DataSource> getDataSourceMap() {

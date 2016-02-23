@@ -26,11 +26,9 @@ public class ConfigCache {
 
   public ConfigCache() {
     this.yamlObjectMapper = new ObjectMapper(new YAMLFactory());
-    this.customDashboardCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(1, TimeUnit.MINUTES)
+    this.customDashboardCache = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES)
         .build(new CustomDashboardSpecLoader());
-    this.dimensionGroupCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(1, TimeUnit.MINUTES)
+    this.dimensionGroupCache = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES)
         .build(new DimensionGroupSpecLoader());
   }
 
@@ -43,7 +41,8 @@ public class ConfigCache {
   }
 
   /** Returns a custom dashboard spec */
-  public CustomDashboardSpec getCustomDashboardSpec(String collection, String name) throws Exception {
+  public CustomDashboardSpec getCustomDashboardSpec(String collection, String name)
+      throws Exception {
     CacheKey key = new CacheKey(collection, name);
     return customDashboardCache.get(key);
   }

@@ -16,9 +16,15 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.api.swagger.HttpVerb;
 import com.linkedin.pinot.controller.api.swagger.Parameter;
 import com.linkedin.pinot.controller.api.swagger.Paths;
@@ -28,12 +34,17 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.Interval;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.restlet.data.MediaType;
@@ -75,7 +86,8 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     if (!tempUntarredPath.exists()) {
       tempUntarredPath.mkdirs();
     }
-    vip = StringUtil.join("://", "http", StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
+
+    vip = StringUtil.join("://", _controllerConf.getControllerVipProtocol(), StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()));
     LOGGER.info("controller download url base is : " + vip);
   }
 
@@ -85,18 +97,20 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+      final String active = getReference().getQueryAsForm().getValues("active");
 
       if ((tableName == null) && (segmentName == null)) {
         return getAllSegments();
 
       } else if ((tableName != null) && (segmentName == null)) {
-        return getSegmentsForTable(tableName);
+        return getSegmentsForTable(tableName, !"false".equalsIgnoreCase(active));
       }
 
       presentation = getSegmentFile(tableName, segmentName);
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing get request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -133,21 +147,36 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
   })
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
-      String tableName) {
+      String tableName,
+      @Parameter(name = "active", in = "query", description = "true = show active segments (in Helix), false = all segments (on filesystem)", required = false)
+      boolean activeOnly
+      ) {
     Representation presentation;
     final JSONArray ret = new JSONArray();
-    File tableDir = new File(baseDataDir, tableName);
 
-    if (tableDir.exists()) {
-      for (final File file : tableDir.listFiles()) {
-        final String url =
-            "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
-                + tableName + "/" + file.getName();
-        ret.put(url);
+    if(activeOnly) {
+      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+
+      for (String segmentName : segmentList) {
+        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
+        ret.put(offlineSegmentZKMetadata.getDownloadUrl());
       }
     } else {
-      LOGGER.error("Error: Table {} not found.", tableName);
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      File tableDir = new File(baseDataDir, tableName);
+
+      if (tableDir.exists()) {
+        for (final File file : tableDir.listFiles()) {
+          final String url = "http://" + StringUtil
+              .join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/" + tableName + "/" + file.getName();
+          ret.put(url);
+        }
+      } else {
+        LOGGER.error("Error: Table {} not found.", tableName);
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      }
     }
 
     presentation = new StringRepresentation(ret.toString());
@@ -165,9 +194,14 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     Representation presentation;
     final JSONArray ret = new JSONArray();
     for (final File file : baseDataDir.listFiles()) {
+      final String fileName = file.getName();
+      if (fileName.equalsIgnoreCase("fileUploadTemp") || fileName.equalsIgnoreCase("schemasTemp")) {
+        continue;
+      }
+
       final String url =
           "http://" + StringUtil.join(":", _controllerConf.getControllerVipHost(), _controllerConf.getControllerPort()) + "/segments/"
-              + file.getName();
+              + fileName;
       ret.put(url);
     }
     presentation = new StringRepresentation(ret.toString());
@@ -224,17 +258,22 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
         // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files in the segment in
         // order to ensure the segment is not corrupted
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
-
-        return uploadSegment(tmpSegmentDir.listFiles()[0], dataFile);
+        File segmentFile = tmpSegmentDir.listFiles()[0];
+        String clientIpAddress = getClientInfo().getAddress();
+        String clientAddress = InetAddress.getByName(clientIpAddress).getHostName();
+        LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentFile.getName(), clientAddress);
+        return uploadSegment(segmentFile, dataFile);
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
         LOGGER.warn("No file was uploaded");
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception in file upload", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     } finally {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
@@ -242,6 +281,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
           LOGGER.error("Caught exception in file upload", e);
+          ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
           setStatus(Status.SERVER_ERROR_INTERNAL);
         }
       }
@@ -269,12 +309,67 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     }
     FileUtils.moveFile(dataFile, segmentFile);
 
-    PinotResourceManagerResponse response =
-        _pinotHelixResourceManager.addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+    PinotResourceManagerResponse response;
+    if (!isSegmentTimeValid(metadata)) {
+      response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
+    } else {
+      response = _pinotHelixResourceManager
+          .addSegment(metadata, constructDownloadUrl(metadata.getTableName(), dataFile.getName()));
+    }
 
-    setStatus((response.isSuccessfull() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL));
+    if (response.isSuccessfull()) {
+      setStatus(Status.SUCCESS_OK);
+    } else {
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
+      }
+
     return new StringRepresentation(response.toJSON().toString());
   }
+
+  /**
+   * Returns true if:
+   * - Segment does not have a start/end time, OR
+   * - The start/end time are in a valid range (Jan 01 1971 - Jan 01, 2071)
+   * @param metadata
+   * @return
+   */
+  private boolean isSegmentTimeValid(SegmentMetadata metadata) {
+    Interval interval = metadata.getTimeInterval();
+    if (interval == null) {
+      return true;
+    }
+
+    long startMillis = interval.getStartMillis();
+    long endMillis = interval.getEndMillis();
+
+    if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
+      Date startDate = new Date(interval.getStartMillis());
+      Date endDate = new Date(interval.getEndMillis());
+
+      Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
+      Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
+
+      LOGGER.error("Invalid start time '{}' or end time '{}' for segment, must be between '{}' and '{}'", startDate,
+          endDate, minDate, maxDate);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Returns true if segment start and end time are between a valid range, or if
+   * segment does not have a time interval.
+   * The current valid range is between 1971 and 2071.
+   * @param metadata
+   * @return
+   */
+  private boolean validateSegmentTimeRange(SegmentMetadata metadata) {
+    Interval timeInterval = metadata.getTimeInterval();
+    return (timeInterval == null || (TimeUtils.timeValueInValidRange(timeInterval.getStartMillis())) && TimeUtils
+        .timeValueInValidRange(timeInterval.getEndMillis()));
+    }
 
   /**
    * URI Mappings:
@@ -300,6 +395,7 @@ public class PinotSegmentUploadRestletResource extends PinotRestletResourceBase 
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_DELETE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return rep;

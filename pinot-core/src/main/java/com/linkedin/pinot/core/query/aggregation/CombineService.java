@@ -15,20 +15,20 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,10 +49,12 @@ public class CombineService {
       mergedBlock = blockToMerge;
       return;
     }
+
+
     // Combine NumDocsScanned
     mergedBlock.setNumDocsScanned(mergedBlock.getNumDocsScanned() + blockToMerge.getNumDocsScanned());
     // Combine TotalDocs
-    mergedBlock.setTotalDocs(mergedBlock.getTotalDocs() + blockToMerge.getTotalDocs());
+    mergedBlock.setTotalRawDocs(mergedBlock.getTotalRawDocs() + blockToMerge.getTotalRawDocs());
     // Debug mode enable : Combine SegmentStatistics and TraceInfo
     if (brokerRequest.isEnableTrace()) {
       // mergedBlock.getSegmentStatistics().addAll(blockToMerge.getSegmentStatistics());
@@ -74,15 +76,40 @@ public class CombineService {
             blockToMerge.getAggregationResult()));
       }
     } else {
+
+      DataTableBuilder.DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
+      DataTableBuilder.DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
+      Collection<Serializable[]> mergedResultSet = mergedBlock.getSelectionResult();
+      Collection<Serializable[]> toMergeResultSet = blockToMerge.getSelectionResult();
+
+      // [pinot 2315] For select * queries we let every segment determine schema and then
+      // combine results here. Combine can fail or silently give wrong results if the
+      // schemas are different. Here, we select the schema that returns atleast one
+      // row. If both mergedBlock and blockToMerge have result sets but different schema
+      // then the results are random.
+      // Data schema can be null if the filter query does not return results
+      if (mergedBlockSchema != null && ! mergedBlockSchema.equals(blockToMergeSchema)) {
+        if (mergedResultSet.size() == 0 && toMergeResultSet.size() > 0) {
+          // select the schema that has returned atleast one row
+          mergedBlock.setSelectionDataSchema(blockToMergeSchema);
+          // fall to the logic below which correctly handles null results sets
+        } else {
+          LOGGER
+              .warn("Schema inconsistency. merged block schema: {}, block to merge schema: {}. Dropping block to merge",
+                  mergedBlockSchema, blockToMergeSchema);
+          return;
+        }
+      }
+
       // Combine Selections
       if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
         SelectionOperatorService selectionService =
-            new SelectionOperatorService(brokerRequest.getSelections(), mergedBlock.getSelectionDataSchema());
-        mergedBlock.setSelectionResult(selectionService.merge(mergedBlock.getSelectionResult(),
-            blockToMerge.getSelectionResult()));
+            new SelectionOperatorService(brokerRequest.getSelections(), mergedBlockSchema);
+        mergedBlock.setSelectionResult(selectionService.merge(mergedResultSet, toMergeResultSet));
       } else {
-        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedBlock.getSelectionResult(),
-            blockToMerge.getSelectionResult(), brokerRequest.getSelections().getSize()));
+        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedResultSet,
+            toMergeResultSet,
+            brokerRequest.getSelections().getSize()));
       }
     }
   }

@@ -6,8 +6,11 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_DIMENSION_STATS_PATH;
 import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION;
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_METRIC_SUMS_PATH;
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_CONVERTER_CLASS;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -18,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.api.*;
 import com.linkedin.thirdeye.bootstrap.util.ThirdEyeAvroUtils;
+import com.linkedin.thirdeye.bootstrap.util.ThirdeyeConverter;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -31,13 +35,13 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
-import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
@@ -57,6 +61,9 @@ public class AggregatePhaseJob extends Configured {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private static final String STATS_FOLDER_SUFFIX = "_stats";
+  private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
+
   private String name;
   private Properties props;
 
@@ -70,8 +77,7 @@ public class AggregatePhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class AggregationMapper extends
-      Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+  public static class AggregationMapper<K, V> extends Mapper<K, V, BytesWritable, BytesWritable> {
     private StarTreeConfig starTreeConfig;
     private AggregationJobConfig config;
     private TimeUnit sourceTimeUnit;
@@ -83,6 +89,8 @@ public class AggregatePhaseJob extends Configured {
     private String[] dimensionValues;
     private RollupThresholdFunction rollupThresholdFunction;
     private boolean preserveTime;
+    private String converterClassName;
+    private ThirdeyeConverter thirdeyeConverter;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -103,30 +111,49 @@ public class AggregatePhaseJob extends Configured {
         Map<String, String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
         rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
-        preserveTime = Boolean.parseBoolean(configuration.get(AGG_PRESERVE_TIME_COMPACTION.toString()));
+        preserveTime =
+            Boolean.parseBoolean(configuration.get(AGG_PRESERVE_TIME_COMPACTION.toString()));
+
+        converterClassName = configuration.get(AGG_CONVERTER_CLASS.toString());
+        LOGGER.info("Using converter class {}", converterClassName);
+        Constructor<?> converterConstructor = Class.forName(converterClassName).getConstructor();
+        thirdeyeConverter = (ThirdeyeConverter) converterConstructor.newInstance();
       } catch (Exception e) {
         throw new IOException(e);
       }
     }
 
     @Override
-    public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
-        throws IOException, InterruptedException {
+    public void map(K key, V value, Context context) throws IOException, InterruptedException {
 
-      for (int i = 0; i < dimensionNames.size(); i++) {
-        String dimensionName = dimensionNames.get(i);
-        String dimensionValue = "";
-        Object val = record.datum().get(dimensionName);
-        if (val != null) {
-          dimensionValue = val.toString();
+      StarTreeRecord starTreeRecord = null;
+      try {
+        if (converterClassName.equals(DEFAULT_CONVERTER_CLASS)) {
+
+          AvroKey<GenericRecord> avroKey = (AvroKey<GenericRecord>) key;
+          starTreeRecord = thirdeyeConverter.convert(starTreeConfig, avroKey.datum());
+
+        } else {
+
+          Text textValue = (Text) value;
+          starTreeRecord = thirdeyeConverter.convert(starTreeConfig, textValue);
         }
-        dimensionValues[i] = dimensionValue;
+      } catch (Exception e) {
+        LOGGER.error("Exception in reading converter classes", e);
       }
-
-      StarTreeRecord starTreeRecord = ThirdEyeAvroUtils.convert(starTreeConfig, record.datum());
 
       // Create flattened series
       MetricTimeSeries originalSeries = starTreeRecord.getMetricTimeSeries();
+
+      // Count metric values
+      for (Long time : originalSeries.getTimeWindowSet()) {
+        for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
+          Number metricValue = originalSeries.get(time, metricSpec.getName());
+          context.getCounter(starTreeConfig.getCollection(), metricSpec.getName())
+              .increment(metricValue.longValue());
+        }
+      }
+
       MetricTimeSeries series = originalSeries;
       LOGGER.info("Preserve time {} ", preserveTime);
 
@@ -163,8 +190,9 @@ public class AggregatePhaseJob extends Configured {
 
   }
 
-  public static class AggregationReducer extends
-      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+  public static class AggregationReducer
+      extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+    private StarTreeConfig starTreeConfig;
     private AggregationJobConfig config;
     private List<String> dimensionNames;
     private List<MetricType> metricTypes;
@@ -174,6 +202,7 @@ public class AggregatePhaseJob extends Configured {
     String dimensionStatsOutputDir;
     private FileSystem fileSystem;
     private DimensionStats dimensionStats;
+    int numRecordsFlattened = 0;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -181,14 +210,14 @@ public class AggregatePhaseJob extends Configured {
       fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         aggregationStats = new AggregationStats(metricSchema);
         dimensionStats = new DimensionStats();
-        statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString()) + "_stats/";
+        statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString()) + STATS_FOLDER_SUFFIX + File.separator;
         dimensionStatsOutputDir = configuration.get(AGG_DIMENSION_STATS_PATH.toString());
       } catch (Exception e) {
         throw new IOException(e);
@@ -203,27 +232,35 @@ public class AggregatePhaseJob extends Configured {
         MetricTimeSeries series = MetricTimeSeries.fromBytes(writable.copyBytes(), metricSchema);
         out.aggregate(series);
       }
+
       // record the stats
       DimensionKey key = DimensionKey.fromBytes(aggregationKey.getBytes());
       for (int i = 0; i < dimensionNames.size(); i++) {
         dimensionStats.record(dimensionNames.get(i), key.getDimensionValues()[i]);
       }
       aggregationStats.record(out);
+
+      numRecordsFlattened += out.getTimeWindowSet().size();
+
       byte[] serializedBytes = out.toBytes();
       context.write(aggregationKey, new BytesWritable(serializedBytes));
     }
 
     protected void cleanup(Context context) throws IOException, InterruptedException {
-      // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks are used (gbrandt, 2015-08-27)
-//      FSDataOutputStream dimensionStatsOutputStream =
-//          fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-//      OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
-//      dimensionStatsOutputStream.close();
-//
-//      FSDataOutputStream outputStream =
-//          fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-//      outputStream.write(aggregationStats.toString().getBytes());
-//      outputStream.close();
+
+      context.getCounter(AggregationCounter.NUMBER_OF_RECORDS_FLATTENED).increment(numRecordsFlattened);
+      // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks
+      // are used (gbrandt, 2015-08-27)
+      // FSDataOutputStream dimensionStatsOutputStream =
+      // fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() +
+      // ".stat"));
+      // OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
+      // dimensionStatsOutputStream.close();
+      //
+      // FSDataOutputStream outputStream =
+      // fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+      // outputStream.write(aggregationStats.toString().getBytes());
+      // outputStream.close();
     }
   }
 
@@ -232,16 +269,24 @@ public class AggregatePhaseJob extends Configured {
     job.setJobName(name);
     job.setJarByClass(AggregatePhaseJob.class);
     FileSystem fs = FileSystem.get(getConf());
-    // Avro schema
-    Schema schema =
-        new Schema.Parser().parse(fs.open(new Path(
-            getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString()))));
-    LOGGER.info("{}", schema);
+
+    Configuration configuration = job.getConfiguration();
+    String aggConverterClass = getAndSetConfiguration(configuration, AGG_CONVERTER_CLASS);
 
     // Map config
     job.setMapperClass(AggregationMapper.class);
-    AvroJob.setInputKeySchema(job, schema);
-    job.setInputFormatClass(AvroKeyInputFormat.class);
+    if (aggConverterClass.equals(DEFAULT_CONVERTER_CLASS)) {
+      // Avro schema
+      Schema schema = new Schema.Parser().parse(
+          fs.open(new Path(getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString()))));
+      LOGGER.info("{}", schema);
+      AvroJob.setInputKeySchema(job, schema);
+      job.setInputFormatClass(AvroKeyInputFormat.class);
+      LOGGER.info("Using default avro inpur format {}", aggConverterClass);
+    } else {
+      LOGGER.info("Setting text input format for {}", aggConverterClass);
+      job.setInputFormatClass(TextInputFormat.class);
+    }
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
 
@@ -261,15 +306,16 @@ public class AggregatePhaseJob extends Configured {
     LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // aggregation phase config
-    Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, AGG_INPUT_PATH);
     getAndSetConfiguration(configuration, AGG_CONFIG_PATH);
-    getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
-    getAndSetConfiguration(configuration, AGG_DIMENSION_STATS_PATH);
     getAndSetConfiguration(configuration, AGG_PRESERVE_TIME_COMPACTION);
-    LOGGER.info("Input path dir: " + inputPathDir);
+    Path outputPath = new Path(getAndSetConfiguration(configuration, AGG_OUTPUT_PATH));
+    Path aggStatsOutputPath = new Path(outputPath, STATS_FOLDER_SUFFIX);
+    Path dimensionStatsPath = new Path(getAndSetConfiguration(configuration, AGG_DIMENSION_STATS_PATH));
+    Path metricSumsPath = new Path(getAndSetConfiguration(configuration, AGG_METRIC_SUMS_PATH));
 
+    LOGGER.info("Input path dir: " + inputPathDir);
     FileInputFormat.setInputDirRecursive(job, true);
 
     for (String inputPath : inputPathDir.split(",")) {
@@ -288,6 +334,20 @@ public class AggregatePhaseJob extends Configured {
         FileInputFormat.addInputPath(job, input);
       }
     }
+
+    LOGGER.info("Set output paths");
+    if (fs.exists(outputPath)) {
+      fs.delete(outputPath, true);
+    }
+    if (fs.exists(aggStatsOutputPath)) {
+      fs.delete(aggStatsOutputPath, true);
+    }
+    if (fs.exists(dimensionStatsPath)) {
+      fs.delete(dimensionStatsPath, true);
+    }
+    if (fs.exists(metricSumsPath)) {
+      fs.delete(metricSumsPath, true);
+    }
     FileOutputFormat.setOutputPath(job, new Path(getAndCheck(AGG_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
@@ -297,8 +357,30 @@ public class AggregatePhaseJob extends Configured {
     if (counter.getValue() == 0) {
       throw new IllegalStateException("No input records in " + inputPathDir);
     }
+    counter = job.getCounters().findCounter(AggregationCounter.NUMBER_OF_RECORDS_FLATTENED);
+    LOGGER.info(counter.getDisplayName() + " : " + counter.getValue());
+
+    recordMetricSums(configuration, fs, job);
 
     return job;
+  }
+
+  private void recordMetricSums(Configuration configuration, FileSystem fs, Job job)
+      throws IOException {
+
+    Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
+    StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
+    AggregationJobConfig config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
+    MetricSums metricSums = new MetricSums();
+    for (String metricName : config.getMetricNames()) {
+      Counter metricCounter =
+          job.getCounters().findCounter(starTreeConfig.getCollection(), metricName);
+      metricSums.addMetricSum(metricCounter.getDisplayName(), metricCounter.getValue());
+      LOGGER.info(metricCounter.getDisplayName() + " : " + metricCounter.getValue());
+    }
+    FSDataOutputStream outputStream =
+        fs.create(new Path(configuration.get(AGG_METRIC_SUMS_PATH.toString())));
+    OBJECT_MAPPER.writeValue(outputStream, metricSums);
   }
 
   private String getAndSetConfiguration(Configuration configuration,
@@ -328,8 +410,9 @@ public class AggregatePhaseJob extends Configured {
     job.run();
   }
 
-  public static enum AggregationCounter{
-    NUMBER_OF_RECORDS
+  public static enum AggregationCounter {
+    NUMBER_OF_RECORDS,
+    NUMBER_OF_RECORDS_FLATTENED
   }
 
 }

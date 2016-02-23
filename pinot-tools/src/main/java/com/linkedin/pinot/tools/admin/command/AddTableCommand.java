@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.tools.Command;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -34,7 +35,7 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
  * Class to implement CreateResource command.
  *
  */
-public class AddTableCommand extends AbstractBaseCommand implements Command {
+public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
   @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
@@ -113,8 +114,8 @@ public class AddTableCommand extends AbstractBaseCommand implements Command {
 
     LOGGER.info("Executing command: " + toString());
     String res =
-        AbstractBaseCommand.sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(),
-            node.toString());
+        AbstractBaseAdminCommand
+            .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
 
     LOGGER.info(res);
     return true;

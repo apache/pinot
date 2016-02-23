@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonProcessingException;
@@ -58,6 +60,7 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
         addTable(config);
       } catch (Exception e) {
         LOGGER.error("Caught exception while adding table", e);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return new StringRepresentation("Failed: " + e.getMessage());
       }
@@ -114,6 +117,7 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
         return getAllTables();
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching table ", e);
+        ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_GET_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
@@ -130,6 +134,7 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while fetching table ", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }

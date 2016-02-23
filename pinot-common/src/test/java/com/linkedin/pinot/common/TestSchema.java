@@ -18,6 +18,7 @@ package com.linkedin.pinot.common;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
@@ -32,7 +33,6 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
 
-
 public class TestSchema {
 
   private static Schema schema;
@@ -40,7 +40,9 @@ public class TestSchema {
 
   @BeforeClass
   public void setup() throws JsonParseException, JsonMappingException, IOException, JSONException {
-    schemaFile = new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("data1.schema")));
+    URL resource = getClass().getClassLoader().getResource("data1.schema");
+    String resourceUrl = TestUtils.getFileFromResourceUrl(resource);
+    schemaFile = new File(resourceUrl);
     schema = Schema.fromFile(schemaFile);
   }
 
@@ -56,18 +58,5 @@ public class TestSchema {
     String schemaString = new ObjectMapper().writeValueAsString(schema);
     Schema newSchema = new ObjectMapper().readValue(schemaString, Schema.class);
 
-  }
-
-  @Test
-  public void testSchemaWithStarTree() throws Exception {
-    InputStream inputStream = ClassLoader.getSystemResourceAsStream("data2.with-star-tree.schema");
-    Schema schema = new ObjectMapper().readValue(inputStream, Schema.class);
-    Assert.assertNotNull(schema.getStarTreeIndexSpec());
-
-    StarTreeIndexSpec indexSpec = new StarTreeIndexSpec();
-    indexSpec.setSplitOrder(Arrays.asList("dim2", "dim1", "dim3"));
-    indexSpec.setMaxLeafRecords(10000); // the known default
-
-    Assert.assertEquals(schema.getStarTreeIndexSpec(), indexSpec);
   }
 }

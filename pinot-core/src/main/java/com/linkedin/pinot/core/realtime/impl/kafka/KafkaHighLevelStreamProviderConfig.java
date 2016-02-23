@@ -54,6 +54,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private String decodeKlass;
   private Schema indexingSchema;
   private Map<String, String> decoderProps;
+  private Map<String, String> kafkaConsumerProps;
   private long segmentTimeInMillis = ONE_HOUR;
   private int realtimeRecordsThreshold = FIVE_MILLION;
 
@@ -68,6 +69,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   @Override
   public void init(Map<String, String> properties, Schema schema) {
     decoderProps = new HashMap<String, String>();
+    kafkaConsumerProps = new HashMap<>();
 
     this.indexingSchema = schema;
     if (properties.containsKey(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID)) {
@@ -105,6 +107,10 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
       if (key.startsWith(Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX)) {
         decoderProps.put(Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key), properties.get(key));
       }
+
+      if (key.startsWith(Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX)) {
+        kafkaConsumerProps.put(Helix.DataSource.Realtime.Kafka.getConsumerPropertyKey(key), properties.get(key));
+      }
     }
   }
 
@@ -128,6 +134,11 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     for (String key : defaultProps.keySet()) {
       props.put(key, defaultProps.get(key));
     }
+
+    for (String key : kafkaConsumerProps.keySet()) {
+      props.put(key, kafkaConsumerProps.get(key));
+    }
+
     props.put("group.id", groupId);
     props.put("zookeeper.connect", zkString);
     return new ConsumerConfig(props);
@@ -152,6 +163,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();
+    this.kafkaConsumerProps = kafkaMetadata.getKafkaConsumerProperties();
     this.zkString = kafkaMetadata.getZkBrokerUrl();
     if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
       realtimeRecordsThreshold =

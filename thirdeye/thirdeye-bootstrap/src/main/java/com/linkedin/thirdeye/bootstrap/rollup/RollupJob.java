@@ -59,11 +59,9 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob;
  *
  * NOTE: ALl these jobs could be more efficient by partitioning the output based on key and using map side join.
  * overall map reduce is not the right framework for doing this, its much more efficient to do it with something like spark
- *
  * </pre>
  *
  * @author kgopalak
- *
  */
 public class RollupJob {
 

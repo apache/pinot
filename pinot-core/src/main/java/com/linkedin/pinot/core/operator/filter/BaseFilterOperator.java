@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.BaseFilterBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 
 
 /**
@@ -29,17 +29,8 @@ import com.linkedin.pinot.core.operator.BaseOperator;
  */
 public abstract class BaseFilterOperator extends BaseOperator {
 
-  private FilterResultBlock resultBlock;
   private Predicate predicate;
   private int nextBlockCallCounter = 0;
-
-  public void setInputBlock(FilterResultBlock block) {
-    this.resultBlock = block;
-  }
-
-  public FilterResultBlock getResultBlock() {
-    return resultBlock;
-  }
 
   public void setPredicate(Predicate predicate) {
     this.predicate = predicate;

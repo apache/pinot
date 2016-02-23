@@ -14,22 +14,12 @@ import java.io.Serializable;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-
 @Entity
 @Table(name = "anomaly_function_relations")
 @NamedQueries({
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#find",
-        query = "SELECT r FROM AnomalyFunctionRelation r"
-    ),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#findByParent",
-        query = "SELECT r FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId"
-    ),
-    @NamedQuery(
-        name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#deleteByParent",
-        query = "DELETE FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId"
-    )
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#find", query = "SELECT r FROM AnomalyFunctionRelation r"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#findByParent", query = "SELECT r FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId"),
+    @NamedQuery(name = "com.linkedin.thirdeye.api.AnomalyFunctionRelation#deleteByParent", query = "DELETE FROM AnomalyFunctionRelation r WHERE r.parentId = :parentId")
 })
 public class AnomalyFunctionRelation implements Serializable {
   private static final long serialVersionUID = 7526472295622776147L;
@@ -42,7 +32,8 @@ public class AnomalyFunctionRelation implements Serializable {
   @Column(name = "child_id", nullable = false)
   private long childId;
 
-  public AnomalyFunctionRelation() {}
+  public AnomalyFunctionRelation() {
+  }
 
   public long getParentId() {
     return parentId;
@@ -62,9 +53,7 @@ public class AnomalyFunctionRelation implements Serializable {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("parentId", parentId)
-        .add("childId", childId)
+    return MoreObjects.toStringHelper(this).add("parentId", parentId).add("childId", childId)
         .toString();
   }
 
@@ -74,8 +63,7 @@ public class AnomalyFunctionRelation implements Serializable {
       return false;
     }
     AnomalyFunctionRelation r = (AnomalyFunctionRelation) o;
-    return Objects.equals(parentId, r.getParentId())
-        && Objects.equals(childId, r.getChildId());
+    return Objects.equals(parentId, r.getParentId()) && Objects.equals(childId, r.getChildId());
   }
 
   @Override

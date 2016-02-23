@@ -29,7 +29,8 @@ import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +70,8 @@ public class SegmentDictionaryCreator implements Closeable {
   public void build() throws Exception {
     switch (spec.getDataType()) {
       case INT:
-        final FixedByteWidthRowColDataFileWriter intDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter intDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
         intValueToIndexMap = new Int2IntOpenHashMap(rowCount);
         int[] sortedInts = (int[]) sortedList;
@@ -82,8 +83,8 @@ public class SegmentDictionaryCreator implements Closeable {
         intDictionaryWrite.close();
         break;
       case FLOAT:
-        final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter floatDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         floatValueToIndexMap = new Float2IntOpenHashMap(rowCount);
         float[] sortedFloats = (float[]) sortedList;
@@ -95,8 +96,8 @@ public class SegmentDictionaryCreator implements Closeable {
         floatDictionaryWrite.close();
         break;
       case LONG:
-        final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter longDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         longValueToIndexMap = new Long2IntOpenHashMap(rowCount);
         long[] sortedLongs = (long[]) sortedList;
@@ -108,8 +109,8 @@ public class SegmentDictionaryCreator implements Closeable {
         longDictionaryWrite.close();
         break;
       case DOUBLE:
-        final FixedByteWidthRowColDataFileWriter doubleDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter doubleDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         doubleValueToIndexMap = new Double2IntOpenHashMap(rowCount);
         double[] sortedDoubles = (double[]) sortedList;
@@ -131,8 +132,8 @@ public class SegmentDictionaryCreator implements Closeable {
           }
         }
 
-        final FixedByteWidthRowColDataFileWriter stringDictionaryWrite =
-            new FixedByteWidthRowColDataFileWriter(dictionaryFile, rowCount, 1,
+        final FixedByteSingleValueMultiColWriter stringDictionaryWrite =
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 new int[] { stringColumnMaxLength });
 
         final String[] revised = new String[rowCount];
@@ -154,7 +155,9 @@ public class SegmentDictionaryCreator implements Closeable {
         stringValueToIndexMap = new Object2IntOpenHashMap<>(rowCount);
         for (int i = 0; i < revised.length; i++) {
           stringDictionaryWrite.setString(i, 0, revised[i]);
-          stringValueToIndexMap.put(revised[i], i);
+
+          // No need to store padded value, we can store and lookup by raw value.
+          stringValueToIndexMap.put(sortedObjects[i].toString(), i);
         }
         stringDictionaryWrite.close();
         break;
@@ -179,13 +182,8 @@ public class SegmentDictionaryCreator implements Closeable {
         return longValueToIndexMap.get(e);
       case STRING:
       case BOOLEAN:
-        final StringBuilder bld = new StringBuilder();
         String value = e.toString();
-        bld.append(value);
-        for (int i = 0; i < (stringColumnMaxLength - value.getBytes(Charset.forName("UTF-8")).length); i++) {
-          bld.append(V1Constants.Str.STRING_PAD_CHAR);
-        }
-        return stringValueToIndexMap.get(bld.toString());
+        return stringValueToIndexMap.get(value);
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + spec.getDataType() +
             " for column : " + spec.getName());
@@ -221,13 +219,8 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
       case BOOLEAN:
         for (int i = 0; i < multiValues.length; i++) {
-          final StringBuilder bld = new StringBuilder();
           String value = multiValues[i].toString();
-          bld.append(value);
-          for (int j = 0; j < (stringColumnMaxLength - value.getBytes(Charset.forName("UTF-8")).length); j++) {
-            bld.append(V1Constants.Str.STRING_PAD_CHAR);
-          }
-          ret[i] = stringValueToIndexMap.get(bld.toString());
+          ret[i] = stringValueToIndexMap.get(value);
         }
         break;
       default:

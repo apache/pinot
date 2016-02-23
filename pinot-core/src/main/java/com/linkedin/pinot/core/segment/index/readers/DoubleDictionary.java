@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.File;
-import java.io.IOException;
-
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import java.io.File;
+import java.io.IOException;
 
 
 /**
@@ -37,41 +36,45 @@ public class DoubleDictionary extends ImmutableDictionaryReader  {
     Double lookup;
 
     if (rawValue instanceof String) {
-      lookup = new Double(Double.parseDouble((String)rawValue));
+      lookup = Double.parseDouble((String) rawValue);
     } else {
       lookup = (Double)rawValue;
     }
-    return doubleIndexOf(lookup.doubleValue());
+    return doubleIndexOf(lookup);
   }
 
   @Override
   public Double get(int dictionaryId) {
-    return new Double(getDouble(dictionaryId));
+    return getDoubleValue(dictionaryId);
   }
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return (new Double(getDouble(dictionaryId))).longValue();
+    return (long) getDoubleValue(dictionaryId);
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(getDouble(dictionaryId));
+    return dataFileReader.getDouble(dictionaryId, 0);
   }
 
   @Override
   public String toString(int dictionaryId) {
-    return (new Double(getDouble(dictionaryId))).toString();
+    return Double.toString(getDoubleValue(dictionaryId));
   }
 
-  
   @Override
   public String getStringValue(int dictionaryId) {
-    return (new Double(getDouble(dictionaryId))).toString();
-  }
-  
-  private double getDouble(int dictionaryId){
-    return dataFileReader.getDouble(dictionaryId, 0);
+    return Double.toString(getDoubleValue(dictionaryId));
   }
 
+  @Override
+  public float getFloatValue(int dictionaryId) {
+    return (float) getDoubleValue(dictionaryId);
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return (int) getDoubleValue(dictionaryId);
+  }
 }

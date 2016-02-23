@@ -31,8 +31,15 @@ public class ZkStarter {
   public static final int DEFAULT_ZK_TEST_PORT = 2191;
   public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT;
 
-  private static PublicZooKeeperServerMain _zookeeperServerMain = null;
-  private static String _zkDataDir = null;
+  public static class ZookeeperInstance {
+    private PublicZooKeeperServerMain _serverMain;
+    private String _dataDirPath;
+
+    private ZookeeperInstance(PublicZooKeeperServerMain serverMain, String dataDirPath) {
+      _serverMain = serverMain;
+      _dataDirPath = dataDirPath;
+    }
+  }
 
   /**
    * Silly class to make protected methods public.
@@ -52,16 +59,16 @@ public class ZkStarter {
   /**
    * Starts an empty local Zk instance on the default port
    */
-  public static void startLocalZkServer() {
-    startLocalZkServer(DEFAULT_ZK_TEST_PORT);
+  public static ZookeeperInstance startLocalZkServer() {
+    return startLocalZkServer(DEFAULT_ZK_TEST_PORT);
   }
 
   /**
    * Starts a local Zk instance with a generated empty data directory
    * @param port The port to listen on
    */
-  public static void startLocalZkServer(final int port) {
-    startLocalZkServer(port,
+  public static ZookeeperInstance startLocalZkServer(final int port) {
+    return startLocalZkServer(port,
         org.apache.commons.io.FileUtils.getTempDirectoryPath() + File.separator + "test-" + System.currentTimeMillis());
   }
 
@@ -70,21 +77,16 @@ public class ZkStarter {
    * @param port The port to listen on
    * @param dataDirPath The path for the Zk data directory
    */
-  public synchronized static void startLocalZkServer(final int port, final String dataDirPath) {
-    if (_zookeeperServerMain != null) {
-      throw new RuntimeException("Zookeeper server is already started!");
-    }
-
+  public synchronized static ZookeeperInstance startLocalZkServer(final int port, final String dataDirPath) {
     // Start the local ZK server
     try {
-      _zookeeperServerMain = new PublicZooKeeperServerMain();
-      _zkDataDir = dataDirPath;
+      final PublicZooKeeperServerMain zookeeperServerMain = new PublicZooKeeperServerMain();
       final String[] args = new String[] { Integer.toString(port), dataDirPath };
       new Thread() {
         @Override
         public void run() {
           try {
-            _zookeeperServerMain.initializeAndRun(args);
+            zookeeperServerMain.initializeAndRun(args);
           } catch (QuorumPeerConfig.ConfigException e) {
             LOGGER.warn("Caught exception while starting ZK", e);
           } catch (IOException e) {
@@ -92,38 +94,40 @@ public class ZkStarter {
           }
         }
       }.start();
+
+      // Wait until the ZK server is started
+      ZkClient client = new ZkClient("localhost:" + port, 10000);
+      client.waitUntilConnected(10L, TimeUnit.SECONDS);
+      client.close();
+
+      return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while starting ZK", e);
       throw new RuntimeException(e);
     }
-
-    // Wait until the ZK server is started
-    ZkClient client = new ZkClient("localhost:" + port, 10000);
-    client.waitUntilConnected(10L, TimeUnit.SECONDS);
-    client.close();
   }
 
   /**
    * Stops a local Zk instance, deleting its data directory
    */
-  public static void stopLocalZkServer() {
-    stopLocalZkServer(true);
+  public static void stopLocalZkServer(final ZookeeperInstance instance) {
+    stopLocalZkServer(instance, true);
   }
 
   /**
    * Stops a local Zk instance.
    * @param deleteDataDir Whether or not to delete the data directory
    */
-  public synchronized static void stopLocalZkServer(final boolean deleteDataDir) {
-    if (_zookeeperServerMain != null) {
+  public synchronized static void stopLocalZkServer(final ZookeeperInstance instance, final boolean deleteDataDir) {
+    if (instance._serverMain != null) {
       try {
         // Shut down ZK
-        _zookeeperServerMain.shutdown();
-        _zookeeperServerMain = null;
+        instance._serverMain.shutdown();
+        instance._serverMain = null;
 
         // Delete the data dir
         if (deleteDataDir) {
-          org.apache.commons.io.FileUtils.deleteDirectory(new File(_zkDataDir));
+          org.apache.commons.io.FileUtils.deleteDirectory(new File(instance._dataDirPath));
         }
       } catch (Exception e) {
         LOGGER.warn("Caught exception while stopping ZK server", e);

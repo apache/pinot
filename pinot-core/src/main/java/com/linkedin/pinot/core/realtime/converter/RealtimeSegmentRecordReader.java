@@ -15,17 +15,17 @@
  */
 package com.linkedin.pinot.core.realtime.converter;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.BaseRecordReader;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 
-
-public class RealtimeSegmentRecordReader implements RecordReader {
+// TODO Implement null counting if needed.
+public class RealtimeSegmentRecordReader extends BaseRecordReader {
 
   private RealtimeSegmentImpl realtimeSegment;
   private Schema dataSchema;
@@ -34,6 +34,8 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   private final Iterator<Integer> docIdIterator;
 
   public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema) {
+    super();
+    super.initNullCounters(schema);
     this.realtimeSegment = rtSegment;
     this.dataSchema = schema;
     columns = new ArrayList<String>();
@@ -41,6 +43,8 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema, String sortedColumn) {
+    super();
+    super.initNullCounters(schema);
     this.realtimeSegment = rtSegment;
     this.dataSchema = schema;
     columns = new ArrayList<String>();
@@ -87,5 +91,4 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   public void close() throws Exception {
     realtimeSegment = null;
   }
-
 }

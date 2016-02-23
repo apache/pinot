@@ -46,6 +46,7 @@ public class HybridQuickstart {
   private File _offlineQuickStartDataDir;
   private File _realtimeQuickStartDataDir;
   KafkaServerStartable kafkaStarter;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   private QuickstartTableRequest prepareOfflineTableRequest() throws IOException {
     _offlineQuickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
@@ -99,7 +100,7 @@ public class HybridQuickstart {
   }
 
   private void startKafka() {
-    ZkStarter.startLocalZkServer();
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
 
     kafkaStarter =
         KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
@@ -115,7 +116,7 @@ public class HybridQuickstart {
 
     File tempDir = new File("/tmp/" + System.currentTimeMillis());
     tempDir.mkdir();
-    QuickstartRunner runner =
+    final QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(offlineRequest, realtimeTableRequest), 2, 2, 1, tempDir, false);
     printStatus(color.YELLOW, "***** starting kafka  *****");
     startKafka();
@@ -140,7 +141,7 @@ public class HybridQuickstart {
 
     printStatus(color.YELLOW,
         "***** publishing data to kafka for airline realtime to start consuming event stream  *****");
-    AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(schemaFile), dataFile);
+    final AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(schemaFile), dataFile);
     stream.run();
     
     printStatus(color.YELLOW, "***** Pinot Hybrid with hybrid table setup is complete *****");
@@ -167,7 +168,7 @@ public class HybridQuickstart {
           FileUtils.deleteDirectory(_offlineQuickStartDataDir);
           FileUtils.deleteDirectory(_realtimeQuickStartDataDir);
           KafkaStarterUtils.stopServer(kafkaStarter);
-          ZkStarter.stopLocalZkServer();
+          ZkStarter.stopLocalZkServer(_zookeeperInstance);
         } catch (Exception e) {
         }
       }

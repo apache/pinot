@@ -21,7 +21,8 @@ public class ClearCachesTask extends Task {
   }
 
   @Override
-  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter) throws Exception {
+  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter)
+      throws Exception {
     if (!params.get("skipDataCache").isEmpty()) {
       printWriter.println("Clearing data cache...");
       printWriter.flush();

@@ -20,7 +20,7 @@ public class DimensionKeyUtils {
   /**
    * @param dimensionKey
    * @return
-   *  The number of star fields in the dimension key
+   *         The number of star fields in the dimension key
    */
   public static int getStarCount(DimensionKey dimensionKey) {
     int count = 0;
@@ -36,9 +36,10 @@ public class DimensionKeyUtils {
    * @param dimensions
    * @param dimensionKey
    * @return
-   *  A map of the dimension key
+   *         A map of the dimension key
    */
-  public static Map<String, String>  toMap(List<DimensionSpec> dimensions, DimensionKey dimensionKey) {
+  public static Map<String, String> toMap(List<DimensionSpec> dimensions,
+      DimensionKey dimensionKey) {
     Map<String, String> dimensionMap = new TreeMap<>();
     String[] dimensionValues = dimensionKey.getDimensionValues();
     for (int i = 0; i < dimensions.size(); i++) {
@@ -51,7 +52,7 @@ public class DimensionKeyUtils {
    * @param d1
    * @param d2
    * @return
-   *  Whether d2 is contained within d1.
+   *         Whether d2 is contained within d1.
    */
   public static boolean isContainedWithin(DimensionKey d1, DimensionKey d2) {
     String[] d1Values = d1.getDimensionValues();
@@ -71,6 +72,7 @@ public class DimensionKeyUtils {
     return true;
   }
 
-  private DimensionKeyUtils() {}
+  private DimensionKeyUtils() {
+  }
 
 }

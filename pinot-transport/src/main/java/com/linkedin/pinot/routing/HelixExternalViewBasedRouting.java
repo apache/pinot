@@ -56,7 +56,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private final Map<String, List<ServerToSegmentSetMap>> _brokerRoutingTable =
       new ConcurrentHashMap<String, List<ServerToSegmentSetMap>>();
-  private final Map<String, Long> _routingTableModifiedTimeStampMap = new ConcurrentHashMap<String, Long>();
+  private final Map<String, Integer> _routingTableLastKnownZkVersionMap = new ConcurrentHashMap<>();
   private final Random _random = new Random(System.currentTimeMillis());
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
 
@@ -113,22 +113,27 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (externalView == null) {
       return;
     }
-    if (_routingTableModifiedTimeStampMap.containsKey(tableName)) {
-      long recentModifiedTimeStamp = _routingTableModifiedTimeStampMap.get(tableName);
-      LOGGER.info("ExternalView modified timestamp for table: " + tableName + " is "
-          + externalView.getRecord().getModifiedTime());
-      LOGGER.info("Recent updated timestamp for for table: " + tableName + " is " + recentModifiedTimeStamp);
-      if (externalView.getRecord().getModifiedTime() <= recentModifiedTimeStamp) {
-        LOGGER.info("No change on routing table version, do nothing for table: " + tableName);
+    int externalViewRecordVersion = externalView.getRecord().getVersion();
+    if (_routingTableLastKnownZkVersionMap.containsKey(tableName)) {
+      long lastKnownZkVersion = _routingTableLastKnownZkVersionMap.get(tableName);
+      if (externalViewRecordVersion == lastKnownZkVersion) {
+        LOGGER.info(
+            "No change on routing table version (current version {}, last known version {}), do nothing for table {}",
+            externalViewRecordVersion, lastKnownZkVersion, tableName);
         return;
       }
+
+      LOGGER.info(
+          "Updating routing table for table {} due to ZK change (current version {}, last known version {})",
+          tableName, externalViewRecordVersion, lastKnownZkVersion);
     }
-    _routingTableModifiedTimeStampMap.put(tableName, externalView.getRecord().getModifiedTime());
+
+    _routingTableLastKnownZkVersionMap.put(tableName, externalViewRecordVersion);
     if (!_dataTableSet.contains(tableName)) {
       LOGGER.info("Adding a new data table to broker : " + tableName);
       _dataTableSet.add(tableName);
     }
-    RoutingTableBuilder routingTableBuilder = null;
+    RoutingTableBuilder routingTableBuilder;
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != null) {
       switch (tableType) {
@@ -171,7 +176,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (_dataTableSet.contains(tableName)) {
       _dataTableSet.remove(tableName);
       _brokerRoutingTable.remove(tableName);
-      _routingTableModifiedTimeStampMap.remove(tableName);
+      _routingTableLastKnownZkVersionMap.remove(tableName);
       _timeBoundaryService.remove(tableName);
     }
   }

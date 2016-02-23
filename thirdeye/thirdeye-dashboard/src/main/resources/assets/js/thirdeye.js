@@ -820,6 +820,9 @@ function updateTableOrder(tableContainer, orderContainer) {
   window.location.hash = encodeHashParameters(hashParams)
 }
 
+
+/** Render tables **/
+
 /**
  * Sets the html of the provided cell to the time provided 
  * in its 'currentUTC' attribute, using the selected timezone.
@@ -853,3 +856,110 @@ function renderTimeCell(index, cell) {
       window.location.pathname = getDashboardPath(path)
     })
 }
+
+/** Assign background color value to each heat-map-cell **/
+function  calcHeatMapCellBackground(cell){
+    var cellObj = $(cell)
+    var value = parseFloat(cellObj.attr('value'))
+    var absValue = Math.abs(value)
+
+    if (value < 0) {
+        cellObj.css('background-color', 'rgba(255,0,0,' + absValue + ')') // red
+    } else {
+        cellObj.css('background-color', 'rgba(0,0,255,' + absValue + ')') // blue
+    }
+};
+
+
+/** Transform UTC time into user selected or browser's timezone and display the date value **/
+function transformUTCToTZDate(cell){
+    var cellObj = $(cell);
+    var currentTime = moment(cellObj.attr('currentUTC'));
+    cellObj.html(currentTime.tz(tz).format('YY-MM-DD z'));
+    var baselineTime = moment(cellObj.attr('title'));
+    cellObj.attr('title', baselineTime.tz(tz).format('MM-DD HH:mm z'));
+};
+
+/** Transform UTC time into user selected or browser's timezone and display the time value **/
+function transformUTCToTZTime(cell, format){
+
+    var cellObj = $(cell);
+    var currentTime = moment(cellObj.attr('currentUTC'));
+    cellObj.html(currentTime.tz(tz).format(format));
+    var baselineTime = moment(cellObj.attr('title'));
+    cellObj.attr('title', baselineTime.tz(tz).format('MM-DD HH:mm'));
+};
+
+/** Loop through each columns that's not displaying ratio values,
+ take the total of the cells' value in the column (if the row of the cell is checked  and the value id not N/A) and place the total into the total row.
+ Then calculate the sum row ratio column cell value based on the 2 previous column's value.  **/
+function sumColumn(col){
+    var currentTable =  $(col).closest("table");
+    var currentMetric =  $(col).closest(".metric-section-wrapper").attr("rel");
+    var firstDataRow = $("tr.data-row", currentTable)[0];
+    var columns = $("td",firstDataRow);
+    var isCumulative = !$("tr.cumulative-values.hidden",  currentTable)[0];
+
+    //Work with the cumulative or hourly total row
+    var sumRow = (isCumulative) ?  $("tr.cumulative-values.sum-row",  currentTable)[0] : $("tr.hourly-values.sum-row",  currentTable)[0];
+
+    //For "Ratio" metrics total value is N/A since that would add up the nominal % values
+    if(currentMetric.indexOf("RATIO(") == -1 ){
+
+        //Loop through each column, except for column index 0-2 since those have string values
+        for(var z= 3, len = columns.length; z < len; z++){
+
+
+            //Filter out ratio columns
+            if( (z + 1 ) % 3 !== 0 ){
+
+                var rows =  $("tr.data-row", currentTable);
+                //Check if cumulative table is displayed
+                var i =  (isCumulative) ?  1 : 0;
+                var sum = 0;
+                for(var rlen = rows.length; i < rlen; i = i + 2){
+
+                    //Check if checkbox of the row is selected
+                    if( $("input", rows[i]).is(':checked')) {
+                        var currentRow = rows[i];
+                        var currentCell = $("td", currentRow)[z];
+                        var currentCellVal =  parseInt($(currentCell).html().trim().replace(/[\$,]/g, ''));
+                        //NaN value will be skipped
+                        if (!isNaN(currentCellVal)) {
+                            sum = sum + currentCellVal;
+                        }
+                    }
+                }
+
+                //Display the sum in the current column of the sumRow
+                var sumCell = $("th", sumRow)[z];
+                $(sumCell).html(sum);
+
+                //In case of ratio columns calculate them based on the baseline and current values of the timebucket
+            }else{
+                //take the 2 previous total row elements
+                var baselineValCell = $("th", sumRow)[z-2];
+                var currentValCell = $("th", sumRow)[z-1];
+                var baselineVal = parseInt($(baselineValCell).html().trim().replace(/[\$,]/g, ''));
+                var currentVal = parseInt($(currentValCell).html().trim().replace(/[\$,]/g, ''));
+                var sumCell = $("th", sumRow)[z];
+                //Round the ratio to 2 decimal places, add 0.00001 to prevent Chrome rounding 0.005 to 0.00
+                var ratioVal = (Math.round(((currentVal - baselineVal) / baselineVal + 0.00001) * 1000)/10).toFixed(1);
+
+                $(sumCell).html(ratioVal + "%");
+                $(sumCell).attr('value' , (ratioVal /100));
+                calcHeatMapCellBackground(sumCell);
+            }
+        }
+
+        //If the metric is a derived metric = has RATIO() form display N/A in the total row
+    }else{
+        var sumCells = $("th", sumRow);
+        for(var i = 3, tLen = sumCells.length; i< tLen; i++){
+            $(sumCells[i]).html("N/A");
+        }
+    }
+
+}
+
+

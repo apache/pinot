@@ -21,7 +21,9 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.api.swagger.HttpVerb;
 import com.linkedin.pinot.controller.api.swagger.Parameter;
 import com.linkedin.pinot.controller.api.swagger.Paths;
@@ -116,6 +118,7 @@ public class PinotSegmentRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing get request", e);
+      ControllerRestApplication.metrics.addMeteredValue(null, ControllerMeter.CONTROLLER_SEGMENT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
 

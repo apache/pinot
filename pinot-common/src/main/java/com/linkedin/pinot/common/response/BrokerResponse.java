@@ -231,7 +231,11 @@ public class BrokerResponse {
     if (_traceInfo == null) {
       sb.append("null");
     } else {
-      sb.append(_traceInfo);
+      // The values are already in json formatted string, so we don't want to quote the quoted strings.
+      // But printing the map as is does not make it json parsable, so quote the keys and print the values as they are
+      for (Map.Entry<String, String> entry : _traceInfo.entrySet()) {
+        sb.append("\"" + entry.getKey() + "\":" + entry.getValue());
+      }
     }
     sb.append(")");
     return sb.toString();

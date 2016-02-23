@@ -90,7 +90,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setEndTime(2000);
     realtimeSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     realtimeSegmentMetadata.setStatus(Status.DONE);
-    realtimeSegmentMetadata.setTotalDocs(10000);
+    realtimeSegmentMetadata.setTotalRawDocs(10000);
     realtimeSegmentMetadata.setCrc(1234);
     realtimeSegmentMetadata.setCreationTime(3000);
     return realtimeSegmentMetadata;
@@ -123,7 +123,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setEndTime(-1);
     realtimeSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     realtimeSegmentMetadata.setStatus(Status.IN_PROGRESS);
-    realtimeSegmentMetadata.setTotalDocs(-1);
+    realtimeSegmentMetadata.setTotalRawDocs(-1);
     realtimeSegmentMetadata.setCrc(-1);
     realtimeSegmentMetadata.setCreationTime(1000);
     return realtimeSegmentMetadata;
@@ -157,7 +157,7 @@ public class SegmentZKMetadataTest {
     offlineSegmentMetadata.setStartTime(1000);
     offlineSegmentMetadata.setEndTime(2000);
     offlineSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
-    offlineSegmentMetadata.setTotalDocs(50000);
+    offlineSegmentMetadata.setTotalRawDocs(50000);
     offlineSegmentMetadata.setCrc(54321);
     offlineSegmentMetadata.setCreationTime(1000);
     offlineSegmentMetadata.setDownloadUrl("http://localhost:8000/testTable_O_3000_4000");

@@ -1,8 +1,5 @@
 {
   "metricFieldSpecs" : [
-
-  ],
-  "dimensionFieldSpecs" : [
     {
       "dataType": "INT",
       "name": "ActualElapsedTime",
@@ -11,11 +8,6 @@
     {
       "dataType": "INT",
       "name": "AirTime",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "AirlineID",
       "singleValueField": true
     },
     {
@@ -30,7 +22,70 @@
     },
     {
       "dataType": "INT",
+      "name": "ArrivalDelayGroups",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
       "name": "ArrDelayMinutes",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "Cancelled",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "CarrierDelay",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "DepDel15",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "DepDelay",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "DepDelayMinutes",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "DepartureDelayGroups",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "LateAircraftDelay",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "NASDelay",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "SecurityDelay",
+      "singleValueField": true
+    },
+    {
+      "dataType": "INT",
+      "name": "WeatherDelay",
+      "singleValueField": true
+    }
+
+  ],
+  "dimensionFieldSpecs" : [
+    {
+      "dataType": "INT",
+      "name": "AirlineID",
       "singleValueField": true
     },
     {
@@ -41,11 +96,6 @@
     {
       "dataType": "STRING",
       "name": "ArrTimeBlk",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "ArrivalDelayGroups",
       "singleValueField": true
     },
     {
@@ -69,18 +119,8 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",
-      "name": "Cancelled",
-      "singleValueField": true
-    },
-    {
       "dataType": "STRING",
       "name": "Carrier",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "CarrierDelay",
       "singleValueField": true
     },
     {
@@ -95,32 +135,12 @@
     },
     {
       "dataType": "INT",
-      "name": "DepDel15",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "DepDelay",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "DepDelayMinutes",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
       "name": "DepTime",
       "singleValueField": true
     },
     {
       "dataType": "STRING",
       "name": "DepTimeBlk",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "DepartureDelayGroups",
       "singleValueField": true
     },
     {
@@ -270,22 +290,12 @@
     },
     {
       "dataType": "INT",
-      "name": "LateAircraftDelay",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
       "name": "LongestAddGTime",
       "singleValueField": true
     },
     {
       "dataType": "INT",
       "name": "Month",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "NASDelay",
       "singleValueField": true
     },
     {
@@ -344,11 +354,6 @@
       "singleValueField": false
     },
     {
-      "dataType": "INT",
-      "name": "SecurityDelay",
-      "singleValueField": true
-    },
-    {
       "dataType": "STRING",
       "name": "TailNum",
       "singleValueField": true
@@ -376,11 +381,6 @@
     {
       "dataType": "INT",
       "name": "WheelsOff",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "WeatherDelay",
       "singleValueField": true
     },
     {

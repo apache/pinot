@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.util.datasource;
 
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class IntArrayBackedImmutableDictionary extends ImmutableDictionaryReader {
@@ -38,8 +37,63 @@ public class IntArrayBackedImmutableDictionary extends ImmutableDictionaryReader
   }
 
   @Override
+  public float getFloatValue(int dictionaryId) {
+    return dictionary[dictionaryId];
+  }
+
+  @Override
+  public int getIntValue(int dictionaryId) {
+    return dictionary[dictionaryId];
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return String.valueOf(dictionary[dictionaryId]);
+  }
+
+  @Override
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int row = dictionaryIds[iter];
+      outValues[iter] = dictionary[row];
+    }
+  }
+
+  @Override
+  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int row = dictionaryIds[iter];
+      outValues[iter] = dictionary[row];
+    }
+  }
+
+  @Override
+  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int row = dictionaryIds[iter];
+      outValues[iter] = dictionary[row];
+    }
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int row = dictionaryIds[iter];
+      outValues[iter] = dictionary[row];
+    }
+  }
+
+  @Override
+  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int row = dictionaryIds[iter];
+      outValues[iter] = String.valueOf(dictionary[row]);
+    }
   }
 
   @Override

@@ -23,9 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import junit.framework.Assert;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -46,19 +42,23 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -70,6 +70,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.util.DoubleComparisonUtil;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
+import junit.framework.Assert;
 
 
 public class AggregationQueriesTest {
@@ -81,7 +82,7 @@ public class AggregationQueriesTest {
       + "TestAggregationQueriesList");
 
   public static IndexSegment _indexSegment;
-  private static List<IndexSegment> _indexSegmentList;
+  private static List<SegmentDataManager> _indexSegmentList;
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
@@ -93,7 +94,7 @@ public class AggregationQueriesTest {
   public void setup() throws Exception {
     setupSegment();
     setupQuery();
-    _indexSegmentList = new ArrayList<IndexSegment>();
+    _indexSegmentList = new ArrayList<SegmentDataManager>();
   }
 
   @AfterClass
@@ -121,7 +122,7 @@ public class AggregationQueriesTest {
     driver.init(config);
     driver.build();
 
-    LOGGER.info("built at : {}", INDEX_DIR.getAbsolutePath());
+    LOGGER.debug("built at : {}", INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
@@ -146,8 +147,8 @@ public class AggregationQueriesTest {
       driver.init(config);
       driver.build();
 
-      LOGGER.info("built at : {}", segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
+      LOGGER.debug("built at : {}", segmentDir.getAbsolutePath());
+      _indexSegmentList.add(new OfflineSegmentDataManager(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap)));
     }
   }
 
@@ -157,10 +158,15 @@ public class AggregationQueriesTest {
 
   @Test
   public void testAggregationFunctions() {
+    getIntermediateResultsBlock();
+  }
+
+  private IntermediateResultsBlock getIntermediateResultsBlock() {
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
         new ArrayList<BAggregationFunctionOperator>();
+    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -177,42 +183,21 @@ public class AggregationQueriesTest {
         new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator, aggregationFunctionOperatorList);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
+
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result : {}", block.getAggregationResult().get(i));
+      LOGGER.debug("Result : {}", block.getAggregationResult().get(i));
     }
+    return block;
   }
 
   @Test
   public void testAggregationFunctionsWithCombine() {
-    final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
-        new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
-    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
-
-    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
-
-    for (int i = 0; i < _numAggregations; ++i) {
-      final BAggregationFunctionOperator aggregationFunctionOperator =
-          new BAggregationFunctionOperator(_aggregationInfos.get(i), new UReplicatedProjectionOperator(
-              projectionOperator), true);
-
-      aggregationFunctionOperatorList.add(aggregationFunctionOperator);
-    }
-
-    final MAggregationOperator aggregationOperator =
-        new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator, aggregationFunctionOperatorList);
-
-    final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
-
-    for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result 1: {}", block.getAggregationResult().get(i));
-    }
-    /////////////////////////////////////////////////////////////////////////
+    IntermediateResultsBlock block = getIntermediateResultsBlock();
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList1 =
         new ArrayList<BAggregationFunctionOperator>();
+    Operator filterOperator1 = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
-        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+        new BReusableFilteredDocIdSetOperator(filterOperator1, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -231,28 +216,33 @@ public class AggregationQueriesTest {
     final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationOperator1.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Result 2: {}", block1.getAggregationResult().get(i));
+      LOGGER.debug("Result 2: {}", block1.getAggregationResult().get(i));
     }
     CombineService.mergeTwoBlocks(getAggregationNoFilterBrokerRequest(), block, block1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      LOGGER.info("Combined Result : {}", block.getAggregationResult().get(i));
+      LOGGER.debug("Combined Result : {}", block.getAggregationResult().get(i));
     }
   }
 
   @Test
   public void testInnerSegmentPlanMakerForAggregationFunctionOperatorNoFilter() throws Exception {
     final BrokerRequest brokerRequest = getAggregationNoFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
-    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
 
+    logReducedResults(resultBlock);
+  }
+
+  private void logReducedResults(IntermediateResultsBlock resultBlock)
+      throws Exception {
     final ReduceService reduceService = new DefaultReduceService();
 
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -269,48 +259,32 @@ public class AggregationQueriesTest {
     final BrokerResponse reducedResults =
         reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
 
-    LOGGER.info("Reduced Result : {}", reducedResults);
+    LOGGER.debug("Reduced Result : {}", reducedResults);
   }
 
   @Test
   public void testInnerSegmentPlanMakerForAggregationFunctionOperatorWithFilter() throws Exception {
     final BrokerRequest brokerRequest = getAggregationWithFilterBrokerRequest();
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
     final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    LOGGER.info("RunningTime : {}", resultBlock.getTimeUsedMs());
-    LOGGER.info("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
-    LOGGER.info("TotalDocs : {}", resultBlock.getTotalDocs());
+    LOGGER.debug("RunningTime : {}", resultBlock.getTimeUsedMs());
+    LOGGER.debug("NumDocsScanned : {}", resultBlock.getNumDocsScanned());
+    LOGGER.debug("TotalDocs : {}", resultBlock.getTotalRawDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
-    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+    Assert.assertEquals(resultBlock.getTotalRawDocs(), 10001);
 
-    final ReduceService reduceService = new DefaultReduceService();
-
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationResultDataTable());
-    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationResultDataTable());
-    final BrokerResponse reducedResults =
-        reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
-
-    LOGGER.info("Reduced Result : {}", reducedResults);
+    logReducedResults(resultBlock);
   }
 
   @Test
   public void testInterSegmentAggregationFunctionPlanMakerAndRun() throws Exception {
     final int numSegments = 20;
     setupSegmentList(numSegments);
-    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final BrokerRequest brokerRequest = getAggregationNoFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
@@ -318,14 +292,14 @@ public class AggregationQueriesTest {
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
-    LOGGER.info("Instance Response : {}", instanceResponse);
+    LOGGER.debug("Instance Response : {}", instanceResponse);
 
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    LOGGER.info("Result : {}", new JSONArray(brokerResponse.getAggregationResults()));
-    LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
+    LOGGER.debug("Result : {}", new JSONArray(brokerResponse.getAggregationResults()));
+    LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -415,6 +389,10 @@ public class AggregationQueriesTest {
 
   private static AggregationInfo getSumAggregationInfo() {
     final String type = "sum";
+    return getAggregationInfo(type);
+  }
+
+  private static AggregationInfo getAggregationInfo(String type) {
     final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
     final AggregationInfo aggregationInfo = new AggregationInfo();
@@ -425,32 +403,17 @@ public class AggregationQueriesTest {
 
   private static AggregationInfo getMaxAggregationInfo() {
     final String type = "max";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getMinAggregationInfo() {
     final String type = "min";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getAvgAggregationInfo() {
     final String type = "avg";
-    final Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met_impressionCount");
-    final AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+    return getAggregationInfo(type);
   }
 
   private static AggregationInfo getDistinctCountAggregationInfo(String dim) {

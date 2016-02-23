@@ -23,6 +23,7 @@ import org.apache.avro.generic.GenericData.Array;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -40,28 +41,42 @@ public class AvroRecordToPinotRowGenerator {
     Map<String, Object> rowEntries = new HashMap<String, Object>();
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = record.get(column);
-      if (entry instanceof Array) {
-        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, indexingSchema.getFieldSpecFor(column));
-        if (indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING
-            || indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING_ARRAY) {
-          for (int i = 0; i < ((Object[]) entry).length; ++i) {
-            if (((Object[]) entry)[i] != null) {
-              ((Object[]) entry)[i] = ((Object[]) entry)[i].toString();
+      FieldSpec fieldSpec = indexingSchema.getFieldSpecFor(column);
+
+      if (entry != null) {
+        if (entry instanceof Array) {
+          entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, fieldSpec);
+          if (fieldSpec.getDataType() == DataType.STRING || fieldSpec.getDataType() == DataType.STRING_ARRAY) {
+            for (int i = 0; i < ((Object[]) entry).length; ++i) {
+              if (((Object[]) entry)[i] != null) {
+                ((Object[]) entry)[i] = ((Object[]) entry)[i].toString();
+              }
             }
           }
-        }
-      } else {
-        if (entry instanceof Utf8) {
-          entry = ((Utf8) entry).toString();
-        }
-        if (indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING) {
-          if (entry != null) {
+        } else {
+          if (entry instanceof Utf8) {
+            entry = ((Utf8) entry).toString();
+          }
+          if (fieldSpec.getDataType() == DataType.STRING) {
             entry = entry.toString();
           }
         }
-      }
-      if (entry == null && indexingSchema.getFieldSpecFor(column).isSingleValueField()) {
-        entry = AvroRecordReader.getDefaultNullValue(indexingSchema.getFieldSpecFor(column));
+      } else {
+        // entry was null.
+        if (fieldSpec.isSingleValueField()) {
+          entry = AvroRecordReader.getDefaultNullValue(fieldSpec);
+        } else {
+          // A multi-value field, and null. Any of the instanceof checks above will not match, so we need to repeat some
+          // of the logic above here.
+          entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, fieldSpec);
+          if (fieldSpec.getDataType() == DataType.STRING || fieldSpec.getDataType() == DataType.STRING_ARRAY) {
+            for (int i = 0; i < ((Object[]) entry).length; ++i) {
+              if (((Object[]) entry)[i] != null) {
+                ((Object[]) entry)[i] = ((Object[]) entry)[i].toString();
+              }
+            }
+          }
+        }
       }
       rowEntries.put(column, entry);
     }

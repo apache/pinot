@@ -15,15 +15,13 @@
  */
 package com.linkedin.pinot.routing.builder;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.utils.CommonConstants;
 
 
 public class RoutingTableInstancePruner {
@@ -38,24 +36,41 @@ public class RoutingTableInstancePruner {
     }
   }
 
-  public boolean isShuttingDown(String instanceName) {
+  /**
+   * Returns True iff:
+   * - The given instance is disabled in Helix.
+   * - The instance is being shutdown.
+   * False otherwise
+   *
+   * @param instanceName Name of instance to check.
+   * @return True if instance is disabled in helix, or is being shutdown, False otherwise.
+   */
+  public boolean isInactive(String instanceName) {
     if (!instanceConfigMap.containsKey(instanceName)) {
-      return false;
+      return true;
+    }
+
+    // If the instance is not enabled, return false.
+    InstanceConfig instanceConfig = instanceConfigMap.get(instanceName);
+    if (!instanceConfig.getInstanceEnabled()) {
+      LOGGER.info("Instance '{}' is disabled in the config map.", instanceName);
+      return true;
     }
 
     boolean status = false;
-    if (instanceConfigMap.get(instanceName).getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
+    if (instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
       try {
-        if (instanceConfigMap.get(instanceName).getRecord() == null) {
-          return false;
+        if (instanceConfig.getRecord() == null) {
+          LOGGER.info("Config record not found for instance '{}'.", instanceName);
+          return true;
         }
-        if (instanceConfigMap.get(instanceName).getRecord()
+        if (instanceConfig.getRecord()
             .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
           status =
-              Boolean.valueOf(instanceConfigMap.get(instanceName).getRecord()
+              Boolean.valueOf(instanceConfig.getRecord()
                   .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS));
           if (status == true) {
-            LOGGER.info("found an instance : {} in shutting down state", instanceName);
+            LOGGER.info("found an instance : '{}' in shutting down state", instanceName);
           }
         }
       } catch (Exception e) {

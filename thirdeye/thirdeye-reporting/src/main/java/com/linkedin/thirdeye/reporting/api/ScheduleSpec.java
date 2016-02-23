@@ -22,8 +22,9 @@ public class ScheduleSpec {
 
   }
 
-  public ScheduleSpec(String cron, int aggregationSize, TimeUnit aggregationUnit, int reportWindow, int lagSize,
-      TimeUnit lagUnit, String emailTo, String emailFrom, boolean findAnomalies, String emailTemplate) {
+  public ScheduleSpec(String cron, int aggregationSize, TimeUnit aggregationUnit, int reportWindow,
+      int lagSize, TimeUnit lagUnit, String emailTo, String emailFrom, boolean findAnomalies,
+      String emailTemplate) {
     this.cron = cron;
     this.aggregationSize = aggregationSize;
     this.aggregationUnit = aggregationUnit;
@@ -35,8 +36,6 @@ public class ScheduleSpec {
     this.findAnomalies = findAnomalies;
     this.emailTemplate = emailTemplate;
   }
-
-
 
   public String getErrorEmailTo() {
     return errorEmailTo;

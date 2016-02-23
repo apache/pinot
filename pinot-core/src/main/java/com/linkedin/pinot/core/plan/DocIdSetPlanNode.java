@@ -27,12 +27,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 /**
  * DocIdSetPlanNode takes care creating BDocIdSetOperator.
  * Configure filter query and max size of docId cache here.
- *
- *
- * This logic is refactored into another class used by {@link com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV3}
- * @see RawDocIdSetPlanNode
  */
-@Deprecated
 public class DocIdSetPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
   private final IndexSegment _indexSegment;
@@ -45,25 +40,15 @@ public class DocIdSetPlanNode implements PlanNode {
     _maxDocPerAggregation = maxDocPerAggregation;
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    if (_brokerRequest.isSetFilterQuery()) {
-      _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
-    } else {
-      _filterNode = null;
-    }
+    _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
   }
 
   @Override
   public Operator run() {
-    int totalRawDocs = _indexSegment.getTotalDocs() - _indexSegment.getSegmentMetadata().getTotalAggregateDocs();
+    int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
-      if (_filterNode != null) {
-        _projectOp =
-            new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs,
-                _maxDocPerAggregation);
-      } else {
-        _projectOp = new BReusableFilteredDocIdSetOperator(null, totalRawDocs, _maxDocPerAggregation);
-      }
+      _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerAggregation);
       long end = System.currentTimeMillis();
       LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;
@@ -75,7 +60,7 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "DocIdSet Plan Node :");
+    LOGGER.debug(prefix + "DocIdSetPlanNode Plan Node :");
     LOGGER.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     if (_filterNode != null) {

@@ -174,6 +174,7 @@ public class QuantileDigest implements Serializable {
         postOrderTraversal(root, new Callback() {
             private double sum = 0;
 
+            @Override
             public boolean process(Node node) {
                 sum += node.weightedCount;
 
@@ -238,6 +239,7 @@ public class QuantileDigest implements Serializable {
         final double normalizationFactor = weight(TimeUnit.NANOSECONDS.toSeconds(ticker.read()));
 
         postOrderTraversal(root, new Callback() {
+            @Override
             public boolean process(Node node) {
 
                 while (iterator.hasNext() && iterator.peek() <= node.getUpperBound()) {
@@ -272,6 +274,7 @@ public class QuantileDigest implements Serializable {
     public long getMin() {
         final AtomicLong chosen = new AtomicLong(min);
         postOrderTraversal(root, new Callback() {
+            @Override
             public boolean process(Node node) {
                 if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
                     chosen.set(node.getLowerBound());
@@ -287,6 +290,7 @@ public class QuantileDigest implements Serializable {
     public long getMax() {
         final AtomicLong chosen = new AtomicLong(max);
         postOrderTraversal(root, new Callback() {
+            @Override
             public boolean process(Node node) {
                 if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
                     chosen.set(node.getUpperBound());
@@ -431,6 +435,7 @@ public class QuantileDigest implements Serializable {
         final int compressionFactor = calculateCompressionFactor();
 
         postOrderTraversal(root, new Callback() {
+            @Override
             public boolean process(Node node) {
                 if (node.isLeaf()) {
                     return true;
@@ -490,6 +495,7 @@ public class QuantileDigest implements Serializable {
         weightedCount *= factor;
 
         postOrderTraversal(root, new Callback() {
+            @Override
             public boolean process(Node node) {
                 double oldWeight = node.weightedCount;
 
@@ -957,6 +963,7 @@ public class QuantileDigest implements Serializable {
             return result;
         }
 
+        @Override
         public String toString() {
             return String.format("[count: %f, mean: %f]", count, mean);
         }
@@ -1017,6 +1024,7 @@ public class QuantileDigest implements Serializable {
             return getLowerBound() + (getUpperBound() - getLowerBound()) / 2;
         }
 
+        @Override
         public String toString() {
             return format("%s (level = %d, count = %s, left = %s, right = %s)", bits, level, weightedCount, left != null, right != null);
         }

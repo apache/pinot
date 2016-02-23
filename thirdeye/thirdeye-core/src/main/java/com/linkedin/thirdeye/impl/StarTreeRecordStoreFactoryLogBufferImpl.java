@@ -12,8 +12,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordStoreFactory
-{
+public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordStoreFactory {
   private StarTreeConfig config;
 
   private int bufferSize = 1024 * 1;
@@ -21,37 +20,31 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   private boolean useDirect = true;
 
   @Override
-  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
-  {
+  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig) {
     this.config = starTreeConfig;
 
-    if (recordStoreConfig != null)
-    {
+    if (recordStoreConfig != null) {
       String bufferSizeString = recordStoreConfig.getProperty("bufferSize");
-      if (bufferSizeString != null)
-      {
+      if (bufferSizeString != null) {
         bufferSize = Integer.valueOf(bufferSizeString);
       }
 
       String useDirectString = recordStoreConfig.getProperty("useDirect");
-      if (useDirectString != null)
-      {
+      if (useDirectString != null) {
         useDirect = Boolean.valueOf(useDirectString);
       }
 
       String targetLoadFactorString = recordStoreConfig.getProperty("targetLoadFactor");
-      if (targetLoadFactorString != null)
-      {
+      if (targetLoadFactorString != null) {
         targetLoadFactor = Double.valueOf(targetLoadFactorString);
       }
     }
   }
 
   @Override
-  public StarTreeRecordStore createRecordStore(UUID nodeId)
-  {
-    return new StarTreeRecordStoreLogBufferImpl(
-            nodeId, config, bufferSize, useDirect, targetLoadFactor);
+  public StarTreeRecordStore createRecordStore(UUID nodeId) {
+    return new StarTreeRecordStoreLogBufferImpl(nodeId, config, bufferSize, useDirect,
+        targetLoadFactor);
   }
 
   @Override

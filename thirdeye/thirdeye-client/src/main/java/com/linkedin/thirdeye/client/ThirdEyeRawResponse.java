@@ -1,5 +1,12 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionKey;
@@ -7,20 +14,18 @@ import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 public class ThirdEyeRawResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final TypeReference<List<String>> LIST_TYPE_REF = new TypeReference<List<String>>(){};
+  private static final TypeReference<List<String>> LIST_TYPE_REF =
+      new TypeReference<List<String>>() {
+      };
 
   private List<String> metrics;
   private List<String> dimensions;
   private Map<String, Map<String, Number[]>> data;
 
-  public ThirdEyeRawResponse() {}
+  public ThirdEyeRawResponse() {
+  }
 
   public List<String> getMetrics() {
     return metrics;
@@ -38,16 +43,37 @@ public class ThirdEyeRawResponse {
     this.dimensions = dimensions;
   }
 
+  /**
+   * Key should be dimension key (JSON Array of dimension values) followed by timestamp (millis
+   * since epoch).
+   */
   public Map<String, Map<String, Number[]>> getData() {
     return data;
   }
 
+  /**
+   * Key should be dimension key (JSON Array of dimension values) followed by timestamp (millis
+   * since epoch).
+   */
   public void setData(Map<String, Map<String, Number[]>> data) {
     this.data = data;
   }
 
-  public Map<DimensionKey, MetricTimeSeries> convert(List<MetricType> metricTypes) throws Exception {
-    MetricSchema metricSchema = new MetricSchema(metrics, metricTypes);
+  /**
+   * Converts this response to a Map<DimensionKey, MetricTimeSeries> using the provided metric types
+   * for each metric. If the metricType is null, this method assumes the corresponding metric is a
+   * derived metric and should be interpreted as a Double.
+   */
+  public Map<DimensionKey, MetricTimeSeries> convert(List<MetricType> metricTypes)
+      throws Exception {
+    List<MetricType> filteredMetricTypes = new ArrayList<>(metricTypes);
+    for (int i = 0; i < filteredMetricTypes.size(); i++) {
+      MetricType metricType = filteredMetricTypes.get(i);
+      if (metricType == null) {
+        filteredMetricTypes.set(i, MetricType.DOUBLE);
+      }
+    }
+    MetricSchema metricSchema = new MetricSchema(metrics, filteredMetricTypes);
 
     // Convert raw data
     Map<DimensionKey, MetricTimeSeries> converted = new HashMap<>();
@@ -74,5 +100,40 @@ public class ThirdEyeRawResponse {
     }
 
     return converted;
+  }
+
+  /**
+   * Merges data of each response, assuming each response contains the same metrics and dimensions.
+   * Data for any conflicting time ranges is undefined.
+   */
+  public static ThirdEyeRawResponse merge(ThirdEyeRawResponse... responses) {
+    return merge(responses[0], Arrays.copyOfRange(responses, 1, responses.length));
+  }
+
+  /**
+   * Merges data of each response, assuming each response contains the same metrics and dimensions.
+   * Data for any conflicting time ranges is undefined.
+   */
+  public static ThirdEyeRawResponse merge(ThirdEyeRawResponse first,
+      ThirdEyeRawResponse... others) {
+    Map<String, Map<String, Number[]>> mergedData = new HashMap<>(first.getData());
+    for (ThirdEyeRawResponse next : others) {
+      for (Entry<String, Map<String, Number[]>> entry : next.getData().entrySet()) {
+        String key = entry.getKey();
+        Map<String, Number[]> value = entry.getValue();
+        if (mergedData.containsKey(key)) {
+          // merge results
+          mergedData.get(key).putAll(value);
+        } else {
+          mergedData.put(key, value);
+        }
+      }
+    }
+
+    ThirdEyeRawResponse resp = new ThirdEyeRawResponse();
+    resp.setMetrics(first.getMetrics());
+    resp.setDimensions(first.getDimensions());
+    resp.setData(mergedData);
+    return resp;
   }
 }

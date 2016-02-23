@@ -17,8 +17,8 @@ public class TableSpec {
 
   }
 
-  public TableSpec(List<String> metrics, String groupBy, FilterSpec filter, Map<String, String> fixedDimensions,
-      int baselineSize, TimeUnit baselineUnit) {
+  public TableSpec(List<String> metrics, String groupBy, FilterSpec filter,
+      Map<String, String> fixedDimensions, int baselineSize, TimeUnit baselineUnit) {
     super();
     this.metrics = metrics;
     this.groupBy = groupBy;
@@ -28,31 +28,25 @@ public class TableSpec {
     this.baselineUnit = baselineUnit;
   }
 
-
   public List<String> getMetrics() {
     return metrics;
   }
-
 
   public String getGroupBy() {
     return groupBy;
   }
 
-
   public FilterSpec getFilter() {
     return filter;
   }
-
 
   public Map<String, String> getFixedDimensions() {
     return fixedDimensions;
   }
 
-
   public int getBaselineSize() {
     return baselineSize;
   }
-
 
   public TimeUnit getBaselineUnit() {
     return baselineUnit;
@@ -81,6 +75,5 @@ public class TableSpec {
   public void setBaselineUnit(TimeUnit baselineUnit) {
     this.baselineUnit = baselineUnit;
   }
-
 
 }

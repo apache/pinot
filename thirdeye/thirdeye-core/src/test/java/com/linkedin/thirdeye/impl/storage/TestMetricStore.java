@@ -20,15 +20,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class TestMetricStore
-{
+public class TestMetricStore {
   private StarTreeConfig config;
   private MetricStoreImmutableImpl metricStore;
   private MetricSchema metricSchema;
 
   @BeforeClass
-  public void beforeClass() throws Exception
-  {
+  public void beforeClass() throws Exception {
     InputStream inputStream = ClassLoader.getSystemResourceAsStream("sample-config.yml");
     config = StarTreeConfig.decode(inputStream);
     metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
@@ -40,52 +38,47 @@ public class TestMetricStore
   }
 
   @Test
-  public void testGetTimeSeries_singleOffset_singleTime()
-  {
+  public void testGetTimeSeries_singleOffset_singleTime() {
     MetricTimeSeries timeSeries =
         metricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getTimeWindowSet(), getTimes(0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      1
+        1
     });
   }
 
   @Test
-  public void testGetTimeSeries_singleOffset_multipleTime()
-  {
+  public void testGetTimeSeries_singleOffset_multipleTime() {
     MetricTimeSeries timeSeries =
         metricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 1L));
     Assert.assertEquals(timeSeries.getTimeWindowSet(), getTimes(0L, 1L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      2
+        2
     });
   }
 
   @Test
-  public void testGetTimeSeries_multipleOffset_singleTime()
-  {
+  public void testGetTimeSeries_multipleOffset_singleTime() {
     MetricTimeSeries timeSeries =
         metricStore.getTimeSeries(getLogicalOffsets(0, 1), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getTimeWindowSet(), getTimes(0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      2
+        2
     });
   }
 
   @Test
-  public void testGetTimeSeries_multipleOffset_multipleTime()
-  {
+  public void testGetTimeSeries_multipleOffset_multipleTime() {
     MetricTimeSeries timeSeries =
         metricStore.getTimeSeries(getLogicalOffsets(0, 1), new TimeRange(0L, 1L));
     Assert.assertEquals(timeSeries.getTimeWindowSet(), getTimes(0L, 1L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      4
+        4
     });
   }
 
   @Test
-  public void testNotifyCreate()
-  {
+  public void testNotifyCreate() {
     TimeRange timeRange = new TimeRange(0L, 3L);
     ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers =
         new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
@@ -97,11 +90,11 @@ public class TestMetricStore
     MetricTimeSeries timeSeries =
         createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      1
+        1
     });
     timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(4L, 4L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      0
+        0
     });
 
     timeRange = new TimeRange(4L, 7L);
@@ -110,17 +103,16 @@ public class TestMetricStore
     // After (something)
     timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      1
+        1
     });
     timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(4L, 4L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      1
+        1
     });
   }
 
   @Test
-  public void testNotifyDelete()
-  {
+  public void testNotifyDelete() {
     TimeRange timeRange = new TimeRange(0L, 3L);
     ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers =
         new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
@@ -132,7 +124,7 @@ public class TestMetricStore
     MetricTimeSeries timeSeries =
         deleteMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      1
+        1
     });
 
     deleteMetricStore.notifyDelete(timeRange);
@@ -140,33 +132,27 @@ public class TestMetricStore
     // After (something)
     timeSeries = deleteMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[] {
-      0
+        0
     });
   }
 
-  private List<Integer> getLogicalOffsets(Integer... offsets)
-  {
+  private List<Integer> getLogicalOffsets(Integer... offsets) {
     return Arrays.asList(offsets);
   }
 
-  private Set<Long> getTimes(Long... times)
-  {
+  private Set<Long> getTimes(Long... times) {
     return new HashSet<Long>(Arrays.asList(times));
   }
 
-  private List<MetricTimeSeries> generateTimeSeries(TimeRange timeRange)
-  {
+  private List<MetricTimeSeries> generateTimeSeries(TimeRange timeRange) {
     List<MetricTimeSeries> result = new ArrayList<MetricTimeSeries>();
 
-    for (int i = 0; i < 10; i++)
-    {
+    for (int i = 0; i < 10; i++) {
       MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
       // four hours (see sample-config.yml retention)
-      for (long j = timeRange.getStart(); j <= timeRange.getEnd(); j++)
-      {
-        for (MetricSpec metricSpec : config.getMetrics())
-        {
+      for (long j = timeRange.getStart(); j <= timeRange.getEnd(); j++) {
+        for (MetricSpec metricSpec : config.getMetrics()) {
           timeSeries.set(j, metricSpec.getName(), 1);
         }
       }
@@ -177,8 +163,7 @@ public class TestMetricStore
     return result;
   }
 
-  private ByteBuffer generateBuffer(TimeRange timeRange)
-  {
+  private ByteBuffer generateBuffer(TimeRange timeRange) {
     List<MetricTimeSeries> allSeries = generateTimeSeries(timeRange);
     System.out.println(allSeries);
     ByteBuffer metricBuffer = VariableSizeBufferUtil.createMetricBuffer(config, allSeries);

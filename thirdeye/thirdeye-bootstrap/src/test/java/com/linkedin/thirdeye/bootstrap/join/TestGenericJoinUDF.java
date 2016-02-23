@@ -29,37 +29,48 @@ public class TestGenericJoinUDF {
   private static Schema INPUT_SCHEMA_2 = null;
 
   String input1SourceName = "input1";
-  String[] input1Dimensions = new String[] { "joinKey", "d1", "d2", "d3" };
-  String[] input1Metrics = new String[] { "m1" };
+  String[] input1Dimensions = new String[] {
+      "joinKey", "d1", "d2", "d3"
+  };
+  String[] input1Metrics = new String[] {
+      "m1"
+  };
 
   String input2SourceName = "input2";
-  String[] input2Dimensions = new String[] { "joinKey", "d4", "d5", "d6" };
-  String[] input2Metrics = new String[] { "m2" };
+  String[] input2Dimensions = new String[] {
+      "joinKey", "d4", "d5", "d6"
+  };
+  String[] input2Metrics = new String[] {
+      "m2"
+  };
 
-  String[] outputDimensions = new String[] { "d1", "d2", "d3", "d4", "d5", "d6" };
-  String[] outputMetrics = new String[] { "m1", "m2" };
+  String[] outputDimensions = new String[] {
+      "d1", "d2", "d3", "d4", "d5", "d6"
+  };
+  String[] outputMetrics = new String[] {
+      "m1", "m2"
+  };
 
   String outputSourceName = "output";
 
   @BeforeTest
   public void setup() {
-    INPUT_SCHEMA_1 = AvroTestUtil.createSchemaFor(input1SourceName,
-        input1Dimensions, input1Metrics);
+    INPUT_SCHEMA_1 =
+        AvroTestUtil.createSchemaFor(input1SourceName, input1Dimensions, input1Metrics);
 
-    INPUT_SCHEMA_2 = AvroTestUtil.createSchemaFor(input1SourceName,
-        input2Dimensions, input2Metrics);
+    INPUT_SCHEMA_2 =
+        AvroTestUtil.createSchemaFor(input1SourceName, input2Dimensions, input2Metrics);
 
-    OUTPUT_SCHEMA = AvroTestUtil.createSchemaFor(outputSourceName,
-        outputDimensions, outputMetrics);
+    OUTPUT_SCHEMA = AvroTestUtil.createSchemaFor(outputSourceName, outputDimensions, outputMetrics);
 
   }
 
   @Test
   public void testSimpleJoin() throws IOException {
-    GenericRecord record1 = AvroTestUtil.generateDummyRecord(INPUT_SCHEMA_1, input1Dimensions,
-        input1Metrics);
-    GenericRecord record2 = AvroTestUtil.generateDummyRecord(INPUT_SCHEMA_2, input2Dimensions,
-        input2Metrics);
+    GenericRecord record1 =
+        AvroTestUtil.generateDummyRecord(INPUT_SCHEMA_1, input1Dimensions, input1Metrics);
+    GenericRecord record2 =
+        AvroTestUtil.generateDummyRecord(INPUT_SCHEMA_2, input2Dimensions, input2Metrics);
 
     // make them have the same join key
     String joinKeyVal = "1234";
@@ -99,7 +110,8 @@ public class TestGenericJoinUDF {
     Map<String, List<GenericRecord>> joinInput = new HashMap<String, List<GenericRecord>>();
     joinInput.put(input1SourceName, Lists.newArrayList(record1));
     joinInput.put(input2SourceName, Lists.newArrayList(record2));
-    GenericRecord joinOutputRecord = udf.performJoin(joinKeyVal, joinInput);
+    List<GenericRecord> joinOutputRecords = udf.performJoin(joinKeyVal, joinInput);
+    GenericRecord joinOutputRecord = joinOutputRecords.get(0);
     System.out.println(joinOutputRecord);
 
     for (String dim : outputDimensions) {
@@ -119,7 +131,5 @@ public class TestGenericJoinUDF {
     }
 
   }
-
-  
 
 }

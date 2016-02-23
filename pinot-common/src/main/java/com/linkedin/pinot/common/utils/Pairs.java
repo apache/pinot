@@ -17,7 +17,6 @@ package com.linkedin.pinot.common.utils;
 
 import java.util.Comparator;
 
-
 public class Pairs {
 
   public static IntPair intPair(int a, int b) {
@@ -37,13 +36,40 @@ public class Pairs {
       this.a = a;
       this.b = b;
     }
-
-    public int getA() {
+    
+    public int getLeft() {
       return a;
     }
 
-    public int getB() {
+    public int getRight() {
       return b;
+    }
+
+    public void setLeft(int a) {
+      this.a = a;
+    }
+
+    public void setRight(int b) {
+      this.b = b;
+    }
+
+    @Override
+    public String toString() {
+      return "[" + a + "," + b + "]";
+    }
+
+    @Override
+    public int hashCode() {
+      return toString().hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IntPair) {
+        IntPair that = (IntPair) obj;
+        return obj != null && a == (that.a) && b == that.b;
+      }
+      return false;
     }
   }
 
@@ -51,7 +77,7 @@ public class Pairs {
 
     @Override
     public int compare(IntPair o1, IntPair o2) {
-      return new Integer(o1.a).compareTo(new Integer(o2.a));
+      return Integer.compare(o1.a, o2.a);
     }
   }
 
@@ -82,14 +108,16 @@ public class Pairs {
     }
   }
 
-  public static class AscendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
+  public static class AscendingNumber2ObjectPairComparator
+      implements Comparator<Number2ObjectPair> {
     @Override
     public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
       return new Double(o1.a.doubleValue()).compareTo(new Double(o2.a.doubleValue()));
     }
   }
 
-  public static class DescendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
+  public static class DescendingNumber2ObjectPairComparator
+      implements Comparator<Number2ObjectPair> {
     @Override
     public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
       return new Double(o2.a.doubleValue()).compareTo(new Double(o1.a.doubleValue()));

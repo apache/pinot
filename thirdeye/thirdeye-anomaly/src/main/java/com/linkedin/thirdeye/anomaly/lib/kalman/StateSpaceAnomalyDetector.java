@@ -27,7 +27,8 @@ public class StateSpaceAnomalyDetector {
   private static final double ESTIMATE_NOISE_PROP_RANGE_DELTA = 0.25;
 
   /**
-   * If the solution is found within this proportion of the estimated search space, rerun with a larger search space.
+   * If the solution is found within this proportion of the estimated search space, rerun with a
+   * larger search space.
    */
   private static final double ESTIMATE_NOISE_PROP_THESHOLD_DELTA = 0.05;
 
@@ -48,7 +49,7 @@ public class StateSpaceAnomalyDetector {
 
   /**
    * @return
-   *  The estimatedStateNoise afterFineTuning.
+   *         The estimatedStateNoise afterFineTuning.
    */
   public Double getEstimatedStateNoise() {
     return estimatedStateNoise;
@@ -56,7 +57,7 @@ public class StateSpaceAnomalyDetector {
 
   /**
    * @param estimatedStateNoise
-   *  The initial estimate prior to optimization/fine-tuning.
+   *          The initial estimate prior to optimization/fine-tuning.
    */
   public void setInitialEstimatedStateNoise(Double initialEstimatedStateNoise) {
     this.initialEstimatedStateNoise = initialEstimatedStateNoise;
@@ -64,8 +65,7 @@ public class StateSpaceAnomalyDetector {
 
   public StateSpaceAnomalyDetector(long trainStartInput, long trainEndInput, int stepsAheadInput,
       long timeGranularityInput, Set<Long> omitTimestampsInput, int seasonalInput, int orderInput,
-      int numStatesInput, int outputStatesInput, double rInput)
-  {
+      int numStatesInput, int outputStatesInput, double rInput) {
     trainStart = trainStartInput;
     trainEnd = trainEndInput;
     stepsAhead = stepsAheadInput;
@@ -81,26 +81,21 @@ public class StateSpaceAnomalyDetector {
 
   public Map<Long, StateSpaceDataPoint> constantTrainingSequenceCase(DoubleMatrix[] inputTimeSeries,
       long[] inputTimeStamps) throws FunctionDidNotEvaluateException, Exception {
-    DoubleMatrix[] trainingTimeSeries = StateSpaceDataUtils.getTrainingData(inputTimeSeries, inputTimeStamps,
-        trainStart, trainEnd);
+    DoubleMatrix[] trainingTimeSeries =
+        StateSpaceDataUtils.getTrainingData(inputTimeSeries, inputTimeStamps, trainStart, trainEnd);
     StateSpaceDataUtils.removeTimeStamps(trainingTimeSeries, inputTimeStamps, omitTimestamps);
 
     double estimateMean = StateSpaceDataUtils.estimateTrainingMean(trainingTimeSeries, seasonal);
     Map<Long, StateSpaceDataPoint> output = new HashMap<Long, StateSpaceDataPoint>();
 
-    for (int ii = 0; ii < trainingTimeSeries.length; ii++ )
-    {
-      if (trainingTimeSeries[ii] == null)
-      {
-        output.put(inputTimeStamps[ii], new StateSpaceDataPoint(Double.NaN, Double.NaN, Double.NaN, 0.0,
-            inputTimeStamps[ii], ii));
-      }
-      else
-      {
-        if (trainingTimeSeries[ii].get(0, 0) == estimateMean)
-        {
-          output.put(inputTimeStamps[ii], new StateSpaceDataPoint(estimateMean, estimateMean, 1.0, 0.0,
-              inputTimeStamps[ii], ii));
+    for (int ii = 0; ii < trainingTimeSeries.length; ii++) {
+      if (trainingTimeSeries[ii] == null) {
+        output.put(inputTimeStamps[ii], new StateSpaceDataPoint(Double.NaN, Double.NaN, Double.NaN,
+            0.0, inputTimeStamps[ii], ii));
+      } else {
+        if (trainingTimeSeries[ii].get(0, 0) == estimateMean) {
+          output.put(inputTimeStamps[ii], new StateSpaceDataPoint(estimateMean, estimateMean, 1.0,
+              0.0, inputTimeStamps[ii], ii));
         }
       }
     }
@@ -108,11 +103,11 @@ public class StateSpaceAnomalyDetector {
     return output;
   }
 
-  private StateSpaceModel estimateStateSpaceModel(DoubleMatrix[] inputTimeSeries, long[] inputTimeStamps)
-      throws FunctionDidNotEvaluateException, Exception {
+  private StateSpaceModel estimateStateSpaceModel(DoubleMatrix[] inputTimeSeries,
+      long[] inputTimeStamps) throws FunctionDidNotEvaluateException, Exception {
 
-    DoubleMatrix[] trainingTimeSeries = StateSpaceDataUtils.getTrainingData(inputTimeSeries, inputTimeStamps,
-        trainStart, trainEnd);
+    DoubleMatrix[] trainingTimeSeries =
+        StateSpaceDataUtils.getTrainingData(inputTimeSeries, inputTimeStamps, trainStart, trainEnd);
     StateSpaceDataUtils.removeTimeStamps(trainingTimeSeries, inputTimeStamps, omitTimestamps);
 
     if (trainingTimeSeries.length <= seasonal) {
@@ -136,7 +131,7 @@ public class StateSpaceAnomalyDetector {
         GG.put(order, ii, -1);
       }
       for (int ii = order + 1; ii < numStates; ii++) {
-        GG.put(ii, (ii-1), 1);
+        GG.put(ii, (ii - 1), 1);
       }
     }
 
@@ -145,7 +140,8 @@ public class StateSpaceAnomalyDetector {
       FF.put(0, 1, 1);
     }
 
-    double estimate2ndRawMoment= StateSpaceDataUtils.estimateTrainingRawMoment(trainingTimeSeries, seasonal, 2);
+    double estimate2ndRawMoment =
+        StateSpaceDataUtils.estimateTrainingRawMoment(trainingTimeSeries, seasonal, 2);
     double estimateMean = StateSpaceDataUtils.estimateTrainingMean(trainingTimeSeries, seasonal);
     LOGGER.warn("estimated input data variance");
     LOGGER.warn(String.format("%f", estimate2ndRawMoment));
@@ -162,7 +158,8 @@ public class StateSpaceAnomalyDetector {
 
     BrentOptimizer optimizer = new BrentOptimizer(1e-6, 1e-12);
 
-//    initialEstimatedStateNoise = StateSpaceDataUtils.estimateTrainingVariance(processTrainingTimeSeries, seasonal) / (r + 1);
+    // initialEstimatedStateNoise =
+    // StateSpaceDataUtils.estimateTrainingVariance(processTrainingTimeSeries, seasonal) / (r + 1);
 
     LOGGER.info("initial estimate : {}", initialEstimatedStateNoise);
     /*
@@ -170,19 +167,22 @@ public class StateSpaceAnomalyDetector {
      */
     if (initialEstimatedStateNoise != null) {
       UnivariatePointValuePair solution = optimizer.optimize(
-          new UnivariateObjectiveFunction(new StateSpaceUnivariateObj(GG, FF, r, m0, c0, trainingTimeSeries)),
-          new MaxEval(100),
-          GoalType.MAXIMIZE,
+          new UnivariateObjectiveFunction(
+              new StateSpaceUnivariateObj(GG, FF, r, m0, c0, trainingTimeSeries)),
+          new MaxEval(100), GoalType.MAXIMIZE,
           new SearchInterval((1 - ESTIMATE_NOISE_PROP_RANGE_DELTA) * initialEstimatedStateNoise,
               (1 + ESTIMATE_NOISE_PROP_RANGE_DELTA) * initialEstimatedStateNoise));
       double lowerAcceptabilityThreshold =
-          (1 - ESTIMATE_NOISE_PROP_RANGE_DELTA + ESTIMATE_NOISE_PROP_THESHOLD_DELTA) * initialEstimatedStateNoise;
+          (1 - ESTIMATE_NOISE_PROP_RANGE_DELTA + ESTIMATE_NOISE_PROP_THESHOLD_DELTA)
+              * initialEstimatedStateNoise;
       double upperAcceptabilityThreshold =
-          (1 + ESTIMATE_NOISE_PROP_RANGE_DELTA - ESTIMATE_NOISE_PROP_THESHOLD_DELTA) * initialEstimatedStateNoise;
+          (1 + ESTIMATE_NOISE_PROP_RANGE_DELTA - ESTIMATE_NOISE_PROP_THESHOLD_DELTA)
+              * initialEstimatedStateNoise;
       /*
        * Accept solution if it is not too close to the edge.
        */
-      if (solution.getPoint() > lowerAcceptabilityThreshold && solution.getPoint() < upperAcceptabilityThreshold) {
+      if (solution.getPoint() > lowerAcceptabilityThreshold
+          && solution.getPoint() < upperAcceptabilityThreshold) {
         estimatedStateNoise = solution.getPoint();
       } else {
         LOGGER.warn("the solution from fine-tuning is unsatisfactory");
@@ -192,42 +192,43 @@ public class StateSpaceAnomalyDetector {
     if (estimatedStateNoise == null) {
       LOGGER.info("optimizing from scratch");
       UnivariatePointValuePair solution = optimizer.optimize(
-          new UnivariateObjectiveFunction(new StateSpaceUnivariateObj(GG, FF, r, m0,c0, trainingTimeSeries)),
-          new MaxEval(100),
-          GoalType.MAXIMIZE,
-          new SearchInterval(0.0001, estimate2ndRawMoment));
+          new UnivariateObjectiveFunction(
+              new StateSpaceUnivariateObj(GG, FF, r, m0, c0, trainingTimeSeries)),
+          new MaxEval(100), GoalType.MAXIMIZE, new SearchInterval(0.0001, estimate2ndRawMoment));
       estimatedStateNoise = solution.getPoint();
     }
 
     LOGGER.info("estimatedStateNoise : {}", estimatedStateNoise);
 
-    //construct observation noise matrix and state noise matrix there
+    // construct observation noise matrix and state noise matrix there
     DoubleMatrix StateNoiseMatrix = DoubleMatrix.eye(numStates).muli(estimatedStateNoise);
-    DoubleMatrix ObservationNoiseMatrix = DoubleMatrix.eye(outputStates).muli(estimatedStateNoise * r);
+    DoubleMatrix ObservationNoiseMatrix =
+        DoubleMatrix.eye(outputStates).muli(estimatedStateNoise * r);
 
-    StateSpaceModel Subject = new StateSpaceModel(GG, FF, StateNoiseMatrix,
-        ObservationNoiseMatrix, m0, c0, trainingTimeSeries);
+    StateSpaceModel Subject = new StateSpaceModel(GG, FF, StateNoiseMatrix, ObservationNoiseMatrix,
+        m0, c0, trainingTimeSeries);
     return Subject;
   }
 
-  public Map<Long, StateSpaceDataPoint> detectAnomalies(double[] inputData, long[] inputTimeStamps, long offset)
-      throws Exception {
+  public Map<Long, StateSpaceDataPoint> detectAnomalies(double[] inputData, long[] inputTimeStamps,
+      long offset) throws Exception {
 
-    DoubleMatrix[] inputTimeSeries =  new DoubleMatrix[inputData.length];
+    DoubleMatrix[] inputTimeSeries = new DoubleMatrix[inputData.length];
 
-    for (int ii = 0; ii < inputData.length; ii++)
-    {
-      if (Double.isNaN(inputData[ii]))
-      {
+    for (int ii = 0; ii < inputData.length; ii++) {
+      if (Double.isNaN(inputData[ii])) {
         inputTimeSeries[ii] = null;
       } else {
-        inputTimeSeries[ii] = new DoubleMatrix(new double[] {inputData[ii]});
+        inputTimeSeries[ii] = new DoubleMatrix(new double[] {
+            inputData[ii]
+        });
       }
     }
 
     StateSpaceModel Subject = estimateStateSpaceModel(inputTimeSeries, inputTimeStamps);
     if (Subject == null) {
-      Map<Long, StateSpaceDataPoint> output = constantTrainingSequenceCase(inputTimeSeries, inputTimeStamps);
+      Map<Long, StateSpaceDataPoint> output =
+          constantTrainingSequenceCase(inputTimeSeries, inputTimeStamps);
       return output;
     }
 
@@ -235,17 +236,15 @@ public class StateSpaceAnomalyDetector {
     Subject.calculatePrediction(stepsAhead);
     DoubleMatrix[] estimatedMean = Subject.getEstimatedMeans();
     DoubleMatrix[] estimatedCovariance = Subject.getEstimatedCovariances();
-    NormalDistribution pCal =  new NormalDistribution(0, 1);
+    NormalDistribution pCal = new NormalDistribution(0, 1);
 
     // output P value here
-    if (stepsAhead == -1)
-    {
+    if (stepsAhead == -1) {
       // assuming one dimension here (todo: extend to multi input)
       DoubleMatrix[] trainingSequence = Subject.getTrainingSequence();
 
       Map<Long, StateSpaceDataPoint> output = new HashMap<Long, StateSpaceDataPoint>();
-      for (int ii = 0; ii < trainingSequence.length; ii++)
-      {
+      for (int ii = 0; ii < trainingSequence.length; ii++) {
         double MeanTmp;
         if (estimatedMean[ii] != null) {
           MeanTmp = estimatedMean[ii].get(0, 0);
@@ -260,41 +259,38 @@ public class StateSpaceAnomalyDetector {
           VarianceTmp = Double.NaN;
         }
 
-        if (trainingSequence[ii] == null)
-        {
-          output.put(inputTimeStamps[ii], new StateSpaceDataPoint(MeanTmp, Double.NaN, Double.NaN,Math.sqrt(VarianceTmp),
-              inputTimeStamps[ii], ii));
-        }
-        else
-        {
-          double Actual = trainingSequence[ii].get(0,0);
-          double aPvalue = 1-pCal.cumulativeProbability(Math.abs(Actual-MeanTmp) / Math.sqrt(VarianceTmp));
-          output.put(inputTimeStamps[ii], new StateSpaceDataPoint(MeanTmp, Actual, aPvalue, Math.sqrt(VarianceTmp),
-              inputTimeStamps[ii], ii));
+        if (trainingSequence[ii] == null) {
+          output.put(inputTimeStamps[ii], new StateSpaceDataPoint(MeanTmp, Double.NaN, Double.NaN,
+              Math.sqrt(VarianceTmp), inputTimeStamps[ii], ii));
+        } else {
+          double Actual = trainingSequence[ii].get(0, 0);
+          double aPvalue =
+              1 - pCal.cumulativeProbability(Math.abs(Actual - MeanTmp) / Math.sqrt(VarianceTmp));
+          output.put(inputTimeStamps[ii], new StateSpaceDataPoint(MeanTmp, Actual, aPvalue,
+              Math.sqrt(VarianceTmp), inputTimeStamps[ii], ii));
         }
       }
       return output;
-    }
-    else // stepsAhead != -1
+    } else // stepsAhead != -1
     {
-      DoubleMatrix[] predictionSequence = StateSpaceDataUtils.getPredictionData(inputTimeSeries, inputTimeStamps, trainEnd,
-          stepsAhead);
+      DoubleMatrix[] predictionSequence = StateSpaceDataUtils.getPredictionData(inputTimeSeries,
+          inputTimeStamps, trainEnd, stepsAhead);
       if (predictionSequence == null) {
         throw new FunctionDidNotEvaluateException("no output");
       }
 
-      //double[] pValue = new double[predictionSequence.length];
+      // double[] pValue = new double[predictionSequence.length];
       Map<Long, StateSpaceDataPoint> output = new HashMap<Long, StateSpaceDataPoint>();
       long monitorStart = trainEnd + offset;
-      for (int ii = 0; ii < predictionSequence.length; ii++)
-      {
+      for (int ii = 0; ii < predictionSequence.length; ii++) {
         double MeanTmp = estimatedMean[ii].get(0, 0);
         double VarianceTmp = estimatedCovariance[ii].get(0, 0);
-        double Actual = predictionSequence[ii].get(0,0);
-        double aPvalue = 1 - pCal.cumulativeProbability(Math.abs(Actual-MeanTmp) / Math.sqrt(VarianceTmp));
+        double Actual = predictionSequence[ii].get(0, 0);
+        double aPvalue =
+            1 - pCal.cumulativeProbability(Math.abs(Actual - MeanTmp) / Math.sqrt(VarianceTmp));
 
         // todo here to fix the date range
-        output.put(monitorStart + ii * offset , new StateSpaceDataPoint(MeanTmp, Actual, aPvalue,
+        output.put(monitorStart + ii * offset, new StateSpaceDataPoint(MeanTmp, Actual, aPvalue,
             Math.sqrt(VarianceTmp), monitorStart + ii * offset, ii));
       }
       return output;

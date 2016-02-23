@@ -90,8 +90,11 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
-    <kafka.version>0.8.2.0</kafka.version>
     <helix.version>0.6.5</helix.version>
+    <!-- jfim: for Kafka 0.9.0.0, use zkclient 0.7 -->
+    <kafka.version>0.8.2.0</kafka.version>
+    <zkclient.version>0.3</zkclient.version>
+    <jackson.version>2.2.2</jackson.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms10G -Xmx10G</argLine>
   </properties>
@@ -226,7 +229,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.4.9</version>
+        <version>0.5.10</version>
       </dependency>
       <dependency>
         <groupId>com.alibaba</groupId>
@@ -234,9 +237,9 @@
         <version>1.1.24</version>
       </dependency>
       <dependency>
-        <groupId>com.github.sgroschupf</groupId>
+        <groupId>com.101tec</groupId>
         <artifactId>zkclient</artifactId>
-        <version>0.1</version>
+        <version>${zkclient.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.guava</groupId>
@@ -311,7 +314,7 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-compress</artifactId>
-        <version>1.4.1</version>
+        <version>1.9</version>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
@@ -363,6 +366,12 @@
         <groupId>org.apache.helix</groupId>
         <artifactId>helix-core</artifactId>
         <version>${helix.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.github.sgroschupf</groupId>
+            <artifactId>zkclient</artifactId>
+          </exclusion>
+      </exclusions>
       </dependency>
       <dependency>
         <groupId>log4j</groupId>
@@ -375,6 +384,31 @@
         <version>1.9.22</version>
       </dependency>
 
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.yaml</groupId>
+        <artifactId>snakeyaml</artifactId>
+        <version>1.16</version>
+      </dependency>
+      <dependency>
+        <groupId>org.xerial.larray</groupId>
+        <artifactId>larray</artifactId>
+        <version>0.2.1</version>
+      </dependency>
       <!-- Transitive dependencies with inconsistent version numbers -->
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
@@ -485,8 +519,8 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>2.5.1</version>
           <configuration>
-            <source>1.8</source>
-            <target>1.8</target>
+            <source>1.7</source>
+            <target>1.7</target>
           </configuration>
         </plugin>
         <plugin>
@@ -611,6 +645,7 @@
       See also: properties section and profiles section.
      -->
         <configuration>
+          <testFailureIgnore>false</testFailureIgnore>
           <!-- Excludes integration tests when unit tests are run. -->
           <excludes>
             <exclude>**/*IT.java</exclude>

@@ -22,7 +22,8 @@ import com.linkedin.thirdeye.api.TimeRange;
  */
 public class AnomalyDetectionFunctionHistoryImpl implements AnomalyDetectionFunctionHistory {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionFunctionHistoryImpl.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(AnomalyDetectionFunctionHistoryImpl.class);
 
   private AnomalyDatabaseConfig dbConfig;
   private StarTreeConfig starTreeConfig;
@@ -32,16 +33,13 @@ public class AnomalyDetectionFunctionHistoryImpl implements AnomalyDetectionFunc
 
   /**
    * @param dbConfig
-   *  Database with anomaly table and function table
+   *          Database with anomaly table and function table
    * @param starTreeConfig
    * @param functionId
-   *  Id of function in function table
+   *          Id of function in function table
    */
-  public AnomalyDetectionFunctionHistoryImpl(
-      StarTreeConfig starTreeConfig,
-      AnomalyDatabaseConfig dbConfig,
-      int functionId)
-  {
+  public AnomalyDetectionFunctionHistoryImpl(StarTreeConfig starTreeConfig,
+      AnomalyDatabaseConfig dbConfig, int functionId) {
     super();
     this.dbConfig = dbConfig;
     this.starTreeConfig = starTreeConfig;
@@ -50,17 +48,20 @@ public class AnomalyDetectionFunctionHistoryImpl implements AnomalyDetectionFunc
 
   /**
    * @param queryTimeRange
-   *  Fetches history for this time range
+   *          Fetches history for this time range
    */
   public void init(TimeRange queryTimeRange) {
     functionHistory = ArrayListMultimap.create();
     try {
-      List<AnomalyTableRow> anomalyTableRows = AnomalyTable.selectRows(dbConfig, functionId, queryTimeRange);
+      List<AnomalyTableRow> anomalyTableRows =
+          AnomalyTable.selectRows(dbConfig, functionId, queryTimeRange);
       for (AnomalyTableRow anomalyTableRow : anomalyTableRows) {
-        DimensionKey dimensionKey = dimensionKeyFromMap(starTreeConfig.getDimensions(),
-            anomalyTableRow.getDimensions());
-        functionHistory.put(dimensionKey, new AnomalyResult(true, anomalyTableRow.getTimeWindow(),
-            anomalyTableRow.getAnomalyScore(), anomalyTableRow.getAnomalyVolume(), anomalyTableRow.getProperties()));
+        DimensionKey dimensionKey =
+            dimensionKeyFromMap(starTreeConfig.getDimensions(), anomalyTableRow.getDimensions());
+        functionHistory.put(dimensionKey,
+            new AnomalyResult(true, anomalyTableRow.getTimeWindow(),
+                anomalyTableRow.getAnomalyScore(), anomalyTableRow.getAnomalyVolume(),
+                anomalyTableRow.getProperties()));
       }
     } catch (SQLException e) {
       LOGGER.error("could not select anomaly history", e);
@@ -70,14 +71,14 @@ public class AnomalyDetectionFunctionHistoryImpl implements AnomalyDetectionFunc
   /**
    * @param dimensionKey
    * @return
-   *  A collection of all anomaly results produced by the function
+   *         A collection of all anomaly results produced by the function
    */
   public List<AnomalyResult> getHistoryForDimensionKey(DimensionKey dimensionKey) {
     return functionHistory.get(dimensionKey);
   }
 
-  private static DimensionKey dimensionKeyFromMap(List<DimensionSpec> dimensionSpecs, Map<String,
-      String> dimensionsMap) {
+  private static DimensionKey dimensionKeyFromMap(List<DimensionSpec> dimensionSpecs,
+      Map<String, String> dimensionsMap) {
     String[] dimensionValues = new String[dimensionSpecs.size()];
     int idx = 0;
     for (DimensionSpec dimensionSpec : dimensionSpecs) {

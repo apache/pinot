@@ -79,7 +79,7 @@
                    <div id='div-tabularView-metric_${metric?index}' class="title-box">
                        <table style="width:100%; table-layout:fixed;">
                            <tr>
-                               <th><h2>${metric}</h2></th>
+                               <th><p>${metric}</p></th>
                                <th> Baseline Date: </th>
                                <th> Current Date: </th>
                                <th> Baseline Total:</th>

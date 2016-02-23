@@ -15,25 +15,23 @@
  */
 package com.linkedin.pinot.core.common.docidsets;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class SortedDocIdSetTest {
   @Test
   public void testEmpty() {
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    List<IntPair> pairs = new ArrayList<IntPair>();
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -45,48 +43,45 @@ public class SortedDocIdSetTest {
 
   @Test
   public void testPairWithSameStartAndEnd() {
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
-    pairs.add(Pair.of(1, 1));
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    List<IntPair> pairs = new ArrayList<IntPair>();
+    pairs.add(Pairs.intPair(1, 1));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol",pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    System.out.println(result);
     Assert.assertEquals(1, result.size());
   }
 
   @Test
   public void testOnePair() {
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
-    pairs.add(Pair.of(0, 9));
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    List<IntPair> pairs = new ArrayList<IntPair>();
+    pairs.add(Pairs.intPair(0, 9));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    System.out.println(result);
     Assert.assertEquals(10, result.size());
   }
 
   @Test
   public void testTwoPair() {
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
-    pairs.add(Pair.of(90, 99));
-    pairs.add(Pair.of(100, 109));
+    List<IntPair> pairs = new ArrayList<IntPair>();
+    pairs.add(Pairs.intPair(90, 99));
+    pairs.add(Pairs.intPair(100, 109));
 
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol",pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);
     }
-    System.out.println(result);
     Assert.assertEquals(20, result.size());
   }
 
@@ -114,11 +109,10 @@ public class SortedDocIdSetTest {
   private void testCustomRange(String rangeString) {
     String trim =
         rangeString.replace('[', ' ').replace(']', ' ').replace('(', ' ').replace(')', ' ').replaceAll("[\\s]+", "");
-    System.out.println("'" + trim + "'");
     String[] splits = trim.split(",");
     Assert.assertTrue(splits.length % 2 == 0);
     List<Integer> expectedList = new ArrayList<Integer>();
-    List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
+    List<IntPair> pairs = new ArrayList<IntPair>();
 
     for (int i = 0; i < splits.length; i += 2) {
       int start = Integer.parseInt(splits[i]);
@@ -126,9 +120,9 @@ public class SortedDocIdSetTest {
       for (int val = start; val <= end; val++) {
         expectedList.add(val);
       }
-      pairs.add(Pair.of(start, end));
+      pairs.add(Pairs.intPair(start, end));
     }
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -137,6 +131,5 @@ public class SortedDocIdSetTest {
     }
     Assert.assertEquals(result.size(), expectedList.size());
     Assert.assertEquals(result, expectedList);
-    System.out.println(result.size());
   }
 }

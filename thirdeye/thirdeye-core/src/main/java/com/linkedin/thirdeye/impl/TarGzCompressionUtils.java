@@ -120,7 +120,8 @@ public class TarGzCompressionUtils {
   }
 
   /**
-   * Untar an input file into an output file. The output file is created in the output folder, having the same name
+   * Untar an input file into an output file. The output file is created in the output folder,
+   * having the same name
    * as the input file, minus the '.tar' extension.
    * @param inputFile the input .tar file
    * @param outputDir the output directory file.
@@ -151,10 +152,10 @@ public class TarGzCompressionUtils {
             LOGGER.debug(String.format("Attempting to create output directory %s.",
                 outputFile.getAbsolutePath()));
             if (!outputFile.mkdirs()) {
-              throw new IllegalStateException(String.format("Couldn't create directory %s.",
-                  outputFile.getAbsolutePath()));
+              throw new IllegalStateException(
+                  String.format("Couldn't create directory %s.", outputFile.getAbsolutePath()));
             }
-          } 
+          }
         } else {
           LOGGER.debug(String.format("Creating output file %s.", outputFile.getAbsolutePath()));
           File directory = outputFile.getParentFile();

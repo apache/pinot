@@ -20,17 +20,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.RandomAccessFile;
 import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
+
+import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class FixedBitWidthSingleColumnMultiValueWriterTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitWidthSingleColumnMultiValueWriterTest.class);
   @Test
   public void testSingleColMultiValue() throws Exception {
     int maxBits = 2;
     while (maxBits < 32) {
-      System.out.println("START test maxBit:" + maxBits);
+      LOGGER.trace("START test maxBit:" + maxBits);
       File file = new File("test_single_col_multi_value_writer.dat");
       file.delete();
       int rows = 100;
@@ -46,7 +50,7 @@ public class FixedBitWidthSingleColumnMultiValueWriterTest {
         }
         totalNumValues += numValues;
       }
-      FixedBitWidthSingleColumnMultiValueWriter writer = new FixedBitWidthSingleColumnMultiValueWriter(
+      FixedBitSingleColumnMultiValueWriter writer = new FixedBitSingleColumnMultiValueWriter(
           file, rows, totalNumValues, maxBits);
       CustomBitSet bitSet = CustomBitSet
           .withBitLength(totalNumValues * maxBits);
@@ -88,7 +92,7 @@ public class FixedBitWidthSingleColumnMultiValueWriterTest {
       Assert.assertEquals(byteArray, b);
       raf.close();
       file.delete();
-      System.out.println("END test maxBit:" + maxBits);
+      LOGGER.trace("END test maxBit:" + maxBits);
       maxBits = maxBits + 1;
       bitSet.close();
     }

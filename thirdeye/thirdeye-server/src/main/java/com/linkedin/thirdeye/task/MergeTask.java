@@ -26,7 +26,8 @@ public class MergeTask extends Task {
   }
 
   @Override
-  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter) throws Exception {
+  public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter)
+      throws Exception {
     for (String collection : params.get("collection")) {
       printWriter.println("NOTE: WILL ONLY MERGE data_KAFKA* trees currently!");
       printWriter.println("Merging trees for " + collection);
@@ -69,8 +70,10 @@ public class MergeTask extends Task {
       printWriter.flush();
       StarTree mergedTree = dataUpdateManager.mergeTrees(toMerge.values());
 
-      // n.b. !!! This has a race condition in which we may double count values in the merged segments,
-      // but which will eventually correct. To ensure the query path is unaffected, we need to prefer
+      // n.b. !!! This has a race condition in which we may double count values in the merged
+      // segments,
+      // but which will eventually correct. To ensure the query path is unaffected, we need to
+      // prefer
       // to query segments of a more coarse time granularity
 
       // Persist the merged tree

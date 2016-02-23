@@ -31,10 +31,9 @@ import com.linkedin.thirdeye.impl.NumberUtils;
  * Converts the Fixed size buffer format data directory to variable size buffer format
  * @author kgopalak
  */
-public class FixedToVariableFormatConvertor
-{
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(FixedToVariableFormatConvertor.class);
+public class FixedToVariableFormatConvertor {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(FixedToVariableFormatConvertor.class);
 
   private String dataDirectory;
   private StarTreeConfig config;
@@ -43,12 +42,10 @@ public class FixedToVariableFormatConvertor
 
   private IndexMetadata indexMetadata;
 
-  FixedToVariableFormatConvertor(String dataDirectory) throws IOException
-  {
+  FixedToVariableFormatConvertor(String dataDirectory) throws IOException {
     this.dataDirectory = dataDirectory;
-    config =
-        StarTreeConfig.decode(new FileInputStream(new File(dataDirectory,
-            StarTreeConstants.CONFIG_FILE_NAME)));
+    config = StarTreeConfig
+        .decode(new FileInputStream(new File(dataDirectory, StarTreeConstants.CONFIG_FILE_NAME)));
     metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
     numMetrics = config.getMetrics().size();
     InputStream indexMetadataFile =
@@ -60,34 +57,28 @@ public class FixedToVariableFormatConvertor
 
   }
 
-  FixedToVariableFormatConvertor(File inputDataDirectory) throws IOException
-  {
+  FixedToVariableFormatConvertor(File inputDataDirectory) throws IOException {
     this(inputDataDirectory.getAbsolutePath());
   }
 
-  public void convert() throws IOException
-  {
-    if (!indexMetadata.getIndexFormat().equals(IndexFormat.FIXED_SIZE))
-    {
+  public void convert() throws IOException {
+    if (!indexMetadata.getIndexFormat().equals(IndexFormat.FIXED_SIZE)) {
       LOGGER.warn("Index format is not in FIXED_SIZE format, aborting conversion for directory:{}",
           dataDirectory);
       return;
     }
     File inputDir = new File(dataDirectory, StarTreeConstants.METRIC_STORE);
-    FilenameFilter filter = new FilenameFilter()
-    {
+    FilenameFilter filter = new FilenameFilter() {
 
       @Override
-      public boolean accept(File dir, String name)
-      {
+      public boolean accept(File dir, String name) {
         return name.endsWith(StarTreeConstants.BUFFER_FILE_SUFFIX);
       }
     };
     File[] listFiles = inputDir.listFiles(filter);
-    for (File bufferFile : listFiles)
-    {
-      LOGGER.debug("START:Converting bufferfile:{} original size:{}"
-          , bufferFile.getAbsolutePath(), bufferFile.length());
+    for (File bufferFile : listFiles) {
+      LOGGER.debug("START:Converting bufferfile:{} original size:{}", bufferFile.getAbsolutePath(),
+          bufferFile.length());
       convert(bufferFile);
     }
     indexMetadata.setIndexFormat(IndexFormat.VARIABLE_SIZE);
@@ -102,14 +93,11 @@ public class FixedToVariableFormatConvertor
    * @param bufferFile
    * @throws IOException
    */
-  public void convert(File bufferFile) throws IOException
-  {
-    String indexFilePath =
-        bufferFile.getAbsolutePath().replace(StarTreeConstants.BUFFER_FILE_SUFFIX,
-            StarTreeConstants.INDEX_FILE_SUFFIX);
+  public void convert(File bufferFile) throws IOException {
+    String indexFilePath = bufferFile.getAbsolutePath()
+        .replace(StarTreeConstants.BUFFER_FILE_SUFFIX, StarTreeConstants.INDEX_FILE_SUFFIX);
     File indexFile = new File(indexFilePath);
-    if (!indexFile.exists())
-    {
+    if (!indexFile.exists()) {
       throw new IllegalArgumentException(
           "Invalid directory, Metric Index File missing for buffer file:" + bufferFile);
     }
@@ -121,14 +109,12 @@ public class FixedToVariableFormatConvertor
     metricBuffer.order(ByteOrder.BIG_ENDIAN);
     Map<MetricIndexEntry, List<MetricTimeSeries>> map =
         new LinkedHashMap<MetricIndexEntry, List<MetricTimeSeries>>();
-    for (MetricIndexEntry indexEntry : metricIndexEntries)
-    {
+    for (MetricIndexEntry indexEntry : metricIndexEntries) {
       List<MetricTimeSeries> timeSeriesList = new ArrayList<MetricTimeSeries>();
       metricBuffer.position(indexEntry.getStartOffset());
       ByteBuffer slicedBuffer = metricBuffer.slice();
       slicedBuffer.limit(indexEntry.getLength());
-      if (indexEntry.getLength() == 0)
-      {
+      if (indexEntry.getLength() == 0) {
         map.put(indexEntry, timeSeriesList);
         continue;
       }
@@ -139,30 +125,24 @@ public class FixedToVariableFormatConvertor
       // System.out.println(numLogicalOffsets);
       List<Number> numbers = new ArrayList<Number>(numMetrics);
 
-      for (int logicalOffset = 0; logicalOffset < numLogicalOffsets; logicalOffset++)
-      {
+      for (int logicalOffset = 0; logicalOffset < numLogicalOffsets; logicalOffset++) {
 
         MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
-        for (long time = timeRange.getStart(); time <= timeRange.getEnd(); time++)
-        {
+        for (long time = timeRange.getStart(); time <= timeRange.getEnd(); time++) {
           // must be same as the time variable we are iterating on
           long timeFromBuffer = slicedBuffer.getLong();
           assert timeFromBuffer == time;
           boolean skip = true;
           numbers.clear();
-          for (MetricSpec metricSpec : config.getMetrics())
-          {
+          for (MetricSpec metricSpec : config.getMetrics()) {
             Number value = NumberUtils.readFromBuffer(slicedBuffer, metricSpec.getType());
             numbers.add(value);
-            if (!NumberUtils.isZero(value, metricSpec.getType()))
-            {
+            if (!NumberUtils.isZero(value, metricSpec.getType())) {
               skip = false;
             }
           }
-          if (!skip)
-          {
-            for (int i = 0; i < numMetrics; i++)
-            {
+          if (!skip) {
+            for (int i = 0; i < numMetrics; i++) {
               timeSeries.set(time, config.getMetrics().get(i).getName(), numbers.get(i));
             }
           }
@@ -182,16 +162,14 @@ public class FixedToVariableFormatConvertor
     bufferFile.delete();
     indexFile.delete();
     FileOutputStream fos = new FileOutputStream(bufferFile);
-    for (MetricIndexEntry indexEntry : map.keySet())
-    {
+    for (MetricIndexEntry indexEntry : map.keySet()) {
       List<MetricTimeSeries> timeSeriesList = map.get(indexEntry);
       ByteBuffer newMetricBuffer =
           VariableSizeBufferUtil.createMetricBuffer(config, timeSeriesList);
       byte[] bytes = newMetricBuffer.array();
       int length = bytes.length;
-      MetricIndexEntry newIndexEntry =
-          new MetricIndexEntry(indexEntry.getNodeId(), indexEntry.getFileId(), startOffset, length,
-              indexEntry.getTimeRange());
+      MetricIndexEntry newIndexEntry = new MetricIndexEntry(indexEntry.getNodeId(),
+          indexEntry.getFileId(), startOffset, length, indexEntry.getTimeRange());
       newMetricIndexEntries.add(newIndexEntry);
       startOffset += length;
       fos.write(bytes);
@@ -206,8 +184,7 @@ public class FixedToVariableFormatConvertor
    * @param args
    * @throws Exception
    */
-  public static void main(String[] args) throws Exception
-  {
+  public static void main(String[] args) throws Exception {
     String inputDataDirectory = args[0];
     FixedToVariableFormatConvertor convertor =
         new FixedToVariableFormatConvertor(inputDataDirectory);

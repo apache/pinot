@@ -16,10 +16,13 @@
 package com.linkedin.pinot.core.util;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -28,8 +31,6 @@ import java.util.List;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
-
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 public class CrcUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
+  private static final int BUFFER_SIZE = 65536;
 
   private final List<File> filesToProcess;
 
@@ -58,8 +60,7 @@ public class CrcUtils {
 
       @Override
       public boolean accept(File pathname) {
-        if (pathname.getName().equals(V1Constants.SEGMENT_CREATION_META)
-            || pathname.getName().equals(V1Constants.STARTREE_DIR)) {
+        if (pathname.getName().equals(V1Constants.SEGMENT_CREATION_META)) {
           return false;
         }
         return true;
@@ -78,13 +79,13 @@ public class CrcUtils {
 
   public long computeCrc() {
     CheckedInputStream cis = null;
-    FileInputStream is = null;
+    InputStream is = null;
     final Checksum checksum = new Adler32();
-    final byte[] tempBuf = new byte[128];
+    final byte[] tempBuf = new byte[BUFFER_SIZE];
 
     for (final File file : filesToProcess) {
       try {
-        is = new FileInputStream(file);
+        is = new BufferedInputStream(new FileInputStream(file));
         cis = new CheckedInputStream(is, checksum);
         while (cis.read(tempBuf) >= 0) {
         }

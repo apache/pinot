@@ -18,20 +18,20 @@ public class MetricTimeSeriesUtils {
 
   /**
    * @param series
-   *  The MetricTimeSeries
+   *          The MetricTimeSeries
    * @param metric
-   *  The metric to extract
+   *          The metric to extract
    * @param bucketWidthInMillis
-   *  The width of the bucket in milliseconds
+   *          The width of the bucket in milliseconds
    * @param missingTimeStamps
-   *  If this is not null, then any missing timestamps will be added to this set
+   *          If this is not null, then any missing timestamps will be added to this set
    * @param defaultValue
-   *  The default value to use if the data is missing
+   *          The default value to use if the data is missing
    * @return
-   *  A pair containing the timestamps and values
+   *         A pair containing the timestamps and values
    */
-  public static Pair<long[], double[]> toArray(MetricTimeSeries series, String metric, long bucketWidthInMillis,
-      Set<Long> missingTimeStamps, double defaultValue) {
+  public static Pair<long[], double[]> toArray(MetricTimeSeries series, String metric,
+      long bucketWidthInMillis, Set<Long> missingTimeStamps, double defaultValue) {
     long startTime = Collections.min(series.getTimeWindowSet());
     long endTime = Collections.max(series.getTimeWindowSet());
 
@@ -53,8 +53,8 @@ public class MetricTimeSeriesUtils {
     }
 
     if (numValues != series.getTimeWindowSet().size()) {
-      LOGGER.warn("looks like there are holes in the data: expected {} timestamps, found {}", numValues,
-          series.getTimeWindowSet().size());
+      LOGGER.warn("looks like there are holes in the data: expected {} timestamps, found {}",
+          numValues, series.getTimeWindowSet().size());
     }
 
     return new Pair<>(timestamps, values);

@@ -43,7 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AvroRecordReader implements RecordReader {
+public class AvroRecordReader extends BaseRecordReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroRecordReader.class);
 
   private static final String COMMA = ",";
@@ -57,8 +57,10 @@ public class AvroRecordReader implements RecordReader {
   private final Map<String, Object> _fieldMap = new HashMap<String, Object>();
 
   public AvroRecordReader(final FieldExtractor fieldExtractor, String filePath) throws Exception {
+    super();
     _schemaExtractor = fieldExtractor;
     _fileName = filePath;
+    super.initNullCounters(_schemaExtractor.getSchema());
     init();
   }
 
@@ -106,6 +108,7 @@ public class AvroRecordReader implements RecordReader {
       }
       Object value = rawRecord.get(field.name());
       if (value == null) {
+        incrementNullCountFor(field.name());
         if (spec.isSingleValueField()) {
           value = spec.getDefaultNullValue();
         } else {

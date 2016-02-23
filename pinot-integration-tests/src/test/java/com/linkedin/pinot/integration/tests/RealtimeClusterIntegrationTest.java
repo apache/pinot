@@ -16,10 +16,8 @@
 package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -29,19 +27,14 @@ import java.util.concurrent.TimeUnit;
 import kafka.server.KafkaServerStartable;
 
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -55,6 +48,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final int SEGMENT_COUNT = 12;
   public static final int QUERY_COUNT = 1000;
+  protected static final int ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH = 20000;
   private KafkaServerStartable kafkaStarter;
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
@@ -62,7 +56,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addRealtimeTable(tableName, timeColumnName, timeColumnType, 900, "Days", kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile);
+        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH);
   }
 
   @BeforeClass
@@ -82,83 +76,38 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     // Unpack data
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(RealtimeClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
+    final List<File> avroFiles = unpackAvroData(_tmpDir, SEGMENT_COUNT);
 
-    _tmpDir.mkdirs();
-    final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
-    for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
-      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
-    }
-
-    File schemaFile =
-        new File(OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
-
-    // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        schemaFile, avroFiles.get(0));
+    File schemaFile = getSchemaFile();
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
-    Class.forName("org.h2.Driver");
-    _connection = DriverManager.getConnection("jdbc:h2:mem:");
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        createH2SchemaAndInsertAvroFiles(avroFiles, _connection);
-      }
-    });
+    setupH2AndInsertAvro(avroFiles, executor);
 
     // Initialize query generator
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        _queryGenerator = new QueryGenerator(avroFiles, "'mytable'", "mytable");
-      }
-    });
+    setupQueryGenerator(avroFiles, executor);
 
     // Push data into the Kafka topic
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
-      }
-    });
+    pushAvroIntoKafka(avroFiles, executor, KAFKA_TOPIC);
 
     // Wait for data push, query generator initialization and H2 load to complete
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
+    // Create Pinot table
+    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+        schemaFile, avroFiles.get(0));
+
     // Wait until the Pinot event count matches with the number of events in the Avro files
-    int pinotRecordCount, h2RecordCount;
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    do {
-      Thread.sleep(5000L);
+    statement.execute("select count(*) from mytable");
+    ResultSet rs = statement.getResultSet();
+    rs.first();
+    int h2RecordCount = rs.getInt(1);
+    rs.close();
 
-      // Run the query
-      JSONObject response = postQuery("select count(*) from 'mytable'");
-      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-      String pinotValue = firstAggregationResult.getString("value");
-      pinotRecordCount = Integer.parseInt(pinotValue);
-
-      statement.execute("select count(*) from mytable");
-      ResultSet rs = statement.getResultSet();
-      rs.first();
-      h2RecordCount = rs.getInt(1);
-      rs.close();
-      LOGGER.info("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
-      Assert.assertTrue(System.currentTimeMillis() < timeInTwoMinutes, "Failed to read all records within two minutes");
-      TOTAL_DOCS = response.getLong("totalDocs");
-    } while (h2RecordCount != pinotRecordCount);
-  }
-
-  @Override
-  protected String getHelixClusterName() {
-    return "RealtimeClusterIntegrationTest";
+    waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInTwoMinutes);
   }
 
   @Override

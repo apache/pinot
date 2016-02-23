@@ -24,8 +24,7 @@ import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.NumberUtils;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 
-public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListener
-{
+public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetricStoreImmutableImpl.class);
 
   private static final TimeRange EMPTY_TIME_RANGE = new TimeRange(-1L, -1L);
@@ -42,8 +41,7 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   private boolean useBinarySearch = false;;
 
   public MetricStoreImmutableImpl(StarTreeConfig config,
-      ConcurrentMap<TimeRange, List<ByteBuffer>> buffers)
-  {
+      ConcurrentMap<TimeRange, List<ByteBuffer>> buffers) {
     this.config = config;
     this.buffers = buffers;
     this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
@@ -51,8 +49,7 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
     this.maxTime = new AtomicReference<TimeRange>(EMPTY_TIME_RANGE);
     this.timeRangeCount = new ConcurrentHashMap<>();
 
-    if (!buffers.isEmpty())
-    {
+    if (!buffers.isEmpty()) {
       minTime.set(Collections.min(buffers.keySet()));
       maxTime.set(Collections.max(buffers.keySet()));
     }
@@ -61,32 +58,26 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   @Override
-  public void update(int id, MetricTimeSeries timeSeries)
-  {
+  public void update(int id, MetricTimeSeries timeSeries) {
     throw new UnsupportedOperationException("update not supported on immutable store");
   }
 
   @Override
-  public void clear()
-  {
+  public void clear() {
     throw new UnsupportedOperationException("clear not supported on immutable store");
   }
 
   @Override
-  public MetricTimeSeries getTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange)
-  {
+  public MetricTimeSeries getTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange) {
     MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
 
     Set<Long> times = getTimes(timeRange);
     Collections.sort(logicalOffsets);
-    for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet())
-    {
+    for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet()) {
       TimeRange bufferTimeRange = entry.getKey();
       if (bufferTimeRange.getStart() >= 0
-          && (timeRange == null || !bufferTimeRange.isDisjoint(timeRange)))
-      {
-        for (ByteBuffer originalBuffer : entry.getValue())
-        {
+          && (timeRange == null || !bufferTimeRange.isDisjoint(timeRange))) {
+        for (ByteBuffer originalBuffer : entry.getValue()) {
           ByteBuffer buffer = originalBuffer.duplicate();
           computeAggregateTimeSeries(logicalOffsets, timeRange, timeSeries, times, buffer);
         }
@@ -97,46 +88,37 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   private void computeAggregateTimeSeries(List<Integer> logicalOffsets, TimeRange timeRange,
-      MetricTimeSeries timeSeries, Set<Long> times, ByteBuffer buffer)
-  {
+      MetricTimeSeries timeSeries, Set<Long> times, ByteBuffer buffer) {
     buffer.rewind();
-    for (Integer logicalOffset : logicalOffsets)
-    {
+    for (Integer logicalOffset : logicalOffsets) {
       buffer.position(logicalOffset * (4 + 4));
       int startOffset = buffer.getInt();
       int length = buffer.getInt();
-      if (length == 0)
-      {
+      if (length == 0) {
         continue;
       }
       buffer.position(startOffset);
       long minTime = buffer.getLong();
       int middle = 0;
       long timeRangeStartValue = timeRange.getStart();
-      if (useBinarySearch)
-      {
+      if (useBinarySearch) {
         middle = findStartIndex(buffer, startOffset, length, minTime, timeRangeStartValue);
       }
-      if (middle == -1)
-      {
+      if (middle == -1) {
         continue;
       }
-      for (int i = middle; i < length; i++)
-      {
+      for (int i = middle; i < length; i++) {
         buffer.position(startOffset + (i * sizePerEntry));
         Long time = buffer.getLong();
-        if (times.contains(time))
-        {
-          for (MetricSpec metricSpec : config.getMetrics())
-          {
+        if (times.contains(time)) {
+          for (MetricSpec metricSpec : config.getMetrics()) {
             Number value = NumberUtils.readFromBuffer(buffer, metricSpec.getType());
             timeSeries.increment(time, metricSpec.getName(), value);
           }
         }
         // since the times in buffer are sorted, if the time is greater the end of TimeRange
         // break
-        if (time >= timeRange.getEnd())
-        {
+        if (time >= timeRange.getEnd()) {
           break;
         }
       }
@@ -144,31 +126,24 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   private int findStartIndex(ByteBuffer buffer, int startOffset, int length, long minTime,
-      long timeRangeStartValue)
-  {
+      long timeRangeStartValue) {
     int middle = -1;
-    if (minTime >= timeRangeStartValue)
-    {
+    if (minTime >= timeRangeStartValue) {
       middle = 0;
-    } else
-    {
+    } else {
       // do a binary search to find the start Index
       int low = 0;
       int high = length - 1;
       boolean found = false;
-      while (low <= high)
-      {
+      while (low <= high) {
         middle = (low + high) / 2;
         buffer.position(startOffset + (middle * sizePerEntry));
         final long midValue = buffer.getLong();
-        if (timeRangeStartValue > midValue)
-        {
+        if (timeRangeStartValue > midValue) {
           low = middle + 1;
-        } else if (timeRangeStartValue < midValue)
-        {
+        } else if (timeRangeStartValue < midValue) {
           high = middle - 1;
-        } else
-        {
+        } else {
           found = true;
           break;
         }
@@ -178,31 +153,26 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   @Override
-  public Long getMinTime()
-  {
+  public Long getMinTime() {
     return minTime.get().getStart();
   }
 
   @Override
-  public Long getMaxTime()
-  {
+  public Long getMaxTime() {
     return maxTime.get().getEnd();
   }
 
   @Override
-  public Map<TimeRange, Integer> getTimeRangeCount()
-  {
+  public Map<TimeRange, Integer> getTimeRangeCount() {
 
-    for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet())
-    {
+    for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet()) {
       timeRangeCount.put(entry.getKey(), entry.getValue().size());
     }
     return timeRangeCount;
   }
 
   @Override
-  public void notifyDelete(TimeRange timeRange)
-  {
+  public void notifyDelete(TimeRange timeRange) {
     Set<TimeRange> timeRanges = new HashSet<TimeRange>(buffers.keySet());
     timeRanges.remove(timeRange);
     this.minTime.set(timeRanges.isEmpty() ? EMPTY_TIME_RANGE : Collections.min(timeRanges));
@@ -211,29 +181,23 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   @Override
-  public void notifyCreate(TimeRange timeRange, ByteBuffer buffer)
-  {
+  public void notifyCreate(TimeRange timeRange, ByteBuffer buffer) {
     this.buffers.putIfAbsent(timeRange, new CopyOnWriteArrayList<ByteBuffer>());
     this.buffers.get(timeRange).add(buffer);
     this.minTime.set(Collections.min(buffers.keySet()));
     this.maxTime.set(Collections.max(buffers.keySet()));
   }
 
-  private Set<Long> getTimes(TimeRange timeRange)
-  {
-    if (timeRange != null)
-    {
+  private Set<Long> getTimes(TimeRange timeRange) {
+    if (timeRange != null) {
       Set<Long> times = new HashSet<Long>();
-      for (long i = timeRange.getStart(); i <= timeRange.getEnd(); i++)
-      {
+      for (long i = timeRange.getStart(); i <= timeRange.getEnd(); i++) {
         times.add(i);
       }
       return times;
-    } else
-    {
+    } else {
       Set<Long> times = new HashSet<Long>();
-      for (long i = getMinTime(); i <= getMaxTime(); i++)
-      {
+      for (long i = getMinTime(); i <= getMaxTime(); i++) {
         times.add(i);
       }
       return times;

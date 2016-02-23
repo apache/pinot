@@ -54,7 +54,6 @@ import com.linkedin.thirdeye.api.TimeRange;
  *              fileId.buf
  *              fileId.idx
  * </pre>
- *
  * </p>
  * <p>
  * "someId" here is a unique identifier for the file, not
@@ -73,7 +72,6 @@ import com.linkedin.thirdeye.api.TimeRange;
  * <pre>
  *      leafId fileId dictStartOffset length bufStartOffset length
  * </pre>
- *
  * </p>
  * <p>
  * The metricStore/*.idx file contains entries in the following format:
@@ -89,8 +87,8 @@ import com.linkedin.thirdeye.api.TimeRange;
 public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStoreFactory {
   public static String PROP_METRIC_STORE_MUTABLE = "metricStoreMutable";
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(StarTreeRecordStoreFactoryDefaultImpl.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(StarTreeRecordStoreFactoryDefaultImpl.class);
 
   private final Object sync = new Object();
 
@@ -147,20 +145,21 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       this.rootDir = rootDir;
       this.isInit = true;
       this.starTreeConfig = starTreeConfig;
-      
-      InputStream indexMetadataFile = new FileInputStream(new File(rootDir, StarTreeConstants.METADATA_FILE_NAME));
+
+      InputStream indexMetadataFile =
+          new FileInputStream(new File(rootDir, StarTreeConstants.METADATA_FILE_NAME));
       Properties indexMetadataProps = new Properties();
       indexMetadataProps.load(indexMetadataFile);
       indexMetadataFile.close();
-      
+
       indexMetadata = IndexMetadata.fromProperties(indexMetadataProps);
 
-      //check if the data needs to be converted
-      if(indexMetadata.getIndexFormat().equals(IndexFormat.FIXED_SIZE)){
+      // check if the data needs to be converted
+      if (indexMetadata.getIndexFormat().equals(IndexFormat.FIXED_SIZE)) {
         LOGGER.info("START: Converting data from Fixed format to  Variable format at {}", rootDir);
         FixedToVariableFormatConvertor convertor = new FixedToVariableFormatConvertor(rootDir);
         convertor.convert();
-        
+
         LOGGER.info("DONE: Converted data from Fixed format to  Variable format at {}", rootDir);
       }
       if (recordStoreConfig != null) {
@@ -297,9 +296,8 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       }
 
       if (!dimensionSegments.containsKey(indexEntry.getFileId())) {
-        File bufferFile =
-            new File(dimensionStore,
-                associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
+        File bufferFile = new File(dimensionStore,
+            associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
         dimensionSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Loaded buffer file {}", bufferFile);
@@ -307,9 +305,8 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       }
 
       if (!dictionarySegments.containsKey(indexEntry.getFileId())) {
-        File bufferFile =
-            new File(dimensionStore,
-                associatedDescriptor.toString(StarTreeConstants.DICT_FILE_SUFFIX));
+        File bufferFile = new File(dimensionStore,
+            associatedDescriptor.toString(StarTreeConstants.DICT_FILE_SUFFIX));
         dictionarySegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Loaded buffer file {}", bufferFile);
@@ -327,9 +324,8 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       }
 
       if (!metricSegments.containsKey(indexEntry.getFileId())) {
-        File bufferFile =
-            new File(metricStore,
-                associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
+        File bufferFile = new File(metricStore,
+            associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
         metricSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Loaded buffer file {}", bufferFile);

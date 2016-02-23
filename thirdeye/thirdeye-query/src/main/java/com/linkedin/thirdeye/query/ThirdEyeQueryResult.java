@@ -44,10 +44,7 @@ public class ThirdEyeQueryResult {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(ThirdEyeQueryResult.class)
-        .add("dimensions", dimensions)
-        .add("metrics", metrics)
-        .add("data", data)
-        .toString();
+    return Objects.toStringHelper(ThirdEyeQueryResult.class).add("dimensions", dimensions)
+        .add("metrics", metrics).add("data", data).toString();
   }
 }
