@@ -127,7 +127,9 @@ public class DashboardResource {
     // Get segment metadata
     List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(collection);
     if (segments.isEmpty()) {
-      throw new NotFoundException("No data loaded in server for " + collection);
+
+      throw new NotFoundException("No data available for " + collection
+          + ". Selectable collections are " + dataCache.getCollections());
     }
 
     // Find the latest and earliest data times

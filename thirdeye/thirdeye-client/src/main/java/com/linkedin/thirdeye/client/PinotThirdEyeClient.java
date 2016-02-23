@@ -427,6 +427,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     String sql = PqlUtils.getDataTimeRangeSql(collection, timeColumnName);
     LOG.info("Retrieving segment: {}", sql);
     ResultSetGroup result = resultSetGroupCache.get(sql);
+    if (result.getResultSetCount() == 0) {
+      LOG.info("No segments retrieved!");
+      return Collections.emptyList();
+    }
     double minTime = result.getResultSet(0).getDouble(0);
     double maxTime = result.getResultSet(1).getDouble(0);
     TimeUnit dataUnit = timeSpec.getBucket().getUnit();

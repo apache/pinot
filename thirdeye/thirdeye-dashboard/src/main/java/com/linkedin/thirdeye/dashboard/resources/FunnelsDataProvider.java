@@ -310,7 +310,7 @@ public class FunnelsDataProvider {
 
   // TODO : {dpatel : move this to config cache later, would have started with it but found that out
   // late}
-  private void loadConfigs() throws Exception {
+  void loadConfigs() throws Exception {
 
     funnelSpecsMap.clear();
     // looping through all the dirs, finding one funnels file and loading it up

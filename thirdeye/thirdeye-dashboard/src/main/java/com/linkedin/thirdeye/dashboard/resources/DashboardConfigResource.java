@@ -69,14 +69,16 @@ public class DashboardConfigResource {
   private final ObjectMapper objectMapper;
   private final CollectionMapThirdEyeClient clientMap;
   private final String clientConfigFolder;
+  private final FunnelsDataProvider funnelsProvider;
 
   public DashboardConfigResource(DataCache dataCache, QueryCache queryCache,
       CollectionMapThirdEyeClient clientMap, String clientConfigFilePath,
-      ObjectMapper objectMapper) {
+      FunnelsDataProvider funnelsProvider, ObjectMapper objectMapper) {
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.clientMap = clientMap;
     this.clientConfigFolder = clientConfigFilePath;
+    this.funnelsProvider = funnelsProvider;
     this.objectMapper = objectMapper;
   }
 
@@ -393,6 +395,9 @@ public class DashboardConfigResource {
   public Response reloadClients() throws Exception {
     LOGGER.info("Reloading client configurations from {}", clientConfigFolder);
     clientMap.reloadFromFolder(clientConfigFolder);
+    if (funnelsProvider != null) {
+      funnelsProvider.loadConfigs();
+    }
     return Response.ok().build();
   }
 

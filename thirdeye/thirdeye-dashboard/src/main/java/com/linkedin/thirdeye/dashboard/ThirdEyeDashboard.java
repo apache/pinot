@@ -87,8 +87,9 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
       environment.jersey().register(collectionConfigResource);
     }
 
-    DashboardConfigResource dashboardConfigResource = new DashboardConfigResource(dataCache,
-        queryCache, clientMap, clientConfigFilePath, environment.getObjectMapper());
+    DashboardConfigResource dashboardConfigResource =
+        new DashboardConfigResource(dataCache, queryCache, clientMap, clientConfigFilePath,
+            funnelsResource, environment.getObjectMapper());
     environment.jersey().register(dashboardConfigResource);
 
     ContributorDataProvider contributorResource =
