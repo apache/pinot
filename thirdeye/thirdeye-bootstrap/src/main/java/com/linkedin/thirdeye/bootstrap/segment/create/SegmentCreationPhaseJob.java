@@ -92,17 +92,17 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("Input path : {}", inputSegmentDir);
     String outputDir = getAndSetConfiguration(configuration, SEGMENT_CREATION_OUTPUT_PATH);
     LOGGER.info("Output path : {}", outputDir);
-    String stagingDir = new File(outputDir, TEMP).getAbsolutePath();
+    Path stagingDir = new Path(outputDir, TEMP);
     LOGGER.info("Staging dir : {}", stagingDir);
     String tableName = getAndSetConfiguration(configuration, SEGMENT_CREATION_SEGMENT_TABLE_NAME);
     LOGGER.info("Segment table name : {}", tableName);
 
     // Create temporary directory
-    if (fs.exists(new Path(stagingDir))) {
+    if (fs.exists(stagingDir)) {
       LOGGER.warn("Found the temp folder, deleting it");
-      fs.delete(new Path(stagingDir), true);
+      fs.delete(stagingDir, true);
     }
-    fs.mkdirs(new Path(stagingDir));
+    fs.mkdirs(stagingDir);
     fs.mkdirs(new Path(stagingDir + "/input/"));
 
     if (fs.exists(new Path(outputDir))) {
@@ -170,7 +170,7 @@ public class SegmentCreationPhaseJob extends Configured {
     // Delete temporary directory.
     LOGGER.info("Cleanup the working directory.");
     LOGGER.info("Deleting the dir: {}", stagingDir);
-    fs.delete(new Path(stagingDir), true);
+    fs.delete(stagingDir, true);
 
     return job;
   }
