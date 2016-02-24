@@ -1,5 +1,19 @@
 package com.linkedin.thirdeye.function;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.math3.util.Pair;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.AnomalyFunctionSpec;
@@ -9,15 +23,10 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.lib.scanstatistics.ScanStatistics;
 import com.linkedin.thirdeye.lib.util.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.lib.util.STLDecomposition;
-import org.apache.commons.math3.util.Pair;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-
+/**
+ * Warning: this function is no longer actively maintained by ThirdEye.
+ */
 public class ScanStatisticsAnomalyFunction extends BaseAnomalyFunction {
   private static Logger LOGGER = LoggerFactory.getLogger(ScanStatisticsAnomalyFunction.class);
   private static final Joiner CSV = Joiner.on(",");

@@ -9,6 +9,7 @@ import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +39,7 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.CachedThirdEyeClientConfig;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdEyeMetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRawResponse;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
@@ -179,13 +181,17 @@ public class ReportGenerator implements Job {
           // generate report for every metric
           for (String metric : tableSpec.getMetrics()) {
             LOGGER.info("Metric : " + metric);
+
+            ThirdEyeMetricFunction metricFunction = new ThirdEyeMetricFunction(
+                starTreeConfig.getTime().getBucket(), Collections.singletonList(metric));
             ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
-                .setMetricFunction(metric).setStartTime(currentStartHour).setEndTime(currentEndHour)
-                .setDimensionValues(dimensionValues).setGroupBy(groupBy).build();
-            ThirdEyeRequest baselineReq =
-                new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metric)
-                    .setStartTime(baselineStartHour).setEndTime(baselineEndHour)
-                    .setDimensionValues(dimensionValues).setGroupBy(groupBy).build();
+                .setMetricFunction(metricFunction).setStartTime(currentStartHour)
+                .setEndTime(currentEndHour).setDimensionValues(dimensionValues).setGroupBy(groupBy)
+                .build();
+            ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
+                .setMetricFunction(metricFunction).setStartTime(baselineStartHour)
+                .setEndTime(baselineEndHour).setDimensionValues(dimensionValues).setGroupBy(groupBy)
+                .build();
             LOGGER.info("Current req: {}", currentReq);
             LOGGER.info("Baseline req: {}", baselineReq);
 

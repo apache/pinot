@@ -33,17 +33,11 @@ public class ThirdEyeRequestUtils {
     // make the start time more generic
     start = start.withMillisOfDay(0);
     DateTime end = new DateTime(timeRange.getEnd(), DateTimeZone.UTC);
-    String metricFunction = buildMetricFunction(aggregationGranularity, metricNames);
+    ThirdEyeMetricFunction metricFunction =
+        new ThirdEyeMetricFunction(aggregationGranularity, metricNames);
     return new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
         .setStartTime(start).setEndTime(end).setDimensionValues(fixedDimensionValues)
         .setGroupBy(groupByDimension).build();
-  }
-
-  // TODO break up metricFunction field in request object and replace with these params.
-  public static String buildMetricFunction(TimeGranularity aggregationGranularity,
-      List<String> metricNames) {
-    return String.format("AGGREGATE_%d_%s(%s)", aggregationGranularity.getSize(),
-        aggregationGranularity.getUnit().toString().toUpperCase(), COMMA.join(metricNames));
   }
 
   /**

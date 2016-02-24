@@ -1,16 +1,30 @@
 package com.linkedin.thirdeye.function;
 
-import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.api.AnomalyResult;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import org.joda.time.DateTime;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.DateTime;
+
+import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.AnomalyResult;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+
+/**
+ * See params for property configuration
+ * @param baseline baseline comparison period. Value should be one of 'w/w', 'w/2w',
+ *          'w/3w'. The anomaly function spec should also be configured to provide a sufficient
+ *          window size.
+ * @param changeThreshold detection threshold for percent change relative to baseline, defined as
+ *          (current - baseline) / baseline. Positive values detect an increase, while negative
+ *          values detect a decrease. This value should be a decimal, eg a 50% increase would have a
+ *          threshold of 0.50.
+ * @param averageVolumeThreshold minimum average threshold across the entire input window. If the
+ *          average value does not meet the
+ *          threshold, no anomaly results will be generated. This value should be a double.
+ */
 public class UserRuleAnomalyFunction extends BaseAnomalyFunction {
   public static String BASELINE = "baseline";
   public static String CHANGE_THRESHOLD = "changeThreshold";

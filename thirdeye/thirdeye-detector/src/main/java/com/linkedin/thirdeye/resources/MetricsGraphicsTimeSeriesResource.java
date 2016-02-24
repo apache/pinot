@@ -37,7 +37,9 @@ import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricsGraphicsTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.client.ThirdEyeMetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.db.AnomalyResultDAO;
@@ -72,9 +74,10 @@ public class MetricsGraphicsTimeSeriesResource {
     Multimap<String, String> fixedValues = extractDimensionValues(uriInfo);
 
     // Get time series data
-    ThirdEyeRequestBuilder req = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(getMetricFunction(metric, bucketSize)).setStartTime(startTime)
-        .setEndTime(endTime).setDimensionValues(fixedValues);
+    ThirdEyeMetricFunction metricFunction = getMetricFunction(metric, bucketSize, collection);
+    ThirdEyeRequestBuilder req =
+        new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
+            .setStartTime(startTime).setEndTime(endTime).setDimensionValues(fixedValues);
 
     if (groupBy != null) {
       req.setGroupBy(groupBy);
@@ -154,10 +157,9 @@ public class MetricsGraphicsTimeSeriesResource {
       }
 
       long shiftMillis = endTime.getMillis() - overlayEnd.getMillis();
-
       ThirdEyeRequest overlayReq = new ThirdEyeRequestBuilder().setCollection(collection)
-          .setMetricFunction(getMetricFunction(metric, bucketSize)).setStartTime(overlayStart)
-          .setEndTime(overlayEnd).setDimensionValues(fixedValues).build();
+          .setMetricFunction(metricFunction).setStartTime(overlayStart).setEndTime(overlayEnd)
+          .setDimensionValues(fixedValues).build();
 
       Map<DimensionKey, MetricTimeSeries> overlayRes = thirdEyeClient.execute(overlayReq);
       for (Map.Entry<DimensionKey, MetricTimeSeries> entry : overlayRes.entrySet()) {
@@ -319,11 +321,15 @@ public class MetricsGraphicsTimeSeriesResource {
     return dateTime;
   }
 
-  private static String getMetricFunction(String metric, String bucketSize) {
+  private ThirdEyeMetricFunction getMetricFunction(String metric, String bucketSize,
+      String collection) throws Exception {
     if (bucketSize == null) {
-      return metric;
+      // default to data bucket size
+      StarTreeConfig starTreeConfig = thirdEyeClient.getStarTreeConfig(collection);
+      TimeGranularity bucket = starTreeConfig.getTime().getBucket();
+      return new ThirdEyeMetricFunction(bucket, Collections.singletonList(metric));
     }
-    return String.format("AGGREGATE_%s(%s)", bucketSize, metric);
+    return ThirdEyeMetricFunction.fromStr(String.format("AGGREGATE_%s(%s)", bucketSize, metric));
   }
 
   private Multimap<String, String> extractDimensionValues(UriInfo uriInfo) {

@@ -1,24 +1,7 @@
 package com.linkedin.thirdeye.function;
 
-import com.fasterxml.jackson.databind.util.LRUMap;
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.api.AnomalyResult;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.lib.kalman.StateSpaceAnomalyDetector;
-import com.linkedin.thirdeye.lib.kalman.StateSpaceDataPoint;
-import com.linkedin.thirdeye.lib.util.MetricTimeSeriesUtils;
-import org.apache.commons.math3.util.Pair;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -28,6 +11,24 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.math3.util.Pair;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.util.LRUMap;
+import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.AnomalyResult;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.lib.kalman.StateSpaceAnomalyDetector;
+import com.linkedin.thirdeye.lib.kalman.StateSpaceDataPoint;
+import com.linkedin.thirdeye.lib.util.MetricTimeSeriesUtils;
+
+/**
+ * Warning: this function is no longer actively maintained by ThirdEye.
+ */
 public class KalmanFilterAnomalyFunction extends BaseAnomalyFunction {
   private static final Logger LOGGER = LoggerFactory.getLogger(KalmanFilterAnomalyFunction.class);
   private static final Joiner CSV = Joiner.on(",");
