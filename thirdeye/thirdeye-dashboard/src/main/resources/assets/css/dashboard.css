@@ -388,6 +388,10 @@ li {
 }
 
 /* Dimension */
+.section-wrapper{
+    border-bottom: 3px solid #d5d5d5;
+    margin-bottom: 10px;
+}
 
 .heatmap-tabs,
 .funnel-tabs {

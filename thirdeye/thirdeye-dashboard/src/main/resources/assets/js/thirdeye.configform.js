@@ -87,9 +87,14 @@ $(document).ready(function() {
     })
 
     //Allow user to switch dimension displayed on the dropdown
-    $("#view-dimension-selector .section-selector").on("change", function(){
+    $("#view-dimension-selector .dimension-section-selector").on("change", function(){
         $(".section-wrapper").hide()
-        $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show()
+        for(var i= 0, len=$(".dimension-section-selector").length; i < len; i++){
+            var checkboxObj = $($(".dimension-section-selector")[i])
+            if (checkboxObj.is(':checked')){
+                $(".section-wrapper[rel = '" +  checkboxObj.attr("value") + "' ]").show()
+            }
+        }
     })
 
     //Allow user to switch metric displayed on the dropdown
@@ -283,10 +288,10 @@ $(document).ready(function() {
     // Always start at AGGREGATE
     var tokens = metricFunctionObj.name.split("_")
     if($(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"']").length > 0){
-        $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"']").trigger("click")
+        $(".baseline-aggregate[unit='" + tokens[tokens.length - 1] +"']").trigger("click");
     }
     //When baseline-aggregate after the initial change on load enable Go (submit) button
-    $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit)
+    $('.baseline-aggregate:not(.uk-active)').click(enableFormSubmit);
 
     // May have applied moving average as well
     /*var firstArg = metricFunctionObj.args[0]
@@ -371,19 +376,13 @@ $(document).ready(function() {
         $(".metric-section-wrapper[rel = '" +  $(".metric-section-selector").val() + "' ]").show();
     })
 
-    //Selecting the dimension to display
-    $(".section-selector").on("change", function(){
-        $(".section-wrapper").hide();
-        $(".section-wrapper[rel = '" +  $(".section-selector").val() + "' ]").show();
-    })
-
+    $($(".dimension-section-selector")[0]).trigger("click");
     //Set default dimension view on Timeseries and the default metric view on Heatmap
     window.onload = load
     function load() {
         //Using settimeout since the table has minor css issues when created on a hidden parent
         // and flot.js has no callback function for drawing the data
         window.setTimeout(function(){$(".metric-section-selector").trigger("change")}, 2000)
-        window.setTimeout(function(){$(".section-selector").trigger("change")}, 2000)
-    }
+         }
 
 })

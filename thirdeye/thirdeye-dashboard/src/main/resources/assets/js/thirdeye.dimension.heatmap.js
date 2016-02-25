@@ -230,8 +230,6 @@ $(document).ready(function() {
             $(".dimension-heat-map-treemap-section").toggleClass("hidden")
         }
     })
-
-
 })
 
 

@@ -16,7 +16,7 @@
             <table class="uk-table dimension-view-funnel-heat-map-rendered">
                 <thead>
                     <tr>
-                        <th>Hour</th>
+                        <th>Date and Time</th>
                         <#list funnel.aliasToActualMap?keys as key>
                             <th class="metric-label" title="${funnel.aliasToActualMap[key]}" style="cursor:pointer;">${key}</th>
                         </#list>

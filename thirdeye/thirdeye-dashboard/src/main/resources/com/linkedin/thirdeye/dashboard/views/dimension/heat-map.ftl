@@ -216,17 +216,16 @@
 
                 showTreeMapTooltip : function(row, size, value){
 
+                    var currentTable = $(this.ma).attr('id');
+                    var tableMetricDim = currentTable.substr(0, currentTable.length -10);
 
-                    var currentTable = $(this.ma).attr('id')
-                    var tableMetricDim = currentTable.substr(0, currentTable.length -10)
-                    //console.log('tableMetricDim', tableMetricDim)
-                    var dataMode = currentTable.substr(currentTable.length -1, 1)
-                    var dataTable = tableMetricDim + '_data_' + dataMode
-                    var indexStr =  Treemap[ dataTable ].getValue(row, 0)
+                    var dataMode = currentTable.substr(currentTable.length -1, 1);
+                    var dataTable = tableMetricDim + '_data_' + dataMode;
+                    var indexStr =  Treemap[ dataTable ].getValue(row, 0);
                     if(isNaN(indexStr)){
                         return "";
                     }
-                    var index = Number(indexStr)
+                    var index = Number(indexStr);
 
                     //Tooltip Data columns
                     //['id',  'metric','dimension','cellvalue','baseline_value', 'current_value','baseline_ratio', 'current_ratio','delta_percent_change', 'contribution_difference', 'volume_difference' ],
@@ -256,12 +255,9 @@
                 mouseDownHandler : function(){
                   // TODO: click on the cell of the treemap should fix the value and dimension in the query and rerender the page
                 },
-
                 selectHandler : function(){
                  // TODO: click on the cell of the treemap should fix the value and dimension in the query and rerender the page
-
                 }
-
             }
 
             var options = {
@@ -370,10 +366,8 @@
                 e.preventDefault()
 
                 //get value and dimension from the current tooltip
-                var value = ($(this).html().trim() == "unknown") ? "" : $(this).html().trim()
-                console.log("value", value)
-
-                var dimension = $(this).attr("rel")
+                var value = ($(this).html().trim() == "unknown") ? "" : $(this).html().trim();
+                var dimension = $(this).attr("rel");
 
                /* earlier version when the URI was handled as an object
                //fix the value and dimension in the query and redraw the page
@@ -395,6 +389,54 @@
 
                 //Preselect treeemap mode on pageload (mode 0 = Percentage Change)
                $(".dimension-treemap-mode[mode = '0']").click()
+
+
+            //After all the content loaded set the fontcolor of the cells based on the brightness of the background color
+            function fontColorOverride(cell) {
+
+                var cellObj = $(cell);
+                var hex = cellObj.attr("fill");
+
+                var colorIsLight = function (r, g, b) {
+                    // Counting the perceptive luminance
+                    // human eye favors green color...
+                    var a = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    return (a < 0.5);
+                }
+
+
+                function hexToRgb(hex) {
+                    // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+                    var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+                    hex = hex.replace(shorthandRegex, function (m, r, g, b) {
+                        return r + r + g + g + b + b;
+                    });
+
+                    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                    return result ? {
+                        r: parseInt(result[1], 16),
+                        g: parseInt(result[2], 16),
+                        b: parseInt(result[3], 16)
+                    } : null;
+                }
+
+                if (hexToRgb(hex)) {
+                    var textColor = colorIsLight(hexToRgb(hex).r, hexToRgb(hex).g, hexToRgb(hex).b) ? '#000000' : '#ffffff';
+                    cellObj.next('text').attr('fill', textColor);
+                }
+
+            };
+            var area = $("#dimension-heat-map-area")
+            $("rect", area).each( function(index,cell){
+                fontColorOverride(cell);
+            });
+
+            $("g", area).on("mouseout", function(event){
+                if($(event.currentTarget).prop("tagName") === "g"){
+                    fontColorOverride($("rect", event.currentTarget));
+                }
+            });
+
         }
     }
 

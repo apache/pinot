@@ -63,15 +63,16 @@
     </li>
 
     <li>
-        <div class="uk-margin-medium">Dimension:<br>
-            <div  class="uk-button uk-form-select" data-uk-form-select>
-                <span>Dimension</span>
-                <i class="uk-icon-caret-down"></i>
-                <select id="view-dimension-selector" class="section-selector">
-                    <#list dimensionView.view.dimensions as dimension>
-                        <option value="${dimension}">${dimension}</option>
-                    </#list>
-                </select>
+        <div class="uk-margin-medium "><br>
+            <div class="uk-button-dropdown" data-uk-dropdown="{mode:'click'}" aria-haspopup="true" aria-expanded="false">
+                <button class="uk-button">Dimension <i class="uk-icon-caret-down"></i></button>
+                <div class="uk-dropdown uk-dropdown-bottom" style="top: 30px; left: 0px;">
+                    <ul id="view-dimension-selector" class="uk-nav uk-nav-dropdown">
+                        <#list dimensionView.view.dimensions as dimension>
+                            <li><a href="#"><input class="dimension-section-selector" type="checkbox" value="${dimension}">${dimension}</a></li>
+                        </#list>
+                    </ul>
+                </div>
             </div>
         </div>
     </li>
