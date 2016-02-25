@@ -209,15 +209,20 @@ public class CollectionsResource implements Managed {
   @Timed
   public Response postData(@PathParam("collection") String collection,
       @PathParam("minTime") long minTimeMillis, @PathParam("maxTime") long maxTimeMillis,
-      @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule, InputStream dataBytes)
-          throws Exception {
+      @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule, InputStream dataBytes) throws Exception
+           {
     DateTime minTime = new DateTime(minTimeMillis, DateTimeZone.UTC);
     DateTime maxTime = new DateTime(maxTimeMillis, DateTimeZone.UTC);
 
     LOG.info("Received data for {} in {} to {}", collection, minTime, maxTime);
 
     LOG.info("Deleting older segment for same date range, if exists");
-    dataUpdateManager.deleteData(collection, schedule, minTime, maxTime);
+
+    try {
+      dataUpdateManager.deleteData(collection, schedule, minTime, maxTime);
+    } catch (Exception e) {
+      LOG.info("Older segment does not exist");
+    }
 
     dataUpdateManager.updateData(collection, schedule, minTime, maxTime, dataBytes);
 
