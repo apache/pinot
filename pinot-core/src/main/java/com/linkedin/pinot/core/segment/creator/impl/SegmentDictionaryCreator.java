@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -169,6 +171,7 @@ public class SegmentDictionaryCreator implements Closeable {
                 new int[] { stringColumnMaxLength });
 
         final String[] revised = new String[rowCount];
+        Map<String, Integer> revisedMap = new HashMap<String, Integer>();
         for (int i = 0; i < rowCount; i++) {
           final String toWrite = sortedObjects[i].toString();
           final int padding = stringColumnMaxLength - toWrite.getBytes(Charset.forName("UTF-8")).length;
@@ -181,6 +184,7 @@ public class SegmentDictionaryCreator implements Closeable {
           String entry = bld.toString();
           revised[i] = entry;
           assert (revised[i].getBytes(Charset.forName("UTF-8")).length == stringColumnMaxLength);
+          revisedMap.put(revised[i], i);
         }
         Arrays.sort(revised);
 
@@ -188,8 +192,12 @@ public class SegmentDictionaryCreator implements Closeable {
         for (int i = 0; i < revised.length; i++) {
           stringDictionaryWrite.setString(i, 0, revised[i]);
 
-          // No need to store padded value, we can store and lookup by raw value.
-          stringValueToIndexMap.put(sortedObjects[i].toString(), i);
+          // No need to store padded value, we can store and lookup by raw value. In certain cases, original sorted order
+          // may be different from revised sorted order [PINOT-2730], so would need to use the original order in value
+          // to index map.
+          Integer origIndex = revisedMap.get(revised[i]);
+          String origString = sortedObjects[origIndex].toString();
+          stringValueToIndexMap.put(origString, origIndex);
         }
         stringDictionaryWrite.close();
         break;
