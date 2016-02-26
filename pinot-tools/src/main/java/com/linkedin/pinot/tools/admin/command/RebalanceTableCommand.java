@@ -37,11 +37,8 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of the tenant. Note All offline tables belonging this tenant will be rebalanced", forbids ={"-tableName"})
   private String _tenantName;
 
-  @Option(name = "-force", required = true, metaVar = "<boolean>", usage = "Force run rebalance. Useful when a node(s) is down currently")
+  @Option(name = "-force", required = false, metaVar = "<boolean>", usage = "Run the rebalance")
   private boolean _forceRun;
-
-  @Option(name = "-dryRun", required = false, metaVar = "<boolean>", usage = "Dry run")
-  private boolean _dryRun = true;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
@@ -53,6 +50,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @Override
   public boolean execute() throws Exception {
+    boolean _dryRun = !_forceRun;
     PinotSegmentRebalancer rebalancer = new PinotSegmentRebalancer(_zkAddress, _clusterName, _dryRun);
     if (_tenantName == null && _tableName == null) {
       System.err.println("One of tenantName or tableName must be specified");
@@ -64,7 +62,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
       rebalancer.rebalanceTable(_tableName);
     }
     if (_dryRun) {
-      System.out.println("\n\nThat was a dryrun. Use -dryRun false to make it happen");
+      System.out.println("\n\nThat was a dryrun. Use -force to make it happen");
     }
     return true;
   }
