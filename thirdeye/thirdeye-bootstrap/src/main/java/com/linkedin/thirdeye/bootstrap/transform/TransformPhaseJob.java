@@ -57,6 +57,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class TransformPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformPhaseJob.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final String CONFIGS_SEPARATOR = ";";
+
 
   private String name;
   private Properties props;
@@ -174,22 +176,25 @@ public class TransformPhaseJob extends Configured {
 
     // Set input schema, input path for every source
     String sources = getAndSetConfiguration(configuration, TRANSFORM_SOURCE_NAMES);
-    List<String> sourceNames = Arrays.asList(sources.split(","));
+    List<String> sourceNames = Arrays.asList(sources.split(CONFIGS_SEPARATOR));
     Map<String, String> schemaMap = new HashMap<String, String>();
     Map<String, String> schemaPathMapping = new HashMap<String, String>();
 
-    for (String sourceName : sourceNames) {
+    String[] transformInputAvroSchemas = getAndCheck(TRANSFORM_INPUT_AVRO_SCHEMA.toString()).split(CONFIGS_SEPARATOR);
+    String[] transformInputPaths = getAndCheck(TRANSFORM_INPUT_PATH.toString()).split(CONFIGS_SEPARATOR);
+    for (int i = 0; i < sourceNames.size(); i++) {
 
       // load schema for each source
+      String sourceName = sourceNames.get(i);
       LOGGER.info("Loading Schema for {}", sourceName);
-      FSDataInputStream schemaStream =
-          fs.open(new Path(getAndCheck(sourceName + "." + TRANSFORM_INPUT_AVRO_SCHEMA.toString())));
+
+      FSDataInputStream schemaStream = fs.open(new Path(transformInputAvroSchemas[i]));
       Schema schema = new Schema.Parser().parse(schemaStream);
       schemaMap.put(sourceName, schema.toString());
       LOGGER.info("Schema for {}:  \n{}", sourceName, schema);
 
       // configure input data for each source
-      String inputPathDir = getAndCheck(sourceName + "." + TRANSFORM_INPUT_PATH.toString());
+      String inputPathDir = transformInputPaths[i];
       LOGGER.info("Input path dir for " + sourceName + ": " + inputPathDir);
       for (String inputPath : inputPathDir.split(",")) {
         Path input = new Path(inputPath);

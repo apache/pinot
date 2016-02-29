@@ -61,6 +61,7 @@ public class JoinPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(JoinPhaseJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final String CONFIGS_SEPARATOR = ";";
 
   private String name;
   private Properties props;
@@ -284,18 +285,21 @@ public class JoinPhaseJob extends Configured {
     Map<String, String> schemaMap = new HashMap<String, String>();
     Map<String, String> schemaPathMapping = new HashMap<String, String>();
 
-    for (String sourceName : sourceNames) {
+    String[] joinInputAvroSchemas = getAndCheck(JOIN_INPUT_AVRO_SCHEMA.toString()).split(CONFIGS_SEPARATOR);
+    String[] joinInputPaths = getAndCheck(JOIN_INPUT_PATH.toString()).split(CONFIGS_SEPARATOR);
+    for (int i = 0; i < sourceNames.size(); i++) {
       // load schema for each source
+      String sourceName = sourceNames.get(i);
       LOGGER.info("Loading Schema for {}", sourceName);
 
       FSDataInputStream schemaStream =
-          fs.open(new Path(getAndCheck(sourceName + "." + JOIN_INPUT_AVRO_SCHEMA.toString())));
+          fs.open(new Path(joinInputAvroSchemas[i]));
       Schema schema = new Schema.Parser().parse(schemaStream);
       schemaMap.put(sourceName, schema.toString());
       LOGGER.info("Schema for {}:  \n{}", sourceName, schema);
 
       // configure input data for each source
-      String inputPathDir = getAndCheck(sourceName + "." + JOIN_INPUT_PATH.toString());
+      String inputPathDir = joinInputPaths[i];
       LOGGER.info("Input path dir for " + sourceName + ": " + inputPathDir);
       for (String inputPath : inputPathDir.split(",")) {
         Path input = new Path(inputPath);
@@ -384,7 +388,7 @@ public class JoinPhaseJob extends Configured {
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
 
-    JoinPhaseJob job = new JoinPhaseJob("aggregate_avro_job", props);
+    JoinPhaseJob job = new JoinPhaseJob("join_job", props);
     job.run();
   }
 
