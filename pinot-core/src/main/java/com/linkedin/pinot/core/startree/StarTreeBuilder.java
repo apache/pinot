@@ -83,7 +83,7 @@ public interface StarTreeBuilder {
   /**
    * Returns the split order 
    */
-  List<String> getSplitOrder();
+  List<String> getDimensionsSplitOrder();
 
   Map<String, HashBiMap<Object, Integer>> getDictionaryMap();
 

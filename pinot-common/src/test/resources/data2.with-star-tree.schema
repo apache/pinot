@@ -40,7 +40,7 @@
     }
   },
   "starTreeIndexSpec": {
-    "splitOrder": [
+    "dimensionsSplitOrder": [
       "dim2",
       "dim1",
       "dim3"

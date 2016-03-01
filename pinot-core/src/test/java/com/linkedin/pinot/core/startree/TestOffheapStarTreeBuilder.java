@@ -23,7 +23,6 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.util.MathUtils;
 import org.testng.annotations.Test;
 
@@ -43,12 +42,12 @@ public class TestOffheapStarTreeBuilder {
     int ROWS = (int) MathUtils.factorial(numDimensions);
     StarTreeBuilderConfig builderConfig = new StarTreeBuilderConfig();
     Schema schema = new Schema();
-    builderConfig.splitOrder = new ArrayList<>();
+    builderConfig.dimensionsSplitOrder = new ArrayList<>();
     for (int i = 0; i < numDimensions; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
       schema.addField(dimName, dimensionFieldSpec);
-      builderConfig.splitOrder.add(dimName);
+      builderConfig.dimensionsSplitOrder.add(dimName);
     }
     schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < numMetrics; i++) {
@@ -93,12 +92,12 @@ public class TestOffheapStarTreeBuilder {
     int numMetrics = 6;
     StarTreeBuilderConfig builderConfig = new StarTreeBuilderConfig();
     Schema schema = new Schema();
-    builderConfig.splitOrder = new ArrayList<>();
+    builderConfig.dimensionsSplitOrder = new ArrayList<>();
     for (int i = 0; i < numDimensions; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.INT, true);
       schema.addField(dimName, dimensionFieldSpec);
-      builderConfig.splitOrder.add(dimName);
+      builderConfig.dimensionsSplitOrder.add(dimName);
     }
     schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < numMetrics; i++) {

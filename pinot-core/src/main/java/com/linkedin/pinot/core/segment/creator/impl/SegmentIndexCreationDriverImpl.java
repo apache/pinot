@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
@@ -136,21 +135,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
     if (starTreeIndexSpec == null) {
       starTreeIndexSpec = new StarTreeIndexSpec();
-      starTreeIndexSpec.setExcludedDimensions(Lists.newArrayList(dataSchema.getTimeColumnName()));
       starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
       config.setStarTreeIndexSpec(starTreeIndexSpec);
     }
-    List<String> splitOrder = starTreeIndexSpec.getSplitOrder();
-    if (splitOrder != null && !splitOrder.isEmpty()) {
-      if (starTreeIndexSpec.getSplitExcludes() != null) {
-        splitOrder.removeAll(starTreeIndexSpec.getSplitExcludes());
+    List<String> dimensionsSplitOrder = starTreeIndexSpec.getDimensionsSplitOrder();
+    if (dimensionsSplitOrder != null && !dimensionsSplitOrder.isEmpty()) {
+      String timeColumnName = config.getTimeColumnName();
+      if (timeColumnName != null) {
+        dimensionsSplitOrder.remove(timeColumnName);
       }
     }
     //create star builder config from startreeindexspec. Merge these two in one later.
     StarTreeBuilderConfig starTreeBuilderConfig = new StarTreeBuilderConfig();
     starTreeBuilderConfig.setSchema(dataSchema);
-    starTreeBuilderConfig.setSplitOrder(splitOrder);
+    starTreeBuilderConfig.setDimensionsSplitOrder(dimensionsSplitOrder);
     starTreeBuilderConfig.setMaxLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
+    starTreeBuilderConfig.setSkipStarNodeCreationForDimensions(starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
     //initialize star tree builder
     StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder();
@@ -197,10 +197,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       indexCreator.indexRow(genericRow);
     }
 
-    // If no splitOrder was specified in starTreeIndexSpec, set the order used by the starTreeBuilder.
-    // This is required so the splitOrder used by the builder can be written into the segment metadata.
-    if (splitOrder == null || splitOrder.isEmpty()) {
-      starTreeIndexSpec.setSplitOrder(starTreeBuilder.getSplitOrder());
+    // If no dimensionsSplitOrder was specified in starTreeIndexSpec, set the order used by the starTreeBuilder.
+    // This is required so the dimensionsSplitOrder used by the builder can be written into the segment metadata.
+    if (dimensionsSplitOrder == null || dimensionsSplitOrder.isEmpty()) {
+      starTreeIndexSpec.setDimensionsSplitOrder(starTreeBuilder.getDimensionsSplitOrder());
     }
 
     serializeTree(starTreeBuilder);

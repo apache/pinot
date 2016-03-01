@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.STAR_TREE_ENABLED;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.STAR_TREE_SPLIT_ORDER;
 
@@ -212,8 +213,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
     if (starTreeIndexSpec != null) {
-      properties.setProperty(STAR_TREE_SPLIT_ORDER, starTreeIndexSpec.getSplitOrder());
+      properties.setProperty(STAR_TREE_SPLIT_ORDER, starTreeIndexSpec.getDimensionsSplitOrder());
       properties.setProperty(STAR_TREE_MAX_LEAF_RECORDS, starTreeIndexSpec.getMaxLeafRecords());
+      properties.setProperty(STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS, starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
     }
 
     if (indexCreationInfoMap.get(timeColumn) != null) {

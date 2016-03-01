@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
@@ -62,8 +63,8 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  *  constructTree(table, 0, N, 0);
  * }
  * constructTree(table,start,end, level){
- *    splitDimensionName = splitOrder[level]
- *    groupByResult<dimName, length> = table.groupBy(splitOrder[level]); //returns the number of rows for each value in splitDimension
+ *    splitDimensionName = dimensionsSplitOrder[level]
+ *    groupByResult<dimName, length> = table.groupBy(dimensionsSplitOrder[level]); //returns the number of rows for each value in splitDimension
  *    int rangeStart = 0;
  *    for each ( entry<dimName,length> groupByResult){
  *      if(entry.length > minThreshold){
@@ -91,7 +92,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private DataOutputStream dataBuffer;
   int rawRecordCount = 0;
   int aggRecordCount = 0;
-  private List<String> splitOrder;
+  private List<String> dimensionsSplitOrder;
+  private Set<String> skipStarNodeCreationForDimensions;
 
   private int maxLeafRecords;
   private StarTree starTree;
@@ -117,7 +119,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   public void init(StarTreeBuilderConfig builderConfig) throws Exception {
     Schema schema = builderConfig.schema;
     timeColumnName = schema.getTimeColumnName();
-    this.splitOrder = builderConfig.splitOrder;
+    this.dimensionsSplitOrder = builderConfig.dimensionsSplitOrder;
+    skipStarNodeCreationForDimensions = builderConfig.getSkipStarNodeCreationForDimensions();
     this.maxLeafRecords = builderConfig.maxLeafRecords;
     this.outDir = builderConfig.getOutDir();
     if (outDir == null) {
@@ -283,10 +286,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   public void build() throws Exception {
-    if (splitOrder == null || splitOrder.isEmpty()) {
-      splitOrder = computeDefaultSplitOrder();
+    if (dimensionsSplitOrder == null || dimensionsSplitOrder.isEmpty()) {
+      dimensionsSplitOrder = computeDefaultSplitOrder();
     }
-    LOG.debug("Split order:{}", splitOrder);
+    LOG.debug("Split order:{}", dimensionsSplitOrder);
     long start = System.currentTimeMillis();
     dataBuffer.flush();
     sort(dataFile, 0, rawRecordCount);
@@ -368,14 +371,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private int[] getSortOrder() {
     if (sortOrder == null) {
       sortOrder = new int[dimensionNames.size()];
-      for (int i = 0; i < splitOrder.size(); i++) {
-        sortOrder[i] = dimensionNameToIndexMap.get(splitOrder.get(i));
+      for (int i = 0; i < dimensionsSplitOrder.size(); i++) {
+        sortOrder[i] = dimensionNameToIndexMap.get(dimensionsSplitOrder.get(i));
       }
-      //add remaining dimensions that were not part of splitOrder
+      //add remaining dimensions that were not part of dimensionsSplitOrder
       int counter = 0;
       for (String dimName : dimensionNames) {
-        if (!splitOrder.contains(dimName)) {
-          sortOrder[splitOrder.size() + counter] = dimensionNameToIndexMap.get(dimName);
+        if (!dimensionsSplitOrder.contains(dimName)) {
+          sortOrder[dimensionsSplitOrder.size() + counter] = dimensionNameToIndexMap.get(dimName);
           counter = counter + 1;
         }
       }
@@ -403,10 +406,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       throws Exception {
     //node.setStartDocumentId(startDocId);
     int docsAdded = 0;
-    if (level == splitOrder.size() - 1) {
+    if (level == dimensionsSplitOrder.size() - 1) {
       return 0;
     }
-    String splitDimensionName = splitOrder.get(level);
+    String splitDimensionName = dimensionsSplitOrder.get(level);
     Integer splitDimensionId = dimensionNameToIndexMap.get(splitDimensionName);
     LOG.debug("Building tree at level:{} using file:{} from startDoc:{} endDocId:{} splitting on dimension:{}", level,
         file.getName(), startDocId, endDocId, splitDimensionName);
@@ -434,6 +437,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         child.setEndDocumentId(range.getRight());
       }
     }
+
+    // Return if star node does not need to be created.
+    if (skipStarNodeCreationForDimensions.contains(splitDimensionName)) {
+      return docsAdded;
+    }
+
     //create star node
     StarTreeIndexNode starChild = new StarTreeIndexNode();
     starChild.setDimensionName(splitDimensionId);
@@ -647,8 +656,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   @Override
-  public List<String> getSplitOrder() {
-    return splitOrder;
+  public List<String> getDimensionsSplitOrder() {
+    return dimensionsSplitOrder;
   }
 
   public Map<String, HashBiMap<Object, Integer>> getDictionaryMap() {

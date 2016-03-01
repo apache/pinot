@@ -19,16 +19,20 @@ import java.io.File;
 import java.util.List;
 
 import com.linkedin.pinot.common.data.Schema;
+import java.util.Set;
+
 
 public class StarTreeBuilderConfig {
- 
+
   public Schema schema;
-  
-  public List<String> splitOrder;
+
+  public List<String> dimensionsSplitOrder;
 
   public int maxLeafRecords;
-  
+
   File outDir;
+
+  private Set<String> skipStarNodeCreationForDimensions;
 
   public File getOutDir() {
     return outDir;
@@ -46,12 +50,12 @@ public class StarTreeBuilderConfig {
     this.schema = schema;
   }
 
-  public List<String> getSplitOrder() {
-    return splitOrder;
+  public List<String> getDimensionsSplitOrder() {
+    return dimensionsSplitOrder;
   }
 
-  public void setSplitOrder(List<String> splitOrder) {
-    this.splitOrder = splitOrder;
+  public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
+    this.dimensionsSplitOrder = dimensionsSplitOrder;
   }
 
   public int getMaxLeafRecords() {
@@ -61,6 +65,13 @@ public class StarTreeBuilderConfig {
   public void setMaxLeafRecords(int maxLeafRecords) {
     this.maxLeafRecords = maxLeafRecords;
   }
-  
-  
+
+  public void setSkipStarNodeCreationForDimensions(Set<String> excludedStarDimensions) {
+    this.skipStarNodeCreationForDimensions = excludedStarDimensions;
+  }
+
+  /** Set of dimension names for which not to create star nodes at split. */
+  public Set<String> getSkipStarNodeCreationForDimensions() {
+    return skipStarNodeCreationForDimensions;
+  }
 }
