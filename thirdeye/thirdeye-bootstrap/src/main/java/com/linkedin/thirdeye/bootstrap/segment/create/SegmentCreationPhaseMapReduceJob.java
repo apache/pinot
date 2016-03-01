@@ -167,8 +167,7 @@ public class SegmentCreationPhaseMapReduceJob {
 
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setMaxLeafRecords(starTreeConfig.getSplit().getThreshold());
-      starTreeIndexSpec.setSplitOrder(starTreeConfig.getSplit().getOrder());
-      starTreeIndexSpec.setExcludedDimensions(Lists.newArrayList(starTreeConfig.getTime().getColumnName()));
+      starTreeIndexSpec.setDimensionsSplitOrder(starTreeConfig.getSplit().getOrder());
       segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
