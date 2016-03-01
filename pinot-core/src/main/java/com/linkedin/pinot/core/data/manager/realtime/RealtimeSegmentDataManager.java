@@ -139,6 +139,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // continue indexing until criteria is met
         boolean notFull = true;
         long exceptionSleepMillis = 50L;
+        LOGGER.info("Starting to collect rows for segment {}", segmentName);
 
         do {
           GenericRow row = null;
@@ -163,12 +164,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         } while (notFull && keepIndexing);
 
         try {
-          LOGGER.info("Indexing threshold reached, proceeding with index conversion");
+          LOGGER.info("Indexing threshold reached, proceeding with index conversion for {}", segmentName);
           // kill the timer first
           segmentStatusTask.cancel();
-          LOGGER.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
-          LOGGER.info("Indexed " + realtimeSegment.getRawDocumentCount() + " raw events, current number of docs = "
-              + realtimeSegment.getSegmentMetadata().getTotalDocs());
+          LOGGER.info("Trying to persist a realtimeSegment {}" + realtimeSegment.getSegmentName());
+          LOGGER.info("Indexed {} raw events, current number of docs = {} for {}",
+              realtimeSegment.getRawDocumentCount(), realtimeSegment.getSegmentMetadata().getTotalDocs(), segmentName);
           File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
           // lets convert the segment now
@@ -176,7 +177,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns);
 
-          LOGGER.info("Trying to build segment!");
+          LOGGER.info("Trying to build segment {}", segmentName);
           converter.build();
           File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
@@ -228,7 +229,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           LOGGER.info("Successfully closed and committed kafka for {}", segmentName);
         } catch (Exception e) {
-          LOGGER.error("Caught exception in the realtime indexing thread", e);
+          LOGGER.error("Caught exception in the realtime indexing thread for {}", segmentName, e);
         }
       }
     });
@@ -259,13 +260,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
           || realtimeSegment.getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
         if (realtimeSegment.getRawDocumentCount() == 0) {
-          LOGGER.info("no new events coming in, extending the end time by another hour");
+          LOGGER.info("no new events coming in for {}, extending the end time by another hour", segmentName);
           segmentEndTimeThreshold =
               System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
           return;
         }
-        LOGGER.info("Stopped indexing due to reaching segment limit: " + realtimeSegment.getRawDocumentCount()
-            + " raw documents indexed, segment is aged "
+        LOGGER.info("Stopped indexing {} due to reaching segment limit: {} raw documents indexed, segment is aged {}"
+            + realtimeSegment.getRawDocumentCount()
             + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
         keepIndexing = false;
       }

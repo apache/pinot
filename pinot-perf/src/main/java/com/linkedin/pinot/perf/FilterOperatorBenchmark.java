@@ -26,13 +26,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.log4j.Level;
 import org.json.JSONObject;
-
 import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -143,7 +140,22 @@ public class FilterOperatorBenchmark {
       int matchedCount = 0;
       while ((docId = iterator.next()) != Constants.EOF) {
         matchedCount = matchedCount + 1;
+        /* Sample ode to print a particular column from matched records
+        {
+          final String columnName = "someColumn";
+          BlockSingleValIterator it =
+              (BlockSingleValIterator) indexSegmentImpl.getDataSource(columnName).getNextBlock().getBlockValueSet()
+                  .iterator();
+          it.skipTo(docId);
+          int dictId = it.nextIntVal();  // dict id
+          // get the dictionary and use this dictionary id to get the value
+          System.out.println("Segment " + indexSegmentImpl.getSegmentName() + " " + columnName + " " + indexSegmentImpl
+              .getDataSource(columnName).getDictionary().get(dictId));
+        }
+        */
       }
+
+
       end = System.currentTimeMillis();
       timesSpent[id] = (end - start);
       filterOperator.close();

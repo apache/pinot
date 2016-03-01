@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
@@ -30,15 +29,14 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -120,7 +118,7 @@ public class AvroUtils {
       try {
         columnType = AvroRecordReader.getColumnType(field);
       } catch (UnsupportedOperationException e) {
-        LOGGER.warn("Unsupported field type for field {}, using String instead.", field.name());
+        LOGGER.warn("Unsupported field type for field {} schema {}, using String instead.", field.name(), field.schema());
         columnType = FieldSpec.DataType.STRING;
       }
 
