@@ -137,11 +137,7 @@ public class FixedBitSingleValueMultiColWriter implements Closeable {
     assert val >= minValues[col]  && val <= maxValues[col];
     long bitOffset = ((long) rowSizeInBits) * row + columnOffsetsInBits[col];
     val = val + offsets[col];
-    for (int bitPos = colSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
-      if ((val & (1 << bitPos)) != 0) {
-        bitSet.setBit(bitOffset + (colSizesInBits[col] - bitPos - 1));
-      }
-    }
+    bitSet.writeInt(bitOffset, colSizesInBits[col], val);
   }
 
   @Override

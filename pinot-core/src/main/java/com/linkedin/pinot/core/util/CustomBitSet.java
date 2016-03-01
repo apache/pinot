@@ -151,6 +151,24 @@ public final class CustomBitSet implements Closeable {
     }
   }
 
+  public void writeInt(long startBitIndex, int bitLength, int value) {
+    if (bitLength < 16 && startBitIndex + bitLength + 32 < nrBytes * 8L) {
+      int bytePosition = (int) (startBitIndex / 8);
+      int bitOffset = (int) (startBitIndex % 8);
+      int shiftOffset = 32 - (bitOffset + bitLength);
+      int intValue = buf.getInt(bytePosition);
+      int bitMask = ((1 << bitLength) - 1) << shiftOffset;
+      int updatedIntValue = (intValue & ~bitMask) | ((value << shiftOffset) & bitMask);
+      buf.putInt(bytePosition, updatedIntValue);
+    } else {
+      for (int bitPos = bitLength - 1; bitPos >= 0; bitPos--) {
+        if ((value & (1 << bitPos)) != 0) {
+          setBit(startBitIndex + (bitLength - bitPos - 1));
+        }
+      }
+    }
+  }
+
   public byte[] toByteArray() {
     byte[] dst = new byte[buf.capacity()];
     buf.get(dst);
