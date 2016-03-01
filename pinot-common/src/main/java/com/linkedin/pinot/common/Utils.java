@@ -47,6 +47,17 @@ public class Utils {
     throw (T) exception;
   }
 
+  /**
+   * Obtains the name of the calling method and line number. This is slow, only use this for debugging!
+   */
+  public static String getCallingMethodDetails() {
+    try {
+      throw new RuntimeException();
+    } catch (RuntimeException e) {
+      return e.getStackTrace()[2].toString();
+    }
+  }
+
   private static final AtomicLong _uniqueIdGen = new AtomicLong(1);
 
   public static long getUniqueId() {

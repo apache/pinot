@@ -22,7 +22,9 @@ import java.io.RandomAccessFile;
 import java.lang.reflect.Method;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -121,7 +123,19 @@ public class MmapUtils {
           }
           BUFFER_TO_CONTEXT_MAP.remove(buffer);
         } else {
-          LOGGER.warn("Attempted to release byte buffer of size {} with no context", bufferSize);
+          LOGGER.warn("Attempted to release byte buffer of size {} with no context, no deallocation performed.", bufferSize);
+          if (LOGGER.isDebugEnabled()) {
+            List<String> matchingAllocationContexts = new ArrayList<>();
+
+            for (Map.Entry<ByteBuffer, AllocationContext> byteBufferAllocationContextEntry : BUFFER_TO_CONTEXT_MAP.entrySet()) {
+              if (byteBufferAllocationContextEntry.getKey().capacity() == bufferSize) {
+                matchingAllocationContexts.add(byteBufferAllocationContextEntry.getValue().toString());
+              }
+            }
+
+            LOGGER.debug("Contexts with a size of {}: {}", bufferSize, matchingAllocationContexts);
+            LOGGER.debug("Called by: {}", Utils.getCallingMethodDetails());
+          }
         }
       }
     } catch (Exception e) {
