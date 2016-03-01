@@ -15,26 +15,6 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.avro.Schema.Field;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.util.Utf8;
-import org.apache.commons.io.FileUtils;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -46,6 +26,7 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
@@ -62,6 +43,24 @@ import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.util.Utf8;
+import org.apache.commons.io.FileUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class DictionariesTest {
@@ -359,5 +358,49 @@ public class DictionariesTest {
     Assert.assertEquals((statsCollector.getMinValue()).toString(), "false");
     Assert.assertEquals((statsCollector.getMaxValue()).toString(), "true");
     Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  /**
+   * Tests DictionaryCreator for case when one value is a substring of another.
+   * For example, in case of sorted values {"abc", "abc def"} after padding,
+   * the sorted order would change to {"abc def%%%%", "abc%%%%%%%"}
+   *
+   * This test asserts that DictionaryCreator.indexOfSV("abc") returns 1 (ie index of "abc%%%%%%%"
+   * in actual padded dictionary), and not 0.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testStringsValuesWithPadding()
+      throws Exception {
+    File indexDir = new File("/tmp/dict.test");
+    FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true, "\t");
+
+    String[] inputStrings = new String[2];
+    String[] paddedStrings = new String[2];
+
+    inputStrings[0] = "abc def";
+    inputStrings[1] = "abc";
+    Arrays.sort(inputStrings); // Sorted order: {"abc", "abc def"}
+
+    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
+    dictionaryCreator.build();
+
+    // Get the padded string as stored in the dictionary.
+    int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
+    for (int i = 0; i < inputStrings.length; i++) {
+      paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength);
+    }
+    Arrays.sort(paddedStrings); // Sorted Order: {"abc def%%%%", "abc%%%%%%%"}
+
+    // Assert that indexOfSV for un-padded string returns the index of the corresponding padded string.
+    for (int i = 0; i < inputStrings.length; i++) {
+      int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
+      Assert.assertTrue(paddedStrings[paddedIndex]
+          .equals(SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength)));
+    }
+
+    dictionaryCreator.close();
+    FileUtils.deleteQuietly(indexDir);
   }
 }

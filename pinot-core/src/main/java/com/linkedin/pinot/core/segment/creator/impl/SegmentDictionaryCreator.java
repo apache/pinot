@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -25,14 +27,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +41,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private final FieldSpec spec;
   private final File dictionaryFile;
   private final int rowCount;
+  private static final Charset utf8CharSet = Charset.forName("UTF-8");
 
   private Int2IntOpenHashMap intValueToIndexMap;
   private Long2IntOpenHashMap longValueToIndexMap;
@@ -160,7 +158,7 @@ public class SegmentDictionaryCreator implements Closeable {
         Object[] sortedObjects = (Object[]) sortedList;
         for (final Object e : sortedObjects) {
           String val = e.toString();
-          int length = val.getBytes(Charset.forName("UTF-8")).length;
+          int length = val.getBytes(utf8CharSet).length;
           if (stringColumnMaxLength < length) {
             stringColumnMaxLength = length;
           }
@@ -171,20 +169,13 @@ public class SegmentDictionaryCreator implements Closeable {
                 new int[] { stringColumnMaxLength });
 
         final String[] revised = new String[rowCount];
-        Map<String, Integer> revisedMap = new HashMap<String, Integer>();
+        Map<String, String> revisedMap = new HashMap<String, String>();
         for (int i = 0; i < rowCount; i++) {
           final String toWrite = sortedObjects[i].toString();
-          final int padding = stringColumnMaxLength - toWrite.getBytes(Charset.forName("UTF-8")).length;
-
-          final StringBuilder bld = new StringBuilder();
-          bld.append(toWrite);
-          for (int j = 0; j < padding; j++) {
-            bld.append(V1Constants.Str.STRING_PAD_CHAR);
-          }
-          String entry = bld.toString();
+          String entry = getPaddedString(toWrite, stringColumnMaxLength);
           revised[i] = entry;
-          assert (revised[i].getBytes(Charset.forName("UTF-8")).length == stringColumnMaxLength);
-          revisedMap.put(revised[i], i);
+          assert (revised[i].getBytes(utf8CharSet).length == stringColumnMaxLength);
+          revisedMap.put(revised[i], toWrite);
         }
         Arrays.sort(revised);
 
@@ -195,9 +186,8 @@ public class SegmentDictionaryCreator implements Closeable {
           // No need to store padded value, we can store and lookup by raw value. In certain cases, original sorted order
           // may be different from revised sorted order [PINOT-2730], so would need to use the original order in value
           // to index map.
-          Integer origIndex = revisedMap.get(revised[i]);
-          String origString = sortedObjects[origIndex].toString();
-          stringValueToIndexMap.put(origString, origIndex);
+          String origString = revisedMap.get(revised[i]);
+          stringValueToIndexMap.put(origString, i);
         }
         stringDictionaryWrite.close();
         break;
@@ -269,5 +259,26 @@ public class SegmentDictionaryCreator implements Closeable {
     }
 
     return ret;
+  }
+
+  /**
+   * Given an input string and a target length append the padding characters to the string
+   * to make it of desired length. If length of string >= target length, returns the original string.
+   *
+   * @param inputString
+   * @param targetLength
+   * @return
+   */
+  public static String getPaddedString(String inputString, int targetLength) {
+    if (inputString.length() >= targetLength) {
+      return inputString;
+    }
+
+    StringBuilder stringBuilder = new StringBuilder(inputString);
+    final int padding = targetLength - inputString.getBytes(utf8CharSet).length;
+    for (int i = 0; i < padding; i++) {
+      stringBuilder.append(V1Constants.Str.STRING_PAD_CHAR);
+    }
+    return stringBuilder.toString();
   }
 }
