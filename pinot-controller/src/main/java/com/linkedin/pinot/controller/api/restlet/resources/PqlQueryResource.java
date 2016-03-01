@@ -32,7 +32,6 @@ import java.util.Set;
 
 import org.antlr.runtime.RecognitionException;
 import org.apache.helix.model.InstanceConfig;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -42,7 +41,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
 
 /**
@@ -52,7 +51,7 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
 public class PqlQueryResource extends PinotRestletResourceBase {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);
-  private static final PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());;
+  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
   public PqlQueryResource() {
   }
@@ -64,25 +63,11 @@ public class PqlQueryResource extends PinotRestletResourceBase {
     final String traceEnabled = getQuery().getValues("trace");
 
     LOGGER.info("*** found pql : " + pqlString);
-    JSONObject compiledJSON;
-
-    try {
-      compiledJSON = compiler.compile(pqlString);
-    } catch (final RecognitionException e) {
-      LOGGER.error("Caught exception while processing get request", e);
-      ProcessingException parsingException = QueryException.PQL_PARSING_ERROR.deepCopy();
-      parsingException.setMessage(e.toString());
-      return new StringRepresentation(parsingException.toString());
-    }
-
-    if (!compiledJSON.has("collection")) {
-      return new StringRepresentation("your request does not contain the collection information");
-    }
 
     final String resource;
     try {
-      resource = compiledJSON.getString("collection");
-    } catch (final JSONException e) {
+      resource = REQUEST_COMPILER.compileToBrokerRequest(pqlString).getQuerySource().getTableName();
+    } catch (final Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
     }

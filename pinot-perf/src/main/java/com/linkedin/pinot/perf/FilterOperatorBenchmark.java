@@ -29,8 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.log4j.Level;
-import org.json.JSONObject;
-import com.linkedin.pinot.common.client.request.RequestConverter;
+
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -43,7 +42,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
 /**
  * Allows us to benchmark filter operator in isolation
@@ -59,9 +58,8 @@ public class FilterOperatorBenchmark {
     File[] segmentDirs = new File(rootDir).listFiles();
     String query = args[1];
     AtomicInteger totalDocsMatched = new AtomicInteger(0);
-    PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());
-    JSONObject jsonObject = compiler.compile(query);
-    BrokerRequest brokerRequest = RequestConverter.fromJSON(jsonObject);
+    Pql2Compiler pql2Compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest = pql2Compiler.compileToBrokerRequest(query);
     List<Callable<Void>> segmentProcessors = new ArrayList<>();
     long[] timesSpent = new long[segmentDirs.length];
     for (int i = 0; i < segmentDirs.length; i++) {
@@ -86,7 +84,7 @@ public class FilterOperatorBenchmark {
           new IndexLoadingConfigMetadata(tableDataManagerConfig);
       IndexSegmentImpl indexSegmentImpl = (IndexSegmentImpl) Loaders.IndexSegment
           .load(indexSegmentDir, ReadMode.heap, indexLoadingConfigMetadata);
-      segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest, 
+      segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest,
           totalDocsMatched, timesSpent));
     }
     ExecutorService executorService = Executors.newCachedThreadPool();

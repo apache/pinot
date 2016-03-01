@@ -36,7 +36,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -60,7 +59,7 @@ import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -70,7 +69,7 @@ public class RealtimeQueriesSentinelTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeQueriesSentinelTest.class);
   private static ReduceService REDUCE_SERVICE = new DefaultReduceService();
 
-  private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());
+  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
   private final String AVRO_DATA = "data/test_data-mv.avro";
   private static com.linkedin.pinot.common.data.Schema PINOT_SCHEMA;
@@ -114,7 +113,7 @@ public class RealtimeQueriesSentinelTest {
     final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(10000);
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
       LOGGER.info("running " + counter + " : " + aggCall.pql);
-      final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
+      final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(aggCall.pql);
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
@@ -150,7 +149,7 @@ public class RealtimeQueriesSentinelTest {
     fromAvro.put("F", 127.0D);
     fromAvro.put("A", 20.0D);
     fromAvro.put("H", 29.0D);
-    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     InstanceRequest instanceRequest = new InstanceRequest(485, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add("testTable_testTable");
@@ -171,7 +170,7 @@ public class RealtimeQueriesSentinelTest {
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
       LOGGER.info("running " + counter + " : " + groupBy.pql);
-      final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
+      final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(groupBy.pql);
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");

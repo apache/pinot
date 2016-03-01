@@ -58,16 +58,10 @@ public abstract class ControllerTest {
   protected HelixManager _helixZkManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
-  public JSONObject postQuery(String query, String brokerBaseApiUrl, boolean usePql2Compiler) throws Exception {
+  public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
     json.put("trace", isTraceEnabled);
-
-    if (usePql2Compiler) {
-      json.put("dialect", "pql2");
-    } else {
-      json.put("dialect", "bql");
-    }
 
     final long start = System.currentTimeMillis();
     final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();
@@ -99,7 +93,7 @@ public abstract class ControllerTest {
   }
 
   public JSONObject postQuery(String query) throws Exception {
-    return postQuery(query, BROKER_BASE_API_URL, true);
+    return postQuery(query, BROKER_BASE_API_URL);
   }
 
   protected void startZk() {

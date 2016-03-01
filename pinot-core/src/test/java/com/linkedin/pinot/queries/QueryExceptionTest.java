@@ -31,7 +31,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.ReduceService;
@@ -50,7 +49,7 @@ import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -60,7 +59,7 @@ public class QueryExceptionTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueriesSentinelTest.class);
   private static ReduceService REDUCE_SERVICE = new DefaultReduceService();
 
-  private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());
+  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private final String AVRO_DATA = "data/test_data-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "QueriesSentinelTest");
   private static QueryExecutor QUERY_EXECUTOR;
@@ -122,7 +121,7 @@ public class QueryExceptionTest {
     String query = "select count(*) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
@@ -138,7 +137,7 @@ public class QueryExceptionTest {
     String query = "select sudm(blablaa) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
@@ -155,7 +154,7 @@ public class QueryExceptionTest {
     String query = "select sum(blablaa) from testTable where column1='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
@@ -172,7 +171,7 @@ public class QueryExceptionTest {
     String query = "select count(*) from testTable where column1='24516187' group by bla";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);

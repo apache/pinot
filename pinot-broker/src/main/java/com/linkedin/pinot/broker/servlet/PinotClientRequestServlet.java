@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.transport.common.BucketingSelection;
@@ -47,8 +46,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class PinotClientRequestServlet extends HttpServlet {
-  private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
-  private static final Pql2Compiler pql2Compiler = new Pql2Compiler();
+  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
   private static final long serialVersionUID = -3516093545255816357L;
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequestServlet.class);
@@ -116,12 +114,7 @@ public class PinotClientRequestServlet extends HttpServlet {
     final long startTime = System.nanoTime();
     final BrokerRequest brokerRequest;
     try {
-      if (request.has("dialect") && "bql".equals(request.getString("dialect"))) {
-        final JSONObject compiled = requestCompiler.compile(pql);
-        brokerRequest = convertToBrokerRequest(compiled);
-      } else {
-        brokerRequest = pql2Compiler.compileToBrokerRequest(pql);
-      }
+      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
       if (isTraceEnabled) brokerRequest.setEnableTrace(true);
     } catch (Exception e) {
       BrokerResponse brokerResponse = new BrokerResponse();
@@ -156,10 +149,6 @@ public class PinotClientRequestServlet extends HttpServlet {
   private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {
     final Map<SegmentId, ServerInstance> bucketMap = new HashMap<>();
     return new BucketingSelection(bucketMap);
-  }
-
-  private BrokerRequest convertToBrokerRequest(JSONObject compiled) throws Exception {
-    return com.linkedin.pinot.common.client.request.RequestConverter.fromJSON(compiled);
   }
 
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
