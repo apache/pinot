@@ -439,7 +439,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
 
     // Return if star node does not need to be created.
-    if (skipStarNodeCreationForDimensions.contains(splitDimensionName)) {
+    if (skipStarNodeCreationForDimensions != null && skipStarNodeCreationForDimensions.contains(splitDimensionName)) {
       return docsAdded;
     }
 
