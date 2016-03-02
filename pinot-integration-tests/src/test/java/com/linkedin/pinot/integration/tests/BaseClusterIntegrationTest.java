@@ -747,21 +747,28 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void waitForRecordCountToStabilizeToExpectedCount(int expectedRecordCount, long deadline) throws Exception {
-    int pinotRecordCount;
+    int pinotRecordCount = -1;
 
     do {
       Thread.sleep(5000L);
 
-      // Run the query
-      JSONObject response = postQuery("select count(*) from 'mytable'");
-      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-      String pinotValue = firstAggregationResult.getString("value");
-      pinotRecordCount = Integer.parseInt(pinotValue);
+      try {
+        // Run the query
+        JSONObject response = postQuery("select count(*) from 'mytable'");
+        JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
+        JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
+        String pinotValue = firstAggregationResult.getString("value");
+        pinotRecordCount = Integer.parseInt(pinotValue);
 
-      LOGGER.info("Pinot record count: " + pinotRecordCount + "\tExpected count: " + expectedRecordCount);
-      Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
-      TOTAL_DOCS = response.getLong("totalDocs");
+        LOGGER.info("Pinot record count: " + pinotRecordCount + "\tExpected count: " + expectedRecordCount);
+        TOTAL_DOCS = response.getLong("totalDocs");
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while waiting for record count to stabilize, will try again.", e);
+      }
+
+      if (expectedRecordCount != pinotRecordCount) {
+        Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
+      }
     } while (expectedRecordCount != pinotRecordCount);
   }
 
