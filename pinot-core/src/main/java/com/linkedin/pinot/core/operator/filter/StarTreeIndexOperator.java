@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -104,16 +107,23 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     String column = childFilter.getColumn();
     //only equality predicates are supported
     Predicate predicate = Predicate.newPredicate(childFilter);
+    Dictionary dictionary = segment.getDataSource(column).getDictionary();
     if (childFilter.getOperator() == FilterOperator.EQUALITY) {
       EqPredicate eqPredicate = (EqPredicate) predicate;
       //computing dictionaryId allows us early termination and avoids multiple looks up during tree traversal
-      int dictId = segment.getDataSource(column).getDictionary().indexOf(eqPredicate.getEqualsValue());
+      int dictId = dictionary.indexOf(eqPredicate.getEqualsValue());
       if (dictId < 0) {
         //empty result
         emptyResult = true;
       }
       eligibleEqualityPredicatesMap.put(column, new PredicateEntry(predicate, dictId));
     } else {
+      // If dictionary does not have any values that satisfy the predicate, set emptyResults to true.
+      PredicateEvaluator predicateEvaluator =
+          PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
+      if (predicateEvaluator.alwaysFalse()) {
+        emptyResult = true;
+      }
       //store this predicate, we will have to apply it later
       nonEqualityPredicatesMap.put(column, new PredicateEntry(predicate, -1));
     }
