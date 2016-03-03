@@ -147,7 +147,7 @@ public class PinotClientRequestServlet extends HttpServlet {
     long queryProcessingTimeInMillis = TimeUnit.MILLISECONDS.convert(queryProcessingTimeInNanos, TimeUnit.NANOSECONDS);
     resp.setTimeUsedMs(queryProcessingTimeInMillis);
 
-    LOGGER.info("Broker Response : {}", resp);
+    LOGGER.debug("Broker Response : {}", resp);
     LOGGER.info("ResponseTimes for {} {}", requestId, scatterGatherStats);
     LOGGER.info("Total query processing time : {} ms", queryProcessingTimeInMillis);
 
