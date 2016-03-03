@@ -62,8 +62,14 @@ public class AggregationGroupByOperatorService {
     // If result size is < _trimThreshold, return the results without sorting or trimming.
     // Else, sort the results, and trim the result set size to 5 times of _minTrimSize.
     int minTrimSize = Math.max(_groupByTopN, 1000);
-    _trimThreshold = minTrimSize * 20;
-    _trimSize = minTrimSize * 5;
+
+    // In case of int overflow, default to Integer.MAX_VALUE. These cannot be long because MinMaxPriorityQueue class
+    // can only handle int size.
+    boolean overFlow = (Integer.MAX_VALUE / 20) <= minTrimSize;
+    _trimThreshold = overFlow ? Integer.MAX_VALUE : (minTrimSize * 20);
+
+    overFlow = (Integer.MAX_VALUE / 5) <= minTrimSize;
+    _trimSize = overFlow ? Integer.MAX_VALUE : (minTrimSize * 5);
   }
 
   public static List<Map<String, Serializable>> transformDataTableToGroupByResult(DataTable dataTable) {
