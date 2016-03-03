@@ -70,6 +70,11 @@ public class EmailReportJob implements Job {
       throw new JobExecutionException(e);
     }
 
+    if (results.isEmpty() && !config.getSendZeroAnomalyEmail()) {
+      LOG.info("Zero anomalies found, skipping sending email");
+      return;
+    }
+
     // Sort them in descending time (newest appear first)
     Collections.sort(results, Collections.reverseOrder());
 

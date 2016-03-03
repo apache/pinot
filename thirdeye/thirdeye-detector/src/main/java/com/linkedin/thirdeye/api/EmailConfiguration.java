@@ -80,6 +80,9 @@ public class EmailConfiguration {
   @Column(name = "is_active", nullable = false)
   private boolean isActive;
 
+  @Column(name = "send_zero_anomaly_email", nullable = false)
+  private boolean sendZeroAnomalyEmail;
+
   public long getId() {
     return id;
   }
@@ -184,12 +187,21 @@ public class EmailConfiguration {
     this.isActive = isActive;
   }
 
+  public boolean getSendZeroAnomalyEmail() {
+    return sendZeroAnomalyEmail;
+  }
+
+  public void setSendZeroAnomalyEmail(boolean sendZeroAnomalyEmail) {
+    this.sendZeroAnomalyEmail = sendZeroAnomalyEmail;
+  }
+
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
         .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
         .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", isActive)
+        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail)
         .toString();
   }
 }

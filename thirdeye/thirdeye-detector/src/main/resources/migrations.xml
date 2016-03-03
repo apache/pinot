@@ -112,7 +112,7 @@
         <constraints nullable="true"/>
       </column>
     </createTable>
-    
+
     <!-- EmailConfiguration -->
     <createTable tableName="email_configurations">
       <column name="id" type="bigint" autoIncrement="true">
@@ -169,4 +169,13 @@
     </createTable>
     <addPrimaryKey tableName="anomaly_function_relations" columnNames="parent_id, child_id" constraintName="pk_anomaly_function_relations"/>
   </changeSet>
+
+  <changeSet id="3" author="npawar">
+    <addColumn tableName="email_configurations">
+      <column name="send_zero_anomaly_email" type="boolean" defaultValueBoolean="true">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
 </databaseChangeLog>
