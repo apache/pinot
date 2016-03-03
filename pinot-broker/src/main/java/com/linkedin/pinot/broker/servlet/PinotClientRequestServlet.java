@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -141,8 +142,15 @@ public class PinotClientRequestServlet extends HttpServlet {
               }
             });
 
+    // Query processing time is the total time spent in all steps include query parsing, scatter/gather, ser/de etc.
+    long queryProcessingTimeInNanos = System.nanoTime() - startTime;
+    long queryProcessingTimeInMillis = TimeUnit.MILLISECONDS.convert(queryProcessingTimeInNanos, TimeUnit.NANOSECONDS);
+    resp.setTimeUsedMs(queryProcessingTimeInMillis);
+
     LOGGER.info("Broker Response : {}", resp);
     LOGGER.info("ResponseTimes for {} {}", requestId, scatterGatherStats);
+    LOGGER.info("Total query processing time : {} ms", queryProcessingTimeInMillis);
+
     return resp;
   }
 
