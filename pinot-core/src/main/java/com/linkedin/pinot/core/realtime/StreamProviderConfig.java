@@ -35,4 +35,9 @@ public interface StreamProviderConfig {
   public int getSizeThresholdToFlushSegment();
   
   public long getTimeThresholdToFlushSegment();
+
+  /**
+   * @return Name of this stream. May return null if called before init() is called.
+   */
+  public String getStreamName();
 }

@@ -22,7 +22,7 @@ public interface StreamProvider {
   /**
    *
    */
-  public void init(StreamProviderConfig streamProviderConfig) throws Exception;
+  public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception;
 
   /**
    *

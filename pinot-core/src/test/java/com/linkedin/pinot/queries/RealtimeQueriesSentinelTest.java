@@ -268,7 +268,7 @@ public class RealtimeQueriesSentinelTest {
   }
 
   private IndexSegment getRealtimeSegment() throws IOException {
-    RealtimeSegmentImpl realtimeSegmentImpl = new RealtimeSegmentImpl(PINOT_SCHEMA, 100000);
+    RealtimeSegmentImpl realtimeSegmentImpl = new RealtimeSegmentImpl(PINOT_SCHEMA, 100000, "testTable", "testTable_testTable", AVRO_DATA);
     realtimeSegmentImpl.setSegmentMetadata(getRealtimeSegmentZKMetadata());
     try {
       DataFileStream<GenericRecord> avroReader =
@@ -285,7 +285,6 @@ public class RealtimeQueriesSentinelTest {
     }
     System.out.println("Current raw events indexed: " + realtimeSegmentImpl.getRawDocumentCount() + ", totalDocs = "
         + realtimeSegmentImpl.getSegmentMetadata().getTotalDocs());
-    realtimeSegmentImpl.setSegmentName("testTable_testTable");
     realtimeSegmentImpl.setSegmentMetadata(getRealtimeSegmentZKMetadata());
     return realtimeSegmentImpl;
 

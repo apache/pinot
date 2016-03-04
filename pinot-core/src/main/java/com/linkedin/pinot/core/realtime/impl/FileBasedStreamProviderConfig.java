@@ -82,4 +82,8 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
     return 1000 * 60 * 60;
   }
 
+  @Override
+  public String getStreamName() {
+    return getPath();
+  }
 }

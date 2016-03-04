@@ -55,16 +55,15 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricName;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
-  private static Counter invalidRowsDropped = Metrics.newCounter(new MetricName(RealtimeSegmentImpl.class, "invalidRowsDropped"));
+  private final Counter invalidRowsDropped;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class);
+  private final Logger LOGGER;
   public static final int[] EMPTY_DICTIONARY_IDS_ARRAY = new int[0];
 
   private SegmentMetadataImpl _segmentMetadata;
@@ -94,8 +93,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private final Map<String, DataFileReader> columnIndexReaderWriterMap;
 
-  public RealtimeSegmentImpl(Schema schema, int capacity) throws IOException {
+  public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName) throws IOException {
     // initial variable setup
+    this.segmentName = segmentName;
+    LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class.getName() + "_" + segmentName + "_" + streamName);
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
@@ -147,6 +148,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     columnIndexReaderWriterMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
         V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
 
+    invalidRowsDropped = Metrics.newCounter(new MetricName(RealtimeSegmentImpl.class,
+        tableName + "-" + streamName + "-" + "invalidRowsDropped"));
   }
 
   @Override
@@ -317,10 +320,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     throw new UnsupportedOperationException("not implemented");
   }
 
-  public void setSegmentName(String segmentId) {
-    this.segmentName = segmentId;
-  }
-
   @Override
   public String getSegmentName() {
     return segmentName;
@@ -428,7 +427,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(),
+        (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
@@ -451,7 +451,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     long start = System.currentTimeMillis();
 
-    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(),
+        (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValuesArr.length; i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
@@ -472,7 +473,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(),
+        (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
@@ -493,7 +495,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(),
+        (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
@@ -514,7 +517,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     long start = System.currentTimeMillis();
     Collections.sort(rawValues);
 
-    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(), (System.currentTimeMillis() - start));
+    LOGGER.info("Column {}, dictionary len : {}, time to sort : {} ", columnToSortOn, dictionary.length(),
+        (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
       intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();

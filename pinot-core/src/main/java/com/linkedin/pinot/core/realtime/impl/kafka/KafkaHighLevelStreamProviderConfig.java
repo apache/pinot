@@ -18,16 +18,13 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-
-import kafka.consumer.ConsumerConfig;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import kafka.consumer.ConsumerConfig;
 
 
 public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {
@@ -175,6 +172,11 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
           Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME));
     }
     
+  }
+
+  @Override
+  public String getStreamName() {
+    return getTopicName();
   }
 
   @Override

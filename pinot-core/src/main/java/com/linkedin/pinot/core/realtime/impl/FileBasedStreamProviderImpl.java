@@ -31,7 +31,7 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
   private int count;
 
   @Override
-  public void init(StreamProviderConfig streamProviderConfig) throws Exception {
+  public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception {
     config = (FileBasedStreamProviderConfig) streamProviderConfig;
 
     FieldExtractor extractor = FieldExtractorFactory.getPlainFieldExtractor(config.getSchema());

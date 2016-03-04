@@ -15,15 +15,15 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 
 
 /**
@@ -39,7 +39,7 @@ public class RealtimeSegmentImplTest {
         .addTime("time", TimeUnit.SECONDS, FieldSpec.DataType.LONG)
         .build();
 
-    RealtimeSegmentImpl realtimeSegment = new RealtimeSegmentImpl(schema, 100);
+    RealtimeSegmentImpl realtimeSegment = new RealtimeSegmentImpl(schema, 100, "noTable", "noSegment", schema.getSchemaName());
 
     // Segment should be empty
     Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 0);

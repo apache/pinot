@@ -78,9 +78,10 @@ public class RealtimeSegmentTest {
     StreamProviderConfig config = new FileBasedStreamProviderConfig(FileFormat.AVRO, filePath, schema);
     System.out.println(config);
     StreamProvider provider = new FileBasedStreamProviderImpl();
-    provider.init(config);
+    final String tableName = RealtimeSegmentTest.class.getSimpleName() + ".noTable";
+    provider.init(config, tableName);
 
-    segment = new RealtimeSegmentImpl(schema, 100000);
+    segment = new RealtimeSegmentImpl(schema, 100000, tableName, "noSegment", AVRO_DATA);
     GenericRow row = provider.next();
     while (row != null) {
       segment.index(row);

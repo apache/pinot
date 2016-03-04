@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import java.util.Random;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.StreamProviderFactory;
-import java.util.Random;
 
 
 /**
@@ -45,8 +45,8 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void init(StreamProviderConfig streamProviderConfig) throws Exception {
-      _streamProvider.init(streamProviderConfig);
+    public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception {
+      _streamProvider.init(streamProviderConfig, tableName);
     }
 
     @Override
