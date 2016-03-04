@@ -1,5 +1,5 @@
-thirdEyeHost: 'localhost'
-thirdEyePort: 10000
+clientConfigRoot: <thirdeyeRoot>/thirdeye-client/configs
+functionConfigPath: <thirdeyeRoot>/thirdeye-detector/anomalyFunctionConfig/functions.properties
 
 logging:
   level: INFO
