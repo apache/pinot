@@ -41,7 +41,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     final String lookup = rawValue.toString();
-    final int differenceInLength = lengthofMaxEntry - lookup.length();
+    final int differenceInLength = lengthofMaxEntry - lookup.getBytes(Charset.forName("UTF-8")).length;
     final StringBuilder bld = new StringBuilder();
     bld.append(lookup);
     for (int i = 0; i < differenceInLength; i++) {
