@@ -85,7 +85,14 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
 
     @Override
     public void commit() {
-      _streamProvider.commit();
+      // Fail to commit 50% of the time
+      boolean failToCommit = _random.nextBoolean();
+
+      if (failToCommit) {
+        throw new RuntimeException("Flaky stream provider exception");
+      } else {
+        _streamProvider.commit();
+      }
     }
 
     @Override

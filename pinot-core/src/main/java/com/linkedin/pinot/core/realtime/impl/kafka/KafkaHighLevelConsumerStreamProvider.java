@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -25,9 +23,7 @@ import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricName;
-import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
 
 
@@ -44,12 +40,11 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
   private KafkaMessageDecoder decoder;
 
-  private ConsumerConfig kafkaConsumerConfig;
   private ConsumerConnector consumer;
-  private KafkaStream<byte[], byte[]> kafkaStreams;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;
   private long lastLogTime = 0;
   private long lastCount = 0;
+  private ConsumerAndIterator consumerAndIterator;
 
   private Logger INSTANCE_LOGGER = STATIC_LOGGER;
   private Counter kafkaEventsConsumedCount = globalKafkaEventsConsumedCount;
@@ -59,7 +54,6 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   @Override
   public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception {
     this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
-    this.kafkaConsumerConfig = this.streamProviderConfig.getKafkaConsumerConfig();
     this.decoder = this.streamProviderConfig.getDecoder();
     kafkaEventsConsumedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class,
             tableName + "-" + this.streamProviderConfig.getStreamName() + "-" + "kafkaEventsConsumedCount"));
@@ -75,12 +69,9 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
 
   @Override
   public void start() throws Exception {
-    consumer = kafka.consumer.Consumer.createJavaConsumerConnector(this.kafkaConsumerConfig);
-    Map<String, Integer> topicsMap = streamProviderConfig.getTopicMap(1);
-
-    Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.createMessageStreams(topicsMap);
-    this.kafkaStreams = consumerMap.get(streamProviderConfig.getTopicName()).get(0);
-    kafkaIterator = kafkaStreams.iterator();
+    consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(streamProviderConfig);
+    kafkaIterator = consumerAndIterator.getIterator();
+    consumer = consumerAndIterator.getConsumer();
   }
 
   @Override
@@ -144,8 +135,12 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
 
   @Override
   public void shutdown() throws Exception {
-    if (consumer != null) {
-      consumer.shutdown();
+    if (consumerAndIterator != null) {
+      kafkaIterator = null;
+      consumer = null;
+
+      KafkaConsumerManager.releaseConsumerAndIterator(consumerAndIterator);
+      consumerAndIterator = null;
     }
   }
 }
