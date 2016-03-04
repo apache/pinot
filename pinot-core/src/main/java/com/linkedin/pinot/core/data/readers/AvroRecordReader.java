@@ -92,7 +92,7 @@ public class AvroRecordReader extends BaseRecordReader {
   public GenericRow next() {
     try {
       _genericRecord = _dataStream.next(_genericRecord);
-      return _schemaExtractor.transform(getGenericRow(_genericRecord));
+      return getGenericRow(_genericRecord);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading record", e);
       Utils.rethrowException(e);

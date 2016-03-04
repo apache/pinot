@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import com.linkedin.pinot.core.data.extractors.FieldExtractor;
+import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
@@ -72,6 +75,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   SegmentCreator indexCreator;
   SegmentIndexCreationInfo segementIndexCreationInfo;
   Schema dataSchema;
+  PlainFieldExtractor extractor;
   int totalDocs = 0;
   int totalRawDocs = 0;
   int totalAggDocs = 0;
@@ -96,6 +100,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader = reader;
     recordReader.init();
     dataSchema = recordReader.getSchema();
+    extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
 
     // Initialize stats collection
     statsCollector = new SegmentPreIndexStatsCollectorImpl(recordReader.getSchema());
@@ -160,7 +165,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Start building star tree!");
     totalDocs = 0;
     while (recordReader.hasNext()) {
-      GenericRow row = recordReader.next();
+      GenericRow row = readNextRowSanitized();
       starTreeBuilder.append(row);
       statsCollector.collectRow(row);
       totalRawDocs++;
@@ -272,7 +277,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       totalDocs++;
       totalRawDocs++;
       long start = System.currentTimeMillis();
-      GenericRow row = recordReader.next();
+      GenericRow row = readNextRowSanitized();
       long stop = System.currentTimeMillis();
       statsCollector.collectRow(row);
       long stop1 = System.currentTimeMillis();
@@ -291,7 +296,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Start building IndexCreator!");
     while (recordReader.hasNext()) {
       long start = System.currentTimeMillis();
-      GenericRow row = recordReader.next();
+      GenericRow row = readNextRowSanitized();
       long stop = System.currentTimeMillis();
       indexCreator.indexRow(row);
       long stop1 = System.currentTimeMillis();
@@ -444,5 +449,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     } else {
       return null;
     }
+  }
+
+  private GenericRow readNextRowSanitized() {
+    GenericRow rowOrig = recordReader.next();
+    return extractor.transform(rowOrig);
   }
 }
