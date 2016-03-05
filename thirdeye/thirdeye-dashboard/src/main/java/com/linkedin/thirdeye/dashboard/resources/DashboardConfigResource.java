@@ -209,36 +209,69 @@ public class DashboardConfigResource {
     DateTime current = new DateTime(currentMillis);
 
     List<String> metrics = getMetrics(collection);
-    String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION,
-        METRIC_FUNCTION_JOINER.join(metrics));
+    String dummyFunction =
+        String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION,
+            METRIC_FUNCTION_JOINER.join(metrics));
 
     Multimap<String, String> dimensionValues = LinkedListMultimap.create();
-    Map<String, Future<QueryResult>> resultFutures = new HashMap<>();
+    Map<String, List<Future<QueryResult>>> resultFutures = new HashMap<>();
     // query w/ group by for each dimension.
     for (String dimension : dimensions) {
-      // Generate request
-      ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
-          .setMetricFunction(dummyFunction).setStartTime(baseline).setEndTime(current)
-          .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
-      LOGGER.info("Generated request for dimension retrieval: {}", req);
+      ArrayList<Future<QueryResult>> futures = new ArrayList<>();
+
+      // Generate requests
+      ThirdEyeRequest req1 =
+          new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(dummyFunction)
+              .setStartTime(baseline).setEndTime(baseline.plusDays(1))
+              .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
+      LOGGER.info("Generated request for dimension retrieval: {}", req1);
+      futures.add(queryCache.getQueryResultAsync(req1));
+
+      ThirdEyeRequest req2 =
+          new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(dummyFunction)
+              .setStartTime(current.minusDays(1)).setEndTime(current)
+              .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
+      LOGGER.info("Generated request for dimension retrieval: {}", req2);
+      futures.add(queryCache.getQueryResultAsync(req2));
 
       // Query (in parallel)
-      resultFutures.put(dimension, queryCache.getQueryResultAsync(req));
+      resultFutures.put(dimension, futures);
     }
 
     Map<String, Collection<String>> collectedDimensionValues = new HashMap<>();
     // Wait for all queries and generate the ordered list from the result.
     for (int i = 0; i < dimensions.size(); i++) {
       String dimension = dimensions.get(i);
-      QueryResult queryResult = resultFutures.get(dimension).get();
 
       // Sum up hourly data over entire dataset for each dimension combination
       int metricCount = metrics.size();
       double[] total = new double[metricCount];
       Map<String, double[]> summedValues = new HashMap<>();
+      QueryResult mergedQueryResult = new QueryResult();
+
+      boolean inited = false;
+      for (Future<QueryResult> futureQueryResult : resultFutures.get(dimension)) {
+        QueryResult queryResult = futureQueryResult.get();
+        if (!inited) {
+          mergedQueryResult.setDimensions(queryResult.getDimensions());
+          mergedQueryResult.setMetrics(queryResult.getMetrics());
+          mergedQueryResult.setData(new HashMap<>(queryResult.getData()));
+          inited = true;
+        } else {
+          for (String dimValue : queryResult.getData().keySet()) {
+            if (mergedQueryResult.getData().containsKey(dimValue)) {
+              mergedQueryResult.getData().get(dimValue).putAll(queryResult.getData().get(dimValue));
+            }
+            mergedQueryResult.getData().put(dimValue, queryResult.getData().get(dimValue));
+          }
+        }
+      }
+
+      QueryResult queryResult = mergedQueryResult;
 
       for (Map.Entry<String, Map<String, Number[]>> entry : queryResult.getData().entrySet()) {
         double[] sum = new double[metricCount];
+
         for (Map.Entry<String, Number[]> hourlyEntry : entry.getValue().entrySet()) {
           for (int j = 0; j < metricCount; j++) {
             double value = hourlyEntry.getValue()[j].doubleValue();
@@ -246,6 +279,7 @@ public class DashboardConfigResource {
           }
         }
         summedValues.put(entry.getKey(), sum);
+
         // update total w/ sums for each dimension value.
         for (int j = 0; j < metricCount; j++) {
           total[j] += sum[j];
