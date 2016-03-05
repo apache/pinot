@@ -36,4 +36,21 @@ public class NetUtil {
     }
     return localAddress.getHostAddress();
   }
+
+  /**
+   * Get the hostname or IP address.
+   *
+   * @return The hostname if available, otherwise a dotted quad address. Returns null if neither can be determined.
+   */
+  public static String getHostnameOrAddress() {
+    try {
+      return InetAddress.getLocalHost().getCanonicalHostName();
+    } catch (UnknownHostException ignored) {
+      try {
+        return getHostAddress();
+      } catch (Exception e) {
+        return null;
+      }
+    }
+  }
 }

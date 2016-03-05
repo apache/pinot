@@ -16,7 +16,7 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
-import com.linkedin.pinot.broker.servlet.PinotBrokerDebugServlet;
+import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.Utils;
@@ -189,8 +189,8 @@ public class BrokerServerBuilder {
 
     WebAppContext context = new WebAppContext();
     context.addServlet(PinotClientRequestServlet.class, "/query");
-    context.addServlet(PinotBrokerDebugServlet.class, "/debug");
-    
+    context.addServlet(PinotBrokerRoutingTableDebugServlet.class, "/debug/routingTable/*");
+
     if (clientConfig.enableConsole()) {
       context.setResourceBase(clientConfig.getConsoleWebappPath());
     } else {

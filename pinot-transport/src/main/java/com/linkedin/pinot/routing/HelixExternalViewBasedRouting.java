@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.routing;
 
+import com.linkedin.pinot.common.utils.NetUtil;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -198,23 +199,28 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   @Override
-  public String dumpSnapShot() throws Exception {
+  public String dumpSnapshot(String tableName) throws Exception {
     JSONObject ret = new JSONObject();
     JSONArray routingTableSnapshot = new JSONArray();
-    for (String tableName : _brokerRoutingTable.keySet()) {
-      JSONObject tableEntry = new JSONObject();
-      tableEntry.put("tableName", tableName);
 
-      JSONArray entries = new JSONArray();
-      List<ServerToSegmentSetMap> routableTable = _brokerRoutingTable.get(tableName);
-      for (ServerToSegmentSetMap serverToInstaceMap : routableTable) {
-        entries.put(new JSONObject(serverToInstaceMap.toString()));
+    for (String currentTable : _brokerRoutingTable.keySet()) {
+      if (tableName == null || currentTable.startsWith(tableName)) {
+        JSONObject tableEntry = new JSONObject();
+        tableEntry.put("tableName", currentTable);
+
+        JSONArray entries = new JSONArray();
+        List<ServerToSegmentSetMap> routableTable = _brokerRoutingTable.get(currentTable);
+        for (ServerToSegmentSetMap serverToInstaceMap : routableTable) {
+          entries.put(new JSONObject(serverToInstaceMap.toString()));
+        }
+        tableEntry.put("routingTableEntries", entries);
+
+        routingTableSnapshot.put(tableEntry);
       }
-      tableEntry.put("routingTableEntries", entries);
-
-      routingTableSnapshot.put(tableEntry);
     }
+
     ret.put("routingTableSnapshot", routingTableSnapshot);
-    return ret.toString();
+    ret.put("host", NetUtil.getHostnameOrAddress());
+    return ret.toString(2);
   }
 }

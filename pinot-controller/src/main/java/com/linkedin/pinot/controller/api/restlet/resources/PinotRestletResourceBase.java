@@ -2,10 +2,9 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Map;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.restlet.Response;
@@ -55,11 +54,12 @@ public class PinotRestletResourceBase extends ServerResource {
     if (controllerHostName != null) {
       return controllerHostName;
     }
-    try {
-      controllerHostName =  InetAddress.getLocalHost().getCanonicalHostName();
-    } catch (UnknownHostException e) {
+
+    controllerHostName = NetUtil.getHostnameOrAddress();
+    if (controllerHostName == null) {
       return "Unknown";
     }
+
     return controllerHostName;
   }
 

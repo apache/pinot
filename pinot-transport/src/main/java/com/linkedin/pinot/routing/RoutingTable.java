@@ -22,7 +22,6 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 public interface RoutingTable {
-
   /**
    * Return the candidate set of servers that hosts each segment-set.
    * The List of services are expected to be ordered so that replica-selection strategy can be
@@ -30,22 +29,23 @@ public interface RoutingTable {
    *
    * @return SegmentSet to Servers map.
    */
-  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request);
+  Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request);
 
   /**
    * Initialize and start the Routing table population
    */
-  public void start();
+  void start();
 
   /**
    * Shutdown Routing table cleanly
    */
-  public void shutdown();
-  
+  void shutdown();
+
   /**
-   * @throws Exception 
-   * 
+   * Dumps a snapshot of the routing table.
+   *
+   * @param tableName The table name or empty string for all tables.
+   * @throws Exception
    */
-  
-  public String dumpSnapShot() throws Exception;
+  String dumpSnapshot(String tableName) throws Exception;
 }
