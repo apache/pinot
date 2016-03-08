@@ -24,7 +24,11 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 
 
-public interface ReduceService {
+/**
+ * Interface for merging/reducing responses from a set of servers.
+ * @param <T>
+ */
+public interface ReduceService<T extends BrokerResponse> {
   /**
    * Reduce instanceResponses gathered from server instances to one brokerResponse.
    * ServerInstance would be helpful in debug mode
@@ -33,9 +37,9 @@ public interface ReduceService {
    *
    * @param brokerRequest
    * @param instanceResponseMap
-   * @return BrokerResponse
+   * @return T extends BrokerResponse
    */
-  public BrokerResponse reduce(BrokerRequest brokerRequest, Map<ServerInstance, InstanceResponse> instanceResponseMap);
+  public T reduce(BrokerRequest brokerRequest, Map<ServerInstance, InstanceResponse> instanceResponseMap);
 
   /**
    * Reduce instanceResponses gathered from server instances to one brokerResponse.
@@ -45,9 +49,9 @@ public interface ReduceService {
    *
    * @param brokerRequest
    * @param instanceResponseMap
-   * @return BrokerResponse
+   * @return T extends BrokerResponse
    */
-  public BrokerResponse reduceOnDataTable(BrokerRequest brokerRequest,
+  public T reduceOnDataTable(BrokerRequest brokerRequest,
       Map<ServerInstance, DataTable> instanceResponseMap);
 
 }

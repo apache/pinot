@@ -15,29 +15,11 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import java.io.Serializable;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -63,6 +45,23 @@ import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import java.io.Serializable;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 /**
@@ -73,15 +72,24 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 public class SelectionOperatorUtils {
 
   public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
+
   static {
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE, new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT_ARRAY, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG_ARRAY, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT_ARRAY, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE_ARRAY, new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.INT, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.LONG, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.FLOAT, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE,
+        new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.INT_ARRAY, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG_ARRAY,
+        new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.FLOAT_ARRAY, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE_ARRAY,
+        new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
   }
 
   public static List<String> getSelectionColumns(List<String> selectionColumns, IndexSegment indexSegment) {
@@ -149,7 +157,9 @@ public class SelectionOperatorUtils {
     return rowEventsSet;
   }
 
-  public static JSONObject render(Collection<Serializable[]> finalResults, List<String> selectionColumns, DataSchema dataSchema) throws Exception {
+  public static JSONObject render(Collection<Serializable[]> finalResults, List<String> selectionColumns,
+      DataSchema dataSchema)
+      throws Exception {
     final LinkedList<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
     List<Serializable[]> list = (List<Serializable[]>) finalResults;
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
@@ -162,6 +172,33 @@ public class SelectionOperatorUtils {
     resultJsonObject.put("results", new JSONArray(rowEventsJSonList));
     resultJsonObject.put("columns", getSelectionColumnsFromDataSchema(selectionColumns, dataSchema));
     return resultJsonObject;
+  }
+
+  /**
+   * Given a collection of selection results from broker, format and render the SelectionResults
+   * object, to be used in building the BrokerResponse.
+   *
+   * @param reducedResults
+   * @param selectionColumns
+   * @param dataSchema
+   * @return
+   * @throws Exception
+   */
+  public static SelectionResults renderSelectionResults(Collection<Serializable[]> reducedResults,
+      List<String> selectionColumns, DataSchema dataSchema)
+      throws Exception {
+    List<Serializable[]> rowData = (List<Serializable[]>) reducedResults;
+    List<Serializable[]> rows = new ArrayList<Serializable[]>();
+
+    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+      selectionColumns = getSelectionColumns(selectionColumns, dataSchema);
+    }
+
+    for (int i = 0; i < rowData.size(); i++) {
+      rows.add(getFormattedRow(rowData.get(i), selectionColumns, dataSchema));
+    }
+
+    return new SelectionResults(selectionColumns, rows);
   }
 
   private static JSONArray getSelectionColumnsFromDataSchema(List<String> selectionColumns, DataSchema dataSchema) {
@@ -307,8 +344,7 @@ public class SelectionOperatorUtils {
           default:
             break;
         }
-      } else if (blocks[j] instanceof UnSortedSingleValueBlock
-          || blocks[j] instanceof SortedSingleValueBlock) {
+      } else if (blocks[j] instanceof UnSortedSingleValueBlock || blocks[j] instanceof SortedSingleValueBlock) {
         if (blocks[j].getMetadata().hasDictionary()) {
           Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
           BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
@@ -409,7 +445,8 @@ public class SelectionOperatorUtils {
     return row;
   }
 
-  public static JSONArray getJSonArrayFromRow(Serializable[] poll, List<String> selectionColumns, DataSchema dataSchema) throws JSONException {
+  public static JSONArray getJSonArrayFromRow(Serializable[] poll, List<String> selectionColumns, DataSchema dataSchema)
+      throws JSONException {
 
     final JSONArray jsonArray = new JSONArray();
     for (int i = 0; i < dataSchema.size(); ++i) {
@@ -460,11 +497,87 @@ public class SelectionOperatorUtils {
               break;
           }
           jsonArray.put(stringJsonArray);
-
         }
       }
     }
     return jsonArray;
+  }
+
+  /**
+   * Given an array of input values, format them as per their data type and return the formatted array.
+   * The formatted object in the array are of type String.
+   *
+   * @param inputValues To be formatted
+   * @param selectionColumns Columns to pick up
+   * @param dataSchema
+   * @return
+   * @throws JSONException
+   */
+  private static Serializable[] getFormattedRow(Serializable[] inputValues, List<String> selectionColumns,
+      DataSchema dataSchema)
+      throws JSONException {
+    Serializable[] formattedRow = new Serializable[inputValues.length];
+
+    for (int i = 0; i < dataSchema.size(); ++i) {
+      // If column not part of schema, we don't know how to format it, so just skip.
+      if (!selectionColumns.contains(dataSchema.getColumnName(i))) {
+        continue;
+      }
+
+      if (dataSchema.getColumnType(i).isSingleValue()) {
+        if (dataSchema.getColumnType(i) == DataType.STRING) {
+          formattedRow[i] = inputValues[i];
+        } else {
+          formattedRow[i] = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(inputValues[i]);
+        }
+      } else {
+        String[] multiValued;
+        DecimalFormat decimalFormat = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i));
+
+        switch (dataSchema.getColumnType(i)) {
+          case STRING_ARRAY:
+            multiValued = (String[]) inputValues[i];
+            break;
+
+          case INT_ARRAY:
+            int[] intValues = (int[]) inputValues[i];
+            multiValued = new String[intValues.length];
+            for (int j = 0; j < intValues.length; j++) {
+              multiValued[j] = decimalFormat.format(intValues[j]);
+            }
+            break;
+
+          case FLOAT_ARRAY:
+            float[] floatValues = (float[]) inputValues[i];
+            multiValued = new String[floatValues.length];
+            for (int j = 0; j < floatValues.length; j++) {
+              multiValued[j] = decimalFormat.format(floatValues[j]);
+            }
+            break;
+
+          case LONG_ARRAY:
+            long[] longValues = (long[]) inputValues[i];
+            multiValued = new String[longValues.length];
+            for (int j = 0; j < longValues.length; j++) {
+              multiValued[j] = decimalFormat.format(longValues[j]);
+            }
+            break;
+
+          case DOUBLE_ARRAY:
+            double[] doubleValues = (double[]) inputValues[i];
+            multiValued = new String[doubleValues.length];
+            for (int j = 0; j < doubleValues.length; j++) {
+              multiValued[j] = decimalFormat.format(doubleValues[j]);
+            }
+            break;
+
+          default:
+            throw new RuntimeException("Unsupported data type in selection results");
+        }
+        formattedRow[i] = multiValued;
+      }
+    }
+    return formattedRow;
   }
 
   public static Serializable[] extractRowFromDataTable(DataTable dt, int rowId) {
@@ -660,10 +773,8 @@ public class SelectionOperatorUtils {
             break;
         }
         rowString += "]";
-
       }
     }
     return rowString;
   }
-
 }

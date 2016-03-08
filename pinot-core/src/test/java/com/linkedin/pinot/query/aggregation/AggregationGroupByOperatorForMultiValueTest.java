@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -383,7 +383,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
-    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
+    final BrokerResponseJSON brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
@@ -393,11 +393,11 @@ public class AggregationGroupByOperatorForMultiValueTest {
     setupSegmentList(numSegments);
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     final BrokerRequest brokerRequest = getAggregationGroupByWithEmptyFilterBrokerRequest();
-    final BrokerResponse brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
+    final BrokerResponseJSON brokerResponse = getBrokerResponse(instancePlanMaker, brokerRequest);
     assertEmptyBrokerResponse(brokerResponse);
   }
 
-  private BrokerResponse getBrokerResponse(PlanMaker instancePlanMaker, BrokerRequest brokerRequest) {
+  private BrokerResponseJSON getBrokerResponse(PlanMaker instancePlanMaker, BrokerRequest brokerRequest) {
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     final Plan globalPlan =
         instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
@@ -409,13 +409,13 @@ public class AggregationGroupByOperatorForMultiValueTest {
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug("brokerResponse: {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.info("Time used : {}", brokerResponse.getTimeUsedMs());
     return brokerResponse;
   }
 
-  private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
+  private void assertBrokerResponse(int numSegments, BrokerResponseJSON brokerResponse) throws JSONException {
     Assert.assertEquals(100000 * numSegments, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
@@ -454,7 +454,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
 
   }
 
-  private void assertEmptyBrokerResponse(BrokerResponse brokerResponse) throws JSONException {
+  private void assertEmptyBrokerResponse(BrokerResponseJSON brokerResponse) throws JSONException {
     Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
@@ -467,7 +467,7 @@ public class AggregationGroupByOperatorForMultiValueTest {
     assertionOnCount(brokerResponse);
   }
 
-  private void assertionOnCount(BrokerResponse brokerResponse)
+  private void assertionOnCount(BrokerResponseJSON brokerResponse)
       throws JSONException {
     Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
     Assert.assertEquals("sum_count", brokerResponse.getAggregationResults().get(1).getString("function").toString());

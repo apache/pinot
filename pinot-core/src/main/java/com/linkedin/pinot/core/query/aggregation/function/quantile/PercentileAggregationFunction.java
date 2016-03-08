@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.util.Locale;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -152,7 +153,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   @Override
   public JSONObject render(Double finalAggregationResult) {
     try {
-      return new JSONObject().put("value", finalAggregationResult.toString());
+      return new JSONObject().put("value", String.format(Locale.US, "%1.5f", finalAggregationResult));
     } catch (JSONException e) {
       LOGGER.error("Caught exception while rendering aggregation result", e);
       Utils.rethrowException(e);

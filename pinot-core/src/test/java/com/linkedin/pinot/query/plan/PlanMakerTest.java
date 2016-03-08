@@ -41,7 +41,7 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -416,7 +416,7 @@ public class PlanMakerTest {
     DefaultReduceService reduceService = new DefaultReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
-    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseJSON brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println(brokerResponse.getAggregationResults());
   }
 
@@ -539,7 +539,7 @@ public class PlanMakerTest {
     DefaultReduceService defaultReduceService = new DefaultReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
 
@@ -569,7 +569,7 @@ public class PlanMakerTest {
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
-    BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println(brokerResponse.getSelectionResults());
     System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
     System.out.println(brokerResponse);
@@ -608,7 +608,7 @@ public class PlanMakerTest {
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
-    BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println(brokerResponse.getSelectionResults());
     System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
     System.out.println(brokerResponse);

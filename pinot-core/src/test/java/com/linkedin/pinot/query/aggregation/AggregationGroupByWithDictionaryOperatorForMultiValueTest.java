@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -381,7 +381,7 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
 
@@ -405,13 +405,13 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug("Aggregation Results : {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
     assertEmptyBrokerResponse(brokerResponse);
   }
 
-  private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
+  private void assertBrokerResponse(int numSegments, BrokerResponseJSON brokerResponse) throws JSONException {
     Assert.assertEquals(100000 * numSegments, brokerResponse.getNumDocsScanned());
     final int groupSize = 15;
     verifyResponse(brokerResponse, groupSize);
@@ -443,7 +443,7 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
 
   }
 
-  private void verifyResponse(BrokerResponse brokerResponse, int groupSize)
+  private void verifyResponse(BrokerResponseJSON brokerResponse, int groupSize)
       throws JSONException {
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
     for (int i = 0; i < _numAggregations; ++i) {
@@ -462,7 +462,7 @@ public class AggregationGroupByWithDictionaryOperatorForMultiValueTest {
         .toString());
   }
 
-  private void assertEmptyBrokerResponse(BrokerResponse brokerResponse) throws JSONException {
+  private void assertEmptyBrokerResponse(BrokerResponseJSON brokerResponse) throws JSONException {
     Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
     final int groupSize = 0;
     verifyResponse(brokerResponse, groupSize);

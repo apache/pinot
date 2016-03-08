@@ -15,31 +15,11 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import java.io.Serializable;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.PriorityQueue;
-
-import javax.activation.UnsupportedDataTypeException;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -68,6 +48,24 @@ import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import java.io.Serializable;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.PriorityQueue;
+import javax.activation.UnsupportedDataTypeException;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 /**
@@ -94,15 +92,24 @@ public class SelectionOperatorService {
   private final boolean _doOrdering;
 
   public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
+
   static {
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE, new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT_ARRAY, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG_ARRAY, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT_ARRAY, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
-    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE_ARRAY, new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.INT, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.LONG, new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.FLOAT, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE,
+        new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.INT_ARRAY, new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG_ARRAY,
+        new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP
+        .put(DataType.FLOAT_ARRAY, new DecimalFormat("##########.#####", DecimalFormatSymbols.getInstance(Locale.US)));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE_ARRAY,
+        new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)));
   }
 
   public SelectionOperatorService(Selection selections, IndexSegment indexSegment) {
@@ -238,7 +245,8 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  public JSONObject render(Collection<Serializable[]> finalResults, DataSchema dataSchema, int offset) throws Exception {
+  public JSONObject render(Collection<Serializable[]> finalResults, DataSchema dataSchema, int offset)
+      throws Exception {
     final LinkedList<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
     if (finalResults instanceof PriorityQueue<?>) {
       PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) finalResults;
@@ -252,16 +260,50 @@ public class SelectionOperatorService {
         rowEventsJSonList.add(getJSonArrayFromRow(list.get(i), dataSchema));
       }
     } else {
-      throw new UnsupportedDataTypeException("type of results Expected: (PriorityQueue| ArrayList)) actual:"
-          + finalResults.getClass());
+      throw new UnsupportedDataTypeException(
+          "type of results Expected: (PriorityQueue| ArrayList)) actual:" + finalResults.getClass());
     }
     final JSONObject resultJsonObject = new JSONObject();
     resultJsonObject.put("results", new JSONArray(rowEventsJSonList));
-    resultJsonObject.put("columns", getSelectionColumnsFromDataSchema(dataSchema));
+    resultJsonObject.put("columns", getSelectionColumnsJsonArrayFromDataSchema(dataSchema));
     return resultJsonObject;
   }
 
-  private JSONArray getSelectionColumnsFromDataSchema(DataSchema dataSchema) {
+  /**
+   * Given a collection of selection results from broker, translate them to SelectionResults object
+   * to be used for building BrokerResponse.
+   *
+   * @param reducedResults
+   * @param dataSchema
+   * @param offset
+   * @return
+   * @throws Exception
+   */
+  public SelectionResults renderSelectionResults(Collection<Serializable[]> reducedResults, DataSchema dataSchema,
+      int offset)
+      throws Exception {
+    final LinkedList<Serializable[]> rows = new LinkedList<Serializable[]>();
+
+    if (reducedResults instanceof PriorityQueue<?>) {
+      PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) reducedResults;
+      while (reducedResults.size() > offset) {
+        rows.addFirst(getFormattedRow(queue.poll(), dataSchema));
+      }
+    } else if (reducedResults instanceof ArrayList<?>) {
+      List<Serializable[]> list = (List<Serializable[]>) reducedResults;
+      for (int i = offset; i < list.size(); i++) {
+        rows.add(getFormattedRow(list.get(i), dataSchema));
+      }
+    } else {
+      throw new UnsupportedDataTypeException(
+          "type of results Expected: (PriorityQueue| ArrayList)) actual:" + reducedResults.getClass());
+    }
+
+    List<String> columns = getSelectionColumnsFromDataSchema(dataSchema);
+    return new SelectionResults(columns, rows);
+  }
+
+  private JSONArray getSelectionColumnsJsonArrayFromDataSchema(DataSchema dataSchema) {
     final JSONArray jsonArray = new JSONArray();
     for (int idx = 0; idx < dataSchema.size(); ++idx) {
       if (_selectionColumns.contains(dataSchema.getColumnName(idx))) {
@@ -269,6 +311,17 @@ public class SelectionOperatorService {
       }
     }
     return jsonArray;
+  }
+
+  private List<String> getSelectionColumnsFromDataSchema(DataSchema dataSchema) {
+    List<String> columns = new ArrayList<String>();
+
+    for (int i = 0; i < dataSchema.size(); i++) {
+      if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
+        columns.add(dataSchema.getColumnName(i));
+      }
+    }
+    return columns;
   }
 
   public Collection<Serializable[]> getRowEventsSet() {
@@ -283,7 +336,8 @@ public class SelectionOperatorService {
     return _numDocsScanned;
   }
 
-  private Comparator<Serializable[]> getComparator(final List<SelectionSort> sortSequence, final DataSchema dataSchema) {
+  private Comparator<Serializable[]> getComparator(final List<SelectionSort> sortSequence,
+      final DataSchema dataSchema) {
     return new Comparator<Serializable[]>() {
       @Override
       public int compare(Serializable[] o1, Serializable[] o2) {
@@ -335,17 +389,33 @@ public class SelectionOperatorService {
             default:
               break;
           }
-          if (ret != 0){
+          if (ret != 0) {
             return ret;
           }
         }
         return 0;
-      };
+      }
+
+      ;
     };
   }
 
-  public JSONObject render(Collection<Serializable[]> reduceResults) throws Exception {
+  public JSONObject render(Collection<Serializable[]> reduceResults)
+      throws Exception {
     return render(reduceResults, _dataSchema, _selectionOffset);
+  }
+
+  /**
+   * Translate the selection results from broker to SelectionResults object to be used
+   * for building BrokerResponse.
+   *
+   * @param reduceResults
+   * @return
+   * @throws Exception
+   */
+  public SelectionResults renderSelectionResults(Collection<Serializable[]> reduceResults)
+      throws Exception {
+    return renderSelectionResults(reduceResults, _dataSchema, _selectionOffset);
   }
 
   private DataSchema getDataSchema(List<SelectionSort> sortSequence, List<String> selectionColumns,
@@ -377,7 +447,8 @@ public class SelectionOperatorService {
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
-  public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks) throws Exception {
+  public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks)
+      throws Exception {
     int docId = 0;
     _rowDocIdComparator = getDocValBasedComparator(_sortSequence, _dataSchema, blocks);
     if (_doOrdering) {
@@ -403,7 +474,8 @@ public class SelectionOperatorService {
     mergeToRowEventsSet(blocks);
   }
 
-  public Collection<Serializable[]> mergeToRowEventsSet(Block[] blocks) throws Exception {
+  public Collection<Serializable[]> mergeToRowEventsSet(Block[] blocks)
+      throws Exception {
     SelectionFetcher selectionFetcher = new SelectionFetcher(blocks, _dataSchema);
     if (_doOrdering) {
       final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
@@ -427,14 +499,15 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  private Comparator<Integer> getDocValBasedComparator(final List<SelectionSort> sortSequence, final DataSchema dataSchema,
-      final Block[] blocks) {
+  private Comparator<Integer> getDocValBasedComparator(final List<SelectionSort> sortSequence,
+      final DataSchema dataSchema, final Block[] blocks) {
 
     return new CompositeDocIdValComparator(sortSequence, blocks);
   }
 
   @Deprecated
-  private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks) throws Exception {
+  private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks)
+      throws Exception {
 
     final Serializable[] row = new Serializable[_dataSchema.size()];
     int j = 0;
@@ -533,8 +606,7 @@ public class SelectionOperatorService {
           default:
             break;
         }
-      } else if (blocks[j] instanceof UnSortedSingleValueBlock
-          || blocks[j] instanceof SortedSingleValueBlock) {
+      } else if (blocks[j] instanceof UnSortedSingleValueBlock || blocks[j] instanceof SortedSingleValueBlock) {
         if (blocks[j].getMetadata().hasDictionary()) {
           Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
           BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
@@ -635,7 +707,8 @@ public class SelectionOperatorService {
     return row;
   }
 
-  private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
+  private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema)
+      throws JSONException {
 
     final JSONArray jsonArray = new JSONArray();
     for (int i = 0; i < dataSchema.size(); ++i) {
@@ -686,11 +759,63 @@ public class SelectionOperatorService {
               break;
           }
           jsonArray.put(stringJsonArray);
-
         }
       }
     }
     return jsonArray;
+  }
+
+  /**
+   * Given an array of input values, format them based on their data type, and return an
+   * array of formatted strings.
+   *
+   * @param inputValues
+   * @param dataSchema
+   * @return
+   * @throws JSONException
+   */
+  private Serializable[] getFormattedRow(Serializable[] inputValues, DataSchema dataSchema)
+      throws JSONException {
+    Serializable[] formattedRow = new Serializable[inputValues.length];
+
+    for (int i = 0; i < dataSchema.size(); ++i) {
+      if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
+
+        if (dataSchema.getColumnType(i).isSingleValue()) {
+          if (dataSchema.getColumnType(i) == DataType.STRING) {
+            formattedRow[i] = inputValues[i];
+          } else {
+            formattedRow[i] = DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(inputValues[i]);
+          }
+        } else {
+          Object[] pollArray = (Object[]) inputValues[i];
+          Serializable[] multiValued = new Serializable[pollArray.length];
+
+          switch (dataSchema.getColumnType(i)) {
+            case STRING_ARRAY:
+              for (String value : (String[]) pollArray) {
+                multiValued[i] = value;
+              }
+              break;
+
+            case INT_ARRAY:
+            case FLOAT_ARRAY:
+            case LONG_ARRAY:
+            case DOUBLE_ARRAY:
+              for (int j = 0; j < pollArray.length; j++) {
+                DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(pollArray[j]);
+              }
+              break;
+
+            default:
+              throw new RuntimeException("Unsupported data type in selection results");
+          }
+
+          formattedRow[i] = multiValued;
+        }
+      }
+    }
+    return formattedRow;
   }
 
   private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
@@ -884,7 +1009,6 @@ public class SelectionOperatorService {
         break;
     }
     return "";
-
   }
 
   public static String getRowStringFromSerializable(Serializable[] row, DataSchema dataSchema) {
@@ -956,7 +1080,6 @@ public class SelectionOperatorService {
             break;
         }
         rowString += "]";
-
       }
     }
     return rowString;

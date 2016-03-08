@@ -124,6 +124,7 @@ struct BrokerRequest {
   9: optional FilterQueryMap filterSubQueryMap;
  10: optional string bucketHashKey;
  11: optional bool enableTrace;
+ 12: optional string responseFormat;
 }
 
 /**

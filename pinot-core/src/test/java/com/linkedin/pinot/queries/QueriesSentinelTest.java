@@ -15,27 +15,6 @@
  */
 package com.linkedin.pinot.queries;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import org.antlr.runtime.RecognitionException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.ReduceService;
@@ -45,6 +24,7 @@ import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestSimpleAggreati
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -61,6 +41,25 @@ import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.antlr.runtime.RecognitionException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
@@ -69,7 +68,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class QueriesSentinelTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueriesSentinelTest.class);
-  private static ReduceService REDUCE_SERVICE = new DefaultReduceService();
+  private static ReduceService<BrokerResponseJSON> REDUCE_SERVICE = new DefaultReduceService();
 
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private final String AVRO_DATA = "data/test_data-mv.avro";
@@ -127,7 +126,7 @@ public class QueriesSentinelTest {
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
 
       // compute value
@@ -229,7 +228,7 @@ public class QueriesSentinelTest {
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + aggCall.result);
       try {
@@ -259,7 +258,7 @@ public class QueriesSentinelTest {
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + groupBy.groupResults);
 
@@ -372,7 +371,7 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
   }
 
@@ -388,7 +387,7 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(1));
@@ -410,7 +409,7 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     Assert.assertEquals(brokerResponse.getAggregationResults().get(0).getInt("value"), 14);
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), 14);
@@ -430,7 +429,7 @@ public class QueriesSentinelTest {
     final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     LOGGER.info("TraceInfo is " + brokerResponse.getTraceInfo()); //
   }

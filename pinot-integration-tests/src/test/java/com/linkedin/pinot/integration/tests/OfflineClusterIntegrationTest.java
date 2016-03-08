@@ -172,16 +172,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSingleQuery() throws Exception {
     String query;
-    query = "select count(*) from 'mytable' where DaysSinceEpoch >= 16312";
+    query = "select max(ArrTime), min(ArrTime) from 'mytable' where DaysSinceEpoch >= 16312";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
-    query = "select * from 'mytable' limit 5";
-    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+//    query = "select count(*) from 'mytable' where DaysSinceEpoch < 16312";
+//    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+//    query = "select count(*) from 'mytable' where DaysSinceEpoch <= 16312";
+//    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+//    query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312";
+//    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+//    query = "select * from 'mytable' limit 5";
+//    super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
 
   }
 

@@ -20,6 +20,8 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.AggregationResult;
+import com.linkedin.pinot.common.response.broker.GroupByResult;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
@@ -29,6 +31,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.json.JSONArray;
@@ -102,10 +105,8 @@ public class AggregationGroupByOperatorService {
         for (int i = 0; i < reducedResult.size(); ++i) {
           for (String key : toBeReducedResult.get(i).keySet()) {
             if (reducedResult.get(i).containsKey(key)) {
-              reducedResult.get(i).put(
-                  key,
-                  _aggregationFunctionList.get(i).combineTwoValues(reducedResult.get(i).get(key),
-                      toBeReducedResult.get(i).get(key)));
+              reducedResult.get(i).put(key, _aggregationFunctionList.get(i)
+                  .combineTwoValues(reducedResult.get(i).get(key), toBeReducedResult.get(i).get(key)));
             } else {
               reducedResult.get(i).put(key, toBeReducedResult.get(i).get(key));
             }
@@ -118,8 +119,8 @@ public class AggregationGroupByOperatorService {
         Map<String, Serializable> functionLevelReducedResult = reducedResult.get(i);
         for (String key : functionLevelReducedResult.keySet()) {
           if (functionLevelReducedResult.get(key) != null) {
-            functionLevelReducedResult.put(key,
-                _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
+            functionLevelReducedResult
+                .put(key, _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
           }
         }
       }
@@ -155,8 +156,8 @@ public class AggregationGroupByOperatorService {
             ImmutablePair res;
             while ((res = (ImmutablePair) minMaxPriorityQueue.pollFirst()) != null) {
               JSONObject groupByResultObject = new JSONObject();
-              groupByResultObject.put("group", new JSONArray(((String) res.getRight()).split(
-                      GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
+              groupByResultObject.put("group", new JSONArray(((String) res.getRight())
+                  .split(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
               //          if (res.getFirst() instanceof Number) {
               //            groupByResultObject.put("value", df.format(res.getFirst()));
               //          } else {
@@ -184,6 +185,69 @@ public class AggregationGroupByOperatorService {
   }
 
   /**
+   * Translate the reducedGroupByResults (output of broker's reduce) to AggregationResult object
+   * to be used to build the BrokerResponse.
+   *
+   * @param reducedGroupByResults
+   * @return
+   */
+  public List<AggregationResult> renderAggregationGroupByResult(List<Map<String, Serializable>> reducedGroupByResults) {
+    if (reducedGroupByResults == null || reducedGroupByResults.size() != _aggregationFunctionList.size()) {
+      return null;
+    }
+
+    List<AggregationResult> aggregationResults = new ArrayList<AggregationResult>();
+    for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
+      int groupSize = _groupByColumns.size();
+
+      Map<String, Serializable> reducedGroupByResult = reducedGroupByResults.get(i);
+      AggregationFunction aggregationFunction = _aggregationFunctionList.get(i);
+
+      String functionName = aggregationFunction.getFunctionName();
+      List<GroupByResult> groupByResults = new ArrayList<GroupByResult>();
+
+      if (!reducedGroupByResult.isEmpty()) {
+        /* Reverse sort order for min functions. */
+        boolean reverseOrder = aggregationFunction.getFunctionName().startsWith(MIN_PREFIX);
+
+        // The MinMaxPriorityQueue will only add TOP N
+        MinMaxPriorityQueue<ImmutablePair<Serializable, String>> minMaxPriorityQueue =
+            getMinMaxPriorityQueue(reducedGroupByResult.values().iterator().next(), _groupByTopN, reverseOrder);
+
+        if (minMaxPriorityQueue != null) {
+          for (String groupedKey : reducedGroupByResult.keySet()) {
+            minMaxPriorityQueue.add(new ImmutablePair(reducedGroupByResult.get(groupedKey), groupedKey));
+          }
+
+          ImmutablePair res;
+          while ((res = (ImmutablePair) minMaxPriorityQueue.pollFirst()) != null) {
+            String groupByColumnsString = (String) res.getRight();
+            List<String> groupByColumns = Arrays.asList(groupByColumnsString
+                .split(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize));
+
+            Serializable value = (Serializable) res.getLeft();
+            GroupByResult groupValue = new GroupByResult();
+
+            groupValue.setGroup(groupByColumns);
+            groupValue.setValue(formatValue(value));
+            groupByResults.add(groupValue);
+          }
+        }
+      }
+
+      AggregationResult aggregationResult = new AggregationResult(groupByResults, _groupByColumns, functionName);
+      aggregationResults.add(aggregationResult);
+    }
+
+    return aggregationResults;
+  }
+
+  private Serializable formatValue(Serializable value) {
+    return (value instanceof Float || value instanceof Double) ? String.format(Locale.US, "%1.5f", value)
+        : value.toString();
+  }
+
+  /**
    * Given a list of group by results, trim each one of them to desired size.
    * Desired size is computed to be five times that of the TOP N in the query.
    *
@@ -198,8 +262,7 @@ public class AggregationGroupByOperatorService {
     List<Map<String, Serializable>> trimmedResults = new ArrayList<>();
     for (int i = 0; i < aggregationGroupByResultList.size(); ++i) {
       if (aggregationGroupByResultList.get(i).size() > _trimThreshold) {
-        trimmedResults
-            .add(trimToSize(_aggregationFunctionList.get(i), aggregationGroupByResultList.get(i), _trimSize));
+        trimmedResults.add(trimToSize(_aggregationFunctionList.get(i), aggregationGroupByResultList.get(i), _trimSize));
       } else {
         trimmedResults.add(aggregationGroupByResultList.get(i));
       }

@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
@@ -57,17 +58,19 @@ public class PinotClientRequestServlet extends HttpServlet {
   private AtomicLong requestIdGenerator;
 
   @Override
-  public void init(ServletConfig config) throws ServletException {
+  public void init(ServletConfig config)
+      throws ServletException {
     broker = (BrokerRequestHandler) config.getServletContext().getAttribute(BrokerRequestHandler.class.toString());
     brokerMetrics = (BrokerMetrics) config.getServletContext().getAttribute(BrokerMetrics.class.toString());
     requestIdGenerator = new AtomicLong(0);
   }
 
   @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+      throws ServletException, IOException {
     try {
       resp.setCharacterEncoding("UTF-8");
-      resp.getOutputStream().print(handleRequest(new JSONObject(req.getParameter("bql"))).toJson().toString());
+      resp.getOutputStream().print(handleRequest(new JSONObject(req.getParameter("bql"))).toJsonString());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
     } catch (final Exception e) {
@@ -80,10 +83,11 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   @Override
-  protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+  protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+      throws ServletException, IOException {
     try {
       resp.setCharacterEncoding("UTF-8");
-      resp.getOutputStream().print(handleRequest(extractJSON(req)).toJson().toString());
+      resp.getOutputStream().print(handleRequest(extractJSON(req)).toJsonString());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
     } catch (final Exception e) {
@@ -95,11 +99,15 @@ public class PinotClientRequestServlet extends HttpServlet {
     }
   }
 
-  private BrokerResponse handleRequest(JSONObject request) throws Exception {
+  private BrokerResponse handleRequest(JSONObject request)
+      throws Exception {
     final String pql = request.getString("pql");
     final long requestId = requestIdGenerator.incrementAndGet();
     LOGGER.info("Query string for requestId {}: {}", requestId, pql);
     boolean isTraceEnabled = false;
+
+    final BrokerResponseFactory.ResponseType responseType =
+        BrokerResponseFactory.getResponseType(request);
 
     if (request.has("trace")) {
       try {
@@ -116,9 +124,11 @@ public class PinotClientRequestServlet extends HttpServlet {
     final BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
-      if (isTraceEnabled) brokerRequest.setEnableTrace(true);
+      if (isTraceEnabled) {
+        brokerRequest.setEnableTrace(true);
+      }
     } catch (Exception e) {
-      BrokerResponse brokerResponse = new BrokerResponse();
+      BrokerResponse brokerResponse = BrokerResponseFactory.get(responseType);
       brokerResponse.setExceptions(Arrays.asList(QueryException.getException(QueryException.PQL_PARSING_ERROR, e)));
       brokerMetrics.addMeteredValue(null, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       return brokerResponse;
@@ -127,18 +137,18 @@ public class PinotClientRequestServlet extends HttpServlet {
     brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.QUERIES, 1);
 
     final long requestCompilationTime = System.nanoTime() - startTime;
-    brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION,
-            requestCompilationTime);
+    brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION, requestCompilationTime);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
 
-    final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION,
-            new Callable<BrokerResponse>() {
+    final BrokerResponse resp =
+        brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION, new Callable<BrokerResponse>() {
               @Override
               public BrokerResponse call()
-                      throws Exception {
+                  throws Exception {
                 final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
-                return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection,
-                    scatterGatherStats, requestId);
+                return (BrokerResponse) broker
+                    .processBrokerRequest(brokerRequest, responseType, bucketingSelection, scatterGatherStats,
+                        requestId);
               }
             });
 
@@ -147,6 +157,7 @@ public class PinotClientRequestServlet extends HttpServlet {
     long queryProcessingTimeInMillis = TimeUnit.MILLISECONDS.convert(queryProcessingTimeInNanos, TimeUnit.NANOSECONDS);
     resp.setTimeUsedMs(queryProcessingTimeInMillis);
 
+    LOGGER.info("BrokerResponse type : {}", responseType);
     LOGGER.debug("Broker Response : {}", resp);
     LOGGER.info("ResponseTimes for {} {}", requestId, scatterGatherStats);
     LOGGER.info("Total query processing time : {} ms", queryProcessingTimeInMillis);
@@ -159,7 +170,8 @@ public class PinotClientRequestServlet extends HttpServlet {
     return new BucketingSelection(bucketMap);
   }
 
-  private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
+  private JSONObject extractJSON(HttpServletRequest req)
+      throws IOException, JSONException {
     final StringBuilder requestStr = new StringBuilder();
     String line;
     final BufferedReader reader = req.getReader();

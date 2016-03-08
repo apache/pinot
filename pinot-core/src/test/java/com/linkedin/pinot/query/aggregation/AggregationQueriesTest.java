@@ -35,7 +35,7 @@ import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -256,8 +256,8 @@ public class AggregationQueriesTest {
     instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationResultDataTable());
-    final BrokerResponse reducedResults =
-        reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
+    final BrokerResponseJSON reducedResults =
+        (BrokerResponseJSON) reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
 
     LOGGER.debug("Reduced Result : {}", reducedResults);
   }
@@ -297,13 +297,13 @@ public class AggregationQueriesTest {
     final DefaultReduceService defaultReduceService = new DefaultReduceService();
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponseJSON brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     LOGGER.debug("Result : {}", new JSONArray(brokerResponse.getAggregationResults()));
     LOGGER.debug("Time used : {}", brokerResponse.getTimeUsedMs());
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
-  private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
+  private void assertBrokerResponse(int numSegments, BrokerResponseJSON brokerResponse) throws JSONException {
     Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
 

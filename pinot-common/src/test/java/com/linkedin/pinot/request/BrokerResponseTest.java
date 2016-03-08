@@ -21,7 +21,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ProcessingException;
 
 
@@ -29,17 +29,17 @@ public class BrokerResponseTest {
 
   @Test
   public void testEmptyResponse() throws JSONException {
-    BrokerResponse brokerResponse = BrokerResponse.getEmptyBrokerResponse();
+    BrokerResponseJSON brokerResponse = BrokerResponseJSON.getEmptyBrokerResponse();
     String brokerString = brokerResponse.toJson().toString();
-    BrokerResponse newBrokerResponse = BrokerResponse.fromJson(new JSONObject(brokerString));
+    BrokerResponseJSON newBrokerResponse = BrokerResponseJSON.fromJson(new JSONObject(brokerString));
     System.out.println(newBrokerResponse);
   }
 
   @Test
   public void testNullResponse() throws JSONException {
-    BrokerResponse brokerResponse = BrokerResponse.getNullBrokerResponse();
+    BrokerResponseJSON brokerResponse = BrokerResponseJSON.getNullBrokerResponse();
     String brokerString = brokerResponse.toJson().toString();
-    BrokerResponse newBrokerResponse = BrokerResponse.fromJson(new JSONObject(brokerString));
+    BrokerResponseJSON newBrokerResponse = BrokerResponseJSON.fromJson(new JSONObject(brokerString));
     System.out.println(newBrokerResponse);
     System.out.println(newBrokerResponse.getExceptions().get(0));
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
@@ -48,13 +48,13 @@ public class BrokerResponseTest {
 
   @Test
   public void testMultipleExceptionsResponse() throws JSONException {
-    BrokerResponse brokerResponse = BrokerResponse.getNullBrokerResponse();
+    BrokerResponseJSON brokerResponse = BrokerResponseJSON.getNullBrokerResponse();
     ProcessingException processingException = new ProcessingException(400);
     String errorMsgStr = "Some random string!";
     processingException.setMessage(errorMsgStr);
     brokerResponse.addToExceptions(processingException);
     String brokerString = brokerResponse.toJson().toString();
-    BrokerResponse newBrokerResponse = BrokerResponse.fromJson(new JSONObject(brokerString));
+    BrokerResponseJSON newBrokerResponse = BrokerResponseJSON.fromJson(new JSONObject(brokerString));
     System.out.println(newBrokerResponse);
     System.out.println(newBrokerResponse.getExceptions().get(0));
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());

@@ -19,13 +19,12 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.AggregationResult;
-import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.InstanceResponse;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.response.ResponseStatistics;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.response.broker.QueryProcessingException;
+import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -38,83 +37,43 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * DefaultReduceService will reduce DataTables gathered from multiple instances
- * to BrokerResponse.
- *
+ * BrokerReduceService will reduce DataTables gathered from multiple instances
+ * to BrokerResponseNative.
  *
  */
-public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultReduceService.class);
+public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
   private static String NUM_DOCS_SCANNED = "numDocsScanned";
   private static String TIME_USED_MS = "timeUsedMs";
   private static String TOTAL_DOCS = "totalDocs";
 
   @Override
-  public BrokerResponseJSON reduce(BrokerRequest brokerRequest, Map<ServerInstance, InstanceResponse> instanceResponseMap) {
-    BrokerResponseJSON brokerResponse = new BrokerResponseJSON();
-
-    List<List<AggregationResult>> aggregationResultsList = new ArrayList<List<AggregationResult>>();
-    for (int i = 0; i < brokerRequest.getAggregationsInfoSize(); ++i) {
-      aggregationResultsList.add(new ArrayList<AggregationResult>());
-    }
-
-    for (ServerInstance serverInstance : instanceResponseMap.keySet()) {
-      InstanceResponse instanceResponse = instanceResponseMap.get(serverInstance);
-      // Shuffle AggregationResults
-      if (instanceResponse.getAggregationResults() != null) {
-        for (int i = 0; i < brokerRequest.getAggregationsInfoSize(); ++i) {
-          aggregationResultsList.get(i).add(instanceResponse.getAggregationResults().get(i));
-        }
-      }
-      // reduceOnSelectionResults
-      //      reduceOnSelectionResults(brokerResponse.getRowEvents(), serverInstance, instanceResponse.getRowEvents());
-
-      // reduceOnExceptions
-      reduceOnExceptions(brokerResponse.getExceptions(), serverInstance, instanceResponse.getExceptions());
-
-      // debug mode enable : reduceOnTraceInfo
-      /*if (brokerRequest.isEnableTrace()) {
-        reduceOnSegmentStatistics(brokerResponse.getSegmentStatistics(), serverInstance,
-            instanceResponse.getSegmentStatistics());
-        reduceOnTraceInfos(brokerResponse.getTraceInfo(), serverInstance, instanceResponse.getTraceInfo());
-      }*/
-      // reduceOnNumDocsScanned
-      brokerResponse.setNumDocsScanned(brokerResponse.getNumDocsScanned() + instanceResponse.getNumDocsScanned());
-      // reduceOnTotalDocs
-      brokerResponse.setTotalDocs(brokerResponse.getTotalDocs() + instanceResponse.getTotalDocs());
-
-    }
-    // brokerResponse.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
-    return brokerResponse;
-  }
-
-  private void reduceOnSegmentStatistics(List<ResponseStatistics> brokerSegmentStatistics,
-      ServerInstance serverInstance, List<ResponseStatistics> segmentStatisticsToAdd) {
-    brokerSegmentStatistics.addAll(segmentStatisticsToAdd);
-  }
-
-  private void reduceOnExceptions(List<ProcessingException> brokerExceptions, ServerInstance serverInstance,
-      List<ProcessingException> exceptionsToAdd) {
-    brokerExceptions.addAll(exceptionsToAdd);
+  public BrokerResponseNative reduce(BrokerRequest brokerRequest,
+      Map<ServerInstance, InstanceResponse> instanceResponseMap) {
+    // This methods will be removed from the interface, so not implemented currently.
+    throw new RuntimeException("Method 'reduce' not implemented in class BrokerResponseNative");
   }
 
   @Override
-  public BrokerResponseJSON reduceOnDataTable(BrokerRequest brokerRequest,
+  public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
       Map<ServerInstance, DataTable> instanceResponseMap) {
-    BrokerResponseJSON brokerResponse = new BrokerResponseJSON();
+    BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
+
     if (instanceResponseMap == null || instanceResponseMap.size() == 0) {
-      return BrokerResponseJSON.EMPTY_RESULT;
+      return BrokerResponseNative.EMPTY_RESULT;
     }
-    for (ServerInstance serverInstance : instanceResponseMap.keySet().toArray(new ServerInstance[instanceResponseMap.size()])) {
+
+    for (ServerInstance serverInstance : instanceResponseMap.keySet()
+        .toArray(new ServerInstance[instanceResponseMap.size()])) {
+
       DataTable instanceResponse = instanceResponseMap.get(serverInstance);
       if (instanceResponse == null) {
         continue;
@@ -122,86 +81,97 @@ public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
 
       // reduceOnTraceInfo (put it here so that trace info can show up even exception happens)
       if (brokerRequest.isEnableTrace() && instanceResponse.getMetadata() != null) {
-        brokerResponse.getTraceInfo().put(serverInstance.getHostname(),
-                instanceResponse.getMetadata().get("traceInfo"));
+        brokerResponseNative.getTraceInfo()
+            .put(serverInstance.getHostname(), instanceResponse.getMetadata().get("traceInfo"));
       }
 
       if (instanceResponse.getDataSchema() == null && instanceResponse.getMetadata() != null) {
         for (String key : instanceResponse.getMetadata().keySet()) {
           if (key.startsWith("Exception")) {
-            ProcessingException processingException = new ProcessingException();
+            QueryProcessingException processingException = new QueryProcessingException();
             processingException.setErrorCode(Integer.parseInt(key.substring(9)));
             processingException.setMessage(instanceResponse.getMetadata().get(key));
-            brokerResponse.addToExceptions(processingException);
+            brokerResponseNative.getProcessingExceptions().add(processingException);
           }
         }
         instanceResponseMap.remove(serverInstance);
         continue;
       }
 
-      // reduceOnNumDocsScanned
-      brokerResponse.setNumDocsScanned(brokerResponse.getNumDocsScanned()
-          + Long.parseLong(instanceResponse.getMetadata().get(NUM_DOCS_SCANNED)));
-      // reduceOnTotalDocs
-      brokerResponse.setTotalDocs(brokerResponse.getTotalDocs()
-              + Long.parseLong(instanceResponse.getMetadata().get(TOTAL_DOCS)));
-      if (Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)) > brokerResponse.getTimeUsedMs()) {
-        brokerResponse.setTimeUsedMs(Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)));
+      // Reduce on numDocsScanned
+      brokerResponseNative.setNumDocsScanned(brokerResponseNative.getNumDocsScanned() + Long
+          .parseLong(instanceResponse.getMetadata().get(NUM_DOCS_SCANNED)));
+
+      // Reduce on totaDocs
+      brokerResponseNative.setTotalDocs(
+          brokerResponseNative.getTotalDocs() + Long.parseLong(instanceResponse.getMetadata().get(TOTAL_DOCS)));
+
+      if (Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)) > brokerResponseNative.getTimeUsedMs()) {
+        brokerResponseNative.setTimeUsedMs(Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)));
       }
     }
-    try {
 
-      if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null)
-          && (brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
+    try {
+      if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null) && (
+          brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
+
         // Reduce DataTable for selection query.
-        JSONObject selectionRet = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
-        brokerResponse.setSelectionResults(selectionRet);
-        return brokerResponse;
+        SelectionResults selectionResults = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
+        brokerResponseNative.setSelectionResults(selectionResults);
+        return brokerResponseNative;
       }
+
       if (brokerRequest.isSetAggregationsInfo()) {
         if (!brokerRequest.isSetGroupBy()) {
           List<List<Serializable>> aggregationResultsList =
               getShuffledAggregationResults(brokerRequest, instanceResponseMap);
-          brokerResponse.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
+          brokerResponseNative.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
         } else {
-          // Reduce DataTable for aggregation groupby query.
-          //        GroupByAggregationService groupByAggregationService =
-          //            new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-          //        brokerResponse.setAggregationResults(reduceOnAggregationGroupByResults(groupByAggregationService,
-          //            instanceResponseMap));
-
           AggregationGroupByOperatorService aggregationGroupByOperatorService =
               new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-          brokerResponse.setAggregationResults(reduceOnAggregationGroupByOperatorResults(
-              aggregationGroupByOperatorService, instanceResponseMap));
-
+          brokerResponseNative.setAggregationResults(
+              reduceOnAggregationGroupByOperatorResults(aggregationGroupByOperatorService, instanceResponseMap));
         }
-        return brokerResponse;
+        return brokerResponseNative;
       }
-
     } catch (Exception e) {
-      brokerResponse.addToExceptions(QueryException.getException(QueryException.BROKER_GATHER_ERROR, e));
-      return brokerResponse;
+      QueryProcessingException processingException = new QueryProcessingException();
+      processingException.setMessage(e.getMessage());
+      processingException.setErrorCode(QueryException.BROKER_GATHER_ERROR_CODE);
+      brokerResponseNative.getProcessingExceptions().add(processingException);
+      return brokerResponseNative;
     }
+
     throw new UnsupportedOperationException(
         "Should not reach here, the query has no attributes of selection or aggregation!");
   }
 
-  private JSONObject reduceOnSelectionResults(BrokerRequest brokerRequest,
+  /**
+   * Reduce selection results from various servers into SelectionResults object, that goes
+   * into BrokerResponseNative.
+   *
+   * @param brokerRequest
+   * @param instanceResponseMap
+   * @return
+   */
+  private SelectionResults reduceOnSelectionResults(BrokerRequest brokerRequest,
       Map<ServerInstance, DataTable> instanceResponseMap) {
     try {
       if (instanceResponseMap.size() > 0) {
         DataTable dt = chooseFirstNonEmptySchema(instanceResponseMap.values());
-        // best-effort to respond to the client instead of erroring out all requests
-        // if there are errors
         removeConflictingResponses(dt.getDataSchema(), instanceResponseMap);
+
         if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
           SelectionOperatorService selectionService =
               new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
-          return selectionService.render(selectionService.reduce(instanceResponseMap));
+          return selectionService.renderSelectionResults(selectionService.reduce(instanceResponseMap));
         } else {
-          Collection<Serializable[]> reduceResult = SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
-          return SelectionOperatorUtils.render(reduceResult, brokerRequest.getSelections().getSelectionColumns(), dt.getDataSchema());
+          Collection<Serializable[]> reduceResult =
+              SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+
+          return SelectionOperatorUtils
+              .renderSelectionResults(reduceResult, brokerRequest.getSelections().getSelectionColumns(),
+                  dt.getDataSchema());
         }
       } else {
         return null;
@@ -213,15 +183,22 @@ public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
     }
   }
 
+  /**
+   * Remove rows for which the schema does not match the provided master schema.
+   * @param masterSchema
+   * @param instanceResponseMap
+   */
   private void removeConflictingResponses(DataSchema masterSchema, Map<ServerInstance, DataTable> instanceResponseMap) {
     Iterator<Map.Entry<ServerInstance, DataTable>> responseIter = instanceResponseMap.entrySet().iterator();
     StringBuilder droppedServersSb = new StringBuilder();
+
     int droppedCount = 0;
     while (responseIter.hasNext()) {
       Map.Entry<ServerInstance, DataTable> entry = responseIter.next();
       DataTable entryTable = entry.getValue();
       DataSchema entrySchema = entryTable.getDataSchema();
-      if (! masterSchema.equals(entrySchema)) {
+
+      if (!masterSchema.equals(entrySchema)) {
         if (entryTable.getNumberOfRows() > 0) {
           ++droppedCount;
           droppedServersSb.append(" " + entry.getKey());
@@ -229,12 +206,18 @@ public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
         responseIter.remove();
       }
     }
-    // to log once per query
+
+    // To log once per query
     if (droppedCount > 0) {
       LOGGER.error("SCHEMA-MISMATCH: Dropping responses from servers: {}", droppedServersSb.toString());
     }
   }
 
+  /**
+   * Given a collection of data tables, pick the first one with non-empty rows.
+   * @param dataTables
+   * @return
+   */
   private DataTable chooseFirstNonEmptySchema(Iterable<DataTable> dataTables) {
     for (DataTable dt : dataTables) {
       if (dt.getNumberOfRows() > 0) {
@@ -242,47 +225,85 @@ public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
       }
     }
     Iterator<DataTable> it = dataTables.iterator();
-    return  it.hasNext() ? it.next() : null;
+    return it.hasNext() ? it.next() : null;
   }
 
-  private List<JSONObject> reduceOnAggregationGroupByOperatorResults(
+  /**
+   * Reduce the aggregationGroupBy response from various servers, and return a list of
+   * AggregationResult objects, that is used to build the BrokerResponseNative object.
+   *
+   * @param aggregationGroupByOperatorService
+   * @param instanceResponseMap
+   * @return
+   */
+  private List<AggregationResult> reduceOnAggregationGroupByOperatorResults(
       AggregationGroupByOperatorService aggregationGroupByOperatorService,
       Map<ServerInstance, DataTable> instanceResponseMap) {
-    return aggregationGroupByOperatorService.renderGroupByOperators(
-        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap));
+
+    List<Map<String, Serializable>> reducedGroupByResults =
+        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
+
+    return aggregationGroupByOperatorService.renderAggregationGroupByResult(reducedGroupByResults);
   }
 
-  private List<JSONObject> reduceOnAggregationResults(BrokerRequest brokerRequest,
+  /**
+   * Reduce the aggregationGroupBy response from various servers, and return a list of
+   * AggregationResult objects, that is used to build the BrokerResponseNative object.
+   *
+   * @param brokerRequest
+   * @param aggregationResultsList
+   * @return
+   */
+  private List<AggregationResult> reduceOnAggregationResults(BrokerRequest brokerRequest,
       List<List<Serializable>> aggregationResultsList) {
-    List<JSONObject> retAggregationResults = new ArrayList<JSONObject>();
+    List<AggregationResult> aggregationResults = new ArrayList<AggregationResult>();
     List<AggregationFunction> aggregationFunctions = AggregationFunctionFactory.getAggregationFunction(brokerRequest);
+
     for (int i = 0; i < aggregationFunctions.size(); ++i) {
-      Serializable retResult = aggregationFunctions.get(i).reduce(aggregationResultsList.get(i));
-      try {
-        retAggregationResults.add(aggregationFunctions.get(i).render(retResult)
-            .put("function", aggregationFunctions.get(i).getFunctionName()));
-      } catch (JSONException e) {
-        LOGGER.error("Caught exception while reducing aggregation results", e);
-        Utils.rethrowException(e);
-        throw new AssertionError("Should not reach this");
-      }
+      String function = aggregationFunctions.get(i).getFunctionName();
+      Serializable value = formatValue(aggregationFunctions.get(i).reduce(aggregationResultsList.get(i)));
+
+      AggregationResult aggregationResult = new AggregationResult(function, value);
+      aggregationResults.add(aggregationResult);
     }
-    return retAggregationResults;
+
+    return aggregationResults;
   }
 
+  /**
+   * Format the input float/double value to be of the form #####.#####.
+   * If the input is not float or double, return the value as is.
+   *
+   * @param value
+   * @return
+   */
+  private Serializable formatValue(Serializable value) {
+    return (value instanceof Float || value instanceof Double) ? String.format(Locale.US, "%1.5f", value)
+        : value.toString();
+  }
+
+  /**
+   * @param brokerRequest
+   * @param instanceResponseMap
+   * @return
+   */
   private List<List<Serializable>> getShuffledAggregationResults(BrokerRequest brokerRequest,
       Map<ServerInstance, DataTable> instanceResponseMap) {
     List<List<Serializable>> aggregationResultsList = new ArrayList<List<Serializable>>();
+
     for (int i = 0; i < brokerRequest.getAggregationsInfo().size(); ++i) {
       aggregationResultsList.add(new ArrayList<Serializable>());
     }
+
     DataSchema aggregationResultSchema;
     for (ServerInstance serverInstance : instanceResponseMap.keySet()) {
       DataTable instanceResponse = instanceResponseMap.get(serverInstance);
       aggregationResultSchema = instanceResponse.getDataSchema();
+
       if (aggregationResultSchema == null) {
         continue;
       }
+
       // Shuffle AggregationResults
       for (int rowId = 0; rowId < instanceResponse.getNumberOfRows(); ++rowId) {
         for (int colId = 0; colId < brokerRequest.getAggregationsInfoSize(); ++colId) {
