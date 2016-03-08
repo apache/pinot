@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.tools.Command;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpURL;
@@ -45,14 +46,17 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
   private boolean _help = false;
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
+    if (_controllerHost == null) {
+      _controllerHost = NetUtil.getHostAddress();
+    }
+
     String stateValue = _state.toLowerCase();
-    if ( ! stateValue.equals("enable") &&
-         ! stateValue.equals("disable") &&
-         ! stateValue.equals("drop")) {
+    if (!stateValue.equals("enable")
+        && !stateValue.equals("disable")
+        && !stateValue.equals("drop")) {
       throw new IllegalArgumentException("Invalid value for state: " + _state
-      + "\n Value must be one of enable|disable|drop");
+          + "\n Value must be one of enable|disable|drop");
     }
     HttpClient httpClient = new HttpClient();
     HttpURL url = new HttpURL(_controllerHost,
