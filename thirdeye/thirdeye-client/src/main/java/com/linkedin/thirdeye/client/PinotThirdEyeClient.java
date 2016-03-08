@@ -134,6 +134,16 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     return fromZookeeper(new CachedThirdEyeClientConfig(), controllerHost, controllerPort, zkUrl, clusterName, tag);
   }
 
+  /**
+   * Creates a new PinotThirdEyeClient using the clusterName and broker tag
+   * @param config
+   * @param controllerHost
+   * @param controllerPort
+   * @param zkUrl
+   * @param clusterName : required property
+   * @param tag : required property
+   * @return
+   */
   public static PinotThirdEyeClient fromZookeeper(CachedThirdEyeClientConfig config,
       String controllerHost, int controllerPort, String zkUrl, String clusterName, String tag) {
 
