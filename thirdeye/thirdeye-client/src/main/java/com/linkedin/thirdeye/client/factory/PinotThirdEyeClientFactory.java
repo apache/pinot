@@ -3,6 +3,9 @@ package com.linkedin.thirdeye.client.factory;
 import static com.linkedin.thirdeye.client.PinotThirdEyeClient.CONTROLLER_HOST_PROPERTY_KEY;
 import static com.linkedin.thirdeye.client.PinotThirdEyeClient.CONTROLLER_PORT_PROPERTY_KEY;
 import static com.linkedin.thirdeye.client.PinotThirdEyeClient.FIXED_COLLECTIONS_PROPERTY_KEY;
+import static com.linkedin.thirdeye.client.PinotThirdEyeClient.CLUSTER_NAME_PROPERTY_KEY;
+import static com.linkedin.thirdeye.client.PinotThirdEyeClient.TAG_PROPERTY_KEY;
+
 
 import java.util.Arrays;
 import java.util.List;
@@ -23,16 +26,21 @@ public class PinotThirdEyeClientFactory extends BaseThirdEyeClientFactory {
   public ThirdEyeClient getRawClient(Properties props) {
     if (!props.containsKey(CONTROLLER_HOST_PROPERTY_KEY)
         || !props.containsKey(CONTROLLER_PORT_PROPERTY_KEY)
-        || !props.containsKey(ZK_URL_PROPERTY_KEY)) {
+        || !props.containsKey(ZK_URL_PROPERTY_KEY)
+        || !props.containsKey(CLUSTER_NAME_PROPERTY_KEY)
+        || !props.containsKey(TAG_PROPERTY_KEY)) {
       throw new IllegalArgumentException(
           "Config file must contain mappings for " + CONTROLLER_HOST_PROPERTY_KEY + ", "
-              + CONTROLLER_PORT_PROPERTY_KEY + ", and " + ZK_URL_PROPERTY_KEY + ": " + props);
+              + CONTROLLER_PORT_PROPERTY_KEY + ", " + ZK_URL_PROPERTY_KEY + ", "
+              + CLUSTER_NAME_PROPERTY_KEY + " and " + TAG_PROPERTY_KEY + " : " + props);
     }
     String controllerHost = props.getProperty(CONTROLLER_HOST_PROPERTY_KEY);
     int controllerPort = Integer.parseInt(props.getProperty(CONTROLLER_PORT_PROPERTY_KEY));
     String zkUrl = props.getProperty(ZK_URL_PROPERTY_KEY);
+    String clusterName = props.getProperty(CLUSTER_NAME_PROPERTY_KEY);
+    String tag = props.getProperty(TAG_PROPERTY_KEY);
     PinotThirdEyeClient client =
-        PinotThirdEyeClient.fromZookeeper(getConfig(), controllerHost, controllerPort, zkUrl);
+        PinotThirdEyeClient.fromZookeeper(getConfig(), controllerHost, controllerPort, zkUrl, clusterName, tag);
     if (props.containsKey(FIXED_COLLECTIONS_PROPERTY_KEY)) {
       String collectionString = props.getProperty(FIXED_COLLECTIONS_PROPERTY_KEY);
       List<String> collections = Arrays.asList(collectionString.split(","));

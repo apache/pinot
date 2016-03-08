@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -18,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.http.HttpHost;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -74,12 +77,15 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
   public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
+  public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
+  public static final String TAG_PROPERTY_KEY = "tag";
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
   private static final String UTF_8 = "UTF-8";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final String TABLES_ENDPOINT = "tables/";
+  private static final String BROKER_PREFIX = "Broker_";
 
   // No way to determine data retention from pinot schema
   private static final TimeGranularity DEFAULT_TIME_RETENTION = null;
@@ -124,13 +130,22 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   }
 
   public static PinotThirdEyeClient fromZookeeper(String controllerHost, int controllerPort,
-      String zkUrl) {
-    return fromZookeeper(new CachedThirdEyeClientConfig(), controllerHost, controllerPort, zkUrl);
+      String zkUrl, String clusterName, String tag) {
+    return fromZookeeper(new CachedThirdEyeClientConfig(), controllerHost, controllerPort, zkUrl, clusterName, tag);
   }
 
   public static PinotThirdEyeClient fromZookeeper(CachedThirdEyeClientConfig config,
-      String controllerHost, int controllerPort, String zkUrl) {
-    Connection connection = ConnectionFactory.fromZookeeper(zkUrl);
+      String controllerHost, int controllerPort, String zkUrl, String clusterName, String tag) {
+
+    ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkUrl);
+    List<String> thirdeyeBrokerList = helixAdmin.getInstancesInClusterWithTag(clusterName, tag);
+    String[] thirdeyeBrokers = new String[thirdeyeBrokerList.size()];
+    for (int i = 0; i < thirdeyeBrokerList.size(); i++) {
+      String instanceName = thirdeyeBrokerList.get(i);
+      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceName);
+      thirdeyeBrokers[i] = instanceConfig.getHostName().replaceAll(BROKER_PREFIX, "") + ":" + instanceConfig.getPort();
+    }
+    Connection connection = ConnectionFactory.fromHostList(thirdeyeBrokers);
     LOG.info("Created PinotThirdEyeClient to zookeeper: {}", zkUrl);
     return new PinotThirdEyeClient(connection, controllerHost, controllerPort);
   }
