@@ -144,10 +144,9 @@ public class BrokerServerBuilder {
 
     ConnectionPoolConfig connPoolCfg = conf.getConnPool();
 
-    _connPool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
-            connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(),
-            connPoolCfg.getMaxBacklogPerServer(), _resourceManager, _poolTimeoutExecutor, _requestSenderPool, _registry);
+    _connPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
+        connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(), connPoolCfg.getMaxBacklogPerServer(),
+        _resourceManager, _poolTimeoutExecutor, _requestSenderPool, _registry);
     // MoreExecutors.sameThreadExecutor(), _registry);
     _resourceManager.setPool(_connPool);
 
@@ -175,9 +174,8 @@ public class BrokerServerBuilder {
     LOGGER.info("Broker timeout is - " + brokerTimeOutMs + " ms");
 
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
-    _requestHandler =
-        new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, reduceServiceRegistry,
-            _brokerMetrics, brokerTimeOutMs);
+    _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
+        reduceServiceRegistry, _brokerMetrics, brokerTimeOutMs);
 
     LOGGER.info("Network initialized !!");
   }
@@ -189,10 +187,10 @@ public class BrokerServerBuilder {
     ReduceServiceRegistry reduceServiceRegistry = new ReduceServiceRegistry();
 
     DefaultReduceService defaultReduceService = new DefaultReduceService();
-    reduceServiceRegistry
-        .register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_JSON, new DefaultReduceService());
-    reduceServiceRegistry
-        .register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE, new BrokerReduceService());
+    reduceServiceRegistry.register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_JSON,
+        new DefaultReduceService());
+    reduceServiceRegistry.register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE,
+        new BrokerReduceService());
 
     reduceServiceRegistry.registerDefault(defaultReduceService);
     return reduceServiceRegistry;
@@ -269,5 +267,9 @@ public class BrokerServerBuilder {
 
   public BrokerMetrics getBrokerMetrics() {
     return _brokerMetrics;
+  }
+
+  public BrokerRequestHandler getBrokerRequestHandler() {
+    return _requestHandler;
   }
 }
