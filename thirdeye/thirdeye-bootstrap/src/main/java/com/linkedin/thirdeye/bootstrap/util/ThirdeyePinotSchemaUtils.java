@@ -55,6 +55,7 @@ public class ThirdeyePinotSchemaUtils {
       fieldSpec.setName(metricName);
       fieldSpec.setFieldType(FieldType.METRIC);
       fieldSpec.setDataType(DataType.LONG);
+      fieldSpec.setDefaultNullValue(1);
       schema.addField(metricName, fieldSpec);
     }
     TimeGranularitySpec incoming =
