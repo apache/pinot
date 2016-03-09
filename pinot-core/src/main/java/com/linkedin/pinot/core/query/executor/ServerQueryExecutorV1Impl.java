@@ -45,20 +45,14 @@ import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
 import com.linkedin.pinot.core.util.trace.TraceContext;
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.Timer;
 
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
 
-  private static final String Domain = "com.linkedin.pinot";
   private QueryExecutorConfig _queryExecutorConfig = null;
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
-  private Timer _queryExecutorTimer = null;
   private volatile boolean _isStarted = false;
   private long _defaultTimeOutMs = 15000;
   private boolean _printQueryPlan = false;
@@ -89,11 +83,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.info("Trying to build QueryPlanMaker");
     _planMaker = new InstancePlanMakerImplV2();
     LOGGER.info("Trying to build QueryExecutorTimer");
-    if (_queryExecutorTimer == null) {
-      _queryExecutorTimer =
-          Metrics.newTimer(new MetricName(Domain, "timer", "query-executor-time-"), TimeUnit.MILLISECONDS,
-              TimeUnit.SECONDS);
-    }
   }
 
   @Override
@@ -150,7 +139,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           (end-start), TimeUnit.MILLISECONDS.convert(executeTime, TimeUnit.NANOSECONDS));
       return instanceResponse;
     } catch (Exception e) {
-      _serverMetrics.addMeteredValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error("Exception processing requestId {}", requestId, e);
       instanceResponse = new DataTable();
       instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));

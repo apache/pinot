@@ -137,18 +137,18 @@ public class BrokerRequestHandler {
     } catch (Exception e) {
       BrokerResponse brokerResponse = BrokerResponseFactory.get(responseType);
       brokerResponse.setExceptions(Arrays.asList(QueryException.getException(QueryException.PQL_PARSING_ERROR, e)));
-      _brokerMetrics.addMeteredValue(null, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       return brokerResponse;
     }
 
-    _brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.QUERIES, 1);
+    _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.QUERIES, 1);
 
     final long requestCompilationTime = System.nanoTime() - startTime;
     _brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION, requestCompilationTime);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
 
     final BrokerResponse resp =
-        _brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION, new Callable<BrokerResponse>() {
+        _brokerMetrics.timeQueryPhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION, new Callable<BrokerResponse>() {
           @Override
           public BrokerResponse call() throws Exception {
             final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
@@ -353,7 +353,7 @@ public class BrokerRequestHandler {
         scatterGatherStats.setResponseTimeMillis(responseTimes);
       } catch (ExecutionException e) {
         LOGGER.warn("Caught exception while fetching response", e);
-        _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+        _brokerMetrics.addMeteredQueryValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
       }
 
       final long scatterGatherTime = System.nanoTime() - scatterGatherStartTime;
@@ -376,14 +376,14 @@ public class BrokerRequestHandler {
             if (errors != null && errors.containsKey(e.getKey())) {
               Throwable throwable = errors.get(e.getKey());
               r2.getMetadata().put("exception", new RequestProcessingException(throwable).toString());
-              _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+              _brokerMetrics.addMeteredQueryValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
             }
             instanceResponseMap.put(e.getKey(), r2);
           } catch (Exception ex) {
             LOGGER.error(
                 "Got exceptions in collect query result for instance " + e.getKey() + ", error: " + ex.getMessage(),
                 ex);
-            _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+            _brokerMetrics.addMeteredQueryValue(request, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
           }
         }
       }
@@ -393,16 +393,16 @@ public class BrokerRequestHandler {
 
     // Step 6 : Do the reduce and return
     try {
-      return _brokerMetrics.timePhase(request, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
+      return _brokerMetrics.timeQueryPhase(request, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call() {
           BrokerResponse returnValue = _reduceService.reduceOnDataTable(request, instanceResponseMap);
-          _brokerMetrics.addMeteredValue(request, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
+          _brokerMetrics.addMeteredQueryValue(request, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
           return returnValue;
         }
       });
     } catch (Exception e) {
-      // Shouldn't happen, this is only here because timePhase() can throw a checked exception, even though the nested callable can't.
+      // Shouldn't happen, this is only here because timeQueryPhase() can throw a checked exception, even though the nested callable can't.
       LOGGER.error("Caught exception while processing return", e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
@@ -464,7 +464,7 @@ public class BrokerRequestHandler {
           scatterGatherStats.merge(respStats);
         } catch (ExecutionException e) {
           LOGGER.warn("Caught exception while fetching response", e);
-          _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+          _brokerMetrics.addMeteredQueryValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
         }
 
         scatterGatherTime += System.nanoTime() - scatterGatherStartTime;
@@ -490,14 +490,15 @@ public class BrokerRequestHandler {
                 Throwable throwable = errors.get(responseEntry.getKey());
                 if (throwable != null) {
                   r2.getMetadata().put("exception", new RequestProcessingException(throwable).toString());
-                  _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+                  _brokerMetrics.addMeteredQueryValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
                 }
               }
               instanceResponseMap.put(decoratedServerInstance, r2);
             } catch (Exception ex) {
-              LOGGER.error("Got exceptions in collect query result for instance " + responseEntry.getKey() + ", error: "
-                  + ex.getMessage(), ex);
-              _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+              LOGGER.error(
+                  "Got exceptions in collect query result for instance " + responseEntry.getKey() + ", error: " + ex
+                      .getMessage(), ex);
+              _brokerMetrics.addMeteredQueryValue(federatedBrokerRequest, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
             }
           }
         }
@@ -509,17 +510,17 @@ public class BrokerRequestHandler {
 
     // Step 6 : Do the reduce and return
     try {
-      return _brokerMetrics.timePhase(federatedBrokerRequest, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
+      return _brokerMetrics.timeQueryPhase(federatedBrokerRequest, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call() {
           BrokerResponse returnValue = _reduceService.reduceOnDataTable(federatedBrokerRequest, instanceResponseMap);
-          _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.DOCUMENTS_SCANNED,
-              returnValue.getNumDocsScanned());
+          _brokerMetrics
+              .addMeteredQueryValue(federatedBrokerRequest, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
           return returnValue;
         }
       });
     } catch (Exception e) {
-      // Shouldn't happen, this is only here because timePhase() can throw a checked exception, even though the nested callable can't.
+      // Shouldn't happen, this is only here because timeQueryPhase() can throw a checked exception, even though the nested callable can't.
       LOGGER.error("Caught exception while processing query", e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");

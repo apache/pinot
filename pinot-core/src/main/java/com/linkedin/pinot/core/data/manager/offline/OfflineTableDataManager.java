@@ -22,10 +22,8 @@ import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.yammer.metrics.Metrics;
 
 
 /**
@@ -45,15 +43,6 @@ public class OfflineTableDataManager extends AbstractTableDataManager {
 
   protected void doInit() {
     LOGGER = LoggerFactory.getLogger(_tableName + "-OfflineTableDataManager");
-    _currentNumberOfSegments =
-        Metrics.newCounter(OfflineTableDataManager.class,
-            _tableName + "-" + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
-    _currentNumberOfDocuments =
-        Metrics.newCounter(OfflineTableDataManager.class, _tableName + "-"
-            + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
-    _numDeletedSegments =
-        Metrics.newCounter(OfflineTableDataManager.class, _tableName + "-"
-            + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
   }
 
   @Override

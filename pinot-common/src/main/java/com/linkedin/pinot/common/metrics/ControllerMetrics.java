@@ -21,7 +21,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 /**
  * Metrics for the controller.
  */
-public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter> {
+public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, AbstractMetrics.Gauge> {
   public ControllerMetrics(MetricsRegistry metricsRegistry) {
     super("pinot.controller", metricsRegistry, ControllerMetrics.class);
   }

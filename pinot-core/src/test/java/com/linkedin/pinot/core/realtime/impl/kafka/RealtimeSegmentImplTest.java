@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +41,8 @@ public class RealtimeSegmentImplTest {
         .addTime("time", TimeUnit.SECONDS, FieldSpec.DataType.LONG)
         .build();
 
-    RealtimeSegmentImpl realtimeSegment = new RealtimeSegmentImpl(schema, 100, "noTable", "noSegment", schema.getSchemaName());
+    RealtimeSegmentImpl realtimeSegment = new RealtimeSegmentImpl(schema, 100, "noTable", "noSegment", schema.getSchemaName(),
+        new ServerMetrics(new MetricsRegistry()));
 
     // Segment should be empty
     Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 0);

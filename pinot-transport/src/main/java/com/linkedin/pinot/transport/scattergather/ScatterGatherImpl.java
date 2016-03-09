@@ -484,9 +484,9 @@ public class ScatterGatherImpl implements ScatterGather {
         BrokerRequest brokerRequest = (BrokerRequest) _request.getBrokerRequest();
         if (error) {
           if (gotConnection) {
-            _brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_SEND_ERROR, 1);
+            _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_SEND_ERROR, 1);
           } else {
-            _brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR, 1);
+            _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR, 1);
           }
         }
       }

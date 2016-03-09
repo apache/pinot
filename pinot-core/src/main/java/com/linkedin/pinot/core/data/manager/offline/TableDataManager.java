@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
@@ -36,19 +37,18 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  */
 public interface TableDataManager {
-
   /**
    * Initialize TableDataManager based on given config.
    *
    * @param tableDataManagerConfig
    */
-  public void init(TableDataManagerConfig tableDataManagerConfig);
+  void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics);
 
-  public void start();
+  void start();
 
-  public void shutDown();
+  void shutDown();
 
-  public boolean isStarted();
+  boolean isStarted();
 
   /**
    * Adding an IndexSegment into the TableDataManager.
@@ -56,7 +56,7 @@ public interface TableDataManager {
    *
    * @param indexSegmentToAdd
    */
-  public void addSegment(IndexSegment indexSegmentToAdd);
+  void addSegment(IndexSegment indexSegmentToAdd);
 
   /**
    * Adding a Segment into the TableDataManager by given SegmentMetadata.
@@ -64,7 +64,7 @@ public interface TableDataManager {
    * @param segmentMetaToAdd
    * @throws Exception
    */
-  public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
+  void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
 
   /**
    * Adding a Segment into the TableDataManager by given DataTableZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
@@ -74,7 +74,7 @@ public interface TableDataManager {
    * @param segmentZKMetadata
    * @throws Exception
    */
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
+  void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception;
 
   /**
@@ -82,7 +82,7 @@ public interface TableDataManager {
    * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
    * @param segmentToRemove
    */
-  public void removeSegment(String segmentToRemove);
+  void removeSegment(String segmentToRemove);
 
   /**
    *
@@ -90,7 +90,7 @@ public interface TableDataManager {
    * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method
    * @return segments by giving a list of segment names in this TableDataManager.
    */
-  public List<SegmentDataManager> acquireSegments(List<String> segmentList);
+  List<SegmentDataManager> acquireSegments(List<String> segmentList);
 
   /**
    *
@@ -98,17 +98,16 @@ public interface TableDataManager {
    * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method.
    * @return a segment by giving the name of this segment in this TableDataManager.
    */
-  public SegmentDataManager acquireSegment(String segmentName);
+  SegmentDataManager acquireSegment(String segmentName);
 
   /**
   *
   * give back segmentReader, so the segment could be safely deleted.
   */
-  public void releaseSegment(SegmentDataManager segmentDataManager);
-  
+  void releaseSegment(SegmentDataManager segmentDataManager);
+
   /**
    * @return ExecutorService for query.
    */
-  public ExecutorService getExecutorService();
-
+  ExecutorService getExecutorService();
 }

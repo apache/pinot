@@ -63,7 +63,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
   }
 
@@ -81,7 +81,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       LOGGER.error("Caught exception while processing POST request", e);
-      brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
     }
   }
 

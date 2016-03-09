@@ -20,7 +20,6 @@ import java.util.Set;
 
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
@@ -96,7 +95,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while creating tenant ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -137,7 +136,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while updating tenant ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -200,7 +199,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_GET_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       LOGGER.error("Caught exception while fetching tenant ", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
@@ -315,7 +314,7 @@ public class PinotTenantRestletResource extends PinotRestletResourceBase {
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while deleting tenant ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

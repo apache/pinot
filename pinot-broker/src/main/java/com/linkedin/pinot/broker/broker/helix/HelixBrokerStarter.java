@@ -144,7 +144,7 @@ public class HelixBrokerStarter {
           @Override
           public void onPreConnect() {
             _brokerServerBuilder.getBrokerMetrics()
-            .addMeteredValue(null, BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+            .addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
           }
         });
   }

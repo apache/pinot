@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,14 +57,9 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Counter;
-import com.yammer.metrics.core.MetricName;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
-  private final Counter invalidRowsDropped;
-
   private final Logger LOGGER;
   public static final int[] EMPTY_DICTIONARY_IDS_ARRAY = new int[0];
 
@@ -93,9 +90,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private final Map<String, DataFileReader> columnIndexReaderWriterMap;
 
-  public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName) throws IOException {
+  private final ServerMetrics serverMetrics;
+  private final String tableAndStreamName;
+
+  public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
+      ServerMetrics serverMetrics) throws IOException {
     // initial variable setup
     this.segmentName = segmentName;
+    this.serverMetrics = serverMetrics;
     LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class.getName() + "_" + segmentName + "_" + streamName);
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
@@ -148,8 +150,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     columnIndexReaderWriterMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
         V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
 
-    invalidRowsDropped = Metrics.newCounter(new MetricName(RealtimeSegmentImpl.class,
-        tableName + "-" + streamName + "-" + "invalidRowsDropped"));
+    tableAndStreamName = tableName + "-" + streamName;
   }
 
   @Override
@@ -207,7 +208,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     if (invalidColumns != null) {
       LOGGER.warn("Dropping invalid row {} with null values for column(s) {}", row, invalidColumns);
-      invalidRowsDropped.inc();
+      serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1L);
       return true;
     }
 

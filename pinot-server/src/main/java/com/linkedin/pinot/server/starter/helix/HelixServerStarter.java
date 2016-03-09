@@ -120,7 +120,7 @@ public class HelixServerStarter {
         messageHandlerFactory);
 
     _serverInstance.getServerMetrics()
-        .addCallbackGauge("helix.connected", 
+        .addCallbackGauge("helix.connected",
             new Callable<Long>() {
               @Override
               public Long call() throws Exception {
@@ -130,11 +130,9 @@ public class HelixServerStarter {
 
     _helixManager.addPreConnectCallback(
         new PreConnectCallback() {
-          
           @Override
           public void onPreConnect() {
-            _serverInstance.getServerMetrics().addMeteredValue(null,
-                ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+            _serverInstance.getServerMetrics().addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
           }
         });
 

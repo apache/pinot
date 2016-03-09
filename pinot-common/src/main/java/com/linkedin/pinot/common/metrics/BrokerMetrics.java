@@ -22,7 +22,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  * Broker metrics utility class, which provides facilities to log the execution performance of queries.
  *
  */
-public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter> {
+public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge> {
   /**
    * Constructs the broker metrics.
    *

@@ -19,34 +19,26 @@ import com.linkedin.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the meters exposed by the Pinot server.
+* Enumeration containing all the gauges exposed by the Pinot server.
 *
 */
-public enum ServerMeter implements AbstractMetrics.Meter {
-  QUERIES("queries", true),
-  UNCAUGHT_EXCEPTIONS("exceptions", true),
-  RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
-  QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
-  HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
-  DELETED_SEGMENT_COUNT("segments", false),
-  REALTIME_ROWS_CONSUMED("rows", true),
-  INVALID_REALTIME_ROWS_DROPPED("rows", false),
-  REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
-  REALTIME_OFFSET_COMMITS("commits", true);
+public enum ServerGauge implements AbstractMetrics.Gauge {
+  DOCUMENT_COUNT("documents", false),
+  SEGMENT_COUNT("segments", false);
 
-  private final String meterName;
+  private final String gaugeName;
   private final String unit;
   private final boolean global;
 
-  ServerMeter(String unit, boolean global) {
+  ServerGauge(String unit, boolean global) {
     this.unit = unit;
     this.global = global;
-    this.meterName = Utils.toCamelCase(name().toLowerCase());
+    this.gaugeName = Utils.toCamelCase(name().toLowerCase());
   }
 
   @Override
-  public String getMeterName() {
-    return meterName;
+  public String getGaugeName() {
+    return gaugeName;
   }
 
   @Override
@@ -55,9 +47,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   }
 
   /**
-   * Returns true if the metric is global (not attached to a particular resource)
+   * Returns true if the gauge is global (not attached to a particular resource)
    *
-   * @return true if the metric is global
+   * @return true if the gauge is global
    */
   @Override
   public boolean isGlobal() {

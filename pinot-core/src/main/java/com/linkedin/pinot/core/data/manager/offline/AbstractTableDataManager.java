@@ -16,6 +16,9 @@
 
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.linkedin.pinot.common.metrics.ServerGauge;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,13 +36,9 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.yammer.metrics.core.Counter;
 
 
 public abstract  class AbstractTableDataManager implements TableDataManager {
-  protected Counter _currentNumberOfSegments;
-  protected Counter _currentNumberOfDocuments;
-  protected Counter _numDeletedSegments;
   protected final List<String> _activeSegments = new ArrayList<String>();
   protected final List<String> _loadingSegments = new ArrayList<String>();
   // This read-write lock protects the _segmentsMap and SegmentDataManager.refCnt
@@ -58,6 +57,7 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   protected File _indexDir;
   protected int _numberOfTableQueryExecutorThreads;
   protected IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
+  protected ServerMetrics _serverMetrics;
 
 
   protected AbstractTableDataManager() {
@@ -65,9 +65,10 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void init(TableDataManagerConfig tableDataManagerConfig) {
-
+  public void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics) {
     _tableDataManagerConfig = tableDataManagerConfig;
+    _serverMetrics = serverMetrics;
+
     _tableName = _tableDataManagerConfig.getTableName();
     doInit();
 
@@ -159,8 +160,8 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
     if (refCnt == 0) {  // oldSegmentManager must be non-null.
       closeSegment(oldSegmentManager);
     }
-    _currentNumberOfDocuments.inc(newNumDocs);
-    _currentNumberOfSegments.inc();
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, newNumDocs);
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_COUNT, 1L);
   }
 
   /**
@@ -195,9 +196,10 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   protected void closeSegment(SegmentDataManager segmentDataManager) {
     final String segmentName = segmentDataManager.getSegmentName();
     LOGGER.info("Closing segment {} for table {}", segmentName, _tableName);
-    _currentNumberOfSegments.dec();
-    _numDeletedSegments.inc();
-    _currentNumberOfDocuments.dec(segmentDataManager.getSegment().getSegmentMetadata().getTotalRawDocs());
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_COUNT, -1L);
+    _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.DELETED_SEGMENT_COUNT, 1L);
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT,
+        -segmentDataManager.getSegment().getSegmentMetadata().getTotalRawDocs());
     segmentDataManager.getSegment().destroy();
     LOGGER.info("Segment {} for table {} has been closed", segmentName, _tableName);
   }

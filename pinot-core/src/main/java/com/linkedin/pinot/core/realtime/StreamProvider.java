@@ -15,58 +15,57 @@
  */
 package com.linkedin.pinot.core.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
 
 public interface StreamProvider {
+  /**
+   *
+   */
+  void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics) throws Exception;
 
   /**
    *
    */
-  public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception;
-
-  /**
-   *
-   */
-  public void start() throws Exception;
+  void start() throws Exception;
 
   /**
    *
    * @param offset
    */
-  public void setOffset(long offset);
+  void setOffset(long offset);
 
   /**
    * return GenericRow
    */
-  public GenericRow next();
+  GenericRow next();
 
   /**
    *
    * @param offset
    * @return
    */
-  public GenericRow next(long offset);
+  GenericRow next(long offset);
 
   /**
    *
    * @return
    */
-  public long currentOffset();
+  long currentOffset();
 
   /**
    *
    */
-  public void commit();
+  void commit();
 
   /**
    *
    * @param offset
    */
-  public void commit(long offset);
+  void commit(long offset);
 
   /**
    *
    */
-  public void shutdown() throws Exception;
-
+  void shutdown() throws Exception;
 }

@@ -17,6 +17,7 @@ package com.linkedin.pinot.server.starter;
 
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
@@ -181,6 +182,8 @@ public class ServerBuilder {
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     _serverMetrics = new ServerMetrics(metricsRegistry);
     _serverMetrics.initializeGlobalMeters();
+
+    TableDataManagerProvider.setServerMetrics(_serverMetrics);
   }
 
   public ServerMetrics getServerMetrics() {

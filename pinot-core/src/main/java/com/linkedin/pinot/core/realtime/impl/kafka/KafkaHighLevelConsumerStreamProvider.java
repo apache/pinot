@@ -15,14 +15,13 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Counter;
-import com.yammer.metrics.core.MetricName;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
 
@@ -32,10 +31,6 @@ import kafka.javaapi.consumer.ConsumerConnector;
  */
 public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
-
-  private static Counter globalKafkaEventsConsumedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsConsumedCount"));
-  private static Counter globalKafkaEventsFailedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsFailedCount"));
-  private static Counter globalKafkaEventsCommitCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsCommitCount"));
 
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
   private KafkaMessageDecoder decoder;
@@ -47,24 +42,21 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private ConsumerAndIterator consumerAndIterator;
 
   private Logger INSTANCE_LOGGER = STATIC_LOGGER;
-  private Counter kafkaEventsConsumedCount = globalKafkaEventsConsumedCount;
-  private Counter kafkaEventsFailedCount = globalKafkaEventsFailedCount;
-  private Counter kafkaEventsCommitCount = globalKafkaEventsCommitCount;
+
+  private ServerMetrics serverMetrics;
+  private String tableAndStreamName;
+  private long currentCount = 0L;
 
   @Override
-  public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception {
+  public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
+      throws Exception {
     this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
     this.decoder = this.streamProviderConfig.getDecoder();
-    kafkaEventsConsumedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class,
-            tableName + "-" + this.streamProviderConfig.getStreamName() + "-" + "kafkaEventsConsumedCount"));
-    kafkaEventsFailedCount = Metrics.newCounter(
-        new MetricName(KafkaHighLevelConsumerStreamProvider.class,
-            tableName + "-" + this.streamProviderConfig.getStreamName() + "-" + "kafkaEventsFailedCount"));
-    kafkaEventsCommitCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class,
-            tableName + "-" + this.streamProviderConfig.getStreamName() + "-" + "kafkaEventsCommitCount"));
+    tableAndStreamName = tableName + "-" + streamProviderConfig.getStreamName();
     INSTANCE_LOGGER = LoggerFactory.getLogger(
         KafkaHighLevelConsumerStreamProvider.class.getName() + "_" + tableName + "_" + streamProviderConfig
             .getStreamName());
+    this.serverMetrics = serverMetrics;
   }
 
   @Override
@@ -84,12 +76,11 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
     if (kafkaIterator.hasNext()) {
       try {
         GenericRow row = decoder.decode(kafkaIterator.next().message());
-        kafkaEventsConsumedCount.inc();
-        globalKafkaEventsConsumedCount.inc();
+        serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+        serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+        ++currentCount;
 
-        // TODO Remove this logging stuff
         final long now = System.currentTimeMillis();
-        final long currentCount = kafkaEventsConsumedCount.count();
         // Log every minute or 100k events
         if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
           if (lastCount == 0) {
@@ -104,8 +95,8 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
         return row;
       } catch (Exception e) {
         INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
-        kafkaEventsFailedCount.inc();
-        globalKafkaEventsFailedCount.inc();
+        serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
       }
     }
     return null;
@@ -124,8 +115,8 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   @Override
   public void commit() {
     consumer.commitOffsets();
-    kafkaEventsCommitCount.inc();
-    globalKafkaEventsCommitCount.inc();
+    serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
+    serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
   }
 
   @Override

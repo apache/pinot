@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.server.integration.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -129,7 +131,7 @@ public class RealtimeTableDataManagerTest {
     final RealtimeSegmentDataManager manager =
         new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
             tableDataManagerConfig.getDataDir(), ReadMode.valueOf(tableDataManagerConfig.getReadMode()),
-            getTestSchema());
+            getTestSchema(), new ServerMetrics(new MetricsRegistry()));
 
     final long start = System.currentTimeMillis();
     TimerService.timer.scheduleAtFixedRate(new TimerTask() {

@@ -131,7 +131,7 @@ public class ControllerStarter {
     helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
       @Override
       public void onPreConnect() {
-        controllerMetrics.addMeteredValue(null, ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+        controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
       }
     });
     controllerMetrics.initializeGlobalMeters();

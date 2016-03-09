@@ -67,7 +67,7 @@ public class PinotBrokerRoutingTableDebugServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
   }
 }

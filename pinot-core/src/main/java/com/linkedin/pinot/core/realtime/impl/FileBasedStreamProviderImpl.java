@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
@@ -31,7 +32,8 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
   private int count;
 
   @Override
-  public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception {
+  public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
+      throws Exception {
     config = (FileBasedStreamProviderConfig) streamProviderConfig;
 
     FieldExtractor extractor = FieldExtractorFactory.getPlainFieldExtractor(config.getSchema());

@@ -56,7 +56,7 @@ public class PinotTableInstances extends PinotRestletResourceBase {
       return getTableInstances(tableName, type);
     } catch (Exception e) {
       LOGGER.error("Caught exception fetching instances for table ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_INSTANCES_GET_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_INSTANCES_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }

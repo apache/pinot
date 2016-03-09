@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,9 +83,10 @@ public class RealtimeFileBasedReaderTest {
     StreamProviderConfig config = new FileBasedStreamProviderConfig(FileFormat.AVRO, filePath, schema);
     StreamProvider provider = new FileBasedStreamProviderImpl();
     final String tableName = RealtimeFileBasedReaderTest.class.getSimpleName()+".noTable";
-    provider.init(config, tableName);
+    provider.init(config, tableName, new ServerMetrics(new MetricsRegistry()));
 
-    realtimeSegment = new RealtimeSegmentImpl(schema, 100000, tableName, segmentName, AVRO_DATA);
+    realtimeSegment = new RealtimeSegmentImpl(schema, 100000, tableName, segmentName, AVRO_DATA, new
+        ServerMetrics(new MetricsRegistry()));
     GenericRow row = provider.next();
     while (row != null) {
       realtimeSegment.index(row);

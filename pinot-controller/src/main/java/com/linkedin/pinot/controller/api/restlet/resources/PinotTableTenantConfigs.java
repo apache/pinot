@@ -42,7 +42,7 @@ public class PinotTableTenantConfigs extends PinotRestletResourceBase {
       return updateTenantConfig("dummy");
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating tenant config " , e);
-      ControllerRestApplication.getControllerMetrics().addMeteredValue(null, ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }

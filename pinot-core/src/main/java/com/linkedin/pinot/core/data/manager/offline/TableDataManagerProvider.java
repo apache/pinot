@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -27,6 +29,7 @@ import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
  *
  */
 public class TableDataManagerProvider {
+  private static ServerMetrics SERVER_METRICS;
 
   private static Map<String, Class<? extends TableDataManager>> keyToFunction =
       new ConcurrentHashMap<String, Class<? extends TableDataManager>>();
@@ -37,12 +40,14 @@ public class TableDataManagerProvider {
   }
 
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig) {
+    Preconditions.checkNotNull(SERVER_METRICS);
+
     try {
       Class<? extends TableDataManager> cls =
           keyToFunction.get(tableDataManagerConfig.getTableDataManagerType().toLowerCase());
       if (cls != null) {
-        TableDataManager tableDataManager = (TableDataManager) cls.newInstance();
-        tableDataManager.init(tableDataManagerConfig);
+        TableDataManager tableDataManager = cls.newInstance();
+        tableDataManager.init(tableDataManagerConfig, SERVER_METRICS);
         return tableDataManager;
       } else {
         throw new UnsupportedOperationException("No tableDataManager type found.");
@@ -53,4 +58,7 @@ public class TableDataManagerProvider {
     }
   }
 
+  public static void setServerMetrics(ServerMetrics serverMetrics) {
+    SERVER_METRICS = serverMetrics;
+  }
 }

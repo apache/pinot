@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.util.Random;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.StreamProvider;
@@ -45,8 +46,9 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void init(StreamProviderConfig streamProviderConfig, String tableName) throws Exception {
-      _streamProvider.init(streamProviderConfig, tableName);
+    public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
+        throws Exception {
+      _streamProvider.init(streamProviderConfig, tableName, serverMetrics);
     }
 
     @Override

@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.offline;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -109,7 +111,7 @@ public class OfflineTableDataManagerTest {
       when(config.getReadMode()).thenReturn(readMode.toString());
       when(config.getIndexLoadingConfigMetadata()).thenReturn(null);
     }
-    tableDataManager.init(config);
+    tableDataManager.init(config, new ServerMetrics(new MetricsRegistry()));
     tableDataManager.start();
     Field segsMapField = AbstractTableDataManager.class.getDeclaredField("_segmentsMap");
     segsMapField.setAccessible(true);

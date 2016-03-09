@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.File;
 import java.util.List;
 import java.util.TimerTask;
@@ -78,7 +79,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
       RealtimeTableDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode,
-      final Schema schema) throws Exception {
+      final Schema schema, final ServerMetrics serverMetrics) throws Exception {
     super();
     this.schema = schema;
     this.segmentName = segmentMetadata.getSegmentName();
@@ -126,12 +127,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // create and init stream provider
     final String tableName = tableConfig.getTableName();
     this.kafkaStreamProvider = StreamProviderFactory.buildStreamProvider();
-    this.kafkaStreamProvider.init(kafkaStreamProviderConfig, tableName);
+    this.kafkaStreamProvider.init(kafkaStreamProviderConfig, tableName, serverMetrics);
     this.kafkaStreamProvider.start();
     // lets create a new realtime segment
     LOGGER.info("Started kafka stream provider");
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
-        segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName());
+        segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics);
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeResourceManager;
 
