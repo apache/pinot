@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -67,6 +68,8 @@ public class ThirdeyeRecordReader extends BaseRecordReader {
   private Map<Long, List<Number>> _metricBuffer = null;
   private Iterator<Entry<Long, List<Number>>> _metricTimeSeriesIterator;
 
+  private boolean countIncluded;
+
 
   public ThirdeyeRecordReader(String sequenceFileName, Schema schema, String starTreeConfigFileName) throws IOException {
     super();
@@ -85,6 +88,14 @@ public class ThirdeyeRecordReader extends BaseRecordReader {
     _metricToIndexMapping = new HashMap<>();
     for (int i = 0; i < _starTreeConfig.getMetrics().size(); i ++) {
       _metricToIndexMapping.put(_starTreeConfig.getMetrics().get(i).getName(), i);
+    }
+
+    countIncluded = false;
+    for (String metricName : _starTreeConfig.getMetricNames()) {
+      if (metricName.equals(StarTreeConstants.AUTO_METRIC_COUNT)) {
+        countIncluded = true;
+        break;
+      }
     }
 
     _metricSchema = MetricSchema.fromMetricSpecs(_starTreeConfig.getMetrics());
@@ -161,6 +172,9 @@ public class ThirdeyeRecordReader extends BaseRecordReader {
       String metricValue = metricTimeSeriesValues.get(_metricToIndexMapping.get(metricName)).toString();
       DataType dataType = DataType.valueOf(metricSpec.getType().toString());
       fieldMap.put(metricName, RecordReaderUtils.convertToDataType(metricValue, dataType));
+    }
+    if (!countIncluded) {
+      fieldMap.put(StarTreeConstants.AUTO_METRIC_COUNT, 1);
     }
 
     fieldMap.put(_starTreeConfig.getTime().getColumnName(), metricTimeSeries.getKey());

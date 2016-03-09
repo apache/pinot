@@ -31,6 +31,8 @@ public final class StarTreeConstants {
   public static final String DIMENSION_STORE = "dimensionStore";
   public static final String DICT_STORE = "dictStore";
 
+  public static final String AUTO_METRIC_COUNT = "__COUNT";
+
   public static final DateTimeFormatter DATE_TIME_FORMATTER =
       DateTimeFormat.forPattern("YYYY-MM-dd-HHmmss");
 

@@ -28,7 +28,6 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
   private static final String NAME_SEPARATOR = "\\.";
   private static final String NULL_VALUE = "";
   private static final String INVALID_DIMENSION_VALUE = "INVALID";
-  private static final String AUTO_METRIC_COUNT = "__COUNT";
 
   public ThirdEyeAvroUtils() {
 
@@ -67,7 +66,7 @@ public class ThirdEyeAvroUtils implements ThirdeyeConverter<GenericRecord> {
 
   private static Number getMetricValue(MetricSpec metricSpec, GenericRecord record) {
     // Automatic count metric
-    if (AUTO_METRIC_COUNT.equals(metricSpec.getName())) {
+    if (StarTreeConstants.AUTO_METRIC_COUNT.equals(metricSpec.getName())) {
       return 1;
     }
 

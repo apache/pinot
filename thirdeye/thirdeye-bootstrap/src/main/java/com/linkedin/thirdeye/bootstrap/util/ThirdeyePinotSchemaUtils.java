@@ -19,10 +19,12 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 
 public class ThirdeyePinotSchemaUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ThirdeyePinotSchemaUtils.class);
+
 
   public static Schema createSchema(StarTreeConfig starTreeConfig) {
     Schema schema = new Schema();
@@ -34,13 +36,26 @@ public class ThirdeyePinotSchemaUtils {
       fieldSpec.setSingleValueField(true);
       schema.addField(dimensionSpec.getName(), fieldSpec);
     }
+    boolean countIncluded = false;
     for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
       FieldSpec fieldSpec = new MetricFieldSpec();
-      fieldSpec.setName(metricSpec.getName());
+      String metricName = metricSpec.getName();
+      if (metricName.equals(StarTreeConstants.AUTO_METRIC_COUNT)) {
+        countIncluded = true;
+      }
+      fieldSpec.setName(metricName);
       fieldSpec.setFieldType(FieldType.METRIC);
       fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
       fieldSpec.setSingleValueField(true);
-      schema.addField(metricSpec.getName(), fieldSpec);
+      schema.addField(metricName, fieldSpec);
+    }
+    if (!countIncluded) {
+      FieldSpec fieldSpec = new MetricFieldSpec();
+      String metricName = StarTreeConstants.AUTO_METRIC_COUNT;
+      fieldSpec.setName(metricName);
+      fieldSpec.setFieldType(FieldType.METRIC);
+      fieldSpec.setDataType(DataType.LONG);
+      schema.addField(metricName, fieldSpec);
     }
     TimeGranularitySpec incoming =
         new TimeGranularitySpec(DataType.LONG, starTreeConfig.getTime().getBucket().getUnit(), starTreeConfig.getTime().getColumnName());
