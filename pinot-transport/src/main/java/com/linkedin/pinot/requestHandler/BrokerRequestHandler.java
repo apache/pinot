@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import com.linkedin.pinot.common.query.ReduceService;
+import com.linkedin.pinot.common.query.ReduceServiceRegistry;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -73,22 +74,25 @@ public class BrokerRequestHandler {
 
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;
-  private final ReduceService _reduceService;
+  private final ReduceServiceRegistry _reduceServiceRegistry;
+  private ReduceService _reduceService;
   private final BrokerMetrics _brokerMetrics;
   private final TimeBoundaryService _timeBoundaryService;
   private final long _brokerTimeOutMs;
   private final BrokerRequestOptimizer _optimizer;
+  private BrokerResponseFactory.ResponseType _responseType;
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
-      ScatterGather scatterGatherer, ReduceService reduceService, BrokerMetrics brokerMetrics, long brokerTimeOutMs) {
+      ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry, BrokerMetrics brokerMetrics,
+      long brokerTimeOutMs) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
+    _reduceServiceRegistry = reduceServiceRegistry;
     _scatterGatherer = scatterGatherer;
     _replicaSelection = new RoundRobinReplicaSelection();
-    _reduceService = reduceService;
     _brokerMetrics = brokerMetrics;
     _brokerTimeOutMs = brokerTimeOutMs;
     _optimizer = new BrokerRequestOptimizer();
@@ -104,27 +108,32 @@ public class BrokerRequestHandler {
    * 6. Reduce (Merge) the responses. Create a broker response to be returned.
    *
    * @param request Broker Request to be sent
-   * @param responseType
    * @return Broker response
    * @throws InterruptedException
    */
   //TODO: Define a broker response class and return
-  public Object processBrokerRequest(final BrokerRequest request, BrokerResponseFactory.ResponseType responseType,
-      BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats, final long requestId)
+  public Object processBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection,
+      final ScatterGatherStats scatterGatherStats, final long requestId)
       throws InterruptedException {
-    if (request == null || request.getQuerySource() == null || request.getQuerySource().getTableName() == null) {
+
+    _responseType = BrokerResponseFactory.getResponseType(request.getResponseFormat());
+
+    if (request.getQuerySource() == null || request.getQuerySource().getTableName() == null) {
       LOGGER.info("Query contains null table.");
-      return BrokerResponseFactory.getNoTableHitBrokerResponse(responseType);
+      return BrokerResponseFactory.getNoTableHitBrokerResponse(_responseType);
     }
+
     List<String> matchedTables = getMatchedTables(request);
+    _reduceService = _reduceServiceRegistry.get(_responseType);
+
     if (matchedTables.size() > 1) {
       return processFederatedBrokerRequest(request, overriddenSelection, scatterGatherStats, requestId);
     }
     if (matchedTables.size() == 1) {
-      return processSingleTableBrokerRequest(request, responseType, matchedTables.get(0), overriddenSelection,
+      return processSingleTableBrokerRequest(request, matchedTables.get(0), overriddenSelection,
           scatterGatherStats, requestId);
     }
-    return BrokerResponseFactory.getNoTableHitBrokerResponse(responseType);
+    return BrokerResponseFactory.getNoTableHitBrokerResponse(_responseType);
   }
 
   /**
@@ -154,22 +163,22 @@ public class BrokerRequestHandler {
   }
 
   private Object processSingleTableBrokerRequest(final BrokerRequest request,
-      BrokerResponseFactory.ResponseType responseType,
       String matchedTableName, BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats,
       final long requestId)
       throws InterruptedException {
     request.getQuerySource().setTableName(matchedTableName);
-    return getDataTableFromBrokerRequest(_optimizer.optimize(request), responseType, null, scatterGatherStats,
+    return getDataTableFromBrokerRequest(_optimizer.optimize(request), null, scatterGatherStats,
         requestId);
   }
 
-  private Object processFederatedBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection,
-      final ScatterGatherStats scatterGatherStats, final long requestId) {
+  private Object processFederatedBrokerRequest(final BrokerRequest request,
+      BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats, final long requestId) {
     List<BrokerRequest> perTableRequests = new ArrayList<BrokerRequest>();
     perTableRequests.add(getRealtimeBrokerRequest(request));
     perTableRequests.add(getOfflineBrokerRequest(request));
     try {
-      return getDataTableFromBrokerRequestList(request, perTableRequests, null, scatterGatherStats, requestId);
+      return getDataTableFromBrokerRequestList(request, perTableRequests, null, scatterGatherStats,
+          requestId);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing federated broker request", e);
       Utils.rethrowException(e);
@@ -238,7 +247,6 @@ public class BrokerRequestHandler {
   }
 
   private Object getDataTableFromBrokerRequest(final BrokerRequest request,
-      BrokerResponseFactory.ResponseType responseType,
       BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats, final long requestId)
       throws InterruptedException {
     // Step1
@@ -247,7 +255,7 @@ public class BrokerRequestHandler {
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null || segmentServices.isEmpty()) {
       LOGGER.warn("Not found ServerInstances to Segments Mapping:");
-      return BrokerResponseFactory.getEmptyBrokerResponse(responseType);
+      return BrokerResponseFactory.getEmptyBrokerResponse(_responseType);
     }
 
     final long queryRoutingTime = System.nanoTime() - routingStartTime;

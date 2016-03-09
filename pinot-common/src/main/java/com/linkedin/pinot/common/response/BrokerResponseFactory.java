@@ -74,6 +74,24 @@ public class BrokerResponseFactory {
   }
 
   /**
+   * Given a responseType string, return the appropriate enum ResponseType.
+   * If the input string is null, return the default BROKER_RESPONSE_TYPE_JSON.
+   * If input string cannot be mapped to enum field, throws an IllegalArgumentException
+   *
+   * @param responseType
+   * @return
+   */
+  public static ResponseType getResponseType(String responseType) {
+    if (responseType == null || responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_JSON.name())) {
+      return ResponseType.BROKER_RESPONSE_TYPE_JSON;
+    } else if (responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name())) {
+      return ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+    } else {
+      throw new IllegalArgumentException("Illegal response type string " + responseType);
+    }
+  }
+
+  /**
    * Returns the static BrokerResponse of specified type, for case when table in query is not found.
    *
    * @param brokerResponseType

@@ -22,7 +22,10 @@ import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.query.ReduceServiceRegistry;
+import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
@@ -171,13 +174,28 @@ public class BrokerServerBuilder {
     }
     LOGGER.info("Broker timeout is - " + brokerTimeOutMs + " ms");
 
+    ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler =
-        new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(),
+        new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, reduceServiceRegistry,
             _brokerMetrics, brokerTimeOutMs);
 
-    //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
-
     LOGGER.info("Network initialized !!");
+  }
+
+  /**
+   * Build the reduce service registry for each broker response.
+   */
+  private ReduceServiceRegistry buildReduceServiceRegistry() {
+    ReduceServiceRegistry reduceServiceRegistry = new ReduceServiceRegistry();
+
+    DefaultReduceService defaultReduceService = new DefaultReduceService();
+    reduceServiceRegistry
+        .register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_JSON, new DefaultReduceService());
+    reduceServiceRegistry
+        .register(BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE, new BrokerReduceService());
+
+    reduceServiceRegistry.registerDefault(defaultReduceService);
+    return reduceServiceRegistry;
   }
 
   public void buildHTTP() {

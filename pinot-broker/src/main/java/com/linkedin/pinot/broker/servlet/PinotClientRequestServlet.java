@@ -147,8 +147,7 @@ public class PinotClientRequestServlet extends HttpServlet {
                   throws Exception {
                 final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
                 return (BrokerResponse) broker
-                    .processBrokerRequest(brokerRequest, responseType, bucketingSelection, scatterGatherStats,
-                        requestId);
+                    .processBrokerRequest(brokerRequest,bucketingSelection, scatterGatherStats, requestId);
               }
             });
 
