@@ -11,6 +11,7 @@ import io.dropwizard.views.View;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,10 +32,12 @@ public class DimensionViewHeatMap extends View {
       new HashMap<String, Map<String, Number>>();
   private final Map<String, Map<String, String>> dimensionGroupMap;
   private final Map<String, Map<Pattern, String>> dimensionRegexMap;
+  private final DateTime baseline;
+  private final DateTime current;
 
   public DimensionViewHeatMap(CollectionSchema schema, ObjectMapper objectMapper,
       Map<String, QueryResult> queryResults, Map<String, Map<String, String>> dimensionGroupMap,
-      Map<String, Map<Pattern, String>> dimensionRegexMap) throws Exception {
+      Map<String, Map<Pattern, String>> dimensionRegexMap, DateTime baseline, DateTime current) throws Exception {
     super("dimension/heat-map.ftl");
     this.schema = schema;
     this.objectMapper = objectMapper;
@@ -43,6 +46,8 @@ public class DimensionViewHeatMap extends View {
     this.heatMaps = new ArrayList<>();
     this.metricNames = new ArrayList<>();
     this.dimensionNames = new ArrayList<>();
+    this.baseline = baseline;
+    this.current = current;
 
     for (Map.Entry<String, QueryResult> entry : queryResults.entrySet()) {
       this.heatMaps.addAll(generateHeatMaps(entry.getKey(), entry.getValue()));
@@ -57,6 +62,8 @@ public class DimensionViewHeatMap extends View {
         dimensionNames.add(heatMap.getDimension());
       }
     }
+
+
   }
 
   public Map<String, Map<String, Number>> getMetricGlobalStats() {
@@ -73,6 +80,14 @@ public class DimensionViewHeatMap extends View {
 
   public List<String> getDimensionNames() {
     return dimensionNames;
+  }
+
+  public DateTime getBaseline() {
+    return baseline;
+  }
+
+  public DateTime getCurrent() {
+    return current;
   }
 
   private List<HeatMap> generateHeatMaps(String dimension, QueryResult queryResult)
@@ -142,15 +157,34 @@ public class DimensionViewHeatMap extends View {
       String value = combination.get(dimensionIdx);
 
       // Find min / max times (for current / baseline)
+
       long minTime = -1;
       long maxTime = -1;
-      for (String timeString : entry.getValue().keySet()) {
-        long time = Long.valueOf(timeString);
-        if (minTime == -1 || time < minTime) {
-          minTime = time;
+
+      long baselineSinceEpoch = baseline.getMillis();
+      long currentSinceEpoch = current.getMillis();
+
+      Set<String> timeStamps = entry.getValue().keySet();
+
+      if (timeStamps.contains(Long.toString(baselineSinceEpoch))) {
+        minTime = baselineSinceEpoch;
+      } else {
+        for (String timeString : timeStamps) {
+          long time = Long.valueOf(timeString);
+          if (minTime == -1 || time < minTime) {
+            minTime = time;
+          }
         }
-        if (maxTime == -1 || time > maxTime) {
-          maxTime = time;
+      }
+
+      if (timeStamps.contains(Long.toString(currentSinceEpoch))) {
+        maxTime = currentSinceEpoch;
+      } else {
+        for (String timeString : timeStamps) {
+          long time = Long.valueOf(timeString);
+          if (maxTime == -1 || time > maxTime) {
+            maxTime = time;
+          }
         }
       }
 

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.SegmentDescriptor;
+import com.linkedin.thirdeye.client.ThirdEyeMetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeRequestUtils;
@@ -335,7 +337,7 @@ public class DashboardResource {
           selectedDimensions, viewDimensions, baseline, current, reverseDimensionGroups);
 
     case HEAT_MAP:
-      Map<String, Future<QueryResult>> resultActualFutures = new HashMap<>();
+      Map<String, List<Future<QueryResult>>> resultActualFutures = new HashMap<>();
       // TODO separate this into two requests for the current + baseline period only (eg 2 days
       // instead of a full week)
       Multimap<String, String> expandedDimensionValues =
@@ -343,14 +345,32 @@ public class DashboardResource {
       for (String dimension : schema.getDimensions()) {
         if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
-          ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
-              .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
-              .setDimensionValues(expandedDimensionValues).setGroupBy(dimension).build();
 
-          LOGGER.info("Generated request for heat map: {}", req);
+          ThirdEyeMetricFunction thirdEyeMetricFunction =
+              ThirdEyeMetricFunction.fromStr(metricFunction);
+          int secs = (int) thirdEyeMetricFunction.getTimeGranularity().toSeconds();
+
+          ThirdEyeRequest baseLineReq =
+              new ThirdEyeRequestBuilder().setCollection(collection)
+                  .setMetricFunction(thirdEyeMetricFunction)
+                  .setDimensionValues(expandedDimensionValues).setGroupBy(dimension)
+                  .setStartTime(baseline.minusSeconds(secs)).setEndTime(baseline.plusSeconds(secs))
+                  .build();
+
+          ThirdEyeRequest currentReq =
+              new ThirdEyeRequestBuilder().setCollection(collection)
+                  .setMetricFunction(thirdEyeMetricFunction)
+                  .setDimensionValues(expandedDimensionValues).setGroupBy(dimension)
+                  .setStartTime(current.minusSeconds(secs)).setEndTime(current.plusSeconds(secs))
+                  .build();
 
           // Query (in parallel)
-          resultActualFutures.put(dimension, queryCache.getQueryResultAsync(req));
+          ArrayList<Future<QueryResult>> futures = new ArrayList<>();
+          futures.add(queryCache.getQueryResultAsync(baseLineReq));
+          futures.add(queryCache.getQueryResultAsync(currentReq));
+          LOGGER.info("Generated request for heat map: {}", baseLineReq);
+          LOGGER.info("Generated request for heat map: {}", currentReq);
+          resultActualFutures.put(dimension, futures);
         }
       }
 
@@ -363,19 +383,16 @@ public class DashboardResource {
         dimensionRegex = groupSpec.getRegexMapping();
       }
 
-      // // Wait for all queries
-      Map<String, QueryResult> actualResults = QueryUtils.waitForQueries(resultActualFutures);
-      // Map<String, QueryResult> currentResults = QueryUtils.waitForQueries(resultCurrentFutures);
-      // Map<String, QueryResult> baselineResults =
-      // QueryUtils.waitForQueries(resultBaselineFutures);
-      // Map<String, QueryResult> mergedResults =
-      // QueryUtils.mergeQueryMaps(currentResults, baselineResults);
+      // Wait for all queries
+      Map<String, QueryResult> actualResults =
+          QueryUtils.waitForAndMergeMultipleResults(resultActualFutures);
 
       return new DimensionViewHeatMap(schema, objectMapper, actualResults, dimensionGroups,
-          dimensionRegex);
+          dimensionRegex, baseline, current);
     case TABULAR:
-      List<FunnelTable> funnelTables = funnelResource.computeFunnelViews(collection, metricFunction,
-          funnels, baselineMillis, currentMillis, selectedDimensions);
+      List<FunnelTable> funnelTables =
+          funnelResource.computeFunnelViews(collection, metricFunction, funnels, baselineMillis,
+              currentMillis, selectedDimensions);
       return new DimensionViewFunnel(funnelTables);
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);

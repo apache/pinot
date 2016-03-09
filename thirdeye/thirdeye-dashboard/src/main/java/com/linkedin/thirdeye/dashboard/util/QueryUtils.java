@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.util;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -25,6 +26,38 @@ public class QueryUtils {
     for (Map.Entry<String, Future<QueryResult>> entry : resultFutures.entrySet()) {
       results.put(entry.getKey(), entry.getValue().get());
     }
+    return results;
+  }
+
+  /**
+   * Resolves all queries and returns a map with the returned data.
+   * @param resultFutures Each key will have a list of futures
+   * @return
+   * @throws InterruptedException
+   * @throws ExecutionException
+   */
+  public static Map<String, QueryResult> waitForAndMergeMultipleResults(
+      Map<String, List<Future<QueryResult>>> resultFutures) throws InterruptedException,
+      ExecutionException {
+
+    Map<String, QueryResult> results = new HashMap<>(resultFutures.size());
+
+    for (Map.Entry<String, List<Future<QueryResult>>> entry : resultFutures.entrySet()) {
+
+      QueryResult finalQueryResult = null;
+      for (Future<QueryResult> futureQueryResult : entry.getValue()) {
+
+        QueryResult queryResult = futureQueryResult.get();
+          if (finalQueryResult == null) {
+            finalQueryResult = queryResult;
+          } else {
+            finalQueryResult = mergeQueries(finalQueryResult, queryResult);
+          }
+      }
+
+      results.put(entry.getKey(), finalQueryResult);
+    }
+
     return results;
   }
 
