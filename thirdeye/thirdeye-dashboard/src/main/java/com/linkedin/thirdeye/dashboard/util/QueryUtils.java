@@ -33,7 +33,7 @@ public class QueryUtils {
    * identical except for the time window of data that they return (eg the dimension combinations
    * returned are identical in both results)
    */
-  public static QueryResult mergeQueries(QueryResult first, QueryResult second) {
+  public static QueryResult mergeQueryResults(QueryResult first, QueryResult second) {
     if (first == null || second == null) {
       throw new IllegalArgumentException("Query result cannot be null");
     }
@@ -70,7 +70,7 @@ public class QueryUtils {
    * identical except for the time window of data that they return (eg the dimension combinations
    * returned are identical in both results)
    */
-  public static Map<String, QueryResult> mergeQueryMaps(Map<String, QueryResult> first,
+  public static Map<String, QueryResult> mergeQueryResultMaps(Map<String, QueryResult> first,
       Map<String, QueryResult> second) {
     if (first == null || second == null) {
       throw new IllegalArgumentException("Query result cannot be null");
@@ -79,7 +79,7 @@ public class QueryUtils {
     for (String dimensionKey : first.keySet()) {
       QueryResult firstResult = first.get(dimensionKey);
       QueryResult secondResult = second.get(dimensionKey);
-      mergedResults.put(dimensionKey, mergeQueries(firstResult, secondResult));
+      mergedResults.put(dimensionKey, mergeQueryResults(firstResult, secondResult));
     }
     return mergedResults;
   }

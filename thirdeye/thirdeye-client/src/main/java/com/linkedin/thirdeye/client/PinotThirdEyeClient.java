@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -131,7 +130,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   public static PinotThirdEyeClient fromZookeeper(String controllerHost, int controllerPort,
       String zkUrl, String clusterName, String tag) {
-    return fromZookeeper(new CachedThirdEyeClientConfig(), controllerHost, controllerPort, zkUrl, clusterName, tag);
+    return fromZookeeper(new CachedThirdEyeClientConfig(), controllerHost, controllerPort, zkUrl,
+        clusterName, tag);
   }
 
   /**
@@ -146,18 +146,17 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
    */
   public static PinotThirdEyeClient fromZookeeper(CachedThirdEyeClientConfig config,
       String controllerHost, int controllerPort, String zkUrl, String clusterName, String tag) {
-
+    LOG.info("Creating PinotThirdEyeClient from zk,cluster,tag: {},{},{}", zkUrl, clusterName, tag);
     ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkUrl);
     List<String> thirdeyeBrokerList = helixAdmin.getInstancesInClusterWithTag(clusterName, tag);
     String[] thirdeyeBrokers = new String[thirdeyeBrokerList.size()];
     for (int i = 0; i < thirdeyeBrokerList.size(); i++) {
       String instanceName = thirdeyeBrokerList.get(i);
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceName);
-      thirdeyeBrokers[i] = instanceConfig.getHostName().replaceAll(BROKER_PREFIX, "") + ":" + instanceConfig.getPort();
+      thirdeyeBrokers[i] = instanceConfig.getHostName().replaceAll(BROKER_PREFIX, "") + ":"
+          + instanceConfig.getPort();
     }
-    Connection connection = ConnectionFactory.fromHostList(thirdeyeBrokers);
-    LOG.info("Created PinotThirdEyeClient to zookeeper: {}", zkUrl);
-    return new PinotThirdEyeClient(connection, controllerHost, controllerPort);
+    return fromHostList(config, controllerHost, controllerPort, thirdeyeBrokers);
   }
 
   public static PinotThirdEyeClient fromProperties(Properties properties) {
@@ -225,7 +224,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   private Map<String, Map<String, Number[]>> parseResultSetGroup(ThirdEyeRequest request,
       ResultSetGroup result, List<String> rawMetrics, StarTreeConfig starTreeConfig,
       List<String> dimensionNames)
-          throws JsonProcessingException, RuntimeException, NumberFormatException {
+      throws JsonProcessingException, RuntimeException, NumberFormatException {
 
     // Key: dimensionKey -> timestamp
     HashMap<String, Map<String, Number[]>> data = new HashMap<String, Map<String, Number[]>>();
@@ -238,16 +237,15 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     DateTime startTime = request.getStartTime();
 
     int columnOffset = 0; // number of observed columns from previous result sets.
-    String dimensionKey;
-    String timestamp = null;
-    List<String> dimensionKeyList = new LinkedList<String>();
-    Double[] rowData;
     for (int groupIdx = 0; groupIdx < result.getResultSetCount(); groupIdx++) {
       ResultSet resultSet = result.getResultSet(groupIdx);
       int columnCount = resultSet.getColumnCount();
       for (int row = 0; row < resultSet.getRowCount(); row++) {
+        String dimensionKey;
+        String timestamp = null;
         // determine timestamp + dimensionKey
         if (resultSet.getGroupKeyLength() > 0) {
+          List<String> dimensionKeyList = new LinkedList<String>();
           for (int group = 0; group < resultSet.getGroupKeyLength(); group++) {
             String timeKey = resultSet.getGroupKeyString(row, group);
             if (group == 0) {
@@ -263,7 +261,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
         }
 
         // Populate column values for current result set
-        rowData = getRowData(data, rawMetrics.size(), dimensionKey, timestamp);
+        Double[] rowData = getRowData(data, rawMetrics.size(), dimensionKey, timestamp);
         for (int col = 0; col < columnCount; col++) {
           String colValStr = resultSet.getString(row, col);
           int metricIdx = col + columnOffset;
@@ -273,8 +271,6 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       }
       // increment columnOffset to account for the result sets observed so far.
       columnOffset += columnCount;
-      dimensionKeyList.clear();
-      timestamp = null;
     }
     return data;
   }

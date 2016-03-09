@@ -1,12 +1,15 @@
 package com.linkedin.thirdeye.client;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.ISODateTimeFormat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
@@ -20,6 +23,7 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 public class ThirdEyeRequestUtils {
 
   private static final Joiner COMMA = Joiner.on(",");
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /**
    * Creates a request from the input parameters, specifying the start of the request as the
@@ -87,6 +91,37 @@ public class ThirdEyeRequestUtils {
       multimap.put(entry.getKey(), entry.getValue());
     }
     return multimap;
+  }
+
+  // primitive debugging mechanism, ideally meant to consume the printed toString() output and
+  // recreate the results.
+  private static ThirdEyeRequest fromString(String requestObject) throws Exception {
+    // trim outer object
+    requestObject =
+        requestObject.substring(requestObject.indexOf('{') + 1, requestObject.lastIndexOf('}'));
+    ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();
+    for (String string : requestObject.split(", ")) {
+      String[] split = string.split("=");
+      String property = split[0];
+      String value = split[1];
+      if (property.equals("collection")) {
+        builder.setCollection(value);
+      } else if (property.equals("metricFunction")) {
+        builder.setMetricFunction(value);
+      } else if (property.equals("startTime")) {
+        builder.setStartTime(ISODateTimeFormat.dateTimeParser().parseDateTime(value));
+      } else if (property.equals("endTime")) {
+        builder.setEndTime(ISODateTimeFormat.dateTimeParser().parseDateTime(value));
+      } else if (property.equals("dimensionValues")) {
+        // TODO fix to correctly handle multimap inputs
+        builder.setDimensionValues(MAPPER.readValue(value, Map.class));
+      } else if (property.equals("groupBy")) {
+        value = value.replaceAll("[\\[\\]]", "");
+        List<String> names = Arrays.asList(value.split(","));
+        builder.setGroupBy(names);
+      }
+    }
+    return builder.build();
   }
 
 }
