@@ -165,7 +165,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public String toJsonString()
       throws IOException {
-    return OBJECT_MAPPER.defaultPrettyPrintingWriter().writeValueAsString(this);
+    return OBJECT_MAPPER.writeValueAsString(this);
   }
 
   @Override
@@ -195,11 +195,13 @@ public class BrokerResponseNative implements BrokerResponse {
     }
   }
 
+  @JsonIgnore
   @Override
   public BrokerResponseFactory.ResponseType getResponseType() {
     return BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
   }
 
+  @JsonIgnore
   @Override
   public int getExceptionsSize() {
     return _processingExceptions.size();
