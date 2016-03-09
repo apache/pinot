@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.File;
 import java.util.List;
@@ -237,6 +238,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             // serving recent data.
             LOGGER.error("FATAL: Exception committing or shutting down consumer commitSuccessful={}",
                 commitSuccessful, e);
+            serverMetrics.addMeteredTableValue(tableName, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
               kafkaStreamProvider.shutdown();
             }

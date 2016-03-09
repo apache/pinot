@@ -32,7 +32,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_ROWS_CONSUMED("rows", true),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
-  REALTIME_OFFSET_COMMITS("commits", true);
+  REALTIME_OFFSET_COMMITS("commits", true),
+  REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false);
 
   private final String meterName;
   private final String unit;
