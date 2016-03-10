@@ -13,12 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
 
-public enum SegmentVersion {
-  v1,
-  v2,//Changed the forward index format to use bitpacking library instead of custombitset format.
+package com.linkedin.pinot.core.segment.store;
 
-  // v3 supports writing all the indexes in a single file
-  v3
+public enum ColumnIndexType {
+  DICTIONARY("dictionary"),
+  FORWARD_INDEX("forward_index"),
+  INVERTED_INDEX("inverted_index");
+
+  private final String indexName;
+  ColumnIndexType(String name) {
+    indexName = name;
+  }
+
+  public String getIndexName() {
+    return indexName;
+  }
+
+  public static ColumnIndexType getValue(String val) {
+    for (ColumnIndexType type : values()) {
+      if (type.getIndexName().equalsIgnoreCase(val)) {
+        return type;
+      }
+    }
+    throw new IllegalArgumentException("Unknown value: " + val);
+  }
 }
