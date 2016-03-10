@@ -1383,61 +1383,65 @@ public class ThirdEyeJob {
             DEFAULT_THIRDEYE_PRESERVE_TIME_COMPACTION));
 
         // list folders in dimensionDir starting with data_
-        FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexDir, new PathFilter() {
+        if (fileSystem.exists(dimensionIndexDir)) {
+          FileStatus[] fileStatus = fileSystem.listStatus(dimensionIndexDir, new PathFilter() {
 
-          @Override
-          public boolean accept(Path path) {
+            @Override
+            public boolean accept(Path path) {
 
-            return path.getName().startsWith(StarTreeConstants.DATA_DIR_PREFIX);
-          }
-        });
-
-        for (FileStatus file : fileStatus) {
-          if (preserveAggregation) {
-            FileStatus[] phases = fileSystem.listStatus(file.getPath(), new PathFilter() {
-
-              @Override
-              public boolean accept(Path path) {
-                return !path.getName().equals(PhaseSpec.AGGREGATION.getName());
-              }
-            });
-            for (FileStatus phase : phases) {
-              cleanupFolder(phase, cleanupDaysAgoDate, fileSystem);
+              return path.getName().startsWith(StarTreeConstants.DATA_DIR_PREFIX);
             }
-          } else {
-            cleanupFolder(file, cleanupDaysAgoDate, fileSystem);
+          });
+
+          for (FileStatus file : fileStatus) {
+            if (preserveAggregation) {
+              FileStatus[] phases = fileSystem.listStatus(file.getPath(), new PathFilter() {
+
+                @Override
+                public boolean accept(Path path) {
+                  return !path.getName().equals(PhaseSpec.AGGREGATION.getName());
+                }
+              });
+              for (FileStatus phase : phases) {
+                cleanupFolder(phase, cleanupDaysAgoDate, fileSystem);
+              }
+            } else {
+              cleanupFolder(file, cleanupDaysAgoDate, fileSystem);
+            }
           }
         }
 
         // list folders in metricDir starting with data_
-        fileStatus = fileSystem.listStatus(metricIndexDir, new PathFilter() {
+        if (fileSystem.exists(metricIndexDir)) {
+          FileStatus[] fileStatus = fileSystem.listStatus(metricIndexDir, new PathFilter() {
 
-          @Override
-          public boolean accept(Path path) {
+            @Override
+            public boolean accept(Path path) {
 
-            return path.getName().startsWith(StarTreeConstants.DATA_DIR_PREFIX);
-          }
-        });
-
-        for (FileStatus file : fileStatus) {
-          // get last modified date
-          DateTime lastModifiedDate = new DateTime(file.getModificationTime());
-
-          if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis())) {
-            Path startreeBootstrapPath1 = new Path(file.getPath(),
-                PhaseSpec.STARTREE_BOOTSTRAP_PHASE1.getName().toLowerCase());
-            if (fileSystem.exists(startreeBootstrapPath1)) {
-              LOGGER.info("Deleting {}", startreeBootstrapPath1);
-              fileSystem.delete(startreeBootstrapPath1, true);
+              return path.getName().startsWith(StarTreeConstants.DATA_DIR_PREFIX);
             }
+          });
 
-            Path startreeBootstrapPath2 = new Path(file.getPath(),
-                PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName().toLowerCase());
-            if (fileSystem.exists(startreeBootstrapPath2)) {
-              LOGGER.info("Deleting {}", startreeBootstrapPath2);
-              fileSystem.delete(startreeBootstrapPath2, true);
+          for (FileStatus file : fileStatus) {
+            // get last modified date
+            DateTime lastModifiedDate = new DateTime(file.getModificationTime());
+
+            if (lastModifiedDate.isBefore(cleanupDaysAgoDate.getMillis())) {
+              Path startreeBootstrapPath1 = new Path(file.getPath(),
+                  PhaseSpec.STARTREE_BOOTSTRAP_PHASE1.getName().toLowerCase());
+              if (fileSystem.exists(startreeBootstrapPath1)) {
+                LOGGER.info("Deleting {}", startreeBootstrapPath1);
+                fileSystem.delete(startreeBootstrapPath1, true);
+              }
+
+              Path startreeBootstrapPath2 = new Path(file.getPath(),
+                  PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName().toLowerCase());
+              if (fileSystem.exists(startreeBootstrapPath2)) {
+                LOGGER.info("Deleting {}", startreeBootstrapPath2);
+                fileSystem.delete(startreeBootstrapPath2, true);
+              }
+
             }
-
           }
         }
 
