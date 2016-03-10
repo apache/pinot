@@ -15,14 +15,15 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.nio.channels.FileChannel;
 import java.util.concurrent.TimeUnit;
-import me.lemire.integercompression.BitPacking;
-import org.apache.commons.math.util.MathUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -30,12 +31,9 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
-
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 
 
 @State(Scope.Benchmark)
@@ -81,8 +79,9 @@ public class BenchmarkFileRead {
     int columnSizeInBits = 3;
     boolean isMMap = true;
     boolean hasNulls = false;
+    PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "benchmark");
     FixedBitSingleValueReader reader =
-        new FixedBitSingleValueReader(file, rows, columnSizeInBits, isMMap, hasNulls);
+        new FixedBitSingleValueReader(dataBuffer, rows, columnSizeInBits, hasNulls);
     int[] result2 = new int[rows];
     for (int i = 0; i < rows; i++) {
       result2[i] = reader.getInt(i);

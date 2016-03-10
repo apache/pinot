@@ -15,20 +15,13 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v2;
 
-import java.io.File;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.util.SizeUtil;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-
+import me.lemire.integercompression.BitPacking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.util.SizeUtil;
-
-import me.lemire.integercompression.BitPacking;
 
 /**
  * Reads integers that were bit compressed. It unpacks 32 values at a time (since these are aligned
@@ -41,131 +34,27 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSingleValueReader.class);
   private int compressedSize;
   private int uncompressedSize;
-  private RandomAccessFile file;
   private int rows;
-  private ByteBuffer byteBuffer;
-  private boolean ownsByteBuffer;
-  private boolean isMmap;
+  private PinotDataBuffer indexDataBuffer;
   private BitUnpackResultWrapper bitUnpackWrapper;
   private int numBits;
-
-  /**
-   * @param file
-   * @param rows
-   * @param columnSizesInBits
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueReader forHeap(File file, int rows, int numBits)
-      throws IOException {
-    boolean signed = false;
-    return new FixedBitSingleValueReader(file, rows, numBits, signed, false);
-  }
-
-  /**
-   * @param file
-   * @param rows
-   * @param numBits
-   * @param signed
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueReader forHeap(File file, int rows, int numBits, boolean signed)
-      throws IOException {
-    return new FixedBitSingleValueReader(file, rows, numBits, signed, false);
-  }
-
-  /**
-   * @param file
-   * @param rows
-   * @param numBits
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueReader forMmap(File file, int rows, int numBits)
-      throws IOException {
-    boolean signed = false;
-    return new FixedBitSingleValueReader(file, rows, numBits, signed, true);
-  }
-
-  /**
-   * @param file
-   * @param rows
-   * @param numBits
-   * @param signed
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueReader forMmap(File file, int rows, int numBits, boolean signed)
-      throws IOException {
-    return new FixedBitSingleValueReader(file, rows, numBits, signed, true);
-  }
 
   /**
    * @param dataBuffer
    * @param rows
    * @param numBits
    * @param signed
-   * @return
    * @throws IOException
    */
-  public static FixedBitSingleValueReader forByteBuffer(ByteBuffer dataBuffer, int rows,
-      int numBits, boolean signed) throws IOException {
-    return new FixedBitSingleValueReader(dataBuffer, rows, numBits, signed);
-  }
-
-  /**
-   * @param dataFile
-   * @param rows
-   * @param numBits
-   * @param signed
-   * @param isMmap
-   * @throws IOException
-   */
-  public FixedBitSingleValueReader(File dataFile, int rows, int numBits, boolean signed,
-      boolean isMmap) throws IOException {
-    init(rows, numBits, signed);
-    file = new RandomAccessFile(dataFile, "rw");
-    this.isMmap = isMmap;
-    if (isMmap) {
-      byteBuffer = MmapUtils.mmapFile(file, FileChannel.MapMode.READ_ONLY, 0, file.length(),
-          dataFile, this.getClass().getSimpleName() + " byteBuffer");
-    } else {
-      byteBuffer = MmapUtils.allocateDirectByteBuffer((int) file.length(), dataFile,
-          this.getClass().getSimpleName() + " byteBuffer");
-      file.getChannel().read(byteBuffer);
-      file.close();
-    }
-    LOGGER.info("Loaded file:{} of size:{}", dataFile.getName(), dataFile.length());
-    // unpack 32 values at a time.
-    ownsByteBuffer = true;
-  }
-
-  /**
-   * @param buffer
-   * @param rows
-   * @param numBits
-   * @param signed
-   * @throws IOException
-   */
-  private FixedBitSingleValueReader(ByteBuffer buffer, int rows, int numBits, boolean signed)
-      throws IOException {
-    this.byteBuffer = buffer;
-    ownsByteBuffer = false;
-    this.isMmap = false;
+  public FixedBitSingleValueReader(PinotDataBuffer dataBuffer, int rows, int numBits, boolean signed) {
+    this.indexDataBuffer = dataBuffer;
     init(rows, numBits, signed);
   }
 
-  /**
-   * @param fileName
-   * @param rows
-   * @param columnSizes
-   * @throws IOException
-   */
-  private FixedBitSingleValueReader(String fileName, int rows, int numBits, boolean signed)
-      throws IOException {
-    this(new File(fileName), rows, numBits, signed, true);
+  public FixedBitSingleValueReader(PinotDataBuffer dataBuffer, int rows, int numBits) {
+    this(dataBuffer, rows, numBits, false /*signed*/);
   }
+
 
   private void init(int rows, int numBits, boolean signed) {
 
@@ -187,7 +76,7 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
   }
 
   /**
-   * @param rowIds assumes rowIds are sorted
+   * @param startRow assumes rowIds are sorted
    * @param values
    * @param length
    */
@@ -199,7 +88,7 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
       if (tempResult.position != batchPosition) {
         int startIndex = batchPosition * numBits * 4;
         for (int i = 0; i < numBits; i++) {
-          tempResult.compressed[i] = byteBuffer.getInt(startIndex + i * 4);
+          tempResult.compressed[i] = indexDataBuffer.getInt(startIndex + i * 4);
         }
         BitPacking.fastunpack(tempResult.compressed, 0, tempResult.uncompressed, 0, numBits);
       }
@@ -224,7 +113,7 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
       if (tempResult.position != batchPosition) {
         int startIndex = batchPosition * numBits * 4;
         for (int i = 0; i < numBits; i++) {
-          tempResult.compressed[i] = byteBuffer.getInt(startIndex + i * 4);
+          tempResult.compressed[i] = indexDataBuffer.getInt(startIndex + i * 4);
         }
         BitPacking.fastunpack(tempResult.compressed, 0, tempResult.uncompressed, 0, numBits);
       }
@@ -249,7 +138,7 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
       for (int i = 0; i < numBits; i++) {
         try {
           index = startIndex + i * 4;
-          result.compressed[i] = byteBuffer.getInt(index);
+          result.compressed[i] = indexDataBuffer.getInt(index);
         } catch (Exception e) {
           LOGGER.error("Exception while retreiving value for row:{} at index:{} numBits:{}", row,
               index, numBits, e);
@@ -271,14 +160,7 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
 
   @Override
   public void close() throws IOException {
-    if (ownsByteBuffer) {
-      MmapUtils.unloadByteBuffer(byteBuffer);
-      byteBuffer = null;
-
-      if (isMmap) {
-        file.close();
-      }
-    }
+    indexDataBuffer.close();
   }
 
   public boolean open() {

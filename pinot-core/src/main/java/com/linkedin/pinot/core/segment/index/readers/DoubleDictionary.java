@@ -15,20 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import java.io.File;
-import java.io.IOException;
-
-
-/**
- * Nov 14, 2014
- */
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 public class DoubleDictionary extends ImmutableDictionaryReader  {
 
-  public DoubleDictionary(File dictFile, ColumnMetadata columnMetadata, ReadMode loadMode) throws IOException {
-    super(dictFile, columnMetadata.getCardinality(), Double.SIZE/8, loadMode == ReadMode.mmap);
+  public DoubleDictionary(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata) {
+    super(dataBuffer, columnMetadata.getCardinality(), Double.SIZE/8);
   }
 
   @Override

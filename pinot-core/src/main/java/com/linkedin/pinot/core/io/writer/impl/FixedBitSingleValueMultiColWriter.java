@@ -15,17 +15,13 @@
  */
 package com.linkedin.pinot.core.io.writer.impl;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.util.CustomBitSet;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.util.PinotDataCustomBitSet;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import org.apache.commons.io.IOUtils;
 
 
 /**
@@ -35,56 +31,60 @@ import org.apache.commons.io.IOUtils;
  *
  */
 public class FixedBitSingleValueMultiColWriter implements Closeable {
-  private File file;
+
   private int[] columnOffsetsInBits;
 
   private int[] offsets;
-  private ByteBuffer byteBuffer;
-  private RandomAccessFile raf;
+  private PinotDataBuffer indexDataBuffer;
   private int rowSizeInBits;
   private int[] colSizesInBits;
   private int[] maxValues;
   private int[] minValues;
 
-  private CustomBitSet bitSet;
+  private PinotDataCustomBitSet bitSet;
   private int bytesRequired;
 
-  public FixedBitSingleValueMultiColWriter(File file, int rows, int cols,
-      int[] columnSizesInBits) throws Exception {
-    init(file, rows, cols, columnSizesInBits);
-    createBuffer(file);
-    bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
-  }
-
-  public FixedBitSingleValueMultiColWriter(File file, int rows, int cols,
-      int[] columnSizesInBits, boolean[] hasNegativeValues) throws Exception {
-    init(file, rows, cols, columnSizesInBits, hasNegativeValues);
-    createBuffer(file);
-    bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
-  }
-
-  public FixedBitSingleValueMultiColWriter(ByteBuffer byteBuffer, int rows,
+  public FixedBitSingleValueMultiColWriter(File file, int rows,
       int cols, int[] columnSizesInBits) throws Exception {
-    init(file, rows, cols, columnSizesInBits);
-    bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
+    init(rows, cols, columnSizesInBits);
+    this.indexDataBuffer = PinotDataBuffer.fromFile(file, 0, bytesRequired, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+        file.getAbsolutePath() + this.getClass().getCanonicalName());
+    bitSet = PinotDataCustomBitSet.withDataBuffer(bytesRequired, indexDataBuffer);
   }
 
-  public FixedBitSingleValueMultiColWriter(ByteBuffer byteBuffer, int rows,
+
+  public FixedBitSingleValueMultiColWriter(File file, int rows,
       int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
       throws Exception {
-    init(file, rows, cols, columnSizesInBits, hasNegativeValues);
-    bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
+    init(rows, cols, columnSizesInBits, hasNegativeValues);
+    this.indexDataBuffer = PinotDataBuffer.fromFile(file, 0, bytesRequired, ReadMode.mmap,
+        FileChannel.MapMode.READ_WRITE, file.getAbsolutePath() + this.getClass().getCanonicalName());
+    bitSet = PinotDataCustomBitSet.withDataBuffer(bytesRequired, indexDataBuffer);
   }
 
-  private void init(File file, int rows, int cols, int[] columnSizesInBits) {
+  public FixedBitSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int rows,
+      int cols, int[] columnSizesInBits) throws Exception {
+    init(rows, cols, columnSizesInBits);
+    this.indexDataBuffer = dataBuffer;
+    bitSet = PinotDataCustomBitSet.withDataBuffer(bytesRequired, indexDataBuffer);
+  }
+
+  public FixedBitSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int rows,
+      int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
+      throws Exception {
+    init(rows, cols, columnSizesInBits, hasNegativeValues);
+    this.indexDataBuffer = dataBuffer;
+    bitSet = PinotDataCustomBitSet.withDataBuffer(bytesRequired, indexDataBuffer);
+  }
+
+  private void init(int rows, int cols, int[] columnSizesInBits) {
     boolean[] hasNegativeValues = new boolean[cols];
     Arrays.fill(hasNegativeValues, false);
-    init(file, rows, cols, columnSizesInBits, hasNegativeValues);
+    init(rows, cols, columnSizesInBits, hasNegativeValues);
   }
 
-  private void init(File file, int rows, int cols, int[] columnSizesInBits,
+  private void init(int rows, int cols, int[] columnSizesInBits,
       boolean[] signed) {
-    this.file = file;
     this.colSizesInBits = new int[cols];
     this.columnOffsetsInBits = new int[cols];
     this.offsets = new int[cols];
@@ -112,17 +112,6 @@ public class FixedBitSingleValueMultiColWriter implements Closeable {
     this.bytesRequired = (int)((totalSizeInBits + 7) / 8);
   }
 
-  private void createBuffer(File file) throws FileNotFoundException,
-      IOException {
-    raf = new RandomAccessFile(file, "rw");
-    byteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
-        bytesRequired, file, this.getClass().getSimpleName() + " byteBuffer");
-    byteBuffer.position(0);
-    for (int i = 0; i < bytesRequired; i++) {
-      byteBuffer.put((byte) 0);
-    }
-  }
-
   public boolean open() {
     return true;
   }
@@ -142,11 +131,9 @@ public class FixedBitSingleValueMultiColWriter implements Closeable {
 
   @Override
   public void close() {
-    IOUtils.closeQuietly(raf);
-    raf = null;
-    MmapUtils.unloadByteBuffer(byteBuffer);
-    byteBuffer = null;
     bitSet.close();
+    indexDataBuffer.close();
     bitSet = null;
+    indexDataBuffer = null;
   }
 }

@@ -36,6 +36,7 @@ public class SortedForwardIndexReader
   @Override
   public void close() throws IOException {
     // no need to close here , will be closed by parent container
+
   }
 
   @Override

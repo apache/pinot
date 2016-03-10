@@ -15,20 +15,20 @@
  */
 package com.linkedin.pinot.index.reader;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
-import java.util.Arrays;
+import java.nio.channels.FileChannel;
 import java.util.Random;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 
 public class FixedBitMultiValueTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitMultiValueTest.class);
@@ -57,7 +57,7 @@ public class FixedBitMultiValueTest {
     });
     Constructor<? extends SingleColumnMultiValueReader> readerClazzConstructor =
         readerClazz.getConstructor(new Class[] {
-            File.class, int.class, int.class, int.class, boolean.class, boolean.class
+            PinotDataBuffer.class, int.class, int.class, int.class, boolean.class
     });
     int maxBits = 1;
     while (maxBits < 32) {
@@ -96,10 +96,10 @@ public class FixedBitMultiValueTest {
       raf.close();
 
       // Test heap mode
-
+      PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
       SingleColumnMultiValueReader<? extends ReaderContext> heapReader =
           readerClazzConstructor.newInstance(new Object[] {
-              f, numDocs, totalNumValues, maxBits, false, false
+              heapBuffer, numDocs, totalNumValues, maxBits, false
       });
       final int[] readValues = new int[maxNumValues];
       for (int i = 0; i < data.length; i++) {
@@ -109,14 +109,15 @@ public class FixedBitMultiValueTest {
           Assert.assertEquals(readValues[j], data[i][j]);
         }
       }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
       heapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      heapBuffer.close();
 
       // Test mmap mode
+      PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
+
       SingleColumnMultiValueReader<? extends ReaderContext> mmapReader =
           readerClazzConstructor.newInstance(new Object[] {
-              f, numDocs, totalNumValues, maxBits, false, true
+              mmapBuffer, numDocs, totalNumValues, maxBits, false
       });
       for (int i = 0; i < data.length; i++) {
         final int numValues = mmapReader.getIntArray(i, readValues);
@@ -127,6 +128,7 @@ public class FixedBitMultiValueTest {
       }
       // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
       mmapReader.close();
+      mmapBuffer.close();
       // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
       f.delete();
@@ -147,7 +149,7 @@ public class FixedBitMultiValueTest {
     });
     Constructor<? extends SingleColumnMultiValueReader<? extends ReaderContext>> readerClazzConstructor =
         readerClazz.getConstructor(new Class[] {
-            File.class, int.class, int.class, int.class, boolean.class, boolean.class
+            PinotDataBuffer.class, int.class, int.class, int.class, boolean.class
     });
     int maxBits = 1;
     while (maxBits < 32) {
@@ -186,10 +188,10 @@ public class FixedBitMultiValueTest {
       raf.close();
 
       // Test heap mode
-
+      PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
       SingleColumnMultiValueReader heapReader =
           readerClazzConstructor.newInstance(new Object[] {
-              f, numDocs, totalNumValues, maxBits, false, false
+              heapBuffer, numDocs, totalNumValues, maxBits, false
       });
       ReaderContext context = heapReader.createContext();
       final int[] readValues = new int[maxNumValues];
@@ -204,14 +206,15 @@ public class FixedBitMultiValueTest {
           Assert.assertEquals(readValues[j], data[i][j]);
         }
       }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
       heapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      heapBuffer.close();
+
 
       // Test mmap mode
+      PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
       SingleColumnMultiValueReader<? extends ReaderContext> mmapReader =
           readerClazzConstructor.newInstance(new Object[] {
-              f, numDocs, totalNumValues, maxBits, false, true
+              mmapBuffer, numDocs, totalNumValues, maxBits, false
       });
       for (int i = 0; i < data.length; i++) {
         final int numValues = mmapReader.getIntArray(i, readValues);
@@ -220,9 +223,10 @@ public class FixedBitMultiValueTest {
           Assert.assertEquals(readValues[j], data[i][j]);
         }
       }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+
       mmapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+      mmapBuffer.close();
+
 
       f.delete();
       maxBits = maxBits + 1;

@@ -86,6 +86,10 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return null;
   }
 
+  @Override
+  public String toString() {
+    return segmentDirectory.toString();
+  }
 
   public void load()
       throws IOException, ConfigurationException {
@@ -166,6 +170,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       // do nothing here
       segmentLock.unlock();
     }
+
+    @Override
+    public String toString() {
+      return segmentDirectory.toString();
+    }
   }
 
   public class Writer extends SegmentDirectory.Writer {
@@ -228,6 +237,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     void abort() {
 
+    }
+
+    @Override
+    public String toString() {
+      return segmentDirectory.toString();
     }
 
     public void close() {

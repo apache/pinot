@@ -15,26 +15,15 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel.MapMode;
-
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-
-/**
- * Aug 10, 2014
- */
 
 public class BitmapInvertedIndexReader implements InvertedIndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
@@ -42,8 +31,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   final private int numberOfBitmaps;
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
 
-  private RandomAccessFile _rndFile;
-  private ByteBuffer buffer;
+  private PinotDataBuffer buffer;
   public static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
 
   private File file;
@@ -55,10 +43,10 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
    *          the dictionary.
    * @throws IOException
    */
-  public BitmapInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
+  public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality) throws IOException {
     this.file = file;
     numberOfBitmaps = cardinality;
-    load(file, isMmap);
+    load(indexDataBuffer);
   }
 
   /**
@@ -106,10 +94,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
     final int bufferLength = nextOffset - currentOffset;
 
     // Slice the buffer appropriately for Roaring Bitmap
-    buffer.position(currentOffset);
-    final ByteBuffer bb = buffer.slice();
-    bb.limit(bufferLength);
-
+    ByteBuffer bb = buffer.toDirectByteBuffer(currentOffset, bufferLength);
     ImmutableRoaringBitmap immutableRoaringBitmap = null;
     try {
       immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
@@ -125,32 +110,15 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
     return buffer.getInt(index * INT_SIZE_IN_BYTES);
   }
 
-  private void load(File file, boolean isMmap) throws IOException {
-    final DataInputStream dis =
-        new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
-
-    dis.skipBytes(numberOfBitmaps * INT_SIZE_IN_BYTES);
-    final int lastOffset = dis.readInt();
-    dis.close();
-
-    _rndFile = new RandomAccessFile(file, "r");
-    if (isMmap) {
-      buffer = MmapUtils.mmapFile(_rndFile, MapMode.READ_ONLY, 0, lastOffset, file,
-          this.getClass().getSimpleName() + " buffer");
-    } else {
-      buffer = MmapUtils.allocateDirectByteBuffer(lastOffset, file,
-          this.getClass().getSimpleName() + " buffer");
-      _rndFile.getChannel().read(buffer);
-    }
+  private void load(PinotDataBuffer indexDataBuffer) throws IOException {
+    final int lastOffset = indexDataBuffer.getInt(numberOfBitmaps * INT_SIZE_IN_BYTES);
+    assert lastOffset == indexDataBuffer.size();
+    this.buffer = indexDataBuffer;
   }
 
   @Override
   public void close() throws IOException {
-    MmapUtils.unloadByteBuffer(buffer);
-    buffer = null;
-    if (_rndFile != null) {
-      _rndFile.close();
-    }
+    buffer.close();
   }
 
   @Override

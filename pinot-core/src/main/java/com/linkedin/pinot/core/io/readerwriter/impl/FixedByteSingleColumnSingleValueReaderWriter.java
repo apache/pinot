@@ -15,13 +15,11 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
@@ -31,7 +29,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   private int cols;
   private int[] colOffSets;
   private int rowSize;
-  private ByteBuffer _buffer;
+  private PinotDataBuffer _buffer;
 
   public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) throws IOException {
     this(rows, new int[]{columnSizesInBytes});
@@ -50,8 +48,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
       rowSize += columnSizesInBytes[i];
     }
     final int totalSize = rowSize * rows;
-    _buffer = MmapUtils.allocateDirectByteBuffer(totalSize, null, this.getClass().getSimpleName() + " buffer");
-    _buffer.order(ByteOrder.nativeOrder());
+    _buffer = PinotDataBuffer.allocateDirect(totalSize);
+    //_buffer.order(ByteOrder.nativeOrder());
     reader = new FixedByteSingleValueMultiColReader(_buffer, rows, cols, columnSizesInBytes);
     writer = new FixedByteSingleValueMultiColWriter(_buffer, rows, cols, columnSizesInBytes);
   }
@@ -62,7 +60,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     reader = null;
     writer.close();
     writer = null;
-    MmapUtils.unloadByteBuffer(_buffer);
+    _buffer.close();
     _buffer = null;
   }
 

@@ -15,26 +15,18 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import java.io.File;
-import java.io.IOException;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.charset.Charset;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str.STRING_PAD_CHAR;
-
-
-/**
- * Nov 14, 2014
- */
 
 public class StringDictionary extends ImmutableDictionaryReader {
   private final int lengthofMaxEntry;
   private static Charset UTF_8 = Charset.forName("UTF-8");
 
-  public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode)
-      throws IOException {
-    super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(), mode == ReadMode.mmap);
+  public StringDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
+    super(dataBuffer, metadata.getCardinality(), metadata.getStringColumnMaxLength());
     lengthofMaxEntry = metadata.getStringColumnMaxLength();
   }
 

@@ -17,24 +17,20 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
-import java.io.File;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 
 
 
 public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
 
-  private final File indexFile;
   private final FixedBitSingleValueMultiColReader dataFileReader;
   private final int rows;
 
-  public FixedBitSingleValueReader(File file, int rows, int columnSize, boolean isMMap, boolean hasNulls) throws IOException {
-    indexFile = file;
-    if (isMMap) {
-      dataFileReader = FixedBitSingleValueMultiColReader.forMmap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
-    } else {
-      dataFileReader = FixedBitSingleValueMultiColReader.forHeap(indexFile, rows, 1, new int[] { columnSize }, new boolean[] { hasNulls });
-    }
+  public FixedBitSingleValueReader(PinotDataBuffer indexDataBuffer, int rows,
+      int columnSize, boolean hasNulls) {
+    dataFileReader = new FixedBitSingleValueMultiColReader(indexDataBuffer, rows, 1,
+        new int[] { columnSize }, new boolean[] { hasNulls });
     this.rows = rows;
   }
 
