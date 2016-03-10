@@ -23,13 +23,13 @@ import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestGroupByAggreat
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestSimpleAggreationQuery;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.BrokerResponseJSON;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -80,6 +80,8 @@ public class QueriesSentinelTest {
 
   @BeforeClass
   public void setup() throws Exception {
+    TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
+
     CONFIG_BUILDER = new TestingServerPropertiesBuilder("testTable");
 
     setupSegmentFor("testTable");

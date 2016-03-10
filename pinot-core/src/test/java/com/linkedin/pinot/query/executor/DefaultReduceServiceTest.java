@@ -17,6 +17,7 @@ package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.JsonAssert;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -71,6 +72,8 @@ public class DefaultReduceServiceTest {
 
   @BeforeClass
   public void setup() throws Exception {
+    TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
+
     File confDir = new File(QueryExecutorTest.class.getClassLoader().getResource("conf").toURI());
     setupSegmentList(2);
     FileUtils.deleteDirectory(new File("/tmp/pinot/test1"));

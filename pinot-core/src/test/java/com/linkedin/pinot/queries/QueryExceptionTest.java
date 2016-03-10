@@ -16,6 +16,7 @@
 package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.response.BrokerResponseJSON;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,7 +38,6 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -69,6 +69,8 @@ public class QueryExceptionTest {
 
   @BeforeClass
   public void setup() throws Exception {
+    TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
+
     CONFIG_BUILDER = new TestingServerPropertiesBuilder("testTable");
 
     setupSegmentFor("testTable");

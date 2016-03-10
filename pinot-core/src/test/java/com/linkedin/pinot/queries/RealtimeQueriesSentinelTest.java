@@ -16,6 +16,7 @@
 package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.response.BrokerResponseJSON;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -80,6 +81,7 @@ public class RealtimeQueriesSentinelTest {
 
   @BeforeClass
   public void setup() throws Exception {
+    TableDataManagerProvider.setServerMetrics(new ServerMetrics(new MetricsRegistry()));
 
     PINOT_SCHEMA = getTestSchema();
     PINOT_SCHEMA.setSchemaName("realtimeSchema");
