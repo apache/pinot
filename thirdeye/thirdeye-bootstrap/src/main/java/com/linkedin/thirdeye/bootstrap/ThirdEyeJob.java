@@ -1399,13 +1399,24 @@ public class ThirdEyeJob {
 
                 @Override
                 public boolean accept(Path path) {
-                  return !path.getName().equals(PhaseSpec.AGGREGATION.getName());
+                  return !path.getName().equals(PhaseSpec.AGGREGATION.getName())
+                      && !path.getName().equals(PhaseSpec.SEGMENT_CREATION.getName());
                 }
               });
               for (FileStatus phase : phases) {
                 cleanupFolder(phase, cleanupDaysAgoDate, fileSystem);
               }
             } else {
+              FileStatus[] phases = fileSystem.listStatus(file.getPath(), new PathFilter() {
+
+                @Override
+                public boolean accept(Path path) {
+                  return !path.getName().equals(PhaseSpec.SEGMENT_CREATION.getName());
+                }
+              });
+              for (FileStatus phase : phases) {
+                cleanupFolder(phase, cleanupDaysAgoDate, fileSystem);
+              }
               cleanupFolder(file, cleanupDaysAgoDate, fileSystem);
             }
           }
