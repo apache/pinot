@@ -103,8 +103,8 @@
               <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
               <name>pinot-admin</name>
               <jvmSettings>
-                <initialMemorySize>10G</initialMemorySize>
-                <maxMemorySize>30G</maxMemorySize>
+                <initialMemorySize>4G</initialMemorySize>
+                <maxMemorySize>4G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j.configuration=conf/pinot-admin-log4j.properties</extraArgument>
