@@ -42,10 +42,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, int size)
+  public PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
       throws IOException {
     String dictFilename = metadata.getDictionaryFileName(column, metadata.getVersion());
-    return mapForWrites(dictFilename, size, "dictionary.writer");
+    return mapForWrites(dictFilename, sizeBytes, "dictionary.writer");
   }
 
   @Override
@@ -56,10 +56,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, int size)
+  public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
       throws IOException {
     String fwdIndexFilename = metadata.getForwardIndexFileName(column, metadata.getVersion());
-    return mapForWrites(fwdIndexFilename, size, "forward_index.writer");
+    return mapForWrites(fwdIndexFilename, sizeBytes, "forward_index.writer");
   }
 
   @Override
@@ -70,10 +70,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, int size)
+  public PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
       throws IOException {
     String invertedIndexFname = metadata.getBitmapInvertedIndexFileName(column, metadata.getVersion());
-    return mapForWrites(invertedIndexFname, size, "inverted_index.writer");
+    return mapForWrites(invertedIndexFname, sizeBytes, "inverted_index.writer");
   }
 
   @Override

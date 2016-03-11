@@ -78,34 +78,24 @@ public class ColumnIndexDirectoryTestHelper {
   static void verifyMultipleReads(ColumnIndexDirectory columnDirectory, String column, int numIter)
       throws Exception {
     for (int ii = 0; ii < numIter; ii++) {
-      PinotDataBuffer buf = null;
-      try {
-        buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, ii);
+      try (PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.getIndexBuffer(columnDirectory, column, ii)) {
         int numValues = (int) (buf.size() / 4);
         for (int j = 0; j < numValues; ++j) {
           Assert.assertEquals(buf.getInt(j * 4), j, "Inconsistent value at index: " + j);
-        }
-      } finally {
-        if (buf != null) {
-          buf.close();
         }
       }
     }
   }
 
-  static void performMultipleWrites(ColumnIndexDirectory columnDirectory, String column, int size, int numIter)
+  static void performMultipleWrites(ColumnIndexDirectory columnDirectory, String column, long size, int numIter)
       throws Exception {
+    // size is the size of large buffer...split it into parts
+    int bufsize = (int) (size / numIter);
     for (int i = 0; i < numIter; i++) {
-      PinotDataBuffer buf = null;
-      try {
-        buf = ColumnIndexDirectoryTestHelper.newIndexBuffer(columnDirectory, column, size, i);
-        int numValues = size / 4;
+      try(PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.newIndexBuffer(columnDirectory, column, bufsize, i)) {
+        int numValues = bufsize / 4;
         for (int j = 0; j < numValues; j++) {
           buf.putInt(j * 4, j);
-        }
-      } finally {
-        if (buf != null) {
-          buf.close();
         }
       }
     }

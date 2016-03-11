@@ -97,6 +97,9 @@ public abstract class SegmentDirectory implements AutoCloseable {
    * @param readMode mmap vs heap ReadMode for data
    * @return segmentDirectory
    */
+  // NOTE: this needs to be metadata impl to read all columns.
+  // In future, we will have this class load metadata rather than
+  // passing it in.
   public static SegmentDirectory createFromLocalFS(File directory,
       SegmentMetadataImpl metadata, ReadMode readMode) {
     return new SegmentLocalFSDirectory(directory, metadata, readMode);
@@ -137,14 +140,14 @@ public abstract class SegmentDirectory implements AutoCloseable {
      * Failures in the middle can cause corruption.
      * @param columnName column name
      * @param indexType column index type
-     * @param size size of index data
+     * @param sizeBytes sizeBytes of index data
      * @return PinotDataBufferOld that writers can update
      * @throws IOException
      */
-    // NOTE: an interface like readFrom(File f, String column, ColumnIndexType, int size) will be safe
+    // NOTE: an interface like readFrom(File f, String column, ColumnIndexType, int sizeBytes) will be safe
     // but it can lead to potential endianness issues. Endianness used to create data may not be
     // same as PinotDataBufferOld
-    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int size)
+    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int sizeBytes)
         throws IOException;
 
     /**
