@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.api;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TimeGranularity {
@@ -25,6 +26,11 @@ public class TimeGranularity {
   @JsonProperty
   public TimeUnit getUnit() {
     return unit;
+  }
+
+  @JsonIgnore
+  public long toMillis() {
+    return unit.toMillis(size);
   }
 
   @Override

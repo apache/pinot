@@ -1,17 +1,35 @@
+- name: mockClient
+  factoryClassName: com.linkedin.thirdeye.client.factory.MockThirdEyeClientFactory
+  clientArgs:
+    collection: mockCollection
+    numDimensions: 3
+    numMetrics: 5
+    bucketSize: 1
+    bucketUnit: HOURS
+    metricValueRange: 2500000
+    dimensionValueCardinality: 5
+    # a starTreeConfigFile may also be provided in lieu of the above params.
+    # starTreeConfigFile: /tmp/mockClient.yml
 - name: pinotCacheDisabledConfig
-  factoryClassName: com.linkedin.thirdeye.client.factory.PinotThirdEyeClientFactory #abook (pinot/local)
+  factoryClassName: com.linkedin.thirdeye.client.factory.PinotThirdEyeClientFactory 
   cached: false
   clientArgs: 
+    # if brokers is provided, zkUrl/clusterName/tag may be omitted and will be ignored.
+    brokers: localhost:7001 
+    # zkUrl, clusterName, and tag must all be provided if brokers is not listed.
     zkUrl: localhost/PinotCluster
+    clusterName: mpSprintDemoCluster
+    tag: thirdeye_BROKER
+    fixedCollections: thirdeyeAds,thirdeyeAbook # optionally narrow down the list of available collections
     controllerHost: localhost
     controllerPort: 9000
 - name: defaultCacheEnabledConfig
-  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory #abook, default impl
+  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory 
   clientArgs: 
     host: localhost
     port: 10000
 - name: customCacheConfigConfig
-  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory #ads
+  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory 
   clientArgs: 
     host: localhost
     port: 10000
@@ -21,7 +39,7 @@
     expirationUnit: MINUTES
     useCacheForExecuteMethod: false
 - name: cacheEnabledConfig
-  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory #pulitzer
+  factoryClassName: com.linkedin.thirdeye.client.factory.DefaultThirdEyeClientFactory 
   cached: true
   clientArgs: 
     host: localhost

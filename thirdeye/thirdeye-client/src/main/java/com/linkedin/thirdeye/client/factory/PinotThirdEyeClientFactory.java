@@ -24,18 +24,7 @@ public class PinotThirdEyeClientFactory extends BaseThirdEyeClientFactory {
 
   @Override
   public ThirdEyeClient getRawClient(Properties props) {
-    if (!props.containsKey(CONTROLLER_HOST_PROPERTY_KEY)
-        || !props.containsKey(CONTROLLER_PORT_PROPERTY_KEY)) {
-      throw new IllegalArgumentException("Config file must contain mappings for "
-          + CONTROLLER_HOST_PROPERTY_KEY + ", " + CONTROLLER_PORT_PROPERTY_KEY + " : " + props);
-    }
-    if (!props.containsKey(BROKERS_PROPERTY_KEY) && !(props.containsKey(ZK_URL_PROPERTY_KEY)
-        && props.containsKey(CLUSTER_NAME_PROPERTY_KEY) && props.containsKey(TAG_PROPERTY_KEY))) {
-      throw new IllegalArgumentException("Config file must contain mappings for "
-          + BROKERS_PROPERTY_KEY + ", or all of " + CONTROLLER_HOST_PROPERTY_KEY + ", "
-          + CONTROLLER_PORT_PROPERTY_KEY + ", " + ZK_URL_PROPERTY_KEY + ", "
-          + CLUSTER_NAME_PROPERTY_KEY + " and " + TAG_PROPERTY_KEY + " : " + props);
-    }
+    assertContainsKeys(props, CONTROLLER_HOST_PROPERTY_KEY, CONTROLLER_PORT_PROPERTY_KEY);
     PinotThirdEyeClient client;
     String controllerHost = props.getProperty(CONTROLLER_HOST_PROPERTY_KEY);
     int controllerPort = Integer.parseInt(props.getProperty(CONTROLLER_PORT_PROPERTY_KEY));
@@ -43,6 +32,7 @@ public class PinotThirdEyeClientFactory extends BaseThirdEyeClientFactory {
       client = PinotThirdEyeClient.fromHostList(controllerHost, controllerPort,
           props.getProperty(BROKERS_PROPERTY_KEY).split(","));
     } else {
+      assertContainsKeys(props, ZK_URL_PROPERTY_KEY, CLUSTER_NAME_PROPERTY_KEY, TAG_PROPERTY_KEY);
       String zkUrl = props.getProperty(ZK_URL_PROPERTY_KEY);
       String clusterName = props.getProperty(CLUSTER_NAME_PROPERTY_KEY);
       String tag = props.getProperty(TAG_PROPERTY_KEY);

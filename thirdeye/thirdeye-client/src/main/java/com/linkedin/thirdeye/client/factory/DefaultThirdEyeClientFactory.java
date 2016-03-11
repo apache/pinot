@@ -20,6 +20,7 @@ public class DefaultThirdEyeClientFactory extends BaseThirdEyeClientFactory {
 
   @Override
   public ThirdEyeClient getRawClient(Properties props) {
+    assertContainsKeys(props, HOST, PORT);
     String hostname = props.getProperty(HOST);
     int port = Integer.valueOf(props.getProperty(PORT));
     return new DefaultThirdEyeClient(hostname, port);

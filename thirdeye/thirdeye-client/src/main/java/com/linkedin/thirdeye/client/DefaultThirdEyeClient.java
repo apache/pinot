@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,9 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.SegmentDescriptor;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
@@ -35,8 +31,7 @@ import com.linkedin.thirdeye.client.util.SqlUtils;
  * {@link CachedThirdEyeClient} or instantiate this class via {@link DefaultThirdEyeClientFactory}
  * to improve performance.
  */
-public class DefaultThirdEyeClient implements ThirdEyeClient {
-  private static final int DEFAULT_CACHE_EXPIRATION_DURATION = 5;
+public class DefaultThirdEyeClient extends BaseThirdEyeClient {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultThirdEyeClient.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -55,27 +50,6 @@ public class DefaultThirdEyeClient implements ThirdEyeClient {
     // use pooled manager if more parallelism required.
     this.httpClient = HttpClients.createDefault();
     LOG.info("Created DefaultThirdEyeClient to {}", httpHost);
-  }
-
-  @Override
-  public Map<DimensionKey, MetricTimeSeries> execute(ThirdEyeRequest request) throws Exception {
-
-    ThirdEyeRawResponse rawResponse = getRawResponse(request);
-
-    // Figure out the metric types of the projection
-    StarTreeConfig starTreeConfig = getStarTreeConfig(request.getCollection());
-    Map<String, MetricType> metricTypes = new HashMap<>();
-    for (MetricSpec metricSpec : starTreeConfig.getMetrics()) {
-      String metricName = metricSpec.getName();
-      MetricType metricType = metricSpec.getType();
-      metricTypes.put(metricName, metricType);
-    }
-    List<MetricType> projectionTypes = new ArrayList<>();
-    for (String metricName : rawResponse.getMetrics()) {
-      MetricType metricType = metricTypes.get(metricName);
-      projectionTypes.add(metricType);
-    }
-    return rawResponse.convert(projectionTypes);
   }
 
   @Override
