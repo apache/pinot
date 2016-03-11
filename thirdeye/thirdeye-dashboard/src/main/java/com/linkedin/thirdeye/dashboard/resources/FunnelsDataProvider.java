@@ -7,9 +7,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 import javax.ws.rs.Consumes;
@@ -314,6 +316,7 @@ public class FunnelsDataProvider {
 
     funnelSpecsMap.clear();
     // looping through all the dirs, finding one funnels file and loading it up
+    Set<String> collections = new HashSet<>(dataCache.getCollections());
     ObjectMapper ymlReader = new ObjectMapper(new YAMLFactory());
     if (funnelsRoot.exists()) {
       for (File f : funnelsRoot.listFiles()) {
@@ -328,10 +331,13 @@ public class FunnelsDataProvider {
           CustomFunnelSpec spec = ymlReader.readValue(funnelsFile, CustomFunnelSpec.class);
           // add default funnel spec
           String collection = spec.getCollection();
+          if (!collections.contains(collection)) {
+            LOG.error("Invalid funnel collection: {}", collection);
+            continue;
+          }
           FunnelSpec defaultFunnelSpec = createDefaultFunnelSpec(collection);
           spec.getFunnels().put(defaultFunnelSpec.getName(), defaultFunnelSpec);
           this.funnelSpecsMap.put(collection, spec);
-
         } catch (Exception e) {
           LOG.error("error loading the configFile", e);
         }
@@ -382,7 +388,7 @@ public class FunnelsDataProvider {
   }
 
   /* Returns empty list if server request fails. */
-  private List<String> getCollections() throws Exception {
+  private List<String> getCollections() {
     List<String> collections;
     try {
       collections = dataCache.getCollections();
@@ -394,7 +400,7 @@ public class FunnelsDataProvider {
   }
 
   /* Returns null if server request fails. */
-  private CollectionSchema getCollectionSchema(String collection) throws Exception {
+  private CollectionSchema getCollectionSchema(String collection) {
     CollectionSchema result;
     try {
       result = dataCache.getCollectionSchema(collection);
