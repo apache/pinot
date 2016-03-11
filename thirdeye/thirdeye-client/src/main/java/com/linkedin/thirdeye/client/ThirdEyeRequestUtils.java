@@ -119,9 +119,13 @@ public class ThirdEyeRequestUtils {
         value = value.replaceAll("[\\[\\]]", "");
         List<String> names = Arrays.asList(value.split(","));
         builder.setGroupBy(names);
+      } else if (property.equals("shouldGroupByTime")) {
+        builder.setShouldGroupByTime(Boolean.parseBoolean(value));
       }
     }
+
     return builder.build();
+
   }
 
 }

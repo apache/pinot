@@ -151,7 +151,7 @@ public class DashboardConfigResource {
       @PathParam("current") long currentMillis,
       @DefaultValue(DIMENSION_VALUES_OPTIONS_THRESHOLD) @QueryParam("threshold") double contributionThreshold,
       @DefaultValue(DIMENSION_VALUES_LIMIT) @QueryParam("limit") int dimensionValuesLimit)
-          throws Exception {
+      throws Exception {
     return retrieveDimensionValues(collection, baselineMillis, currentMillis, contributionThreshold,
         dimensionValuesLimit);
   }
@@ -209,9 +209,8 @@ public class DashboardConfigResource {
     DateTime current = new DateTime(currentMillis);
 
     List<String> metrics = getMetrics(collection);
-    String dummyFunction =
-        String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION,
-            METRIC_FUNCTION_JOINER.join(metrics));
+    String dummyFunction = String.format(DIMENSION_VALUES_OPTIONS_METRIC_FUNCTION,
+        METRIC_FUNCTION_JOINER.join(metrics));
 
     Multimap<String, String> dimensionValues = LinkedListMultimap.create();
     Map<String, List<Future<QueryResult>>> resultFutures = new HashMap<>();
@@ -220,17 +219,17 @@ public class DashboardConfigResource {
       ArrayList<Future<QueryResult>> futures = new ArrayList<>();
 
       // Generate requests
-      ThirdEyeRequest req1 =
-          new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(dummyFunction)
-              .setStartTime(baseline).setEndTime(baseline.plusDays(1))
-              .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
+      ThirdEyeRequest req1 = new ThirdEyeRequestBuilder().setCollection(collection)
+          .setMetricFunction(dummyFunction).setStartTime(baseline).setEndTime(baseline.plusDays(1))
+          .setDimensionValues(dimensionValues).setGroupBy(dimension).setShouldGroupByTime(false)
+          .build();
       LOGGER.info("Generated request for dimension retrieval: {}", req1);
       futures.add(queryCache.getQueryResultAsync(req1));
 
-      ThirdEyeRequest req2 =
-          new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(dummyFunction)
-              .setStartTime(current.minusDays(1)).setEndTime(current)
-              .setDimensionValues(dimensionValues).setGroupBy(dimension).build();
+      ThirdEyeRequest req2 = new ThirdEyeRequestBuilder().setCollection(collection)
+          .setMetricFunction(dummyFunction).setStartTime(current.minusDays(1)).setEndTime(current)
+          .setDimensionValues(dimensionValues).setGroupBy(dimension).setShouldGroupByTime(false)
+          .build();
       LOGGER.info("Generated request for dimension retrieval: {}", req2);
       futures.add(queryCache.getQueryResultAsync(req2));
 
@@ -357,7 +356,7 @@ public class DashboardConfigResource {
       @PathParam("current") long currentMillis,
       @DefaultValue(DIMENSION_VALUES_OPTIONS_THRESHOLD) @QueryParam("threshold") double contributionThreshold,
       @DefaultValue(DIMENSION_VALUES_LIMIT) @QueryParam("limit") int dimensionValuesLimit)
-          throws Exception {
+      throws Exception {
     Map<String, Object> schemaInfo = new HashMap<>();
     schemaInfo.putAll(getDimensionInfo(collection, uriInfo, baselineMillis, currentMillis,
         contributionThreshold, dimensionValuesLimit));
@@ -382,7 +381,7 @@ public class DashboardConfigResource {
       @PathParam("current") long currentMillis,
       @DefaultValue(DIMENSION_VALUES_OPTIONS_THRESHOLD) @QueryParam("threshold") double contributionThreshold,
       @DefaultValue(DIMENSION_VALUES_LIMIT) @QueryParam("limit") int dimensionValuesLimit)
-          throws Exception {
+      throws Exception {
     Map<String, Object> dimensionInfo = new HashMap<>();
     dimensionInfo.put("dimensions", getDimensions(collection, uriInfo));
     dimensionInfo.put("dimensionAliases", getDimensionAliases(collection));

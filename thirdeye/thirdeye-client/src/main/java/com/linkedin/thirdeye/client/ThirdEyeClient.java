@@ -9,9 +9,16 @@ import com.linkedin.thirdeye.api.SegmentDescriptor;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public interface ThirdEyeClient {
-
+  /**
+   * Executes the request. If {@link ThirdEyeRequest#shouldGroupByTime()} is false, the client may
+   * return a single timestamp entry corresponding to the request start date for each dimension key.
+   */
   Map<DimensionKey, MetricTimeSeries> execute(ThirdEyeRequest request) throws Exception;
 
+  /**
+   * Executes the request. If {@link ThirdEyeRequest#shouldGroupByTime()} is false, the client may
+   * return a single timestamp entry corresponding to the request start date for each dimension key.
+   */
   ThirdEyeRawResponse getRawResponse(ThirdEyeRequest request) throws Exception;
 
   // TODO Refactor: the client only needs to provide dimensions, metrics, and time field.

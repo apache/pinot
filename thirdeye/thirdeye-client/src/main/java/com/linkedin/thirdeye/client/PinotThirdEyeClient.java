@@ -59,7 +59,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeMetricFunction.Expression;
 import com.linkedin.thirdeye.client.factory.PinotThirdEyeClientFactory;
-import com.linkedin.thirdeye.client.util.PqlUtils;
+import com.linkedin.thirdeye.client.util.PqlGenerator;
 import com.linkedin.thirdeye.query.ThirdEyeRatioFunction;
 
 /**
@@ -78,6 +78,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
   public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
   public static final String TAG_PROPERTY_KEY = "tag";
+  public static final String BROKERS_PROPERTY_KEY = "brokers";
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
 
@@ -97,6 +98,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
   private List<String> fixedCollections = null;
+  private PqlGenerator pqlGenerator = new PqlGenerator();
 
   protected PinotThirdEyeClient(Connection connection, String controllerHostName,
       int controllerPort) {
@@ -109,6 +111,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     this.controllerHost = new HttpHost(controllerHostName, controllerPort);
     // TODO currently no way to configure the CloseableHttpClient
     this.controllerClient = HttpClients.createDefault();
+
     LOG.info("Created PinotThirdEyeClient to {} with controller {}", connection, controllerHost);
   }
 
@@ -203,7 +206,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<String> rawMetrics = request.getRawMetricNames();
     List<String> dimensionNames = starTreeConfig.getDimensionNames();
 
-    String sql = PqlUtils.getPql(request, dataTimeSpec);
+    String sql = pqlGenerator.getPql(request, dataTimeSpec);
     LOG.info("getRawResponse: {}", sql);
     ResultSetGroup result = resultSetGroupCache.get(sql);
 
@@ -242,13 +245,15 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
       int columnCount = resultSet.getColumnCount();
       for (int row = 0; row < resultSet.getRowCount(); row++) {
         String dimensionKey;
-        String timestamp = null;
+        // default start time if timestamp won't appear in group key.
+        String timestamp =
+            request.shouldGroupByTime() ? null : Long.toString(startTime.getMillis());
         // determine timestamp + dimensionKey
         if (resultSet.getGroupKeyLength() > 0) {
           List<String> dimensionKeyList = new LinkedList<String>();
           for (int group = 0; group < resultSet.getGroupKeyLength(); group++) {
             String timeKey = resultSet.getGroupKeyString(row, group);
-            if (group == 0) {
+            if (group == 0 && request.shouldGroupByTime()) {
               timestamp = calculateTimeStamp(timeKey, bucketGranularity, aggGranularity, startTime);
             } else {
               dimensionKeyList.add(timeKey);
@@ -445,7 +450,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public List<SegmentDescriptor> getSegmentDescriptors(String collection) throws Exception {
     TimeSpec timeSpec = getStarTreeConfig(collection).getTime();
     String timeColumnName = timeSpec.getColumnName();
-    String sql = PqlUtils.getDataTimeRangeSql(collection, timeColumnName);
+    String sql = pqlGenerator.getDataTimeRangeSql(collection, timeColumnName);
     LOG.info("Retrieving segment: {}", sql);
     ResultSetGroup result = resultSetGroupCache.get(sql);
     if (result.getResultSetCount() == 0) {
@@ -474,7 +479,17 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     controllerClient.close();
   }
 
-  private Schema getSchema(String collection) throws ClientProtocolException, IOException,
+  /** Method provided for mocking in unit tests */
+  PqlGenerator getPqlGenerator() {
+    return pqlGenerator;
+  }
+
+  /** Method provided for mocking in unit tests */
+  void setPqlGenerator(PqlGenerator pqlGenerator) {
+    this.pqlGenerator = pqlGenerator;
+  }
+
+  Schema getSchema(String collection) throws ClientProtocolException, IOException,
       InterruptedException, ExecutionException, TimeoutException {
     return schemaCache.get(collection);
   }

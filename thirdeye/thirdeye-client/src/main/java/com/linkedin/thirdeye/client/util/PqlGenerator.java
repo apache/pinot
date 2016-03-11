@@ -17,28 +17,32 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
 /**
- * Util class for generated PQL queries (pinot).
+ * PQL string generator (pinot).
  * @author jteoh
  */
-public class PqlUtils {
+public class PqlGenerator {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
   private static final int DEFAULT_TOP = Integer.MAX_VALUE;
+
+  public PqlGenerator() {
+  };
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
    * time within the requested date range. </br>
    * Due to the summation, all metric column values can be assumed to be doubles.
    */
-  public static String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
+  public String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
     return getPql(request.getCollection(), request.getRawMetricNames(), request.getStartTime(),
-        request.getEndTime(), request.getDimensionValues(), request.getGroupBy(), dataTimeSpec);
+        request.getEndTime(), request.getDimensionValues(), request.getGroupBy(), dataTimeSpec,
+        request.shouldGroupByTime());
   }
 
-  static String getPql(String collection, List<String> metrics, DateTime startTime,
-      DateTime endTime, Multimap<String, String> dimensionValues, Set<String> groupBy,
-      TimeSpec dataTimeSpec) {
+  String getPql(String collection, List<String> metrics, DateTime startTime, DateTime endTime,
+      Multimap<String, String> dimensionValues, Set<String> groupBy, TimeSpec dataTimeSpec,
+      boolean shouldGroupByTime) {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metrics, dataTimeSpec);
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
@@ -48,7 +52,7 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
-    String groupByClause = getDimensionGroupByClause(groupBy, dataTimeSpec);
+    String groupByClause = getDimensionGroupByClause(groupBy, dataTimeSpec, shouldGroupByTime);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
     }
@@ -68,7 +72,7 @@ public class PqlUtils {
    * SUM each metric over the current time bucket. Ignores the time column if requested, since
    * it is already grouped and summation over that value does not make sense.
    */
-  static String getSelectionClause(List<String> metrics, TimeSpec timeSpec) {
+  String getSelectionClause(List<String> metrics, TimeSpec timeSpec) {
     String timeColumnName = timeSpec.getColumnName();
     List<String> updatedMetrics = new ArrayList<String>(metrics.size());
     for (int i = 0; i < metrics.size(); i++) {
@@ -82,7 +86,7 @@ public class PqlUtils {
     return COMMA.join(updatedMetrics);
   }
 
-  static String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
+  String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
     String timeField = timeFieldSpec.getColumnName();
     TimeUnit timeFieldUnit = timeFieldSpec.getBucket().getUnit();
     long startInConvertedUnits = timeFieldUnit.convert(start.getMillis(), TimeUnit.MILLISECONDS);
@@ -91,7 +95,7 @@ public class PqlUtils {
         endInConvertedUnits);
   }
 
-  static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
+  String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
       String key = entry.getKey();
@@ -116,19 +120,20 @@ public class PqlUtils {
     return AND.join(components);
   }
 
-  static String getDimensionGroupByClause(Set<String> groupBy, TimeSpec timeSpec) {
+  String getDimensionGroupByClause(Set<String> groupBy, TimeSpec timeSpec,
+      boolean shouldGroupByTime) {
     String timeColumnName = timeSpec.getColumnName();
     List<String> groups = new LinkedList<String>();
     if (groupBy != null) {
       groups.addAll(groupBy);
     }
-    if (!groups.contains(timeColumnName)) {
+    if (shouldGroupByTime && !groups.contains(timeColumnName)) {
       groups.add(0, timeColumnName);
     }
     return String.format("GROUP BY %s", COMMA.join(groups));
   }
 
-  public static String getDataTimeRangeSql(String collection, String timeColumnName) {
+  public String getDataTimeRangeSql(String collection, String timeColumnName) {
     return String.format("select min(%s), max(%s) from %s", timeColumnName, timeColumnName,
         collection);
   }

@@ -29,4 +29,11 @@ public class ThirdEyeRequestTest {
     String key = "test";
     new ThirdEyeRequestBuilder().addDimensionValue(key, key).addGroupBy(key).build();
   }
+
+  // default should be always grouped by time.
+  @Test
+  public void isGroupedByTime() {
+    ThirdEyeRequest request = new ThirdEyeRequestBuilder().build();
+    Assert.assertTrue(request.shouldGroupByTime());
+  }
 }
