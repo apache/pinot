@@ -46,9 +46,9 @@ public class BrokerResponseFactory {
    */
   public static BrokerResponse get(ResponseType brokerResponseType) {
     if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_JSON)) {
-      return new BrokerResponseNative();
-    } else if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_JSON)) {
       return new BrokerResponseJSON();
+    } else if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+      return new BrokerResponseNative();
     } else {
       throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE);
     }
