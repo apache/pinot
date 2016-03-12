@@ -81,10 +81,10 @@ public class BrokerRequestHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
+  private static final String BROKER_RESPONSE_TYPE = "responseType";
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;
   private final ReduceServiceRegistry _reduceServiceRegistry;
-  private ReduceService<? extends BrokerResponse> _reduceService;
   private final BrokerMetrics _brokerMetrics;
   private final TimeBoundaryService _timeBoundaryService;
   private final long _brokerTimeOutMs;
@@ -133,6 +133,12 @@ public class BrokerRequestHandler {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
       if (isTraceEnabled) {
         brokerRequest.setEnableTrace(true);
+      }
+
+      if (request.has(BROKER_RESPONSE_TYPE)) {
+        brokerRequest.setResponseFormat(request.getString(BROKER_RESPONSE_TYPE));
+      } else {
+        brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_JSON.name());
       }
     } catch (Exception e) {
       BrokerResponse brokerResponse = BrokerResponseFactory.get(responseType);
@@ -192,6 +198,7 @@ public class BrokerRequestHandler {
       final ScatterGatherStats scatterGatherStats, final long requestId) throws InterruptedException {
 
     ResponseType responseType = BrokerResponseFactory.getResponseType(request.getResponseFormat());
+    LOGGER.info("Broker Response Type: {}", responseType.name());
 
     if (request.getQuerySource() == null || request.getQuerySource().getTableName() == null) {
       LOGGER.info("Query contains null table.");
@@ -199,13 +206,13 @@ public class BrokerRequestHandler {
     }
 
     List<String> matchedTables = getMatchedTables(request);
-    _reduceService = _reduceServiceRegistry.get(responseType);
+    ReduceService<? extends BrokerResponse> reduceService = _reduceServiceRegistry.get(responseType);
 
     if (matchedTables.size() > 1) {
-      return processFederatedBrokerRequest(request, overriddenSelection, scatterGatherStats, requestId);
+      return processFederatedBrokerRequest(request, reduceService, scatterGatherStats, requestId);
     }
     if (matchedTables.size() == 1) {
-      return processSingleTableBrokerRequest(request, matchedTables.get(0), overriddenSelection, scatterGatherStats,
+      return processSingleTableBrokerRequest(request, reduceService, matchedTables.get(0), scatterGatherStats,
           requestId);
     }
     return BrokerResponseFactory.getNoTableHitBrokerResponse(responseType);
@@ -237,20 +244,22 @@ public class BrokerRequestHandler {
     return matchedTables;
   }
 
-  private Object processSingleTableBrokerRequest(final BrokerRequest request, String matchedTableName,
-      BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats, final long requestId)
-          throws InterruptedException {
+  private Object processSingleTableBrokerRequest(final BrokerRequest request, ReduceService reduceService,
+      String matchedTableName, final ScatterGatherStats scatterGatherStats, final long requestId)
+      throws InterruptedException {
     request.getQuerySource().setTableName(matchedTableName);
-    return getDataTableFromBrokerRequest(_optimizer.optimize(request), null, scatterGatherStats, requestId);
+    return getDataTableFromBrokerRequest(_optimizer.optimize(request), reduceService, null, scatterGatherStats,
+        requestId);
   }
 
-  private Object processFederatedBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection,
+  private Object processFederatedBrokerRequest(final BrokerRequest request, ReduceService reduceService,
       final ScatterGatherStats scatterGatherStats, final long requestId) {
     List<BrokerRequest> perTableRequests = new ArrayList<BrokerRequest>();
     perTableRequests.add(getRealtimeBrokerRequest(request));
     perTableRequests.add(getOfflineBrokerRequest(request));
     try {
-      return getDataTableFromBrokerRequestList(request, perTableRequests, null, scatterGatherStats, requestId);
+      return getDataTableFromBrokerRequestList(request, reduceService, perTableRequests, null, scatterGatherStats,
+          requestId);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing federated broker request", e);
       Utils.rethrowException(e);
@@ -318,8 +327,9 @@ public class BrokerRequestHandler {
     }
   }
 
-  private Object getDataTableFromBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection,
-      final ScatterGatherStats scatterGatherStats, final long requestId) throws InterruptedException {
+  private Object getDataTableFromBrokerRequest(final BrokerRequest request, final ReduceService reduceService,
+      BucketingSelection overriddenSelection, final ScatterGatherStats scatterGatherStats, final long requestId)
+      throws InterruptedException {
     // Step1
     final long routingStartTime = System.nanoTime();
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getTableName());
@@ -396,7 +406,7 @@ public class BrokerRequestHandler {
       return _brokerMetrics.timeQueryPhase(request, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call() {
-          BrokerResponse returnValue = _reduceService.reduceOnDataTable(request, instanceResponseMap);
+          BrokerResponse returnValue = reduceService.reduceOnDataTable(request, instanceResponseMap);
           _brokerMetrics.addMeteredQueryValue(request, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
           return returnValue;
         }
@@ -410,8 +420,9 @@ public class BrokerRequestHandler {
   }
 
   private Object getDataTableFromBrokerRequestList(final BrokerRequest federatedBrokerRequest,
-      final List<BrokerRequest> requests, BucketingSelection overriddenSelection,
-      final ScatterGatherStats scatterGatherStats, final long requestId) throws InterruptedException {
+      final ReduceService reduceService, final List<BrokerRequest> requests, BucketingSelection overriddenSelection,
+      final ScatterGatherStats scatterGatherStats, final long requestId)
+      throws InterruptedException {
     // Step1
     long scatterGatherStartTime = System.nanoTime();
     long queryRoutingTime = 0;
@@ -434,10 +445,11 @@ public class BrokerRequestHandler {
 
       // Step 2-4
       scatterGatherStartTime = System.nanoTime();
-      ScatterGatherRequestImpl scatterRequest = new ScatterGatherRequestImpl(request, segmentServices,
-          _replicaSelection, ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0,
-          //TODO: Speculative Requests not yet supported
-          overriddenSelection, requestId, _brokerTimeOutMs);
+      ScatterGatherRequestImpl scatterRequest =
+          new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
+              ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0,
+              //TODO: Speculative Requests not yet supported
+              overriddenSelection, requestId, _brokerTimeOutMs);
       responseFuturesList.put(request,
           Pair.of(_scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, _brokerMetrics), respStats));
     }
@@ -513,7 +525,7 @@ public class BrokerRequestHandler {
       return _brokerMetrics.timeQueryPhase(federatedBrokerRequest, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call() {
-          BrokerResponse returnValue = _reduceService.reduceOnDataTable(federatedBrokerRequest, instanceResponseMap);
+          BrokerResponse returnValue = reduceService.reduceOnDataTable(federatedBrokerRequest, instanceResponseMap);
           _brokerMetrics
               .addMeteredQueryValue(federatedBrokerRequest, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
           return returnValue;
