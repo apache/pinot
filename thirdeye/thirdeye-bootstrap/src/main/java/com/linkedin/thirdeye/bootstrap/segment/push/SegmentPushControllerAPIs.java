@@ -61,24 +61,29 @@ public class SegmentPushControllerAPIs {
 
   private List<String> getOverlappingSegments(String tablename, String segmentName) throws IOException {
 
-    String pattern = getOverlapPattern(segmentName, tablename);
-    LOGGER.info("Finding segments overlapping to {} with pattern {}", segmentName, pattern);
-    List<String> allSegments = getAllSegments(tablename, segmentName);
-
     List<String> overlappingSegments = new ArrayList<>();
-    for (String segment : allSegments) {
-      if (segment.startsWith(pattern)) {
-        LOGGER.info("Found overlapping segment {}", segment);
-        overlappingSegments.add(segment);
+    String pattern = getOverlapPattern(segmentName, tablename);
+    if (pattern != null) {
+      LOGGER.info("Finding segments overlapping to {} with pattern {}", segmentName, pattern);
+      List<String> allSegments = getAllSegments(tablename, segmentName);
+
+      for (String segment : allSegments) {
+        if (segment.startsWith(pattern)) {
+          LOGGER.info("Found overlapping segment {}", segment);
+          overlappingSegments.add(segment);
+        }
       }
     }
     return overlappingSegments;
   }
 
   private String getOverlapPattern(String segmentName, String tablename) {
+    String pattern = null;
     String[] tokens = segmentName.split(SEGMENT_JOINER);
-    String datePrefix = tokens[2].substring(0, tokens[2].lastIndexOf("-"));
-    String pattern = Joiner.on(SEGMENT_JOINER).join(tablename, HOURLY_SCHEDULE, datePrefix);
+    if (tokens.length > 2 && tokens[2].lastIndexOf("-") != -1) {
+      String datePrefix = tokens[2].substring(0, tokens[2].lastIndexOf("-"));
+      pattern = Joiner.on(SEGMENT_JOINER).join(tablename, HOURLY_SCHEDULE, datePrefix);
+    }
     return pattern;
   }
 

@@ -30,7 +30,7 @@ public class SegmentPushPhase  extends Configured {
   private String port;
   private String tablename;
   private boolean uploadSuccess = true;
-  private String segmentName;
+  private String segmentName = null;
 
   SegmentPushControllerAPIs segmentPushControllerAPIs;
 
@@ -62,7 +62,7 @@ public class SegmentPushPhase  extends Configured {
       }
     }
 
-    if (uploadSuccess) {
+    if (uploadSuccess && segmentName != null) {
       segmentPushControllerAPIs = new SegmentPushControllerAPIs(hosts, port);
       LOGGER.info("Deleting segments overlapping to {} from table {}  ", segmentName, tablename);
       segmentPushControllerAPIs.deleteOverlappingSegments(tablename, segmentName);
@@ -93,7 +93,9 @@ public class SegmentPushPhase  extends Configured {
       try {
         inputStream = fs.open(path);
         fileName = fileName.split(".tar")[0];
-        segmentName = fileName.substring(0, fileName.lastIndexOf(SEGMENT_JOINER));
+        if (fileName.lastIndexOf(SEGMENT_JOINER) != -1) {
+          segmentName = fileName.substring(0, fileName.lastIndexOf(SEGMENT_JOINER));
+        }
         LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} *******", fileName, host, port);
         try {
           int responseCode = FileUploadUtils.sendSegmentFile(host, port, fileName, inputStream, length);
