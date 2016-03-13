@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.bootstrap.segment.push;
 import static com.linkedin.thirdeye.bootstrap.segment.push.SegmentPushPhaseConstants.SEGMENT_PUSH_INPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.segment.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_HOSTS;
 import static com.linkedin.thirdeye.bootstrap.segment.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT;
+import static com.linkedin.thirdeye.bootstrap.segment.push.SegmentPushPhaseConstants.SEGMENT_PUSH_TABLENAME;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -20,12 +21,18 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 
 public class SegmentPushPhase  extends Configured {
 
+  private static String SEGMENT_JOINER = "_";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushPhase.class);
   private final String name;
   private final Properties props;
   private String[] hosts;
   private String port;
+  private String tablename;
+  private boolean uploadSuccess = true;
+  private String segmentName;
 
+  SegmentPushControllerAPIs segmentPushControllerAPIs;
 
 
   public SegmentPushPhase(String jobName, Properties properties) throws Exception {
@@ -42,6 +49,8 @@ public class SegmentPushPhase  extends Configured {
     LOGGER.info("Segment path : {}", segmentPath);
     hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(",");
     port = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_PORT);
+    tablename = getAndSetConfiguration(configuration, SEGMENT_PUSH_TABLENAME);
+
 
     Path path = new Path(segmentPath);
     FileStatus[] fileStatusArr = fs.globStatus(path);
@@ -51,6 +60,12 @@ public class SegmentPushPhase  extends Configured {
       } else {
         pushOneTarFile(fs, fileStatus.getPath());
       }
+    }
+
+    if (uploadSuccess) {
+      segmentPushControllerAPIs = new SegmentPushControllerAPIs(hosts, port);
+      LOGGER.info("Deleting segments overlapping to {} from table {}  ", segmentName, tablename);
+      segmentPushControllerAPIs.deleteOverlappingSegments(tablename, segmentName);
     }
 
   }
@@ -78,10 +93,16 @@ public class SegmentPushPhase  extends Configured {
       try {
         inputStream = fs.open(path);
         fileName = fileName.split(".tar")[0];
+        segmentName = fileName.substring(0, fileName.lastIndexOf(SEGMENT_JOINER));
         LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} *******", fileName, host, port);
         try {
           int responseCode = FileUploadUtils.sendSegmentFile(host, port, fileName, inputStream, length);
           LOGGER.info("Response code: {}", responseCode);
+
+          if (uploadSuccess == true && responseCode != 200) {
+            uploadSuccess = false;
+          }
+
         } catch (Exception e) {
           LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, port);
           LOGGER.error("Caught exception during upload", e);

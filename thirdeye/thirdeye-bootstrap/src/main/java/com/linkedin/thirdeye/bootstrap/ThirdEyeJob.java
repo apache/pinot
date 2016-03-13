@@ -342,7 +342,12 @@ public class ThirdEyeJob {
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString(),
             collection);
-
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME.toString(),
+            String.valueOf(minTime.getMillis()));
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME.toString(),
+            String.valueOf(maxTime.getMillis()));
+        String schedule = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getName());
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE.toString(), schedule);
         return config;
       }
     },
@@ -369,6 +374,8 @@ public class ThirdEyeJob {
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_HOSTS.getName()));
         config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT.toString(),
             inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_PINOT_CONTROLLER_PORT.getName()));
+        config.setProperty(SegmentPushPhaseConstants.SEGMENT_PUSH_TABLENAME.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getName()));
         return config;
       }
     },

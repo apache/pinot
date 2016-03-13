@@ -22,8 +22,10 @@ import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhas
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_STARTREE_CONFIG;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.List;
@@ -96,6 +98,12 @@ public class SegmentCreationPhaseJob extends Configured {
     LOGGER.info("Staging dir : {}", stagingDir);
     String tableName = getAndSetConfiguration(configuration, SEGMENT_CREATION_SEGMENT_TABLE_NAME);
     LOGGER.info("Segment table name : {}", tableName);
+    String segmentWallClockStart = getAndSetConfiguration(configuration, SEGMENT_CREATION_WALLCLOCK_START_TIME);
+    LOGGER.info("Segment wallclock start time : {}", segmentWallClockStart);
+    String segmentWallClockEnd = getAndSetConfiguration(configuration, SEGMENT_CREATION_WALLCLOCK_END_TIME);
+    LOGGER.info("Segment wallclock end time : {}", segmentWallClockEnd);
+    String schedule = getAndSetConfiguration(configuration, SEGMENT_CREATION_SCHEDULE);
+    LOGGER.info("Segment schedule : {}", schedule);
 
     // Create temporary directory
     if (fs.exists(stagingDir)) {

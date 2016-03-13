@@ -26,6 +26,12 @@
       <artifactId>pinot-core</artifactId>
       <version>0.016</version>
     </dependency>
+        <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+      <version>4.3.2</version>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
@@ -116,13 +122,6 @@
           <artifactId>servlet-api</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-      <version>4.3.2</version>
-      <scope>test</scope>
     </dependency>
 
     <dependency>

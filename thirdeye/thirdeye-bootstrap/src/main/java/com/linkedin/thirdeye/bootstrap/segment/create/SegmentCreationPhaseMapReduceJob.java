@@ -20,6 +20,9 @@ import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhas
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_DATA_SCHEMA;
 import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_STARTREE_CONFIG;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
+import static com.linkedin.thirdeye.bootstrap.segment.create.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,13 +39,14 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 
 
 public class SegmentCreationPhaseMapReduceJob {
@@ -50,6 +54,7 @@ public class SegmentCreationPhaseMapReduceJob {
   public static class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
     private static Logger LOGGER = LoggerFactory.getLogger(SegmentCreationPhaseMapReduceJob.class);
     private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static String SEGMENT_JOINER = "_";
 
     private Configuration properties;
 
@@ -68,6 +73,10 @@ public class SegmentCreationPhaseMapReduceJob {
 
     private StarTreeConfig starTreeConfig;
     private Schema schema;
+
+    private Long segmentWallClockStartTime;
+    private Long segmentWallClockEndTime;
+    private String segmentSchedule;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -97,6 +106,9 @@ public class SegmentCreationPhaseMapReduceJob {
       schema = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_DATA_SCHEMA.toString()), Schema.class);
       starTreeConfig = OBJECT_MAPPER.readValue(properties.get(SEGMENT_CREATION_STARTREE_CONFIG.toString()), StarTreeConfig.class);
 
+      segmentWallClockStartTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_START_TIME.toString()));
+      segmentWallClockEndTime = Long.valueOf(properties.get(SEGMENT_CREATION_WALLCLOCK_END_TIME.toString()));
+      segmentSchedule = properties.get(SEGMENT_CREATION_SCHEDULE.toString());
     }
 
     @Override
@@ -164,6 +176,10 @@ public class SegmentCreationPhaseMapReduceJob {
       segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       segmentGeneratorConfig.setIndexOutputDir(localDiskSegmentDirectory);
       segmentGeneratorConfig.setCreateStarTreeIndex(true);
+      String minTime = StarTreeConstants.DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
+      String maxTime = StarTreeConstants.DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
+      segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
+          .buildBasic(tableName + SEGMENT_JOINER + segmentSchedule, minTime, maxTime, seqId));
 
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setMaxLeafRecords(starTreeConfig.getSplit().getThreshold());
