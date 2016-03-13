@@ -26,7 +26,7 @@
       <artifactId>pinot-core</artifactId>
       <version>0.016</version>
     </dependency>
-        <dependency>
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
       <version>4.3.2</version>
