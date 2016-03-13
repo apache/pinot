@@ -192,6 +192,7 @@ public class BrokerResponseNative implements BrokerResponse {
       QueryProcessingException processingException = new QueryProcessingException();
       processingException.setErrorCode(exception.getErrorCode());
       processingException.setMessage(exception.getMessage());
+      _processingExceptions.add(processingException);
     }
   }
 
