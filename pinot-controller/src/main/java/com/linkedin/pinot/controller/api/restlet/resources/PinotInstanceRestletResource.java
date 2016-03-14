@@ -36,11 +36,11 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.controller.api.pojos.Instance;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
@@ -49,7 +49,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
  *
  */
 
-public class PinotInstanceRestletResource extends PinotRestletResourceBase {
+public class PinotInstanceRestletResource extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotInstanceRestletResource.class);
 
   private final ObjectMapper mapper;

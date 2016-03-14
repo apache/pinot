@@ -1,5 +1,6 @@
-package com.linkedin.pinot.controller.api.restlet.resources;
+package com.linkedin.pinot.common.restlet.swagger;
 
+import com.linkedin.pinot.common.restlet.PinotRestletApplication;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -23,14 +24,6 @@ import org.restlet.routing.TemplateRoute;
 import org.restlet.util.RouteList;
 import org.restlet.util.Series;
 
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.api.swagger.Description;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
-
 
 /**
  * Resource that returns a Swagger definition of the API
@@ -47,7 +40,7 @@ public class SwaggerResource extends ServerResource {
 
       // Paths
       JSONObject paths = new JSONObject();
-      Router router = ControllerRestApplication.getRouter();
+      Router router = PinotRestletApplication.getRouter();
       RouteList routeList = router.getRoutes();
 
       for (Route route : routeList) {

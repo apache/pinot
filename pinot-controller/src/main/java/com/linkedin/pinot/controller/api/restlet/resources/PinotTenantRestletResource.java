@@ -38,12 +38,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.swagger.Description;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Parameter;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
+import com.linkedin.pinot.common.restlet.swagger.Description;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
 
@@ -68,7 +68,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.Res
  *    }' http://lva1-pinot-controller-vip-1.corp.linkedin.com:11984/tenants
  */
 
-public class PinotTenantRestletResource extends PinotRestletResourceBase {
+public class PinotTenantRestletResource extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
 
   private static final String TENANT_NAME = "tenantName";

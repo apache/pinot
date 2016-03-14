@@ -13,19 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.swagger;
+package com.linkedin.pinot.common.restlet.swagger;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 
 /**
- * TODO Document me!
+ * A text description of this method call, as exposed through the Swagger API documentation.
  */
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Parameter {
-  String name();
-  String in();
-  String description();
-  boolean required() default false;
+public @interface Description {
+  String value();
 }

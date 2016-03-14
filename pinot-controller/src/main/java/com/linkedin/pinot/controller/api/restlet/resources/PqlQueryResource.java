@@ -24,13 +24,11 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.antlr.runtime.RecognitionException;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
@@ -40,7 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
 
@@ -48,7 +45,7 @@ import com.linkedin.pinot.pql.parsers.Pql2Compiler;
  * Dec 8, 2014
  */
 
-public class PqlQueryResource extends PinotRestletResourceBase {
+public class PqlQueryResource extends BasePinotControllerRestletResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();

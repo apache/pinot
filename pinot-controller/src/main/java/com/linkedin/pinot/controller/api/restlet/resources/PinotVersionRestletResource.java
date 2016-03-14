@@ -1,10 +1,10 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.controller.api.swagger.HttpVerb;
-import com.linkedin.pinot.controller.api.swagger.Paths;
-import com.linkedin.pinot.controller.api.swagger.Summary;
-import com.linkedin.pinot.controller.api.swagger.Tags;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
 import org.restlet.representation.Representation;
@@ -15,7 +15,7 @@ import org.restlet.resource.Get;
 /**
  * API endpoint that returns the versions of Pinot components.
  */
-public class PinotVersionRestletResource extends PinotRestletResourceBase {
+public class PinotVersionRestletResource extends BasePinotControllerRestletResource {
   @Override
   @Get
   public Representation get() {

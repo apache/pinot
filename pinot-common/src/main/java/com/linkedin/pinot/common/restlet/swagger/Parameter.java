@@ -13,16 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.swagger;
+package com.linkedin.pinot.common.restlet.swagger;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 
 /**
- * TODO Document me!
+ * Documentation for a method parameter.
  */
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Description {
-  String value();
+public @interface Parameter {
+  /** The name of the parameter (can be named differently in the exposed API than in the Java code). */
+  String name();
+  /** Whether the argument is a "path" parameter or a "query" parameter. */
+  String in();
+  /** The description of the parameter */
+  String description();
+  /** Whether or not the parameter is required */
+  boolean required() default false;
 }

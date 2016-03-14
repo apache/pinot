@@ -117,11 +117,6 @@
     </dependency>
     <!-- End Helix Related Depedency -->
 
-    <dependency>
-      <groupId>org.webjars</groupId>
-      <artifactId>swagger-ui</artifactId>
-    </dependency>
-
   </dependencies>
   <build>
     <plugins>

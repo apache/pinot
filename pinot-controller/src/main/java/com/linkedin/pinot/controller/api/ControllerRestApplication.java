@@ -16,25 +16,11 @@
 package com.linkedin.pinot.controller.api;
 
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.restlet.resources.PinotRestletResourceBase;
+import com.linkedin.pinot.common.restlet.PinotRestletApplication;
+import com.linkedin.pinot.controller.api.restlet.resources.BasePinotControllerRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
-import com.linkedin.pinot.controller.api.restlet.resources.SwaggerResource;
-import com.linkedin.pinot.controller.api.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import it.unimi.dsi.fastutil.ints.IntComparator;
-import it.unimi.dsi.fastutil.ints.IntComparators;
-
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.TreeSet;
-
-import org.apache.commons.collections.ComparatorUtils;
-import org.restlet.Application;
 import org.restlet.Context;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -71,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * Sep 24, 2014
  */
 
-public class ControllerRestApplication extends Application {
+public class ControllerRestApplication extends PinotRestletApplication {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
   private static final String ONE_HOUR_IN_MILLIS = Long.toString(3600L * 1000L);
 
@@ -92,13 +78,11 @@ public class ControllerRestApplication extends Application {
 
   public static ControllerMetrics getControllerMetrics() { return metrics; }
 
-  @Override
-  public Restlet createInboundRoot() {
+  protected void configureRouter(Router router) {
     // Remove server-side HTTP timeout (see http://stackoverflow.com/questions/12943447/restlet-server-socket-timeout)
     getContext().getParameters().add("maxIoIdleTimeMs", ONE_HOUR_IN_MILLIS);
     getContext().getParameters().add("ioMaxIdleTimeMs", ONE_HOUR_IN_MILLIS);
 
-    router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
 
     /**
@@ -168,30 +152,11 @@ public class ControllerRestApplication extends Application {
 
     final Redirector redirector = new Redirector(getContext(), "/swagger-ui/index.html?url=/api", Redirector.MODE_CLIENT_TEMPORARY);
     router.attach("/help", redirector);
-
-    return router;
   }
 
-  private void attachRoutesForClass(Router router, Class<? extends ServerResource> clazz) {
-    TreeSet<String> pathsOrderedByLength = new TreeSet<String>(ComparatorUtils.chainedComparator(new Comparator<String>() {
-      private IntComparator _intComparator = IntComparators.NATURAL_COMPARATOR;
-      @Override
-      public int compare(String o1, String o2) {
-        return _intComparator.compare(o1.length(), o2.length());
-      }
-    }, ComparatorUtils.NATURAL_COMPARATOR));
-
-    for (Method method : clazz.getDeclaredMethods()) {
-      Annotation annotationInstance = method.getAnnotation(Paths.class);
-      if (annotationInstance != null) {
-        pathsOrderedByLength.addAll(Arrays.asList(((Paths) annotationInstance).value()));
-      }
-    }
-
-    for (String routePath : pathsOrderedByLength) {
-      LOGGER.info("Attaching route {} -> {}", routePath, clazz.getSimpleName());
-      router.attach(routePath, new AddHeaderFilter(getContext(), createFinder(clazz)));
-    }
+  @Override
+  protected void attachRoute(Router router, String routePath, Class<? extends ServerResource> clazz) {
+    router.attach(routePath, new AddHeaderFilter(getContext(), createFinder(clazz)));
   }
 
   private class AddHeaderFilter extends Filter {
@@ -201,7 +166,7 @@ public class ControllerRestApplication extends Application {
 
     @Override
     protected int beforeHandle(Request request, Response response) {
-      PinotRestletResourceBase.addExtraHeaders(response);
+      BasePinotControllerRestletResource.addExtraHeaders(response);
       return Filter.CONTINUE;
     }
   }

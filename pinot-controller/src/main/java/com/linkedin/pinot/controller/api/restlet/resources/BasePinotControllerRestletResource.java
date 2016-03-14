@@ -20,8 +20,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Base class for Controller restlet resource apis.
  */
-public class PinotRestletResourceBase extends ServerResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRestletResourceBase.class);
+public class BasePinotControllerRestletResource extends ServerResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BasePinotControllerRestletResource.class);
 
   protected static final String TABLE_NAME = "tableName";
   protected static final String TABLE_TYPE = "type";
@@ -75,7 +75,7 @@ public class PinotRestletResourceBase extends ServerResource {
     return controllerVersion;
   }
 
-  public PinotRestletResourceBase() {
+  public BasePinotControllerRestletResource() {
     _controllerConf =
         (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
 
