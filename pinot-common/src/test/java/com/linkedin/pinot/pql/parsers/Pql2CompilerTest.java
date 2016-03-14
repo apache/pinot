@@ -15,9 +15,11 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.pql.parsers.pql2.ast.TopAstNode;
 
 
 /**
@@ -44,5 +46,29 @@ public class Pql2CompilerTest {
     brokerRequest = compiler.compileToBrokerRequest(
         "select * from vegetables where origin = \"Martha''s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha''s Vineyard");
+  }
+
+  @Test
+  public void testTopZero() throws Exception {
+    Pql2Compiler compiler  = new Pql2Compiler();
+    testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top 0", TopAstNode.DEFAULT_TOP_N, false);
+    testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top 1", 1, false);
+    testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top -1", TopAstNode.DEFAULT_TOP_N, true);
+  }
+
+  private void testTopZeroFor(Pql2Compiler compiler, String s, final int expectedTopN, boolean parseException) throws Exception {
+    BrokerRequest req;
+    try {
+      req = compiler.compileToBrokerRequest(s);
+    } catch (Pql2CompilationException e) {
+      if (parseException) {
+        return;
+      }
+      throw e;
+    }
+    Assert.assertTrue(req.isSetGroupBy());
+    GroupBy groupBy = req.getGroupBy();
+    Assert.assertTrue(groupBy.isSetTopN());
+    Assert.assertEquals(expectedTopN, groupBy.getTopN());
   }
 }

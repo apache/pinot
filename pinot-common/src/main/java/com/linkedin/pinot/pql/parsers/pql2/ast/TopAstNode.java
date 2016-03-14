@@ -15,14 +15,25 @@
  */
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
+import com.linkedin.pinot.common.exception.QueryException;
+
+
 /**
  * AST node for the TOP clause.
  */
 public class TopAstNode extends BaseAstNode {
   private int _count;
+  public static int DEFAULT_TOP_N = 50;
 
   public TopAstNode(int count) {
-    _count = count;
+    if (count < 0) {
+      throw new RuntimeException(QueryException.PQL_PARSING_ERROR);
+    }
+    if (count == 0) {
+      _count = DEFAULT_TOP_N;
+    } else {
+      _count = count;
+    }
   }
 
   public int getCount() {
