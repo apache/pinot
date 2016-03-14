@@ -46,6 +46,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  */
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvgAggregationFunction.class);
+  private static final double DEFAULT_AVG_VALUE = 0.0;
 
   private String _avgByColumn;
 
@@ -134,7 +135,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       double avgResult = reducedSumResult / reducedCntResult;
       return avgResult;
     } else {
-      return Double.NaN;
+      // Backward compatibility.
+      return DEFAULT_AVG_VALUE;
     }
   }
 
@@ -142,7 +144,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   public JSONObject render(Double finalAggregationResult) {
     try {
       if ((finalAggregationResult == null) || (Double.isNaN(finalAggregationResult))) {
-        return new JSONObject().put("value", Dictionary.NULL_VALUE_INDEX);
+        return new JSONObject().put("value", DEFAULT_AVG_VALUE);
       }
       return new JSONObject().put("value", String.format(Locale.US, "%1.5f", finalAggregationResult));
     } catch (JSONException e) {
