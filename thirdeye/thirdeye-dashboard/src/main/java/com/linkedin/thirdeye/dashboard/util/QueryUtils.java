@@ -51,7 +51,7 @@ public class QueryUtils {
           if (finalQueryResult == null) {
             finalQueryResult = queryResult;
           } else {
-            finalQueryResult = mergeQueries(finalQueryResult, queryResult);
+            finalQueryResult = mergeQueryResults(finalQueryResult, queryResult);
           }
       }
 
