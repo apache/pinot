@@ -88,7 +88,7 @@ public class Loaders {
         LOGGER.debug("Loading star tree index file {}", starTreeFile);
         starTree = StarTree.fromBytes(new FileInputStream(starTreeFile));
       }
-      return new IndexSegmentImpl(indexDir, metadata, indexContainerMap, starTree);
+      return new IndexSegmentImpl(segmentDirectory, metadata, indexContainerMap, starTree);
     }
   }
 }

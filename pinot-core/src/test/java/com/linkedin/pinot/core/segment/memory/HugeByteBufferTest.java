@@ -1,18 +1,3 @@
-package com.linkedin.pinot.core.segment.memory;
-
-import com.linkedin.pinot.common.segment.ReadMode;
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.util.Random;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-
 /**
  * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
  *
@@ -28,6 +13,21 @@ import org.testng.annotations.Test;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package com.linkedin.pinot.core.segment.memory;
+
+import com.linkedin.pinot.common.segment.ReadMode;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 public class HugeByteBufferTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(HugeByteBufferTest.class);
 

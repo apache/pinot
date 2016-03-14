@@ -15,17 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import java.io.File;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-
-import com.linkedin.pinot.core.startree.StarTree;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
@@ -41,6 +30,14 @@ import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import com.linkedin.pinot.core.startree.StarTree;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -52,18 +49,18 @@ public class IndexSegmentImpl implements IndexSegment {
 
   public static final SegmentVersion EXPECTED_SEGMENT_VERSION = SegmentVersion.v1;
 
-  private final File indexDir;
+  private SegmentDirectory segmentDirectory;
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ColumnIndexContainer> indexContainerMap;
   private final StarTree starTree;
 
-  public IndexSegmentImpl(File indexDir, SegmentMetadataImpl segmentMetadata,
+  public IndexSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree) throws Exception {
-    this.indexDir = indexDir;
+    this.segmentDirectory = segmentDirectory;
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
     this.starTree = starTree;
-    LOGGER.debug("successfully loaded the index segment : " + indexDir.getName());
+    LOGGER.info("Successfully loaded the index segment : " + segmentDirectory.getPath());
   }
 
   public ImmutableDictionaryReader getDictionaryFor(String column) {
@@ -90,7 +87,7 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public String getAssociatedDirectory() {
-    return indexDir.getAbsolutePath();
+    return segmentDirectory.getPath();
   }
 
   @Override
@@ -133,6 +130,11 @@ public class IndexSegmentImpl implements IndexSegment {
       } catch (Exception e) {
         LOGGER.error("Error when close inverted index for column : " + column, e);
       }
+    }
+    try {
+      segmentDirectory.close();
+    } catch (Exception e) {
+      LOGGER.error("Failed to close segment directory: {}. Continuing with error.", segmentDirectory.getPath(), e);
     }
     indexContainerMap.clear();
   }

@@ -60,6 +60,10 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  @Override
+  public String getPath() {
+    return segmentDirectory.getPath();
+  }
 
   public Reader createReader()
       throws IOException {

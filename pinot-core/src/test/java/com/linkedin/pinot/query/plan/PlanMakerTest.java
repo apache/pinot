@@ -92,6 +92,13 @@ public class PlanMakerTest {
     } catch (Exception e) {
       e.printStackTrace();
     }
+    if (_indexSegment != null) {
+      _indexSegment.destroy();
+    }
+    for (IndexSegment segment : _indexSegmentList) {
+      segment.destroy();
+    }
+    _indexSegmentList.clear();
   }
 
   @AfterClass

@@ -61,6 +61,8 @@ public class HugeByteBuffer extends PinotDataBuffer {
   // the same buffer.
   protected int extensionBytes = 8;
 
+  private RandomAccessFile raf;
+
   /**
    * Fully load the file in to the in-memory buffer
    * @param file file containing index data
@@ -119,8 +121,10 @@ public class HugeByteBuffer extends PinotDataBuffer {
       pending -= DEFAULT_SEGMENT_SIZE_BYTES;
       ++bufIndex;
     }
-
-    return new HugeByteBuffer(buffers, 0, length, true /*owner*/, DEFAULT_SEGMENT_SIZE_BYTES, MMAP_EXTENSION_SIZE_BYTES);
+    HugeByteBuffer bb = new HugeByteBuffer(buffers, 0, length, true /*owner*/,
+        DEFAULT_SEGMENT_SIZE_BYTES, MMAP_EXTENSION_SIZE_BYTES);
+    bb.raf = raf;
+    return bb;
   }
 
   static PinotDataBuffer loadFromFile(File file, long startPosition, long length, FileChannel.MapMode openMode,
@@ -180,6 +184,13 @@ public class HugeByteBuffer extends PinotDataBuffer {
     if (owner && buffers != null) {
       for (ByteBuffer buffer : buffers) {
         MmapUtils.unloadByteBuffer(buffer);
+      }
+      if (raf != null) {
+        try {
+          raf.close();
+        } catch (IOException e) {
+          LOGGER.error("Failed to close file: {}. Continuing with errors.", raf, e);
+        }
       }
       buffers = null;
     }

@@ -106,6 +106,13 @@ public abstract class SegmentDirectory implements AutoCloseable {
   }
 
   /**
+   * Get the path/URL for the directory
+   * @return
+   */
+  public abstract String getPath();
+
+
+  /**
    * Reader for columnar index buffers from segment directory
    */
   public abstract class Reader implements AutoCloseable {

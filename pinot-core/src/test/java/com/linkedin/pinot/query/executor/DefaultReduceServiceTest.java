@@ -101,6 +101,10 @@ public class DefaultReduceServiceTest {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
+    for (IndexSegment segment : _indexSegmentList) {
+      segment.destroy();
+    }
+    _indexSegmentList.clear();
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {

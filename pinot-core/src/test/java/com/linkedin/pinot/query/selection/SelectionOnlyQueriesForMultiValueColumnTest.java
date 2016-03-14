@@ -97,6 +97,13 @@ public class SelectionOnlyQueriesForMultiValueColumnTest {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
+    if (_indexSegment != null) {
+      _indexSegment.destroy();
+    }
+    for (IndexSegment segment : _indexSegmentList) {
+      segment.destroy();
+    }
+    _indexSegmentList.clear();
   }
 
   private void setupSegment() throws Exception {

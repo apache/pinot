@@ -111,6 +111,13 @@ public class AggregationGroupByOperatorForMultiValueTest {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
+    if (_indexSegment != null) {
+      _indexSegment.destroy();
+    }
+    for (SegmentDataManager segmentDataManager : _indexSegmentList) {
+      segmentDataManager.getSegment().destroy();
+    }
+    _indexSegmentList.clear();
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
