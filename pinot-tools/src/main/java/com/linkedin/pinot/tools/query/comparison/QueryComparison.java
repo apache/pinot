@@ -82,12 +82,30 @@ public class QueryComparison {
       LOGGER.error("Invalid segments directory: {}", _segmentsDir.getName());
       return;
     }
+
+    if (_config.getPerfMode() && (_config.getPerfUrl() == null)) {
+      LOGGER.error("Must specify perf url in perf mode");
+      return;
+    }
   }
 
   private void run()
       throws Exception {
     startCluster();
 
+    // For function mode, compare response with the expected response.
+    if (_config.getFunctionMode()) {
+      runFunctionMode();
+    }
+
+    // For perf mode, count the client side response time.
+    if (_config.getPerfMode()) {
+      runPerfMode();
+    }
+  }
+
+  private void runFunctionMode()
+      throws Exception {
     String query;
     ScanBasedQueryProcessor scanBasedQueryProcessor = null;
     BufferedReader resultReader = null;
@@ -121,8 +139,10 @@ public class QueryComparison {
 
         if (compare(actualJson, expectedJson)) {
           ++passed;
-          LOGGER.info("Comparison PASSED: Id: {} actual Time: {} ms expected Time: {} ms Docs Scanned: {}", total,
-              actualJson.get(TIME_USED_MS), expectedJson.get(TIME_USED_MS), actualJson.get(NUM_DOCS_SCANNED));
+          LOGGER.info(
+              "Comparison PASSED: Id: {} actual Time: {} ms expected Time: {} ms Docs Scanned: {}",
+              total, actualJson.get(TIME_USED_MS), expectedJson.get(TIME_USED_MS),
+              actualJson.get(NUM_DOCS_SCANNED));
           LOGGER.debug("actual Response: {}", actualJson);
           LOGGER.debug("expected Response: {}", expectedJson);
         } else {
@@ -138,6 +158,21 @@ public class QueryComparison {
     }
 
     LOGGER.info("Total {} out of {} queries passed.", passed, total);
+  }
+
+  private void runPerfMode()
+      throws Exception {
+    String query;
+    BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile));
+
+    while ((query = queryReader.readLine()) != null) {
+      if (query.isEmpty() || query.startsWith("#")) {
+        continue;
+      }
+
+      int clientTime = _clusterStarter.perfQuery(query);
+      LOGGER.info("Client side response time: {} ms", clientTime);
+    }
   }
 
   private void startCluster()

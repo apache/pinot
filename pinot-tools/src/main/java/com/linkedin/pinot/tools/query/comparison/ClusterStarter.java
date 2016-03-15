@@ -28,8 +28,14 @@ import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
 import com.linkedin.pinot.tools.admin.command.StartServerCommand;
 import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.SocketException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.sql.Timestamp;
 import java.util.List;
@@ -53,6 +59,7 @@ public class ClusterStarter {
   private String _brokerHost;
   private String _brokerPort;
   private String _serverPort;
+  private String _perfUrl;
   private String _zkAddress;
   private String _clusterName;
   private String _localhost;
@@ -96,6 +103,7 @@ public class ClusterStarter {
     _brokerHost = config.getBrokerHost();
     _brokerPort = config.getBrokerPort();
     _serverPort = config.getServerPort();
+    _perfUrl = config.getPerfUrl();
     _startZookeeper = config.getStartZookeeper();
 
     _tableName = config.getTableName();
@@ -252,6 +260,30 @@ public class ClusterStarter {
     PostQueryCommand queryRunner =
         new PostQueryCommand().setQuery(query).setBrokerHost(_brokerHost).setBrokerPort(_brokerPort);
     return queryRunner.run();
+  }
+
+  public int perfQuery(String query)
+      throws Exception {
+    LOGGER.debug("Running perf query on Pinot Cluster");
+    String encodedQuery = URLEncoder.encode(query, "UTF-8");
+    String brokerUrl = _perfUrl + encodedQuery;
+    LOGGER.info("Executing command: " + brokerUrl);
+    URLConnection conn = new URL(brokerUrl).openConnection();
+    conn.setDoOutput(true);
+
+    long startTime = System.currentTimeMillis();
+    InputStream input = conn.getInputStream();
+    long endTime = System.currentTimeMillis();
+
+    BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
+    StringBuilder sb = new StringBuilder();
+    String line;
+    while ((line = reader.readLine()) != null) {
+      sb.append(line);
+    }
+    LOGGER.debug("Actual response: " + sb.toString());
+
+    return (int) (endTime - startTime);
   }
 
   private void waitForExternalViewUpdate() {

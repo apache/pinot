@@ -30,6 +30,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String BROKER_HOST = "broker.host";
   private static final String BROKER_PORT = "broker.port";
   private static final String SERVER_PORT = "server.port";
+  private static final String PERF_URL = "perf.url";
 
   // Used if a reference cluster needs to be started for testing.
   private static final String REF_CONTROLLER_PORT = "ref.controller.port";
@@ -51,6 +52,10 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String START_CLUSTER = "start.cluster";
   private static final String TIME_COLUMN_NAME = "time.column.name";
 
+  // Used for different test mode
+  private static final String FUNCTION_MODE = "function.mode";
+  private static final String PERF_MODE = "perf.mode";
+
   private static final String TIME_UNIT = "time.unit";
   private static final String DEFAULT_CLUSTER_NAME = "QueryComparisonCluster";
   private static final String DEFAULT_ZOOKEEPER_ADDRESS = "localhost:2181";
@@ -67,6 +72,9 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
 
   private static final boolean DEFAULT_START_ZOOKEEPER = true;
   private static final boolean DEFAULT_ENABLE_STAR_TREE = false;
+
+  private static final boolean DEFAULT_FUNCTION_MODE = true;
+  private static final boolean DEFAULT_PERF_MODE = false;
 
   public static final String DEFAULT_SEGMENT_NAME = "pinotSegment";
 
@@ -99,6 +107,16 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
     return (value != null) ? Boolean.valueOf(value) : DEFAULT_START_CLUSTER;
   }
 
+  public boolean getFunctionMode() {
+    String value = (String) getProperty(FUNCTION_MODE);
+    return (value != null) ? Boolean.valueOf(value) : DEFAULT_FUNCTION_MODE;
+  }
+
+  public boolean getPerfMode() {
+    String value = (String) getProperty(PERF_MODE);
+    return (value != null) ? Boolean.valueOf(value) : DEFAULT_PERF_MODE;
+  }
+
   public String getControllerPort() {
     String value =  (String) getProperty(CONTROLLER_PORT);
     return (value != null) ? value : DEFAULT_CONTROLLER_PORT;
@@ -116,6 +134,11 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   public String getServerPort() {
     String value = (String) getProperty(SERVER_PORT);
     return (value != null) ? value : DEFAULT_SERVER_PORT;
+  }
+
+  public String getPerfUrl() {
+    String value = (String) getProperty(PERF_URL);
+    return value;
   }
 
   public String getRefControllerPort() {
