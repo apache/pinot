@@ -336,8 +336,16 @@ public class ThirdEyeJob {
             getPinotSchemaPath(root, collection));
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_CONFIG_PATH.toString(),
             getConfigPath(root, collection));
-        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(),
-            getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + AGGREGATION.getName());
+        String inputPath = getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator;
+        FileSystem fs = FileSystem.get(new Configuration());
+        if (fs.exists(new Path(inputPath + TOPK_ROLLUP_PHASE3.getName()))) {
+          inputPath = inputPath + TOPK_ROLLUP_PHASE3.getName();
+        } else if (fs.exists(new Path(inputPath + ROLLUP_PHASE4.getName()))) {
+          inputPath = inputPath + ROLLUP_PHASE4.getName();
+        } else {
+          inputPath = inputPath + AGGREGATION.getName();
+        }
+        config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_INPUT_PATH.toString(), inputPath);
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator + SEGMENT_CREATION.getName());
         config.setProperty(SegmentCreationPhaseConstants.SEGMENT_CREATION_SEGMENT_TABLE_NAME.toString(),
@@ -675,17 +683,17 @@ public class ThirdEyeJob {
         config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH.toString(),
             getConfigPath(root, collection));
 
-        boolean isTopK = Boolean.parseBoolean(
-            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TOPK.getName(), DEFAULT_TOPK));
-        if (isTopK) {
-          config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(),
-              getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
-                  + TOPK_ROLLUP_PHASE3.getName());
+        String inputPath = getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator;
+        FileSystem fs = FileSystem.get(new Configuration());
+        if (fs.exists(new Path(inputPath + TOPK_ROLLUP_PHASE3.getName()))) {
+          inputPath = inputPath + TOPK_ROLLUP_PHASE3.getName();
+        } else if (fs.exists(new Path(inputPath + ROLLUP_PHASE4.getName()))) {
+          inputPath = inputPath + ROLLUP_PHASE4.getName();
         } else {
-          config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(),
-              getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
-                  + ROLLUP_PHASE4.getName());
+          inputPath = inputPath + AGGREGATION.getName();
         }
+        config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(), inputPath);
+
         config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(),
             getMetricIndexDir(root, collection, flowSpec, minTime, maxTime) + File.separator
                 + STARTREE_GENERATION.getName());
