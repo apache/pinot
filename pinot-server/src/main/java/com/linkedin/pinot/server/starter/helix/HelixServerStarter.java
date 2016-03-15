@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.server.api.restlet.PinotAdminEndpointApplication;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,9 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.restlet.Component;
+import org.restlet.Context;
+import org.restlet.data.Protocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
@@ -73,10 +77,10 @@ public class HelixServerStarter {
 
   private final String _helixClusterName;
   private final String _instanceId;
+  private Component _adminApiComponent = null;
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
-
     _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
 
@@ -136,6 +140,7 @@ public class HelixServerStarter {
           }
         });
 
+    // Create metrics for mmap stuff
     _serverInstance.getServerMetrics().addCallbackGauge(
         "memory.directByteBufferUsage", new Callable<Long>() {
               @Override
@@ -159,6 +164,31 @@ public class HelixServerStarter {
                 return MmapUtils.getMmapBufferCount();
               }
             });
+
+    // Start restlet server for admin API endpoint
+    try {
+      int adminApiPort = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
+          Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+
+      if (0 < adminApiPort) {
+        _adminApiComponent = new Component();
+
+        _adminApiComponent.getServers().add(Protocol.HTTP, adminApiPort);
+        _adminApiComponent.getClients().add(Protocol.FILE);
+        _adminApiComponent.getClients().add(Protocol.JAR);
+        _adminApiComponent.getClients().add(Protocol.WAR);
+
+        PinotAdminEndpointApplication adminEndpointApplication = new PinotAdminEndpointApplication();
+        final Context applicationContext = _adminApiComponent.getContext().createChildContext();
+        adminEndpointApplication.setContext(applicationContext);
+        _adminApiComponent.getDefaultHost().attach(adminEndpointApplication);
+        LOGGER.info("Will start admin API endpoint on port {}", adminApiPort);
+      } else {
+        LOGGER.warn("Not starting admin API endpoint due to invalid port number {}", adminApiPort);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Not starting admin API endpoint due to exception", e);
+    }
   }
 
   private void setShuttingDownStatus(boolean shuttingDown) {
@@ -198,6 +228,10 @@ public class HelixServerStarter {
       _serverInstance.init(_serverConf, new MetricsRegistry());
       LOGGER.info("Trying to start ServerInstance!");
       _serverInstance.start();
+      if (_adminApiComponent != null) {
+        LOGGER.info("Trying to start admin API endpoint");
+        _adminApiComponent.start();
+      }
     }
   }
 
@@ -212,6 +246,14 @@ public class HelixServerStarter {
   }
 
   public void stop() {
+    if (_adminApiComponent != null) {
+      try {
+        _adminApiComponent.stop();
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while stopping admin API endpoint", e);
+      }
+    }
+
     setShuttingDownStatus(true);
     try {
       Thread.sleep(5000);
