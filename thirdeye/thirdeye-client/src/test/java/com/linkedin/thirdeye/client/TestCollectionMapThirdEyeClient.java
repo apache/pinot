@@ -110,6 +110,14 @@ public class TestCollectionMapThirdEyeClient {
     verify(client).getSegmentDescriptors(baseCollection);
   }
 
+  @Test(dataProvider = "collectionClientProvider")
+  public void getExpectedTimeBuckets(String collectionKey, ThirdEyeClient client,
+      String baseCollection) throws Exception {
+    ThirdEyeRequest request = mockRequest(collectionKey);
+    clientMap.getExpectedTimeBuckets(request);
+    verify(client).getExpectedTimeBuckets(baseRequest(baseCollection));
+  }
+
   @Test
   public void clear() throws Exception {
     initMap();

@@ -62,6 +62,7 @@ public class DashboardResource {
   static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
 
   private static final Joiner PATH_JOINER = Joiner.on("/");
+  private static final int HEATMAP_GROUP_COUNT = 25;
 
   private final String feedbackEmailAddress;
   private final DataCache dataCache;
@@ -176,7 +177,7 @@ public class DashboardResource {
   @Path("/dashboard/{collection}/{metricFunction}")
   public Response getDashboardView(@PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction, @Context UriInfo uriInfo)
-          throws Exception {
+      throws Exception {
     // TODO check if this is being used outside of dashboard (not used on main page)
     return Response.seeOther(URI.create(PATH_JOINER.join("", "dashboard", collection,
         metricFunction, MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
@@ -189,7 +190,7 @@ public class DashboardResource {
       @PathParam("metricViewType") MetricViewType metricViewType,
       @PathParam("dimensionViewType") DimensionViewType dimensionViewType,
       @PathParam("baselineOffsetMillis") Long baselineOffsetMillis, @Context UriInfo uriInfo)
-          throws Exception {
+      throws Exception {
     // TODO check if this is being used outside of dashboard (not used on main page)
     // Get segment metadata
     List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(collection);
@@ -316,7 +317,7 @@ public class DashboardResource {
   private View getDimensionView(String collection, String metricFunction,
       DimensionViewType dimensionViewType, Long baselineMillis, Long currentMillis,
       Multimap<String, String> selectedDimensions, String funnels, UriInfo uriInfo)
-          throws Exception {
+      throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(collection);
     DateTime baseline = new DateTime(baselineMillis);
     DateTime current = new DateTime(currentMillis);
@@ -348,21 +349,19 @@ public class DashboardResource {
 
           ThirdEyeMetricFunction thirdEyeMetricFunction =
               ThirdEyeMetricFunction.fromStr(metricFunction);
-          int secs = (int) thirdEyeMetricFunction.getTimeGranularity().toSeconds();
+          long bucketSize = thirdEyeMetricFunction.getTimeGranularity().toMillis();
+          // add an extra +/- bucket size on each side in case of missing data - this is to cover a
+          // previously existing bug with TE server
 
-          ThirdEyeRequest baseLineReq =
-              new ThirdEyeRequestBuilder().setCollection(collection)
-                  .setMetricFunction(thirdEyeMetricFunction)
-                  .setDimensionValues(expandedDimensionValues).setGroupBy(dimension)
-                  .setStartTime(baseline.minusSeconds(secs)).setEndTime(baseline.plusSeconds(secs))
-                  .build();
+          ThirdEyeRequest baseLineReq = new ThirdEyeRequestBuilder().setCollection(collection)
+              .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
+              .setGroupBy(dimension).setStartTime(baseline.minus(bucketSize))
+              .setEndTime(baseline.plus(bucketSize)).setTopCount(HEATMAP_GROUP_COUNT).build();
 
-          ThirdEyeRequest currentReq =
-              new ThirdEyeRequestBuilder().setCollection(collection)
-                  .setMetricFunction(thirdEyeMetricFunction)
-                  .setDimensionValues(expandedDimensionValues).setGroupBy(dimension)
-                  .setStartTime(current.minusSeconds(secs)).setEndTime(current.plusSeconds(secs))
-                  .build();
+          ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
+              .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
+              .setGroupBy(dimension).setTopCount(HEATMAP_GROUP_COUNT)
+              .setStartTime(current.minus(bucketSize)).setEndTime(current.plus(bucketSize)).build();
 
           // Query (in parallel)
           ArrayList<Future<QueryResult>> futures = new ArrayList<>();
@@ -390,9 +389,8 @@ public class DashboardResource {
       return new DimensionViewHeatMap(schema, objectMapper, actualResults, dimensionGroups,
           dimensionRegex, baseline, current);
     case TABULAR:
-      List<FunnelTable> funnelTables =
-          funnelResource.computeFunnelViews(collection, metricFunction, funnels, baselineMillis,
-              currentMillis, selectedDimensions);
+      List<FunnelTable> funnelTables = funnelResource.computeFunnelViews(collection, metricFunction,
+          funnels, baselineMillis, currentMillis, selectedDimensions);
       return new DimensionViewFunnel(funnelTables);
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);

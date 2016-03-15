@@ -75,16 +75,17 @@ public class MetricsGraphicsTimeSeriesResource {
 
     // Get time series data
     ThirdEyeMetricFunction metricFunction = getMetricFunction(metric, bucketSize, collection);
-    ThirdEyeRequestBuilder req =
+    ThirdEyeRequestBuilder requestBuilder =
         new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
             .setStartTime(startTime).setEndTime(endTime).setDimensionValues(fixedValues);
 
     if (groupBy != null) {
-      req.setGroupBy(groupBy);
+      requestBuilder.setGroupBy(groupBy);
     }
 
+    ThirdEyeRequest request = requestBuilder.build();
     // Do query
-    Map<DimensionKey, MetricTimeSeries> res = thirdEyeClient.execute(req.build());
+    Map<DimensionKey, MetricTimeSeries> res = thirdEyeClient.execute(request);
     Map<DimensionKey, List<Map<String, Object>>> dataByDimensionKey = new HashMap<>(res.size());
     final Map<DimensionKey, Double> totalVolume = new HashMap<>(res.size());
 
@@ -172,7 +173,7 @@ public class MetricsGraphicsTimeSeriesResource {
 
     MetricsGraphicsTimeSeries timeSeries = new MetricsGraphicsTimeSeries();
     timeSeries.setTitle(metric + (groupBy == null || "".equals(groupBy) ? "" : " by " + groupBy));
-    timeSeries.setDescription(req.toString());
+    timeSeries.setDescription(request.toString());
     timeSeries.setData(data);
     timeSeries.setxAccessor("time");
     timeSeries.setyAccessor("value");

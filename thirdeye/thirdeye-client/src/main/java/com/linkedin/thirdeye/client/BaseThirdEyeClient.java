@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.client.util.ThirdEyeClientUtils;
 
 public abstract class BaseThirdEyeClient implements ThirdEyeClient {
 
@@ -31,5 +32,11 @@ public abstract class BaseThirdEyeClient implements ThirdEyeClient {
       projectionTypes.add(metricType);
     }
     return rawResponse.convert(projectionTypes);
+  }
+
+  @Override
+  public int getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
+    StarTreeConfig config = getStarTreeConfig(request.getCollection());
+    return ThirdEyeClientUtils.getTimeBucketCount(request, config.getTime());
   }
 }

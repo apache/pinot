@@ -55,6 +55,24 @@ public class ViewUtils {
     return flattened;
   }
 
+  /**
+   * Returns queryResult data for the provided dimension in a nested 2-key map where the first key
+   * is the dimension key (eg [*, 'us', *]), the second key is the
+   * timestamp, and the indexes of the value (Number[]) correspond to metrics. If a dimension value
+   * is found in dimensionGroupMap, it is replaced with the corresponding value. If it matches one
+   * or more patterns in dimensionRegexMap, it is replaced with the value of the last matched
+   * pattern. If the dimension value is present in both parameters, dimensionGroupMap's value is
+   * used.<br/>
+   * Disclaimer: I (jteoh) didn't write this code so the javadoc is based off a quick glance and may
+   * have mistakes.
+   * @param queryResult - base data to work with.
+   * @param objectMapper
+   * @param dimensionGroupMap dimension -> dimension value -> group mapping. eg
+   *          {'country':{'us':'NA','ca':'NA','mx':'NA'}}
+   * @param dimensionRegexMap dimension -> dimension value regex -> group mapping. eg
+   *          {'jobTitle':{'back\s*end developer':'backend developer'}}
+   * @param dimensionName
+   */
   public static Map<List<String>, Map<String, Number[]>> processDimensionGroups(
       QueryResult queryResult, ObjectMapper objectMapper,
       Map<String, Map<String, String>> dimensionGroupMap,

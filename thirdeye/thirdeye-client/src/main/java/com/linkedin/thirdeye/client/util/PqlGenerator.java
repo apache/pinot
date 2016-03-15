@@ -24,7 +24,7 @@ public class PqlGenerator {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(",");
   private static final Joiner EQUALS = Joiner.on(" = ");
-  private static final int DEFAULT_TOP = Integer.MAX_VALUE;
+  static final int DEFAULT_TOP_COUNT_PER_BUCKET = 100;
 
   public PqlGenerator() {
   };
@@ -35,14 +35,15 @@ public class PqlGenerator {
    * Due to the summation, all metric column values can be assumed to be doubles.
    */
   public String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
+    int numTimeBuckets = ThirdEyeClientUtils.getTimeBucketCount(request, dataTimeSpec);
     return getPql(request.getCollection(), request.getRawMetricNames(), request.getStartTime(),
         request.getEndTime(), request.getDimensionValues(), request.getGroupBy(), dataTimeSpec,
-        request.shouldGroupByTime());
+        request.shouldGroupByTime(), request.getTopCount(), numTimeBuckets);
   }
 
   String getPql(String collection, List<String> metrics, DateTime startTime, DateTime endTime,
       Multimap<String, String> dimensionValues, Set<String> groupBy, TimeSpec dataTimeSpec,
-      boolean shouldGroupByTime) {
+      boolean shouldGroupByTime, Integer topCount, int numTimeBuckets) {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metrics, dataTimeSpec);
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
@@ -57,12 +58,7 @@ public class PqlGenerator {
       sb.append(" ").append(groupByClause);
     }
 
-    int bucketCount = DEFAULT_TOP;
-    if (groupBy == null || groupBy.isEmpty()) {
-      long duration = endTime.getMillis() - startTime.getMillis();
-      bucketCount =
-          (int) dataTimeSpec.getBucket().getUnit().convert(duration, TimeUnit.MILLISECONDS) + 1;
-    }
+    int bucketCount = getTopCountClause(topCount, numTimeBuckets, groupBy);
 
     sb.append(" TOP ").append(bucketCount);
     return sb.toString();
@@ -131,6 +127,26 @@ public class PqlGenerator {
       groups.add(0, timeColumnName);
     }
     return String.format("GROUP BY %s", COMMA.join(groups));
+  }
+
+  /**
+   * Formula: timeBuckets * countPerBucket where <br/>
+   * timeBuckets = number of expected timestamps (1 if shouldGroupByTime = false)<br/>
+   * countPerBucket = 1 if groupBy is empty, otherwise the input or default value if none is
+   * provided.
+   */
+  int getTopCountClause(Integer topCountPerBucket, int numTimeBuckets, Set<String> groupBy) {
+
+    if (groupBy == null || groupBy.isEmpty()) {
+      // no dimension values to group by
+      return numTimeBuckets;
+    }
+
+    if (topCountPerBucket == null) {
+      topCountPerBucket = DEFAULT_TOP_COUNT_PER_BUCKET;
+    }
+
+    return topCountPerBucket * numTimeBuckets;
   }
 
   public String getDataTimeRangeSql(String collection, String timeColumnName) {

@@ -130,12 +130,13 @@ public class TestThirdEyeMetricFunction {
 
     List<String> metricsM1M2 = Arrays.asList("m1", "m2");
     String standard = "RATIO(m1,m2)"; // normal, uppercase
-    String metricSpace = "RATIO(m1, m2)"; // with a space between metrics
+    String metricSpace1 = "RATIO(m1,m2)"; // with a space just before metric
+    String metricSpace2 = "RATIO(m1 ,m2)"; // with a space just after metrics
     String parenSpace = "RATIO( m1,m2 )"; // spaces before/after parens
     String quotedMetrics = "RATIO('m1','m2')"; // legacy behavior: quoted metrics
     String lowercaseRatio = "ratio(m1,m2)"; // handle lowercase RATIO
     String[] testStrs = new String[] {
-        standard, metricSpace, parenSpace, quotedMetrics, lowercaseRatio
+        standard, metricSpace1, metricSpace2, parenSpace, quotedMetrics, lowercaseRatio
     };
     Object[][] result = new Object[testStrs.length][];
     for (int i = 0; i < testStrs.length; i++) {

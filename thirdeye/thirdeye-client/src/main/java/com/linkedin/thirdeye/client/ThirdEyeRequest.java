@@ -20,8 +20,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
  * Request object containing all information for a {@link ThirdEyeClient} to retrieve data. Request
- * objects can be constructed via {@link ThirdEyeRequestBuilder}.
- * <br/>
+ * objects can be constructed via {@link ThirdEyeRequestBuilder}. <br/>
  * By default all requests are structured so that time series data will be returned. If the results
  * should be aggregated over the entire time window rather than grouped by each time bucket, see
  * {@link ThirdEyeRequestBuilder#setShouldGroupByTime(boolean)}.
@@ -36,6 +35,7 @@ public class ThirdEyeRequest {
   private final Multimap<String, String> dimensionValues;
   private final Set<String> groupBy;
   private final boolean shouldGroupByTime;
+  private final Integer topCount;
 
   private ThirdEyeRequest(ThirdEyeRequestBuilder builder) {
     this.collection = builder.collection;
@@ -45,6 +45,7 @@ public class ThirdEyeRequest {
     this.dimensionValues = builder.dimensionValues;
     this.groupBy = builder.groupBy;
     this.shouldGroupByTime = builder.shouldGroupByTime;
+    this.topCount = builder.topCount;
   }
 
   public static ThirdEyeRequestBuilder newBuilder() {
@@ -98,6 +99,11 @@ public class ThirdEyeRequest {
     return shouldGroupByTime;
   }
 
+  /** Number of dimension groups to return per time bucket when group by is provided */
+  public Integer getTopCount() {
+    return topCount;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(collection, metricFunction, startTime, endTime, dimensionValues, groupBy);
@@ -114,7 +120,8 @@ public class ThirdEyeRequest {
         && Objects.equals(getStartTime(), other.getStartTime())
         && Objects.equals(getEndTime(), other.getEndTime())
         && Objects.equals(getDimensionValues(), other.getDimensionValues())
-        && Objects.equals(getGroupBy(), other.getGroupBy());
+        && Objects.equals(getGroupBy(), other.getGroupBy())
+        && Objects.equals(getTopCount(), other.getTopCount());
 
   };
 
@@ -123,7 +130,7 @@ public class ThirdEyeRequest {
     return MoreObjects.toStringHelper(this).add("collection", collection)
         .add("metricFunction", metricFunction).add("startTime", startTime).add("endTime", endTime)
         .add("dimensionValues", dimensionValues).add("groupBy", groupBy)
-        .add("shouldGroupByTime", shouldGroupByTime).toString();
+        .add("shouldGroupByTime", shouldGroupByTime).add("topCount", topCount).toString();
   }
 
   public static class ThirdEyeRequestBuilder {
@@ -134,6 +141,7 @@ public class ThirdEyeRequest {
     private final Multimap<String, String> dimensionValues;
     private final Set<String> groupBy;
     private boolean shouldGroupByTime = true;
+    private Integer topCount = null;
 
     public ThirdEyeRequestBuilder() {
       this.dimensionValues = LinkedListMultimap.create();
@@ -147,7 +155,8 @@ public class ThirdEyeRequest {
       this.endTime = request.getEndTime();
       this.dimensionValues = LinkedListMultimap.create(request.getDimensionValues());
       this.groupBy = new LinkedHashSet<String>(request.getGroupBy());
-      this.shouldGroupByTime = request.shouldGroupByTime;
+      this.shouldGroupByTime = request.shouldGroupByTime();
+      this.topCount = request.getTopCount();
     }
 
     public ThirdEyeRequestBuilder setCollection(String collection) {
@@ -232,6 +241,11 @@ public class ThirdEyeRequest {
 
     public ThirdEyeRequestBuilder setShouldGroupByTime(boolean shouldGroupByTime) {
       this.shouldGroupByTime = shouldGroupByTime;
+      return this;
+    }
+
+    public ThirdEyeRequestBuilder setTopCount(Integer topCount) {
+      this.topCount = topCount;
       return this;
     }
 

@@ -238,6 +238,11 @@ public class CollectionMapThirdEyeClient implements ThirdEyeClient {
     return get(collection).getSegmentDescriptors(CollectionKey.getBaseCollection(collection));
   }
 
+  @Override
+  public int getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
+    return get(request).getExpectedTimeBuckets(getBaseRequest(request));
+  }
+
   private ThirdEyeRequest getBaseRequest(ThirdEyeRequest request) {
     ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder(request);
     builder.setCollection(CollectionKey.getBaseCollection(request.getCollection()));
@@ -348,4 +353,5 @@ public class CollectionMapThirdEyeClient implements ThirdEyeClient {
     }
 
   }
+
 }

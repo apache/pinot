@@ -38,10 +38,6 @@ public class TimeGranularity {
     return size + "-" + unit;
   }
 
-  public long toSeconds() {
-    return unit.toSeconds(size);
-  }
-
   @Override
   public int hashCode() {
     return Objects.hash(size, unit);

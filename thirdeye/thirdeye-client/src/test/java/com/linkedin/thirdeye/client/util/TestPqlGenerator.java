@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.client.util;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -8,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.ImmutableMultimap;
@@ -19,6 +21,10 @@ public class TestPqlGenerator {
 
   private static final TimeSpec DEFAULT_TIME_SPEC = new TimeSpec("timeColumn",
       new TimeGranularity(5, TimeUnit.MILLISECONDS), new TimeGranularity(1, TimeUnit.HOURS), null);
+  private static final DateTime DEFAULT_START =
+      ISODateTimeFormat.dateTimeParser().parseDateTime("2016-01-01T00:00:00.000+00:00");
+  private static final DateTime DEFAULT_END =
+      ISODateTimeFormat.dateTimeParser().parseDateTime("2016-01-02T00:00:00.000+00:00");
 
   private static final PqlGenerator pqlGenerator = new PqlGenerator();
 
@@ -31,11 +37,8 @@ public class TestPqlGenerator {
 
   @Test
   public void testGetBetweenClause() {
-    DateTime start =
-        ISODateTimeFormat.dateTimeParser().parseDateTime("2016-01-01T00:00:00.000+00:00");
-    DateTime end =
-        ISODateTimeFormat.dateTimeParser().parseDateTime("2016-01-02T00:00:00.000+00:00");
-    String betweenClause = pqlGenerator.getBetweenClause(start, end, DEFAULT_TIME_SPEC);
+    String betweenClause =
+        pqlGenerator.getBetweenClause(DEFAULT_START, DEFAULT_END, DEFAULT_TIME_SPEC);
     Assert.assertEquals(betweenClause, "timeColumn BETWEEN '403224' AND '403248'");
   }
 
@@ -61,6 +64,35 @@ public class TestPqlGenerator {
   public void testGetDataTimeRangeSql() {
     String dataTimeRangeSql = pqlGenerator.getDataTimeRangeSql("abook", "timeColumn");
     Assert.assertEquals(dataTimeRangeSql, "select min(timeColumn), max(timeColumn) from abook");
+  }
+
+  @Test(dataProvider = "topCountProvider")
+  public void testGetTopCount(Integer topCount, int numTimeBuckets, Set<String> groupBy,
+      int expected) {
+    int actual = pqlGenerator.getTopCountClause(topCount, numTimeBuckets, groupBy);
+    Assert.assertEquals(actual, expected);
+  }
+
+  @DataProvider(name = "topCountProvider")
+  private Object[][] topCountProvider() {
+    int numTimeBuckets = (int) DEFAULT_TIME_SPEC.getBucket().getUnit()
+        .convert(DEFAULT_END.getMillis() - DEFAULT_START.getMillis(), TimeUnit.MILLISECONDS) + 1;
+    int topCount = 17;
+    Set<String> dimensionGroup = Collections.singleton("dim1");
+    return new Object[][] {
+        new Object[] { // provided topCount value with no groupings
+            topCount, numTimeBuckets, null, numTimeBuckets
+        }, new Object[] { // provided topCount value with dimension grouping
+            topCount, numTimeBuckets, dimensionGroup, topCount * numTimeBuckets
+        }, new Object[] { // empty group by dimensions, no topCount
+            null, numTimeBuckets, Collections.emptySet(), numTimeBuckets
+        }, new Object[] { // no group by dimensions, no topCount
+            null, numTimeBuckets, null, numTimeBuckets
+        }, new Object[] { // group by dimensions w/ default topCount
+            null, numTimeBuckets, dimensionGroup,
+            PqlGenerator.DEFAULT_TOP_COUNT_PER_BUCKET * numTimeBuckets
+        }
+    };
   }
 
 }
