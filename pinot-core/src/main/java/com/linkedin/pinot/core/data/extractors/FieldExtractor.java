@@ -22,12 +22,12 @@ import com.linkedin.pinot.core.data.GenericRow;
 /**
  * Take a GenericRow transform it to an indexable GenericRow.
  * Customized logic will apply in transform(...)
+ * Constructor of implementation should specify schema
+ * Schema should not be changed for the life of the FieldExtractor
  *
  *
  */
 public interface FieldExtractor {
-
-  void setSchema(Schema schema);
 
   Schema getSchema();
 
