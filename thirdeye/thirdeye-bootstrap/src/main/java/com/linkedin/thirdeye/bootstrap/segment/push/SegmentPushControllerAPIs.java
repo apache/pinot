@@ -33,6 +33,8 @@ public class SegmentPushControllerAPIs {
   private static String DROP_PARAMETERS = "?state=drop";
   private static String UTF_8 = "UTF-8";
   private static String SEGMENT_JOINER = "_";
+  private static long TIMEOUT = 120000;
+  private static String SUCCESS = "success";
 
   SegmentPushControllerAPIs(String[] controllerHosts, String controllerPort) {
     this.controllerHosts = controllerHosts;
@@ -119,9 +121,17 @@ public class SegmentPushControllerAPIs {
   }
 
   private void deleteOverlappingSegments(String tablename, List<String> overlappingSegments) throws IOException {
+
     for (String segment : overlappingSegments) {
-      String response = deleteSegment(tablename, segment);
-      LOGGER.info("Response {} while deleting segment {} from table {}", response, segment, tablename);
+      String response = "";
+      long elapsedTime = 0;
+      long startTimeMillis = System.currentTimeMillis();
+      while (elapsedTime < TIMEOUT && !response.toLowerCase().contains(SUCCESS)) {
+        response = deleteSegment(tablename, segment);
+        LOGGER.info("Response {} while deleting segment {} from table {}", response, segment, tablename);
+        long currentTimeMillis = System.currentTimeMillis();
+        elapsedTime = elapsedTime + (currentTimeMillis - startTimeMillis);
+      }
     }
   }
 
