@@ -51,13 +51,13 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 /**
  * Uses file to build the star tree. Each row is divided into dimension and metrics. Time is added to dimension list.
  * We use the split order to build the tree. In most cases, split order will be ranked depending on the cardinality (descending order).
- * Time column will be excluded or last entry in split order irrespective of its cardinality 
- * This is a recursive algorithm where we branch on one dimension at every level. 
- * 
+ * Time column will be excluded or last entry in split order irrespective of its cardinality
+ * This is a recursive algorithm where we branch on one dimension at every level.
+ *
  * <b>Psuedo algo</b>
  * <code>
- * 
- * build(){ 
+ *
+ * build(){
  *  let table(1,N) consists of N input rows
  *  table.sort(1,N) //sort the table on all dimensions, according to split order
  *  constructTree(table, 0, N, 0);
@@ -69,13 +69,13 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  *    for each ( entry<dimName,length> groupByResult){
  *      if(entry.length > minThreshold){
  *        constructTree(table, rangeStart, rangeStart + entry.length, level +1);
- *      } 
+ *      }
  *      rangeStart = rangeStart + entry.length;
  *      updateStarTree() //add new child
  *    }
- *    
+ *
  *    //create a star tree node
- *    
+ *
  *    aggregatedRows = table.uniqueAfterRemovingAttributeAndAggregateMetrics(start,end, splitDimensionName);
  *    for(each row in aggregatedRows_
  *    table.add(row);
@@ -244,7 +244,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       Map<Object, Integer> dictionary = dictionaryMap.get(dimName);
       Object dimValue = row.getValue(dimName);
       if (dimValue == null) {
-        //TODO: Have another default value to represent STAR. Using default value to represent STAR as of now. 
+        //TODO: Have another default value to represent STAR. Using default value to represent STAR as of now.
         //It does not matter during query execution, since we know that values is STAR from the star tree
         dimValue = dimensionNameToStarValueMap.get(dimName);
       }
@@ -429,10 +429,15 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       // Add child to parent
       node.getChildren().put(childDimensionValue, child);
 
+      int childDocs = 0;
       IntPair range = sortGroupBy.get(childDimensionValue);
       if (range.getRight() - range.getLeft() > maxLeafRecords) {
-        docsAdded += constructStarTree(child, range.getLeft(), range.getRight(), level + 1, file);
-      } else {
+        childDocs = constructStarTree(child, range.getLeft(), range.getRight(), level + 1, file);
+        docsAdded += childDocs;
+      }
+
+      // Either range <= maxLeafRecords, or we did not split further (last level).
+      if (childDocs == 0) {
         child.setStartDocumentId(range.getLeft());
         child.setEndDocumentId(range.getRight());
       }
@@ -470,10 +475,16 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     LOG.debug("Added {} additional records at level {}", rowsAdded, level);
     //flush
     dataBuffer.flush();
+
+    int childDocs = 0;
     if (rowsAdded >= maxLeafRecords) {
       sort(dataFile, startOffset, startOffset + rowsAdded);
-      docsAdded += constructStarTree(starChild, startOffset, startOffset + rowsAdded, level + 1, dataFile);
-    } else {
+      childDocs = constructStarTree(starChild, startOffset, startOffset + rowsAdded, level + 1, dataFile);
+      docsAdded += childDocs;
+    }
+
+    // Either rowsAdded < maxLeafRecords, or we did not split further (last level).
+    if (childDocs == 0) {
       starChild.setStartDocumentId(startOffset);
       starChild.setEndDocumentId(startOffset + rowsAdded);
     }
@@ -482,12 +493,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   /**
-   * Assumes the file is already sorted, returns the unique combinations after removing a specified dimension. 
+   * Assumes the file is already sorted, returns the unique combinations after removing a specified dimension.
    * Aggregates the metrics for each unique combination, currently only sum is supported by default
    * @param startDocId
    * @param endDocId
-   * @param hasStarParent
+   * @param file
+   * @param splitDimensionId
    * @return
+   * @throws Exception
    */
   private Iterator<Pair<DimensionBuffer, MetricBuffer>> uniqueCombinations(int startDocId, int endDocId, File file,
       int splitDimensionId) throws Exception {
@@ -563,7 +576,9 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    * sorts the file from start to end on a dimension index
    * @param startDocId
    * @param endDocId
-   * @param dimensionToSplitOn
+   * @param dimension
+   * @param file
+   * @return
    */
   private Map<Integer, IntPair> groupBy(int startDocId, int endDocId, Integer dimension, File file) {
     StarTreeDataTable dataSorter = new StarTreeDataTable(file, dimensionSizeBytes, metricSizeBytes, getSortOrder());
