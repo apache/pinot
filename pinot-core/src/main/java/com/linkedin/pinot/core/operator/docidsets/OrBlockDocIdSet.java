@@ -96,7 +96,7 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
           rawIterators.add(iterator);
         }
       }
-      MutableRoaringBitmap answer = (MutableRoaringBitmap) allBitmaps.get(0).clone();
+      MutableRoaringBitmap answer = allBitmaps.get(0).toMutableRoaringBitmap();
       for (int i = 1; i < allBitmaps.size(); i++) {
         answer.or(allBitmaps.get(i));
       }

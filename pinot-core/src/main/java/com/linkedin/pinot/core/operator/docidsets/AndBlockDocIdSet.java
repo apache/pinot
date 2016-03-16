@@ -191,7 +191,7 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
       // handle bitmaps
       if (childBitmaps.size() > 0) {
         if (answer == null) {
-          answer = (MutableRoaringBitmap) childBitmaps.get(0).clone();
+          answer = childBitmaps.get(0).toMutableRoaringBitmap();
           for (int i = 1; i < childBitmaps.size(); i++) {
             answer.and(childBitmaps.get(i));
           }

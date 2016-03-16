@@ -15,14 +15,12 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import java.util.Arrays;
-
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
-
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import java.util.Arrays;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
@@ -35,7 +33,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
 
   private int endDocId;
 
-  private MutableRoaringBitmap answer;
+  private ImmutableRoaringBitmap answer;
 
   /**
    * 
@@ -64,10 +62,21 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
     this.bitmaps = bitmaps;
     setStartDocId(startDocId);
     setEndDocId(endDocId);
-    answer = MutableRoaringBitmap.or(bitmaps);
-    if (exclusion) {
-      answer.flip(startDocId, endDocId + 1); // end is exclusive
+    // or() operation below can be expensive for large segment sizes
+    // We avoid that for simple '=' queries
+    if (bitmaps.length > 1 || exclusion) {
+      MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(bitmaps);
+      if (exclusion) {
+        orBitmap.flip(startDocId, endDocId + 1); // end is exclusive
+      }
+      answer = orBitmap;
+
+    } else if (bitmaps.length == 1){
+      answer = bitmaps[0];
+    } else {
+      answer = new MutableRoaringBitmap().toMutableRoaringBitmap();
     }
+
     //by default bitmap is created for the all documents (raw docs + agg docs of star tree).
     //we need to consider only bits between start/end docId
     //startDocId/endDocId is decided by the filter plan node based on starTree vs raw data
@@ -77,12 +86,14 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
     if (blockMetadata.getStartDocId() != startDocId) {
       int start = Math.min(startDocId, blockMetadata.getStartDocId());
       int end = Math.max(startDocId, blockMetadata.getStartDocId());
-      answer.remove(start, end + 1);//end is exclusive
+      // TODO/atumbde: Removed to address [PINOT-2806]
+      //answer.remove(start, end + 1);//end is exclusive
     }
     if (blockMetadata.getEndDocId() != endDocId) {
       int start = Math.min(endDocId, blockMetadata.getEndDocId());
       int end = Math.max(endDocId, blockMetadata.getEndDocId());
-      answer.remove(start, end + 1);//end is exclusive
+      // TODO/atumbde: Removed to address [PINOT-2806]
+      //answer.remove(start, end + 1);//end is exclusive
     }
   }
 
