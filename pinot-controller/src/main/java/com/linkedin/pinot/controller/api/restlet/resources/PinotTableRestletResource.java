@@ -3,6 +3,7 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
+import java.util.TreeSet;
 
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
@@ -173,7 +174,8 @@ public class PinotTableRestletResource extends PinotRestletResourceBase {
   private Representation getAllTables() throws JSONException {
     JSONObject object = new JSONObject();
     JSONArray tableArray = new JSONArray();
-    Set<String> tableNames = _pinotHelixResourceManager.getAllUniquePinotRawTableNames();
+    Set<String> tableNames = new TreeSet<String>();
+    tableNames.addAll(_pinotHelixResourceManager.getAllUniquePinotRawTableNames());
     for (String pinotTableName : tableNames) {
       tableArray.put(pinotTableName);
     }
