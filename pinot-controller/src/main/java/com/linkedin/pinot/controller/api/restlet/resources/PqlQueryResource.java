@@ -76,6 +76,7 @@ public class PqlQueryResource extends PinotRestletResourceBase {
     final InstanceConfig config;
     try {
       final List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(resource);
+      instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
       if (instanceIds.isEmpty()) {
         return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
       } else {

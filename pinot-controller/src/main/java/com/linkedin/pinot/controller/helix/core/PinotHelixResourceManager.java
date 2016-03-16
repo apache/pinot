@@ -1732,4 +1732,8 @@ public class PinotHelixResourceManager {
     instanceList.retainAll(liveInstances);
     return instanceList;
   }
+
+  public List<String> getOnlineInstanceList() {
+    return _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
+  }
 }
