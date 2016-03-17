@@ -49,7 +49,7 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 
 public class RealtimeSegmentDataManager extends SegmentDataManager {
-  private static final Logger GLOBAL_LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
   private final String segmentName;
@@ -73,7 +73,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
-  private Logger LOGGER = GLOBAL_LOGGER;
+  private Logger segmentLogger = LOGGER;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
@@ -86,17 +86,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     this.segmentName = segmentMetadata.getSegmentName();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig.getSortedColumn().isEmpty()) {
-      GLOBAL_LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
+      LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
           segmentName);
       this.sortedColumn = null;
     } else {
       String firstSortedColumn = indexingConfig.getSortedColumn().get(0);
       if (this.schema.isExisted(firstSortedColumn)) {
-        GLOBAL_LOGGER.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
+        LOGGER.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
             firstSortedColumn, segmentName);
         this.sortedColumn = firstSortedColumn;
       } else {
-        GLOBAL_LOGGER.warn(
+        LOGGER.warn(
             "Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
             firstSortedColumn, segmentName);
         this.sortedColumn = null;
@@ -111,11 +111,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
     this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
     this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
-    LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() +
+    segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() +
             "_" + segmentName +
             "_" + kafkaStreamProviderConfig.getStreamName()
     );
-    LOGGER.info("Created segment data manager with Sorted column:{}, invertedIndexColumns:{}", sortedColumn,
+    segmentLogger.info("Created segment data manager with Sorted column:{}, invertedIndexColumns:{}", sortedColumn,
         invertedIndexColumns);
 
     segmentEndTimeThreshold = start + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
@@ -131,7 +131,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig, tableName, serverMetrics);
     this.kafkaStreamProvider.start();
     // lets create a new realtime segment
-    LOGGER.info("Started kafka stream provider");
+    segmentLogger.info("Started kafka stream provider");
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
         segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics);
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
@@ -151,7 +151,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // continue indexing until criteria is met
         boolean notFull = true;
         long exceptionSleepMillis = 50L;
-        LOGGER.info("Starting to collect rows");
+        segmentLogger.info("Starting to collect rows");
 
         do {
           GenericRow row = null;
@@ -163,23 +163,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               exceptionSleepMillis = 50L;
             }
           } catch (Exception e) {
-            LOGGER.warn("Caught exception while indexing row, sleeping for {} ms, row contents {}",
+            segmentLogger.warn("Caught exception while indexing row, sleeping for {} ms, row contents {}",
                 exceptionSleepMillis, row, e);
 
             // Sleep for a short time as to avoid filling the logs with exceptions too quickly
             Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
             exceptionSleepMillis = Math.min(60000L, exceptionSleepMillis * 2);
           } catch (Error e) {
-            LOGGER.error("Caught error in indexing thread", e);
+            segmentLogger.error("Caught error in indexing thread", e);
             throw e;
           }
         } while (notFull && keepIndexing);
 
         try {
-          LOGGER.info("Indexing threshold reached, proceeding with index conversion");
+          segmentLogger.info("Indexing threshold reached, proceeding with index conversion");
           // kill the timer first
           segmentStatusTask.cancel();
-          LOGGER.info("Indexed {} raw events, current number of docs = {}",
+          segmentLogger.info("Indexed {} raw events, current number of docs = {}",
               realtimeSegment.getRawDocumentCount(), realtimeSegment.getSegmentMetadata().getTotalDocs());
           File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
@@ -188,11 +188,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns);
 
-          LOGGER.info("Trying to build segment {}", segmentName);
+          segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
           converter.build();
           final long buildEndTime = System.nanoTime();
-          LOGGER.info("Built segment in {}ms",
+          segmentLogger.info("Built segment in {} ms",
               TimeUnit.MILLISECONDS.convert((buildEndTime - buildStartTime), TimeUnit.NANOSECONDS));
           File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
@@ -203,60 +203,106 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           long segEndTime = realtimeSegment.getMaxTime();
 
           TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-          RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
-          metadaToOverrite.setTableName(segmentMetadata.getTableName());
-          metadaToOverrite.setSegmentName(segmentMetadata.getSegmentName());
-          metadaToOverrite.setSegmentType(SegmentType.OFFLINE);
-          metadaToOverrite.setStatus(Status.DONE);
-          metadaToOverrite.setStartTime(segStartTime);
-          metadaToOverrite.setEndTime(segEndTime);
-          metadaToOverrite.setTotalRawDocs(realtimeSegment.getSegmentMetadata().getTotalDocs());
-          metadaToOverrite.setTimeUnit(timeUnit);
           Configuration configuration = new PropertyListConfiguration();
           configuration.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX, invertedIndexColumns);
           IndexLoadingConfigMetadata configMetadata = new IndexLoadingConfigMetadata(configuration);
           IndexSegment segment = Loaders.IndexSegment.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), mode, configMetadata);
-          notifier.notifySegmentCommitted(metadaToOverrite, segment);
 
-          LOGGER.info("Committing Kafka offset");
+          segmentLogger.info("Committing Kafka offsets");
           boolean commitSuccessful = false;
           try {
             kafkaStreamProvider.commit();
             commitSuccessful = true;
             kafkaStreamProvider.shutdown();
+            segmentLogger.info("Successfully committed Kafka offsets, consumer release requested.");
           } catch (Throwable e) {
-            // We have already marked this segment as "DONE", so the controller will be giving us a new segment.
-            // The new segment manager will start consumption with the same kafka group Id. One of the two scenarios can
-            // happen:
-            // a. We committed kafka offset successfully.  In that case, the new segment manager will consume events from
-            //    the new check-point, but will get only half the events if we have not shut down this consumer correctly.
-            // b. Kafka commit failed. In this case, we have not yet shutdown the consumer, so both consumers will be active,
-            //    getting half the number of events.
-            // Manual action needs to be taken at this point.
-            // The server needs to be cleared of all segments, and consumption started afresh.
-            // It is enough to start consumption from latest (since there are other servers that may be
-            // serving recent data.
-            LOGGER.error("FATAL: Exception committing or shutting down consumer commitSuccessful={}",
+            // If we got here, it means that either the commit or the shutdown failed. Considering that the
+            // KafkaConsumerManager delays shutdown and only adds the consumer to be released in a deferred way, this
+            // likely means that writing the Kafka offsets failed.
+            //
+            // The old logic (mark segment as done, then commit offsets and shutdown the consumer immediately) would die
+            // in a terrible way, leaving the consumer open and causing us to only get half the records from that point
+            // on. In this case, because we keep the consumer open for a little while, we should be okay if the
+            // controller reassigns us a new segment before the consumer gets released. Hopefully by the next time that
+            // we get to committing the offsets, the transient ZK failure that caused the write to fail will not
+            // happen again and everything will be good.
+            //
+            // Several things can happen:
+            // - The controller reassigns us a new segment before we release the consumer (KafkaConsumerManager will
+            //   keep the consumer open for about a minute, which should be enough time for the controller to reassign
+            //   us a new segment) and the next time we close the segment the offsets commit successfully; we're good.
+            // - The controller reassigns us a new segment, but after we released the consumer (if the controller was
+            //   down or there was a ZK failure on writing the Kafka offsets but not the Helix state). We lose whatever
+            //   data was in this segment. Not good.
+            // - The server crashes after this comment and before we mark the current segment as done; if the Kafka
+            //   offsets didn't get written, then when the server restarts it'll start consuming the current segment
+            //   from the previously committed offsets; we're good.
+            // - The server crashes after this comment, the Kafka offsets were written but the segment wasn't marked as
+            //   done in Helix, but we got a failure (or not) on the commit; we lose whatever data was in this segment
+            //   if we restart the server (not good). If we manually mark the segment as done in Helix by editing the
+            //   state in ZK, everything is good, we'll consume a new segment that starts from the correct offsets.
+            //
+            // This is still better than the previous logic, which would have these failure modes:
+            // - Consumer was left open and the controller reassigned us a new segment; consume only half the events
+            //   (because there are two consumers and Kafka will try to rebalance partitions between those two)
+            // - We got a segment assigned to us before we got around to committing the offsets, reconsume the data that
+            //   we got in this segment again, as we're starting consumption from the previously committed offset (eg.
+            //   duplicate data).
+            //
+            // This is still not very satisfactory, which is why this part is due for a redesign.
+            //
+            // Assuming you got here because the realtime offset commit metric has fired, check the logs to determine
+            // which of the above scenarios happened. If you're in one of the good scenarios, then there's nothing to
+            // do. If you're not, then based on how critical it is to get those rows back, then your options are:
+            // - Wipe the realtime table and reconsume everything (mark the replica as disabled so that clients don't
+            //   see query results from partially consumed data, then re-enable it when this replica has caught up)
+            // - Accept that those rows are gone in this replica and move on (they'll be replaced by good offline data
+            //   soon anyway)
+            // - If there's a replica that has consumed properly, you could shut it down, copy its segments onto this
+            //   replica, assign a new consumer group id to this replica, rename the copied segments and edit their
+            //   metadata to reflect the new consumer group id, copy the Kafka offsets from the shutdown replica onto
+            //   the new consumer group id and then restart both replicas. This should get you the missing rows.
+
+            segmentLogger.error("FATAL: Exception committing or shutting down consumer commitSuccessful={}",
                 commitSuccessful, e);
             serverMetrics.addMeteredTableValue(tableName, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
               kafkaStreamProvider.shutdown();
             }
-            throw e;
           }
-          LOGGER.info("Successfully closed and committed kafka", segmentName);
+
+          try {
+            segmentLogger.info("Marking current segment as completed in Helix");
+            RealtimeSegmentZKMetadata metadataToOverwrite = new RealtimeSegmentZKMetadata();
+            metadataToOverwrite.setTableName(segmentMetadata.getTableName());
+            metadataToOverwrite.setSegmentName(segmentMetadata.getSegmentName());
+            metadataToOverwrite.setSegmentType(SegmentType.OFFLINE);
+            metadataToOverwrite.setStatus(Status.DONE);
+            metadataToOverwrite.setStartTime(segStartTime);
+            metadataToOverwrite.setEndTime(segEndTime);
+            metadataToOverwrite.setTotalRawDocs(realtimeSegment.getSegmentMetadata().getTotalDocs());
+            metadataToOverwrite.setTimeUnit(timeUnit);
+            notifier.notifySegmentCommitted(metadataToOverwrite, segment);
+            segmentLogger.info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
+          } catch (Exception e) {
+            if (commitSuccessful) {
+              segmentLogger.error("Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. Manually mark the segment as completed in Helix; restarting this instance will result in data loss.", e);
+            } else {
+              segmentLogger.warn("Caught exception while marking segment as completed in Helix. Offsets were not written, restarting the instance should be safe.", e);
+            }
+          }
         } catch (Exception e) {
-          LOGGER.error("Caught exception in the realtime indexing thread", e);
+          segmentLogger.error("Caught exception in the realtime indexing thread", e);
         }
       }
     });
 
     indexingThread.start();
 
-    LOGGER.debug("scheduling keepIndexing timer check");
+    segmentLogger.debug("scheduling keepIndexing timer check");
     // start a schedule timer to keep track of the segment
     TimerService.timer.schedule(segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
-    LOGGER.info("finished scheduling keepIndexing timer check");
+    segmentLogger.info("finished scheduling keepIndexing timer check");
   }
 
   @Override
@@ -271,19 +317,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private void computeKeepIndexing() {
     if (keepIndexing) {
-      LOGGER.debug(
+      segmentLogger.debug(
           "Current indexed " + realtimeSegment.getRawDocumentCount() + " raw events, success = " + realtimeSegment
               .getSuccessIndexedCount() + " docs, total = " + realtimeSegment.getSegmentMetadata().getTotalDocs()
               + " docs in realtime segment");
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
           || realtimeSegment.getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
         if (realtimeSegment.getRawDocumentCount() == 0) {
-          LOGGER.info("no new events coming in, extending the end time by another hour");
+          segmentLogger.info("no new events coming in, extending the end time by another hour");
           segmentEndTimeThreshold =
               System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
           return;
         }
-        LOGGER.info(
+        segmentLogger.info(
             "Stopped indexing due to reaching segment limit: {} raw documents indexed, segment is aged {}"
                 + realtimeSegment.getRawDocumentCount() + ((System.currentTimeMillis() - start)
                 / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
