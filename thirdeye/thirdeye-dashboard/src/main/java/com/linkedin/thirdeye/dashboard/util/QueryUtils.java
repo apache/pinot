@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.util;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,24 @@ public class QueryUtils {
     }
 
     return results;
+  }
+
+  public static QueryResult waitForAndMergeMultipleResults(List<Future<QueryResult>> resultFutures)
+      throws InterruptedException, ExecutionException {
+
+    QueryResult finalQueryResult = null;
+    for (Future<QueryResult> futureQueryResult : resultFutures) {
+      QueryResult queryResult = futureQueryResult.get();
+
+      if (finalQueryResult == null) {
+        finalQueryResult = queryResult;
+      } else {
+        finalQueryResult = mergeQueryResults(finalQueryResult, queryResult);
+      }
+
+    }
+
+    return finalQueryResult;
   }
 
   /**

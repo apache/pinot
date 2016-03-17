@@ -52,8 +52,10 @@ public class ThirdEyeRequestUtils {
   public static Multimap<String, String> expandDimensionGroups(
       Multimap<String, String> dimensionValues,
       Map<String, Multimap<String, String>> dimensionGroups) {
-    if (dimensionValues == null || dimensionGroups == null) {
+    if (dimensionValues == null) {
       return null;
+    } else if (dimensionGroups == null || dimensionGroups.isEmpty()) {
+      return dimensionValues;
     }
     ArrayListMultimap<String, String> map = ArrayListMultimap.create();
     for (String key : dimensionValues.keySet()) {
@@ -79,6 +81,7 @@ public class ThirdEyeRequestUtils {
         }
       }
     }
+    // TODO test case?
     return map;
   }
 
