@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import io.dropwizard.views.View;
-
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -55,6 +53,8 @@ import com.linkedin.thirdeye.dashboard.views.ExceptionView;
 import com.linkedin.thirdeye.dashboard.views.FunnelTable;
 import com.sun.jersey.api.NotFoundException;
 
+import io.dropwizard.views.View;
+
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
 public class DashboardResource {
@@ -78,7 +78,8 @@ public class DashboardResource {
   public DashboardResource(DataCache dataCache, String feedbackEmailAddress, QueryCache queryCache,
       ObjectMapper objectMapper, CustomDashboardResource customDashboardResource,
       ConfigCache configCache, FunnelsDataProvider funnelResource,
-      ContributorDataProvider contributorResource, DashboardConfigResource dashboardConfigResource) {
+      ContributorDataProvider contributorResource,
+      DashboardConfigResource dashboardConfigResource) {
     this.dataCache = dataCache;
     this.queryCache = queryCache;
     this.objectMapper = objectMapper;
@@ -112,12 +113,10 @@ public class DashboardResource {
     if (collection == null) {
       return null;
     }
-    JSONObject ret =
-        new JSONObject(new ObjectMapper().writeValueAsString(funnelResource
-            .getFunnelSpecFor(collection)));
-    JSONObject dimGroups =
-        new JSONObject(new ObjectMapper().writeValueAsString(configCache
-            .getDimensionGroupSpec(collection)));
+    JSONObject ret = new JSONObject(
+        new ObjectMapper().writeValueAsString(funnelResource.getFunnelSpecFor(collection)));
+    JSONObject dimGroups = new JSONObject(
+        new ObjectMapper().writeValueAsString(configCache.getDimensionGroupSpec(collection)));
     ret.put("dimension_groups", dimGroups.get("groups"));
     return ret.toString();
   }
@@ -140,8 +139,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null
-          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null
+          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -167,9 +166,8 @@ public class DashboardResource {
     String firstMetric = schema.getMetrics().get(0);
     String metricFunction = String.format("AGGREGATE_1_HOURS('%s')", firstMetric);
 
-    String baseUrl =
-        PATH_JOINER.join("/dashboard", collection, metricFunction, MetricViewType.INTRA_DAY,
-            DimensionViewType.TABULAR, baselineTimeMillis, currentTimeMillis);
+    String baseUrl = PATH_JOINER.join("/dashboard", collection, metricFunction,
+        MetricViewType.INTRA_DAY, DimensionViewType.TABULAR, baselineTimeMillis, currentTimeMillis);
     String funnelsParam = Joiner.on(",").join(funnelNames);
     URI uri = new URIBuilder(baseUrl).addParameter("funnels", funnelsParam).build();
     return Response.seeOther(uri).build();
@@ -181,9 +179,8 @@ public class DashboardResource {
       @PathParam("metricFunction") String metricFunction, @Context UriInfo uriInfo)
       throws Exception {
     // TODO check if this is being used outside of dashboard (not used on main page)
-    return Response.seeOther(
-        URI.create(PATH_JOINER.join("", "dashboard", collection, metricFunction,
-            MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
+    return Response.seeOther(URI.create(PATH_JOINER.join("", "dashboard", collection,
+        metricFunction, MetricViewType.INTRA_DAY, DimensionViewType.HEAT_MAP))).build();
   }
 
   @GET
@@ -205,8 +202,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null
-          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null
+          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -233,15 +230,15 @@ public class DashboardResource {
       @PathParam("currentMillis") Long currentMillis, @Context UriInfo uriInfo) throws Exception {
     Multimap<String, String> selectedDimensions = UriUtils.extractDimensionValues(uriInfo);
     Collection<String> selectedFunnelsList = UriUtils.extractFunnels(uriInfo);
-    String selectedFunnels =
-        (selectedFunnelsList == null || selectedFunnelsList.isEmpty()) ? null : selectedFunnelsList
-            .iterator().next();
+    String selectedFunnels = (selectedFunnelsList == null || selectedFunnelsList.isEmpty()) ? null
+        : selectedFunnelsList.iterator().next();
 
     // Check no group bys
     for (String value : selectedDimensions.values()) {
       if (ThirdEyeRequest.GROUP_BY_VALUE.equals(value)) {
-        throw new WebApplicationException(new IllegalArgumentException(
-            "No group by dimensions allowed"), Response.Status.BAD_REQUEST);
+        throw new WebApplicationException(
+            new IllegalArgumentException("No group by dimensions allowed"),
+            Response.Status.BAD_REQUEST);
       }
     }
 
@@ -255,8 +252,8 @@ public class DashboardResource {
     DateTime earliestDataTime = null;
     DateTime latestDataTime = null;
     for (SegmentDescriptor segment : segments) {
-      if (segment.getStartDataTime() != null
-          && (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
+      if (segment.getStartDataTime() != null && (earliestDataTime == null
+          || segment.getStartDataTime().compareTo(earliestDataTime) < 0)) {
         earliestDataTime = segment.getStartDataTime();
       }
       if (segment.getEndDataTime() != null
@@ -283,22 +280,20 @@ public class DashboardResource {
     }
 
     try {
-      View dimensionView =
-          getDimensionView(collection, metricFunction, dimensionViewType, baselineMillis,
-              currentMillis, selectedDimensions, selectedFunnels, uriInfo);
+      View dimensionView = getDimensionView(collection, metricFunction, dimensionViewType,
+          baselineMillis, currentMillis, selectedDimensions, selectedFunnels, uriInfo);
 
       Map<String, Collection<String>> dimensionValueOptions =
           dashboardConfigResource.getDimensionValues(collection, baselineMillis, currentMillis);
 
       return new DashboardView(collection, selectedDimensions, new DateTime(baselineMillis),
-          new DateTime(currentMillis), new DimensionView(dimensionView, dimensionViewType,
-              dimensionValueOptions), earliestDataTime, latestDataTime, customDashboardNames,
-          feedbackEmailAddress, funnelNames, dashboardConfigResource);
+          new DateTime(currentMillis),
+          new DimensionView(dimensionView, dimensionViewType, dimensionValueOptions),
+          earliestDataTime, latestDataTime, customDashboardNames, feedbackEmailAddress, funnelNames,
+          dashboardConfigResource);
+    } catch (WebApplicationException e) {
+      throw e;// sends appropriate HTTP response
     } catch (Exception e) {
-      if (e instanceof WebApplicationException) {
-        throw e; // sends appropriate HTTP response
-      }
-
       // TODO: Better message, but at least this propagates it to client
       LOGGER.error("Error processing request {}", uriInfo.getRequestUri(), e);
       return new ExceptionView(e);
@@ -354,19 +349,15 @@ public class DashboardResource {
         if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
           long bucketSize = thirdEyeMetricFunction.getTimeGranularity().toMillis();
-          ThirdEyeRequest baseLineReq =
-              new ThirdEyeRequestBuilder().setCollection(collection)
-                  .setMetricFunction(thirdEyeMetricFunction)
-                  .setDimensionValues(expandedDimensionValues).setGroupBy(dimension)
-                  .setStartTime(baseline).setEndTime(baseline).setTopCount(HEATMAP_GROUP_COUNT)
-                  .build();
+          ThirdEyeRequest baseLineReq = new ThirdEyeRequestBuilder().setCollection(collection)
+              .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
+              .setGroupBy(dimension).setStartTime(baseline).setEndTime(baseline)
+              .setTopCount(HEATMAP_GROUP_COUNT).build();
 
-          ThirdEyeRequest currentReq =
-              new ThirdEyeRequestBuilder().setCollection(collection)
-                  .setMetricFunction(thirdEyeMetricFunction)
-                  .setDimensionValues(expandedDimensionValues).setGroupBy(dimension)
-                  .setTopCount(HEATMAP_GROUP_COUNT).setStartTime(current).setEndTime(current)
-                  .build();
+          ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
+              .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
+              .setGroupBy(dimension).setTopCount(HEATMAP_GROUP_COUNT).setStartTime(current)
+              .setEndTime(current).build();
 
           // Query (in parallel)
           ArrayList<Future<QueryResult>> futures = new ArrayList<>();
@@ -382,17 +373,13 @@ public class DashboardResource {
 
       List<Future<QueryResult>> resultFuturesForTotal = new ArrayList<>(2);
 
-      ThirdEyeRequest baselineReqForTotal =
-          new ThirdEyeRequestBuilder().setCollection(collection)
-              .setMetricFunction(thirdEyeMetricFunction)
-              .setDimensionValues(expandedDimensionValues).setStartTime(baseline)
-              .setEndTime(baseline).build();
+      ThirdEyeRequest baselineReqForTotal = new ThirdEyeRequestBuilder().setCollection(collection)
+          .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
+          .setStartTime(baseline).setEndTime(baseline).build();
 
-      ThirdEyeRequest currentReqForTotal =
-          new ThirdEyeRequestBuilder().setCollection(collection)
-              .setMetricFunction(thirdEyeMetricFunction)
-              .setDimensionValues(expandedDimensionValues).setStartTime(current)
-              .setEndTime(current).build();
+      ThirdEyeRequest currentReqForTotal = new ThirdEyeRequestBuilder().setCollection(collection)
+          .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
+          .setStartTime(current).setEndTime(current).build();
 
       LOGGER.info("Generated Total request for heat map: {}", baselineReqForTotal);
       LOGGER.info("Generated Total request for heat map: {}", currentReqForTotal);
@@ -415,14 +402,12 @@ public class DashboardResource {
 
       QueryResult resultForTotal = QueryUtils.waitForAndMergeMultipleResults(resultFuturesForTotal);
 
-      DimensionViewHeatMap dimensionViewHeatMap =
-          new DimensionViewHeatMap(schema, objectMapper, actualResults, dimensionGroups,
-              dimensionRegex, baseline, current, resultForTotal);
+      DimensionViewHeatMap dimensionViewHeatMap = new DimensionViewHeatMap(schema, objectMapper,
+          actualResults, dimensionGroups, dimensionRegex, baseline, current, resultForTotal);
       return dimensionViewHeatMap;
     case TABULAR:
-      List<FunnelTable> funnelTables =
-          funnelResource.computeFunnelViews(collection, metricFunction, funnels, baselineMillis,
-              currentMillis, selectedDimensions);
+      List<FunnelTable> funnelTables = funnelResource.computeFunnelViews(collection, metricFunction,
+          funnels, baselineMillis, currentMillis, selectedDimensions);
       return new DimensionViewFunnel(funnelTables);
     default:
       throw new NotFoundException("No dimension view implementation for " + dimensionViewType);

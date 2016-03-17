@@ -333,7 +333,7 @@ public class CustomDashboardResource {
 
   private CustomFunnelTabularView getCustomFunnelTabularView(String collection, Integer year,
       Integer month, Integer day, List<String> metricList, Multimap<String, String> queryParams)
-          throws Exception {
+      throws Exception {
     // Always aggregate at 1 hour (for intra-day style report)
     String metricFunction = "AGGREGATE_1_HOURS(" + METRIC_FUNCTION_JOINER.join(metricList) + ")";
 
@@ -433,7 +433,11 @@ public class CustomDashboardResource {
   static Map<Long, Number[]> extractFunnelData(QueryResult queryResult) throws Exception {
     Map<Long, Number[]> data = new HashMap<>();
 
-    if (queryResult.getData().size() != 1) {
+    if (queryResult.getData().isEmpty()) {
+      LOG.warn("No data returned!");
+      return Collections.emptyMap();
+    }
+    if (queryResult.getData().size() > 1) {
       throw new WebApplicationException(
           new Exception("Custom funnel tabular view cannot support multi-dimensional queries"),
           Response.Status.BAD_REQUEST);
