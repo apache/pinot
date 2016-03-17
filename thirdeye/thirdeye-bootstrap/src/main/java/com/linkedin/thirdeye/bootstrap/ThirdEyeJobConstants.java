@@ -27,7 +27,8 @@ public enum ThirdEyeJobConstants {
   THIRDEYE_TOPK("thirdeye.topk"),
   THIRDEYE_NUM_PARTITIONS("thirdeye.num.partitions"),
   THIRDEYE_PINOT_CONTROLLER_HOSTS("thirdeye.pinot.controller.hosts"),
-  THIRDEYE_PINOT_CONTROLLER_PORT("thirdeye.pinot.controller.port");
+  THIRDEYE_PINOT_CONTROLLER_PORT("thirdeye.pinot.controller.port"),
+  THIRDEYE_AGG_JOB_DUMP_STATISTICS("thirdeye.agg.job.dump.statistics");
 
   private final String propertyName;
 

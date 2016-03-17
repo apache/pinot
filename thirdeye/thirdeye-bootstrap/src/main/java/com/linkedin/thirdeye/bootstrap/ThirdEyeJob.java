@@ -166,6 +166,7 @@ public class ThirdEyeJob {
   private static final String DATA_FOLDER_JOINER = "_";
   private static final String TEMPORARY_FOLDER = "_temporary";
   private static final String DEFAULT_CONVERTER_CLASS = ThirdEyeAvroUtils.class.getName();
+  private static final String DEFAULT_THIRDEYE_AGG_JOB_DUMP_STATISTICS = "false";
 
   protected enum FlowSpec {
     DIMENSION_INDEX,
@@ -311,6 +312,10 @@ public class ThirdEyeJob {
           converterClass = DEFAULT_CONVERTER_CLASS;
         }
         config.setProperty(AggregationJobConstants.AGG_CONVERTER_CLASS.toString(), converterClass);
+
+        config.setProperty(AggregationJobConstants.AGG_JOB_DUMP_STATISTICS.toString(),
+            inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_AGG_JOB_DUMP_STATISTICS.getName(),
+                DEFAULT_THIRDEYE_AGG_JOB_DUMP_STATISTICS));
 
         return config;
       }

@@ -1,14 +1,5 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_CONFIG_PATH;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_INPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_OUTPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_DIMENSION_STATS_PATH;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_PRESERVE_TIME_COMPACTION;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_METRIC_SUMS_PATH;
-import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.AGG_CONVERTER_CLASS;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,6 +39,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants.*;
+
 
 /**
  * @author kgopalak <br/>
@@ -202,6 +196,7 @@ public class AggregatePhaseJob extends Configured {
     String dimensionStatsOutputDir;
     private FileSystem fileSystem;
     private DimensionStats dimensionStats;
+    private boolean isDumpStatistics;
     int numRecordsFlattened = 0;
 
     @Override
@@ -219,6 +214,7 @@ public class AggregatePhaseJob extends Configured {
         dimensionStats = new DimensionStats();
         statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString()) + STATS_FOLDER_SUFFIX + File.separator;
         dimensionStatsOutputDir = configuration.get(AGG_DIMENSION_STATS_PATH.toString());
+        isDumpStatistics = configuration.getBoolean(AGG_JOB_DUMP_STATISTICS.toString(), false);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -249,18 +245,17 @@ public class AggregatePhaseJob extends Configured {
     protected void cleanup(Context context) throws IOException, InterruptedException {
 
       context.getCounter(AggregationCounter.NUMBER_OF_RECORDS_FLATTENED).increment(numRecordsFlattened);
-      // TODO: Disabling these because they cause HDFS quotas to be hit too quickly when many tasks
-      // are used (gbrandt, 2015-08-27)
-      // FSDataOutputStream dimensionStatsOutputStream =
-      // fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() +
-      // ".stat"));
-      // OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
-      // dimensionStatsOutputStream.close();
-      //
-      // FSDataOutputStream outputStream =
-      // fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
-      // outputStream.write(aggregationStats.toString().getBytes());
-      // outputStream.close();
+      if (isDumpStatistics) {
+        FSDataOutputStream dimensionStatsOutputStream =
+        fileSystem.create(new Path(dimensionStatsOutputDir + "/" + context.getTaskAttemptID() +
+        ".stat"));
+        OBJECT_MAPPER.writeValue(dimensionStatsOutputStream, dimensionStats);
+        dimensionStatsOutputStream.close();
+        FSDataOutputStream outputStream =
+        fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
+        outputStream.write(aggregationStats.toString().getBytes());
+        outputStream.close();
+      }
     }
   }
 
@@ -310,6 +305,7 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_CONFIG_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
     getAndSetConfiguration(configuration, AGG_PRESERVE_TIME_COMPACTION);
+    getAndSetConfiguration(configuration, AGG_JOB_DUMP_STATISTICS);
     Path outputPath = new Path(getAndSetConfiguration(configuration, AGG_OUTPUT_PATH));
     Path aggStatsOutputPath = new Path(outputPath, STATS_FOLDER_SUFFIX);
     Path dimensionStatsPath = new Path(getAndSetConfiguration(configuration, AGG_DIMENSION_STATS_PATH));
