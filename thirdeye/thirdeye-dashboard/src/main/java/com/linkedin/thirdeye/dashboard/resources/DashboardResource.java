@@ -344,20 +344,24 @@ public class DashboardResource {
 
       ThirdEyeMetricFunction thirdEyeMetricFunction =
           ThirdEyeMetricFunction.fromStr(metricFunction);
+      long bucketSize = thirdEyeMetricFunction.getTimeGranularity().toMillis();
+      DateTime baselineStart = baseline;
+      DateTime baselineEnd = baseline.plus(bucketSize);
+      DateTime currentStart = current;
+      DateTime currentEnd = current.plus(bucketSize);
 
       for (String dimension : schema.getDimensions()) {
         if (!selectedDimensions.containsKey(dimension)) {
           // Generate SQL
-          long bucketSize = thirdEyeMetricFunction.getTimeGranularity().toMillis();
           ThirdEyeRequest baseLineReq = new ThirdEyeRequestBuilder().setCollection(collection)
               .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
-              .setGroupBy(dimension).setStartTime(baseline).setEndTime(baseline)
+              .setGroupBy(dimension).setStartTime(baselineStart).setEndTime(baselineEnd)
               .setTopCount(HEATMAP_GROUP_COUNT).build();
 
           ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
               .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
-              .setGroupBy(dimension).setTopCount(HEATMAP_GROUP_COUNT).setStartTime(current)
-              .setEndTime(current).build();
+              .setGroupBy(dimension).setTopCount(HEATMAP_GROUP_COUNT).setStartTime(currentStart)
+              .setEndTime(currentEnd).build();
 
           // Query (in parallel)
           ArrayList<Future<QueryResult>> futures = new ArrayList<>();
@@ -375,11 +379,11 @@ public class DashboardResource {
 
       ThirdEyeRequest baselineReqForTotal = new ThirdEyeRequestBuilder().setCollection(collection)
           .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
-          .setStartTime(baseline).setEndTime(baseline).build();
+          .setStartTime(baselineStart).setEndTime(baselineEnd).build();
 
       ThirdEyeRequest currentReqForTotal = new ThirdEyeRequestBuilder().setCollection(collection)
           .setMetricFunction(thirdEyeMetricFunction).setDimensionValues(expandedDimensionValues)
-          .setStartTime(current).setEndTime(current).build();
+          .setStartTime(currentStart).setEndTime(currentEnd).build();
 
       LOGGER.info("Generated Total request for heat map: {}", baselineReqForTotal);
       LOGGER.info("Generated Total request for heat map: {}", currentReqForTotal);
