@@ -235,10 +235,10 @@ public class FunnelsDataProvider {
         ThirdEyeRequestUtils.expandDimensionGroups(dimensionValuesMap, dimensionGroups);
 
     ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(baselineStart).setEndTime(baselineEnd)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(baselineStart).setEndTime(baselineEnd)
         .setDimensionValues(expandedDimensionValues).build();
     ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(currentStart).setEndTime(currentEnd)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(currentStart).setEndTime(currentEnd)
         .setDimensionValues(expandedDimensionValues).build();
 
     LOG.info("funnel queries for collection : {}, with name : {} ", collection, spec.getName());

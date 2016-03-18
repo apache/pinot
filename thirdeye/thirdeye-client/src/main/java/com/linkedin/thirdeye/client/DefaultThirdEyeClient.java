@@ -172,7 +172,7 @@ public class DefaultThirdEyeClient extends BaseThirdEyeClient {
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[5]);
 
     ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setStartTime(startTime).setEndTime(endTime).setMetricFunction(metricFunction);
+        .setStartTimeInclusive(startTime).setEndTime(endTime).setMetricFunction(metricFunction);
 
     if (args.length == 7) {
       requestBuilder.setGroupBy(args[6]);

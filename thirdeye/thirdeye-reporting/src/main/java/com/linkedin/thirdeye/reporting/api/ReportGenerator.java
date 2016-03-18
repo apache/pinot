@@ -185,11 +185,11 @@ public class ReportGenerator implements Job {
             ThirdEyeMetricFunction metricFunction = new ThirdEyeMetricFunction(
                 starTreeConfig.getTime().getBucket(), Collections.singletonList(metric));
             ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
-                .setMetricFunction(metricFunction).setStartTime(currentStartHour)
+                .setMetricFunction(metricFunction).setStartTimeInclusive(currentStartHour)
                 .setEndTime(currentEndHour).setDimensionValues(dimensionValues).setGroupBy(groupBy)
                 .build();
             ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
-                .setMetricFunction(metricFunction).setStartTime(baselineStartHour)
+                .setMetricFunction(metricFunction).setStartTimeInclusive(baselineStartHour)
                 .setEndTime(baselineEndHour).setDimensionValues(dimensionValues).setGroupBy(groupBy)
                 .build();
             LOGGER.info("Current req: {}", currentReq);

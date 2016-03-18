@@ -14,7 +14,8 @@ public class ThirdEyeClientUtils {
     if (!request.shouldGroupByTime()) {
       timeBucketCount = 1;
     } else {
-      long duration = request.getEndTime().getMillis() - request.getStartTime().getMillis();
+      long duration =
+          request.getEndTimeExclusive().getMillis() - request.getStartTimeInclusive().getMillis();
       timeBucketCount = dataTimeGranularity.convertToUnit(duration);
     }
     return timeBucketCount;
@@ -24,7 +25,7 @@ public class ThirdEyeClientUtils {
       TimeGranularity dataTimeGranularity) {
     long bucketMillis = dataTimeGranularity.toMillis();
 
-    long startMillis = request.getStartTime().getMillis();
+    long startMillis = request.getStartTimeInclusive().getMillis();
     // round up to nearest aligned bucket
     startMillis = (startMillis + bucketMillis - 1) / bucketMillis * bucketMillis;
     List<String> timestamps = new LinkedList<>();
@@ -32,7 +33,7 @@ public class ThirdEyeClientUtils {
       timestamps.add(Long.toString(startMillis));
     } else {
       long currentMillis = startMillis;
-      long endMillis = request.getEndTime().getMillis() / bucketMillis * bucketMillis;
+      long endMillis = request.getEndTimeExclusive().getMillis() / bucketMillis * bucketMillis;
       while (currentMillis < endMillis) { // end time is exclusive
         timestamps.add(Long.toString(currentMillis));
         currentMillis += bucketMillis;

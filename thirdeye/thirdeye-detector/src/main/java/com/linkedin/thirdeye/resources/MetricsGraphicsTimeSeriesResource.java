@@ -77,7 +77,7 @@ public class MetricsGraphicsTimeSeriesResource {
     ThirdEyeMetricFunction metricFunction = getMetricFunction(metric, bucketSize, collection);
     ThirdEyeRequestBuilder requestBuilder =
         new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
-            .setStartTime(startTime).setEndTime(endTime).setDimensionValues(fixedValues);
+            .setStartTimeInclusive(startTime).setEndTime(endTime).setDimensionValues(fixedValues);
 
     if (groupBy != null) {
       requestBuilder.setGroupBy(groupBy);
@@ -159,7 +159,7 @@ public class MetricsGraphicsTimeSeriesResource {
 
       long shiftMillis = endTime.getMillis() - overlayEnd.getMillis();
       ThirdEyeRequest overlayReq = new ThirdEyeRequestBuilder().setCollection(collection)
-          .setMetricFunction(metricFunction).setStartTime(overlayStart).setEndTime(overlayEnd)
+          .setMetricFunction(metricFunction).setStartTimeInclusive(overlayStart).setEndTime(overlayEnd)
           .setDimensionValues(fixedValues).build();
 
       Map<DimensionKey, MetricTimeSeries> overlayRes = thirdEyeClient.execute(overlayReq);

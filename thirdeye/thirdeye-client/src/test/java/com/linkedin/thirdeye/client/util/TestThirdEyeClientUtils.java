@@ -59,7 +59,7 @@ public class TestThirdEyeClientUtils {
   }
 
   private ThirdEyeRequest buildRequest(DateTime start, DateTime end, boolean shouldGroupByTime) {
-    return ThirdEyeRequest.newBuilder().setStartTime(start).setEndTime(end)
+    return ThirdEyeRequest.newBuilder().setStartTimeInclusive(start).setEndTime(end)
         .setShouldGroupByTime(shouldGroupByTime).build();
   }
 }

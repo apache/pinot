@@ -36,8 +36,9 @@ public class PqlGenerator {
    */
   public String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
     long numTimeBuckets = ThirdEyeClientUtils.getTimeBucketCount(request, dataTimeSpec.getBucket());
-    return getPql(request.getCollection(), request.getRawMetricNames(), request.getStartTime(),
-        request.getEndTime(), request.getDimensionValues(), request.getGroupBy(), dataTimeSpec,
+    return getPql(request.getCollection(), request.getRawMetricNames(),
+        request.getStartTimeInclusive(), request.getEndTimeExclusive(),
+        request.getDimensionValues(), request.getGroupBy(), dataTimeSpec,
         request.shouldGroupByTime(), request.getTopCount(), numTimeBuckets);
   }
 

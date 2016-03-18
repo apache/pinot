@@ -256,7 +256,7 @@ public class CustomDashboardResource {
         ThirdEyeRequestUtils.expandDimensionGroups(dimensionValues, dimensionGroups);
 
     ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(baseline).setEndTime(current)
         .setDimensionValues(expandedDimensionValues).setGroupBy(groupBy).build();
     QueryResult result = queryCache.getQueryResult(req);
 
@@ -353,10 +353,10 @@ public class CustomDashboardResource {
 
     // Requests
     ThirdEyeRequest baselineReq = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(baselineStart).setEndTime(baselineEnd)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(baselineStart).setEndTime(baselineEnd)
         .setDimensionValues(expandedDimensionValues).build();
     ThirdEyeRequest currentReq = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(currentStart).setEndTime(currentEnd)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(currentStart).setEndTime(currentEnd)
         .setDimensionValues(expandedDimensionValues).build();
     LOG.info("Generated Req: {}", baselineReq);
     LOG.info("Generated Req: {}", currentReq);

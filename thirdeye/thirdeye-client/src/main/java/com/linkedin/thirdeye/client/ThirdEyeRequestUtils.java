@@ -40,7 +40,7 @@ public class ThirdEyeRequestUtils {
     ThirdEyeMetricFunction metricFunction =
         new ThirdEyeMetricFunction(aggregationGranularity, metricNames);
     return new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
-        .setStartTime(start).setEndTime(end).setDimensionValues(fixedDimensionValues)
+        .setStartTimeInclusive(start).setEndTime(end).setDimensionValues(fixedDimensionValues)
         .setGroupBy(groupByDimension).build();
   }
 
@@ -112,7 +112,7 @@ public class ThirdEyeRequestUtils {
       } else if (property.equals("metricFunction")) {
         builder.setMetricFunction(value);
       } else if (property.equals("startTime")) {
-        builder.setStartTime(ISODateTimeFormat.dateTimeParser().parseDateTime(value));
+        builder.setStartTimeInclusive(ISODateTimeFormat.dateTimeParser().parseDateTime(value));
       } else if (property.equals("endTime")) {
         builder.setEndTime(ISODateTimeFormat.dateTimeParser().parseDateTime(value));
       } else if (property.equals("dimensionValues")) {

@@ -75,7 +75,7 @@ public class FlotTimeSeriesResource {
     Multimap<String, String> expandedDimensionValues =
         ThirdEyeRequestUtils.expandDimensionGroups(dimensionValues, reverseDimensionGroups);
     ThirdEyeRequest req = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(baseline).setEndTime(current)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(baseline).setEndTime(current)
         .setDimensionValues(expandedDimensionValues).build();
     QueryResult queryResult = queryCache.getQueryResult(req).checkEmpty();
 
@@ -115,10 +115,10 @@ public class FlotTimeSeriesResource {
 
     // Generate requests
     ThirdEyeRequest baselineSeriesReq = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(baselineRangeStart)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(baselineRangeStart)
         .setEndTime(baselineRangeEnd).setDimensionValues(expandedDimensionValues).build();
     ThirdEyeRequest currentSeriesReq = new ThirdEyeRequestBuilder().setCollection(collection)
-        .setMetricFunction(metricFunction).setStartTime(currentRangeStart)
+        .setMetricFunction(metricFunction).setStartTimeInclusive(currentRangeStart)
         .setEndTime(currentRangeEnd).setDimensionValues(expandedDimensionValues).build();
 
     // Query (async)

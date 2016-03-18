@@ -123,7 +123,7 @@ public class AnomalyDetectionJob implements Job {
     Queue<ThirdEyeRequest> queue = new LinkedList<>();
     ThirdEyeRequest req =
         new ThirdEyeRequestBuilder().setCollection(anomalyFunction.getSpec().getCollection())
-            .setMetricFunction(metricFunction).setStartTime(windowStart).setEndTime(windowEnd)
+            .setMetricFunction(metricFunction).setStartTimeInclusive(windowStart).setEndTime(windowEnd)
             .build();
     queue.add(req);
 

@@ -220,14 +220,14 @@ public class DashboardConfigResource {
 
       // Generate requests
       ThirdEyeRequest req1 = new ThirdEyeRequestBuilder().setCollection(collection)
-          .setMetricFunction(dummyFunction).setStartTime(baseline).setEndTime(baseline.plusDays(1))
+          .setMetricFunction(dummyFunction).setStartTimeInclusive(baseline).setEndTime(baseline.plusDays(1))
           .setDimensionValues(dimensionValues).setGroupBy(dimension).setShouldGroupByTime(false)
           .build();
       LOGGER.info("Generated request for dimension retrieval: {}", req1);
       futures.add(queryCache.getQueryResultAsync(req1));
 
       ThirdEyeRequest req2 = new ThirdEyeRequestBuilder().setCollection(collection)
-          .setMetricFunction(dummyFunction).setStartTime(current.minusDays(1)).setEndTime(current)
+          .setMetricFunction(dummyFunction).setStartTimeInclusive(current.minusDays(1)).setEndTime(current)
           .setDimensionValues(dimensionValues).setGroupBy(dimension).setShouldGroupByTime(false)
           .build();
       LOGGER.info("Generated request for dimension retrieval: {}", req2);

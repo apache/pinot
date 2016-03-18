@@ -215,7 +215,7 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
 
     TimeGranularity bucketGranularity = starTreeConfig.getTime().getBucket();
     TimeGranularity aggGranularity = request.getTimeGranularity();
-    DateTime startTime = request.getStartTime();
+    DateTime startTime = request.getStartTimeInclusive();
 
     int columnOffset = 0; // number of observed columns from previous result sets.
     for (int groupIdx = 0; groupIdx < result.getResultSetCount(); groupIdx++) {

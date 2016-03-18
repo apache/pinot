@@ -23,8 +23,8 @@ public class SqlUtils {
   public static String getThirdEyeSql(ThirdEyeRequest request) {
     String metricFunction = request.getMetricFunction().getSqlFunction();
     String collection = request.getCollection();
-    DateTime startTime = request.getStartTime();
-    DateTime endTime = request.getEndTime();
+    DateTime startTime = request.getStartTimeInclusive();
+    DateTime endTime = request.getEndTimeExclusive();
     if (metricFunction == null) {
       throw new IllegalStateException("Must provide metric function, e.g. `AGGREGATE_1_HOURS(m1)`");
     }

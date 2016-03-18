@@ -81,11 +81,11 @@ public class ContributorDataProvider {
         ThirdEyeRequestUtils.expandDimensionGroups(selectedDimensions, reverseDimensionGroups);
     ThirdEyeRequest baselineTotalReq =
         new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
-            .setStartTime(baselineStart).setEndTime(baselineStart.plus(intraPeriodMillis))
+            .setStartTimeInclusive(baselineStart).setEndTime(baselineStart.plus(intraPeriodMillis))
             .setDimensionValues(expandedDimensionValues).build();
     ThirdEyeRequest currentTotalReq =
         new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
-            .setStartTime(currentStart).setEndTime(currentStart.plus(intraPeriodMillis))
+            .setStartTimeInclusive(currentStart).setEndTime(currentStart.plus(intraPeriodMillis))
             .setDimensionValues(expandedDimensionValues).build();
 
     LOGGER.info("Generated request for contributor baseline total: {}", baselineTotalReq);
@@ -102,11 +102,11 @@ public class ContributorDataProvider {
         // Generate requests
         ThirdEyeRequest baselineGroupByReq =
             new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
-                .setStartTime(baselineStart).setEndTime(baselineStart.plus(intraPeriodMillis))
+                .setStartTimeInclusive(baselineStart).setEndTime(baselineStart.plus(intraPeriodMillis))
                 .setDimensionValues(expandedDimensionValues).setGroupBy(dimension).build();
         ThirdEyeRequest currentGroupByReq =
             new ThirdEyeRequestBuilder().setCollection(collection).setMetricFunction(metricFunction)
-                .setStartTime(currentStart).setEndTime(currentStart.plus(intraPeriodMillis))
+                .setStartTimeInclusive(currentStart).setEndTime(currentStart.plus(intraPeriodMillis))
                 .setDimensionValues(expandedDimensionValues).setGroupBy(dimension).build();
         LOGGER.info("Generated request for contributor baseline {} : {}", dimension,
             baselineGroupByReq);

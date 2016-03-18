@@ -32,8 +32,8 @@ public class ThirdEyeRequest {
 
   private final String collection;
   private final ThirdEyeMetricFunction metricFunction;
-  private final DateTime startTime;
-  private final DateTime endTime;
+  private final DateTime startTimeInclusive;
+  private final DateTime endTimeExclusive;
   private final Multimap<String, String> dimensionValues;
   private final Set<String> groupBy;
   private final boolean shouldGroupByTime;
@@ -42,8 +42,8 @@ public class ThirdEyeRequest {
   private ThirdEyeRequest(ThirdEyeRequestBuilder builder) {
     this.collection = builder.collection;
     this.metricFunction = builder.metricFunction;
-    this.startTime = builder.startTime;
-    this.endTime = builder.endTime;
+    this.startTimeInclusive = builder.startTimeInclusive;
+    this.endTimeExclusive = builder.endTimeExclusive;
     this.dimensionValues = builder.dimensionValues;
     this.groupBy = builder.groupBy;
     this.shouldGroupByTime = builder.shouldGroupByTime;
@@ -82,13 +82,13 @@ public class ThirdEyeRequest {
   }
 
   /** Start of request window, inclusive. */
-  public DateTime getStartTime() {
-    return startTime;
+  public DateTime getStartTimeInclusive() {
+    return startTimeInclusive;
   }
 
   /** End of request window, exclusive. */
-  public DateTime getEndTime() {
-    return endTime;
+  public DateTime getEndTimeExclusive() {
+    return endTimeExclusive;
   }
 
   public Multimap<String, String> getDimensionValues() {
@@ -110,7 +110,8 @@ public class ThirdEyeRequest {
 
   @Override
   public int hashCode() {
-    return Objects.hash(collection, metricFunction, startTime, endTime, dimensionValues, groupBy);
+    return Objects.hash(collection, metricFunction, startTimeInclusive, endTimeExclusive,
+        dimensionValues, groupBy);
   };
 
   @Override
@@ -121,8 +122,8 @@ public class ThirdEyeRequest {
     ThirdEyeRequest other = (ThirdEyeRequest) o;
     return Objects.equals(getCollection(), other.getCollection())
         && Objects.equals(getMetricFunction(), other.getMetricFunction())
-        && Objects.equals(getStartTime(), other.getStartTime())
-        && Objects.equals(getEndTime(), other.getEndTime())
+        && Objects.equals(getStartTimeInclusive(), other.getStartTimeInclusive())
+        && Objects.equals(getEndTimeExclusive(), other.getEndTimeExclusive())
         && Objects.equals(getDimensionValues(), other.getDimensionValues())
         && Objects.equals(getGroupBy(), other.getGroupBy())
         && Objects.equals(getTopCount(), other.getTopCount());
@@ -132,16 +133,17 @@ public class ThirdEyeRequest {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection)
-        .add("metricFunction", metricFunction).add("startTime", startTime).add("endTime", endTime)
-        .add("dimensionValues", dimensionValues).add("groupBy", groupBy)
-        .add("shouldGroupByTime", shouldGroupByTime).add("topCount", topCount).toString();
+        .add("metricFunction", metricFunction).add("startTime", startTimeInclusive)
+        .add("endTime", endTimeExclusive).add("dimensionValues", dimensionValues)
+        .add("groupBy", groupBy).add("shouldGroupByTime", shouldGroupByTime)
+        .add("topCount", topCount).toString();
   }
 
   public static class ThirdEyeRequestBuilder {
     private String collection;
     private ThirdEyeMetricFunction metricFunction;
-    private DateTime startTime;
-    private DateTime endTime;
+    private DateTime startTimeInclusive;
+    private DateTime endTimeExclusive;
     private final Multimap<String, String> dimensionValues;
     private final Set<String> groupBy;
     private boolean shouldGroupByTime = true;
@@ -155,8 +157,8 @@ public class ThirdEyeRequest {
     public ThirdEyeRequestBuilder(ThirdEyeRequest request) {
       this.collection = request.getCollection();
       this.metricFunction = request.getMetricFunction();
-      this.startTime = request.getStartTime();
-      this.endTime = request.getEndTime();
+      this.startTimeInclusive = request.getStartTimeInclusive();
+      this.endTimeExclusive = request.getEndTimeExclusive();
       this.dimensionValues = LinkedListMultimap.create(request.getDimensionValues());
       this.groupBy = new LinkedHashSet<String>(request.getGroupBy());
       this.shouldGroupByTime = request.shouldGroupByTime();
@@ -177,23 +179,23 @@ public class ThirdEyeRequest {
       return this;
     }
 
-    public ThirdEyeRequestBuilder setStartTime(long startTimeMillis) {
-      this.startTime = new DateTime(startTimeMillis, DateTimeZone.UTC);
+    public ThirdEyeRequestBuilder setStartTime(long startTimeMillisInclusive) {
+      this.startTimeInclusive = new DateTime(startTimeMillisInclusive, DateTimeZone.UTC);
       return this;
     }
 
-    public ThirdEyeRequestBuilder setStartTime(DateTime startTime) {
-      this.startTime = startTime;
+    public ThirdEyeRequestBuilder setStartTimeInclusive(DateTime startTimeInclusive) {
+      this.startTimeInclusive = startTimeInclusive;
       return this;
     }
 
-    public ThirdEyeRequestBuilder setEndTime(long endTimeMillis) {
-      this.endTime = new DateTime(endTimeMillis, DateTimeZone.UTC);
+    public ThirdEyeRequestBuilder setEndTimeExclusive(long endTimeMillisExclusive) {
+      this.endTimeExclusive = new DateTime(endTimeMillisExclusive, DateTimeZone.UTC);
       return this;
     }
 
-    public ThirdEyeRequestBuilder setEndTime(DateTime endTime) {
-      this.endTime = endTime;
+    public ThirdEyeRequestBuilder setEndTime(DateTime endTimeExclusive) {
+      this.endTimeExclusive = endTimeExclusive;
       return this;
     }
 
