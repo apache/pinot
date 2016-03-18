@@ -112,7 +112,7 @@ public class MockThirdEyeClient extends BaseThirdEyeClient {
     response.setMetrics(config.getMetricNames());
 
     Set<String> groupBy = request.getGroupBy();
-    List<String> timestamps = generateTimestamps(request, config);
+    List<String> timestamps = getExpectedTimestamps(request);
 
     int metricCount = config.getMetrics().size();
     HashMap<String, Map<String, Number[]>> data = new HashMap<String, Map<String, Number[]>>();
@@ -127,25 +127,6 @@ public class MockThirdEyeClient extends BaseThirdEyeClient {
     response.setData(data);
     return response;
 
-  }
-
-  private List<String> generateTimestamps(ThirdEyeRequest request, StarTreeConfig config) {
-    long bucketMillis = config.getTime().getBucket().toMillis();
-    long startMillis = request.getStartTime().getMillis();
-    // round up to nearest bucket
-    startMillis = (startMillis + bucketMillis - 1) / bucketMillis * bucketMillis;
-    List<String> timestamps = new LinkedList<>();
-    if (!request.shouldGroupByTime()) {
-      timestamps.add(Long.toString(startMillis));
-    } else {
-      long currentMillis = startMillis;
-      long endMillis = request.getEndTime().getMillis();
-      while (currentMillis < endMillis) {
-        timestamps.add(Long.toString(currentMillis));
-        currentMillis += bucketMillis;
-      }
-    }
-    return timestamps;
   }
 
   private List<String> generateDimensionKeys(List<String> dimensions, Set<String> groupBy)

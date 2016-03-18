@@ -24,6 +24,8 @@ import com.linkedin.thirdeye.api.TimeGranularity;
  * By default all requests are structured so that time series data will be returned. If the results
  * should be aggregated over the entire time window rather than grouped by each time bucket, see
  * {@link ThirdEyeRequestBuilder#setShouldGroupByTime(boolean)}.
+ * <br/>
+ * Date ranges are specified as [start, end), ie inclusive start and exclusive end.
  */
 public class ThirdEyeRequest {
   public static final String GROUP_BY_VALUE = "!";
@@ -79,10 +81,12 @@ public class ThirdEyeRequest {
     return metricFunction.getTimeGranularity();
   }
 
+  /** Start of request window, inclusive. */
   public DateTime getStartTime() {
     return startTime;
   }
 
+  /** End of request window, exclusive. */
   public DateTime getEndTime() {
     return endTime;
   }

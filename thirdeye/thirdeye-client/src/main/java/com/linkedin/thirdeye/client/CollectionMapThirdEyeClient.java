@@ -239,8 +239,13 @@ public class CollectionMapThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public int getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
+  public long getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
     return get(request).getExpectedTimeBuckets(getBaseRequest(request));
+  }
+
+  @Override
+  public List<String> getExpectedTimestamps(ThirdEyeRequest request) throws Exception {
+    return get(request).getExpectedTimestamps(getBaseRequest(request));
   }
 
   private ThirdEyeRequest getBaseRequest(ThirdEyeRequest request) {

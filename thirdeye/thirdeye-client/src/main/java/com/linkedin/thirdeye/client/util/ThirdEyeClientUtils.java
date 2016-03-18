@@ -1,22 +1,44 @@
 package com.linkedin.thirdeye.client.util;
 
-import java.util.concurrent.TimeUnit;
+import java.util.LinkedList;
+import java.util.List;
 
-import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
 public class ThirdEyeClientUtils {
 
-  public static int getTimeBucketCount(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
-    int timeBucketCount;
+  public static long getTimeBucketCount(ThirdEyeRequest request,
+      TimeGranularity dataTimeGranularity) {
+    long timeBucketCount;
     if (!request.shouldGroupByTime()) {
       timeBucketCount = 1;
     } else {
       long duration = request.getEndTime().getMillis() - request.getStartTime().getMillis();
-      timeBucketCount =
-          (int) dataTimeSpec.getBucket().getUnit().convert(duration, TimeUnit.MILLISECONDS) + 1;
+      timeBucketCount = dataTimeGranularity.convertToUnit(duration);
     }
     return timeBucketCount;
+  }
+
+  public static List<String> getTimestamps(ThirdEyeRequest request,
+      TimeGranularity dataTimeGranularity) {
+    long bucketMillis = dataTimeGranularity.toMillis();
+
+    long startMillis = request.getStartTime().getMillis();
+    // round up to nearest aligned bucket
+    startMillis = (startMillis + bucketMillis - 1) / bucketMillis * bucketMillis;
+    List<String> timestamps = new LinkedList<>();
+    if (!request.shouldGroupByTime()) {
+      timestamps.add(Long.toString(startMillis));
+    } else {
+      long currentMillis = startMillis;
+      long endMillis = request.getEndTime().getMillis() / bucketMillis * bucketMillis;
+      while (currentMillis < endMillis) { // end time is exclusive
+        timestamps.add(Long.toString(currentMillis));
+        currentMillis += bucketMillis;
+      }
+    }
+    return timestamps;
   }
 
 }

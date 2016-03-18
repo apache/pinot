@@ -21,6 +21,9 @@ public class TestPqlGenerator {
 
   private static final TimeSpec DEFAULT_TIME_SPEC = new TimeSpec("timeColumn",
       new TimeGranularity(5, TimeUnit.MILLISECONDS), new TimeGranularity(1, TimeUnit.HOURS), null);
+  private static final TimeSpec TEN_MINUTES_BUCKET_TIME_SPEC =
+      new TimeSpec("timeColumn", new TimeGranularity(5, TimeUnit.MILLISECONDS),
+          new TimeGranularity(10, TimeUnit.MINUTES), null);
   private static final DateTime DEFAULT_START =
       ISODateTimeFormat.dateTimeParser().parseDateTime("2016-01-01T00:00:00.000+00:00");
   private static final DateTime DEFAULT_END =
@@ -37,9 +40,13 @@ public class TestPqlGenerator {
 
   @Test
   public void testGetBetweenClause() {
+    // should be inclusive start, exclusive end
     String betweenClause =
         pqlGenerator.getBetweenClause(DEFAULT_START, DEFAULT_END, DEFAULT_TIME_SPEC);
-    Assert.assertEquals(betweenClause, "timeColumn BETWEEN '403224' AND '403248'");
+    Assert.assertEquals(betweenClause, "timeColumn BETWEEN '403224' AND '403247'");
+    betweenClause =
+        pqlGenerator.getBetweenClause(DEFAULT_START, DEFAULT_END, TEN_MINUTES_BUCKET_TIME_SPEC);
+    Assert.assertEquals(betweenClause, "timeColumn BETWEEN '2419344' AND '2419487'");
   }
 
   @Test
@@ -68,8 +75,8 @@ public class TestPqlGenerator {
 
   @Test(dataProvider = "topCountProvider")
   public void testGetTopCount(Integer topCount, int numTimeBuckets, Set<String> groupBy,
-      int expected) {
-    int actual = pqlGenerator.getTopCountClause(topCount, numTimeBuckets, groupBy);
+      long expected) {
+    long actual = pqlGenerator.getTopCountClause(topCount, numTimeBuckets, groupBy);
     Assert.assertEquals(actual, expected);
   }
 

@@ -37,7 +37,8 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
   private final LoadingCache<String, StarTreeConfig> starTreeConfigCache;
   private final LoadingCache<ThirdEyeRequest, ThirdEyeRawResponse> rawResultCache;
   private final LoadingCache<String, List<SegmentDescriptor>> segmentDescriptorCache;
-  private final LoadingCache<ThirdEyeRequest, Integer> expectedTimeBucketCache;
+  private final LoadingCache<ThirdEyeRequest, Long> expectedTimeBucketCache;
+  private final LoadingCache<ThirdEyeRequest, List<String>> expectedTimestampsCache;
   private Supplier<List<String>> collectionsSupplier;
   private final Supplier<List<String>> _baseCollectionsSupplier = new CollectionSupplier();
 
@@ -85,6 +86,7 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
     this.segmentDescriptorCache = readCacheBuilder.build(new SegmentDescriptorCacheLoader());
 
     this.expectedTimeBucketCache = readCacheBuilder.build(new ExpectedTimeBucketsCacheLoader());
+    this.expectedTimestampsCache = readCacheBuilder.build(new ExpectedTimestampsCacheLoader());
 
     this.collectionsSupplier = buildCollectionsSupplier();
   }
@@ -120,8 +122,13 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public int getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
+  public long getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
     return expectedTimeBucketCache.get(request);
+  }
+
+  @Override
+  public List<String> getExpectedTimestamps(ThirdEyeRequest request) throws Exception {
+    return expectedTimestampsCache.get(request);
   }
 
   @Override
@@ -206,10 +213,17 @@ public class CachedThirdEyeClient implements ThirdEyeClient {
     }
   }
 
-  private class ExpectedTimeBucketsCacheLoader extends CacheLoader<ThirdEyeRequest, Integer> {
+  private class ExpectedTimeBucketsCacheLoader extends CacheLoader<ThirdEyeRequest, Long> {
     @Override
-    public Integer load(ThirdEyeRequest request) throws Exception {
+    public Long load(ThirdEyeRequest request) throws Exception {
       return client.getExpectedTimeBuckets(request);
+    }
+  }
+
+  private class ExpectedTimestampsCacheLoader extends CacheLoader<ThirdEyeRequest, List<String>> {
+    @Override
+    public List<String> load(ThirdEyeRequest request) throws Exception {
+      return client.getExpectedTimestamps(request);
     }
   }
 

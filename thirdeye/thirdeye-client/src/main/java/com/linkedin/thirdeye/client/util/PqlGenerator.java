@@ -6,13 +6,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 
@@ -35,7 +35,7 @@ public class PqlGenerator {
    * Due to the summation, all metric column values can be assumed to be doubles.
    */
   public String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) {
-    int numTimeBuckets = ThirdEyeClientUtils.getTimeBucketCount(request, dataTimeSpec);
+    long numTimeBuckets = ThirdEyeClientUtils.getTimeBucketCount(request, dataTimeSpec.getBucket());
     return getPql(request.getCollection(), request.getRawMetricNames(), request.getStartTime(),
         request.getEndTime(), request.getDimensionValues(), request.getGroupBy(), dataTimeSpec,
         request.shouldGroupByTime(), request.getTopCount(), numTimeBuckets);
@@ -43,7 +43,7 @@ public class PqlGenerator {
 
   String getPql(String collection, List<String> metrics, DateTime startTime, DateTime endTime,
       Multimap<String, String> dimensionValues, Set<String> groupBy, TimeSpec dataTimeSpec,
-      boolean shouldGroupByTime, Integer topCount, int numTimeBuckets) {
+      boolean shouldGroupByTime, Integer topCount, long numTimeBuckets) {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metrics, dataTimeSpec);
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
@@ -58,7 +58,7 @@ public class PqlGenerator {
       sb.append(" ").append(groupByClause);
     }
 
-    int bucketCount = getTopCountClause(topCount, numTimeBuckets, groupBy);
+    long bucketCount = getTopCountClause(topCount, numTimeBuckets, groupBy);
 
     sb.append(" TOP ").append(bucketCount);
     return sb.toString();
@@ -84,9 +84,11 @@ public class PqlGenerator {
 
   String getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec) {
     String timeField = timeFieldSpec.getColumnName();
-    TimeUnit timeFieldUnit = timeFieldSpec.getBucket().getUnit();
-    long startInConvertedUnits = timeFieldUnit.convert(start.getMillis(), TimeUnit.MILLISECONDS);
-    long endInConvertedUnits = timeFieldUnit.convert(end.getMillis(), TimeUnit.MILLISECONDS);
+    TimeGranularity timeGranularity = timeFieldSpec.getBucket();
+    long startInConvertedUnits = timeGranularity.convertToUnit(start.getMillis());
+    // ThirdEyeRequest spec is that end should be handled exclusively. Pinot BETWEEN clause is
+    // inclusive, so subtract one time unit.
+    long endInConvertedUnits = timeGranularity.convertToUnit(end.getMillis()) - 1;
     return String.format("%s BETWEEN '%s' AND '%s'", timeField, startInConvertedUnits,
         endInConvertedUnits);
   }
@@ -135,7 +137,7 @@ public class PqlGenerator {
    * countPerBucket = 1 if groupBy is empty, otherwise the input or default value if none is
    * provided.
    */
-  int getTopCountClause(Integer topCountPerBucket, int numTimeBuckets, Set<String> groupBy) {
+  long getTopCountClause(Integer topCountPerBucket, long numTimeBuckets, Set<String> groupBy) {
 
     if (groupBy == null || groupBy.isEmpty()) {
       // no dimension values to group by

@@ -35,8 +35,14 @@ public abstract class BaseThirdEyeClient implements ThirdEyeClient {
   }
 
   @Override
-  public int getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
+  public long getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception {
     StarTreeConfig config = getStarTreeConfig(request.getCollection());
-    return ThirdEyeClientUtils.getTimeBucketCount(request, config.getTime());
+    return ThirdEyeClientUtils.getTimeBucketCount(request, config.getTime().getBucket());
+  }
+
+  @Override
+  public List<String> getExpectedTimestamps(ThirdEyeRequest request) throws Exception {
+    StarTreeConfig config = getStarTreeConfig(request.getCollection());
+    return ThirdEyeClientUtils.getTimestamps(request, config.getTime().getBucket());
   }
 }

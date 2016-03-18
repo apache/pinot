@@ -30,7 +30,10 @@ public interface ThirdEyeClient {
   // TODO Refactor: the main purpose of this method is only for showing start + end times for data.
   List<SegmentDescriptor> getSegmentDescriptors(String collection) throws Exception;
 
-  int getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception;
+  long getExpectedTimeBuckets(ThirdEyeRequest request) throws Exception;
+
+  /** Returns an ordered list of the expected timestamps from the given request window. */
+  List<String> getExpectedTimestamps(ThirdEyeRequest request) throws Exception;
 
   /** Clear any cached values. */
   void clear() throws Exception;
