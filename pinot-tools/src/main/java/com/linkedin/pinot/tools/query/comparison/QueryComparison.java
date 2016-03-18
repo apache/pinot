@@ -21,10 +21,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -414,18 +412,31 @@ public class QueryComparison {
   private static boolean compareSelectionRows(JSONArray actualRows, JSONArray expectedRows,
       Map<Integer, Integer> expectedToActualColMap)
       throws JSONException {
-    final int numExpectedRows = expectedRows.length();
-    Set<String> expectedRowSet = new HashSet<String>(numExpectedRows);
-    for (int i = 0; i < numExpectedRows; i++) {
-      expectedRowSet.add(serializeRow(expectedRows.getJSONArray(i), null));
-    }
     final int numActualRows = actualRows.length();
-    for (int i = 0; i < numActualRows; i++) {
-      if (expectedRowSet.contains(serializeRow(actualRows.getJSONArray(i), expectedToActualColMap))) {
-        continue;
+    final int numExpectedRows = expectedRows.length();
+    if (numActualRows > numExpectedRows) {
+      LOGGER.error("In selection, number of actual rows: {} more than expected rows: {}", numActualRows, numExpectedRows);
+      return false;
+    }
+    Map<String, Integer> expectedRowMap = new HashMap<>(numExpectedRows);
+    for (int i = 0; i < numExpectedRows; i++) {
+      String serialized = serializeRow(expectedRows.getJSONArray(i), expectedToActualColMap);
+      Integer count = expectedRowMap.get(serialized);
+      if (count == null) {
+        expectedRowMap.put(serialized, 1);
       } else {
+        expectedRowMap.put(serialized, count + 1);
+      }
+    }
+
+    for (int i = 0; i < numActualRows; i++) {
+      String serialized = serializeRow(actualRows.getJSONArray(i), null);
+      Integer count = expectedRowMap.get(serialized);
+      if (count == null || count == 0) {
+        LOGGER.error("Cannot find match for row {} in actual result", i);
         return false;
       }
+      expectedRowMap.put(serialized, count - 1);
     }
     return true;
   }
@@ -433,15 +444,20 @@ public class QueryComparison {
   private static String serializeRow(JSONArray row, Map<Integer, Integer> expectedToActualColMap) throws JSONException {
     StringBuilder sb = new StringBuilder();
     final int numCols = row.length();
-    sb.append(numCols).append("_");
+    sb.append(numCols).append('_');
     for (int i = 0; i < numCols; i++) {
-      // For comparison between v2 and v2, we can do string compares
-      // If floating point number discrepancies exist, then re-do this part to change the
-      // string to a double and to an int and then to a string to compare
+      String toAppend;
       if (expectedToActualColMap == null) {
-        sb.append(row.getString(i)).append("_");
+        toAppend = row.getString(i);
       } else {
-        sb.append(row.getString(expectedToActualColMap.get(i))).append("_");
+        toAppend = row.getString(expectedToActualColMap.get(i));
+      }
+      // For number value, uniform the format and do fuzzy comparison
+      try {
+        double numValue = Double.parseDouble(toAppend);
+        sb.append((int) (numValue * 100)).append('_');
+      } catch (NumberFormatException e) {
+        sb.append(toAppend).append('_');
       }
     }
     return sb.toString();
@@ -457,7 +473,7 @@ public class QueryComparison {
     }
 
     try {
-      double doubleValue = Double.parseDouble(str);
+      Double.parseDouble(str);
     } catch (NumberFormatException nfe) {
       return false;
     }
@@ -470,7 +486,7 @@ public class QueryComparison {
       double expectedVal = Double.parseDouble(expectedString);
       return (fuzzyEqual(actualVal, expectedVal));
     } catch (NumberFormatException nfe) {
-      return true;
+      return false;
     }
   }
 
@@ -481,7 +497,7 @@ public class QueryComparison {
     int expectedSize = expectedList.length();
 
     if (actualSize != expectedSize) {
-      LOGGER.error("Number of columns mismatch: actual: {} expected: {}", actualSize, expectedSize);
+      LOGGER.error("Number of columns mis-match: actual: {} expected: {}", actualSize, expectedSize);
       return false;
     }
 
@@ -539,7 +555,7 @@ public class QueryComparison {
     }
 
     // For really large numbers, use relative error.
-    if (d1 > 0 && ((Math.abs(d1 - d2)) / d1) < EPSILON) {
+    if (d1 != 0 && ((Math.abs(d1 - d2)) / Math.abs(d1)) < EPSILON) {
       return true;
     }
 
