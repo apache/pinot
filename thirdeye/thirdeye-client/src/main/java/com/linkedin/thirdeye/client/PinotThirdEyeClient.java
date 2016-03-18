@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -87,8 +88,6 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
 
   // No way to determine data retention from pinot schema
   private static final TimeGranularity DEFAULT_TIME_RETENTION = null;
-  // Pinot TimeFieldSpec always assumes granularity size of 1.
-  private static final int GRANULARITY_SIZE = 1;
 
   private final Connection connection;
   private final LoadingCache<String, ResultSetGroup> resultSetGroupCache;
@@ -437,9 +436,9 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
     }
     double minTime = result.getResultSet(0).getDouble(0);
     double maxTime = result.getResultSet(1).getDouble(0);
-    TimeUnit dataUnit = timeSpec.getBucket().getUnit();
-    long minTimeMillis = dataUnit.toMillis((long) minTime);
-    long maxTimeMillis = dataUnit.toMillis((long) maxTime);
+    TimeGranularity timeGranularity = timeSpec.getBucket();
+    long minTimeMillis = timeGranularity.toMillis((long) minTime);
+    long maxTimeMillis = timeGranularity.toMillis((long) maxTime);
     SegmentDescriptor singletonDescriptor =
         new SegmentDescriptor(null, null, null, new DateTime(minTimeMillis, DateTimeZone.UTC),
             new DateTime(maxTimeMillis, DateTimeZone.UTC));
@@ -531,9 +530,9 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
   }
 
   private TimeSpec fromTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
-    TimeGranularity inputGranularity = new TimeGranularity(GRANULARITY_SIZE,
+    TimeGranularity inputGranularity = new TimeGranularity(timeFieldSpec.getIncomingGranularitySpec().getSize(),
         timeFieldSpec.getIncomingGranularitySpec().getTimeType());
-    TimeGranularity outputGranularity = new TimeGranularity(GRANULARITY_SIZE,
+    TimeGranularity outputGranularity = new TimeGranularity(timeFieldSpec.getOutgoingGranularitySpec().getSize(),
         timeFieldSpec.getOutgoingGranularitySpec().getTimeType());
     TimeSpec spec = new TimeSpec(timeFieldSpec.getOutGoingTimeColumnName(), inputGranularity,
         outputGranularity, DEFAULT_TIME_RETENTION);

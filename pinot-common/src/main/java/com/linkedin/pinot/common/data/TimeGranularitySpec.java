@@ -22,8 +22,11 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 public class TimeGranularitySpec {
 
+  private static int DEFAULT_TIME_SIZE = 1;
+
   DataType dataType;
   TimeUnit timeType;
+  int size = DEFAULT_TIME_SIZE;
   String name;
 
   // Default constructor required by JSON de-serielizer.
@@ -33,6 +36,13 @@ public class TimeGranularitySpec {
   public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String name) {
     this.dataType = dataType;
     this.timeType = timeType;
+    this.name = name;
+  }
+
+  public TimeGranularitySpec(DataType dataType, TimeGranularity timeGranularity, String name) {
+    this.dataType = dataType;
+    this.timeType = timeGranularity.getTimeUnit();
+    this.size = timeGranularity.getSize();
     this.name = name;
   }
 
@@ -52,6 +62,14 @@ public class TimeGranularitySpec {
     this.timeType = timeType;
   }
 
+  public int getSize() {
+    return size;
+  }
+
+  public void setTimeBucket(int size) {
+    this.size = size;
+  }
+
   public String getName() {
     return name;
   }
@@ -68,7 +86,7 @@ public class TimeGranularitySpec {
 
     TimeGranularitySpec spec = (TimeGranularitySpec) object;
     if (this.getName().equals(spec.getName()) && spec.getDataType() == this.getDataType()
-        && this.getTimeType() == spec.getTimeType()) {
+        && this.getTimeType() == spec.getTimeType() && this.getSize() == spec.getSize()) {
       return true;
     }
 
@@ -79,6 +97,7 @@ public class TimeGranularitySpec {
   public int hashCode() {
     int result = dataType != null ? dataType.hashCode() : 0;
     result = 31 * result + (timeType != null ? timeType.hashCode() : 0);
+    result = 31 * result +  Integer.valueOf(size).hashCode();
     result = 31 * result + (name != null ? name.hashCode() : 0);
     return result;
   }

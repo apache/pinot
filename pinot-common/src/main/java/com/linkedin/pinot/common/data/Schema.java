@@ -135,7 +135,7 @@ public class Schema {
   }
 
   @JsonIgnore(true)
-  @Deprecated //use addField 
+  @Deprecated //use addField
   public void addSchema(String columnName, FieldSpec fieldSpec) {
     addField(columnName, fieldSpec);
   }
@@ -363,9 +363,24 @@ public class Schema {
 
     public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType,
         String outGoingColumnName, TimeUnit outgoingGranularity, DataType outgoingDataType) {
-
       TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
       TimeGranularitySpec outgoing = new TimeGranularitySpec(outgoingDataType, outgoingGranularity, outGoingColumnName);
+      schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
+      return this;
+    }
+
+    public SchemaBuilder addTime(String incomingColumnName, TimeGranularity incomingTimeGranularity, DataType incomingDataType) {
+      TimeGranularitySpec incomingGranularitySpec =
+          new TimeGranularitySpec(incomingDataType, incomingTimeGranularity, incomingColumnName);
+
+      schema.addSchema(incomingColumnName, new TimeFieldSpec(incomingGranularitySpec));
+      return this;
+    }
+
+    public SchemaBuilder addTime(String incomingColumnName, TimeGranularity incomingTimeGranularity, DataType incomingDataType,
+        String outGoingColumnName, TimeGranularity outgoingTimeGranularity, DataType outgoingDataType) {
+      TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingTimeGranularity, incomingColumnName);
+      TimeGranularitySpec outgoing = new TimeGranularitySpec(outgoingDataType, outgoingTimeGranularity, outGoingColumnName);
       schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
       return this;
     }

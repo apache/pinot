@@ -21,9 +21,11 @@ public class TestPqlGenerator {
 
   private static final TimeSpec DEFAULT_TIME_SPEC = new TimeSpec("timeColumn",
       new TimeGranularity(5, TimeUnit.MILLISECONDS), new TimeGranularity(1, TimeUnit.HOURS), null);
+
   private static final TimeSpec TEN_MINUTES_BUCKET_TIME_SPEC =
       new TimeSpec("timeColumn", new TimeGranularity(5, TimeUnit.MILLISECONDS),
           new TimeGranularity(10, TimeUnit.MINUTES), null);
+
   private static final DateTime DEFAULT_START =
       ISODateTimeFormat.dateTimeParser().parseDateTime("2016-01-01T00:00:00.000+00:00");
   private static final DateTime DEFAULT_END =

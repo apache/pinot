@@ -87,9 +87,11 @@ public class PqlGenerator {
     String timeField = timeFieldSpec.getColumnName();
     TimeGranularity timeGranularity = timeFieldSpec.getBucket();
     long startInConvertedUnits = timeGranularity.convertToUnit(start.getMillis());
+
     // ThirdEyeRequest spec is that end should be handled exclusively. Pinot BETWEEN clause is
     // inclusive, so subtract one time unit.
     long endInConvertedUnits = timeGranularity.convertToUnit(end.getMillis()) - 1;
+
     return String.format("%s BETWEEN '%s' AND '%s'", timeField, startInConvertedUnits,
         endInConvertedUnits);
   }

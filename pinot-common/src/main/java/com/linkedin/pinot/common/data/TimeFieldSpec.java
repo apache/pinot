@@ -38,6 +38,13 @@ public class TimeFieldSpec extends FieldSpec {
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
+
+  public TimeFieldSpec(String name, DataType dType, TimeGranularity timeGranularity) {
+    super(name, FieldType.TIME, dType, true);
+    this.incomingGranularitySpec = new TimeGranularitySpec(dType, timeGranularity, name);
+    this.outgoingGranularitySpec = incomingGranularitySpec;
+  }
+
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec) {
     super(incominGranularitySpec.getName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;

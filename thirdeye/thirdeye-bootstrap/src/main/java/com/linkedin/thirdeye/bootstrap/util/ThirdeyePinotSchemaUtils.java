@@ -16,6 +16,7 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularity;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -59,9 +60,14 @@ public class ThirdeyePinotSchemaUtils {
       schema.addField(metricName, fieldSpec);
     }
     TimeGranularitySpec incoming =
-        new TimeGranularitySpec(DataType.LONG, starTreeConfig.getTime().getBucket().getUnit(), starTreeConfig.getTime().getColumnName());
+        new TimeGranularitySpec(DataType.LONG,
+            new TimeGranularity(starTreeConfig.getTime().getBucket().getSize(), starTreeConfig.getTime().getBucket().getUnit()),
+            starTreeConfig.getTime().getColumnName());
     TimeGranularitySpec outgoing =
-        new TimeGranularitySpec(DataType.LONG, starTreeConfig.getTime().getBucket().getUnit(), starTreeConfig.getTime().getColumnName());
+        new TimeGranularitySpec(DataType.LONG,
+            new TimeGranularity(starTreeConfig.getTime().getBucket().getSize(), starTreeConfig.getTime().getBucket().getUnit()),
+            starTreeConfig.getTime().getColumnName());
+
     FieldSpec fieldSpec = new TimeFieldSpec(incoming, outgoing);
     fieldSpec.setFieldType(FieldType.TIME);
     schema.addField(starTreeConfig.getTime().getColumnName(), new TimeFieldSpec(incoming, outgoing));
