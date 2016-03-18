@@ -220,7 +220,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       @Override
       public void run() {
         final ScanBasedQueryProcessor scanBasedQueryProcessor =
-            ThreadLocal.withInitial(new Supplier<ScanBasedQueryProcessor>() {
+            (new ThreadLocal<ScanBasedQueryProcessor>() {
               @Override
               public ScanBasedQueryProcessor get() {
                 return _scanBasedQueryProcessor.clone();
