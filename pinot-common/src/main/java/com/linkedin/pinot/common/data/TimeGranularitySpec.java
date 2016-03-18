@@ -66,7 +66,7 @@ public class TimeGranularitySpec {
     return size;
   }
 
-  public void setTimeBucket(int size) {
+  public void setSize(int size) {
     this.size = size;
   }
 
