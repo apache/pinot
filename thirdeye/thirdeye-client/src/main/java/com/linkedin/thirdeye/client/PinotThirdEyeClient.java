@@ -530,9 +530,9 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
   }
 
   private TimeSpec fromTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
-    TimeGranularity inputGranularity = new TimeGranularity(timeFieldSpec.getIncomingGranularitySpec().getSize(),
+    TimeGranularity inputGranularity = new TimeGranularity(timeFieldSpec.getIncomingGranularitySpec().getTimeunitSize(),
         timeFieldSpec.getIncomingGranularitySpec().getTimeType());
-    TimeGranularity outputGranularity = new TimeGranularity(timeFieldSpec.getOutgoingGranularitySpec().getSize(),
+    TimeGranularity outputGranularity = new TimeGranularity(timeFieldSpec.getOutgoingGranularitySpec().getTimeunitSize(),
         timeFieldSpec.getOutgoingGranularitySpec().getTimeType());
     TimeSpec spec = new TimeSpec(timeFieldSpec.getOutGoingTimeColumnName(), inputGranularity,
         outputGranularity, DEFAULT_TIME_RETENTION);

@@ -356,8 +356,7 @@ public class Schema {
     public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType) {
       TimeGranularitySpec incomingGranularitySpec =
           new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
-
-      schema.addSchema(incomingColumnName, new TimeFieldSpec(incomingGranularitySpec));
+      addTime(incomingColumnName, incomingGranularitySpec);
       return this;
     }
 
@@ -365,15 +364,14 @@ public class Schema {
         String outGoingColumnName, TimeUnit outgoingGranularity, DataType outgoingDataType) {
       TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
       TimeGranularitySpec outgoing = new TimeGranularitySpec(outgoingDataType, outgoingGranularity, outGoingColumnName);
-      schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
+      addTime(incomingColumnName, incoming, outgoing);
       return this;
     }
 
     public SchemaBuilder addTime(String incomingColumnName, int incomingSize, TimeUnit incomingGranularity, DataType incomingDataType) {
       TimeGranularitySpec incomingGranularitySpec =
           new TimeGranularitySpec(incomingDataType, incomingSize, incomingGranularity, incomingColumnName);
-
-      schema.addSchema(incomingColumnName, new TimeFieldSpec(incomingGranularitySpec));
+      addTime(incomingColumnName, incomingGranularitySpec);
       return this;
     }
 
@@ -381,8 +379,16 @@ public class Schema {
         String outGoingColumnName, int outgoingSize, TimeUnit outgoingGranularity, DataType outgoingDataType) {
       TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingSize, incomingGranularity, incomingColumnName);
       TimeGranularitySpec outgoing = new TimeGranularitySpec(outgoingDataType, outgoingSize, outgoingGranularity, outGoingColumnName);
-      schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
+      addTime(incomingColumnName, incoming, outgoing);
       return this;
+    }
+
+    public void addTime(String incomingColumnName, TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
+      schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
+    }
+
+    public void addTime(String incomingColumnName, TimeGranularitySpec incoming) {
+      schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming));
     }
 
     public Schema build() {

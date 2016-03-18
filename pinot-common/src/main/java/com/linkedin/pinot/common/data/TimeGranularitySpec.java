@@ -19,14 +19,28 @@ import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
-
+/**
+ * TimeGranularitySpec contains all spec related to timeField
+ *
+ * name is the name of the time column in the schema
+ * dataType is the data type of the time column (eg. LONG, INT)
+ * timeType is the TimeUnit of the time column (eg. HOURS, MINUTES)
+ * timeunitSize is the size of the time buckets (eg. 10 MINUTES, 2 HOURS). By defult this will be set to 1.
+ *
+ * eg. If the time column is in milliseconds, constructor can be invoked as
+ * TimeGranularitySpec(LONG, MILLISECONDS, timeColumnName)
+ *
+ * If the time column is aggregated in tenMinutesSinceEpoch, constructor can be invoked as
+ * TimeGranularitySpec(LONG, 10, MINUTES, timeColumnName)
+ *
+ */
 public class TimeGranularitySpec {
 
   private static int DEFAULT_TIME_SIZE = 1;
 
   DataType dataType;
   TimeUnit timeType;
-  int size = DEFAULT_TIME_SIZE;
+  int timeunitSize = DEFAULT_TIME_SIZE;
   String name;
 
   // Default constructor required by JSON de-serielizer.
@@ -39,10 +53,10 @@ public class TimeGranularitySpec {
     this.name = name;
   }
 
-  public TimeGranularitySpec(DataType dataType, int size, TimeUnit timeType, String name) {
+  public TimeGranularitySpec(DataType dataType, int timeunitSize, TimeUnit timeType, String name) {
     this.dataType = dataType;
     this.timeType = timeType;
-    this.size = size;
+    this.timeunitSize = timeunitSize;
     this.name = name;
   }
 
@@ -62,12 +76,12 @@ public class TimeGranularitySpec {
     this.timeType = timeType;
   }
 
-  public int getSize() {
-    return size;
+  public int getTimeunitSize() {
+    return timeunitSize;
   }
 
-  public void setSize(int size) {
-    this.size = size;
+  public void setTimeunitSize(int timeunitSize) {
+    this.timeunitSize = timeunitSize;
   }
 
   public String getName() {
@@ -86,7 +100,7 @@ public class TimeGranularitySpec {
 
     TimeGranularitySpec spec = (TimeGranularitySpec) object;
     if (this.getName().equals(spec.getName()) && spec.getDataType() == this.getDataType()
-        && this.getTimeType() == spec.getTimeType() && this.getSize() == spec.getSize()) {
+        && this.getTimeType() == spec.getTimeType() && this.getTimeunitSize() == spec.getTimeunitSize()) {
       return true;
     }
 
@@ -97,7 +111,7 @@ public class TimeGranularitySpec {
   public int hashCode() {
     int result = dataType != null ? dataType.hashCode() : 0;
     result = 31 * result + (timeType != null ? timeType.hashCode() : 0);
-    result = 31 * result +  Integer.valueOf(size).hashCode();
+    result = 31 * result +  Integer.valueOf(timeunitSize).hashCode();
     result = 31 * result + (name != null ? name.hashCode() : 0);
     return result;
   }
