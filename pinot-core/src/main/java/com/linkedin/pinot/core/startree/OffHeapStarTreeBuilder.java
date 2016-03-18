@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +95,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   int aggRecordCount = 0;
   private List<String> dimensionsSplitOrder;
   private Set<String> skipStarNodeCreationForDimensions;
+  private Set<String> skipMaterializationForDimensions;
 
   private int maxLeafRecords;
   private StarTree starTree;
@@ -115,12 +117,16 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
   boolean debugMode = false;
   private int[] sortOrder;
+  private int skipMaterializationCardinalityThreshold;
 
   public void init(StarTreeBuilderConfig builderConfig) throws Exception {
     Schema schema = builderConfig.schema;
     timeColumnName = schema.getTimeColumnName();
     this.dimensionsSplitOrder = builderConfig.dimensionsSplitOrder;
     skipStarNodeCreationForDimensions = builderConfig.getSkipStarNodeCreationForDimensions();
+    skipMaterializationForDimensions = builderConfig.getSkipMaterializationForDimensions();
+    skipMaterializationCardinalityThreshold = builderConfig.getSkipMaterializationCardinalityThreshold();
+
     this.maxLeafRecords = builderConfig.maxLeafRecords;
     this.outDir = builderConfig.getOutDir();
     if (outDir == null) {
@@ -188,6 +194,26 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     this.starTreeRootIndexNode.setLevel(0);
     LOG.debug("dimensionNames:{}", dimensionNames);
     LOG.debug("metricNames:{}", metricNames);
+  }
+
+  /**
+   * Validate the split order by removing any dimensions that may be part of the skip materialization list.
+   * @param dimensionsSplitOrder
+   * @param skipMaterializationForDimensions
+   * @return
+   */
+  private List<String> sanitizeSplitOrder(List<String> dimensionsSplitOrder,
+      Set<String> skipMaterializationForDimensions) {
+    List<String> validatedSplitOrder = new ArrayList<String>();
+    for (String dimension : dimensionsSplitOrder) {
+      if (skipMaterializationForDimensions == null || !skipMaterializationForDimensions.contains(dimension)) {
+        LOG.info(
+            "Dimension {} cannot be part of 'dimensionSplitOrder' and 'skipMaterializationForDimensions', removing it from split order",
+            dimension);
+        validatedSplitOrder.add(dimension);
+      }
+    }
+    return validatedSplitOrder;
   }
 
   private Object getAllStarValue(DimensionFieldSpec spec) throws Exception {
@@ -286,9 +312,16 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   public void build() throws Exception {
+    if (skipMaterializationForDimensions == null || skipMaterializationForDimensions.isEmpty()) {
+      skipMaterializationForDimensions = computeDefaultDimensionsToSkipMaterialization();
+    }
     if (dimensionsSplitOrder == null || dimensionsSplitOrder.isEmpty()) {
       dimensionsSplitOrder = computeDefaultSplitOrder();
     }
+
+    // Remove any dimensions from split order that would be not be materialized.
+    dimensionsSplitOrder = sanitizeSplitOrder(dimensionsSplitOrder, skipMaterializationForDimensions);
+
     LOG.debug("Split order:{}", dimensionsSplitOrder);
     long start = System.currentTimeMillis();
     dataBuffer.flush();
@@ -337,8 +370,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
   private List<String> computeDefaultSplitOrder() {
     ArrayList<String> defaultSplitOrder = new ArrayList<>();
-    //include only the dimensions not time column
-    defaultSplitOrder.addAll(dimensionNames);
+    //include only the dimensions not time column. Also, assumes that skipMaterializationForDimensions is built.
+    for (String dimensionName : dimensionNames) {
+      if (skipMaterializationForDimensions != null && !skipMaterializationForDimensions.contains(dimensionName)) {
+        defaultSplitOrder.add(dimensionName);
+      }
+    }
     if (timeColumnName != null) {
       defaultSplitOrder.remove(timeColumnName);
     }
@@ -350,6 +387,18 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     });
     return defaultSplitOrder;
   }
+
+
+  private Set<String> computeDefaultDimensionsToSkipMaterialization() {
+    Set<String> skipDimensions = new HashSet<String>();
+    for (String dimensionName : dimensionNames) {
+      if (dictionaryMap.get(dimensionName).size() > skipMaterializationCardinalityThreshold) {
+        skipDimensions.add(dimensionName);
+      }
+    }
+    return skipDimensions;
+  }
+
 
   /*
    * Sorts the file on all dimensions
@@ -514,7 +563,9 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       byte[] metricBuffer = next.getRight();
       DimensionBuffer dimensions = DimensionBuffer.fromBytes(dimensionBuffer);
       for (int i = 0; i < numDimensions; i++) {
-        if (i == splitDimensionId) {
+        String dimensionName = dimensionNameToIndexMap.inverse().get(i);
+        if (i == splitDimensionId || (skipMaterializationForDimensions != null &&
+            skipMaterializationForDimensions.contains(dimensionName))) {
           dos.writeInt(StarTreeIndexNode.all());
         } else {
           dos.writeInt(dimensions.getDimension(i));
@@ -683,4 +734,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     return dimensionNameToIndexMap;
   }
 
+  @Override
+  public Set<String> getSkipMaterializationForDimensions() {
+    return skipMaterializationForDimensions;
+  }
 }

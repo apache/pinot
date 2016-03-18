@@ -93,6 +93,10 @@ public class V1Constants {
       public static final String STAR_TREE_MAX_LEAF_RECORDS = "startree.max.leaf.records";
       public static final String STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS =
           "startree.skip.star.node.creation.for.dimensions";
+      public static final String STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS =
+          "star.tree.skip.materialization.for.dimensions";
+      public static final String STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY =
+          "star.tree.skip.materialization.cardinality";
     }
 
     public static class Segment {

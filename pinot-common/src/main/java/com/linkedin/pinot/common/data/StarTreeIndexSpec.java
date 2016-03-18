@@ -23,6 +23,7 @@ import java.util.Set;
 
 public class StarTreeIndexSpec {
   public static final Integer DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
+  public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
 
   /** The upper bound on the number of leaf records to be scanned for any query */
   private Integer maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
@@ -32,6 +33,8 @@ public class StarTreeIndexSpec {
 
   /** Dimensions for which to exclude star nodes at split. */
   private Set<String> skipStarNodeCreationForDimensions = Collections.emptySet();
+  private Set<String> _skipMaterializationForDimensions;
+  private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
   public StarTreeIndexSpec() {}
 
@@ -57,6 +60,22 @@ public class StarTreeIndexSpec {
 
   public Set<String> getSkipStarNodeCreationForDimensions() {
     return skipStarNodeCreationForDimensions;
+  }
+
+  public Set<String> getskipMaterializationForDimensions() {
+    return _skipMaterializationForDimensions;
+  }
+
+  public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
+    _skipMaterializationForDimensions = skipMaterializationForDimensions;
+  }
+
+  public int getskipMaterializationCardinalityThreshold() {
+    return skipMaterializationCardinalityThreshold;
+  }
+
+  public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
+    this.skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
   @Override

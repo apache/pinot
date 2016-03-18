@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.io.File;
 import java.util.List;
 
@@ -33,6 +34,12 @@ public class StarTreeBuilderConfig {
   File outDir;
 
   private Set<String> skipStarNodeCreationForDimensions;
+  private Set<String> _skipMaterializationFroDimensions;
+  private int _skipMaterializationCardinalityThreshold =
+      StarTreeIndexSpec.DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
+
+  public StarTreeBuilderConfig() {
+  }
 
   public File getOutDir() {
     return outDir;
@@ -70,8 +77,34 @@ public class StarTreeBuilderConfig {
     this.skipStarNodeCreationForDimensions = excludedStarDimensions;
   }
 
-  /** Set of dimension names for which not to create star nodes at split. */
+  public int getSkipMaterializationCardinalityThreshold() {
+    return _skipMaterializationCardinalityThreshold;
+  }
+
+  public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
+    _skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
+  }
+
+  /**
+   * Get of dimension names for which not to create star nodes at split.
+   */
   public Set<String> getSkipStarNodeCreationForDimensions() {
     return skipStarNodeCreationForDimensions;
+  }
+
+  /**
+   * Get the set of dimension names that should be skipped from materialization.
+   * @return
+   */
+  public Set<String> getSkipMaterializationForDimensions() {
+    return _skipMaterializationFroDimensions;
+  }
+
+  /**
+   * Set the set of dimensions for which to skip materialization
+   * @param skipMaterializationForDimensions
+   */
+  public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
+    _skipMaterializationFroDimensions = skipMaterializationForDimensions;
   }
 }

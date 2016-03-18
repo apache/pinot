@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -54,6 +53,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.slf4j.Logger;
@@ -156,6 +156,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setDimensionsSplitOrder(dimensionsSplitOrder);
     starTreeBuilderConfig.setMaxLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
     starTreeBuilderConfig.setSkipStarNodeCreationForDimensions(starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
+    Set<String> skipMaterializationForDimensions = starTreeIndexSpec.getskipMaterializationForDimensions();
+    starTreeBuilderConfig.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
+    starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
     //initialize star tree builder
     StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder();
@@ -206,6 +209,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // This is required so the dimensionsSplitOrder used by the builder can be written into the segment metadata.
     if (dimensionsSplitOrder == null || dimensionsSplitOrder.isEmpty()) {
       starTreeIndexSpec.setDimensionsSplitOrder(starTreeBuilder.getDimensionsSplitOrder());
+    }
+
+    if (skipMaterializationForDimensions == null || skipMaterializationForDimensions.isEmpty()) {
+      starTreeIndexSpec.setSkipMaterializationForDimensions(starTreeBuilder.getSkipMaterializationForDimensions());
     }
 
     serializeTree(starTreeBuilder);

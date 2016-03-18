@@ -18,8 +18,10 @@ package com.linkedin.pinot.core.startree;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -35,20 +37,26 @@ import com.linkedin.pinot.core.data.GenericRow;
 
 
 public class TestOffheapStarTreeBuilder {
-  @Test
-  public void testSimple() throws Exception {
-    int numDimensions = 3;
-    int numMetrics = 2;
+
+  private void testSimpleCore(int numDimensions, int numMetrics, int numSkipMaterializationDimensions) throws Exception {
     int ROWS = (int) MathUtils.factorial(numDimensions);
     StarTreeBuilderConfig builderConfig = new StarTreeBuilderConfig();
     Schema schema = new Schema();
     builderConfig.dimensionsSplitOrder = new ArrayList<>();
+    builderConfig.setSkipMaterializationForDimensions(new HashSet<String>());
+    Set<String> skipMaterializationForDimensions = builderConfig.getSkipMaterializationForDimensions();
     for (int i = 0; i < numDimensions; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
       schema.addField(dimName, dimensionFieldSpec);
-      builderConfig.dimensionsSplitOrder.add(dimName);
+
+      if (i < (numDimensions - numSkipMaterializationDimensions)) {
+        builderConfig.dimensionsSplitOrder.add(dimName);
+      } else {
+        builderConfig.getSkipMaterializationForDimensions().add(dimName);
+      }
     }
+
     schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < numMetrics; i++) {
       String metricName = "m" + (i + 1);
@@ -79,12 +87,43 @@ public class TestOffheapStarTreeBuilder {
     builder.build();
     int totalDocs = builder.getTotalRawDocumentCount() + builder.getTotalAggregateDocumentCount();
     Iterator<GenericRow> iterator = builder.iterator(0, totalDocs);
-    while(iterator.hasNext()){
-      System.out.println(iterator.next());
+    while(iterator.hasNext()) {
+      GenericRow row = iterator.next();
+      System.out.println(row);
     }
+
+    iterator = builder.iterator(builder.getTotalRawDocumentCount(), totalDocs);
+    while (iterator.hasNext()) {
+      GenericRow row = iterator.next();
+      for (String skipDimension : skipMaterializationForDimensions) {
+        String rowValue = (String) row.getValue(skipDimension);
+        assert(rowValue.equals("ALL"));
+      }
+    }
+
     FileUtils.deleteDirectory(builderConfig.outDir);
   }
-  
+
+  /**
+   * Test the star tree builder.
+   * @throws Exception
+   */
+  @Test
+  public void testSimple()
+      throws Exception {
+    testSimpleCore(3, 2, 0);
+  }
+
+  /**
+   * Test the star tree builder with some dimensions to be skipped from materialization.
+   * @throws Exception
+   */
+  @Test
+  public void testSkipMaterialization()
+      throws Exception {
+    testSimpleCore(6, 2, 2);
+  }
+
   @Test
   public void testRandom() throws Exception {
     int ROWS = 100;
