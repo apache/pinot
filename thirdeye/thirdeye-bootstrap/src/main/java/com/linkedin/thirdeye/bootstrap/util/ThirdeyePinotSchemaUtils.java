@@ -61,11 +61,13 @@ public class ThirdeyePinotSchemaUtils {
     }
     TimeGranularitySpec incoming =
         new TimeGranularitySpec(DataType.LONG,
-            new TimeGranularity(starTreeConfig.getTime().getBucket().getSize(), starTreeConfig.getTime().getBucket().getUnit()),
+            starTreeConfig.getTime().getBucket().getSize(),
+            starTreeConfig.getTime().getBucket().getUnit(),
             starTreeConfig.getTime().getColumnName());
     TimeGranularitySpec outgoing =
         new TimeGranularitySpec(DataType.LONG,
-            new TimeGranularity(starTreeConfig.getTime().getBucket().getSize(), starTreeConfig.getTime().getBucket().getUnit()),
+            starTreeConfig.getTime().getBucket().getSize(),
+            starTreeConfig.getTime().getBucket().getUnit(),
             starTreeConfig.getTime().getColumnName());
 
     FieldSpec fieldSpec = new TimeFieldSpec(incoming, outgoing);

@@ -39,9 +39,9 @@ public class TimeFieldSpec extends FieldSpec {
   }
 
 
-  public TimeFieldSpec(String name, DataType dType, TimeGranularity timeGranularity) {
+  public TimeFieldSpec(String name, DataType dType, int size, TimeUnit timeType) {
     super(name, FieldType.TIME, dType, true);
-    this.incomingGranularitySpec = new TimeGranularitySpec(dType, timeGranularity, name);
+    this.incomingGranularitySpec = new TimeGranularitySpec(dType, size, timeType, name);
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 

@@ -39,10 +39,10 @@ public class TimeGranularitySpec {
     this.name = name;
   }
 
-  public TimeGranularitySpec(DataType dataType, TimeGranularity timeGranularity, String name) {
+  public TimeGranularitySpec(DataType dataType, int size, TimeUnit timeType, String name) {
     this.dataType = dataType;
-    this.timeType = timeGranularity.getTimeUnit();
-    this.size = timeGranularity.getSize();
+    this.timeType = timeType;
+    this.size = size;
     this.name = name;
   }
 
