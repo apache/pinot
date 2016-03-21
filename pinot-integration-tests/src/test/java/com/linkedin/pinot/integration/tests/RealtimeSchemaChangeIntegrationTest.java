@@ -47,7 +47,7 @@ public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrat
 
     // Create the table with a different schema than the final one
     addRealtimeTable(tableName, timeColumnName, timeColumnType, 900, "Days", kafkaZkUrl, kafkaTopic,
-        schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH);
+        schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier");
 
     // Sleep for a little bit to get some events in the realtime table
     Uninterruptibles.sleepUninterruptibly(15L, TimeUnit.SECONDS);

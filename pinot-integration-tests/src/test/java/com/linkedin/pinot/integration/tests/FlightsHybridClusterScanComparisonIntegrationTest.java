@@ -44,6 +44,11 @@ public class FlightsHybridClusterScanComparisonIntegrationTest extends HybridClu
   }
 
   @Override
+  protected String getSortedColumn() {
+    return "DaysSinceEpoch";
+  }
+
+  @Override
   protected void extractAvroIfNeeded() throws IOException {
     // Unpack the Avro files
     try {

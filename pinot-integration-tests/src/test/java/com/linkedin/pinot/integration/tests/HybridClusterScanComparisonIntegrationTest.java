@@ -119,6 +119,8 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   protected abstract String getTimeColumnType();
 
+  protected abstract String getSortedColumn();
+
   @Override
   @BeforeClass
   public void setUp() throws Exception {
@@ -150,7 +152,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
     // Create Pinot table
     setUpTable("mytable", getTimeColumnName(), getTimeColumnType(), KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        _schemaFile, avroFiles.get(0), invertedIndexColumns);
+        _schemaFile, avroFiles.get(0), getSortedColumn(), invertedIndexColumns);
 
     final List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
     final List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
@@ -404,7 +406,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     // Recreate the realtime table
     addRealtimeTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 900, "Days", KafkaStarterUtils.DEFAULT_ZK_STR,
         KAFKA_TOPIC, _schema.getSchemaName(), "TestTenant", "TestTenant",
-        _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, new ArrayList<String>());
+        _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, getSortedColumn(), new ArrayList<String>());
   }
 
   @Override
