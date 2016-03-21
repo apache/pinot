@@ -93,7 +93,7 @@ public class AggregationGroupByOperatorTest {
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
-  public static int _numAggregations = 6;
+  public static int _numAggregations = 7;
 
   public Map<String, ColumnMetadata> _medataMap;
   public static GroupBy _groupBy;
@@ -483,8 +483,10 @@ public class AggregationGroupByOperatorTest {
         .toString());
     Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
         .toString());
+    Assert.assertEquals("minMaxRange_met_impressionCount", brokerResponse.getAggregationResults().get(5).getString("function")
+        .toString());
     Assert.assertEquals("distinctCount_column12",
-        brokerResponse.getAggregationResults().get(5).getString("function").toString());
+        brokerResponse.getAggregationResults().get(6).getString("function").toString());
   }
 
   private void assertEmptyBrokerResponse(BrokerResponseJSON brokerResponse) throws JSONException {
@@ -507,6 +509,7 @@ public class AggregationGroupByOperatorTest {
     aggregationResultList.add(getMaxResult());
     aggregationResultList.add(getMinResult());
     aggregationResultList.add(getAvgResult());
+    aggregationResultList.add(getMinMaxRangeResult());
     aggregationResultList.add(getDistinctCountResult());
     return aggregationResultList;
   }
@@ -518,6 +521,7 @@ public class AggregationGroupByOperatorTest {
     groupResults.add(getMaxGroupResult());
     groupResults.add(getMinGroupResult());
     groupResults.add(getAvgGroupResult());
+    groupResults.add(getMinMaxRangeGroupResult());
     groupResults.add(getDistinctCountGroupResult());
     return groupResults;
   }
@@ -562,6 +566,14 @@ public class AggregationGroupByOperatorTest {
     return new String[] { "[\"U\",\"yhq\"]", "[\"U\",\"mNh\"]", "[\"U\",\"Vj\"]", "[\"U\",\"OYMU\"]", "[\"U\",\"zZe\"]", "[\"U\",\"jb\"]", "[\"D\",\"aN\"]", "[\"U\",\"bVnY\"]", "[\"U\",\"iV\"]", "[\"i\",\"LjAS\"]", "[\"D\",\"xDLG\"]", "[\"U\",\"EXYv\"]", "[\"D\",\"iV\"]", "[\"D\",\"Gac\"]", "[\"D\",\"QMl\"]" };
   }
 
+  private static double[] getMinMaxRangeResult() {
+    return new double[] { 8023137590212612100.00000, 8023137590212612100.00000, 8023137590212612100.00000, 8023137590212612100.00000, 8023137590212612100.00000, 8023137590212612100.00000, 8023137590212612100.00000, 8023137590212612100.00000, 7589238585770968100.00000, 7589238585770968100.00000, 7589238585770968100.00000, 4934060917342722000.00000, 4934060917342722000.00000, 4934060917342722000.00000, 4934060917342722000.00000 };
+  }
+
+  private static String[] getMinMaxRangeGroupResult() {
+    return new String[] { "[\"i\",\"yhq\"]", "[\"i\",\"VsKz\"]", "[\"i\",\"mNh\"]", "[\"D\",\"Gac\"]", "[\"D\",\"CqC\"]", "[\"U\",\"\"]", "[\"D\",\"\"]", "[\"i\",\"jb\"]", "[\"i\",\"QMl\"]", "[\"D\",\"bVnY\"]", "[\"i\",\"\"]", "[\"i\",\"Pcb\"]", "[\"i\",\"EXYv\"]", "[\"i\",\"CqC\"]", "[\"i\",\"zZe\"]" };
+  }
+
   private static double[] getDistinctCountResult() {
     return new double[] { 128, 109, 100, 99, 84, 81, 77, 76, 75, 74, 71, 67, 67, 62, 57 };
   }
@@ -578,6 +590,7 @@ public class AggregationGroupByOperatorTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getMinMaxRangeAggregationInfo());
     aggregationsInfo.add(getDistinctCountAggregationInfo("column12"));
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
@@ -591,6 +604,7 @@ public class AggregationGroupByOperatorTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getMinMaxRangeAggregationInfo());
     aggregationsInfo.add(getDistinctCountAggregationInfo("column12"));
     return aggregationsInfo;
   }
@@ -653,6 +667,16 @@ public class AggregationGroupByOperatorTest {
     return aggregationInfo;
   }
 
+  private static AggregationInfo getMinMaxRangeAggregationInfo() {
+    final String type = "minMaxRange";
+    final Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "met_impressionCount");
+    final AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
+
   private static AggregationInfo getDistinctCountAggregationInfo(String dim) {
     final String type = "distinctCount";
     final Map<String, String> params = new HashMap<String, String>();
@@ -682,6 +706,7 @@ public class AggregationGroupByOperatorTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getMinMaxRangeAggregationInfo());
     aggregationsInfo.add(getDistinctCountAggregationInfo("column12"));
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
@@ -722,6 +747,7 @@ public class AggregationGroupByOperatorTest {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getMinMaxRangeAggregationInfo());
     aggregationsInfo.add(getDistinctCountAggregationInfo("column12"));
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
