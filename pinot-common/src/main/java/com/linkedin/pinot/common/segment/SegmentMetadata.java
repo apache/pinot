@@ -75,7 +75,7 @@ public interface SegmentMetadata {
   public int getTotalDocs();
 
   /**
-   * 
+   *
    * @return
    */
   int getTotalRawDocs();
@@ -114,6 +114,12 @@ public interface SegmentMetadata {
 
   /** Returns true if the segment has a StarTree index defined */
   public boolean hasStarTree();
+
+  /**
+   * Returns the StarTreeMetadata for the segment
+   * @return
+   */
+  public StarTreeMetadata getStarTreeMetadata();
 
   /**
    * returns the forward Index file name with appropriate extension for a given version

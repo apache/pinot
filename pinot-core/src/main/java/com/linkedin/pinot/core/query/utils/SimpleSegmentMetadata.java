@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.utils;
 
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -165,6 +166,11 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public boolean hasStarTree() {
     return false;
+  }
+
+  @Override
+  public StarTreeMetadata getStarTreeMetadata() {
+    return null;
   }
 
   @Override

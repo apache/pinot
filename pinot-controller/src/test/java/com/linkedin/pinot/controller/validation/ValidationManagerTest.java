@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -433,6 +434,11 @@ public class ValidationManagerTest {
     @Override
     public boolean hasStarTree() {
       return false;
+    }
+
+    @Override
+    public StarTreeMetadata getStarTreeMetadata() {
+      return null;
     }
 
     @Override

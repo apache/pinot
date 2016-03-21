@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.io.File;
 import java.io.IOException;
@@ -424,6 +425,11 @@ public class RetentionManagerTest {
       @Override
       public boolean hasStarTree() {
         return false;
+      }
+
+      @Override
+      public StarTreeMetadata getStarTreeMetadata() {
+        return null;
       }
 
       @Override

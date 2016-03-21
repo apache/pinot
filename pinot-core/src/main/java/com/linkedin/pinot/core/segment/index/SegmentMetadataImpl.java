@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -28,9 +29,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -65,6 +68,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
+  private StarTreeMetadata _starTreeMetadata = null;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
@@ -240,6 +244,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // StarTree config here
     _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
+    if (_hasStarTree) {
+      initStarTreeMetadata();
+    }
 
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
 
@@ -249,6 +256,58 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     for (final String column : _columnMetadataMap.keySet()) {
       _schema.addField(column, _columnMetadataMap.get(column).toFieldSpec());
+    }
+  }
+
+  /**
+   * Reads and initializes the star tree metadata from segment metadata properties.
+   */
+  private void initStarTreeMetadata() {
+    _starTreeMetadata = new StarTreeMetadata();
+
+    // Set the maxLeafRecords
+    String maxLeafRecordsString =
+        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+    if (maxLeafRecordsString != null) {
+      _starTreeMetadata.setMaxLeafRecords(Long.valueOf(maxLeafRecordsString));
+    }
+
+    // Set the splitOrder
+    Iterator<String> iterator =
+        _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.STAR_TREE_SPLIT_ORDER).iterator();
+    List<String> splitOrder = new ArrayList<String>();
+    while (iterator.hasNext()) {
+      final String splitColumn = iterator.next();
+      splitOrder.add(splitColumn);
+    }
+    _starTreeMetadata.setDimensionsSplitOrder(splitOrder);
+
+    // Set dimensions for which star node creation is to be skipped.
+    iterator = _segmentMetadataPropertiesConfiguration.getList(
+        MetadataKeys.StarTree.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS).iterator();
+    List<String> skipStarNodeCreationForDimensions = new ArrayList<String>();
+    while (iterator.hasNext()) {
+      final String column = iterator.next();
+      skipStarNodeCreationForDimensions.add(column);
+    }
+    _starTreeMetadata.setSkipStarNodeCreationForDimensions(skipStarNodeCreationForDimensions);
+
+    // Set dimensions for which to skip materialization.
+    iterator = _segmentMetadataPropertiesConfiguration.getList(
+        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS).iterator();
+    List<String> skipMaterializationForDimensions = new ArrayList<String>();
+
+    while (iterator.hasNext()) {
+      final String column = iterator.next();
+      skipMaterializationForDimensions.add(column);
+    }
+    _starTreeMetadata.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
+
+    // Skip skip materialization cardinality.
+    String skipMaterializationCardinalityString = _segmentMetadataPropertiesConfiguration.getString(
+        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
+    if (skipMaterializationCardinalityString != null) {
+      _starTreeMetadata.setSkipMaterializationCardinality(Long.valueOf(skipMaterializationCardinalityString));
     }
   }
 
@@ -404,6 +463,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public boolean hasStarTree() {
     return _hasStarTree;
+  }
+
+  @Override
+  public StarTreeMetadata getStarTreeMetadata() {
+    return _starTreeMetadata;
   }
 
   @Override
