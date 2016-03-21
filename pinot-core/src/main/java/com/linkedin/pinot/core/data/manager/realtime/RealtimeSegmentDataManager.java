@@ -330,9 +330,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return;
         }
         segmentLogger.info(
-            "Stopped indexing due to reaching segment limit: {} raw documents indexed, segment is aged {}"
-                + realtimeSegment.getRawDocumentCount() + ((System.currentTimeMillis() - start)
-                / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
+            "Stopped indexing due to reaching segment limit: {} raw documents indexed, segment is aged {} minutes"
+                , realtimeSegment.getRawDocumentCount() , ((System.currentTimeMillis() - start)
+                / (ONE_MINUTE_IN_MILLSEC)));
         keepIndexing = false;
       }
     }
