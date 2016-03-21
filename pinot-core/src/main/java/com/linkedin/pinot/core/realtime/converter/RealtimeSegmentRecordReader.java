@@ -23,22 +23,24 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-
 // TODO Implement null counting if needed.
 public class RealtimeSegmentRecordReader extends BaseRecordReader {
 
+  private final Schema dataSchema;
+  private final List<String> columns;
+  private final String sortedColumn;
+
   private RealtimeSegmentImpl realtimeSegment;
-  private Schema dataSchema;
-  private List<String> columns;
-  int counter = 0;
-  private final Iterator<Integer> docIdIterator;
+  private int counter = 0;
+  private Iterator<Integer> docIdIterator = null;
 
   public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema) {
     super();
     super.initNullCounters(schema);
     this.realtimeSegment = rtSegment;
     this.dataSchema = schema;
-    columns = new ArrayList<String>();
+    this.columns = new ArrayList<String>();
+    this.sortedColumn = null;
     this.docIdIterator = null;
   }
 
@@ -48,6 +50,7 @@ public class RealtimeSegmentRecordReader extends BaseRecordReader {
     this.realtimeSegment = rtSegment;
     this.dataSchema = schema;
     columns = new ArrayList<String>();
+    this.sortedColumn = sortedColumn;
     this.docIdIterator = realtimeSegment.getSortedDocIdIteratorOnColumn(sortedColumn);
   }
 
@@ -60,7 +63,11 @@ public class RealtimeSegmentRecordReader extends BaseRecordReader {
 
   @Override
   public void rewind() throws Exception {
-    counter = 0;
+    if (docIdIterator == null) {
+      counter = 0;
+    } else {
+      this.docIdIterator = realtimeSegment.getSortedDocIdIteratorOnColumn(this.sortedColumn);
+    }
   }
 
   @Override
