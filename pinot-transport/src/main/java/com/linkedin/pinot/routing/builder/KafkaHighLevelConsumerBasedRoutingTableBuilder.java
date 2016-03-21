@@ -49,7 +49,7 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTa
     for (String segment : segments) {
       Map<String, String> instanceMap = externalView.getStateMap(segment);
       for (String instance : instanceMap.keySet()) {
-        if (instanceMap.get(instance).equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)
+        if (!instanceMap.get(instance).equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
             || pruner.isInactive(instance)) {
           continue;
         }
