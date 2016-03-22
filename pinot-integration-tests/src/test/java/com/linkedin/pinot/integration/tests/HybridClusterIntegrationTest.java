@@ -69,11 +69,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private KafkaServerStartable kafkaStarter;
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile, List<String> invertedIndexColumns) throws Exception {
+      String kafkaTopic, File schemaFile, File avroFile, String sortedColumn, List<String> invertedIndexColumns)
+      throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, invertedIndexColumns);
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns);
   }
 
   protected void setSegmentCount(int segmentCount) {
@@ -115,7 +116,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create Pinot table
     setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
-        avroFiles.get(0), null);
+        avroFiles.get(0), "Carrier", null);
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
