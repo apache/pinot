@@ -513,7 +513,7 @@ public class SelectionOperatorUtils {
    * @return
    * @throws JSONException
    */
-  private static Serializable[] getFormattedRow(Serializable[] inputValues, List<String> selectionColumns,
+  public static Serializable[] getFormattedRow(Serializable[] inputValues, List<String> selectionColumns,
       DataSchema dataSchema)
       throws JSONException {
     Serializable[] formattedRow = new Serializable[inputValues.length];
