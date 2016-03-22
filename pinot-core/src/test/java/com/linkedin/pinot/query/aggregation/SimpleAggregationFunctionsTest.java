@@ -36,8 +36,9 @@ import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFuncti
 import com.linkedin.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction.MinMaxRangePair;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
-
 
 public class SimpleAggregationFunctionsTest {
 
@@ -77,14 +78,14 @@ public class SimpleAggregationFunctionsTest {
       List<Serializable> aggregationResults = getLongValues(i);
       List<Serializable> combinedResults = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
 
-      assertEquals(((Number)combinedResults.get(0)).longValue(), (long) (((i - 1) * i) / 2));
+      assertEquals(((Number) combinedResults.get(0)).longValue(), (long) (((i - 1) * i) / 2));
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> combinedResults = getLongValues(i);
       Serializable reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals(((Number)reduceResults).longValue(), (long) ((i - 1) * i) / 2);
+      assertEquals(((Number) reduceResults).longValue(), (long) ((i - 1) * i) / 2);
     }
   }
 
@@ -177,6 +178,29 @@ public class SimpleAggregationFunctionsTest {
   }
 
   @Test
+  public void testMinMaxRangeAggregation() {
+    AggregationFunction aggregationFunction = new MinMaxRangeAggregationFunction();
+    aggregationFunction.init(_paramsInfo);
+
+    // Test aggregate
+
+    // Test combine
+    for (int i = 1; i <= _sizeOfCombineList; ++i) {
+      List<Serializable> aggregationResults = getMinMaxRangePairValues(i);
+      List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
+      MinMaxRangePair retMinMaxRangePair = (MinMaxRangePair) combinedResult.get(0);
+      assertEquals(retMinMaxRangePair.getSecond() - retMinMaxRangePair.getFirst(), (double) i);
+    }
+
+    // Test reduce
+    for (int i = 1; i <= _sizeOfCombineList; ++i) {
+      List<Serializable> combinedResults = getMinMaxRangePairValues(i);
+      Serializable reduceResult = aggregationFunction.reduce(combinedResults);
+      assertEquals(reduceResult, (double) i);
+    }
+  }
+
+  @Test
   public void testDistinctCountAggregation() {
     AggregationFunction aggregationFunction = new DistinctCountAggregationFunction();
     aggregationFunction.init(_paramsInfo);
@@ -221,6 +245,15 @@ public class SimpleAggregationFunctionsTest {
       avgPairList.add(aggregationFunction.getAvgPair(i, i));
     }
     return avgPairList;
+  }
+
+  private static List<Serializable> getMinMaxRangePairValues(int numberOfElements) {
+    List<Serializable> minMaxRangePairList = new ArrayList<Serializable>();
+    MinMaxRangeAggregationFunction aggregationFunction = new MinMaxRangeAggregationFunction();
+    for (int i = 1; i <= numberOfElements; ++i) {
+      minMaxRangePairList.add(aggregationFunction.getMinMaxRangePair(0, i));
+    }
+    return minMaxRangePairList;
   }
 
   private static List<Serializable> getIntOpenHashSets(int numberOfElements) {

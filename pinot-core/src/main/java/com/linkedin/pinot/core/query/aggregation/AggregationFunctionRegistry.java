@@ -28,6 +28,8 @@ import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationNoDictionaryFunction;
+import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
@@ -55,6 +57,7 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithDictionary.put("min", MinAggregationFunction.class);
     keyToFunctionWithDictionary.put("sum", SumAggregationFunction.class);
     keyToFunctionWithDictionary.put("avg", AvgAggregationFunction.class);
+    keyToFunctionWithDictionary.put("minmaxrange", MinMaxRangeAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcount", DistinctCountAggregationFunction.class);
     keyToFunctionWithDictionary.put("distinctcounthll", DistinctCountHLLAggregationFunction.class);
     // quantiles
@@ -73,6 +76,7 @@ public class AggregationFunctionRegistry {
     keyToFunctionWithoutDictionary.put("min", MinAggregationNoDictionaryFunction.class);
     keyToFunctionWithoutDictionary.put("sum", SumAggregationNoDictionaryFunction.class);
     keyToFunctionWithoutDictionary.put("avg", AvgAggregationNoDictionaryFunction.class);
+    keyToFunctionWithoutDictionary.put("minmaxrange", MinMaxRangeAggregationNoDictionaryFunction.class);
     keyToFunctionWithoutDictionary.put("distinctcount", DistinctCountAggregationNoDictionaryFunction.class);
   }
 
