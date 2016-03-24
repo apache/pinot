@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
 import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
 
 /**
@@ -31,15 +30,12 @@ import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
 public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
   private final Operator _filterOperator;
-  private final int _docSize;
   private BlockDocIdIterator _currentBlockDocIdIterator;
   private Block _currentBlock;
   private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
   private final int _maxSizeOfdocIdSet;
   private final int[] _docIdArray;
-  private int _pos = 0;
-  private int _searchableDocIdSize = 0;
   boolean inited = false;
 
   public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize,
@@ -47,8 +43,6 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
     _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
     _docIdArray = new int[_maxSizeOfdocIdSet];
     _filterOperator = filterOperator;
-    _docSize = docSize;
-
   }
 
   @Override
@@ -70,23 +64,18 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
       _currentBlock = _filterOperator.nextBlock();
       _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
     }
-    _pos = 0;
-    getNextDoc();
-    while (_currentDoc != Constants.EOF) {
-      _docIdArray[_pos++] = _currentDoc;
-      if (_pos == _maxSizeOfdocIdSet) {
-        _searchableDocIdSize = _pos;
-        _currentDocIdSetBlock = new DocIdSetBlock(_docIdArray, _pos);
-        return _currentDocIdSetBlock;
+    int pos = 0;
+    for (int i = 0; i < _maxSizeOfdocIdSet; i++) {
+      _currentDoc = _currentBlockDocIdIterator.next();
+      if (_currentDoc == Constants.EOF) {
+        break;
       }
-      getNextDoc();
+      _docIdArray[pos++] = _currentDoc;
+
     }
-    if (_pos > 0) {
-      _searchableDocIdSize = _pos;
-      _currentDocIdSetBlock = new DocIdSetBlock(_docIdArray, _pos);
-      return _currentDocIdSetBlock;
+    if (pos > 0) {
+      _currentDocIdSetBlock = new DocIdSetBlock(_docIdArray, pos);
     }
-    _currentDocIdSetBlock = null;
     return _currentDocIdSetBlock;
   }
 
@@ -98,27 +87,6 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   @Override
   public String getOperatorName() {
     return "BReusableFilteredDocIdSetOperator";
-  }
-
-  private int getNextDoc() {
-    if (_currentDoc == Constants.EOF) {
-      return _currentDoc;
-    }
-    while ((_currentBlockDocIdIterator == null)
-        || ((_currentDoc = _currentBlockDocIdIterator.next()) == Constants.EOF)) {
-      if (_filterOperator != null) {
-        _currentBlock = _filterOperator.nextBlock();
-      } else {
-        if (_currentDoc == Constants.EOF) {
-          _currentBlock = null;
-        }
-      }
-      if (_currentBlock == null) {
-        return Constants.EOF;
-      }
-      _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
-    }
-    return _currentDoc;
   }
 
   @Override

@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
@@ -153,8 +154,10 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       JSONObject response = postQuery(query);
       actualRecordCount = response.getInt("totalDocs");
 
-      LOGGER.info("Actual record count: " + actualRecordCount + "\tExpected count: " + expectedRecordCount);
-      Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
+      String msg = "Actual record count: " + actualRecordCount + "\tExpected count: " + expectedRecordCount;
+      LOGGER.info(msg);
+      Assert.assertTrue(System.currentTimeMillis() < deadline,
+          "Failed to read all records within the deadline.  " + msg);
       Thread.sleep(2000L);
     } while (expectedRecordCount != actualRecordCount);
   }
@@ -234,8 +237,8 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     waitForExternalViewUpdate();
 
     // Wait until all docs are available, this is required because the broker routing tables may not be updated yet.
-    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 10000L);
-    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 100000L);
+    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 15000L);
+    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 15000L);
 
     // Initialize the query generator
     SegmentInfoProvider dictionaryReader = new SegmentInfoProvider(_tarredSegmentsDir.getAbsolutePath());
@@ -303,14 +306,17 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
   @Test
   public void testHardCodedQueries() {
+    BufferedReader queryReader = null;
     try {
-      BufferedReader queryReader = new BufferedReader(new FileReader(_queryFile));
+      queryReader = new BufferedReader(new FileReader(_queryFile));
       String starQuery;
       while ((starQuery = queryReader.readLine()) != null) {
         testOneQuery(starQuery, true);
       }
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
+    } finally {
+      IOUtils.closeQuietly(queryReader);
     }
   }
 }
