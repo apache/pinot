@@ -391,7 +391,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
 
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      rep = deleteSegment(tableName, segmentName);
+      rep = deleteOneSegment(tableName, segmentName);
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
@@ -402,26 +402,29 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   }
 
   @HttpVerb("delete")
-  @Summary("Deletes a segment from a table")
+  @Summary("Delete a segment from a table")
   @Tags({"segment", "table"})
-  @Paths({
-      "/segments/{tableName}/{segmentName}/",
-      "/segments/{tableName}/{segmentName}",
-      "/segments/{tableName}/",
-      "/segments/{tableName}"
-  })
-  private Representation deleteSegment(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides", required = true)
-      String tableName,
-      @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete", required = false)
-      String segmentName)
+  @Paths({ "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/" })
+  private Representation deleteOneSegment(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
+          required = true) String tableName,
+      @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
+          required = true) String segmentName)
       throws JsonProcessingException, JSONException {
-    if (tableName == null) {
-      throw new RuntimeException("either table name or segment name is null");
-    }
 
-    PinotSegmentRestletResource segmentRestletResource = new PinotSegmentRestletResource();
-    return segmentRestletResource.toggleSegmentState(tableName, segmentName, "drop", null);
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", null);
+  }
+
+  @HttpVerb("delete")
+  @Summary("Delete *ALL* segments from a table")
+  @Tags({"segment", "table"})
+  @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
+  private Representation deleteAllSegments(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
+          required = true) String tableName)
+      throws JsonProcessingException, JSONException {
+
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", null);
   }
 
   public String constructDownloadUrl(String tableName, String segmentName) {

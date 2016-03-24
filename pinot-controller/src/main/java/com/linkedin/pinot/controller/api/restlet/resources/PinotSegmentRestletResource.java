@@ -130,9 +130,10 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/metadata", "/tables/{tableName}/segments/metadata/" })
   private Representation getAllSegmentsMetadataForTable(
-      @Parameter(name = "tableName", in = "path",
-          description = "The name of the table for which to list segment metadata", required = true) String tableName,
-      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}", required = false) String tableType)
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segment metadata",
+          required = true) String tableName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = false) String tableType)
       throws JSONException, JsonProcessingException {
 
     JSONArray ret = new JSONArray();
@@ -160,22 +161,61 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   }
 
   /**
-   * Toggle state of provided segment between {enable|disable|drop}. If segmentName not provided,
-   * toggles the state for all segments of the table.
+   * Toggle state of provided segment between {enable|disable|drop}.
    *
    * @throws JsonProcessingException
    * @throws JSONException
    */
   @HttpVerb("get")
-  @Summary("Enable, disable or drop specified or all segments")
+  @Summary("Enable, disable or drop a segment from a table")
   @Tags({ "segment", "table" })
-  @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/", "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
-  protected Representation toggleSegmentState(@Parameter(name = "tableName", in = "path",
-      description = "The name of the table to which segment belongs", required = true) String tableName, @Parameter(
-      name = "segmentName", in = "path", description = "Segment to enable, disable or drop", required = false) String segmentName,
+  @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/" })
+  protected Representation toggleOneSegmentState(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table to which segment belongs",
+          required = true) String tableName,
+      @Parameter(name = "segmentName", in = "path", description = "Segment to enable, disable or drop",
+          required = true) String segmentName,
       @Parameter(name = "state", in = "query", description = "state to set for segment {enable|disable|drop}",
-          required = true) String state, @Parameter(name = "type", in = "query",
-          description = "Type of table {offline|realtime}", required = false) String tableType)
+          required = true) String state,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = false) String tableType)
+      throws JsonProcessingException, JSONException {
+    return toggleSegmentState(tableName, segmentName, state, tableType);
+  }
+
+  /**
+   * Toggle state of provided segment between {enable|disable|drop}.
+   *
+   * @throws JsonProcessingException
+   * @throws JSONException
+   */
+  @HttpVerb("get")
+  @Summary("Enable, disable or drop *ALL* segments from a table")
+  @Tags({ "segment", "table" })
+  @Paths({ "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
+  protected Representation toggleAllSegmentsState(
+        @Parameter(name = "tableName", in = "path", description = "The name of the table to which segment belongs",
+            required = true) String tableName,
+        @Parameter(name = "state", in = "query", description = "state to set for segment {enable|disable|drop}",
+            required = true) String state,
+        @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+            required = false) String tableType)
+        throws JsonProcessingException, JSONException {
+    return toggleSegmentState(tableName, null, state, tableType);
+  }
+
+  /**
+   * Handler to toggle state of segment for a given table.
+   *
+   * @param tableName: External name for the table
+   * @param segmentName: Segment to set the state for
+   * @param state: Value of state to set
+   * @param tableType: Offline or realtime
+   * @return
+   * @throws JsonProcessingException
+   * @throws JSONException
+   */
+  protected Representation toggleSegmentState(String tableName, String segmentName, String state, String tableType)
       throws JsonProcessingException, JSONException {
 
     JSONArray ret = new JSONArray();
@@ -242,11 +282,12 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/{segmentName}/metadata", "/tables/{tableName}/segments/{segmentName}/metadata/" })
   private Representation getSegmentMetadataForTable(
-      @Parameter(name = "tableName", in = "path",
-          description = "The name of the table for which to list segment metadata", required = true) String tableName,
-      @Parameter(name = "segmentName", in = "path",
-          description = "The name of the segment for which to fetch metadata", required = true) String segmentName,
-      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}", required = false) String tableType)
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segment metadata",
+          required = true) String tableName,
+      @Parameter(name = "segmentName", in = "path", description = "The name of the segment for which to fetch metadata",
+          required = true) String segmentName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = false) String tableType)
       throws JsonProcessingException, JSONException {
 
     JSONArray ret = new JSONArray();
