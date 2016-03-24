@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 
 /**
  * BReusableFilteredDocIdSetOperator will take a filter Operator and get the matched docId set.
@@ -32,16 +33,27 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   private final Operator _filterOperator;
   private BlockDocIdIterator _currentBlockDocIdIterator;
   private Block _currentBlock;
-  private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
   private final int _maxSizeOfdocIdSet;
-  private final int[] _docIdArray;
   boolean inited = false;
+  private final ThreadLocal<int[]> _docIdArrays = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+  };
+  private int[] _docIdArray;
 
+  /**
+   * @param filterOperator
+   * @param docSize
+   * @param maxSizeOfdocIdSet must be less than {@link DocIdSetPlanNode}. MAX_DOC_PER_CALL which is
+   *          10000
+   */
   public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize,
       int maxSizeOfdocIdSet) {
-    _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
-    _docIdArray = new int[_maxSizeOfdocIdSet];
+    _maxSizeOfdocIdSet = Math.min(maxSizeOfdocIdSet, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    _docIdArray = _docIdArrays.get();
     _filterOperator = filterOperator;
   }
 
@@ -71,12 +83,12 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
         break;
       }
       _docIdArray[pos++] = _currentDoc;
-
     }
+    DocIdSetBlock docIdSetBlock = null;
     if (pos > 0) {
-      _currentDocIdSetBlock = new DocIdSetBlock(_docIdArray, pos);
+      docIdSetBlock = new DocIdSetBlock(_docIdArray, pos);
     }
-    return _currentDocIdSetBlock;
+    return docIdSetBlock;
   }
 
   @Override

@@ -43,7 +43,7 @@ public class SelectionPlanNode implements PlanNode {
     _indexSegment = indexSegment;
     _brokerRequest = query;
     _selection = _brokerRequest.getSelections();
-    int maxDocPerNextCall = 10000;
+    int maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
     if ((_selection.getSelectionSortSequence() == null) || _selection.getSelectionSortSequence().isEmpty()) {
       //since no ordering is required, we can just get the minimum number of docs that matches the filter criteria

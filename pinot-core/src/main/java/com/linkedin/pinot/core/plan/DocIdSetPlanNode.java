@@ -23,21 +23,31 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 
-
 /**
  * DocIdSetPlanNode takes care creating BDocIdSetOperator.
  * Configure filter query and max size of docId cache here.
  */
 public class DocIdSetPlanNode implements PlanNode {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
+  public static int MAX_DOC_PER_CALL = 10000;
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final PlanNode _filterNode;
-  private final int _maxDocPerAggregation;
+  private final int _maxDocPerCall;
   private BReusableFilteredDocIdSetOperator _projectOp = null;
 
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query, int maxDocPerAggregation) {
-    _maxDocPerAggregation = maxDocPerAggregation;
+  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query) {
+    this(indexSegment, query, MAX_DOC_PER_CALL);
+  }
+
+  /**
+   * @param indexSegment
+   * @param query
+   * @param maxDocPerCall must be <= MAX_DOC_PER_CALL
+   */
+  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query, int maxDocPerCall) {
+    _maxDocPerCall = Math.min(maxDocPerCall, MAX_DOC_PER_CALL);
     _indexSegment = indexSegment;
     _brokerRequest = query;
     _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
@@ -48,7 +58,8 @@ public class DocIdSetPlanNode implements PlanNode {
     int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     long start = System.currentTimeMillis();
     if (_projectOp == null) {
-      _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerAggregation);
+      _projectOp =
+          new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerCall);
       long end = System.currentTimeMillis();
       LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;

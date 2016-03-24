@@ -48,9 +48,8 @@ public class AggregationPlanNode implements PlanNode {
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    _projectionPlanNode =
-        new ProjectionPlanNode(_indexSegment, getAggregationRelatedColumns(), new DocIdSetPlanNode(_indexSegment,
-            _brokerRequest, 5000));
+    _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationRelatedColumns(),
+        new DocIdSetPlanNode(_indexSegment, _brokerRequest));
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
       AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
       boolean hasDictionary = AggregationFunctionUtils.isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
