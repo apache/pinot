@@ -23,13 +23,10 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
 import com.linkedin.pinot.core.operator.docidsets.DocIdSetBlock;
 
-
 /**
  * BReusableFilteredDocIdSetOperator will take a filter Operator and get the matched docId set.
  * Internally, cached a given size of docIds, so this Operator could be replicated
  * for many ColumnarReaderDataSource.
- *
- *
  */
 public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
@@ -45,7 +42,8 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   private int _searchableDocIdSize = 0;
   boolean inited = false;
 
-  public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize, int maxSizeOfdocIdSet) {
+  public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize,
+      int maxSizeOfdocIdSet) {
     _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
     _docIdArray = new int[_maxSizeOfdocIdSet];
     _filterOperator = filterOperator;
@@ -61,8 +59,7 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
 
   @Override
   public Block getNextBlock() {
-
-    // [PINOT-2420] Handle limit 0 clause safely.
+    // Handle limit 0 clause safely.
     // For limit 0, _docIdArray will be zero sized
     if (_currentDoc == Constants.EOF) {
       return null;
@@ -103,14 +100,6 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
     return "BReusableFilteredDocIdSetOperator";
   }
 
-  public Block getCurrentBlock() {
-    return _currentBlock;
-  }
-
-  public DocIdSetBlock getCurrentDocIdSetBlock() {
-    return _currentDocIdSetBlock;
-  }
-
   private int getNextDoc() {
     if (_currentDoc == Constants.EOF) {
       return _currentDoc;
@@ -136,10 +125,6 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   public boolean close() {
     _filterOperator.close();
     return true;
-  }
-
-  public long getCurrentBlockSize() {
-    return _searchableDocIdSize;
   }
 
 }

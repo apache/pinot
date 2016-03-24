@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -39,10 +40,12 @@ public class MProjectionOperator extends BaseOperator {
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, DataSource> _columnToDataSourceMap;
   private ProjectionBlock _currentBlock = null;
+  private Map<String, Block> _blockMap;
 
   public MProjectionOperator(Map<String, DataSource> dataSourceMap, BReusableFilteredDocIdSetOperator docIdSetOperator) {
     _docIdSetOperator = docIdSetOperator;
     _columnToDataSourceMap = dataSourceMap;
+    _blockMap = new HashMap<>();
   }
 
   @Override
@@ -65,7 +68,12 @@ public class MProjectionOperator extends BaseOperator {
 
   @Override
   public Block getNextBlock() {
-    _currentBlock = new ProjectionBlock(_docIdSetOperator, _columnToDataSourceMap);
+    Block docIdSetBlock = _docIdSetOperator.nextBlock();
+    _blockMap.put("_docIdSet", docIdSetBlock);
+    for (String column : _columnToDataSourceMap.keySet()) {
+      _blockMap.put(column, _columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
+    }
+    _currentBlock = new ProjectionBlock(_blockMap, docIdSetBlock);
     if (_currentBlock.getDocIdSetBlock() == null) {
       return null;
     }
@@ -85,15 +93,6 @@ public class MProjectionOperator extends BaseOperator {
   public ProjectionBlock getCurrentBlock() {
     return _currentBlock;
   }
-
-  //  public DictionaryReader getDictionary(String column) {
-  //    if (_columnToDataSourceMap.get(column) instanceof ColumnDataSourceImpl) {
-  //      return ((ColumnDataSourceImpl) _columnToDataSourceMap.get(column)).getDictionary();
-  //    } else {
-  //      throw new UnsupportedOperationException("Not support getDictionary for DataSource: "
-  //          + _columnToDataSourceMap.get(column));
-  //    }
-  //  }
 
   public DataSource getDataSource(String column) {
     return _columnToDataSourceMap.get(column);

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.core.common.Block;
@@ -24,28 +23,21 @@ import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-
 
 /**
  * ProjectionBlock holds a column name to Block Map.
  * It provides DocIdSetBlock and DataBlock for a given column.
- *
- *
  */
 public class ProjectionBlock implements Block {
 
-  private final Map<String, Block> _blockMap = new HashMap<String, Block>();
+  private final Map<String, Block> _blockMap;
   private final Block _docIdSetBlock;
 
-  public ProjectionBlock(BReusableFilteredDocIdSetOperator docIdSetOperator, Map<String, DataSource> columnToDataSourceMap) {
-    _docIdSetBlock = docIdSetOperator.nextBlock();
-    _blockMap.put("_docIdSet", _docIdSetBlock);
-    for (String column : columnToDataSourceMap.keySet()) {
-      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
-    }
+  public ProjectionBlock(Map<String, Block> blockMap, Block docIdSetBlock) {
+    super();
+    this._blockMap = blockMap;
+    this._docIdSetBlock = docIdSetBlock;
   }
 
   @Override
