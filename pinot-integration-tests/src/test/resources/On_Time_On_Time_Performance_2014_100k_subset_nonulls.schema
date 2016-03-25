@@ -16,7 +16,7 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",
+      "dataType": "FLOAT",
       "name": "ArrDelay",
       "singleValueField": true
     },
@@ -26,7 +26,7 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",
+      "dataType": "DOUBLE",
       "name": "ArrDelayMinutes",
       "singleValueField": true
     },
@@ -46,12 +46,12 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",
+      "dataType": "DOUBLE",
       "name": "DepDelay",
       "singleValueField": true
     },
     {
-      "dataType": "INT",
+      "dataType": "FLOAT",
       "name": "DepDelayMinutes",
       "singleValueField": true
     },
@@ -84,7 +84,7 @@
   ],
   "dimensionFieldSpecs" : [
     {
-      "dataType": "INT",
+      "dataType": "LONG",
       "name": "AirlineID",
       "singleValueField": true
     },
@@ -234,7 +234,7 @@
       "singleValueField": true
     },
     {
-      "dataType": "INT",
+      "dataType": "FLOAT",
       "name": "DivLongestGTimes",
       "singleValueField": false
     },
@@ -249,7 +249,7 @@
       "singleValueField": false
     },
     {
-      "dataType": "INT",
+      "dataType": "LONG",
       "name": "DivTotalGTimes",
       "singleValueField": false
     },

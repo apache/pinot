@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.Schema;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
@@ -26,6 +24,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.data.Schema;
 
 
 /**
@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSchemaChangeIntegrationTest.class);
 
-  public File getPartialSchemaFile() {
+  private File getPartialSchemaFile() {
     return new File(OfflineClusterIntegrationTest.class.getClassLoader()
         .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls_missing_columns.schema").getFile());
   }

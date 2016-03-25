@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -199,7 +200,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
+  protected void runQuery(final String pqlQuery, List<String> sqlQueries) throws Exception {
     try {
       // TODO Use Pinot client API for this
       queryCount++;
@@ -226,26 +227,34 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           ResultSet rs = statement.getResultSet();
           LOGGER.debug("Trying to get result from sql: " + rs);
           // Single value result for the aggregation, compare with the actual value
-          String bqlValue = firstAggregationResult.getString("value");
+          final String bqlValue = firstAggregationResult.getString("value");
 
           rs.first();
-          String sqlValue = rs.getString(1);
-
-          if (bqlValue != null && sqlValue != null) {
-            // Strip decimals
-            bqlValue = bqlValue.replaceAll("\\..*", "");
-            sqlValue = sqlValue.replaceAll("\\..*", "");
-          }
+          final String sqlValue = rs.getString(1);
 
           LOGGER.debug("bql value: " + bqlValue);
           LOGGER.debug("sql value: " + sqlValue);
+          long compareSqlValue = -1;
+          long compareBqlValue = -1;
+
+          if (bqlValue != null && sqlValue != null) {
+            // H2 returns float and double values in scientific notation. Convert them to plain notation first..
+            try {
+              compareSqlValue = new BigDecimal(sqlValue).longValue();
+              compareBqlValue = new BigDecimal(bqlValue).longValue();
+            } catch (NumberFormatException e) {
+              LOGGER.warn("Ignoring number format excection in " + sqlValue);
+              compareBqlValue=-2; // So comparison will fail below
+            }
+          }
+
           if (GATHER_FAILED_QUERIES) {
-            if (!EqualityUtils.isEqual(bqlValue, sqlValue)) {
+            if (!EqualityUtils.isEqual(compareBqlValue, compareSqlValue)) {
               saveFailedQuery(pqlQuery, sqlQueries, "Values did not match for query " + pqlQuery + ", expected "
                   + sqlValue + ", got " + bqlValue);
             }
           } else {
-            Assert.assertEquals(bqlValue, sqlValue, "Values did not match for query " + pqlQuery);
+            Assert.assertEquals(compareBqlValue, compareSqlValue, "Values did not match for query " + pqlQuery + ",SQL:" + sqlValue + ",BQL:" + bqlValue);
           }
         } else if (firstAggregationResult.has("groupByResult")) {
           // Load values from the query result
@@ -353,6 +362,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         }
       } else {
         // Don't compare selection results for now
+        LOGGER.warn("Skipping comparison since there are no aggregation columns");
       }
     } catch (JSONException exception) {
       if (GATHER_FAILED_QUERIES) {
