@@ -93,6 +93,7 @@ public class SwaggerResource extends ServerResource {
       addTag(tags, "table", "Table-related operations");
       addTag(tags, "segment", "Segment-related operations");
       addTag(tags, "schema", "Schema-related operations");
+      addTag(tags, "version", "Version-related operations");
 
       // Swagger
       JSONObject swagger = new JSONObject();
