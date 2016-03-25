@@ -385,7 +385,7 @@ public class BrokerRequestHandler {
             DataTable r2 = new DataTable(b2);
             if (errors != null && errors.containsKey(e.getKey())) {
               Throwable throwable = errors.get(e.getKey());
-              r2.getMetadata().put("exception", new RequestProcessingException(throwable).toString());
+              r2.getMetadata().put(DataTable.EXCEPTION_METADATA_KEY, new RequestProcessingException(throwable).toString());
               _brokerMetrics.addMeteredQueryValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
             }
             instanceResponseMap.put(e.getKey(), r2);
