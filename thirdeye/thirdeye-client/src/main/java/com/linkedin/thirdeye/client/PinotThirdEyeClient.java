@@ -187,6 +187,7 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
     LOG.info("getRawResponse: {}", sql);
     ResultSetGroup result = resultSetGroupCache.get(sql);
 
+
     Map<String, Map<String, Number[]>> data =
         parseResultSetGroup(request, result, rawMetrics, starTreeConfig, dimensionNames);
 
@@ -328,7 +329,7 @@ public class PinotThirdEyeClient extends BaseThirdEyeClient {
         double numeratorVal = rawData[numeratorIdx].doubleValue();
         double denominatorVal = rawData[denominatorIdx].doubleValue();
         if (denominatorVal == 0) {
-          expressionValue = null;
+          expressionValue = 0;
         } else {
           expressionValue = numeratorVal / denominatorVal;
         }
