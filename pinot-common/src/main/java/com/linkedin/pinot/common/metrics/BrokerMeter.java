@@ -25,6 +25,8 @@ import com.linkedin.pinot.common.Utils;
 public enum BrokerMeter implements AbstractMetrics.Meter {
   UNCAUGHT_GET_EXCEPTIONS("exceptions", true),
   UNCAUGHT_POST_EXCEPTIONS("exceptions", true),
+  HEALTHCHECK_BAD_CALLS("healthcheck", true),
+  HEALTHCHECK_OK_CALLS("healthcheck", true),
   QUERIES("queries", false),
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
   REQUEST_FETCH_EXCEPTIONS("exceptions", false),

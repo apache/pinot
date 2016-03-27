@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import com.linkedin.pinot.broker.servlet.PinotBrokerHealthCheckServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
@@ -205,6 +206,7 @@ public class BrokerServerBuilder {
 
     WebAppContext context = new WebAppContext();
     context.addServlet(PinotClientRequestServlet.class, "/query");
+    context.addServlet(PinotBrokerHealthCheckServlet.class, "/health");
     context.addServlet(PinotBrokerRoutingTableDebugServlet.class, "/debug/routingTable/*");
 
     if (clientConfig.enableConsole()) {
@@ -214,7 +216,7 @@ public class BrokerServerBuilder {
     }
 
     context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics));
-
+    context.setAttribute(BrokerServerBuilder.class.toString(), this);
     _server.setHandler(context);
   }
 
@@ -257,8 +259,8 @@ public class BrokerServerBuilder {
     LOGGER.info("Stopped Jetty server !!");
   }
 
-  public boolean isStart() {
-    return _state.get() == State.STARTING;
+  public State getCurrentState() {
+    return _state.get();
   }
 
   public RoutingTable getRoutingTable() {
