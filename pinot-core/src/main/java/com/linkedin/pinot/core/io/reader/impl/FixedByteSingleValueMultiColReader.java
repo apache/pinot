@@ -215,7 +215,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    * @return
    */
   public float getFloat(int row, int col) {
-    assert getColumnSizes()[col] == 8;
+    assert getColumnSizes()[col] == 4;
     final int offset = computeOffset(row, col);
     return byteBuffer.getFloat(offset);
   }
