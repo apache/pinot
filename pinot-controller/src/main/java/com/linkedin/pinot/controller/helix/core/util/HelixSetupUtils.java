@@ -18,17 +18,23 @@ package com.linkedin.pinot.controller.helix.core.util;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyPathConfig;
+import org.apache.helix.PropertyType;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.controller.HelixControllerMain;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixManager;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.messaging.handling.HelixTaskExecutor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message.MessageType;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,7 +131,19 @@ public class HelixSetupUtils {
     IdealState idealState =
         PinotTableIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
     admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
+    initPropertyStorePath(helixClusterName, zkPath);
     LOGGER.info("New Cluster setup completed... ********************************************** ");
+  }
+
+  private static void initPropertyStorePath(String helixClusterName, String zkPath) {
+    String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, helixClusterName);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<ZNRecord>(zkPath, new ZNRecordSerializer(), propertyStorePath);
+    propertyStore.create("/CONFIGS", new ZNRecord(""), AccessOption.PERSISTENT);
+    propertyStore.create("/CONFIGS/CLUSTER", new ZNRecord(""), AccessOption.PERSISTENT);
+    propertyStore.create("/CONFIGS/TABLE", new ZNRecord(""), AccessOption.PERSISTENT);
+    propertyStore.create("/CONFIGS/INSTANCE", new ZNRecord(""), AccessOption.PERSISTENT);
+    propertyStore.create("/SCHEMAS", new ZNRecord(""), AccessOption.PERSISTENT);
+    propertyStore.create("/SEGMENTS", new ZNRecord(""), AccessOption.PERSISTENT);
   }
 
   private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,
