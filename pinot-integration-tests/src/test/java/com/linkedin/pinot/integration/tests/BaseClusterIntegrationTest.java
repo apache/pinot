@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.util.concurrent.AsyncFunction;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -80,6 +75,11 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
@@ -748,8 +748,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     });
   }
 
-  protected void waitForRecordCountToStabilizeToExpectedCount(int expectedRecordCount, long deadline) throws Exception {
+  protected void waitForRecordCountToStabilizeToExpectedCount(int expectedRecordCount, long deadlineMs) throws Exception {
     int pinotRecordCount = -1;
+    final long startTimeMs = System.currentTimeMillis();
 
     do {
       Thread.sleep(5000L);
@@ -769,7 +770,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       }
 
       if (expectedRecordCount != pinotRecordCount) {
-        Assert.assertTrue(System.currentTimeMillis() < deadline, "Failed to read all records within the deadline");
+        final long now = System.currentTimeMillis();
+        Assert.assertTrue(now < deadlineMs, "Failed to read " + expectedRecordCount + " records within the deadline (duration "
+            + (deadlineMs-startTimeMs) + "ms,NumRecords=" + pinotRecordCount);
       }
     } while (expectedRecordCount != pinotRecordCount);
   }
