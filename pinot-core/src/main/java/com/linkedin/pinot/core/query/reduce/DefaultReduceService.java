@@ -127,7 +127,7 @@ public class DefaultReduceService implements ReduceService<BrokerResponseJSON> {
 
       if (instanceResponse.getDataSchema() == null && instanceResponse.getMetadata() != null) {
         for (String key : instanceResponse.getMetadata().keySet()) {
-          if (key.startsWith("Exception")) {
+          if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
             ProcessingException processingException = new ProcessingException();
             processingException.setErrorCode(Integer.parseInt(key.substring(9)));
             processingException.setMessage(instanceResponse.getMetadata().get(key));

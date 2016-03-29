@@ -46,6 +46,9 @@ import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
  * Read only Datatable. Use DataTableBuilder to build the data table
  */
 public class DataTable {
+
+  public static final String EXCEPTION_METADATA_KEY = "Exception";
+
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTable.class);
