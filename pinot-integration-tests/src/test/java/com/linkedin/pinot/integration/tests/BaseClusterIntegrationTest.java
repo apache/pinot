@@ -781,8 +781,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
       if (expectedRecordCount != pinotRecordCount) {
         final long now = System.currentTimeMillis();
-        Assert.assertTrue(now < deadlineMs, "Failed to read " + expectedRecordCount + " records within the deadline (duration "
-            + (deadlineMs-startTimeMs) + "ms,NumRecords=" + pinotRecordCount);
+        Assert.assertTrue(now < deadlineMs, "Failed to read " + expectedRecordCount + " records within the deadline (deadline="
+            + deadlineMs + "ms,now="  + now + "ms,NumRecordsRead=)" + pinotRecordCount);
       }
     } while (expectedRecordCount != pinotRecordCount);
   }
