@@ -61,11 +61,17 @@ public abstract class ColumnIndexContainer {
     ImmutableDictionaryReader dictionary = load(metadata, dictionaryFile, mode);
 
     if (metadata.isSorted() && metadata.isSingleValue()) {
+      if (loadInverted) {
+        LOGGER.info("Column {} is sorted, inverted index will not be generated or loaded", column);
+      }
       return loadSorted(column, indexDir, metadata, dictionary, mode);
     }
 
     if (metadata.isSingleValue()) {
       return loadUnsorted(column, indexDir, metadata, dictionary, mode, loadInverted);
+    }
+    if (metadata.isSorted()) {
+      LOGGER.warn("Column {} is multi-valued, sort on multi-valued column is not supported", column);
     }
     return loadMultiValue(column, indexDir, metadata, dictionary, mode, loadInverted);
   }
@@ -76,10 +82,9 @@ public abstract class ColumnIndexContainer {
     File fwdIndexFile =
         new File(indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
 
-    FixedByteSingleValueMultiColReader indexReader = new FixedByteSingleValueMultiColReader(
-        fwdIndexFile, metadata.getCardinality(), 2, new int[] {
-            4, 4
-    }, mode == ReadMode.mmap);
+    FixedByteSingleValueMultiColReader indexReader =
+        new FixedByteSingleValueMultiColReader(fwdIndexFile, metadata.getCardinality(), 2, new int[]{4, 4},
+            mode == ReadMode.mmap);
     return new SortedSVColumnIndexContainer(column, metadata, indexReader, dictionary);
   }
 
