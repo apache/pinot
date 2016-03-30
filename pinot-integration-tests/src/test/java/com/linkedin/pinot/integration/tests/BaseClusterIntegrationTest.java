@@ -277,7 +277,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
               // Grouped result, build correct values and iterate through to compare both
               Map<String, String> correctValues = new TreeMap<String, String>(new NullableStringComparator());
-              LOGGER.info("Trying to execute sql query: " + sqlQueries.get(aggregationGroupIndex));
+              LOGGER.debug("Trying to execute sql query:{}", sqlQueries.get(aggregationGroupIndex));
               statement.execute(sqlQueries.get(aggregationGroupIndex));
               ResultSet rs = statement.getResultSet();
               LOGGER.debug("Trying to get result from sql: " + rs);
@@ -334,7 +334,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
                   }
                 }
               } else {
-                LOGGER.warn("SQL query returned more than 10k rows, skipping comparison");
+                LOGGER.warn("SQL: {} returned more than 10k rows, skipping comparison", sqlQueries.get(aggregationGroupIndex));
                 queryCount--;
               }
             } else {
@@ -530,6 +530,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             messagesToWrite.add(data);
             messagesInThisBatch++;
             if (MAX_MESSAGES_PER_BATCH <= messagesInThisBatch) {
+              LOGGER.info("Sending a batch of {} records to Kafka", messagesInThisBatch);
               messagesInThisBatch = 0;
               producer.send(messagesToWrite);
               messagesToWrite.clear();
@@ -541,13 +542,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         }
 
         if (BATCH_KAFKA_MESSAGES) {
+          LOGGER.info("Sending last match of {} records to Kafka", messagesToWrite.size());
           producer.send(messagesToWrite);
         }
 
         outputStream.close();
         reader.close();
         LOGGER.info("Finished writing " + recordCount + " records from " + avroFile.getName() + " into Kafka topic "
-            + kafkaTopic);
+            + kafkaTopic + " from file " + avroFile.getName());
         int totalRecordCount = totalAvroRecordWrittenCount.addAndGet(recordCount);
         LOGGER.info("Total records written so far " + totalRecordCount);
       } catch (Exception e) {
@@ -733,7 +735,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             String segmentName = outputDir.list()[0];
             final String tarGzPath = TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" +
                     segmentName, new File(segmentTarDir, segmentName).getAbsolutePath());
-            LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName);
+            LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName +" from file " + inputAvroFile.getName());
             return new ImmutablePair<File, File>(inputAvroFile, new File(tarGzPath));
           } catch (Exception e) {
             throw new RuntimeException(e);
@@ -779,12 +781,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         LOGGER.warn("Caught exception while waiting for record count to stabilize, will try again.", e);
       }
 
-      if (expectedRecordCount != pinotRecordCount) {
+      if (expectedRecordCount > pinotRecordCount) {
         final long now = System.currentTimeMillis();
         Assert.assertTrue(now < deadlineMs, "Failed to read " + expectedRecordCount + " records within the deadline (deadline="
-            + deadlineMs + "ms,now="  + now + "ms,NumRecordsRead=)" + pinotRecordCount);
+            + deadlineMs + "ms,now="  + now + "ms,NumRecordsRead=" + pinotRecordCount + ")");
       }
-    } while (expectedRecordCount != pinotRecordCount);
+    } while (pinotRecordCount < expectedRecordCount);
+
+    if (expectedRecordCount != pinotRecordCount) {
+      LOGGER.error("Got more records than expected");
+      Assert.fail("Expecting " + expectedRecordCount + " but got " + pinotRecordCount);
+    }
   }
 
   protected CountDownLatch setupSegmentCountCountDownLatch(final String tableName, final int expectedSegmentCount)
@@ -915,7 +922,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   public void testHardcodedQuerySet() throws Exception {
     for (String query : getHardCodedQuerySet()) {
       try {
-        LOGGER.info("Trying to send query : {}", query);
+        LOGGER.debug("Trying to send query : {}", query);
         runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
       } catch (Exception e) {
         LOGGER.error("Getting erro for query : {}", query);
@@ -940,7 +947,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
 
     for (QueryGenerator.Query query : queries) {
-      LOGGER.info("Trying to send query : {}", query.generatePql());
+      LOGGER.debug("Trying to send query : {}", query.generatePql());
       runQuery(query.generatePql(), query.generateH2Sql());
     }
   }
@@ -961,7 +968,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
 
     for (QueryGenerator.Query query : queries) {
-      LOGGER.info("Trying to send query : {}", query.generatePql());
+      LOGGER.debug("Trying to send query : {}", query.generatePql());
       runQuery(query.generatePql(), query.generateH2Sql());
     }
   }

@@ -144,7 +144,7 @@ public abstract class ColumnIndexContainer {
     // returning inverted index from file only when marker file does not exist and inverted file
     // exist
     if (!inProgress.exists() && invertedIndexFile.exists()) {
-      LOGGER.warn("found inverted index for colummn {}, loading it", column);
+      LOGGER.info("found inverted index for colummn {}, loading it", column);
       return new BitmapInvertedIndexReader(invertedIndexFile, metadata.getCardinality(),
           mode == ReadMode.mmap);
     }
@@ -159,7 +159,7 @@ public abstract class ColumnIndexContainer {
       FileUtils.deleteQuietly(invertedIndexFile);
     }
 
-    LOGGER.warn("did not find inverted index for colummn {}, creating it", column);
+    LOGGER.info("did not find inverted index for colummn {}, creating it", column);
 
     // creating inverted index for the column now
     InvertedIndexCreator creator =
@@ -183,7 +183,7 @@ public abstract class ColumnIndexContainer {
     // delete the marker file
     FileUtils.deleteQuietly(inProgress);
 
-    LOGGER.warn("created inverted index for colummn {}, loading it", column);
+    LOGGER.info("created inverted index for colummn {}, loading it", column);
     return new BitmapInvertedIndexReader(invertedIndexFile, metadata.getCardinality(),
         mode == ReadMode.mmap);
   }

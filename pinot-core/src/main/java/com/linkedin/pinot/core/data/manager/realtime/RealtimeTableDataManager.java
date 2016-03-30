@@ -48,6 +48,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
 
   public RealtimeTableDataManager() {
+    super();
   }
 
   @Override

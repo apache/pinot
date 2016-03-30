@@ -24,7 +24,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -34,11 +33,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.core.util.trace.TraceContext;
 
 
 /**
@@ -81,7 +78,7 @@ public abstract class ControllerTest {
 
     final long stop = System.currentTimeMillis();
 
-    LOGGER.info(" Time take for Request : " + query + " in ms:" + (stop - start));
+    LOGGER.debug("Time taken for '{}':{}ms", query, (stop - start));
 
     final String res = sb.toString();
     final JSONObject ret = new JSONObject(res);

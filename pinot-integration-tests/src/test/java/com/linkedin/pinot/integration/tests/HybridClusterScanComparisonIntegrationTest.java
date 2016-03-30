@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -47,6 +46,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
@@ -120,6 +120,15 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   protected abstract String getTimeColumnType();
 
   protected abstract String getSortedColumn();
+
+  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
+      String kafkaTopic, File schemaFile, File avroFile, String sortedColumn, List<String> invertedIndexColumns)
+      throws Exception {
+    Schema schema = Schema.fromFile(schemaFile);
+    addSchema(schemaFile, schema.getSchemaName());
+    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns);
+  }
 
   @Override
   @BeforeClass
@@ -455,5 +464,11 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
         return null;
       }
     });
+  }
+
+  @Override
+  @Test(enabled = false)
+  public void testMetricAndDimColumns() throws Exception {
+    // This test will not work by calling super() since we depend on h2 queries.
   }
 }

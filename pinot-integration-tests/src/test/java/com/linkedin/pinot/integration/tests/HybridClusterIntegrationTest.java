@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
@@ -56,6 +58,7 @@ import kafka.server.KafkaServerStartable;
  */
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
+  private static final String TENANT_NAME = "TestTenant";
   protected final File _tmpDir = new File("/tmp/HybridClusterIntegrationTest");
   protected final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
   protected final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
@@ -65,17 +68,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private int segmentCount = 12;
   private int offlineSegmentCount = 8;
   private int realtimeSegmentCount = 6;
+  private Random random = new Random();
+  private Schema schema;
 
   private KafkaServerStartable kafkaStarter;
-
-  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile, String sortedColumn, List<String> invertedIndexColumns)
-      throws Exception {
-    Schema schema = Schema.fromFile(schemaFile);
-    addSchema(schemaFile, schema.getSchemaName());
-    addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns);
-  }
 
   protected void setSegmentCount(int segmentCount) {
     this.segmentCount = segmentCount;
@@ -113,10 +109,15 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     final List<File> avroFiles = getAllAvroFiles();
 
     File schemaFile = getSchemaFile();
+    schema = Schema.fromFile(schemaFile);
+    addSchema(schemaFile, schema.getSchemaName());
+    final List<String> invertedIndexColumns = makeInvertedIndexColumns();
+    final String sortedColumn = makeSortedColumn();
 
     // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
-        avroFiles.get(0), "Carrier", null);
+    addHybridTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+        schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns);
+    LOGGER.info("Running with Sorted column=" + sortedColumn + " and inverted index columns = " + invertedIndexColumns);
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
@@ -127,6 +128,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
+    LOGGER.info("Creating offline segments from avro files " + offlineAvroFiles);
     buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false);
 
     // Initialize query generator
@@ -180,6 +182,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     latch.await();
 
     // Load realtime data into Kafka
+    LOGGER.info("Pushing data from realtime avro files " + realtimeAvroFiles);
     pushAvroIntoKafka(realtimeAvroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
 
     // Wait until the Pinot event count matches with the number of events in the Avro files
@@ -194,6 +197,63 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInTwoMinutes);
+  }
+
+  /**
+   * Pick one column at random (or null) out of dimensions and return it as a sorted column.
+   * @note: Change this method to return a specific sorted column (or null) to debug failed tests
+   *
+   * @return sorted column name or null if none is to be used for this run.
+   */
+  private String makeSortedColumn() {
+    List<String> dimensions = schema.getDimensionNames();
+    final int nDimensions = dimensions.size();
+    int ntries = nDimensions;
+    int rand = random.nextInt();
+    if (rand % 5 == 0) {
+      // Return no sorted column 20% of the time
+      return null;
+    }
+
+    while (ntries-- > 0) {
+      int dimPos = random.nextInt(dimensions.size() + 1);
+      if (dimPos == nDimensions) {
+        continue;
+      }
+      String sortedColumn = dimensions.get(dimPos);
+      FieldSpec fieldSpec = schema.getFieldSpecFor(sortedColumn);
+      if (fieldSpec.isSingleValueField()) {
+        return sortedColumn;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Pick one or two inverted index columns from the list of dimension columns, and return them as list of
+   * inverted index columns.
+   * @note: Change this method to return a specific list of columns (or null) as needed to debug a testcase
+   *
+   * @return list of inverted index columns or null is no inv index is to be used for this run
+   */
+  private List<String> makeInvertedIndexColumns() {
+    List<String> dimensions = schema.getDimensionNames();
+    final int nDimensions = dimensions.size();
+    int dimPos = random.nextInt(dimensions.size()+1);
+    List<String> invIndexColumns = new ArrayList<String>(2);
+    invIndexColumns.add("DestStateFips");
+    invIndexColumns.add("OriginStateFips");
+
+    if (dimPos == nDimensions) {
+      return null;
+    }
+    invIndexColumns.add(dimensions.get(dimPos));
+    dimPos = random.nextInt(dimensions.size()+1);
+    if (dimPos == nDimensions || dimensions.get(dimPos).equals(invIndexColumns.get(0))) {
+      return invIndexColumns;
+    }
+    invIndexColumns.add(dimensions.get(dimPos));
+    return invIndexColumns;
   }
 
   protected List<File> getAllAvroFiles() {
@@ -236,8 +296,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServers(2);
 
     // Create tenants
-    createBrokerTenant("TestTenant", 1);
-    createServerTenant("TestTenant", 1, 1);
+    createBrokerTenant(TENANT_NAME, 1);
+    createServerTenant(TENANT_NAME, 1, 1);
   }
 
   @AfterClass
@@ -280,6 +340,41 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
     query = "select count(*) from 'mytable' where DaysSinceEpoch > 16312 and Carrier = 'DL'";
     super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+  }
+
+  @Test
+  public void testMetricAndDimColumns() throws Exception {
+    List<String> dimensions = schema.getDimensionNames();
+    for (String dim : dimensions) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(dim);
+      if (!fieldSpec.isSingleValueField()) {
+        LOGGER.info("Skipping multi-valued dimension field " + dim);
+        continue;
+      }
+      if (isNotWorkingColumn(dim)) {
+        LOGGER.error("Distnct count does not match for column " + dim);
+        continue;
+      }
+      String pqlQuery = "select distinctCount(" + dim + ") from mytable";
+      String sqlQuery = "select COUNT(DISTINCT " + dim + ") from mytable";
+      super.runQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    }
+    List<String> metrics = schema.getMetricNames();
+    for (String metric : metrics) {
+      String query = "select sum(" + metric + ") from mytable";
+      super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable")));
+    }
+  }
+
+  // See PINOT-2887. distinctCount on string dimension does not work correctly in this test
+  private boolean isNotWorkingColumn(String dim) {
+    final String[] badColumns = {"TailNum"};
+    for (String col : badColumns) {
+      if (dim.equals(col)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

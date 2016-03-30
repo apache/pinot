@@ -15,14 +15,30 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
-import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -42,22 +58,6 @@ import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import com.linkedin.pinot.core.util.CrcUtils;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.lang.reflect.Array;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -191,7 +191,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       totalDocs++;
     }
     buildIndexCreationInfo();
-    LOGGER.info("Collected stats for {} documents", totalDocs);
+    LOGGER.info("Collected stats for {} raw documents, {} aggregated documents", totalRawDocs, totalAggDocs);
     long statCollectionFinishTime = System.currentTimeMillis();
     // Initialize the index creation using the per-column statistics information
     indexCreator.init(config, segementIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
