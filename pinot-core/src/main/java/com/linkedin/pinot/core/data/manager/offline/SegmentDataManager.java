@@ -41,4 +41,6 @@ public abstract class SegmentDataManager {
   public abstract IndexSegment getSegment();
 
   public abstract String getSegmentName();
+  
+  public abstract void destroy();
 }

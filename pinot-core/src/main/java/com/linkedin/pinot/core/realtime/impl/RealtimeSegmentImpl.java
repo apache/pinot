@@ -393,6 +393,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public void destroy() {
+    LOGGER.info("Trying to close RealtimeSegmentImpl : {}", this.getSegmentName());
     for (DataFileReader dfReader : columnIndexReaderWriterMap.values()) {
       try {
         dfReader.close();

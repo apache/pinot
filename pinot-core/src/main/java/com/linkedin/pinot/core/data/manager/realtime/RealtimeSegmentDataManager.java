@@ -67,6 +67,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private long segmentEndTimeThreshold;
 
   private volatile boolean keepIndexing = true;
+  private volatile boolean isShuttingDown = false;
+
   private TimerTask segmentStatusTask;
   private final RealtimeTableDataManager notifier;
   private Thread indexingThread;
@@ -173,8 +175,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             segmentLogger.error("Caught error in indexing thread", e);
             throw e;
           }
-        } while (notFull && keepIndexing);
-
+        } while (notFull && keepIndexing && (!isShuttingDown));
+        if (isShuttingDown) {
+          segmentLogger.info("Shutting down indexing thread!");
+          return;
+        }
         try {
           segmentLogger.info("Indexing threshold reached, proceeding with index conversion");
           // kill the timer first
@@ -336,5 +341,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         keepIndexing = false;
       }
     }
+  }
+ 
+  @Override
+  public void destroy() {
+    LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", this.segmentName);
+    isShuttingDown = true;
+    try {
+      kafkaStreamProvider.shutdown();
+    } catch (Exception e) {
+      LOGGER.error("Failed to shutdown kafka stream provider!", e);
+    }
+    keepIndexing = false;
+    segmentStatusTask.cancel();
+    realtimeSegment.destroy();
   }
 }

@@ -114,8 +114,8 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public void destroy() {
+    LOGGER.info("Trying to destroy segment : {}", this.getSegmentName());
     for (String column : indexContainerMap.keySet()) {
-
       try {
         indexContainerMap.get(column).getDictionary().close();
       } catch (Exception e) {

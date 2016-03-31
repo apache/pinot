@@ -200,7 +200,7 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
     _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.DELETED_SEGMENT_COUNT, 1L);
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT,
         -segmentDataManager.getSegment().getSegmentMetadata().getTotalRawDocs());
-    segmentDataManager.getSegment().destroy();
+    segmentDataManager.destroy();
     LOGGER.info("Segment {} for table {} has been closed", segmentName, _tableName);
   }
 

@@ -46,4 +46,9 @@ public class OfflineSegmentDataManager extends SegmentDataManager {
   public String toString() {
     return "SegmentDataManager { " + _indexSegment.getSegmentName() + " } ";
   }
+
+  @Override
+  public void destroy() {
+    _indexSegment.destroy();
+  }
 }

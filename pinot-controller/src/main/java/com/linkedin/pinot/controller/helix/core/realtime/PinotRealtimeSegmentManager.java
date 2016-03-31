@@ -299,7 +299,11 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   @Override
   public void handleChildChange(String parentPath, List<String> currentChilds)
       throws Exception {
-    processPropertyStoreChange(parentPath);
+    for (String table: currentChilds) {
+      if (table.endsWith("_REALTIME")) {
+        processPropertyStoreChange(parentPath + "/" + table);
+      }
+    }
   }
 
   @Override

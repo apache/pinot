@@ -53,6 +53,9 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   @Override
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();
+    for (SegmentDataManager segmentDataManager :_segmentsMap.values() ) {
+      segmentDataManager.destroy();
+    }
   }
 
   protected void doInit() {

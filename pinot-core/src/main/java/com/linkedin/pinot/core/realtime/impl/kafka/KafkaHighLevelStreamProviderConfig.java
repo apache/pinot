@@ -40,7 +40,13 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     /*defaultProps.put("zookeeper.connect", zookeeper);
     defaultProps.put("group.id", groupId);*/
     defaultProps.put("zookeeper.session.timeout.ms", "30000");
-    defaultProps.put("zookeeper.sync.time.ms", "200");
+    defaultProps.put("zookeeper.connection.timeout.ms", "10000");
+    defaultProps.put("zookeeper.sync.time.ms", "2000");
+
+    // Rebalance retries will take up to 1 mins to fail.
+    defaultProps.put("rebalance.max.retries", "30");
+    defaultProps.put("rebalance.backoff.ms", "2000");
+    
     defaultProps.put("auto.commit.enable", "false");
     defaultProps.put("auto.offset.reset", "largest");
   }
