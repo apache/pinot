@@ -73,8 +73,6 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkClient _zkClient;
 
-
-
   public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager) {
     _pinotHelixResourceManager = pinotManager;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
@@ -212,16 +210,19 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
   @Override
   public synchronized void onDataChange(String path) {
+    LOGGER.info("PinotRealtimeSegmentManager.onDataChange: {}", path);
     processPropertyStoreChange(path);
   }
 
   @Override
   public synchronized void onDataCreate(String path) {
+    LOGGER.info("PinotRealtimeSegmentManager.onDataCreate: {}", path);
     processPropertyStoreChange(path);
   }
 
   @Override
   public synchronized void onDataDelete(String path) {
+    LOGGER.info("PinotRealtimeSegmentManager.onDataDelete: {}", path);
     processPropertyStoreChange(path);
   }
 
@@ -299,8 +300,11 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   @Override
   public void handleChildChange(String parentPath, List<String> currentChilds)
       throws Exception {
-    for (String table: currentChilds) {
+    LOGGER.info("PinotRealtimeSegmentManager.handleChildChange: {}", parentPath);
+    processPropertyStoreChange(parentPath);
+    for (String table : currentChilds) {
       if (table.endsWith("_REALTIME")) {
+        LOGGER.info("PinotRealtimeSegmentManager.handleChildChange with table: {}", parentPath + "/" + table);
         processPropertyStoreChange(parentPath + "/" + table);
       }
     }
@@ -309,12 +313,14 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   @Override
   public void handleDataChange(String dataPath, Object data)
       throws Exception {
+    LOGGER.info("PinotRealtimeSegmentManager.handleDataChange: {}", dataPath);
     processPropertyStoreChange(dataPath);
   }
 
   @Override
   public void handleDataDeleted(String dataPath)
       throws Exception {
+    LOGGER.info("PinotRealtimeSegmentManager.handleDataDeleted: {}", dataPath);
     processPropertyStoreChange(dataPath);
   }
 }
