@@ -92,7 +92,7 @@ public class TestStarTreeMetadata {
     starTreeIndexSpec.setSkipStarNodeCreationForDimensions(SKIP_STAR_NODE_CREATION_DIMENSTIONS);
     starTreeIndexSpec.setSkipMaterializationForDimensions(SKIP_MATERIALIZATION_DIMENSIONS);
 
-    config.setCreateStarTreeIndex(true);
+    config.setEnableStarTreeIndex(true);
     config.setStarTreeIndexSpec(starTreeIndexSpec);
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

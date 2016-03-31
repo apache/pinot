@@ -205,7 +205,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_RAW_DOCS, String.valueOf(totalRawDocs));
     properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
-    properties.setProperty(STAR_TREE_ENABLED, String.valueOf(config.isCreateStarTreeIndex()));
+    properties.setProperty(STAR_TREE_ENABLED, String.valueOf(config.isEnableStarTreeIndex()));
     String timeColumn = config.getTimeColumnName();
 
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
@@ -223,21 +223,21 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (indexCreationInfoMap.get(timeColumn) != null) {
       properties.setProperty(SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
       properties.setProperty(SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
-      properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
+      properties.setProperty(TIME_UNIT, config.getSegmentTimeUnit());
     }
 
-    if (config.containsCustomPropertyWithKey(SEGMENT_START_TIME)) {
+    if (config.containsCustomProperty(SEGMENT_START_TIME)) {
       properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
     }
-    if (config.containsCustomPropertyWithKey(SEGMENT_END_TIME)) {
+    if (config.containsCustomProperty(SEGMENT_END_TIME)) {
       properties.setProperty(SEGMENT_END_TIME, config.getEndTime());
     }
-    if (config.containsCustomPropertyWithKey(TIME_UNIT)) {
-      properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
+    if (config.containsCustomProperty(TIME_UNIT)) {
+      properties.setProperty(TIME_UNIT, config.getSegmentTimeUnit());
     }
 
-    for (final String key : config.getAllCustomKeyValuePair().keySet()) {
-      properties.setProperty(key, config.getAllCustomKeyValuePair().get(key));
+    for (final String key : config.getCustomProperties().keySet()) {
+      properties.setProperty(key, config.getCustomProperties().get(key));
     }
 
     for (final String column : indexCreationInfoMap.keySet()) {
@@ -271,7 +271,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           String.valueOf(columnIndexCreationInfo.isCreateDictionary()));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
-          String.valueOf(true));
+          String.valueOf(config.getInvertedIndexCreationColumns().contains(column)));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));

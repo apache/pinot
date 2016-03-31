@@ -33,15 +33,15 @@ public class SegmentTestUtils {
     Schema schema = AvroUtils.extractSchemaFromAvro(inputAvro);
     SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(schema);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
-    segmentGenSpec.setTimeUnitForSegment(timeUnit);
+    segmentGenSpec.setSegmentTimeUnit(timeUnit);
     if (inputAvro.getName().endsWith("gz")) {
-      segmentGenSpec.setInputFileFormat(FileFormat.GZIPPED_AVRO);
+      segmentGenSpec.setFormat(FileFormat.GZIPPED_AVRO);
     } else {
-      segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
+      segmentGenSpec.setFormat(FileFormat.AVRO);
     }
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setTableName(clusterName);
-    segmentGenSpec.setIndexOutputDir(outputDir.getAbsolutePath());
+    segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
     return segmentGenSpec;
   }
 }

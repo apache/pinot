@@ -22,22 +22,22 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 public class RecordReaderFactory {
   public static RecordReader get(final SegmentGeneratorConfig segmentCreationSpec) throws Exception {
-    if (segmentCreationSpec.getInputFileFormat() == null) {
+    if (segmentCreationSpec.getFormat() == null) {
       throw new UnsupportedOperationException("No input format property!");
     }
 
-    if (segmentCreationSpec.getInputFileFormat() == FileFormat.AVRO || segmentCreationSpec.getInputFileFormat() == FileFormat.GZIPPED_AVRO) {
+    if (segmentCreationSpec.getFormat() == FileFormat.AVRO || segmentCreationSpec.getFormat() == FileFormat.GZIPPED_AVRO) {
       return new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(segmentCreationSpec), segmentCreationSpec.getInputFilePath());
 
-    } else if (segmentCreationSpec.getInputFileFormat() == FileFormat.CSV) {
-      return new CSVRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getRecordReaderConfig(),
+    } else if (segmentCreationSpec.getFormat() == FileFormat.CSV) {
+      return new CSVRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getReaderConfig(),
           segmentCreationSpec.getSchema());
 
-    } else if (segmentCreationSpec.getInputFileFormat() == FileFormat.JSON) {
+    } else if (segmentCreationSpec.getFormat() == FileFormat.JSON) {
       return new JSONRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getSchema());
     }
 
-    throw new UnsupportedOperationException("Not support input format: " + segmentCreationSpec.getInputFileFormat());
+    throw new UnsupportedOperationException("Unsupported input format: " + segmentCreationSpec.getFormat());
   }
 
   public static RecordReader get(FileFormat format, String fileName, FieldExtractor extractor) throws Exception {

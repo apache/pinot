@@ -61,11 +61,12 @@ public class SegmentTestUtils {
         new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
-    segmentGenSpec.setTimeUnitForSegment(timeUnit);
-    segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
+    segmentGenSpec.setSegmentTimeUnit(timeUnit);
+    segmentGenSpec.setFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setTableName(tableName);
-    segmentGenSpec.setIndexOutputDir(outputDir.getAbsolutePath());
+    segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
+    segmentGenSpec.createInvertedIndexForAllColumns();
     return segmentGenSpec;
   }
 

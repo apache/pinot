@@ -45,7 +45,6 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.docvaliterators.UnSortedSingleValueIterator;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -75,10 +74,10 @@ public class TestStarTreeIntegrationTest {
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setCreateStarTreeIndex(true);
+    config.setEnableStarTreeIndex(true);
     String tempOutputDir = "/tmp/star-tree-index";
-    config.setIndexOutputDir(tempOutputDir);
-    config.setInputFileFormat(FileFormat.AVRO);
+    config.setOutDir(tempOutputDir);
+    config.setFormat(FileFormat.AVRO);
     config.setSegmentName("testSimple");
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     final List<GenericRow> data = new ArrayList<>();

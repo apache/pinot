@@ -40,6 +40,7 @@ public class AbstractBaseCommand {
   public String getName() {
     return "BaseCommand";
   }
+
   public void printUsage() {
     System.out.println("Usage: " + this.getName());
 
@@ -54,6 +55,5 @@ public class AbstractBaseCommand {
   }
 
   public void cleanup() {
-  };
-
+  }
 }

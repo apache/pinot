@@ -95,7 +95,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
     this.config = config;
-    this.createStarTree = config.isCreateStarTreeIndex();
+    this.createStarTree = config.isEnableStarTreeIndex();
     // Initialize the record reader
     recordReader = reader;
     recordReader.init();
@@ -114,7 +114,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     indexCreator = new SegmentColumnarIndexCreator();
 
     // Ensure that the output directory exists
-    final File indexDir = new File(config.getIndexOutputDir());
+    final File indexDir = new File(config.getOutDir());
     if (!indexDir.exists()) {
       indexDir.mkdirs();
     }
@@ -339,7 +339,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished segment seal!");
 
     // Delete the directory named after the segment name, if it exists
-    final File outputDir = new File(config.getIndexOutputDir());
+    final File outputDir = new File(config.getOutDir());
     final File segmentOutputDir = new File(outputDir, segmentName);
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);

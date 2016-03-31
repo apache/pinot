@@ -21,15 +21,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
@@ -58,7 +55,7 @@ public class AvroDataPublisherTest {
             .addSingleValueDimension("column2", DataType.STRING).build();
 
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setInputFileFormat(FileFormat.AVRO);
+    config.setFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
     config.setSegmentVersion(SegmentVersion.v1);
@@ -99,7 +96,7 @@ public class AvroDataPublisherTest {
             .addSingleValueDimension("column2", DataType.STRING).build();
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
 
-    config.setInputFileFormat(FileFormat.AVRO);
+    config.setFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
     config.setSegmentVersion(SegmentVersion.v1);
@@ -135,7 +132,7 @@ public class AvroDataPublisherTest {
 
     final SegmentGeneratorConfig config =
         new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
-    config.setInputFileFormat(FileFormat.AVRO);
+    config.setFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
     config.setSegmentVersion(SegmentVersion.v1);

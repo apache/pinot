@@ -29,13 +29,8 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
 
@@ -46,52 +41,51 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
-  @Option(name = "-dataDir", required = true, metaVar = "<string>", usage = "Directory containing the data.")
+  @Option(name = "-generatorConfigFile", required = false, metaVar = "<string>",
+      usage = "Config file for segment generator.")
+  private String _generatorConfigFile;
+
+  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
 
   @Option(name = "-format", required = false, metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
-  private FileFormat _format = FileFormat.AVRO;
+  private FileFormat _format;
 
-  @Option(name = "-readerConfigFile", required = false, metaVar = "<string>", usage = "Config file for record readers")
-  private String _recordReaderConfigFile;
+  @Option(name = "-outDir", required = false, metaVar = "<string>", usage = "Name of output directory.")
+  private String _outDir;
 
-  @Option(name = "-tableName", required = true, metaVar = "<string>", usage = "Name of the table.")
+  @Option(name = "-overwrite", required = false, usage = "Overwrite existing output directory.")
+  private boolean _overwrite = false;
+
+  @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Name of the table.")
   private String _tableName;
 
-  @Option(name = "-segmentName", required = true, metaVar = "<string>", usage = "Name of the segment.")
+  @Option(name = "-segmentName", required = false, metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
 
   @Option(name = "-schemaFile", required = false, metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile;
 
-  @Option(name = "-outDir", required = true, metaVar = "<string>", usage = "Name of output directory.")
-  private String _outDir;
+  @Option(name = "-readerConfigFile", required = false, metaVar = "<string>", usage = "Config file for record reader.")
+  private String _readerConfigFile;
 
-  @Option(name = "-overwrite", required = false, metaVar = "<string>", usage = "Overwrite existing output directory.")
-  private boolean _overwrite = false;
-
-  @Option(name = "-enableStarTreeIndex", required = false, metaVar = "<string>", usage = "Enable Star Tree Index.")
+  @Option(name = "-enableStarTreeIndex", required = false, usage = "Enable Star Tree Index.")
   boolean _enableStarTreeIndex = false;
 
   @Option(name = "-starTreeIndexSpecFile", required = false, metaVar = "<string>",
-      usage = "Config file for star tree index")
+      usage = "Config file for star tree index.")
   private String _starTreeIndexSpecFile;
 
   @Option(name = "-numThreads", required = false, metaVar = "<int>",
-      usage = "Parallelism while generating segments. default is 1")
-  int _numThreads = 1;
+      usage = "Parallelism while generating segments, default is 1.")
+  private int _numThreads = 1;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
       usage = "Print this message.")
-  boolean _help = false;
+  private boolean _help = false;
 
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  public CreateSegmentCommand setSchemaFile(String schemaFile) {
-    _schemaFile = schemaFile;
+  public CreateSegmentCommand setGeneratorConfigFile(String generatorConfigFile) {
+    _generatorConfigFile = generatorConfigFile;
     return this;
   }
 
@@ -105,8 +99,13 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
-  public CreateSegmentCommand setReaderConfigFile(String file) {
-    _recordReaderConfigFile = file;
+  public CreateSegmentCommand setOutDir(String outDir) {
+    _outDir = outDir;
+    return this;
+  }
+
+  public CreateSegmentCommand setOverwrite(boolean overwrite) {
+    _overwrite = overwrite;
     return this;
   }
 
@@ -120,13 +119,13 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
-  public CreateSegmentCommand setOutputDir(String outDir) {
-    _outDir = outDir;
+  public CreateSegmentCommand setSchemaFile(String schemaFile) {
+    _schemaFile = schemaFile;
     return this;
   }
 
-  public CreateSegmentCommand setOverwrite(boolean overwrite) {
-    _overwrite = overwrite;
+  public CreateSegmentCommand setReaderConfigFile(String readerConfigFile) {
+    _readerConfigFile = readerConfigFile;
     return this;
   }
 
@@ -135,8 +134,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
-  public CreateSegmentCommand setStarTreeIndexSpecFile(String file) {
-    _starTreeIndexSpecFile = file;
+  public CreateSegmentCommand setStarTreeIndexSpecFile(String starTreeIndexSpecFile) {
+    _starTreeIndexSpecFile = starTreeIndexSpecFile;
     return this;
   }
 
@@ -147,10 +146,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @Override
   public String toString() {
-    return ("CreateSegment -schemaFile " + _schemaFile + " -dataDir " + _dataDir + " -format " + _format
-        + " -readerConfigFile " + _recordReaderConfigFile + " -tableName " + _tableName + " -segmentName "
-        + _segmentName + " -outDir " + _outDir + " -numThreads " + _numThreads + " -enableStarTreeIndex "
-        + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile + " -overwrite " + _overwrite);
+    return ("CreateSegment  -generatorConfigFile " + _generatorConfigFile + " -dataDir " + _dataDir + " -format "
+        + _format + " -outDir " + _outDir + " -overwrite " + _overwrite + " -tableName " + _tableName + " -segmentName "
+        + _segmentName + " -schemaFile " + _schemaFile + " -readerConfigFile " + _readerConfigFile
+        + " -enableStarTreeIndex " + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile
+        + " -numThreads " + _numThreads);
   }
 
   @Override
@@ -159,18 +159,94 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   @Override
-  public void cleanup() {
-  }
-
-  @Override
   public String description() {
     return "Create pinot segments from provided avro/csv/json input data.";
   }
 
   @Override
-  public boolean execute() throws Exception {
-    LOGGER.info("Executing command: " + toString());
+  public boolean getHelp() {
+    return _help;
+  }
 
+  @Override
+  public boolean execute()
+      throws Exception {
+    LOGGER.info("Executing command: {}", toString());
+
+    // Load generator config if exist.
+    final SegmentGeneratorConfig segmentGeneratorConfig;
+    if (_generatorConfigFile != null) {
+      segmentGeneratorConfig =
+          new ObjectMapper().readValue(new File(_generatorConfigFile), SegmentGeneratorConfig.class);
+    } else {
+      segmentGeneratorConfig = new SegmentGeneratorConfig();
+    }
+
+    // Load config from segment generator config.
+    String configDataDir = segmentGeneratorConfig.getDataDir();
+    if (_dataDir == null) {
+      if (configDataDir == null) {
+        throw new RuntimeException("Must specify dataDir.");
+      }
+      _dataDir = configDataDir;
+    } else {
+      if (configDataDir != null && !configDataDir.equals(_dataDir)) {
+        LOGGER.warn("Find dataDir conflict in command line and config file, use config in command line: {}", _dataDir);
+      }
+    }
+
+    FileFormat configFormat = segmentGeneratorConfig.getFormat();
+    if (_format == null) {
+      _format = configFormat;
+    } else {
+      if (configFormat != _format) {
+        LOGGER.warn("Find format conflict in command line and config file, use config in command line: {}", _format);
+      }
+    }
+
+    String configOutDir = segmentGeneratorConfig.getOutDir();
+    if (_outDir == null) {
+      if (configOutDir == null) {
+        throw new RuntimeException("Must specify outDir.");
+      }
+      _outDir = configOutDir;
+    } else {
+      if (configOutDir != null && !configOutDir.equals(_outDir)) {
+        LOGGER.warn("Find outDir conflict in command line and config file, use config in command line: {}", _outDir);
+      }
+    }
+
+    if (segmentGeneratorConfig.isOverwrite()) {
+      _overwrite = true;
+    }
+
+    String configTableName = segmentGeneratorConfig.getTableName();
+    if (_tableName == null) {
+      if (configTableName == null) {
+        throw new RuntimeException("Must specify tableName.");
+      }
+      _tableName = configTableName;
+    } else {
+      if (configTableName != null && !configTableName.equals(_tableName)) {
+        LOGGER.warn("Find tableName conflict in command line and config file, use config in command line: {}",
+            _tableName);
+      }
+    }
+
+    String configSegmentName = segmentGeneratorConfig.getSegmentName();
+    if (_segmentName == null) {
+      if (configSegmentName == null) {
+        throw new RuntimeException("Must specify segmentName.");
+      }
+      _segmentName = configSegmentName;
+    } else {
+      if (configSegmentName != null && !configSegmentName.equals(_segmentName)) {
+        LOGGER.warn("Find segmentName conflict in command line and config file, use config in command line: {}",
+            _segmentName);
+      }
+    }
+
+    // Filter out all input files.
     File dir = new File(_dataDir);
     if (!dir.exists() || !dir.isDirectory()) {
       throw new RuntimeException("Data directory " + _dataDir + " not found.");
@@ -184,42 +260,54 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     });
 
     if ((files == null) || (files.length == 0)) {
-      throw new RuntimeException("Data directory " + _dataDir + " does not contain AVRO files.");
+      throw new RuntimeException(
+          "Data directory " + _dataDir + " does not contain " + _format.toString().toUpperCase() + " files.");
     }
 
     // Make sure output directory does not already exist, or can be overwritten.
-    File odir = new File(_outDir);
-    if (odir.exists()) {
+    File outDir = new File(_outDir);
+    if (outDir.exists()) {
       if (!_overwrite) {
-        throw new IOException("Error: Output directory already exists.");
+        throw new IOException("Output directory " + _outDir + " already exists.");
       } else {
-        FileUtils.deleteDirectory(odir);
+        FileUtils.deleteDirectory(outDir);
       }
     }
 
-    final Schema schema;
+    // Set other generator configs from command line.
+    segmentGeneratorConfig.setDataDir(_dataDir);
+    segmentGeneratorConfig.setFormat(_format);
+    segmentGeneratorConfig.setOutDir(_outDir);
+    segmentGeneratorConfig.setOverwrite(_overwrite);
+    segmentGeneratorConfig.setTableName(_tableName);
+    segmentGeneratorConfig.setSegmentName(_segmentName);
     if (_schemaFile != null) {
-      File schemaFile = new File(_schemaFile);
-      schema = new ObjectMapper().readValue(schemaFile, Schema.class);
-    } else if (_format == FileFormat.AVRO) {
-      schema = AvroUtils.extractSchemaFromAvro(files[0]);
-    } else {
-      LOGGER.error("Error: Input format requires schema");
-      return false;
+      if (segmentGeneratorConfig.getSchemaFile() != null && !segmentGeneratorConfig.getSchemaFile()
+          .equals(_schemaFile)) {
+        LOGGER.warn("Find schemaFile conflict in command line and config file, use config in command line: {}",
+            _schemaFile);
+      }
+      segmentGeneratorConfig.setSchemaFile(_schemaFile);
     }
-
-    final CSVRecordReaderConfig recordReaderConfig;
-    if (_recordReaderConfigFile != null) {
-      recordReaderConfig = new ObjectMapper().readValue(new File(_recordReaderConfigFile), CSVRecordReaderConfig.class);
-    } else {
-      recordReaderConfig = null;
+    if (_readerConfigFile != null) {
+      if (segmentGeneratorConfig.getReaderConfigFile() != null && !segmentGeneratorConfig.getReaderConfigFile()
+          .equals(_readerConfigFile)) {
+        LOGGER.warn("Find readerConfigFile conflict in command line and config file, use config in command line: {}",
+            _readerConfigFile);
+      }
+      segmentGeneratorConfig.setReaderConfigFile(_readerConfigFile);
     }
-
-    final StarTreeIndexSpec starTreeIndexSpec;
+    if (_enableStarTreeIndex) {
+      segmentGeneratorConfig.setEnableStarTreeIndex(true);
+    }
     if (_starTreeIndexSpecFile != null) {
-      starTreeIndexSpec = new ObjectMapper().readValue(new File(_starTreeIndexSpecFile), StarTreeIndexSpec.class);
-    } else {
-      starTreeIndexSpec = null;
+      if (segmentGeneratorConfig.getStarTreeIndexSpecFile() != null
+          && !segmentGeneratorConfig.getStarTreeIndexSpecFile().equals(_starTreeIndexSpecFile)) {
+        LOGGER.warn(
+            "Find starTreeIndexSpecFile conflict in command line and config file, use config in command line: {}",
+            _starTreeIndexSpecFile);
+      }
+      segmentGeneratorConfig.setStarTreeIndexSpecFile(_starTreeIndexSpecFile);
     }
 
     ExecutorService executor = Executors.newFixedThreadPool(_numThreads);
@@ -231,33 +319,14 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
         @Override
         public void run() {
           try {
-
-            SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-            config.setInputFileFormat(_format);
-            config.setRecordeReaderConfig(recordReaderConfig);
-            config.setSegmentVersion(SegmentVersion.v1);
-
-            config.setIndexOutputDir(_outDir);
-            config.setTableName(_tableName);
-
+            SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentGeneratorConfig);
             config.setInputFilePath(file.getAbsolutePath());
             config.setSegmentName(_segmentName + "_" + segCnt);
+            config.loadConfigFiles();
 
-            if (schema.getTimeColumnName() != null) {
-              config.setTimeColumnName(schema.getTimeColumnName());
-            }
-
-            if (schema.getTimeFieldSpec() != null) {
-              config.setTimeUnitForSegment(schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType());
-            } else {
-              config.setTimeUnitForSegment(TimeUnit.DAYS);
-            }
-            config.setCreateStarTreeIndex(_enableStarTreeIndex);
-            config.setStarTreeIndexSpec(starTreeIndexSpec);
             final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
             driver.init(config);
             driver.build();
-
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -267,8 +336,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     }
 
     executor.shutdown();
-    executor.awaitTermination(1, TimeUnit.HOURS);
-
-    return true;
+    return executor.awaitTermination(1, TimeUnit.HOURS);
   }
 }

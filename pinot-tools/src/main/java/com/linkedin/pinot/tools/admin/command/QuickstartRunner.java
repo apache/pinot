@@ -197,7 +197,7 @@ public class QuickstartRunner {
         segmentBuilder.setDataDir(request.getDataDir().getAbsolutePath()).setFormat(request.getSegmentFileFormat())
             .setSchemaFile(request.getSchemaFile().getAbsolutePath()).setTableName(request.getTableName())
             .setSegmentName(request.getTableName() + "_" + String.valueOf(System.currentTimeMillis()))
-            .setOutputDir(tempDir.getAbsolutePath()).setOverwrite(true);
+            .setOutDir(tempDir.getAbsolutePath()).setOverwrite(true);
         segmentBuilder.execute();
         segments.add(tempDir.getAbsolutePath());
       }

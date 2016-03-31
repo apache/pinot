@@ -160,15 +160,15 @@ public class HadoopSegmentCreationMapReduceJob {
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
-      segmentGeneratorConfig.setInputFileFormat(fileFormat);
+      segmentGeneratorConfig.setFormat(fileFormat);
       if (null != _postfix) {
         segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
       } else {
         segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       }
-      segmentGeneratorConfig.setRecordeReaderConfig(getReaderConfig(fileFormat));
+      segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
 
-      segmentGeneratorConfig.setIndexOutputDir(_localDiskSegmentDirectory);
+      segmentGeneratorConfig.setOutDir(_localDiskSegmentDirectory);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);

@@ -724,7 +724,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
-            genConfig.setCreateStarTreeIndex(createStarTreeIndex);
+            genConfig.setEnableStarTreeIndex(createStarTreeIndex);
             genConfig.setStarTreeIndexSpec(null);
 
             final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

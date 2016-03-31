@@ -235,7 +235,7 @@ public class ClusterStarter {
     if (_inputDataDir != null) {
       CreateSegmentCommand segmentCreator =
           new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName)
-              .setTableName(_tableName).setSegmentName(_segmentName).setOutputDir(_segmentDirName).setOverwrite(true)
+              .setTableName(_tableName).setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true)
               .setEnableStarTreeIndex(_enableStarTreeIndex);
 
       segmentCreator.execute();

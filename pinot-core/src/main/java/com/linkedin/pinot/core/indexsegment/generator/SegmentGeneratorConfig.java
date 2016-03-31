@@ -15,185 +15,385 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Configuration properties used in the creation of index segments.
  */
 public class SegmentGeneratorConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
-  private Map<String, String> properties;
-  private Schema schema;
-  private RecordReaderConfig recordReaderConfig;
+  private Map<String, String> _customProperties = new HashMap<>();
+  private List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private String _dataDir = null;
+  private String _inputFilePath = null;
+  private FileFormat _format = FileFormat.AVRO;
+  private String _outDir = null;
+  private boolean _overwrite = false;
+  private String _tableName = null;
+  private String _segmentName = null;
+  private String _segmentNamePostfix = null;
+  private String _segmentTimeColumnName = null;
+  private TimeUnit _segmentTimeUnit = null;
+  private String _segmentCreationTime = null;
+  private String _segmentStartTime = null;
+  private String _segmentEndTime = null;
+  private SegmentVersion _segmentVersion = SegmentVersion.v1;
+  private String _schemaFile = null;
+  private Schema _schema = null;
+  private String _readerConfigFile = null;
+  private RecordReaderConfig _readerConfig = null;
+  private boolean _enableStarTreeIndex = false;
+  private String _starTreeIndexSpecFile = null;
+  private StarTreeIndexSpec _starTreeIndexSpec = null;
 
-  /**
-   * For inverted Index : default
-   */
-  private boolean createInvertedIndex = false;
-  private boolean createStarTreeIndex = false;
-  private List<String> invertedIndexCreationColumns = new ArrayList<String>();
+  public SegmentGeneratorConfig() {
+  }
 
-  private String segmentNamePostfix = null;
-  private String segmentName = null;
-  private String tableName = null;
-  private String segmentTimeColumnName = null;
-  private TimeUnit segmentTimeUnit = null;
-  private String indexOutputDir = null;
-  private SegmentVersion segmentVersion = SegmentVersion.v1;
-  private String segmentCreationTime = null;
-  private String segmentStartTime = null;
-  private String segmentEndTime = null;
-  private FileFormat inputFileFormat = FileFormat.AVRO;
-  private File inputDataFilePath = null;
-  private StarTreeIndexSpec starTreeIndexSpec;
-
-  /*
-   *
-   * Segment metadata, needed properties to sucessfull create the segment
-   *
-   * */
+  public SegmentGeneratorConfig(SegmentGeneratorConfig config) {
+    Preconditions.checkNotNull(config);
+    _customProperties.putAll(config._customProperties);
+    _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
+    _dataDir = config._dataDir;
+    _inputFilePath = config._inputFilePath;
+    _format = config._format;
+    _outDir = config._outDir;
+    _overwrite = config._overwrite;
+    _tableName = config._tableName;
+    _segmentName = config._segmentName;
+    _segmentNamePostfix = config._segmentNamePostfix;
+    _segmentTimeColumnName = config._segmentTimeColumnName;
+    _segmentTimeUnit = config._segmentTimeUnit;
+    _segmentCreationTime = config._segmentCreationTime;
+    _segmentStartTime = config._segmentStartTime;
+    _segmentEndTime = config._segmentEndTime;
+    _segmentVersion = config._segmentVersion;
+    _schemaFile = config._schemaFile;
+    _schema = config._schema;
+    _readerConfigFile = config._readerConfigFile;
+    _readerConfig = config._readerConfig;
+    _enableStarTreeIndex = config._enableStarTreeIndex;
+    _starTreeIndexSpecFile = config._starTreeIndexSpecFile;
+    _starTreeIndexSpec = config._starTreeIndexSpec;
+  }
 
   public SegmentGeneratorConfig(Schema schema) {
-    properties = new HashMap<String, String>();
-    this.schema = schema;
+    _schema = schema;
   }
 
-  public void setSegmentNamePostfix(String prefix) {
-    segmentNamePostfix = prefix;
+  public Map<String, String> getCustomProperties() {
+    return _customProperties;
   }
 
-  public String getSegmentNamePostfix() {
-    return segmentNamePostfix;
+  public void setCustomProperties(Map<String, String> properties) {
+    Preconditions.checkNotNull(properties);
+    _customProperties.putAll(properties);
   }
 
-  /**
-   *
-   * inverted index creation by default is set to false,
-   * it can be turned on, on a per column basis
-   */
-
-  @Deprecated
-  private void setCreateInvertedIndex(boolean create) {
-    createInvertedIndex = create;
-  }
-
-  public boolean isCreateInvertedIndexEnabled() {
-    return createInvertedIndex;
-  }
-
-  public void createInvertedIndexForColumn(String column) {
-    if (createInvertedIndex == false) {
-      createInvertedIndex = true;
-    }
-    invertedIndexCreationColumns.add(column);
-  }
-
-  public void createInvertedIndexForAllColumns() {
-    if (schema == null) {
-      throw new RuntimeException(
-          "schema cannot be null, make sure that schema is property set before calling this method");
-    }
-    createInvertedIndex = true;
-    for (FieldSpec spec : schema.getAllFieldSpecs()) {
-      invertedIndexCreationColumns.add(spec.getName());
-    }
+  public boolean containsCustomProperty(String key) {
+    Preconditions.checkNotNull(key);
+    return _customProperties.containsKey(key);
   }
 
   public List<String> getInvertedIndexCreationColumns() {
-    return invertedIndexCreationColumns;
+    return _invertedIndexCreationColumns;
   }
 
-  public void setSegmentName(String segmentName) {
-    this.segmentName = segmentName;
+  public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
+    Preconditions.checkNotNull(indexCreationColumns);
+    _invertedIndexCreationColumns.addAll(indexCreationColumns);
   }
 
-  public String getSegmentName() {
-    return segmentName;
+  public void createInvertedIndexForColumn(String column) {
+    Preconditions.checkNotNull(column);
+    if (_schema != null && _schema.getFieldSpecFor(column) == null) {
+      LOGGER.warn("Cannot find column {} in schema, will not create inverted index.", column);
+      return;
+    }
+    if (_schema == null) {
+      LOGGER.warn("Schema has not been set, column {} might not exist in schema after all.", column);
+    }
+    _invertedIndexCreationColumns.add(column);
   }
 
-  public void setCustomProperty(String key, String value) {
-    properties.put(key, value);
+  public void createInvertedIndexForAllColumns() {
+    if (_schema == null) {
+      LOGGER.warn("Schema has not been set, will not create inverted index for all columns.");
+      return;
+    }
+    for (FieldSpec spec : _schema.getAllFieldSpecs()) {
+      _invertedIndexCreationColumns.add(spec.getName());
+    }
   }
 
-  public boolean containsCustomPropertyWithKey(String key) {
-    return properties.containsKey(key);
+  public String getDataDir() {
+    return _dataDir;
   }
 
-  public String getCustomProperty(String key) {
-    return properties.get(key).toString();
+  public void setDataDir(String dataDir) {
+    _dataDir = dataDir;
   }
 
-  public void setTableName(String resourceName) {
-    tableName = resourceName;
+  public String getInputFilePath() {
+    return _inputFilePath;
+  }
+
+  public void setInputFilePath(String inputFilePath) {
+    Preconditions.checkNotNull(inputFilePath);
+    File inputFile = new File(inputFilePath);
+    Preconditions.checkState(inputFile.exists(), "Input path {} does not exist.", inputFilePath);
+    Preconditions.checkState(inputFile.isFile(), "Input path {} is not a file.", inputFilePath);
+    _inputFilePath = inputFile.getAbsolutePath();
+  }
+
+  public FileFormat getFormat() {
+    return _format;
+  }
+
+  public void setFormat(FileFormat format) {
+    _format = format;
+  }
+
+  public String getOutDir() {
+    return _outDir;
+  }
+
+  public void setOutDir(String dir) {
+    Preconditions.checkNotNull(dir);
+    final File outputDir = new File(dir);
+    if (outputDir.exists()) {
+      Preconditions.checkState(outputDir.isDirectory(), "Path {} is not a directory.", dir);
+    } else {
+      Preconditions.checkState(outputDir.mkdir(), "Cannot create output dir: {}", dir);
+    }
+    _outDir = outputDir.getAbsolutePath();
+  }
+
+  public boolean isOverwrite() {
+    return _overwrite;
+  }
+
+  public void setOverwrite(boolean overwrite) {
+    _overwrite = overwrite;
   }
 
   public String getTableName() {
-    return tableName;
+    return _tableName;
   }
 
-  public String getDimensions() {
-    return getQualifyingDimensions(FieldType.DIMENSION);
+  public void setTableName(String tableName) {
+    _tableName = tableName;
   }
 
-  public String getMetrics() {
-    return getQualifyingDimensions(FieldType.METRIC);
+  public String getSegmentName() {
+    return _segmentName;
   }
 
-  public void setTimeColumnName(String name) {
-    segmentTimeColumnName = name;
+  public void setSegmentName(String segmentName) {
+    _segmentName = segmentName;
+  }
+
+  public String getSegmentNamePostfix() {
+    return _segmentNamePostfix;
+  }
+
+  public void setSegmentNamePostfix(String postfix) {
+    _segmentNamePostfix = postfix;
   }
 
   public String getTimeColumnName() {
-    if (segmentTimeColumnName != null) {
-      return segmentTimeColumnName;
+    if (_segmentTimeColumnName != null) {
+      return _segmentTimeColumnName;
     }
     return getQualifyingDimensions(FieldType.TIME);
   }
 
-  public void setTimeUnitForSegment(TimeUnit timeUnit) {
-    segmentTimeUnit = timeUnit;
+  public void setTimeColumnName(String timeColumnName) {
+    _segmentTimeColumnName = timeColumnName;
   }
 
-  public TimeUnit getTimeUnitForSegment() {
-    if (segmentTimeUnit != null) {
-      return segmentTimeUnit;
+  public TimeUnit getSegmentTimeUnit() {
+    if (_segmentTimeUnit != null) {
+      return _segmentTimeUnit;
     } else {
-      if (schema.getTimeFieldSpec() != null) {
-        if (schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {
-          return schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
+      if (_schema.getTimeFieldSpec() != null) {
+        if (_schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {
+          return _schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
         }
-        if (schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
-          return schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType();
+        if (_schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
+          return _schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType();
         }
       }
       return TimeUnit.DAYS;
     }
   }
 
-  public Map<String, String> getAllCustomKeyValuePair() {
-    return properties;
+  public void setSegmentTimeUnit(TimeUnit timeUnit) {
+    _segmentTimeUnit = timeUnit;
   }
 
-  public void setRecordeReaderConfig(RecordReaderConfig readerConfig) {
-    recordReaderConfig = readerConfig;
+  public String getCreationTime() {
+    return _segmentCreationTime;
   }
 
-  public RecordReaderConfig getRecordReaderConfig() {
-    return recordReaderConfig;
+  public void setCreationTime(String creationTime) {
+    _segmentCreationTime = creationTime;
+  }
+
+  public String getStartTime() {
+    return _segmentStartTime;
+  }
+
+  public void setStartTime(String startTime) {
+    _segmentStartTime = startTime;
+  }
+
+  public String getEndTime() {
+    return _segmentEndTime;
+  }
+
+  public void setEndTime(String endTime) {
+    _segmentEndTime = endTime;
+  }
+
+  public SegmentVersion getSegmentVersion() {
+    return _segmentVersion;
+  }
+
+  public void setSegmentVersion(SegmentVersion segmentVersion) {
+    _segmentVersion = segmentVersion;
+  }
+
+  public String getSchemaFile() {
+    return _schemaFile;
+  }
+
+  public void setSchemaFile(String schemaFile) {
+    _schemaFile = schemaFile;
+  }
+
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  public void setSchema(Schema schema) {
+    Preconditions.checkNotNull(schema);
+    _schema = schema;
+    if (_invertedIndexCreationColumns != null) {
+      Iterator<String> iterator = _invertedIndexCreationColumns.iterator();
+      while (iterator.hasNext()) {
+        String column = iterator.next();
+        if (_schema.getFieldSpecFor(column) == null) {
+          LOGGER.warn("Cannot find column {} in schema, will not create inverted index.", column);
+          iterator.remove();
+        }
+      }
+    }
+  }
+
+  public String getReaderConfigFile() {
+    return _readerConfigFile;
+  }
+
+  public void setReaderConfigFile(String readerConfigFile) {
+    _readerConfigFile = readerConfigFile;
+  }
+
+  public RecordReaderConfig getReaderConfig() {
+    return _readerConfig;
+  }
+
+  public void setReaderConfig(RecordReaderConfig readerConfig) {
+    _readerConfig = readerConfig;
+  }
+
+  public boolean isEnableStarTreeIndex() {
+    return _enableStarTreeIndex;
+  }
+
+  public void setEnableStarTreeIndex(boolean enableStarTreeIndex) {
+    _enableStarTreeIndex = enableStarTreeIndex;
+  }
+
+  public String getStarTreeIndexSpecFile() {
+    return _starTreeIndexSpecFile;
+  }
+
+  public void setStarTreeIndexSpecFile(String starTreeIndexSpecFile) {
+    _starTreeIndexSpecFile = starTreeIndexSpecFile;
+  }
+
+  public StarTreeIndexSpec getStarTreeIndexSpec() {
+    return _starTreeIndexSpec;
+  }
+
+  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
+    _starTreeIndexSpec = starTreeIndexSpec;
+  }
+
+  @JsonIgnore
+  public String getMetrics() {
+    return getQualifyingDimensions(FieldType.METRIC);
+  }
+
+  public void loadConfigFiles()
+      throws IOException {
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    Schema schema;
+    if (_schemaFile != null) {
+      schema = objectMapper.readValue(new File(_schemaFile), Schema.class);
+      setSchema(schema);
+    } else if (_format == FileFormat.AVRO) {
+      schema = AvroUtils.extractSchemaFromAvro(new File(_inputFilePath));
+      setSchema(schema);
+    } else {
+      throw new RuntimeException("Input format " + _format + " requires schema.");
+    }
+    setTimeColumnName(schema.getTimeColumnName());
+    TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
+    if (timeFieldSpec != null) {
+      setSegmentTimeUnit(timeFieldSpec.getIncomingGranularitySpec().getTimeType());
+    } else {
+      setSegmentTimeUnit(TimeUnit.DAYS);
+    }
+
+    if (_readerConfigFile != null) {
+      setReaderConfig(objectMapper.readValue(new File(_readerConfigFile), CSVRecordReaderConfig.class));
+    }
+
+    if (_starTreeIndexSpecFile != null) {
+      setStarTreeIndexSpec(objectMapper.readValue(new File(_starTreeIndexSpecFile), StarTreeIndexSpec.class));
+    }
+  }
+
+  @JsonIgnore
+  public String getDimensions() {
+    return getQualifyingDimensions(FieldType.DIMENSION);
   }
 
   /**
@@ -201,6 +401,7 @@ public class SegmentGeneratorConfig {
    * @param type FieldType to filter on
    * @return
    */
+  @JsonIgnore
   private String getQualifyingDimensions(FieldType type) {
     List<String> dimensions = new ArrayList<>();
 
@@ -211,110 +412,5 @@ public class SegmentGeneratorConfig {
     }
     Collections.sort(dimensions);
     return StringUtils.join(dimensions, ",");
-  }
-
-  public void setIndexOutputDir(String dir) {
-    final File outputDirectory = new File(dir);
-    if (!outputDirectory.exists()) {
-      outputDirectory.mkdirs();
-    }
-    indexOutputDir = dir;
-  }
-
-  public String getIndexOutputDir() {
-    return indexOutputDir;
-  }
-
-  public void setSegmentVersion(SegmentVersion segmentVersion) {
-    this.segmentVersion = segmentVersion;
-  }
-
-  public SegmentVersion getSegmentVersion() {
-    return segmentVersion;
-  }
-
-  public void setCreationTime(String creationTime) {
-    segmentCreationTime = creationTime;
-  }
-
-  public String getCreationTime() {
-    return segmentCreationTime;
-  }
-
-  public void setStartTime(String startTime) {
-    segmentStartTime = startTime;
-  }
-
-  public String getStartTime() {
-    return segmentStartTime;
-  }
-
-  public void setEndTime(String endTime) {
-    segmentEndTime = endTime;
-  }
-
-  public String getEndTime() {
-    return segmentEndTime;
-  }
-
-  public void setTimeUnit(String timeUnit) {
-    segmentTimeUnit = TimeUnit.valueOf(timeUnit);
-  }
-
-  public String getTimeUnit() {
-    return segmentTimeUnit.toString();
-  }
-
-  public FileFormat getInputFileFormat() {
-    return inputFileFormat;
-  }
-
-  public void setInputFileFormat(FileFormat format) {
-    inputFileFormat = format;
-  }
-
-  public String getInputFilePath() {
-    return inputDataFilePath.getAbsolutePath();
-  }
-
-  public void setInputFilePath(String path) {
-    if (path != null) {
-      inputDataFilePath = new File(path);
-      if (!inputDataFilePath.exists()) {
-        throw new RuntimeException("input path needs to exist: " + inputDataFilePath);
-      }
-    }
-  }
-
-  public List<String> getProjectedColumns() {
-    List<String> ret = new ArrayList<String>();
-    for (FieldSpec spec : schema.getAllFieldSpecs()) {
-      ret.add(spec.getName());
-    }
-    return ret;
-  }
-
-  public StarTreeIndexSpec getStarTreeIndexSpec() {
-    return starTreeIndexSpec;
-  }
-
-  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
-    this.starTreeIndexSpec = starTreeIndexSpec;
-  }
-
-  public Schema getSchema() {
-    return schema;
-  }
-
-  public boolean isCreateStarTreeIndex() {
-    return createStarTreeIndex;
-  }
-
-  public void setCreateStarTreeIndex(boolean createStarTreeIndex) {
-    this.createStarTreeIndex = createStarTreeIndex;
-  }
-
-  public void setSchema(Schema schema) {
-    this.schema = schema;
   }
 }
