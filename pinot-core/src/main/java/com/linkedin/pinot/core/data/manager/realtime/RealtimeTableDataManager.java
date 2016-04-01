@@ -16,12 +16,15 @@
 package com.linkedin.pinot.core.data.manager.realtime;
 
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -60,7 +63,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   protected void doInit() {
-      LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
+    LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
   }
 
   public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, IndexSegment segment) {
@@ -118,6 +121,11 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper = PinotHelixPropertyStoreZnRecordProvider.forSchema(propertyStore);
       ZNRecord record = propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName());
       LOGGER.info("found schema {} ", tableConfig.getValidationConfig().getSchemaName());
+      Schema schema = Schema.fromZNRecord(record);
+      if (!isValid(schema, tableConfig.getIndexingConfig())) {
+        LOGGER.error("Not adding segment {}", segmentId);
+        throw new RuntimeException("Mismatching schema/table config for " + _tableName);
+      }
       SegmentDataManager manager =
           new RealtimeSegmentDataManager(segmentZKMetadata, tableConfig,
               instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode, Schema.fromZNRecord(record),
@@ -131,6 +139,49 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       }
       _loadingSegments.add(segmentId);
     }
+  }
+
+  /**
+   * Validate a schema against the table config for real-time record consumption.
+   * Ideally, we should validate these things when schema is added or table is created, but either of these
+   * may be changed while the table is already provisioned. For the change to take effect, we need to restart the
+   * servers, so  validation at this place is fine.
+   *
+   * As of now, the following validations are done:
+   * 1. Make sure that the sorted column, if specified, is not multi-valued.
+   * 2. Validate the schema itself
+   *
+   * We allow the user to specify multiple sorted columns, but only consider the first one for now.
+   * (secondary sort is not yet implemnented).
+   *
+   * If we add more validations, it may make sense to split this method into multiple validation methods.
+   * But then, we are trying to figure out all the invalid cases before we return from this method...
+   *
+   * @param schema
+   * @param indexingConfig
+   * @return true if schema is valid.
+   */
+  private boolean isValid(Schema schema, IndexingConfig indexingConfig) {
+    // 1. Make sure that the sorted column is not a multi-value field.
+    List<String> sortedColumns = indexingConfig.getSortedColumn();
+    boolean isValid = true;
+    if (!sortedColumns.isEmpty()) {
+      final String sortedColumn = sortedColumns.get(0);
+      if (sortedColumns.size() > 0) {
+        LOGGER.warn("More than one sorted column configured. Using {}", sortedColumn);
+      }
+      FieldSpec fieldSpec = schema.getFieldSpecFor(sortedColumn);
+      if (!fieldSpec.isSingleValueField()) {
+        LOGGER.error("Cannot configure multi-valued column {} as sorted column", sortedColumn);
+        isValid = false;
+      }
+    }
+    // 2. We want to get the schema errors, if any, even if isValid is false;
+    if (!schema.validate(LOGGER)) {
+      isValid = false;
+    }
+
+    return isValid;
   }
 
   @Override

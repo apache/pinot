@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -29,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.ZNRecord;
@@ -42,9 +36,12 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 /**
@@ -285,6 +282,34 @@ public class Schema {
 
   public void setSchemaName(String schemaName) {
     this.schemaName = schemaName;
+  }
+
+  /**
+   * Validates a pinot schema. The following validations are performed:
+   * - All fields must have a default value.
+   * @param ctxLogger to log the message (if null, the current class logger is used)
+   * @return
+   */
+  public boolean validate(Logger ctxLogger) {
+    Collection<FieldSpec> fieldSpecs = getAllFieldSpecs();
+    if (ctxLogger == null) {
+      ctxLogger = LOGGER;
+    }
+    boolean isValid = true;
+    // Log ALL the schema errors that may be present.
+    for (FieldSpec fieldSpec : fieldSpecs) {
+      Object o = null;
+      try {
+        o = fieldSpec.getDefaultNullValue();
+      } catch (Exception e) {
+      }
+      if (o == null) {
+        ctxLogger.error("Field {} of type {} does not have a default value",
+            fieldSpec.getName(), fieldSpec.getFieldType());
+        isValid = false;
+      }
+    }
+    return isValid;
   }
 
   @Override
