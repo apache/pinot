@@ -1,17 +1,15 @@
 /**
  * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 package com.linkedin.pinot.integration.tests;
 
@@ -50,16 +48,16 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
 /**
- * Integration test for Star Tree based indexes:
- * - Sets up the Pinot cluster and creates two tables, one with default indexes, and another with star tree indexes.
- * - Sends queries to both the tables and asserts that results match.
- * - Query to reference table is sent with TOP 10000, and the comparator ensures that response from star tree is contained
- *   within the reference response. This is to avoid false failures when groups with same value are truncated due to LIMIT or TOP N.
+ * Integration test for Star Tree based indexes: - Sets up the Pinot cluster and creates two tables,
+ * one with default indexes, and another with star tree indexes. - Sends queries to both the tables
+ * and asserts that results match. - Query to reference table is sent with TOP 10000, and the
+ * comparator ensures that response from star tree is contained within the reference response. This
+ * is to avoid false failures when groups with same value are truncated due to LIMIT or TOP N.
  */
 public class StarTreeClusterIntegrationTest extends ClusterTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
   private static final int TOTAL_EXPECTED_DOCS = 115545;
   private final String DEFAULT_TABLE_NAME = "myTable";
 
@@ -71,6 +69,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
   private final int RETENTION_TIME = 3000;
   private static final int SEGMENT_COUNT = 12;
+  private static final long TIMEOUT_IN_MILLISECONDS = 15 * 1000;
   private static final long TIMEOUT_IN_SECONDS = 3600;
 
   private final File _tmpDir = new File("/tmp/StarTreeClusterIntegrationTest");
@@ -80,15 +79,10 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
   private File _queryFile;
 
   /**
-   * Start the Pinot Cluster:
-   * - Zookeeper
-   * - One Controller
-   * - One Broker
-   * - Two Servers
+   * Start the Pinot Cluster: - Zookeeper - One Controller - One Broker - Two Servers
    * @throws Exception
    */
-  private void startCluster()
-      throws Exception {
+  private void startCluster() throws Exception {
 
     startZk();
     startController();
@@ -98,19 +92,17 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
   /**
    * Add the reference and star tree tables to the cluster.
-   *
    * @throws Exception
    */
-  private void addOfflineTables()
-      throws Exception {
-    addOfflineTable(DEFAULT_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT, null, null);
-    addOfflineTable(STAR_TREE_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT,
-        null, null);
+  private void addOfflineTables() throws Exception {
+    addOfflineTable(DEFAULT_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME,
+        RETENTION_TIME_UNIT, null, null);
+    addOfflineTable(STAR_TREE_TABLE_NAME, TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME,
+        RETENTION_TIME_UNIT, null, null);
   }
 
   /**
    * Generate the reference and star tree indexes and upload to corresponding tables.
-   *
    * @param avroFiles
    * @param tableName
    * @param starTree
@@ -124,8 +116,8 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     BaseClusterIntegrationTest.ensureDirectoryExistsAndIsEmpty(_tarredSegmentsDir);
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    BaseClusterIntegrationTest
-        .buildSegmentsFromAvro(avroFiles, executor, 0, _segmentsDir, _tarredSegmentsDir, tableName, starTree);
+    BaseClusterIntegrationTest.buildSegmentsFromAvro(avroFiles, executor, 0, _segmentsDir,
+        _tarredSegmentsDir, tableName, starTree);
 
     executor.shutdown();
     executor.awaitTermination(TIMEOUT_IN_SECONDS, TimeUnit.SECONDS);
@@ -133,20 +125,20 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     for (String segmentName : _tarredSegmentsDir.list()) {
       LOGGER.info("Uploading segment {}", segmentName);
       File file = new File(_tarredSegmentsDir, segmentName);
-      FileUploadUtils
-          .sendSegmentFile(ControllerTestUtils.DEFAULT_CONTROLLER_HOST, ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT,
-              segmentName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendSegmentFile(ControllerTestUtils.DEFAULT_CONTROLLER_HOST,
+          ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, segmentName, new FileInputStream(file),
+          file.length());
     }
   }
 
   /**
-   * Waits for total docs to match the expected value in the given table.
-   * There may be delay between
+   * Waits for total docs to match the expected value in the given table. There may be delay between
    * @param expectedRecordCount
    * @param deadline
    * @throws Exception
    */
-  private void waitForTotalDocsToMatch(String tableName, int expectedRecordCount, long deadline) throws Exception {
+  private void waitForTotalDocsToMatch(String tableName, int expectedRecordCount, long deadline)
+      throws Exception {
     int actualRecordCount;
 
     do {
@@ -154,7 +146,8 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       JSONObject response = postQuery(query);
       actualRecordCount = response.getInt("totalDocs");
 
-      String msg = "Actual record count: " + actualRecordCount + "\tExpected count: " + expectedRecordCount;
+      String msg =
+          "Actual record count: " + actualRecordCount + "\tExpected count: " + expectedRecordCount;
       LOGGER.info(msg);
       Assert.assertTrue(System.currentTimeMillis() < deadline,
           "Failed to read all records within the deadline.  " + msg);
@@ -164,8 +157,9 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
   /**
    * Wait for External View to be in sync with Ideal State.
+   * @return
    */
-  private void waitForExternalViewUpdate() {
+  private boolean waitForExternalViewUpdate() {
     final ZKHelixAdmin helixAdmin = new ZKHelixAdmin(ZkStarter.DEFAULT_ZK_STR);
     ClusterStateVerifier.Verifier customVerifier = new ClusterStateVerifier.Verifier() {
 
@@ -174,11 +168,13 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
         String clusterName = getHelixClusterName();
 
         List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
-        LOGGER.info("Waiting for external view to update " + new Timestamp(System.currentTimeMillis()));
+        LOGGER.info("Waiting for external view to update for resources: {} startTime: {}",
+            resourcesInCluster, new Timestamp(System.currentTimeMillis()));
 
         for (String resourceName : resourcesInCluster) {
           IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
           ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, resourceName);
+          LOGGER.info("HERE for {},\n IS:{} \n EV:{}", resourceName, idealState, externalView);
 
           if (idealState == null || externalView == null) {
             return false;
@@ -196,22 +192,22 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
               return false;
             }
           }
+          LOGGER.info("External View updated successfully for {},\n IS:{} \n EV:{}", resourceName,
+              idealState, externalView);
         }
 
-        LOGGER.info("External View updated successfully.");
+        LOGGER.info("External View updated successfully for {}", resourcesInCluster);
         return true;
       }
     };
 
-    ClusterStateVerifier.verifyByPolling(customVerifier, TIMEOUT_IN_SECONDS);
+    return ClusterStateVerifier.verifyByPolling(customVerifier, TIMEOUT_IN_MILLISECONDS);
   }
 
   /**
-   * Replace the star tree table name with reference table name, and add TOP 10000.
-   * The TOP 10000 is added to make the reference result a super-set of star tree result.
-   * This will ensure any groups with equal values that are truncated still appear in the
-   * reference result.
-   *
+   * Replace the star tree table name with reference table name, and add TOP 10000. The TOP 10000 is
+   * added to make the reference result a super-set of star tree result. This will ensure any groups
+   * with equal values that are truncated still appear in the reference result.
    * @param starQuery
    */
   private String convertToRefQuery(String starQuery) {
@@ -220,46 +216,48 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startCluster();
     addOfflineTables();
 
     BaseClusterIntegrationTest.ensureDirectoryExistsAndIsEmpty(_tmpDir);
     List<File> avroFiles = BaseClusterIntegrationTest.unpackAvroData(_tmpDir, SEGMENT_COUNT);
-    _queryFile = new File(TestUtils.getFileFromResourceUrl(
-        BaseClusterIntegrationTest.class.getClassLoader().getResource("OnTimeStarTreeQueries.txt")));
+    _queryFile = new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class
+        .getClassLoader().getResource("OnTimeStarTreeQueries.txt")));
 
     generateAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false);
     generateAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true);
 
     // Ensure that External View is in sync with Ideal State.
-    waitForExternalViewUpdate();
+    if (!waitForExternalViewUpdate()) {
+      Assert.fail("Cluster did not reach stable state");
+    }
 
-    // Wait until all docs are available, this is required because the broker routing tables may not be updated yet.
-    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 15000L);
-    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS, System.currentTimeMillis() + 15000L);
+    // Wait until all docs are available, this is required because the broker routing tables may not
+    // be updated yet.
+    waitForTotalDocsToMatch(DEFAULT_TABLE_NAME, TOTAL_EXPECTED_DOCS,
+        System.currentTimeMillis() + 1500000L);
+    waitForTotalDocsToMatch(STAR_TREE_TABLE_NAME, TOTAL_EXPECTED_DOCS,
+        System.currentTimeMillis() + 1500000L);
 
     // Initialize the query generator
-    SegmentInfoProvider dictionaryReader = new SegmentInfoProvider(_tarredSegmentsDir.getAbsolutePath());
+    SegmentInfoProvider dictionaryReader =
+        new SegmentInfoProvider(_tarredSegmentsDir.getAbsolutePath());
 
     List<String> dimensionColumns = dictionaryReader.getDimensionColumns();
     List<String> metricColumns = dictionaryReader.getMetricColumns();
     Map<String, List<String>> columnValuesMap = dictionaryReader.getColumnValuesMap();
 
-    _queryGenerator =
-        new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, dimensionColumns, metricColumns, columnValuesMap);
+    _queryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, dimensionColumns,
+        metricColumns, columnValuesMap);
   }
 
   /**
-   * Given a query string for star tree:
-   * - Get the result from star tree cluster
-   * - Convert the query to reference query (change table name, add TOP 10000)
-   * - Get the result from reference cluster
-   * - Compare the results and assert that result of star tree is contained in reference result.
-   *   NOTE: This method of testing is limited in that it cannot detect cases where a valid entry
-   *   is missing from star tree result (to be addressed in future).
-   *
+   * Given a query string for star tree: - Get the result from star tree cluster - Convert the query
+   * to reference query (change table name, add TOP 10000) - Get the result from reference cluster -
+   * Compare the results and assert that result of star tree is contained in reference result. NOTE:
+   * This method of testing is limited in that it cannot detect cases where a valid entry is missing
+   * from star tree result (to be addressed in future).
    * @param starQuery
    * @param expectNonZeroDocsScanned
    */
@@ -276,9 +274,8 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
       JSONObject refResponse = postQuery(refQuery);
 
       boolean result = QueryComparison.compare(starResponse, refResponse, false);
-      String message =
-          "Result mis-match for Query: " + starQuery + "\nStar: " + starResponse.toString() + "\nRef: " + refResponse
-              .toString();
+      String message = "Result mis-match for Query: " + starQuery + "\nStar: "
+          + starResponse.toString() + "\nRef: " + refResponse.toString();
       Assert.assertTrue(result, message);
     } catch (Exception e) {
       LOGGER.error("Exception caught when executing query {}", starQuery, e);
@@ -286,8 +283,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     stopBroker();
     stopController();
     stopServer();

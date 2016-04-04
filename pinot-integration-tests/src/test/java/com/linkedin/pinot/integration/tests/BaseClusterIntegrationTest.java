@@ -738,7 +738,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             LOGGER.info("Completed segment " + segmentNumber + " : " + segmentName +" from file " + inputAvroFile.getName());
             return new ImmutablePair<File, File>(inputAvroFile, new File(tarGzPath));
           } catch (Exception e) {
-            throw new RuntimeException(e);
+                LOGGER.error("Exception while building segment input: {} output {} ",
+                    avroFiles.get(segmentIndex), "segment-" + segmentNumber);
+                throw new RuntimeException(e);
           }
         }
       });
