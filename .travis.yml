@@ -1,0 +1,59 @@
+---
+language: java
+
+matrix:
+  fast_finish: true
+  include:
+    - jdk: openjdk7
+      script: MAVEN_OPTS="$MAVEN_OPTS -Xmx4g" &&  mvn clean install -Dassembly.skipAssembly=true -DskipTests
+    - jdk: oraclejdk8
+      script: MAVEN_OPTS="$MAVEN_OPTS -Xmx4g" &&  mvn clean install -Dassembly.skipAssembly=true -DskipTests
+    - jdk: openjdk7
+      script: MAVEN_OPTS="$MAVEN_OPTS -Xmx4g" && cd pinot-integration-tests && mvn test -Dassembly.skipAssembly=true
+    - jdk: oraclejdk8
+      script: MAVEN_OPTS="$MAVEN_OPTS -Xmx4g" && cd pinot-integration-tests && mvn test -Dassembly.skipAssembly=true
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-core"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-core"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-controller"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-controller"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-api"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-common"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-transport"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-broker"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-server"
+    - jdk: openjdk7
+      env: PINOT_MODULE="pinot-perf"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-api"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-common"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-transport"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-broker"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-server"
+    - jdk: oraclejdk8
+      env: PINOT_MODULE="pinot-perf"
+
+before_install:
+  - export MAVEN_OPTS="-Xmx4g -Xms4g -XX:MaxPermSize=512m"
+
+install: mvn clean install -DskipTests -Dassembly.skipAssembly=true > install.output
+
+script:
+  - MAVEN_OPTS="$MAVEN_OPTS -Xmx4g"
+  - mvn clean install -Dassembly.skipAssembly=true -DskipTests > install.output
+  - cd $PINOT_MODULE
+  - cp ../.travis_cmd.sh .
+  - bash .travis_cmd.sh
+

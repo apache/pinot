@@ -218,7 +218,11 @@ public class ChaosMonkeyIntegrationTest {
     int expectedRecordCount = Integer.parseInt(TOTAL_RECORD_COUNT);
     while (currentRecordCount != expectedRecordCount && System.currentTimeMillis() < timeInTwoMinutes) {
       sleep(1000L);
-      currentRecordCount = countRecords();
+      try {
+        currentRecordCount = countRecords();
+      } catch (Exception e) {
+        currentRecordCount = 0;
+      }
     }
     Assert.assertEquals(currentRecordCount, expectedRecordCount, "All segments did not load within 120 seconds");
 
