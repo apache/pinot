@@ -96,7 +96,11 @@ public abstract class ControllerTest {
   }
 
   protected void stopZk() {
-    ZkStarter.stopLocalZkServer(_zookeeperInstance);
+    try {
+      ZkStarter.stopLocalZkServer(_zookeeperInstance);
+    } catch (Exception e) {
+      // Swallow exceptions
+    }
   }
 
   /**
