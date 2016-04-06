@@ -15,17 +15,18 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.File;
 import java.util.List;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.plist.PropertyListConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -33,6 +34,9 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerGauge;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
@@ -52,6 +56,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
+  private final String tableName;
   private final String segmentName;
   private final Schema schema;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
@@ -65,11 +70,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
+  private AtomicLong lastUpdatedRawDocuments = new AtomicLong(0);
 
   private volatile boolean keepIndexing = true;
   private volatile boolean isShuttingDown = false;
 
   private TimerTask segmentStatusTask;
+  private final ServerMetrics serverMetrics;
   private final RealtimeTableDataManager notifier;
   private Thread indexingThread;
 
@@ -85,7 +92,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       final Schema schema, final ServerMetrics serverMetrics) throws Exception {
     super();
     this.schema = schema;
+    this.serverMetrics =serverMetrics;
     this.segmentName = segmentMetadata.getSegmentName();
+    this.tableName = tableConfig.getTableName();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig.getSortedColumn().isEmpty()) {
       LOGGER.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
@@ -176,6 +185,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             throw e;
           }
         } while (notFull && keepIndexing && (!isShuttingDown));
+
         if (isShuttingDown) {
           segmentLogger.info("Shutting down indexing thread!");
           return;
@@ -184,6 +194,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           segmentLogger.info("Indexing threshold reached, proceeding with index conversion");
           // kill the timer first
           segmentStatusTask.cancel();
+          updateCurrentDocumentCountMetrics();
           segmentLogger.info("Indexed {} raw events, current number of docs = {}",
               realtimeSegment.getRawDocumentCount(), realtimeSegment.getSegmentMetadata().getTotalDocs());
           File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
@@ -303,7 +314,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     });
 
     indexingThread.start();
-
+    serverMetrics.addValueToTableGauge(tableName, ServerGauge.SEGMENT_COUNT, 1L);
     segmentLogger.debug("scheduling keepIndexing timer check");
     // start a schedule timer to keep track of the segment
     TimerService.timer.schedule(segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
@@ -341,6 +352,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         keepIndexing = false;
       }
     }
+    updateCurrentDocumentCountMetrics();
+  }
+
+  private void updateCurrentDocumentCountMetrics() {
+    int currentRawDocs = realtimeSegment.getRawDocumentCount();
+    serverMetrics.addValueToTableGauge(tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
+    lastUpdatedRawDocuments.set(currentRawDocs);
   }
  
   @Override
