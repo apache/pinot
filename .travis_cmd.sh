@@ -19,20 +19,14 @@
 set -e
 
 export PING_SLEEP=30s
-export BUILD_OUTPUT=build.out
 
-touch $BUILD_OUTPUT
-
-dump_output() {
-   # nicely terminate the ping output loop
-   kill $PING_LOOP_PID
-   sleep 5s
-   echo Tailing the last 1000 lines of output:
-   tail -1000 $BUILD_OUTPUT
+kill_ping() {
+  # nicely terminate the ping output loop
+  kill $PING_LOOP_PID
 }
 error_handler() {
   echo ERROR: An error was encountered with the build.
-  dump_output
+  kill_ping
   exit 1
 }
 # If an error occurs, run our error handler to output a tail of the build
@@ -44,8 +38,7 @@ bash -c "while true; do echo \$(date) - building ...; sleep $PING_SLEEP; done" &
 PING_LOOP_PID=$!
 
 # Build script
-export MAVEN_OPTS="-Xmx4g -Xms4g -XX:MaxPermSize=512m"
-mvn test -X -Dmaven.test.failure.ignore=true -Dassembly.skipAssembly=true  >> $BUILD_OUTPUT 2>&1
+mvn test
 
 # The build finished without returning an error so dump a tail of the output
-dump_output
+kill_ping

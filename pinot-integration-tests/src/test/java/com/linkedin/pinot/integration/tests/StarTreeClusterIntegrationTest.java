@@ -230,6 +230,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     generateAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false);
     generateAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true);
 
+    Thread.sleep(15000);
     // Ensure that External View is in sync with Ideal State.
     if (!waitForExternalViewUpdate()) {
       Assert.fail("Cluster did not reach stable state");
