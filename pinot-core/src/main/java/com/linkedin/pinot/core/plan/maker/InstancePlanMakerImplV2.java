@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.operator.groupby.AggregationGroupByOperator;
+import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -53,12 +58,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         // Aggregation GroupBy
         PlanNode aggregationGroupByPlanNode;
         if (indexSegment instanceof IndexSegmentImpl) {
-          if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
-            aggregationGroupByPlanNode =
-                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.Dictionary);
+
+          // New (and fast) implementation of aggregation group by operator is currently turned OFF.
+          boolean useAggregationGroupByPlanNode = false;
+          if (useAggregationGroupByPlanNode) {
+            aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest,
+                AggregationGroupByImplementationType.Dictionary);
           } else {
-            aggregationGroupByPlanNode =
-                new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.DictionaryAndTrie);
+            if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
+              aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
+                  AggregationGroupByImplementationType.Dictionary);
+            } else {
+              aggregationGroupByPlanNode = new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
+                  AggregationGroupByImplementationType.DictionaryAndTrie);
+            }
           }
         } else {
           aggregationGroupByPlanNode =

@@ -36,6 +36,14 @@ public class Pair<T1 extends Serializable, T2 extends Serializable> implements S
     return _second;
   }
 
+  public void setFirst(T1 first) {
+    _first = first;
+  }
+
+  public void setSecond(T2 second) {
+    _second = second;
+  }
+
   @Override
   public String toString() {
     return "first=" + _first + ", second=" + _second;
