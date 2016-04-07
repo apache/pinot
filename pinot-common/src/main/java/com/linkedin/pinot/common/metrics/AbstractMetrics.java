@@ -206,6 +206,37 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Sets the value of a table gauge.
+   *
+   * @param tableName The table name
+   * @param gauge The gauge to use
+   * @param value The value to set the gauge to
+   */
+  public void setValueOfTableGauge(final String tableName, final G gauge, final long value) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + tableName;
+
+    if (!_gaugeValues.containsKey(fullGaugeName)) {
+      synchronized (_gaugeValues) {
+        if(!_gaugeValues.containsKey(fullGaugeName)) {
+          _gaugeValues.put(fullGaugeName, new AtomicLong(value));
+          addCallbackGauge(fullGaugeName, new Callable<Long>() {
+            @Override
+            public Long call() throws Exception {
+              return _gaugeValues.get(fullGaugeName).get();
+            }
+          });
+        } else {
+          _gaugeValues.get(fullGaugeName).set(value);
+        }
+      }
+    } else {
+      _gaugeValues.get(fullGaugeName).set(value);
+    }
+  }
+
+  /**
    * Initializes all global meters (such as exceptions count) to zero.
    */
   public void initializeGlobalMeters() {
