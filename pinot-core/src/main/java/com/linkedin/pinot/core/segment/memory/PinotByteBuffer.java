@@ -241,7 +241,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     return 0;
   }
 
-  //@Override
+  @Override
   public byte[] toArray() {
     throw new UnsupportedOperationException("Unimplemented");
   }

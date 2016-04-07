@@ -44,9 +44,9 @@ public class SingleFileIndexDirectoryTest {
   private File segmentDir;
   private SegmentMetadataImpl segmentMetadata;
   static ColumnIndexType[] indexTypes;
-  static final long ONE_KB = 1024L;
-  static final long ONE_MB = ONE_KB * ONE_KB;
-  static final long ONE_GB = ONE_MB * ONE_KB;
+  static final int ONE_KB = 1024;
+  static final int ONE_MB = ONE_KB * ONE_KB;
+  static final int ONE_GB = ONE_MB * ONE_KB;
 
   static {
     indexTypes = ColumnIndexType.values();
@@ -86,7 +86,7 @@ public class SingleFileIndexDirectoryTest {
         new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
     PinotDataBuffer writtenBuffer = columnDirectory.newDictionaryBuffer("foo", 1024);
     String data = new String("This is a test string");
-    final byte[] dataBytes = data.getBytes();
+    byte[] dataBytes = data.getBytes();
     int pos = 0;
     for (byte b : dataBytes) {
       writtenBuffer.putByte(pos++, b);
@@ -96,35 +96,34 @@ public class SingleFileIndexDirectoryTest {
     when(segmentMetadata.getAllColumns()).thenReturn(
         new HashSet<String>(Arrays.asList("foo"))
     );
-    try (SingleFileIndexDirectory directoryReader =
+    SingleFileIndexDirectory directoryReader =
         new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer readBuffer = directoryReader.getDictionaryBufferFor("foo")) {
-      Assert.assertEquals(1024, readBuffer.size());
-      int length = dataBytes.length;
-      for (int i = 0; i < length; i++) {
-        byte b = readBuffer.getByte(i);
-        Assert.assertEquals(dataBytes[i], b);
-      }
+    PinotDataBuffer readBuffer = directoryReader.getDictionaryBufferFor("foo");
+    Assert.assertEquals(1024, readBuffer.size());
+    int length = dataBytes.length;
+    for (int i = 0; i < length; i++) {
+      byte b = readBuffer.getByte(i);
+      Assert.assertEquals(dataBytes[i], b);
     }
   }
 
   @Test
   public void testMmapLargeBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.mmap, 6, 4L * ONE_GB);
+    testMultipleRW(ReadMode.mmap, 6, ONE_KB);
   }
 
   @Test
   public void testLargeRWDirectBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.heap, 6, 3L * ONE_GB);
+    testMultipleRW(ReadMode.heap, 6, ONE_KB);
   }
 
   @Test
   public void testModeChange()
       throws Exception {
     // first verify it all works for one mode
-    long size = 2L * ONE_GB;
+    int size = ONE_MB;
     testMultipleRW(ReadMode.heap, 6, size);
     ColumnIndexDirectory columnDirectory = null;
     try {
@@ -138,17 +137,30 @@ public class SingleFileIndexDirectoryTest {
 
   }
 
-  private void testMultipleRW(ReadMode readMode, int numIter, long size)
+  private void testMultipleRW(ReadMode readMode, int numIter, int size)
       throws Exception {
-
-    try (SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata, readMode)) {
+    //final int ONE_GB = 1024 * 1024 * 1024;
+    // for testing
+    SingleFileIndexDirectory columnDirectory = null;
+    try {
+      columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata, readMode);
       ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
+    } finally {
+      if (columnDirectory != null) {
+        columnDirectory.close();
+        columnDirectory = null;
+      }
     }
-
+    System.out.println(segmentDir.getAbsoluteFile());
     // now read and validate data
-    try(ColumnIndexDirectory columnDirectory =
-          new SingleFileIndexDirectory(segmentDir, segmentMetadata, readMode) ) {
+    try {
+      columnDirectory =
+          new SingleFileIndexDirectory(segmentDir, segmentMetadata, readMode);
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", numIter);
+    } finally {
+      if (columnDirectory != null) {
+        columnDirectory.close();
+      }
     }
   }
 
@@ -157,14 +169,15 @@ public class SingleFileIndexDirectoryTest {
   public void testWriteExisting()
       throws Exception {
     {
-      try ( SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-          PinotDataBuffer buffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+      SingleFileIndexDirectory columnDirectory = new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
+      try (PinotDataBuffer buffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
       }
+      columnDirectory.close();
     }
     {
-      try (SingleFileIndexDirectory columnDirectory =
+      SingleFileIndexDirectory columnDirectory =
           new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-          PinotDataBuffer repeatBuffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+      try (PinotDataBuffer repeatBuffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
 
       }
     }
@@ -175,8 +188,7 @@ public class SingleFileIndexDirectoryTest {
       throws IOException, ConfigurationException {
     SingleFileIndexDirectory columnDirectory =
         new SingleFileIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-    try (PinotDataBuffer buffer = columnDirectory.getDictionaryBufferFor("column1")) {
+    PinotDataBuffer buffer = columnDirectory.getDictionaryBufferFor("column1");
 
-    }
   }
 }

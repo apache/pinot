@@ -31,10 +31,7 @@ import java.nio.channels.FileChannel;
  * The main advantage of this class over ByteBuffer is to support buffers
  * larger than 2GB. This also allows memory-mapping files larger than 2GB.
  *
- * <b>Thread Safety:</b> PinotDataBuffer is not thread-safe. External synchronization
- * is required for thread-safety.
- *
- * <b>Unchecked:</b> All the acesses to this buffer are unchecked. Meaning, accessing
+ * <b>NOTE:</b> All the acesses to this buffer are unchecked. Meaning, accessing
  * index beyond the size of the buffer is undefined - it may crash or provide garbage
  * value.
  *
@@ -245,6 +242,12 @@ public abstract class PinotDataBuffer implements AutoCloseable {
    * @return
    */
   public abstract long address();
+
+  /**
+   * Convert this buffer to a java array.
+   * @return
+   */
+  public abstract byte[] toArray();
 
   /**
    * Gives a ByteBuffer view of the specified range. Writing to the returned ByteBuffer modifies the contenets of this LByteBuffer

@@ -23,6 +23,10 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +87,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
 
-  protected void load()
+  public void load()
       throws IOException, ConfigurationException {
     // in future, we can extend this to support metadata loading as well
     loadData();
@@ -164,40 +168,41 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
-  // TODO: thread-safety. Single writer may be shared
-  // by multiple threads. This is not our typical use-case
-  // but it's nice to have interface guarantee that.
   public class Writer extends SegmentDirectory.Writer {
 
+    Map<IndexKey, File> filesToCopy;
+    List<IndexKey>  keysToRemove;
+
     public Writer() {
+      filesToCopy = new HashMap<>();
+      keysToRemove = new ArrayList<>();
     }
 
     @Override
-    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int sizeBytes)
+    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int size)
         throws IOException {
-      return getNewIndexBuffer(new IndexKey(columnName, indexType), sizeBytes);
+      return getNewIndexBuffer(new IndexKey(columnName, indexType), size);
     }
 
     @Override
     public void removeIndex(String columnName, ColumnIndexType indexType) {
       // TODO
-      throw new UnsupportedOperationException("Unimplemented method");
+      throw new RuntimeException("Unimplemented method");
     }
 
-     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long sizeBytes)
+     private PinotDataBuffer getNewIndexBuffer(IndexKey key, long size)
         throws IOException {
       ColumnIndexType indexType = key.type;
       switch (indexType) {
         case DICTIONARY:
-          return columnIndexDirectory.newDictionaryBuffer(key.name, (int) sizeBytes);
+          return columnIndexDirectory.newDictionaryBuffer(key.name, (int) size);
 
         case FORWARD_INDEX:
-          return columnIndexDirectory.newForwardIndexBuffer(key.name, (int) sizeBytes);
+          return columnIndexDirectory.newForwardIndexBuffer(key.name, (int) size);
         case INVERTED_INDEX:
-          return columnIndexDirectory.newInvertedIndexBuffer(key.name, ((int) sizeBytes));
+          return columnIndexDirectory.newInvertedIndexBuffer(key.name, ((int) size));
         default:
-          throw new RuntimeException("Unknown index type: " + indexType.name() +
-              " for directory: " + segmentDirectory);
+          throw new RuntimeException("Unknown index type: " + indexType.name());
       }
     }
 
@@ -211,6 +216,14 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     void save()
         throws IOException {
+      // TODO: handle index deletes first
+      for (Map.Entry<IndexKey, File> newIndexes : filesToCopy.entrySet()) {
+        IndexKey key = newIndexes.getKey();
+        File dataFile = newIndexes.getValue();
+
+        PinotDataBuffer buffer = getNewIndexBuffer(newIndexes.getKey(), dataFile.length());
+        buffer.readFrom(dataFile);
+      }
     }
 
     void abort() {
@@ -235,11 +248,6 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
-  /*
-   * This is NOT a re-entrant lock. ReentrantReadWriteLock
-   * allows the thread hold write lock to create readers.
-   * We want to prevent that.
-   */
   class SegmentLock implements AutoCloseable{
     int readers = 0;
     int writers = 0;

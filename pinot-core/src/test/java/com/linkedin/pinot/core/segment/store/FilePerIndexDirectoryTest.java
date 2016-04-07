@@ -39,9 +39,9 @@ public class FilePerIndexDirectoryTest {
   private File segmentDir;
   private SegmentMetadataImpl segmentMetadata;
 
-  static final long ONE_KB = 1024L;
-  static final long ONE_MB = ONE_KB * ONE_KB;
-  static final long ONE_GB = ONE_MB * ONE_KB;
+  static final int ONE_KB = 1024;
+  static final int ONE_MB = ONE_KB * ONE_KB;
+  static final int ONE_GB = ONE_MB * ONE_KB;
 
   @BeforeMethod
   public void setUpTest()
@@ -69,80 +69,106 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testEmptyDirectory()
       throws Exception {
-    Assert.assertEquals(0, segmentDir.list().length, segmentDir.list().toString());
-    try (FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.heap);
-        PinotDataBuffer buffer = fpiDir.newDictionaryBuffer("col1", 1024) ) {
-      Assert.assertEquals(1, segmentDir.list().length, segmentDir.list().toString());
+    FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.heap);
+    Assert.assertEquals(0, segmentDir.list().length);
+    PinotDataBuffer buffer = fpiDir.newDictionaryBuffer("col1", 1024);
+    buffer.putLong(0, 0xbadfadL);
+    buffer.putInt(8, 51);
+    // something at random location
+    buffer.putInt(101, 55);
 
-      buffer.putLong(0, 0xbadfadL);
-      buffer.putInt(8, 51);
-      // something at random location
-      buffer.putInt(101, 55);
-    }
+
+    buffer.close();
+    fpiDir.close();
 
     Assert.assertEquals(1, segmentDir.list().length);
 
-    try (FilePerIndexDirectory colDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer readBuffer = colDir.getDictionaryBufferFor("col1")) {
-      Assert.assertEquals(readBuffer.getLong(0), 0xbadfadL);
-      Assert.assertEquals(readBuffer.getInt(8), 51);
-      Assert.assertEquals(readBuffer.getInt(101), 55);
-    }
+    FilePerIndexDirectory colDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
+    PinotDataBuffer readBuffer = colDir.getDictionaryBufferFor("col1");
+    Assert.assertEquals(readBuffer.getLong(0), 0xbadfadL);
+    Assert.assertEquals(readBuffer.getInt(8), 51);
+    Assert.assertEquals(readBuffer.getInt(101), 55);
   }
 
   @Test
   public void testMmapLargeBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.mmap, 6, 3L * ONE_GB);
+    testMultipleRW(ReadMode.mmap, 6, 100 * ONE_MB);
   }
 
   @Test
   public void testLargeRWDirectBuffer()
       throws Exception {
-    testMultipleRW(ReadMode.heap, 6, 3L * ONE_GB);
+    testMultipleRW(ReadMode.heap, 6, 10 * ONE_MB);
   }
 
   @Test
   public void testReadModeChange()
       throws Exception {
     // first verify it all works for one mode
-    testMultipleRW(ReadMode.heap, 6, 100 * ONE_MB);
-    try(ColumnIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+    testMultipleRW(ReadMode.heap, 6, 10 * ONE_MB);
+    ColumnIndexDirectory columnDirectory = null;
+    try {
+      columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", 6);
+    } finally {
+      if (columnDirectory != null) {
+        columnDirectory.close();
+      }
+    }
+
+  }
+
+  private void testMultipleRW(ReadMode readMode, int numIter, int size)
+      throws Exception {
+    //final int ONE_GB = 1024 * 1024 * 1024;
+    // for testing
+    FilePerIndexDirectory columnDirectory = null;
+    try {
+      columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode);
+      ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
+    } finally {
+      if (columnDirectory != null) {
+        columnDirectory.close();
+        columnDirectory = null;
+      }
+    }
+    System.out.println(segmentDir.getAbsoluteFile());
+    // now read and validate data
+    try {
+      columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode);
+      ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", numIter);
+    } finally {
+      if (columnDirectory != null) {
+        columnDirectory.close();
+      }
     }
   }
 
-  private void testMultipleRW(ReadMode readMode, int numIter, long size)
-      throws Exception {
-    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode)) {
-      ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
-    }
-    // now read and validate data
-    try(FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode) ){
-      ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", numIter);
-    }
-  }
 
   @Test(expectedExceptions = RuntimeException.class)
   public void testWriteExisting()
       throws Exception {
-    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer buffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+    {
+      FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
+      try (PinotDataBuffer buffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+      }
+      columnDirectory.close();
     }
-    try (FilePerIndexDirectory columnDirectory =
+    {
+      FilePerIndexDirectory columnDirectory =
           new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer repeatBuffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+      try (PinotDataBuffer repeatBuffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
+
+      }
     }
   }
-
   @Test (expectedExceptions = IOException.class)
   public void testMissingIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpiDirectory =
+    FilePerIndexDirectory fpiDirectory =
         new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
-        PinotDataBuffer buffer = fpiDirectory.getDictionaryBufferFor("noSuchColumn")) {
-
-    }
+    PinotDataBuffer buffer = fpiDirectory.getDictionaryBufferFor("noSuchColumn");
   }
 
 }

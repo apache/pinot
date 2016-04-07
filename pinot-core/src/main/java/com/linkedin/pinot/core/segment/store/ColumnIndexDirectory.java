@@ -91,31 +91,31 @@ abstract class ColumnIndexDirectory implements AutoCloseable {
       throws IOException;
 
   /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
+   * Allocate a new data buffer of specified size in the columnar index directory
    * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
+   * @param size size for the buffer allocation
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newDictionaryBuffer(String column, int size)
       throws IOException;
   /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
+   * Allocate a new data buffer of specified size in the columnar index directory
    * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
+   * @param size size for the buffer allocation
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newForwardIndexBuffer(String column, int size)
       throws IOException;
   /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
+   * Allocate a new data buffer of specified size in the columnar index directory
    * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
+   * @param size size for the buffer allocation
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, int size)
       throws IOException;
 
   /**

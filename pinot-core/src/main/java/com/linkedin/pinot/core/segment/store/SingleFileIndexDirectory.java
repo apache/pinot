@@ -53,11 +53,6 @@ import org.slf4j.LoggerFactory;
 // Remove index: Ability to remove an index (particularly inverted index)
 // Abort writes: There is no way to abort discard changes
 //
-
-/**
- * Design document:
- * https://docs.google.com/document/d/1N7uWXVzcMyOEKBKRoCyC4K9KN1qKqptPZ2HGOu_0TB0/edit#heading=h.t7ma4kyk7rr7
- */
 class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static Logger LOGGER = LoggerFactory.getLogger(SingleFileIndexDirectory.class);
 
@@ -68,7 +63,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
   static final int MAGIC_MARKER_SIZE_BYTES = 8;
 
-  private static final String MAP_KEY_SEPARATOR = ".";
+  private static final String MAP_KEY_SEPARATOR = "\\.";
   private static final String MAP_KEY_NAME_START_OFFSET = "startOffset";
   private static final String MAP_KEY_NAME_SIZE = "size";
   private File indexFile;
@@ -124,22 +119,22 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newDictionaryBuffer(String column, int size)
       throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.DICTIONARY, sizeBytes, "dictionary.create");
+    return allocNewBufferInternal(column, ColumnIndexType.DICTIONARY, size, "dictionary.create");
   }
 
 
   @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newForwardIndexBuffer(String column, int size)
       throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.FORWARD_INDEX, sizeBytes, "forward_index.create");
+    return allocNewBufferInternal(column, ColumnIndexType.FORWARD_INDEX, size, "forward_index.create");
   }
 
   @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newInvertedIndexBuffer(String column, int size)
       throws IOException {
-    return  allocNewBufferInternal(column, ColumnIndexType.INVERTED_INDEX, sizeBytes, "inverted_index.create");
+    return  allocNewBufferInternal(column, ColumnIndexType.INVERTED_INDEX, size, "inverted_index.create");
   }
 
   @Override
@@ -227,7 +222,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Iterator keys = mapConfig.getKeys();
     while (keys.hasNext()) {
       String key = (String) keys.next();
-      String[] keyParts = key.split("\\" + MAP_KEY_SEPARATOR);
+      String[] keyParts = key.split(MAP_KEY_SEPARATOR);
 
       Preconditions.checkState(keyParts.length == 3, "Invalid key: " + key);
       IndexKey indexKey = new IndexKey(keyParts[0], ColumnIndexType.getValue(keyParts[1]));

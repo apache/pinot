@@ -43,13 +43,13 @@ public class HugeByteBuffer extends PinotDataBuffer {
 
   private static Logger LOGGER = LoggerFactory.getLogger(HugeByteBuffer.class);
 
-  private static final int DEFAULT_SEGMENT_SIZE_BYTES = 1024 * 1024 * 1024;
+  private static final int DEFAULT_SEGMENT_SIZE = 1024 * 1024 * 1024;
 
   // 8 means widest field + 1 byte
-  private static final int OFF_HEAP_EXTENSION_SIZE_BYTES = 8;
+  private static final int OFF_HEAP_EXTENSION_SIZE = 8;
 
   // 8K...this will be atleast VM.pageSize()
-  private static final int MMAP_EXTENSION_SIZE_BYTES = 8 * 1024;
+  private static final int MMAP_EXTENSION_SIZE = 8 * 1024;
 
   private ByteBuffer[] buffers;
   private int segmentSize;
@@ -59,7 +59,7 @@ public class HugeByteBuffer extends PinotDataBuffer {
   // for simplicity we allocate extra bytes so that
   // getLong() on the last byte can be returned from
   // the same buffer.
-  protected int extensionBytes = 8;
+  protected int extension = 8;
 
   /**
    * Fully load the file in to the in-memory buffer
@@ -101,8 +101,8 @@ public class HugeByteBuffer extends PinotDataBuffer {
 
   static PinotDataBuffer mapFromFile(File file, long start, long length, FileChannel.MapMode openMode, String context)
       throws IOException {
-    final int bufSize = DEFAULT_SEGMENT_SIZE_BYTES + MMAP_EXTENSION_SIZE_BYTES;
-    ByteBuffer[] buffers = allocBufferArray(length, DEFAULT_SEGMENT_SIZE_BYTES);
+    final int bufSize = DEFAULT_SEGMENT_SIZE + MMAP_EXTENSION_SIZE;
+    ByteBuffer[] buffers = allocBufferArray(length, bufSize);
 
     String rafOpenMode = openMode == FileChannel.MapMode.READ_ONLY ? "r" : "rw";
     if (openMode == FileChannel.MapMode.READ_WRITE && !file.exists()) {
@@ -115,12 +115,12 @@ public class HugeByteBuffer extends PinotDataBuffer {
     while (pending > 0) {
       int toMap = (int) Math.min(bufSize, pending);
       buffers[bufIndex] = MmapUtils.mmapFile(raf, openMode, start, toMap, file, context);
-      start += DEFAULT_SEGMENT_SIZE_BYTES;
-      pending -= DEFAULT_SEGMENT_SIZE_BYTES;
+      start += DEFAULT_SEGMENT_SIZE;
+      pending -= DEFAULT_SEGMENT_SIZE;
       ++bufIndex;
     }
 
-    return new HugeByteBuffer(buffers, 0, length, true /*owner*/, DEFAULT_SEGMENT_SIZE_BYTES, MMAP_EXTENSION_SIZE_BYTES);
+    return new HugeByteBuffer(buffers, 0, length, true /*owner*/, DEFAULT_SEGMENT_SIZE, MMAP_EXTENSION_SIZE);
   }
 
   static PinotDataBuffer loadFromFile(File file, long startPosition, long length, FileChannel.MapMode openMode,
@@ -136,8 +136,8 @@ public class HugeByteBuffer extends PinotDataBuffer {
   }
 
   public static HugeByteBuffer allocateDirect(long size) {
-    int bufsize = DEFAULT_SEGMENT_SIZE_BYTES + OFF_HEAP_EXTENSION_SIZE_BYTES;
-    ByteBuffer[] buffers = allocBufferArray(size, DEFAULT_SEGMENT_SIZE_BYTES);
+    int bufsize = DEFAULT_SEGMENT_SIZE + OFF_HEAP_EXTENSION_SIZE;
+    ByteBuffer[] buffers = allocBufferArray(size, bufsize);
     long pending = size;
     for (int i = 0; i < buffers.length; i++) {
       // intentionally checkState rather than for() condition.
@@ -146,10 +146,9 @@ public class HugeByteBuffer extends PinotDataBuffer {
       int toAllocate = (int) Math.min(bufsize, pending);
       // TODO: pass in context to the method
       buffers[i] = MmapUtils.allocateDirectByteBuffer(toAllocate, null, "direct huge buffer");
-      pending -= (bufsize - OFF_HEAP_EXTENSION_SIZE_BYTES);
+      pending -= (bufsize - OFF_HEAP_EXTENSION_SIZE);
     }
-    return new HugeByteBuffer(buffers, 0, size, true /*owner*/, DEFAULT_SEGMENT_SIZE_BYTES,
-        OFF_HEAP_EXTENSION_SIZE_BYTES);
+    return new HugeByteBuffer(buffers, 0, size, true /*owner*/, DEFAULT_SEGMENT_SIZE, OFF_HEAP_EXTENSION_SIZE);
   }
 
   private static ByteBuffer[] allocBufferArray(long size, int segmentSize) {
@@ -161,18 +160,18 @@ public class HugeByteBuffer extends PinotDataBuffer {
     return (int) (size / segmentSize) + (size % segmentSize != 0 ? 1 : 0);
   }
 
-  HugeByteBuffer(ByteBuffer[] buffers, long startPosition, long size, boolean owner, int segmentSize, int extensionBytes) {
+  HugeByteBuffer(ByteBuffer[] buffers, long startPosition, long size, boolean owner, int segmentSize, int extension) {
     this.buffers = buffers;
     this.startPosition = startPosition;
     this.size = size;
     this.owner = owner;
     this.segmentSize = segmentSize;
-    this.extensionBytes = extensionBytes;
+    this.extension = extension;
   }
 
   @Override
   public PinotDataBuffer duplicate() {
-    return new HugeByteBuffer(buffers, startPosition, size, false/*owner*/, segmentSize, extensionBytes);
+    return new HugeByteBuffer(buffers, startPosition, size, false/*owner*/, segmentSize, extension);
   }
 
   @Override
@@ -387,8 +386,7 @@ public class HugeByteBuffer extends PinotDataBuffer {
 
   @Override
   public HugeByteBuffer view(long start, long end) {
-    return new HugeByteBuffer(this.buffers, start() + start, (end-start), false /*ownership*/, segmentSize,
-        extensionBytes);
+    return new HugeByteBuffer(this.buffers, start() + start, (end-start), false /*ownership*/, segmentSize, extension);
   }
 
   @Override
@@ -397,7 +395,7 @@ public class HugeByteBuffer extends PinotDataBuffer {
     Preconditions.checkArgument(srcOffset >= 0);
     Preconditions.checkArgument(destOffset >= 0);
     Preconditions.checkArgument(size >= 0);
-    Preconditions.checkArgument(destArray.length - size >= destOffset);
+    Preconditions.checkArgument(destOffset + size <= destArray.length);
     Preconditions.checkArgument( size <= size() - srcOffset);
 
     int bufIndex = bufferIndex(srcOffset);
@@ -438,8 +436,8 @@ public class HugeByteBuffer extends PinotDataBuffer {
         srcOffset += toCopy;
         break;
       }
-      length -= (toCopy - extensionBytes);
-      srcOffset += (toCopy - extensionBytes);
+      length -= (toCopy - extension);
+      srcOffset += (toCopy - extension);
       bufPosition = 0;
       ++bufIndex;
     }
@@ -478,8 +476,8 @@ public class HugeByteBuffer extends PinotDataBuffer {
       if (length == toCopy) {
         break;
       }
-      startPosition += (toCopy - extensionBytes);
-      length -= (toCopy - extensionBytes);
+      startPosition += (toCopy - extension);
+      length -= (toCopy - extension);
       bufPosition = 0;
       ++bufIndex;
     }
@@ -493,6 +491,18 @@ public class HugeByteBuffer extends PinotDataBuffer {
   @Override
   public long address() {
     return 0;
+  }
+
+/*
+  @Override
+  public long address() {
+    throw new UnsupportedOperationException("Address is not supported for HugeByteBuffer");
+  }
+*/
+
+  @Override
+  public byte[] toArray() {
+    return new byte[0];
   }
 
   // May copy data
