@@ -135,7 +135,7 @@ public class FilePerIndexDirectoryTest {
     }
   }
 
-  @Test (expectedExceptions = IOException.class)
+  @Test (expectedExceptions = IllegalArgumentException.class)
   public void testMissingIndex()
       throws IOException {
     try (FilePerIndexDirectory fpiDirectory =

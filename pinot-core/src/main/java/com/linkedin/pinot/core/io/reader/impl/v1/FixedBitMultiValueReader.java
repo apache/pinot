@@ -78,12 +78,12 @@ public class FixedBitMultiValueReader
     bitsetSize = (totalNumValues + 7) / 8;
     rawDataSize = Ints.checkedCast(((long) totalNumValues * columnSizeInBits + 7) / 8);
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
-    Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB");
+    Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size should not exceed 2GB");
     chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
     int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
     bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
     rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
-    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs,
+    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numChunks,
         NUM_COLS_IN_HEADER, new int[] {
         SIZE_OF_INT
     });

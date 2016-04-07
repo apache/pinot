@@ -92,6 +92,11 @@ public class PlanMakerTest {
     } catch (Exception e) {
       e.printStackTrace();
     }
+
+  }
+
+  @AfterClass
+  public void tearDown() {
     if (_indexSegment != null) {
       _indexSegment.destroy();
     }
@@ -99,16 +104,13 @@ public class PlanMakerTest {
       segment.destroy();
     }
     _indexSegmentList.clear();
-  }
-
-  @AfterClass
-  public void tearDown() {
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
+
   }
 
   private void setupSegment() throws Exception {

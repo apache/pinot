@@ -32,6 +32,11 @@ import org.slf4j.LoggerFactory;
  * This is implemented as array of ByteBuffers with
  * some extension to serve the widest field (long/double)
  * from the same buffer.
+ *
+ * <p>
+ * <b>Note</b> This class supports buffers larger than ByteBuffer
+ * but it is 30-40% slower than ByteBuffer.
+ * </p>
  */
 /*
  * Ideally, we should break this down into SingleByteBuffer class
@@ -41,7 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HugeByteBuffer extends PinotDataBuffer {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(HugeByteBuffer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HugeByteBuffer.class);
 
   private static final int DEFAULT_SEGMENT_SIZE_BYTES = 1024 * 1024 * 1024;
 

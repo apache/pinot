@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -32,6 +31,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
@@ -53,29 +54,26 @@ import org.slf4j.LoggerFactory;
 // Remove index: Ability to remove an index (particularly inverted index)
 // Abort writes: There is no way to abort discard changes
 //
-
-/**
- * Design document:
- * https://docs.google.com/document/d/1N7uWXVzcMyOEKBKRoCyC4K9KN1qKqptPZ2HGOu_0TB0/edit#heading=h.t7ma4kyk7rr7
- */
 class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static Logger LOGGER = LoggerFactory.getLogger(SingleFileIndexDirectory.class);
 
-  static final String DEFAULT_INDEX_FILE_NAME = "column.index";
-  // We would like to move this information to metadata.properties but the
-  // interfaces are tricky right now
-  static final String INDEX_MAP_FILE = "index_map";
-  static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
-  static final int MAGIC_MARKER_SIZE_BYTES = 8;
-
+  private static final String DEFAULT_INDEX_FILE_NAME = "columns.psf";
+  private static final String INDEX_MAP_FILE = "index_map";
+  private static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
+  private static final int MAGIC_MARKER_SIZE_BYTES = 8;
   private static final String MAP_KEY_SEPARATOR = ".";
   private static final String MAP_KEY_NAME_START_OFFSET = "startOffset";
   private static final String MAP_KEY_NAME_SIZE = "size";
-  private File indexFile;
 
+  // Max size of buffer we want to allocate
+  // ByteBuffer limits the size to 2GB - (some platform dependent size)
+  // This breaks the abstraction with PinotDataBuffer....a workaround for
+  // now till PinotDataBuffer can support large buffers again
+  private static final int MAX_ALLOCATION_SIZE = 2000 * 1024 * 1024;
+
+  private File indexFile;
   private Map<IndexKey, IndexEntry> columnEntries;
-  private PinotDataBuffer fullFileBuffer;
-  private List<PinotDataBuffer> appendedBuffers;
+  private List<PinotDataBuffer> allocBuffers;
 
   public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl metadata, ReadMode readMode)
       throws IOException, ConfigurationException {
@@ -85,42 +83,33 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (! indexFile.exists()) {
       indexFile.createNewFile();
     }
-
-    fullFileBuffer = PinotDataBuffer
-        .fromFile(indexFile, readMode, FileChannel.MapMode.READ_WRITE,  context);
-    columnEntries = new HashMap<IndexKey, IndexEntry>(metadata.getAllColumns().size());
-    appendedBuffers = new ArrayList<>();
-    load();
+    columnEntries = new HashMap<>(metadata.getAllColumns().size());
+    allocBuffers = new ArrayList<>();
+    load() ;
   }
 
   @Override
   public PinotDataBuffer getDictionaryBufferFor(String column)
       throws IOException {
-    IndexEntry entry = checkAndGetIndexEntry(column, ColumnIndexType.DICTIONARY);
-    return validateAndGetBuffer(entry);
+    return checkAndGetIndexBuffer(column, ColumnIndexType.DICTIONARY);
   }
 
   @Override
   public PinotDataBuffer getForwardIndexBufferFor(String column)
       throws IOException {
-    IndexEntry entry = checkAndGetIndexEntry(column, ColumnIndexType.FORWARD_INDEX);
-    return validateAndGetBuffer(entry);
+    return checkAndGetIndexBuffer(column, ColumnIndexType.FORWARD_INDEX);
   }
 
   @Override
   public PinotDataBuffer getInvertedIndexBufferFor(String column)
       throws IOException {
-    IndexEntry entry = checkAndGetIndexEntry(column, ColumnIndexType.INVERTED_INDEX);
-    return validateAndGetBuffer(entry);
+    return checkAndGetIndexBuffer(column, ColumnIndexType.INVERTED_INDEX);
   }
 
-  public IndexEntry checkAndGetIndexEntry(String column, ColumnIndexType type) {
+  @Override
+  public boolean hasIndexFor(String column, ColumnIndexType type) {
     IndexKey key = new IndexKey(column, type);
-    IndexEntry entry = columnEntries.get(key);
-    if (entry == null) {
-      throw new RuntimeException("Could not find dictionary for column: " + column);
-    }
-    return entry;
+    return columnEntries.containsKey(key);
   }
 
   @Override
@@ -142,10 +131,14 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     return  allocNewBufferInternal(column, ColumnIndexType.INVERTED_INDEX, sizeBytes, "inverted_index.create");
   }
 
-  @Override
-  public boolean hasIndexFor(String column, ColumnIndexType type) {
+  private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
     IndexKey key = new IndexKey(column, type);
-    return columnEntries.containsKey(key);
+    IndexEntry entry = columnEntries.get(key);
+    if (entry == null || entry.buffer == null) {
+      throw new RuntimeException("Could not find index for column: " + column + ", type: " + type +
+          ", segment: " + segmentDirectory.toString());
+    }
+    return entry.buffer;
   }
 
   // This is using extra resources right now which can be changed.
@@ -172,7 +165,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     LOGGER.debug("Allotted buffer for key: {}, startOffset: {}, size: {}", key, entry.startOffset, entry.size);
     appendBuffer.putLong(0, MAGIC_MARKER);
-    appendedBuffers.add(appendBuffer);
+    allocBuffers.add(appendBuffer);
 
     entry.buffer = appendBuffer.view(0 + MAGIC_MARKER_SIZE_BYTES, entry.size);
     columnEntries.put(key, entry);
@@ -189,34 +182,20 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  private PinotDataBuffer validateAndGetBuffer(IndexEntry entry)
-      throws IOException {
-    if (entry.buffer != null) {
-      return entry.buffer.duplicate();
-    }
-
-    LOGGER.debug("Reading buffer for entry: {}", entry);
-    validateMagicMarker(entry);
-
-    long startPosition = entry.startOffset + MAGIC_MARKER_SIZE_BYTES;
-    long endPosition = entry.startOffset + entry.size;
-    entry.buffer = fullFileBuffer.view(startPosition, endPosition);
-    return entry.buffer.duplicate();
-  }
-
-  private void validateMagicMarker(IndexEntry entry) {
-    long actualMarkerValue = fullFileBuffer.getLong(entry.startOffset);
+  private void validateMagicMarker(PinotDataBuffer buffer, int startOffset) {
+    long actualMarkerValue = buffer.getLong(startOffset);
     if (actualMarkerValue != MAGIC_MARKER) {
-      LOGGER.error("Missing magic marker in index file: {} at position: {} for indexKey: {}",
-          indexFile, entry.startOffset, entry.key);
+      LOGGER.error("Missing magic marker in index file: {} at position: {}",
+          indexFile, startOffset);
       throw new RuntimeException("Inconsistent data read. Index data file " +
           indexFile.toString() + " is possibly corrupted");
     }
   }
 
   private void load()
-      throws FileNotFoundException, ConfigurationException {
+      throws IOException, ConfigurationException {
     loadMap();
+    mapBufferEntries();
   }
 
   private void loadMap()
@@ -242,7 +221,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       } else if (keyParts[2].equals(MAP_KEY_NAME_SIZE)) {
         entry.size = mapConfig.getLong(key);
       } else {
-        throw new ConfigurationException("Invalid map file key: " + key);
+        throw new ConfigurationException("Invalid map file key: " + key + ", segmentDirectory: " + segmentDirectory.toString());
       }
     }
 
@@ -250,8 +229,65 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     for (Map.Entry<IndexKey, IndexEntry> colIndexEntry : columnEntries.entrySet()) {
       IndexEntry entry = colIndexEntry.getValue();
       if (entry.size < 0 || entry.startOffset < 0) {
-        throw new ConfigurationException("Invalid map entry for key: " + colIndexEntry.getKey().toString());
+        throw new ConfigurationException("Invalid map entry for key: " + colIndexEntry.getKey().toString() +
+            ", segment: " + segmentDirectory.toString());
       }
+    }
+  }
+
+  private void mapBufferEntries()
+      throws IOException {
+    SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
+
+    for (Map.Entry<IndexKey, IndexEntry> columnEntry : columnEntries.entrySet()) {
+      long startOffset = columnEntry.getValue().startOffset;
+      indexStartMap.put(startOffset, columnEntry.getValue());
+    }
+
+    long runningSize = 0;
+    List<Long> offsetAccum = new ArrayList<>();
+    for (Map.Entry<Long, IndexEntry> offsetEntry : indexStartMap.entrySet()) {
+      IndexEntry entry = offsetEntry.getValue();
+      runningSize += entry.size;
+
+      if ( runningSize >= MAX_ALLOCATION_SIZE) {
+        mapAndSliceFile(indexStartMap, offsetAccum, offsetEntry.getKey());
+        runningSize = entry.size;
+        offsetAccum.clear();
+      }
+      offsetAccum.add(offsetEntry.getKey());
+    }
+
+
+    if (offsetAccum.size() > 0) {
+      mapAndSliceFile(indexStartMap, offsetAccum, offsetAccum.get(0) + runningSize);
+    }
+  }
+
+  private void mapAndSliceFile(SortedMap<Long, IndexEntry> startOffsets, List<Long> offsetAccum, long endOffset)
+      throws IOException {
+    Preconditions.checkNotNull(startOffsets);
+    Preconditions.checkNotNull(offsetAccum);
+    Preconditions.checkArgument(offsetAccum.size() >= 1);
+
+    long fromFilePos = offsetAccum.get(0);
+    long toFilePos = endOffset - fromFilePos;
+
+    String context = allocationContext(indexFile, "single_file_index.rw." +
+        "." + String.valueOf(fromFilePos) + "." + String.valueOf(toFilePos));
+
+    PinotDataBuffer buffer = PinotDataBuffer.fromFile(indexFile, fromFilePos, toFilePos, readMode,
+        FileChannel.MapMode.READ_WRITE, context);
+    allocBuffers.add(buffer);
+
+    int prevSlicePoint = 0;
+    for (Long fileOffset : offsetAccum) {
+      IndexEntry entry = startOffsets.get(fileOffset);
+      int endSlicePoint = prevSlicePoint + (int) entry.size;
+      validateMagicMarker(buffer, prevSlicePoint);
+      PinotDataBuffer viewBuffer = buffer.view(prevSlicePoint + MAGIC_MARKER_SIZE_BYTES, endSlicePoint);
+      entry.buffer = viewBuffer;
+      prevSlicePoint = endSlicePoint;
     }
   }
 
@@ -272,7 +308,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  public String getKey(String column, String indexName, boolean isStartOffset) {
+  private String getKey(String column, String indexName, boolean isStartOffset) {
     return column + MAP_KEY_SEPARATOR + indexName + MAP_KEY_SEPARATOR + (isStartOffset ? "startOffset" : "size");
   }
 
@@ -282,34 +318,15 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void close() {
-    for (Map.Entry<IndexKey, IndexEntry> colEntry : columnEntries.entrySet()) {
-      IndexEntry entry = colEntry.getValue();
-      if (entry.buffer != null) {
-        entry.buffer.close();
-      }
-    }
-    columnEntries.clear();
-    for (PinotDataBuffer buf : appendedBuffers) {
+    for (PinotDataBuffer buf : allocBuffers) {
       buf.close();
     }
-    appendedBuffers.clear();
-    fullFileBuffer.close();
+    columnEntries.clear();
+    allocBuffers.clear();
   }
 
-  private class IndexEntry {
-    IndexKey key;
-    long startOffset = -1;
-    long size = -1;
-    PinotDataBuffer buffer;
-
-    public IndexEntry(IndexKey key) {
-      this.key = key;
-    }
-
-    @Override
-    public String toString() {
-      return key.toString() + " : (" + startOffset + "," + size + ")";
-    }
+  @Override
+  public String toString(){
+    return segmentDirectory.toString() + "/" + indexFile.toString();
   }
-
 }

@@ -61,14 +61,13 @@ public class SingleFileIndexDirectoryTest {
       FileUtils.deleteQuietly(segmentDir);
     }
     segmentDir.mkdirs();
+    segmentDir.deleteOnExit();
     writeMetadata();
   }
 
   @AfterMethod
   public void tearDownTest()
       throws IOException {
-    FileUtils.deleteDirectory(segmentDir);
-    Assert.assertFalse(segmentDir.exists());
   }
 
   void writeMetadata() throws ConfigurationException {

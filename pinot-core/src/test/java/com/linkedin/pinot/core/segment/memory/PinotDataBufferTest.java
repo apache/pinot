@@ -169,7 +169,7 @@ public class PinotDataBufferTest {
       throws IOException {
     PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(1024);
     // default behavior right now
-    Assert.assertTrue(buffer instanceof HugeByteBuffer);
+    Assert.assertTrue(buffer instanceof PinotByteBuffer);
     buffer.close();
 
     File f = new File("temp");
@@ -179,8 +179,8 @@ public class PinotDataBufferTest {
       f.createNewFile();
       fileBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "context");
       heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "context");
-      Assert.assertTrue(fileBuffer instanceof HugeByteBuffer);
-      Assert.assertTrue(heapBuffer instanceof HugeByteBuffer);
+      Assert.assertTrue(fileBuffer instanceof PinotByteBuffer);
+      Assert.assertTrue(heapBuffer instanceof PinotByteBuffer);
 
     } finally {
       org.apache.commons.io.FileUtils.deleteQuietly(f);

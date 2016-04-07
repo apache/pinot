@@ -91,7 +91,7 @@ public abstract class PinotDataBuffer implements AutoCloseable {
     if (USE_LBUFFER) {
       return PinotLByteBuffer.mapFromFile(file, startPosition, length, openMode, context);
     } else {
-      return HugeByteBuffer.mapFromFile(file, startPosition, length, openMode, context);
+      return PinotByteBuffer.mapFromFile(file, startPosition, length, openMode, context);
     }
   }
 
@@ -101,7 +101,7 @@ public abstract class PinotDataBuffer implements AutoCloseable {
     if (USE_LBUFFER) {
       return PinotLByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
     } else {
-      return HugeByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
+      return PinotByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
     }
   }
 
@@ -109,7 +109,8 @@ public abstract class PinotDataBuffer implements AutoCloseable {
     if (USE_LBUFFER) {
       return PinotLByteBuffer.allocateDirect(size);
     } else {
-      return HugeByteBuffer.allocateDirect(size);
+      // TODO: provide proper context
+      return PinotByteBuffer.allocateDirect(size, " direct allocation");
     }
   }
 
@@ -255,5 +256,4 @@ public abstract class PinotDataBuffer implements AutoCloseable {
   public abstract ByteBuffer toDirectByteBuffer(long bufferOffset, int size);
 
   protected abstract long start();
-
 }

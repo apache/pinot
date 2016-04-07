@@ -16,20 +16,118 @@
 
 package com.linkedin.pinot.core.segment.memory;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class PinotByteBuffer extends PinotDataBuffer {
-  private static Logger LOGGER = LoggerFactory.getLogger(PinotByteBuffer.class);
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotByteBuffer.class);
 
   private ByteBuffer buffer;
+  private RandomAccessFile raf = null;
 
+  /**
+   * Fully load the file in to the in-memory buffer
+   * @param file file containing index data
+   * @param readMode mmap vs heap mode for the buffer
+   * @param openMode read or read_write mode for the index
+   * @param context context for buffer allocation. Use mainly for resource tracking
+   * @return in-memory buffer containing data
+   */
+  public static PinotDataBuffer fromFile(File file, ReadMode readMode, FileChannel.MapMode openMode, String context)
+      throws IOException {
+    return PinotByteBuffer.fromFile(file, 0, file.length(), readMode, openMode, context);
+  }
+
+  /**
+   * Loads a portion of file in memory. This will load data from [startPosition, startPosition + length).
+   * @param file file to load
+   * @param startPosition (inclusive) start startPosition to the load the data from in the file
+   * @param length size of the data from
+   * @param readMode mmap vs heap
+   * @param openMode read vs read/write
+   * @param context context for buffer allocation. Use mainly for resource tracking
+   * @return in-memory buffer containing data
+   * @throws IOException
+   */
+  public static PinotDataBuffer fromFile(File file, long startPosition, long length,
+      ReadMode readMode, FileChannel.MapMode openMode, String context)
+      throws IOException {
+
+    if (readMode == ReadMode.heap) {
+      return PinotByteBuffer.loadFromFile(file, startPosition, length, openMode, context);
+    } else if (readMode == ReadMode.mmap) {
+      return PinotByteBuffer.mapFromFile(file, startPosition, length, openMode, context);
+    } else {
+      throw new RuntimeException("Unknown readmode: " + readMode.name() + ", file: " + file);
+    }
+
+  }
+
+  static PinotDataBuffer mapFromFile(File file, long start, long length, FileChannel.MapMode openMode, String context)
+      throws IOException {
+    // file may not exist if it's opened for writing
+    Preconditions.checkNotNull(file);
+    Preconditions.checkArgument(start >= 0);
+    Preconditions.checkArgument(length >= 0 && length < Integer.MAX_VALUE,
+        "Mapping files larger than 2GB is not supported, file: " + file.toString() + ", context: " + context);
+    Preconditions.checkNotNull(context);
+
+    if (openMode == FileChannel.MapMode.READ_ONLY) {
+      if (!file.exists()) {
+        throw new IllegalArgumentException("File: " + file + " must exist to open in read-only mode");
+      }
+      if (length > (file.length() - start)) {
+        throw new IllegalArgumentException(
+            String.format("Mapping limits exceed file size, start: %d, length: %d, file size: %d",
+                start, length, file.length() ));
+      }
+    }
+
+
+    String rafOpenMode = openMode == FileChannel.MapMode.READ_ONLY ? "r" : "rw";
+    RandomAccessFile raf = new RandomAccessFile(file, rafOpenMode);
+    ByteBuffer bb = MmapUtils.mmapFile(raf, openMode, start, length, file, context);
+    PinotByteBuffer pbb = new PinotByteBuffer(bb, true /*owner*/);
+    pbb.raf = raf;
+    return pbb;
+  }
+
+  static PinotDataBuffer loadFromFile(File file, long startPosition, long length, FileChannel.MapMode openMode,
+      String context)
+      throws IOException {
+    Preconditions.checkArgument(length >= 0 && length < Integer.MAX_VALUE);
+    Preconditions.checkNotNull(file);
+    Preconditions.checkArgument(startPosition >= 0);
+    Preconditions.checkNotNull(context);
+
+    PinotByteBuffer buffer = allocateDirect((int)length, file.toString()  + "-" + context);
+
+    if (openMode == FileChannel.MapMode.READ_WRITE && !file.exists()) {
+      file.createNewFile();
+    }
+
+    buffer.readFrom(file, startPosition, length);
+    return buffer;
+  }
+
+  public static PinotByteBuffer allocateDirect(long size, String context) {
+    Preconditions.checkArgument(size >= 0 && size < Integer.MAX_VALUE);
+    Preconditions.checkNotNull(context);
+
+    ByteBuffer bb = MmapUtils.allocateDirectByteBuffer( (int)size, null, context);
+    return new PinotByteBuffer(bb, true/*owner*/);
+  }
+
+  // package-private
   PinotByteBuffer(ByteBuffer buffer, boolean ownership) {
     this.buffer = buffer;
     this.owner = ownership;
@@ -51,6 +149,11 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
+  public void putByte(int index, byte value) {
+    buffer.put(index, value);
+  }
+
+  @Override
   public void putChar(long index, char c) {
     throw new UnsupportedOperationException("Long index is not supported");
   }
@@ -61,53 +164,13 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void putFloat(long index, float v) {
-    throw new UnsupportedOperationException("Long index is not supported");
+  public char getChar(int index) {
+    return buffer.getChar(index);
   }
 
   @Override
-  public void putFloat(int index, float value) {
-    buffer.putFloat(index, value);
-  }
-
-  @Override
-  public void putLong(long index, long l1) {
-    throw new UnsupportedOperationException("Long index is not supported");
-  }
-
-  @Override
-  public long getLong(long index) {
-    throw new UnsupportedOperationException("Long index is not supported");
-  }
-
-  @Override
-  public void putLong(int index, long value) {
-    buffer.putLong(index, value);
-  }
-
-  @Override
-  public int getInt(int index) {
-    return buffer.getInt(index);
-  }
-
-  @Override
-  public int getInt(long index) {
-    throw new UnsupportedOperationException("Long index is not supported");
-  }
-
-  @Override
-  public void putInt(int index, int value) {
-    buffer.putInt(index, value);
-  }
-
-  @Override
-  public double getDouble(long l) {
-    throw new UnsupportedOperationException("Long index is not supported");
-  }
-
-  @Override
-  public void putDouble(long index, double value) {
-    throw new UnsupportedOperationException("Long index is not supported");
+  public void putChar(int index, char value) {
+    buffer.putChar(index, value);
   }
 
   @Override
@@ -131,13 +194,54 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
+  public int getInt(int index) {
+    return buffer.getInt(index);
+  }
+
+  @Override
+  public int getInt(long index) {
+    throw new UnsupportedOperationException("Long index is not supported");
+  }
+
+  @Override
+  public void putInt(int index, int value) {
+    buffer.putInt(index, value);
+  }
+
+  @Override
   public void putInt(long index, int value) {
     throw new UnsupportedOperationException("Long index is not supported");
   }
 
   @Override
+  public void putLong(long index, long l1) {
+    throw new UnsupportedOperationException("Long index is not supported");
+  }
+
+  @Override
+  public long getLong(long index) {
+    throw new UnsupportedOperationException("Long index is not supported");
+  }
+
+  @Override
+  public void putLong(int index, long value) {
+    buffer.putLong(index, value);
+  }
+
+  @Override
   public long getLong(int index) {
     return buffer.getLong(index);
+  }
+
+
+  @Override
+  public void putFloat(long index, float v) {
+    throw new UnsupportedOperationException("Long index is not supported");
+  }
+
+  @Override
+  public void putFloat(int index, float value) {
+    buffer.putFloat(index, value);
   }
 
   @Override
@@ -151,8 +255,13 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void putByte(int index, byte value) {
-    buffer.put(index, value);
+  public double getDouble(int index) {
+    return buffer.getDouble(index);
+  }
+
+  @Override
+  public double getDouble(long l) {
+    throw new UnsupportedOperationException("Long index is not supported");
   }
 
   @Override
@@ -161,22 +270,15 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public double getDouble(int index) {
-    return buffer.getDouble(index);
-  }
-
-  @Override
-  public char getChar(int index) {
-    return buffer.getChar(index);
-  }
-
-  @Override
-  public void putChar(int index, char value) {
-    buffer.putChar(index, value);
+  public void putDouble(long index, double value) {
+    throw new UnsupportedOperationException("Long index is not supported");
   }
 
   @Override
   public PinotDataBuffer view(long start, long end) {
+    Preconditions.checkArgument(start >= 0 && start < buffer.limit());
+    Preconditions.checkArgument(end > 0 && end > start && end <= buffer.limit(),
+        "view end position: " + end + " is not valid, start: " + start + ", buffer limit: " + buffer.limit());
     ByteBuffer bb = this.buffer.duplicate();
     bb.position((int)start);
     bb.limit((int)end);
@@ -207,7 +309,6 @@ public class PinotByteBuffer extends PinotDataBuffer {
   public int readFrom(ByteBuffer sourceBuffer, int srcOffset, long destOffset, int length) {
     ByteBuffer srcDup = sourceBuffer.duplicate();
     ByteBuffer localDup = buffer.duplicate();
-
     srcDup.position(srcOffset);
     srcDup.limit(srcOffset + length);
     localDup.put(srcDup);
@@ -241,11 +342,6 @@ public class PinotByteBuffer extends PinotDataBuffer {
     return 0;
   }
 
-  //@Override
-  public byte[] toArray() {
-    throw new UnsupportedOperationException("Unimplemented");
-  }
-
   @Override
   public ByteBuffer toDirectByteBuffer(long bufferOffset, int size) {
     ByteBuffer bb = buffer.duplicate();
@@ -261,14 +357,25 @@ public class PinotByteBuffer extends PinotDataBuffer {
 
   @Override
   public PinotDataBuffer duplicate() {
-    PinotByteBuffer dup = new PinotByteBuffer(this.buffer, false);
+    PinotByteBuffer dup = new PinotByteBuffer(this.buffer.duplicate(), false);
     return dup;
   }
 
   @Override
   public void close() {
-    if (owner && buffer != null) {
-      MmapUtils.unloadByteBuffer(buffer);
+    if (!owner || buffer == null) {
+      return;
     }
+    MmapUtils.unloadByteBuffer(buffer);
+    if (raf != null) {
+      try {
+        raf.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close file: {}. Continuing with errors", raf.toString(), e);
+      }
+    }
+
+    buffer = null;
+    raf = null;
   }
 }
