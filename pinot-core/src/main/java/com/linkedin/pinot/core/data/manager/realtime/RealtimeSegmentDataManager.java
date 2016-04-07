@@ -15,8 +15,11 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -59,6 +62,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final String tableName;
   private final String segmentName;
   private final Schema schema;
+  private final PlainFieldExtractor extractor;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
   private final StreamProviderConfig kafkaStreamProviderConfig;
@@ -67,6 +71,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final File resourceTmpDir;
   private final Object lock = new Object();
   private RealtimeSegmentImpl realtimeSegment;
+  private final String tableStreamName;
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
@@ -92,6 +97,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       final Schema schema, final ServerMetrics serverMetrics) throws Exception {
     super();
     this.schema = schema;
+    this.extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
     this.serverMetrics =serverMetrics;
     this.segmentName = segmentMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
@@ -141,6 +147,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     this.kafkaStreamProvider = StreamProviderFactory.buildStreamProvider();
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig, tableName, serverMetrics);
     this.kafkaStreamProvider.start();
+    this.tableStreamName = tableName + "_" + kafkaStreamProviderConfig.getStreamName();
+
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
@@ -169,6 +177,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           try {
             row = kafkaStreamProvider.next();
 
+            row = extractor.transform(row);
             if (row != null) {
               notFull = realtimeSegment.index(row);
               exceptionSleepMillis = 50L;
@@ -191,6 +200,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return;
         }
         try {
+          int numErrors, numConversions, numNulls, numNullCols;
+          if ((numErrors = extractor.getTotalErrors()) > 0) {
+            serverMetrics.addMeteredTableValue(tableStreamName,
+                ServerMeter.ROWS_WITH_ERRORS, (long) numErrors);
+          }
+          Map<String, Integer> errorCount = extractor.getError_count();
+          for (String column : errorCount.keySet()) {
+            if ((numErrors = errorCount.get(column)) > 0) {
+              segmentLogger.warn("Column {} had {} rows with errors", column, numErrors);
+            }
+          }
+          if ((numConversions = extractor.getTotalConversions()) > 0) {
+            serverMetrics.addMeteredTableValue(tableStreamName,
+                ServerMeter.ROWS_NEEDING_CONVERSIONS, (long) numConversions);
+            segmentLogger.info("{} rows needed conversions ", numConversions);
+          }
+          if ((numNulls = extractor.getTotalNulls()) > 0) {
+            serverMetrics.addMeteredTableValue(tableStreamName,
+                ServerMeter.ROWS_WITH_NULL_VALUES, (long) numNulls);
+            segmentLogger.info("{} rows had null columns", numNulls);
+          }
+          if ((numNullCols = extractor.getTotalNullCols()) > 0) {
+            serverMetrics.addMeteredTableValue(tableStreamName,
+                ServerMeter.COLUMNS_WITH_NULL_VALUES, (long) numNullCols);
+            segmentLogger.info("{} columns had null values", numNullCols);
+          }
           segmentLogger.info("Indexing threshold reached, proceeding with index conversion");
           // kill the timer first
           segmentStatusTask.cancel();
@@ -360,7 +395,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     serverMetrics.addValueToTableGauge(tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
     lastUpdatedRawDocuments.set(currentRawDocs);
   }
- 
+
   @Override
   public void destroy() {
     LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", this.segmentName);

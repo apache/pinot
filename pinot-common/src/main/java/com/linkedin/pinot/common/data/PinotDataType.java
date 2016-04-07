@@ -16,8 +16,6 @@
 package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import org.apache.zookeeper.KeeperException;
-
 
 /**
  *  A {@code PinotDataType} represents the value of a row from a recordReader
@@ -995,35 +993,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return ((Byte[]) d)[0];
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return BYTE.toCharacter(((Byte[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return BYTE.toShort(((Byte[])d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return BYTE.toInteger(((Byte[])d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return BYTE.toLong(((Byte[])d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return BYTE.toFloat(((Byte[])d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return BYTE.toDouble(((Byte[])d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return BYTE.toString(((Byte[])d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1035,23 +1033,43 @@ public enum PinotDataType {
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] charArray = new Character[((Byte[]) d).length];
+      for (int i = 0; i < ((Byte[]) d).length; i++) {
+        charArray[i] = BYTE.toCharacter(((Byte[]) d)[i]);
+      }
+      return charArray;
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((Byte[]) d).length];
+      for (int i = 0; i < ((Byte[]) d).length; i++) {
+        shortArray[i] = BYTE.toShort(((Byte[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] intArray = new Integer[((Byte[]) d).length];
+      for (int i = 0; i < ((Byte[]) d).length; i++) {
+        intArray[i] = BYTE.toInteger(((Byte[]) d)[i]);
+      }
+      return intArray;
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((Byte[]) d).length];
+      for (int i = 0; i < ((Byte[]) d).length; i++) {
+        longArray[i] = BYTE.toLong(((Byte[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((Byte[]) d).length];
+      for (int i = 0; i < ((Byte[]) d).length; i++) {
+        floatArray[i] = BYTE.toFloat(((Byte[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
@@ -1059,7 +1077,11 @@ public enum PinotDataType {
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Byte[]) d).length];
+      for (int i = 0; i < ((Byte[]) d).length; i++) {
+        stringArray[i] = BYTE.toString(((Byte[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Byte[] convert(Object d, PinotDataType u) {
@@ -1072,35 +1094,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return CHARACTER.toByte(((Character[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return ((Character[]) d)[0];
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return CHARACTER.toShort(((Character[]) d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return CHARACTER.toInteger(((Character[]) d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return CHARACTER.toLong(((Character[]) d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return CHARACTER.toFloat(((Character[]) d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return CHARACTER.toDouble(((Character[]) d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return CHARACTER.toString(((Character[]) d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1108,7 +1130,11 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        byteArray[i] = CHARACTER.toByte(((Character[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
@@ -1116,27 +1142,51 @@ public enum PinotDataType {
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        shortArray[i] = CHARACTER.toShort(((Character[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] integerArray = new Integer[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        integerArray[i] = CHARACTER.toInteger(((Character[]) d)[i]);
+      }
+      return integerArray;
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        longArray[i] = CHARACTER.toLong(((Character[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        floatArray[i] = CHARACTER.toFloat(((Character[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
-      return (Double[]) d;
+      Double[] doubleArray = new Double[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        doubleArray[i] = CHARACTER.toDouble(((Character[]) d)[i]);
+      }
+      return doubleArray;
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Character[]) d).length];
+      for (int i = 0; i < ((Character[]) d).length; i++) {
+        stringArray[i] = CHARACTER.toString(((Character[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Character[] convert(Object d, PinotDataType u) {
@@ -1149,35 +1199,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return SHORT.toByte(((Short[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return SHORT.toCharacter(((Short[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return ((Short[]) d)[0];
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return SHORT.toInteger(((Short[]) d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return SHORT.toLong(((Short[]) d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return SHORT.toFloat(((Short[]) d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return SHORT.toDouble(((Short[]) d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return SHORT.toString(((Short[]) d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1185,11 +1235,19 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        byteArray[i] = SHORT.toByte(((Short[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] charArray = new Character[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        charArray[i] = SHORT.toCharacter(((Short[]) d)[i]);
+      }
+      return charArray;
     }
 
     public Short[] toShortArray(Object d) {
@@ -1197,23 +1255,43 @@ public enum PinotDataType {
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] intArray = new Integer[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        intArray[i] = SHORT.toInteger(((Short[]) d)[i]);
+      }
+      return intArray;
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        longArray[i] = SHORT.toLong(((Short[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        floatArray[i] = SHORT.toFloat(((Short[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
-      return (Double[]) d;
+      Double[] doubleArray = new Double[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        doubleArray[i] = SHORT.toDouble(((Short[]) d)[i]);
+      }
+      return doubleArray;
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Short[]) d).length];
+      for (int i = 0; i < ((Short[]) d).length; i++) {
+        stringArray[i] = SHORT.toString(((Short[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Short[] convert(Object d, PinotDataType u) {
@@ -1226,35 +1304,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return INTEGER.toByte(((Integer[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return INTEGER.toCharacter(((Integer[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return INTEGER.toShort(((Integer[]) d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return ((Integer[]) d)[0];
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return INTEGER.toLong(((Integer[]) d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return INTEGER.toFloat(((Integer[]) d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return INTEGER.toDouble(((Integer[]) d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return INTEGER.toString(((Integer[]) d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1262,15 +1340,27 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        byteArray[i] = INTEGER.toByte(((Integer[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] charArray = new Character[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        charArray[i] = INTEGER.toCharacter(((Integer[]) d)[i]);
+      }
+      return charArray;
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        shortArray[i] = INTEGER.toShort(((Integer[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
@@ -1278,19 +1368,35 @@ public enum PinotDataType {
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        longArray[i] = INTEGER.toLong(((Integer[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        floatArray[i] = INTEGER.toFloat(((Integer[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
-      return (Double[]) d;
+      Double[] doubleArray = new Double[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        doubleArray[i] = INTEGER.toDouble(((Integer[]) d)[i]);
+      }
+      return doubleArray;
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Integer[]) d).length];
+      for (int i = 0; i < ((Integer[]) d).length; i++) {
+        stringArray[i] = INTEGER.toString(((Integer[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Integer[] convert(Object d, PinotDataType u) {
@@ -1303,35 +1409,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return LONG.toByte(((Long[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return LONG.toCharacter(((Long[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return LONG.toShort(((Long[]) d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return LONG.toInteger(((Long[]) d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return ((Long[]) d)[0];
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return LONG.toFloat(((Long[]) d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return LONG.toDouble(((Long[]) d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return LONG.toString(((Long[]) d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1339,19 +1445,35 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        byteArray[i] = LONG.toByte(((Long[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] byteArray = new Character[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        byteArray[i] = LONG.toCharacter(((Long[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        shortArray[i] = LONG.toShort(((Long[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] intArray = new Integer[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        intArray[i] = LONG.toInteger(((Long[]) d)[i]);
+      }
+      return intArray;
     }
 
     public Long[] toLongArray(Object d) {
@@ -1359,15 +1481,27 @@ public enum PinotDataType {
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        floatArray[i] = LONG.toFloat(((Long[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
-      return (Double[]) d;
+      Double[] doubleArray = new Double[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        doubleArray[i] = LONG.toDouble(((Long[]) d)[i]);
+      }
+      return doubleArray;
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Long[]) d).length];
+      for (int i = 0; i < ((Long[]) d).length; i++) {
+        stringArray[i] = LONG.toString(((Long[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Long[] convert(Object d, PinotDataType u) {
@@ -1380,35 +1514,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return FLOAT.toByte(((Float[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return FLOAT.toCharacter(((Float[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return FLOAT.toShort(((Float[]) d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return FLOAT.toInteger(((Float[]) d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return FLOAT.toLong(((Float[]) d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return ((Float[]) d)[0];
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return FLOAT.toDouble(((Float[]) d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return FLOAT.toString(((Float[]) d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1416,23 +1550,43 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        byteArray[i] = FLOAT.toByte(((Float[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] charArray = new Character[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        charArray[i] = FLOAT.toCharacter(((Float[]) d)[i]);
+      }
+      return charArray;
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        shortArray[i] = FLOAT.toShort(((Float[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] intArray = new Integer[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        intArray[i] = FLOAT.toInteger(((Float[]) d)[i]);
+      }
+      return intArray;
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        longArray[i] = FLOAT.toLong(((Float[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
@@ -1440,11 +1594,19 @@ public enum PinotDataType {
     }
 
     public Double[] toDoubleArray(Object d) {
-      return (Double[]) d;
+      Double[] doubleArray = new Double[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        doubleArray[i] = FLOAT.toDouble(((Float[]) d)[i]);
+      }
+      return doubleArray;
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Float[]) d).length];
+      for (int i = 0; i < ((Float[]) d).length; i++) {
+        stringArray[i] = FLOAT.toString(((Float[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Float[] convert(Object d, PinotDataType u) {
@@ -1457,35 +1619,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return DOUBLE.toByte(((Double[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return DOUBLE.toCharacter(((Double[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return DOUBLE.toShort(((Double[]) d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return DOUBLE.toInteger(((Double[]) d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return DOUBLE.toLong(((Double[]) d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return DOUBLE.toFloat(((Double[]) d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return ((Double[]) d)[0];
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return DOUBLE.toString(((Double[]) d)[0]);
     }
 
     public Object toObject(Object d) {
@@ -1493,27 +1655,51 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        byteArray[i] = DOUBLE.toByte(((Double[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] charArray = new Character[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        charArray[i] = DOUBLE.toCharacter(((Double[]) d)[i]);
+      }
+      return charArray;
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        shortArray[i] = DOUBLE.toShort(((Double[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] intArray = new Integer[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        intArray[i] = DOUBLE.toInteger(((Double[]) d)[i]);
+      }
+      return intArray;
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        longArray[i] = DOUBLE.toLong(((Double[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        floatArray[i] = DOUBLE.toFloat(((Double[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
@@ -1521,7 +1707,11 @@ public enum PinotDataType {
     }
 
     public String[] toStringArray(Object d) {
-      return (String[]) d;
+      String[] stringArray = new String[((Double[]) d).length];
+      for (int i = 0; i < ((Double[]) d).length; i++) {
+        stringArray[i] = DOUBLE.toString(((Double[]) d)[i]);
+      }
+      return stringArray;
     }
 
     public Double[] convert(Object d, PinotDataType u) {
@@ -1534,35 +1724,35 @@ public enum PinotDataType {
     }
 
     public Byte toByte(Object d) {
-      return (Byte) d;
+      return STRING.toByte(((String[]) d)[0]);
     }
 
     public Character toCharacter(Object d) {
-      return (Character) d;
+      return STRING.toCharacter(((String[]) d)[0]);
     }
 
     public Short toShort(Object d) {
-      return (Short) d;
+      return STRING.toShort(((String[]) d)[0]);
     }
 
     public Integer toInteger(Object d) {
-      return (Integer) d;
+      return STRING.toInteger(((String[]) d)[0]);
     }
 
     public Long toLong(Object d) {
-      return (Long) d;
+      return STRING.toLong(((String[]) d)[0]);
     }
 
     public Float toFloat(Object d) {
-      return (Float) d;
+      return STRING.toFloat(((String[]) d)[0]);
     }
 
     public Double toDouble(Object d) {
-      return (Double) d;
+      return STRING.toDouble(((String[]) d)[0]);
     }
 
     public String toString(Object d) {
-      return (String) d;
+      return ((String[]) d)[0];
     }
 
     public Object toObject(Object d) {
@@ -1570,31 +1760,59 @@ public enum PinotDataType {
     }
 
     public Byte[] toByteArray(Object d) {
-      return (Byte[]) d;
+      Byte[] byteArray = new Byte[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        byteArray[i] = STRING.toByte(((String[]) d)[i]);
+      }
+      return byteArray;
     }
 
     public Character[] toCharArray(Object d) {
-      return (Character[]) d;
+      Character[] charArray = new Character[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        charArray[i] = STRING.toCharacter(((String[]) d)[i]);
+      }
+      return charArray;
     }
 
     public Short[] toShortArray(Object d) {
-      return (Short[]) d;
+      Short[] shortArray = new Short[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        shortArray[i] = STRING.toShort(((String[]) d)[i]);
+      }
+      return shortArray;
     }
 
     public Integer[] toIntegerArray(Object d) {
-      return (Integer[]) d;
+      Integer[] intArray = new Integer[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        intArray[i] = STRING.toInteger(((String[]) d)[i]);
+      }
+      return intArray;
     }
 
     public Long[] toLongArray(Object d) {
-      return (Long[]) d;
+      Long[] longArray = new Long[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        longArray[i] = STRING.toLong(((String[]) d)[i]);
+      }
+      return longArray;
     }
 
     public Float[] toFloatArray(Object d) {
-      return (Float[]) d;
+      Float[] floatArray = new Float[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        floatArray[i] = STRING.toFloat(((String[]) d)[i]);
+      }
+      return floatArray;
     }
 
     public Double[] toDoubleArray(Object d) {
-      return (Double[]) d;
+      Double[] doubleArray = new Double[((String[]) d).length];
+      for (int i = 0; i < ((String[]) d).length; i++) {
+        doubleArray[i] = STRING.toDouble(((String[]) d)[i]);
+      }
+      return doubleArray;
     }
 
     public String[] toStringArray(Object d) {

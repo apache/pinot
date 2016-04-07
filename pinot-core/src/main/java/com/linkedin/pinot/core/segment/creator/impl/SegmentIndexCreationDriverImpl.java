@@ -312,6 +312,26 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
     recordReader.close();
     LOGGER.info("Finished records indexing in IndexCreator!");
+    int numErrors, numConversions, numNulls, numNullCols;
+    if ((numErrors = extractor.getTotalErrors()) > 0) {
+      LOGGER.warn("Index creator for schema {} had {} rows with errors", dataSchema.getSchemaName(), numErrors);
+    }
+    Map<String, Integer> errorCount = extractor.getError_count();
+    for (String column : errorCount.keySet()) {
+      if ((numErrors = errorCount.get(column)) > 0) {
+        LOGGER.info("Column {} had {} rows with errors", column, numErrors);
+      }
+    }
+    if ((numConversions = extractor.getTotalConversions()) > 0) {
+      LOGGER.info("Index creator for schema {} had {} rows with type conversions", dataSchema.getSchemaName(),
+          numConversions);
+    }
+    if ((numNulls = extractor.getTotalNulls()) > 0) {
+      LOGGER.info("Index creator for schema {} had {} rows with null columns", dataSchema.getSchemaName(), numNulls);
+    }
+    if ((numNullCols = extractor.getTotalNullCols()) > 0) {
+      LOGGER.info("Index creator for schema {} had {}  null columns", dataSchema.getSchemaName(), numNullCols);
+    }
 
     handlePostCreation();
   }

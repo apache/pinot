@@ -40,6 +40,9 @@ public class PlainFieldExtractor implements FieldExtractor {
   private Map<String, Integer> _errorCount;
 
   private int _totalErrors = 0;
+  private int _totalNulls = 0;
+  private int _totalConversions = 0;
+  private int _totalNullCols = 0;
   private static final Logger LOGGER = LoggerFactory.getLogger(PlainFieldExtractor.class);
   private Map<String, PinotDataType> _columnType;
   private Map<String, PinotDataType> _typeMap;
@@ -57,6 +60,9 @@ public class PlainFieldExtractor implements FieldExtractor {
       _errorCount.put(column, 0);
     }
     _totalErrors = 0;
+    _totalNulls = 0;
+    _totalConversions = 0;
+    _totalNullCols = 0;
   }
 
   private void initColumnTypes() {
@@ -67,8 +73,7 @@ public class PlainFieldExtractor implements FieldExtractor {
       if (fieldSpec != null) {
         // ChaosMonkey generates schemas with null fieldspecs
         dest = PinotDataType.getPinotDataType(fieldSpec);
-      }
-      else {
+      } else {
         LOGGER.warn("Bad schema: {}, Field: {}", _schema.getSchemaName(), column);
       }
       _columnType.put(column, dest);
@@ -88,11 +93,25 @@ public class PlainFieldExtractor implements FieldExtractor {
     return _schema;
   }
 
+  public int getTotalConversions() {
+    return _totalConversions;
+  }
+
+  public int getTotalNulls() {
+    return _totalNulls;
+  }
+
+  public int getTotalNullCols() {
+    return _totalNullCols;
+  }
+
   @Override
   public GenericRow transform(GenericRow row) {
     Map<String, Object> fieldMap = new HashMap<String, Object>();
     if (_schema.size() > 0) {
       boolean hasError = false;
+      boolean hasNull = false;
+      boolean hasConversion = false;
       for (String column : _schema.getColumnNames()) {
         Object value = row.getValue(column);
         FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
@@ -100,6 +119,8 @@ public class PlainFieldExtractor implements FieldExtractor {
         PinotDataType source;
         if (value == null) {
           source = PinotDataType.OBJECT;
+          hasNull = true;
+          _totalNullCols++;
         } else {
           String typeName = (value.getClass().getCanonicalName());
           if ((typeName.equals("java.lang.Object[]")) && ((Object[]) value).length != 0) {
@@ -115,9 +136,14 @@ public class PlainFieldExtractor implements FieldExtractor {
 
         if ((source != dest) && (value != null)) {
           try {
+            hasConversion = true;
             value = dest.convert(value, source);
+            if (value == null) {
+              hasError = true;
+            }
           } catch (Exception e) {
             value = null;
+            hasError = true;
           }
         }
         if (value == null) {
@@ -126,7 +152,6 @@ public class PlainFieldExtractor implements FieldExtractor {
           // or because there was an error in the conversion.
           // Count an error for column and row
           _errorCount.put(column, _errorCount.get(column) + 1);
-          hasError = true;
           LOGGER.debug("Invalid value {} in column {} in schema {}", row.getValue(column), column,
               _schema.getSchemaName());
           try {
@@ -144,6 +169,12 @@ public class PlainFieldExtractor implements FieldExtractor {
       }
       if (hasError) {
         _totalErrors++;
+      }
+      if (hasNull) {
+        _totalNulls++;
+      }
+      if (hasConversion) {
+        _totalConversions++;
       }
       row.init(fieldMap);
     }
