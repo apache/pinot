@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.Utils;
  * Controller gauges.
  */
 public enum ControllerGauge implements AbstractMetrics.Gauge {
-  MINIMUM_ONLINE_REPLICA_COUNT("replicas", false);
+  NUM_BELOW_REPLICATION_THRESHOLD("replicas", false);
 
   private final String gaugeName;
   private final String unit;
