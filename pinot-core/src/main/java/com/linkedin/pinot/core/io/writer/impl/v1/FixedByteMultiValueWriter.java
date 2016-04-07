@@ -15,24 +15,26 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import org.apache.commons.io.IOUtils;
 
 
 public class FixedByteMultiValueWriter implements
     SingleColumnMultiValueWriter {
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
-
-  private PinotDataBuffer indexDataBuffer;
-  private PinotDataBuffer headerBuffer;
-  private PinotDataBuffer dataBuffer;
+  private ByteBuffer headerBuffer;
+  private ByteBuffer dataBuffer;
+  private RandomAccessFile raf;
   private FixedByteSingleValueMultiColWriter headerWriter;
   private FixedByteSingleValueMultiColWriter dataWriter;
   private FixedByteSingleValueMultiColReader headerReader;
@@ -44,11 +46,11 @@ public class FixedByteMultiValueWriter implements
     int headerSize = numDocs * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     int dataSize = totalNumValues * columnSizeInBytes;
     int totalSize = headerSize + dataSize;
-    indexDataBuffer = PinotDataBuffer.fromFile(file, 0, totalSize, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-        file.getAbsolutePath() + "indexWriter");
-
-    headerBuffer = indexDataBuffer.view(0, headerSize);
-    dataBuffer = indexDataBuffer.view(headerSize, totalSize);
+    raf = new RandomAccessFile(file, "rw");
+    headerBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        headerSize, file, this.getClass().getSimpleName() + " headerBuffer");
+    dataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE,
+        headerSize, dataSize, file, this.getClass().getSimpleName() + " dataBuffer");
     headerWriter = new FixedByteSingleValueMultiColWriter(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
     headerReader = new FixedByteSingleValueMultiColReader(headerBuffer,
@@ -56,20 +58,22 @@ public class FixedByteMultiValueWriter implements
 
     dataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer,
         totalNumValues, 1, new int[] { columnSizeInBytes });
+
   }
 
   @Override
   public void close() throws IOException {
-    dataWriter.close();
-    headerWriter.close();
-    headerReader.close();
-    indexDataBuffer.close();
-
-    indexDataBuffer = null;
+    IOUtils.closeQuietly(raf);
+    raf = null;
+    MmapUtils.unloadByteBuffer(dataBuffer);
     dataBuffer = null;
+    MmapUtils.unloadByteBuffer(headerBuffer);
     headerBuffer = null;
+    dataWriter.close();
     dataWriter = null;
+    headerWriter.close();
     headerWriter = null;
+    headerReader.close();
     headerReader = null;
   }
 

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.HashMap;
@@ -31,7 +30,6 @@ import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.startree.StarTree;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,21 +62,11 @@ public class Loaders {
             indexDir.getName(), from, to);
       }
 
-      // load the metadata again since converter may have changed it
-      metadata = new SegmentMetadataImpl(indexDir);
-
-      // add or removes indexes based on indexLoadingConfigurationMetadata
-      SegmentPreProcessor preProcessor = new SegmentPreProcessor(indexDir, metadata, indexLoadingConfigMetadata);
-      preProcessor.process();
-
-      SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, metadata, readMode);
-      Set<String> allColumns = metadata.getAllColumns();
-
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();
 
       for (String column : metadata.getColumnMetadataMap().keySet()) {
-        indexContainerMap.put(column, ColumnIndexContainer.init(segmentDirectory.createReader(),
-            metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata));
+        indexContainerMap.put(column, ColumnIndexContainer.init(column, indexDir,
+            metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata, readMode));
       }
 
       // The star tree index (if available)

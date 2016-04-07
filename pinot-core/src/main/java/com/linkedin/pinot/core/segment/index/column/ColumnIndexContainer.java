@@ -15,7 +15,15 @@
  */
 package com.linkedin.pinot.core.segment.index.column;
 
+import java.io.File;
+import java.io.IOException;
+
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
@@ -23,116 +31,178 @@ import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import java.io.IOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexContainer.class);
 
-  public static ColumnIndexContainer init(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfigMetadata indexLoadingConfigMetadata)
-      throws IOException {
-    String column = metadata.getColumnName();
+  public static ColumnIndexContainer init(String column, File indexDir, ColumnMetadata metadata,
+      IndexLoadingConfigMetadata indexLoadingConfigMetadata, ReadMode mode) throws Exception {
+
     boolean loadInverted = false;
     if (indexLoadingConfigMetadata != null) {
       if (indexLoadingConfigMetadata.getLoadingInvertedIndexColumns() != null) {
-        loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns().contains(metadata.getColumnName());
+        loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns().contains(column);
       }
     }
-    PinotDataBuffer dictionaryBuffer = segmentReader.getIndexFor(column, ColumnIndexType.DICTIONARY);
-    ImmutableDictionaryReader dictionary = load(metadata, dictionaryBuffer);
+
+    File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENTION);
+    ImmutableDictionaryReader dictionary = load(metadata, dictionaryFile, mode);
 
     if (metadata.isSorted() && metadata.isSingleValue()) {
-      return loadSorted(column, segmentReader, metadata, dictionary);
-      //return loadSorted(column, indexDir, metadata, dictionary, mode);
+      if (loadInverted) {
+        LOGGER.info("Column {} is sorted, inverted index will not be generated or loaded", column);
+      }
+      return loadSorted(column, indexDir, metadata, dictionary, mode);
     }
 
     if (metadata.isSingleValue()) {
-      return loadUnsorted(column, segmentReader, metadata, dictionary, loadInverted);
-      //return loadUnsorted(column, indexDir, metadata, dictionary, mode, loadInverted);
+      return loadUnsorted(column, indexDir, metadata, dictionary, mode, loadInverted);
     }
-    //return loadMultiValue(column, indexDir, metadata, dictionary, mode, loadInverted);
-    return loadMultiValue(column, segmentReader, metadata, dictionary, loadInverted);
+    if (metadata.isSorted()) {
+      LOGGER.warn("Column {} is multi-valued, sort on multi-valued column is not supported", column);
+    }
+    return loadMultiValue(column, indexDir, metadata, dictionary, mode, loadInverted);
   }
 
-  private static ColumnIndexContainer loadMultiValue(String column, SegmentDirectory.Reader segmentReader,
-      ColumnMetadata metadata, ImmutableDictionaryReader dictionary, boolean loadInverted)
-      throws IOException {
+  private static ColumnIndexContainer loadSorted(String column, File indexDir,
+      ColumnMetadata metadata, ImmutableDictionaryReader dictionary, ReadMode mode)
+          throws IOException {
+    File fwdIndexFile =
+        new File(indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
 
-    PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-
-    SingleColumnMultiValueReader<? extends ReaderContext> fwdIndexReader =
-        new FixedBitMultiValueReader(fwdIndexBuffer, metadata.getTotalDocs(),
-            metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement(), false);
-
-    BitmapInvertedIndexReader invertedIndex = null;
-
-    if (loadInverted) {
-      PinotDataBuffer invertedIndexBuffer = segmentReader.getIndexFor(column, ColumnIndexType.INVERTED_INDEX);
-      invertedIndex = new BitmapInvertedIndexReader(invertedIndexBuffer, metadata.getCardinality());
-    }
-
-    return new UnSortedMVColumnIndexContainer(column, metadata, fwdIndexReader, dictionary,
-        invertedIndex);
+    FixedByteSingleValueMultiColReader indexReader =
+        new FixedByteSingleValueMultiColReader(fwdIndexFile, metadata.getCardinality(), 2, new int[]{4, 4},
+            mode == ReadMode.mmap);
+    return new SortedSVColumnIndexContainer(column, metadata, indexReader, dictionary);
   }
 
-  private static ColumnIndexContainer loadUnsorted(String column, SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      ImmutableDictionaryReader dictionary, boolean loadInverted)
-      throws IOException {
+  private static ColumnIndexContainer loadUnsorted(String column, File indexDir,
+      ColumnMetadata metadata, ImmutableDictionaryReader dictionary, ReadMode mode,
+      boolean loadInverted) throws IOException {
+    File fwdIndexFile =
+        new File(indexDir, column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
+    File invertedIndexFile =
+        new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
-    PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
     SingleColumnSingleValueReader fwdIndexReader =
-        new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(),
-            metadata.getBitsPerElement(), metadata.hasNulls());
+        new FixedBitSingleValueReader(fwdIndexFile, metadata.getTotalDocs(),
+            metadata.getBitsPerElement(), mode == ReadMode.mmap, metadata.hasNulls());
 
     BitmapInvertedIndexReader invertedIndex = null;
 
     if (loadInverted) {
-      PinotDataBuffer invertedIndexBuffer = segmentReader.getIndexFor(column, ColumnIndexType.INVERTED_INDEX);
-      invertedIndex = new BitmapInvertedIndexReader(invertedIndexBuffer, metadata.getCardinality());
+      invertedIndex = createAndLoadInvertedIndexFor(column, fwdIndexReader, metadata,
+          invertedIndexFile, mode, indexDir);
     }
 
     return new UnsortedSVColumnIndexContainer(column, metadata, fwdIndexReader, dictionary,
         invertedIndex);
   }
 
-  private static ColumnIndexContainer loadSorted(String column, SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      ImmutableDictionaryReader dictionary)
-      throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-    FixedByteSingleValueMultiColReader indexReader = new FixedByteSingleValueMultiColReader(
-        dataBuffer, metadata.getCardinality(), 2, new int[] {
-        4, 4
-    });
-    return new SortedSVColumnIndexContainer(column, metadata, indexReader, dictionary);
+  private static ColumnIndexContainer loadMultiValue(String column, File indexDir,
+      ColumnMetadata metadata, ImmutableDictionaryReader dictionary, ReadMode mode,
+      boolean loadInverted) throws Exception {
+    File fwdIndexFile =
+        new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
+    File invertedIndexFile =
+        new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+
+    SingleColumnMultiValueReader<? extends ReaderContext> fwdIndexReader =
+        new FixedBitMultiValueReader(fwdIndexFile, metadata.getTotalDocs(),
+            metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement(), false,
+            mode == ReadMode.mmap);
+
+    BitmapInvertedIndexReader invertedIndex = null;
+
+    if (loadInverted) {
+      invertedIndex = createAndLoadInvertedIndexFor(column, fwdIndexReader, metadata,
+          invertedIndexFile, mode, indexDir);
+    }
+
+    return new UnSortedMVColumnIndexContainer(column, metadata, fwdIndexReader, dictionary,
+        invertedIndex);
   }
 
-  private static ImmutableDictionaryReader load(ColumnMetadata metadata, PinotDataBuffer dictionaryBuffer) {
+  private static BitmapInvertedIndexReader createAndLoadInvertedIndexFor(String column,
+      DataFileReader fwdIndex, ColumnMetadata metadata, File invertedIndexFile, ReadMode mode,
+      File indexDir) throws IOException {
+
+    File inProgress = new File(column + "_inv.inprogress");
+
+    // returning inverted index from file only when marker file does not exist and inverted file
+    // exist
+    if (!inProgress.exists() && invertedIndexFile.exists()) {
+      LOGGER.info("found inverted index for colummn {}, loading it", column);
+      return new BitmapInvertedIndexReader(invertedIndexFile, metadata.getCardinality(),
+          mode == ReadMode.mmap);
+    }
+
+    // creating the marker file
+    FileUtils.touch(inProgress);
+
+    if (invertedIndexFile.exists()) {
+      // if inverted index file exists, it means that we got an exception while creating inverted
+      // index last time
+      // deleting it
+      FileUtils.deleteQuietly(invertedIndexFile);
+    }
+
+    LOGGER.info("did not find inverted index for colummn {}, creating it", column);
+
+    // creating inverted index for the column now
+    InvertedIndexCreator creator =
+        new OffHeapBitmapInvertedIndexCreator(indexDir, metadata.getCardinality(), metadata.getTotalDocs(),
+            metadata.getTotalNumberOfEntries(), metadata.toFieldSpec());
+    if (!metadata.isSingleValue()) {
+      SingleColumnMultiValueReader mvFwdIndex = (SingleColumnMultiValueReader) fwdIndex;
+      int[] dictIds = new int[metadata.getMaxNumberOfMultiValues()];
+      for (int i = 0; i < metadata.getTotalDocs(); i++) {
+        int len = mvFwdIndex.getIntArray(i, dictIds);
+        creator.add(i, dictIds, len);
+      }
+    } else {
+      FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
+      for (int i = 0; i < metadata.getTotalDocs(); i++) {
+        creator.add(i, svFwdIndex.getInt(i));
+      }
+    }
+    creator.seal();
+
+    // delete the marker file
+    FileUtils.deleteQuietly(inProgress);
+
+    LOGGER.info("created inverted index for colummn {}, loading it", column);
+    return new BitmapInvertedIndexReader(invertedIndexFile, metadata.getCardinality(),
+        mode == ReadMode.mmap);
+  }
+
+  @SuppressWarnings("incomplete-switch")
+  private static ImmutableDictionaryReader load(ColumnMetadata metadata, File dictionaryFile,
+      ReadMode loadMode) throws IOException {
     switch (metadata.getDataType()) {
-      case INT:
-        return new IntDictionary(dictionaryBuffer, metadata);
-      case LONG:
-        return new LongDictionary(dictionaryBuffer, metadata);
-      case FLOAT:
-        return new FloatDictionary(dictionaryBuffer, metadata);
-      case DOUBLE:
-        return new DoubleDictionary(dictionaryBuffer, metadata);
-      case STRING:
-      case BOOLEAN:
-        return new StringDictionary(dictionaryBuffer, metadata);
+    case INT:
+      return new IntDictionary(dictionaryFile, metadata, loadMode);
+    case LONG:
+      return new LongDictionary(dictionaryFile, metadata, loadMode);
+    case FLOAT:
+      return new FloatDictionary(dictionaryFile, metadata, loadMode);
+    case DOUBLE:
+      return new DoubleDictionary(dictionaryFile, metadata, loadMode);
+    case STRING:
+    case BOOLEAN:
+      return new StringDictionary(dictionaryFile, metadata, loadMode);
     }
 
     throw new UnsupportedOperationException("unsupported data type : " + metadata.getDataType());

@@ -15,9 +15,13 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
 import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -35,14 +39,14 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 public class BenchmarkFileWrite {
   File file;
 
-  PinotDataBuffer byteBuffer;
+  ByteBuffer byteBuffer;
 
   public static final int ROWS = 2500000;
   public static final int COLUMN_SIZE_IN_BITS = 7;
 
   @Setup
   public void loadData() {
-    byteBuffer = PinotDataBuffer.allocateDirect(ROWS * COLUMN_SIZE_IN_BITS / 8 + 1);
+    byteBuffer = ByteBuffer.allocate((ROWS * COLUMN_SIZE_IN_BITS / 8 + 1));
   }
 
   @Benchmark

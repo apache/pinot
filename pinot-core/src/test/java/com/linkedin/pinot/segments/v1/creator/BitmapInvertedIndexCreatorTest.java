@@ -19,15 +19,14 @@ import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.HeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -103,7 +102,7 @@ public class BitmapInvertedIndexCreatorTest {
     // assert that the file sizes and contents are the same
     Assert.assertEquals(bitmapIndexFileHeap.length(), bitmapIndexFileHeap.length());
     Assert.assertTrue(FileUtils.contentEquals(bitmapIndexFileHeap, bitmapIndexFileHeap));
-
+    
     FileUtils.deleteQuietly(indexDirHeap);
     FileUtils.deleteQuietly(indexDirOffHeap);
   }
@@ -111,9 +110,8 @@ public class BitmapInvertedIndexCreatorTest {
   private void validate(String colName, File bitmapIndexFile, int cardinality,
       Map<Integer, Set<Integer>> postingListMap) throws IOException {
     Assert.assertTrue(bitmapIndexFile.exists());
-    PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(bitmapIndexFile, ReadMode.mmap,
-        FileChannel.MapMode.READ_ONLY, "testing");
-    BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(dataBuffer, cardinality);
+    BitmapInvertedIndexReader reader =
+        new BitmapInvertedIndexReader(bitmapIndexFile, cardinality, false);
     for (int i = 0; i < cardinality; i++) {
       ImmutableRoaringBitmap bitmap = reader.getImmutable(i);
       Set<Integer> expected = postingListMap.get(i);
@@ -122,7 +120,6 @@ public class BitmapInvertedIndexCreatorTest {
       List<Integer> actualList = Ints.asList(actual);
       Assert.assertEquals(actualList, expected);
     }
-    dataBuffer.close();
 
   }
 

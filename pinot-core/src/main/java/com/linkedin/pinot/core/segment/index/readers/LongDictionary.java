@@ -15,13 +15,20 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.File;
+import java.io.IOException;
+
+
+/**
+ * Nov 14, 2014
+ */
 
 public class LongDictionary extends ImmutableDictionaryReader {
 
-  public LongDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    super(dataBuffer, metadata.getCardinality(), Long.SIZE / 8);
+  public LongDictionary(File dictFile, ColumnMetadata metadata, ReadMode loadMode) throws IOException {
+    super(dictFile, metadata.getCardinality(), Long.SIZE / 8, loadMode == ReadMode.mmap);
   }
 
   @Override

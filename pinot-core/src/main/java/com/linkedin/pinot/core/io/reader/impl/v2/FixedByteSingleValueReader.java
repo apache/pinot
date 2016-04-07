@@ -15,12 +15,14 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v2;
 
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.File;
+import java.io.IOException;
 
 public class FixedByteSingleValueReader extends com.linkedin.pinot.core.io.reader.impl.v1.FixedByteSingleValueReader{
 
-  public FixedByteSingleValueReader(PinotDataBuffer dataBuffer, int rows, int columnSizeInBytes, boolean hasNulls)  {
-    super(dataBuffer, rows, columnSizeInBytes, hasNulls);
+  public FixedByteSingleValueReader(File file, int rows, int columnSizeInBytes, boolean isMMap,
+      boolean hasNulls) throws IOException {
+    super(file, rows, columnSizeInBytes, isMMap, hasNulls);
   }
 
 }

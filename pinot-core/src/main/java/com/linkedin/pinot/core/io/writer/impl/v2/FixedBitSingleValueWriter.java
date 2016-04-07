@@ -15,17 +15,23 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v2;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.util.SizeUtil;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import me.lemire.integercompression.BitPacking;
+
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
+import com.linkedin.pinot.core.util.SizeUtil;
+
+import me.lemire.integercompression.BitPacking;
 
 /**
  * Represents a datatable where each col contains values that can be represented
@@ -33,48 +39,47 @@ import org.slf4j.LoggerFactory;
  */
 public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitSingleValueWriter.class);
-
-  private PinotDataBuffer indexDataBuffer;
+  private ByteBuffer byteBuffer;
+  private RandomAccessFile raf;
   private int maxValue;
   private int minValue;
   private int currentRow = -1;
+  int[] input;
   private int numBits;
   private int compressedSize;
   private int uncompressedSize;
   private int[] uncompressedData;
   private int[] compressedData;
   private int numRows;
-  private int indexDataBufferPosition = 0;
+  boolean ownsByteBuffer;
+  boolean isMmap;
+
+  private void init(File file, int rows, int numBits) throws Exception {
+    init(rows, numBits, false);
+    createBuffer(file);
+  }
 
   public FixedBitSingleValueWriter(File file, int rows, int numBits) throws Exception {
-    init(rows, numBits, false);
-    createByteBuffer(file);
+    init(file, rows, numBits);
+    createBuffer(file);
   }
 
-  public FixedBitSingleValueWriter(File file, int rows, int numBits,
-      boolean hasNegativeValues) throws Exception {
+  public FixedBitSingleValueWriter(File file, int rows, int numBits, boolean hasNegativeValues)
+      throws Exception {
     init(rows, numBits, hasNegativeValues);
-    createByteBuffer(file);
+    createBuffer(file);
   }
 
-  public FixedBitSingleValueWriter(PinotDataBuffer dataBuffer, int rows, int numBits) throws Exception {
+  public FixedBitSingleValueWriter(ByteBuffer byteBuffer, int rows, int numBits) throws Exception {
+    this.byteBuffer = byteBuffer;
     init(rows, numBits, false);
-    this.indexDataBuffer = dataBuffer;
   }
 
-  public FixedBitSingleValueWriter(PinotDataBuffer dataBuffer, int rows, int numBits,
+  public FixedBitSingleValueWriter(ByteBuffer byteBuffer, int rows, int numBits,
       boolean hasNegativeValues) throws Exception {
+    this.byteBuffer = byteBuffer;
     init(rows, numBits, hasNegativeValues);
-    this.indexDataBuffer = dataBuffer;
   }
-
-  private void createByteBuffer(File file)
-      throws IOException {
-    int bytesRequired = SizeUtil.computeBytesRequired(numRows, numBits, uncompressedSize);
-    this.indexDataBuffer = PinotDataBuffer.fromFile(file, 0, bytesRequired, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-        file.getAbsolutePath() + this.getClass().getSimpleName());
-  }
-
 
   private void init(int rows, int numBits, boolean signed) throws Exception {
     this.numRows = rows;
@@ -94,12 +99,25 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
     compressedData = new int[compressedSize];
   }
 
+  private void createBuffer(File file) throws FileNotFoundException, IOException {
+    raf = new RandomAccessFile(file, "rw");
+    int bytesRequired = SizeUtil.computeBytesRequired(numRows, numBits, uncompressedSize);
+    LOGGER.info("Creating byteBuffer of size:{} to store {} values of bits:{}", bytesRequired,
+        numRows, numBits);
+    byteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0, bytesRequired, file,
+        this.getClass().getSimpleName() + " byteBuffer");
+    isMmap = true;
+    ownsByteBuffer = true;
+    byteBuffer.position(0);
+  }
+
   public boolean open() {
     return true;
   }
 
   /**
    * @param row
+   * @param col
    * @param val
    */
   public void setInt(int row, int val) {
@@ -110,8 +128,7 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
       if (index == uncompressedSize - 1 || row == numRows - 1) {
         BitPacking.fastpack(uncompressedData, 0, compressedData, 0, numBits);
         for (int i = 0; i < compressedSize; i++) {
-          indexDataBuffer.putInt(indexDataBufferPosition, compressedData[i]);
-          indexDataBufferPosition += 4;
+          byteBuffer.putInt(compressedData[i]);
         }
         int[] out = new int[uncompressedSize];
         BitPacking.fastunpack(compressedData, 0, out, 0, numBits);
@@ -126,8 +143,15 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
 
   @Override
   public void close() {
-    indexDataBuffer.close();
-    indexDataBuffer = null;
+    if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+      byteBuffer = null;
+
+      if (isMmap) {
+        IOUtils.closeQuietly(raf);
+        raf = null;
+      }
+    }
   }
 
   @Override

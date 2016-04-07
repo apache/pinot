@@ -15,12 +15,16 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.util.PinotDataCustomBitSet;
+import com.linkedin.pinot.core.util.CustomBitSet;
+import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 
 /**
@@ -32,58 +36,113 @@ import java.io.IOException;
  * RAWDATA This section contains the multi valued data stored in sequence of int's. The number of ints is equal to the totalNumberOfValues
  * We divide all the documents into groups referred to as CHUNK. Each CHUNK will
  * - Have the same number of documents.
- * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up.
- * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section
+ * - Started Offset of each CHUNK in the BITMAP will stored in the HEADER section. This is to speed the look up. 
+ * Over all each look up will take log(NUM CHUNKS) for binary search + CHUNK to linear scan on the bitmap to find the right offset in the raw data section 
  *
  */
 public class FixedByteMultiValueReader extends BaseSingleColumnMultiValueReader {
-  private static final int SIZE_OF_INT = 4;
-  private static final int NUM_COLS_IN_HEADER = 1;
-  //THIS is HARDCODED in THE FixedByteSkipListSCMVWriter class as well.
+  private static int SIZE_OF_INT = 4;
+  private static int NUM_COLS_IN_HEADER = 1;
+  //THIS is HARDCODED in THE FixedByteSkipListSCMVWriter class as well. 
   //If you are changing PREFERRED_NUM_VALUES_PER_CHUNK, make sure you change this in FixedByteSkipListSCMVWriter class as well
-  private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
-
-  private PinotDataBuffer indexDataBuffer;
-  private PinotDataBuffer chunkOffsetsBuffer;
-  private PinotDataBuffer bitsetBuffer;
-  private PinotDataBuffer rawDataBuffer;
+  private int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
+  private ByteBuffer chunkOffsetsBuffer;
+  private ByteBuffer bitsetBuffer;
+  private ByteBuffer rawDataBuffer;
+  private RandomAccessFile raf;
   private FixedByteSingleValueMultiColReader chunkOffsetsReader;
-  private PinotDataCustomBitSet customBitSet;
+  private CustomBitSet customBitSet;
   private FixedByteSingleValueMultiColReader rawDataReader;
   private int numChunks;
+  int prevRowStartIndex = 0;
+  int prevRowLength = 0;
+  int prevRowId = -1;
   private int chunkOffsetHeaderSize;
   private int bitsetSize;
   private int rawDataSize;
   private int totalSize;
   private int totalNumValues;
   private int docsPerChunk;
+  private boolean isMmap;
 
-  public FixedByteMultiValueReader(PinotDataBuffer indexDataBuffer,
-      int numDocs, int totalNumValues, int columnSizeInBytes) {
-    this.indexDataBuffer = indexDataBuffer;
+  public FixedByteMultiValueReader(File file, int numDocs, int totalNumValues, int columnSizeInBytes, boolean isMmap)
+      throws Exception {
     this.totalNumValues = totalNumValues;
     float averageValuesPerDoc = totalNumValues / numDocs;
     this.docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
     this.numChunks = (numDocs + docsPerChunk - 1) / docsPerChunk;
+    this.isMmap = isMmap;
     chunkOffsetHeaderSize = numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     bitsetSize = (totalNumValues + 7) / 8;
     rawDataSize = totalNumValues * columnSizeInBytes;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
-    Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB");
-    chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
-    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs,
-        NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT });
-    int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
-    bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
-    rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
-    customBitSet = PinotDataCustomBitSet.withDataBuffer(bitsetSize, bitsetBuffer);
-    rawDataReader = new FixedByteSingleValueMultiColReader(rawDataBuffer, totalNumValues, 1,
-        new int[] { columnSizeInBytes });
+    raf = new RandomAccessFile(file, "rw");
+    if (isMmap) {
+      //mmap chunk offsets 
+      chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0, chunkOffsetHeaderSize, file,
+          this.getClass().getSimpleName() + " chunkOffsetsBuffer");
+      chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT });
+      //mmap bitset buffer
+      bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize, bitsetSize, file,
+          this.getClass().getSimpleName() + " bitsetBuffer");
+      customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
+      //mmap rawData
+      rawDataBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize, rawDataSize, file,
+          this.getClass().getSimpleName() + " rawDataBuffer");
+      rawDataReader = new FixedByteSingleValueMultiColReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });
+    } else {
+      //chunk offsets
+      chunkOffsetsBuffer = MmapUtils.allocateDirectByteBuffer(chunkOffsetHeaderSize, file,
+          this.getClass().getSimpleName() + " chunkOffsetsBuffer");
+      raf.getChannel().read(chunkOffsetsBuffer);
+      chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numDocs, NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT });
+
+      //bitset buffer
+      bitsetBuffer = MmapUtils.allocateDirectByteBuffer(bitsetSize, file,
+          this.getClass().getSimpleName() + " bitsetBuffer");
+      raf.getChannel().read(bitsetBuffer);
+      customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
+
+      //raw data
+      rawDataBuffer = MmapUtils.allocateDirectByteBuffer(rawDataSize, file,
+        this.getClass().getSimpleName() + " rawDataBuffer");
+      raf.getChannel().read(rawDataBuffer);
+      rawDataReader = new FixedByteSingleValueMultiColReader(rawDataBuffer, totalNumValues, 1, new int[] { columnSizeInBytes });
+
+      raf.close();
+    }
   }
 
+  public int getChunkOffsetHeaderSize() {
+    return chunkOffsetHeaderSize;
+  }
+
+  public int getBitsetSize() {
+    return bitsetSize;
+  }
+
+  public int getRawDataSize() {
+    return rawDataSize;
+  }
 
   public int getTotalSize() {
     return totalSize;
+  }
+
+  public ByteBuffer getChunkOffsetsBuffer() {
+    return chunkOffsetsBuffer;
+  }
+
+  public ByteBuffer getBitsetBuffer() {
+    return bitsetBuffer;
+  }
+
+  public ByteBuffer getRawDataBuffer() {
+    return rawDataBuffer;
+  }
+
+  public int getNumChunks() {
+    return numChunks;
   }
 
   private int computeLength(int rowOffSetStart) {
@@ -106,10 +165,20 @@ public class FixedByteMultiValueReader extends BaseSingleColumnMultiValueReader 
 
   @Override
   public void close() throws IOException {
-    chunkOffsetsReader.close();
-    rawDataReader.close();
+    MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
+    chunkOffsetsBuffer = null;
+    MmapUtils.unloadByteBuffer(bitsetBuffer);
+    bitsetBuffer = null;
+    MmapUtils.unloadByteBuffer(rawDataBuffer);
+    rawDataBuffer = null;
     customBitSet.close();
-    indexDataBuffer.close();
+    customBitSet = null;
+    rawDataReader.close();
+    rawDataReader = null;
+
+    if (isMmap) {
+      raf.close();
+    }
   }
 
   public int getDocsPerChunk() {

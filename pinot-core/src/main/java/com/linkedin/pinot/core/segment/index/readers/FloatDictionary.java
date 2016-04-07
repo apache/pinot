@@ -15,13 +15,15 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.File;
+import java.io.IOException;
 
 public class FloatDictionary extends ImmutableDictionaryReader {
 
-  public FloatDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    super(dataBuffer, metadata.getCardinality(), Float.SIZE / 8);
+  public FloatDictionary(File dictFile, ColumnMetadata metadata, ReadMode loadMode) throws IOException {
+    super(dictFile, metadata.getCardinality(), Float.SIZE / 8, loadMode == ReadMode.mmap);
   }
 
   @Override

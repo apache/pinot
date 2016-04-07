@@ -15,12 +15,9 @@
  */
 package com.linkedin.pinot.index.writer;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.lang.StringUtils;
@@ -52,8 +49,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(rfile, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
-    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, rows, cols, columnSizes);
+    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(rfile, rows, cols, columnSizes, false);
 
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(reader.getInt(i, 0), data[i]);
@@ -81,8 +77,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(rfile, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
-    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, rows, cols, columnSizes);
+    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(rfile, rows, cols, columnSizes, false);
 
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(reader.getFloat(i, 0), data[i]);
@@ -110,8 +105,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(rfile, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
-    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, rows, cols, columnSizes);
+    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(rfile, rows, cols, columnSizes, false);
 
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(reader.getDouble(i, 0), data[i]);
@@ -139,8 +133,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
     writer.close();
 
     File rfile = new File("test_single_col_writer.dat");
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(rfile, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
-    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, rows, cols, columnSizes);
+    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(rfile, rows, cols, columnSizes, false);
 
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(reader.getLong(i, 0), data[i]);
@@ -206,9 +199,7 @@ public class FixedByteWidthRowColDataFileWriterTest {
       writer.setString(i, 0, data[i]);
     }
     writer.close();
-    PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
-    FixedByteSingleValueMultiColReader dataFileReader =
-        new FixedByteSingleValueMultiColReader(mmapBuffer, rows, 1, new int[] { stringColumnMaxLength });
+    FixedByteSingleValueMultiColReader dataFileReader = FixedByteSingleValueMultiColReader.forMmap(file, rows, 1, new int[] { stringColumnMaxLength });
     for (int i = 0; i < rows; i++) {
       String stringInFile = dataFileReader.getString(i, 0);
       Assert.assertEquals(stringInFile, data[i]);

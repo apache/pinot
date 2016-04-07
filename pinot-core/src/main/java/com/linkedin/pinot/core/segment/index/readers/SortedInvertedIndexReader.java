@@ -15,18 +15,20 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import java.io.File;
 import java.io.IOException;
+
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 
 public class SortedInvertedIndexReader implements InvertedIndexReader {
   private final int cardinality;
   private final FixedByteSingleValueMultiColReader indexReader;
   private final static IntPair EMPTY_PAIR = new IntPair(0, 0);
 
-  /*
   public SortedInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
     this.cardinality = cardinality;
     if (isMmap) {
@@ -39,7 +41,7 @@ public class SortedInvertedIndexReader implements InvertedIndexReader {
       });
     }
   }
-*/
+
   public SortedInvertedIndexReader(FixedByteSingleValueMultiColReader indexReader) {
     this.indexReader = indexReader;
     this.cardinality = indexReader.getNumberOfRows();

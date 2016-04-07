@@ -15,13 +15,15 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.util.PinotDataCustomBitSet;
+import com.linkedin.pinot.core.util.CustomBitSet;
 import java.io.File;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import org.apache.commons.io.IOUtils;
 
 /**
  * Storage Layout
@@ -45,13 +47,12 @@ public class FixedByteSkipListMultiValueWriter implements SingleColumnMultiValue
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 1;
   private int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
-
-  private PinotDataBuffer indexDataBuffer;
-  private PinotDataBuffer chunkOffsetsBuffer;
-  private PinotDataBuffer bitsetBuffer;
-  private PinotDataBuffer rawDataBuffer;
+  private ByteBuffer chunkOffsetsBuffer;
+  private ByteBuffer bitsetBuffer;
+  private ByteBuffer rawDataBuffer;
+  private RandomAccessFile raf;
   private FixedByteSingleValueMultiColWriter chunkOffsetsWriter;
-  private PinotDataCustomBitSet customBitSet;
+  private CustomBitSet customBitSet;
   private FixedByteSingleValueMultiColWriter rawDataWriter;
   private int numChunks;
   int prevRowStartIndex = 0;
@@ -72,17 +73,21 @@ public class FixedByteSkipListMultiValueWriter implements SingleColumnMultiValue
     bitsetSize = (totalNumValues + 7) / 8;
     rawDataSize = totalNumValues * columnSizeInBytes;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
-    indexDataBuffer = PinotDataBuffer.fromFile(file, 0, totalSize, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-        file.getAbsolutePath() + "." + this.getClass().getCanonicalName());
-    chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
-    int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
-    bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
-    rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
+    raf = new RandomAccessFile(file, "rw");
+    chunkOffsetsBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        chunkOffsetHeaderSize, file, this.getClass().getSimpleName() + " chunkOffsetsBuffer");
+    bitsetBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize,
+        bitsetSize, file, this.getClass().getSimpleName() + " bitsetBuffer");
+    rawDataBuffer =
+        MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, chunkOffsetHeaderSize + bitsetSize,
+            rawDataSize, file, this.getClass().getSimpleName() + " rawDataBuffer");
+
     chunkOffsetsWriter = new FixedByteSingleValueMultiColWriter(chunkOffsetsBuffer, numDocs,
         NUM_COLS_IN_HEADER, new int[] {
             SIZE_OF_INT
     });
-    customBitSet = PinotDataCustomBitSet.withDataBuffer(bitsetSize, bitsetBuffer);
+
+    customBitSet = CustomBitSet.withByteBuffer(bitsetSize, bitsetBuffer);
     rawDataWriter =
         new FixedByteSingleValueMultiColWriter(rawDataBuffer, totalNumValues, 1, new int[] {
             columnSizeInBytes
@@ -106,22 +111,37 @@ public class FixedByteSkipListMultiValueWriter implements SingleColumnMultiValue
     return totalSize;
   }
 
+  public ByteBuffer getChunkOffsetsBuffer() {
+    return chunkOffsetsBuffer;
+  }
+
+  public ByteBuffer getBitsetBuffer() {
+    return bitsetBuffer;
+  }
+
+  public ByteBuffer getRawDataBuffer() {
+    return rawDataBuffer;
+  }
+
   public int getNumChunks() {
     return numChunks;
   }
 
   @Override
   public void close() {
-    rawDataWriter.close();
-    chunkOffsetsWriter.close();
-    customBitSet.close();
-    indexDataBuffer.close();
-
+    IOUtils.closeQuietly(raf);
+    raf = null;
+    MmapUtils.unloadByteBuffer(chunkOffsetsBuffer);
     chunkOffsetsBuffer = null;
+    MmapUtils.unloadByteBuffer(bitsetBuffer);
     bitsetBuffer = null;
+    MmapUtils.unloadByteBuffer(rawDataBuffer);
     rawDataBuffer = null;
+    customBitSet.close();
     customBitSet = null;
+    chunkOffsetsWriter.close();
     chunkOffsetsWriter = null;
+    rawDataWriter.close();
     rawDataWriter = null;
   }
 

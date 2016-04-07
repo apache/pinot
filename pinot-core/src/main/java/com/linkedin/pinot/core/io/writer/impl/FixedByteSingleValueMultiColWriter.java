@@ -15,27 +15,35 @@
  */
 package com.linkedin.pinot.core.io.writer.impl;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import org.apache.commons.io.IOUtils;
 
 
 public class FixedByteSingleValueMultiColWriter {
+  private File file;
   private int cols;
   private int[] columnOffsets;
   private int rows;
-  private PinotDataBuffer indexDataBuffer;
+  private ByteBuffer byteBuffer;
+  private RandomAccessFile raf;
   private int rowSizeInBytes;
+  private final boolean ownsByteBuffer;
 
   public FixedByteSingleValueMultiColWriter(File file, int rows, int cols,
-      int[] columnSizes)
-      throws IOException {
+      int[] columnSizes) throws Exception {
+    this.file = file;
     this.rows = rows;
     this.cols = cols;
     this.columnOffsets = new int[cols];
+    raf = new RandomAccessFile(file, "rw");
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
       columnOffsets[i] = rowSizeInBytes;
@@ -43,13 +51,13 @@ public class FixedByteSingleValueMultiColWriter {
       rowSizeInBytes += colSize;
     }
     int totalSize = rowSizeInBytes * rows;
-    indexDataBuffer = PinotDataBuffer.fromFile(file, 0, totalSize, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-        file.getAbsolutePath() + this.getClass().getCanonicalName());
+    byteBuffer = MmapUtils.mmapFile(raf, FileChannel.MapMode.READ_WRITE, 0,
+        totalSize, file, this.getClass().getSimpleName() + " byteBuffer");
+    ownsByteBuffer = true;
   }
 
-  public FixedByteSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int rows, int cols,
-      int[] columnSizes)
-      throws IOException {
+  public FixedByteSingleValueMultiColWriter(ByteBuffer byteBuffer, int rows,
+      int cols, int[] columnSizes) throws IOException {
     this.rows = rows;
     this.cols = cols;
     this.columnOffsets = new int[cols];
@@ -59,7 +67,8 @@ public class FixedByteSingleValueMultiColWriter {
       int colSize = columnSizes[i];
       rowSizeInBytes += colSize;
     }
-    indexDataBuffer = dataBuffer;
+    this.byteBuffer = byteBuffer;
+    ownsByteBuffer = false;
   }
 
   public boolean open() {
@@ -68,32 +77,32 @@ public class FixedByteSingleValueMultiColWriter {
 
   public void setChar(int row, int col, char ch) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putChar(offset, ch);
+    byteBuffer.putChar(offset, ch);
   }
 
   public void setInt(int row, int col, int i) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putInt(offset, i);
+    byteBuffer.putInt(offset, i);
   }
 
   public void setShort(int row, int col, short s) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putShort(offset, s);
+    byteBuffer.putShort(offset, s);
   }
 
   public void setLong(int row, int col, long l) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putLong(offset, l);
+    byteBuffer.putLong(offset, l);
   }
 
   public void setFloat(int row, int col, float f) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putFloat(offset, f);
+    byteBuffer.putFloat(offset, f);
   }
 
   public void setDouble(int row, int col, double d) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.putDouble(offset, d);
+    byteBuffer.putDouble(offset, d);
   }
 
   public void setString(int row, int col, String string) {
@@ -102,11 +111,16 @@ public class FixedByteSingleValueMultiColWriter {
 
   public void setBytes(int row, int col, byte[] bytes) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.readFrom(bytes, offset);
+    byteBuffer.position(offset);
+    byteBuffer.put(bytes);
   }
 
   public void close() {
-    this.indexDataBuffer.close();
-    this.indexDataBuffer = null;
+    IOUtils.closeQuietly(raf);
+    raf = null;
+    if (ownsByteBuffer) {
+      MmapUtils.unloadByteBuffer(byteBuffer);
+      byteBuffer = null;
+    }
   }
 }

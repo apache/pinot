@@ -15,13 +15,17 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.SingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 
 
 /**
@@ -60,14 +64,14 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
    * @param rows
    */
 
-  private static final int SIZE_OF_INT = 4;
-  private static final int NUM_COLS_IN_HEADER = 3;
+  private static int SIZE_OF_INT = 4;
+  private static int NUM_COLS_IN_HEADER = 3;
 
-  private static final int AVERAGE_NUM_VALUES_PER_ROW = 10;//used to compute the initial size
-  private static final int INCREMENT_PERCENTAGE = 100;//Increments the Initial size by 100% of initial capacity every time we runs out of capacity
+  private static int AVERAGE_NUM_VALUES_PER_ROW = 10;//used to compute the initial size
+  private static int INCREMENT_PERCENTAGE = 100;//Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
-  private PinotDataBuffer headerBuffer;
-  private List<PinotDataBuffer> dataBuffers = new ArrayList<>();
+  private ByteBuffer headerBuffer;
+  private List<ByteBuffer> dataBuffers = new ArrayList<ByteBuffer>();
   private FixedByteSingleValueMultiColWriter headerWriter;
   private FixedByteSingleValueMultiColReader headerReader;
   private List<FixedByteSingleValueMultiColWriter> dataWriters = new ArrayList<FixedByteSingleValueMultiColWriter>();
@@ -99,8 +103,9 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
     this.columnSizeInBytes = columnSizeInBytes;
     this.maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
     headerSize = rows * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    headerBuffer = PinotDataBuffer.allocateDirect(headerSize);
-//    headerBuffer.order(ByteOrder.nativeOrder());
+    headerBuffer = MmapUtils.allocateDirectByteBuffer(headerSize, null,
+        this.getClass().getSimpleName() + " headerBuffer");
+    headerBuffer.order(ByteOrder.nativeOrder());
     //dataBufferId, startIndex, length
     headerWriter =
         new FixedByteSingleValueMultiColWriter(headerBuffer, rows, 3,
@@ -119,10 +124,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
    * @throws RuntimeException
    */
   private void addCapacity(int rowCapacity) throws RuntimeException {
-    PinotDataBuffer dataBuffer;
+    ByteBuffer dataBuffer;
     try {
-      dataBuffer = PinotDataBuffer.allocateDirect(rowCapacity * columnSizeInBytes);
-      //dataBuffer.order(ByteOrder.nativeOrder());
+      dataBuffer = MmapUtils.allocateDirectByteBuffer(rowCapacity * columnSizeInBytes, null,
+          this.getClass().getSimpleName() + " dataBuffer");
+      dataBuffer.order(ByteOrder.nativeOrder());
       dataBuffers.add(dataBuffer);
       currentDataWriter =
           new FixedByteSingleValueMultiColWriter(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
@@ -142,11 +148,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
 
   @Override
   public void close() {
-    for (PinotDataBuffer dataBuffer : dataBuffers) {
-      dataBuffer.close();
+    for (ByteBuffer dataBuffer : dataBuffers) {
+      MmapUtils.unloadByteBuffer(dataBuffer);
     }
     dataBuffers.clear();
-    headerBuffer.close();
+    MmapUtils.unloadByteBuffer(headerBuffer);
     headerBuffer = null;
   }
 
