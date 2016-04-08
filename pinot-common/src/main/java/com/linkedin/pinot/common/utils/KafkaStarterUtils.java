@@ -51,6 +51,11 @@ public class KafkaStarterUtils {
 
   public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr,
       final Properties configuration) {
+    return startServer(port, brokerId, zkStr, "/tmp/kafka-" + Double.toHexString(Math.random()), configuration);
+  }
+
+  public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr,
+      final String logDirPath, final Properties configuration) {
     // Create the ZK nodes for Kafka, if needed
     int indexOfFirstSlash = zkStr.indexOf('/');
     if (indexOfFirstSlash != -1) {
@@ -61,7 +66,7 @@ public class KafkaStarterUtils {
       client.close();
     }
 
-    File logDir = new File("/tmp/kafka-" + Double.toHexString(Math.random()));
+    File logDir = new File(logDirPath);
     logDir.mkdirs();
 
     configureKafkaPort(configuration, port);
