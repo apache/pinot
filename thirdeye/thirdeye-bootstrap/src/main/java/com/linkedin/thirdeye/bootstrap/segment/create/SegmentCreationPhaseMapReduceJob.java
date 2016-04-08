@@ -174,8 +174,8 @@ public class SegmentCreationPhaseMapReduceJob {
       segmentGeneratorConfig.setTableName(tableName);
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
       segmentGeneratorConfig.setSegmentNamePostfix(seqId);
-      segmentGeneratorConfig.setIndexOutputDir(localDiskSegmentDirectory);
-      segmentGeneratorConfig.setCreateStarTreeIndex(true);
+      segmentGeneratorConfig.setOutDir(localDiskSegmentDirectory);
+      segmentGeneratorConfig.setEnableStarTreeIndex(true);
       String minTime = StarTreeConstants.DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
       String maxTime = StarTreeConstants.DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
       segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
