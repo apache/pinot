@@ -1,7 +1,14 @@
 package com.linkedin.pinot.core.segment.memory;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -22,6 +29,7 @@ import org.testng.annotations.Test;
  * limitations under the License.
  */
 public class HugeByteBufferTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HugeByteBufferTest.class);
 
   @Test
   public void testLoadGet() {
@@ -51,4 +59,22 @@ public class HugeByteBufferTest {
     buffer.close();
   }
 
+  @Test(enabled = false)
+  public void testRead()
+      throws IOException {
+    HugeByteBuffer buffer = HugeByteBuffer.allocateDirect(3L * PinotDataBufferTest.ONE_GB);
+    buffer.putInt(PinotDataBufferTest.ONE_GB - 2, 0x12345678);
+
+    LOGGER.debug(String.valueOf(buffer.getShort(PinotDataBufferTest.ONE_GB)));
+    LOGGER.debug(Integer.toHexString(buffer.getInt(PinotDataBufferTest.ONE_GB - 2)));
+    File tempFilePath = Files.createTempFile(HugeByteBufferTest.class.getName() + "-test", ".tmp").toFile();
+    tempFilePath.deleteOnExit();
+
+    HugeByteBuffer mapBuffer =
+        (HugeByteBuffer) PinotDataBuffer.fromFile(tempFilePath, 0, 3L * PinotDataBufferTest.ONE_GB, ReadMode.mmap,
+            FileChannel.MapMode.READ_WRITE, "allocContext");
+    mapBuffer.putInt(PinotDataBufferTest.ONE_GB - 2, 0x12345678);
+    LOGGER.debug(Integer.toHexString(buffer.getShort(PinotDataBufferTest.ONE_GB - 2)));
+    LOGGER.debug(Integer.toHexString(buffer.getInt(PinotDataBufferTest.ONE_GB - 2)));
+  }
 }
