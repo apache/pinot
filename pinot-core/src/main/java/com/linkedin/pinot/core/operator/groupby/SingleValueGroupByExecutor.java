@@ -91,14 +91,13 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
       _aggrFuncContextList.add(aggregationFunctionContext);
     }
 
-    _groupKeyGenerator = new SingleValueGroupKeyGenerator(indexSegment, _groupByColumns,
-        ResultHolderFactory.MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED);
+    int resultHolderSize = Math.min(maxNumGroupKeys, ResultHolderFactory.MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED);
+    _groupKeyGenerator = new SingleValueGroupKeyGenerator(indexSegment, _groupByColumns, resultHolderSize);
     _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       double defaultValue = _aggrFuncContextList.get(i).getAggregationFunction().getDefaultValue();
-      int resultHolderSize = Math.min(maxNumGroupKeys, ResultHolderFactory.MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED);
-      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(resultHolderSize, defaultValue);
+      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(maxNumGroupKeys, defaultValue);
     }
 
     _docIdToGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -131,13 +130,13 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
       AggregationFunctionContext aggrFuncContext = _aggrFuncContextList.get(i);
+
       String[] aggrColumns = aggrFuncContext.getAggregationColumns();
+      _resultHolderArray[i].ensureCapacity(maxUniqueKeys);
 
       for (int j = 0; j < aggrColumns.length; j++) {
         String aggrColumn = aggrColumns[j];
         double[] valueArray = _columnToValueArrayMap.get(aggrColumn);
-
-        _resultHolderArray[i].ensureCapacity(maxUniqueKeys);
         aggrFuncContext.apply(length, _docIdToGroupKey, _resultHolderArray[i], valueArray);
       }
     }

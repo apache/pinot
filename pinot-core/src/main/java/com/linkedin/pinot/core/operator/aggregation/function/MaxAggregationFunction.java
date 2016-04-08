@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
@@ -44,8 +45,21 @@ public class MaxAggregationFunction implements AggregationFunction {
     return ret;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * While the interface allows for variable number of valueArrays, we do not support
+   * multiple columns within one aggregation function right now.
+   *
+   * @param length
+   * @param groupKeys
+   * @param resultHolder
+   * @param valueArray
+   */
   @Override
   public void apply(int length, int[] groupKeys, ResultHolder resultHolder, double[]... valueArray) {
+    Preconditions.checkState(length <= valueArray[0].length);
+
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getValueForKey(groupKey);
@@ -64,6 +78,7 @@ public class MaxAggregationFunction implements AggregationFunction {
   @Override
   public void apply(int length, Int2ObjectOpenHashMap valueArrayIndexToGroupKeys, ResultHolder resultHolder,
       double[] valueArray) {
+    Preconditions.checkState(length <= valueArray.length);
 
     for (int i = 0; i < length; ++i) {
       long[] groupKeys = (long[]) valueArrayIndexToGroupKeys.get(i);

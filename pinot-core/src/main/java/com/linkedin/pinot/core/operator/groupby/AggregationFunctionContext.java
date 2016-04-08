@@ -105,7 +105,7 @@ public class AggregationFunctionContext {
    * - Mapping array of docId to groupKey
    * - Array containing values for individual docIds, for the column.
    *
-   * Result is populated in the passed in resultArray
+   * Result is populated in the passed in resultHolder.
    *
    * @param length
    * @param docIdToGroupKey

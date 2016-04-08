@@ -49,7 +49,7 @@ public class AggregationFunctionFactory {
 
       case AVG_AGGREGATION_FUNCTION:
       default:
-        throw new RuntimeException("Unsupported aggregation function.");
+        throw new RuntimeException("Unsupported aggregation function: " + functionName);
     }
 
     return function;

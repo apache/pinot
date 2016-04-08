@@ -33,7 +33,9 @@ public interface AggregationFunction {
   double aggregate(double[] values);
 
   /**
-   * Perform a group-by
+   * Perform a group-by aggregation on the given set of values, and the group key to which
+   * each index corresponds to.
+   *
    * @param length
    * @param valueArrayIndexToGroupKeys
    * @param resultHolder
@@ -53,7 +55,7 @@ public interface AggregationFunction {
   double reduce();
 
   /**
-   * Return default value for the aggregation function.
+   * Return the function specific default value (e.g. 0.0 for sum) for the aggregation function.
    * @return
    */
   double getDefaultValue();
