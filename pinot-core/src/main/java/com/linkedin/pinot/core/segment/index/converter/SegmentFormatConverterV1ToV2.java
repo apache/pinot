@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.converter;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -40,31 +44,35 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
   private BufferedOutputStream bos;
 
   @Override
-  public void convert(File indexSegmentDir) throws Exception {
+  public void convert(File indexSegmentDir)
+      throws Exception {
     SegmentMetadataImpl segmentMetadataImpl = new SegmentMetadataImpl(indexSegmentDir);
+    SegmentDirectory segmentDirectory =
+        SegmentDirectory.createFromLocalFS(indexSegmentDir, segmentMetadataImpl, ReadMode.mmap);
     Set<String> columns = segmentMetadataImpl.getAllColumns();
+    SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter();
     for (String column : columns) {
       ColumnMetadata columnMetadata = segmentMetadataImpl.getColumnMetadataFor(column);
       if (columnMetadata.isSorted()) {
         // no need to change sorted forward index
         continue;
       }
-
+      PinotDataBuffer fwdIndexBuffer = segmentWriter.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
       if (columnMetadata.isSingleValue() && !columnMetadata.isSorted()) {
-        File fwdIndexFile = new File(indexSegmentDir,
-            column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
+
         // since we use dictionary to encode values, we wont have any negative values in forward
         // index
         boolean signed = false;
+
         SingleColumnSingleValueReader v1Reader =
-            new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(fwdIndexFile,
-                segmentMetadataImpl.getTotalDocs(), columnMetadata.getBitsPerElement(), true,
-                false);
+            new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(fwdIndexBuffer,
+                segmentMetadataImpl.getTotalDocs(), columnMetadata.getBitsPerElement(), false);
+
         File convertedFwdIndexFile = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION + ".tmp");
          SingleColumnSingleValueWriter v2Writer =
-            new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitSingleValueWriter(convertedFwdIndexFile, segmentMetadataImpl.getTotalDocs(),
-                columnMetadata.getBitsPerElement());
+            new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitSingleValueWriter(convertedFwdIndexFile,
+                segmentMetadataImpl.getTotalDocs(), columnMetadata.getBitsPerElement());
         for (int row = 0; row < segmentMetadataImpl.getTotalDocs(); row++) {
           int value = v1Reader.getInt(row);
           v2Writer.setInt(row, value);
@@ -73,28 +81,23 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
         v2Writer.close();
         File fwdIndexFileCopy = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION + ".orig");
-        bis = new BufferedInputStream(new FileInputStream(fwdIndexFile));
-        bos = new BufferedOutputStream(new FileOutputStream(fwdIndexFileCopy));
-        IOUtils.copy(bis, bos);
-        bis.close();
-        bos.close();
-        fwdIndexFile.delete();
-        bis = new BufferedInputStream(new FileInputStream(convertedFwdIndexFile));
-        bos = new BufferedOutputStream(new FileOutputStream(fwdIndexFile));
-        IOUtils.copy(bis, bos);
-        bis.close();
-        bos.close();
+
+        segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
+        // FIXME
+        PinotDataBuffer newIndexBuffer =
+            segmentWriter.newIndexFor(column, ColumnIndexType.FORWARD_INDEX, (int) convertedFwdIndexFile.length());
+        newIndexBuffer.readFrom(convertedFwdIndexFile);
         convertedFwdIndexFile.delete();
       }
       if (!columnMetadata.isSingleValue()) {
-        File fwdIndexFile = new File(indexSegmentDir,
-            column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
+
         // since we use dictionary to encode values, we wont have any negative values in forward
         // index
         boolean signed = false;
-        SingleColumnMultiValueReader v1Reader = new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(fwdIndexFile,
+
+        SingleColumnMultiValueReader v1Reader = new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(fwdIndexBuffer,
             segmentMetadataImpl.getTotalDocs(), columnMetadata.getTotalNumberOfEntries(),
-            columnMetadata.getBitsPerElement(), signed, false);
+            columnMetadata.getBitsPerElement(), signed);
         File convertedFwdIndexFile = new File(indexSegmentDir,
             column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION + ".tmp");
         SingleColumnMultiValueWriter v2Writer = new com.linkedin.pinot.core.io.writer.impl.v2.FixedBitMultiValueWriter(convertedFwdIndexFile,
@@ -109,19 +112,10 @@ public class SegmentFormatConverterV1ToV2 implements SegmentFormatConverter {
         }
         v1Reader.close();
         v2Writer.close();
-        File fwdIndexFileCopy = new File(indexSegmentDir,
-            column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION + ".orig");
-        bis = new BufferedInputStream(new FileInputStream(fwdIndexFile));
-        bos = new BufferedOutputStream(new FileOutputStream(fwdIndexFileCopy));
-        IOUtils.copy(bis, bos);
-        bis.close();
-        bos.close();
-        fwdIndexFile.delete();
-        bis = new BufferedInputStream(new FileInputStream(convertedFwdIndexFile));
-        bos = new BufferedOutputStream(new FileOutputStream(fwdIndexFile));
-        IOUtils.copy(bis, bos);
-        bis.close();
-        bos.close();
+        segmentWriter.removeIndex(column, ColumnIndexType.FORWARD_INDEX);
+        PinotDataBuffer newIndexBuffer = segmentWriter.newIndexFor(column, ColumnIndexType.FORWARD_INDEX,
+            (int) convertedFwdIndexFile.length());
+        newIndexBuffer.readFrom(convertedFwdIndexFile);
         convertedFwdIndexFile.delete();
       }
     }

@@ -113,7 +113,7 @@ public class ArrayBasedSingleValueBlock implements Block {
       @Override
       public Dictionary getDictionary() {
         try {
-          return new IntArrayBackedImmutableDictionary(null, dictionary.length, 1, true, dictionary);
+          return new IntArrayBackedImmutableDictionary(null, dictionary.length, 1, dictionary);
         } catch (Exception e) {
 
         }

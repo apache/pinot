@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import java.io.File;
-
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
+import java.io.File;
+
 
 public class FixedBitSingleValueWriter implements
     SingleColumnSingleValueWriter {

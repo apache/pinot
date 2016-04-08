@@ -15,9 +15,14 @@
  */
 package com.linkedin.pinot.index.reader;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.nio.channels.FileChannel;
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -28,7 +33,7 @@ import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter
 
 @Test
 public class SortedForwardIndexReaderTest {
-
+  private static Logger LOGGER = LoggerFactory.getLogger(SortedForwardIndexReaderTest.class);
   public void testSimple() throws Exception {
 
     int maxLength = 1000;
@@ -57,9 +62,9 @@ public class SortedForwardIndexReaderTest {
       totalDocs += length;
     }
     writer.close();
-
-    FixedByteSingleValueMultiColReader rawFileReader = FixedByteSingleValueMultiColReader
-        .forHeap(file, cardinality, columnSizes.length, columnSizes);
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
+    FixedByteSingleValueMultiColReader rawFileReader = new FixedByteSingleValueMultiColReader(heapBuffer,
+        cardinality, columnSizes.length, columnSizes);
     SortedForwardIndexReader reader = new SortedForwardIndexReader(rawFileReader, totalDocs);
     // without using context
     long start, end;
@@ -81,9 +86,10 @@ public class SortedForwardIndexReaderTest {
       }
     }
     end = System.currentTimeMillis();
-    System.out.println("Took " + (end - start) + " to scan " + totalDocs + " with context");
+    LOGGER.debug("Took " + (end - start) + " to scan " + totalDocs + " with context");
 
     reader.close();
     file.delete();
+    heapBuffer.close();
   }
 }

@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import java.io.File;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 
 /**
@@ -26,24 +26,15 @@ import java.io.IOException;
 
 public class FixedByteSingleValueReader extends BaseSingleColumnSingleValueReader {
 
-  private final File indexFile;
   private final FixedByteSingleValueMultiColReader dataFileReader;
   private final int rows;
 
-  public FixedByteSingleValueReader(File file, int rows, int columnSizeInBytes, boolean isMMap,
-      boolean hasNulls) throws IOException {
-    indexFile = file;
-    if (isMMap) {
-      // File file,
-      dataFileReader = FixedByteSingleValueMultiColReader.forMmap(indexFile, rows, 1, new int[] {
-          columnSizeInBytes
-      });
-    } else {
-      dataFileReader = FixedByteSingleValueMultiColReader.forHeap(indexFile, rows, 1, new int[] {
-          columnSizeInBytes
-      });
-    }
+  public FixedByteSingleValueReader(PinotDataBuffer indexDataBuffer, int rows, int columnSizeInBytes,
+      boolean hasNulls) {
 
+    // TODO: check what hasNulls was used for
+    dataFileReader = new FixedByteSingleValueMultiColReader(indexDataBuffer, rows, 1,
+        new int[] { columnSizeInBytes});
     this.rows = rows;
   }
 

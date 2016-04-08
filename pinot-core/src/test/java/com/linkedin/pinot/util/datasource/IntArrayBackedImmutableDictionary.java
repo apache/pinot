@@ -16,7 +16,7 @@
 package com.linkedin.pinot.util.datasource;
 
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import java.io.File;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -25,9 +25,9 @@ public class IntArrayBackedImmutableDictionary extends ImmutableDictionaryReader
 
   private final int[] dictionary;
 
-  protected IntArrayBackedImmutableDictionary(File dictFile, int rows, int columnSize, boolean isMmap,
+  protected IntArrayBackedImmutableDictionary(PinotDataBuffer dataBuffer, int rows, int columnSize,
       final int[] dictionary) throws IOException {
-    super(dictFile, rows, columnSize, isMmap);
+    super(dataBuffer, rows, columnSize);
     this.dictionary = dictionary;
   }
 

@@ -18,13 +18,9 @@ package com.linkedin.pinot.core.segment.index.readers;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import java.io.File;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 
-
-/**
- * Nov 13, 2014
- */
 
 public abstract class ImmutableDictionaryReader implements Dictionary {
 
@@ -32,15 +28,12 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   private final ByteBufferBinarySearchUtil fileSearcher;
   private final int rows;
 
-  protected ImmutableDictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
-    if (isMmap) {
-      dataFileReader = FixedByteSingleValueMultiColReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
-    } else {
-      dataFileReader = FixedByteSingleValueMultiColReader.forHeap(dictFile, rows, 1, new int[] { columnSize });
-    }
+  protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int rows, int columnSize) {
+    dataFileReader = new FixedByteSingleValueMultiColReader(dataBuffer, rows, 1, new int[] { columnSize });
     this.rows = rows;
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);
   }
+
 
   protected int intIndexOf(int actualValue) {
     return fileSearcher.binarySearch(0, actualValue);

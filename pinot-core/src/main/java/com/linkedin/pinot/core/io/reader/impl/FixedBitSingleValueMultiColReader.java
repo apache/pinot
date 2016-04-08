@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.core.io.reader.impl;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.util.CustomBitSet;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.util.PinotDataCustomBitSet;
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,162 +39,52 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(FixedBitSingleValueMultiColReader.class);
 
-  RandomAccessFile file;
   private int rows;
   private int cols;
   private int[] colBitOffSets;
   private int rowSizeInBits;
-  private ByteBuffer byteBuffer;
+  private PinotDataBuffer indexBuffer;
   private int[] colSizesInBits;
-  private boolean ownsByteBuffer;
 
   /**
    * used to get the actual value val - offset. offset is non zero if the values
    * contain negative numbers
    */
   private int[] offsets;
-  private CustomBitSet customBitSet;
+  private PinotDataCustomBitSet customBitSet;
 
   private int totalSizeInBytes;
-  private boolean isMmap;
 
-  /**
-   * @param file
-   * @param rows
-   * @param cols
-   * @param columnSizesInBits
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows, int cols,
+  public FixedBitSingleValueMultiColReader(PinotDataBuffer indexBuffer, int rows, int cols,
       int[] columnSizesInBits) throws IOException {
     boolean[] signed = new boolean[cols];
     Arrays.fill(signed, false);
-    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed,
-        false);
+    instantiate(indexBuffer, rows, cols, columnSizesInBits, signed);
   }
 
   /**
-   * @param file
-   * @param rows
-   * @param cols
-   * @param columnSizesInBits
-   * @param signed
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueMultiColReader forHeap(File file, int rows, int cols,
-      int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed,
-        false);
-  }
-
-  /**
-   * @param file
-   * @param rows
-   * @param cols
-   * @param columnSizesInBits
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows, int cols,
-      int[] columnSizesInBits) throws IOException {
-    boolean[] signed = new boolean[cols];
-    Arrays.fill(signed, false);
-    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed, true);
-  }
-
-  /**
-   * @param file
-   * @param rows
-   * @param cols
-   * @param columnSizesInBits
-   * @param signed
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueMultiColReader forMmap(File file, int rows, int cols,
-      int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitSingleValueMultiColReader(file, rows, cols, columnSizesInBits, signed, true);
-  }
-
-  /**
-   * @param dataBuffer
-   * @param rows
-   * @param cols
-   * @param columnSizesInBits
-   * @param signed
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitSingleValueMultiColReader forByteBuffer(ByteBuffer dataBuffer, int rows,
-      int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
-    return new FixedBitSingleValueMultiColReader(dataBuffer, rows, cols, columnSizesInBits, signed);
-  }
-
-  /**
-   * @param dataFile
+   * @param indexBuffer
    * @param rows
    * @param cols
    * @param columnSizesInBits
    *          in bytes
    * @param signed
    *          , true if the data consists of negative numbers
-   * @param isMmap
-   *          heap or mmmap
    * @throws IOException
    */
-  private FixedBitSingleValueMultiColReader(File dataFile, int rows, int cols,
-      int[] columnSizesInBits, boolean[] signed, boolean isMmap) throws IOException {
-    init(rows, cols, columnSizesInBits, signed);
-    file = new RandomAccessFile(dataFile, "rw");
-    this.isMmap = isMmap;
-    if (isMmap) {
-      byteBuffer = MmapUtils.mmapFile(file, FileChannel.MapMode.READ_ONLY, 0, totalSizeInBytes,
-          dataFile, this.getClass().getSimpleName() + " byteBuffer");
-    } else {
-      byteBuffer = MmapUtils.allocateDirectByteBuffer(totalSizeInBytes, dataFile,
-          this.getClass().getSimpleName() + " byteBuffer");
-      file.getChannel().read(byteBuffer);
-      file.close();
-    }
-    ownsByteBuffer = true;
-    customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
+  public FixedBitSingleValueMultiColReader(PinotDataBuffer indexBuffer, int rows, int cols, int[] columnSizesInBits,
+      boolean[] signed) {
+    instantiate(indexBuffer, rows, cols, columnSizesInBits, signed);
   }
 
-  /**
-   * @param buffer
-   * @param rows
-   * @param cols
-   * @param columnSizesInBits
-   *          in bytes
-   * @param signed
-   *          offset to each element to make it non negative
-   * @throws IOException
-   */
-  private FixedBitSingleValueMultiColReader(ByteBuffer buffer, int rows, int cols,
-      int[] columnSizesInBits, boolean[] signed) throws IOException {
-    this.byteBuffer = buffer;
-    ownsByteBuffer = false;
-    this.isMmap = false;
+  private void instantiate(PinotDataBuffer indexBuffer, int rows, int cols,
+      int[] columnSizesInBits, boolean[] signed) {
     init(rows, cols, columnSizesInBits, signed);
-    customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
-  }
-
-  /**
-   * @param fileName
-   * @param rows
-   * @param cols
-   * @param columnSizes
-   * @throws IOException
-   */
-  private FixedBitSingleValueMultiColReader(String fileName, int rows, int cols, int[] columnSizes,
-      boolean[] signed) throws IOException {
-    this(new File(fileName), rows, cols, columnSizes, signed, true);
+    this.indexBuffer = indexBuffer.view(0, totalSizeInBytes);
+    customBitSet = PinotDataCustomBitSet.withDataBuffer(totalSizeInBytes, indexBuffer);
   }
 
   private void init(int rows, int cols, int[] columnSizesInBits, boolean[] signed) {
-
     this.rows = rows;
     this.cols = cols;
     this.colSizesInBits = new int[cols];
@@ -286,16 +172,8 @@ public class FixedBitSingleValueMultiColReader implements Closeable {
 
   @Override
   public void close() throws IOException {
-    if (ownsByteBuffer) {
-      MmapUtils.unloadByteBuffer(byteBuffer);
-      byteBuffer = null;
-      customBitSet.close();
-      customBitSet = null;
-
-      if (isMmap) {
-        file.close();
-      }
-    }
+    customBitSet.close();
+    indexBuffer.close();
   }
 
   public boolean open() {

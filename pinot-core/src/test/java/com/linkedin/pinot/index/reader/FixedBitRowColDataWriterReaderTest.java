@@ -15,9 +15,14 @@
  */
 package com.linkedin.pinot.index.reader;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.nio.channels.FileChannel;
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -26,12 +31,12 @@ import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
 
 
 public class FixedBitRowColDataWriterReaderTest {
- 
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitRowColDataWriterReaderTest.class);
   @Test
   public void testSingleColUnsigned() throws Exception {
     int maxBits = 1;
     while (maxBits < 32) {
-      System.out.println("START test maxBits:" + maxBits);
+      LOGGER.debug("START test maxBits:" + maxBits);
       final String fileName = getClass().getName() + "_single_col_fixed_bit_"
           + maxBits + ".dat";
       final File file = new File(fileName);
@@ -52,24 +57,27 @@ public class FixedBitRowColDataWriterReaderTest {
       writer.close();
 
       // Test heap mode
-      FixedBitSingleValueMultiColReader heapReader = FixedBitSingleValueMultiColReader
-          .forHeap(file, rows, cols, columnSizesInBits, new boolean[] { true });
+      PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap,
+          FileChannel.MapMode.READ_ONLY, "testing");
+      FixedBitSingleValueMultiColReader heapReader = new FixedBitSingleValueMultiColReader(heapBuffer, rows, cols,
+          columnSizesInBits, new boolean[] { true });
+
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
       }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
       heapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+      heapBuffer.close();
 
       // Test mmap mode
-      FixedBitSingleValueMultiColReader mmapReader = FixedBitSingleValueMultiColReader
-          .forMmap(file, rows, cols, columnSizesInBits, new boolean[] { true });
+      PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap-testing");
+      FixedBitSingleValueMultiColReader mmapReader =
+          new FixedBitSingleValueMultiColReader(mmapBuffer, rows, cols, columnSizesInBits, new boolean[] { true });
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
       }
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 2);
+
       mmapReader.close();
-      // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(file), 0);
+      mmapBuffer.close();
 
       maxBits = maxBits + 1;
       file.delete();

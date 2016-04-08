@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.index.reader;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -69,7 +72,8 @@ public class FixedByteSkipListSCMVReaderTest {
     writer.close();
 
     int[] readValues = new int[maxMultiValues];
-    FixedByteMultiValueReader heapReader = new FixedByteMultiValueReader(f, numDocs, totalNumValues, Integer.SIZE / 8, false);
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "heap-testing");
+    FixedByteMultiValueReader heapReader = new FixedByteMultiValueReader(heapBuffer, numDocs, totalNumValues, Integer.SIZE / 8);
     for (int i = 0; i < data.length; i++) {
       int numValues = heapReader.getIntArray(i, readValues);
       Assert.assertEquals(numValues, data[i].length);
@@ -77,11 +81,13 @@ public class FixedByteSkipListSCMVReaderTest {
         Assert.assertEquals(readValues[j], data[i][j], "");
       }
     }
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
-    heapReader.close();
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
-    FixedByteMultiValueReader mmapReader = new FixedByteMultiValueReader(f, numDocs, totalNumValues, Integer.SIZE / 8, true);
+    heapReader.close();
+    heapBuffer.close();
+
+
+    PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap-testing");
+    FixedByteMultiValueReader mmapReader = new FixedByteMultiValueReader(mmapBuffer, numDocs, totalNumValues, Integer.SIZE / 8);
     for (int i = 0; i < data.length; i++) {
       int numValues = mmapReader.getIntArray(i, readValues);
       Assert.assertEquals(numValues, data[i].length);
@@ -89,9 +95,9 @@ public class FixedByteSkipListSCMVReaderTest {
         Assert.assertEquals(readValues[j], data[i][j], "");
       }
     }
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+
     mmapReader.close();
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+    mmapBuffer.close();
 
     f.delete();
   }

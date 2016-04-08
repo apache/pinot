@@ -15,10 +15,13 @@
  */
 package com.linkedin.pinot.index.reader;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.Random;
 
 import org.testng.Assert;
@@ -34,7 +37,9 @@ public class FixedByteWidthRowColDataFileReaderTest {
   void testSingleCol() throws Exception {
     String fileName = "test_single_col.dat";
     File f = new File(fileName);
+
     f.delete();
+
     DataOutputStream dos = new DataOutputStream(new FileOutputStream(f));
     int[] data = new int[100];
     Random r = new Random();
@@ -47,23 +52,28 @@ public class FixedByteWidthRowColDataFileReaderTest {
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
     System.out.println("file size: " + raf.getChannel().size());
     raf.close();
-    FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(f, data.length, 1, new int[] { 4 }, false);
+    
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
+    FixedByteSingleValueMultiColReader heapReader =
+        new FixedByteSingleValueMultiColReader(heapBuffer, data.length, 1, new int[] { 4 });
     heapReader.open();
     for (int i = 0; i < data.length; i++) {
       Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
     }
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
+    heapBuffer.close();
     heapReader.close();
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
-    FixedByteSingleValueMultiColReader mmapReader = new FixedByteSingleValueMultiColReader(f, data.length, 1, new int[] { 4 }, true);
+    // Not strictly required. Let the tests pass first...then we can remove
+    // TODO: remove me
+    PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap_testing");
+    FixedByteSingleValueMultiColReader mmapReader =
+        new FixedByteSingleValueMultiColReader(mmapBuffer, data.length, 1, new int[] { 4 });
     mmapReader.open();
     for (int i = 0; i < data.length; i++) {
       Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
     }
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
+    mmapBuffer.close();
     mmapReader.close();
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
     f.delete();
   }
@@ -92,27 +102,24 @@ public class FixedByteWidthRowColDataFileReaderTest {
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
     System.out.println("file size: " + raf.getChannel().size());
     raf.close();
-    FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(f, numRows, numCols, new int[] { 4, 4 }, false);
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing-heap");
+    FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(heapBuffer, numRows, numCols, new int[] { 4, 4 });
     heapReader.open();
     for (int i = 0; i < numRows; i++) {
       for (int j = 0; j < numCols; j++) {
         Assert.assertEquals(heapReader.getInt(i, j), colData[i][j]);
       }
     }
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
     heapReader.close();
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
-
-    FixedByteSingleValueMultiColReader mmapReader = new FixedByteSingleValueMultiColReader(f, numRows, numCols, new int[] { 4, 4 }, true);
+    PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap_testing");
+    FixedByteSingleValueMultiColReader mmapReader = new FixedByteSingleValueMultiColReader(mmapBuffer, numRows, numCols, new int[] { 4, 4 });
     mmapReader.open();
     for (int i = 0; i < numRows; i++) {
       for (int j = 0; j < numCols; j++) {
         Assert.assertEquals(mmapReader.getInt(i, j), colData[i][j]);
       }
     }
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 2);
     mmapReader.close();
-    // Assert.assertEquals(FileReaderTestUtils.getNumOpenFiles(f), 0);
 
     f.delete();
   }

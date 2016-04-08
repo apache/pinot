@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v2;
 
-import java.io.File;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 public class FixedByteMultiValueReader extends com.linkedin.pinot.core.io.reader.impl.v1.FixedByteMultiValueReader{
 
-  public FixedByteMultiValueReader(File file, int numDocs, int totalNumValues,
-      int columnSizeInBytes, boolean isMmap) throws Exception {
-    super(file, numDocs, totalNumValues, columnSizeInBytes, isMmap);
+  public FixedByteMultiValueReader(PinotDataBuffer dataBuffer, int numDocs, int totalNumValues,
+      int columnSizeInBytes)  {
+    super(dataBuffer, numDocs, totalNumValues, columnSizeInBytes);
   }
 
 }

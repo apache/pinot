@@ -63,7 +63,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  * </p>
  * <code>
  * [BITMAP OFFSET INDEXES] -- cardinality + 1, each entry is of type INT. We need one extra to know the size of the last bitmap.(we don't really need this but had to do this to maintain backward compatibility)
- * [BITMAP SERIALIZED DATA]-- cardinality, each entry is serialized roaring bitmap data. Length of each entry varies based on content of the bitmap  
+ * [BITMAP SERIALIZED DATA]-- cardinality, each entry is serialized roaring bitmap data. Length of each entry varies based on content of the bitmap
  * </code>
  * @see HeapBitmapInvertedIndexCreator for heap based implementation
  */
@@ -302,6 +302,10 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
     }
     currentVacantPos += length;
     lengths.put(docId, length);
+  }
+
+  public File getInvertedIndexFile() {
+    return invertedIndexFile;
   }
 
 }

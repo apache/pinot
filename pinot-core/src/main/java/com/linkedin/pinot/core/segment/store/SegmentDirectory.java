@@ -121,6 +121,8 @@ public abstract class SegmentDirectory implements AutoCloseable {
 
     @Override
     public abstract void close();
+
+    public abstract String toString();
   }
 
   /**
@@ -176,6 +178,8 @@ public abstract class SegmentDirectory implements AutoCloseable {
         throws IOException;
 
     abstract void abort();
+
+    public abstract String toString();
   }
 
   /**
@@ -195,6 +199,7 @@ public abstract class SegmentDirectory implements AutoCloseable {
   public abstract Writer createWriter()
       throws IOException;
 
+  public abstract String toString();
 
   protected SegmentDirectory() {
   }

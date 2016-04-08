@@ -15,27 +15,26 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.MultiValueReaderContext;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-
-import org.apache.commons.io.FileUtils;
+import me.lemire.integercompression.BitPacking;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.MultiValueReaderContext;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
-import me.lemire.integercompression.BitPacking;
 
 /**
  * Given a pinot segment directory, it benchmarks forward index scan speed
@@ -47,9 +46,10 @@ public class ForwardIndexReaderBenchmark {
       throws Exception {
     boolean signed = false;
     boolean isMmap = false;
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "benchmark");
     BaseSingleColumnSingleValueReader reader =
-        new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(file, numDocs,
-            columnSizeInBits, signed, isMmap);
+        new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader(heapBuffer, numDocs,
+            columnSizeInBits, signed);
     // sequential read
     long start, end;
     DescriptiveStatistics stats = new DescriptiveStatistics();
@@ -65,7 +65,7 @@ public class ForwardIndexReaderBenchmark {
     System.out.println(
         stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
     reader.close();
-
+    heapBuffer.close();
   }
 
   public static void singleValuedReadBenchMarkV2(File file, int numDocs, int numBits)
@@ -77,9 +77,11 @@ public class ForwardIndexReaderBenchmark {
 
     boolean batchRead = true;
     boolean singleRead = true;
+
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "benchmarking");
     com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader reader =
-        new com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader(file, numDocs,
-            numBits, signed, isMmap);
+        new com.linkedin.pinot.core.io.reader.impl.v2.FixedBitSingleValueReader(heapBuffer, numDocs,
+            numBits, signed);
 
     if (fullScan) {
       DescriptiveStatistics stats = new DescriptiveStatistics();
@@ -161,9 +163,10 @@ public class ForwardIndexReaderBenchmark {
     boolean contextualRead = true;
     boolean signed = false;
     boolean isMmap = false;
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "benchmarking");
     BaseSingleColumnMultiValueReader reader =
-        new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(file, numDocs,
-            totalNumValues, columnSizeInBits, signed, isMmap);
+        new com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader(heapBuffer, numDocs,
+            totalNumValues, columnSizeInBits, signed);
 
     int[] intArray = new int[maxEntriesPerDoc];
     File outfile = new File("/tmp/" + file.getName() + ".raw");
@@ -237,6 +240,7 @@ public class ForwardIndexReaderBenchmark {
 
     }
     reader.close();
+    heapBuffer.close();
     System.out.println("******************************************************************");
 
   }
@@ -246,10 +250,10 @@ public class ForwardIndexReaderBenchmark {
     boolean signed = false;
     boolean isMmap = false;
     boolean readOneEachTime = true;
-
+    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "benchmarking");
     com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader reader =
-        new com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader(file, numDocs,
-            totalNumValues, columnSizeInBits, signed, isMmap);
+        new com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader(heapBuffer, numDocs,
+            totalNumValues, columnSizeInBits, signed);
 
     int[] intArray = new int[maxEntriesPerDoc];
     long start, end;
@@ -271,7 +275,7 @@ public class ForwardIndexReaderBenchmark {
           stats.toString().replaceAll("\n", ", ") + " raw:" + Arrays.toString(stats.getValues()));
     }
     reader.close();
-
+    heapBuffer.close();
   }
 
   private static void benchmarkForwardIndex(String indexDir) throws Exception {
