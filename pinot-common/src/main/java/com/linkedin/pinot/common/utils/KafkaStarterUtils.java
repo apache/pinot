@@ -44,7 +44,7 @@ public class KafkaStarterUtils {
     configureTopicDeletion(configuration, true);
 
     // Set host name
-    configuration.put("host.name", "localhost");
+    configureHostName(configuration, "localhost");
 
     return configuration;
   }
@@ -103,6 +103,10 @@ public class KafkaStarterUtils {
 
   public static void configureTopicDeletion(Properties configuration, boolean topicDeletionEnabled) {
     configuration.put("delete.topic.enable", Boolean.toString(topicDeletionEnabled));
+  }
+
+  public static void configureHostName(Properties configuration, String hostName) {
+    configuration.put("host.name", hostName);
   }
 
   public static void stopServer(KafkaServerStartable serverStartable) {
