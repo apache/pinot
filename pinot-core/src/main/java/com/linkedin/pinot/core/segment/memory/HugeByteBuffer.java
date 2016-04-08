@@ -307,7 +307,7 @@ public class HugeByteBuffer extends PinotDataBuffer {
   public void putDouble(long index, double value) {
     ByteBuffer buffer = getBuffer(index);
     int bo = bufferOffset(index);
-    buffer.putDouble(bo);
+    buffer.putDouble(bo, value);
   }
 
   @Override
