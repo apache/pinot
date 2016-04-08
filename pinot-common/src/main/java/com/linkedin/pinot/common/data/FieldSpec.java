@@ -25,6 +25,8 @@ import org.json.JSONObject;
 //@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 public abstract class FieldSpec {
   private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
+  private static final String DEFAULT_DIM_NULL_VALUE_OF_BOOLEAN = "false";
+
   private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.valueOf(Integer.MIN_VALUE);
   private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.valueOf(Long.MIN_VALUE);
   private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.valueOf(Float.NEGATIVE_INFINITY);
@@ -351,6 +353,8 @@ public abstract class FieldSpec {
           case DOUBLE:
           case DOUBLE_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
+          case BOOLEAN:
+            return DEFAULT_DIM_NULL_VALUE_OF_BOOLEAN;
           case STRING:
           case STRING_ARRAY:
             return DEFAULT_DIM_NULL_VALUE_OF_STRING;

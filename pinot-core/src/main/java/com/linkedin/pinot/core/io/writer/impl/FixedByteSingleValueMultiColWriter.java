@@ -28,7 +28,7 @@ public class FixedByteSingleValueMultiColWriter {
   private int[] columnOffsets;
   private int rows;
   private PinotDataBuffer indexDataBuffer;
-  private int rowSizeInBytes;
+  private long rowSizeInBytes;
 
   public FixedByteSingleValueMultiColWriter(File file, int rows, int cols,
       int[] columnSizes)
@@ -38,11 +38,11 @@ public class FixedByteSingleValueMultiColWriter {
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
-      columnOffsets[i] = rowSizeInBytes;
+      columnOffsets[i] = (int) rowSizeInBytes;
       int colSize = columnSizes[i];
       rowSizeInBytes += colSize;
     }
-    int totalSize = rowSizeInBytes * rows;
+    long totalSize = rowSizeInBytes * rows;
     indexDataBuffer = PinotDataBuffer.fromFile(file, 0, totalSize, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
         file.getAbsolutePath() + this.getClass().getCanonicalName());
   }
@@ -55,7 +55,7 @@ public class FixedByteSingleValueMultiColWriter {
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
-      columnOffsets[i] = rowSizeInBytes;
+      columnOffsets[i] = (int) rowSizeInBytes;
       int colSize = columnSizes[i];
       rowSizeInBytes += colSize;
     }
@@ -67,32 +67,32 @@ public class FixedByteSingleValueMultiColWriter {
   }
 
   public void setChar(int row, int col, char ch) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.putChar(offset, ch);
   }
 
   public void setInt(int row, int col, int i) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.putInt(offset, i);
   }
 
   public void setShort(int row, int col, short s) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.putShort(offset, s);
   }
 
   public void setLong(int row, int col, long l) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.putLong(offset, l);
   }
 
   public void setFloat(int row, int col, float f) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.putFloat(offset, f);
   }
 
   public void setDouble(int row, int col, double d) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.putDouble(offset, d);
   }
 
@@ -101,7 +101,7 @@ public class FixedByteSingleValueMultiColWriter {
   }
 
   public void setBytes(int row, int col, byte[] bytes) {
-    int offset = rowSizeInBytes * row + columnOffsets[col];
+    long offset = rowSizeInBytes * row + columnOffsets[col];
     indexDataBuffer.readFrom(bytes, offset);
   }
 

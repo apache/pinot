@@ -99,7 +99,7 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
   }
 
   private Object stringToDataType(FieldSpec spec, String inString) {
-    if (inString == null) {
+    if (inString == null || inString.isEmpty()) {
       return AvroRecordReader.getDefaultNullValue(spec);
     }
 

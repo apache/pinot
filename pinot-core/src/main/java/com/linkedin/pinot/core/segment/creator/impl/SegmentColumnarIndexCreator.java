@@ -167,7 +167,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           }
         }
       } catch (Exception e) {
-        throw new RuntimeException("Exception while indexing column:"+ column, e);
+        throw new RuntimeException("Exception while indexing column:"+ column + ", for row: " + row.toString(), e);
       }
     }
     docIdCounter++;

@@ -70,7 +70,7 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
 
   private void createByteBuffer(File file)
       throws IOException {
-    int bytesRequired = SizeUtil.computeBytesRequired(numRows, numBits, uncompressedSize);
+    long bytesRequired = SizeUtil.computeBytesRequired(numRows, numBits, uncompressedSize);
     this.indexDataBuffer = PinotDataBuffer.fromFile(file, 0, bytesRequired, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
         file.getAbsolutePath() + this.getClass().getSimpleName());
   }
