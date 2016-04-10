@@ -46,14 +46,14 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   private String _sumByColumn;
   static final int VECTOR_SIZE = 1000;
-  private final ThreadLocal<int[]> dictionaryIds = new ThreadLocal<int[]>() {
+  private static final  ThreadLocal<int[]> DICTIONARY_ID_ARRAY = new ThreadLocal<int[]>() {
     @Override
     protected int[] initialValue() {
       return new int[VECTOR_SIZE];
     }
   };
 
-  private final ThreadLocal<double[]> documentValues = new ThreadLocal<double[]>() {
+  private static final ThreadLocal<double[]> DOC_VALUE_ARRAY = new ThreadLocal<double[]>() {
     @Override
     protected double[] initialValue() {
       return new double[VECTOR_SIZE];
@@ -92,15 +92,13 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   public Double vectorizedAggregate(ArrayBasedDocIdSet docIdSet, Block[] blocks) {
     double ret = 0;
-    double tmp = 0;
-
     Dictionary dictionaryReader = blocks[0].getMetadata().getDictionary();
     BlockValSet blockValueSet = blocks[0].getBlockValueSet();
 
     final int vectorSize = 1000;
 
-    int[] dictIds = dictionaryIds.get();
-    double[] values = documentValues.get();
+    int[] dictIds = DICTIONARY_ID_ARRAY.get();
+    double[] values = DOC_VALUE_ARRAY.get();
 
     int[] docIds = (int[]) docIdSet.getRaw();
     int docIdLength = docIdSet.size();

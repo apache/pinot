@@ -36,13 +36,12 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   private int _currentDoc = 0;
   private final int _maxSizeOfdocIdSet;
   boolean inited = false;
-  private final ThreadLocal<int[]> _docIdArrays = new ThreadLocal<int[]>() {
+  private static final ThreadLocal<int[]> DOC_ID_ARRAY = new ThreadLocal<int[]>() {
     @Override
     protected int[] initialValue() {
       return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
   };
-  private int[] _docIdArray;
 
   /**
    * @param filterOperator
@@ -53,7 +52,6 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize,
       int maxSizeOfdocIdSet) {
     _maxSizeOfdocIdSet = Math.min(maxSizeOfdocIdSet, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    _docIdArray = _docIdArrays.get();
     _filterOperator = filterOperator;
   }
 
@@ -70,6 +68,7 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
     if (_currentDoc == Constants.EOF) {
       return null;
     }
+    int[] docIdArray = DOC_ID_ARRAY.get();
     if (!inited) {
       inited = true;
       _currentDoc = 0;
@@ -82,11 +81,11 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
       if (_currentDoc == Constants.EOF) {
         break;
       }
-      _docIdArray[pos++] = _currentDoc;
+      docIdArray[pos++] = _currentDoc;
     }
     DocIdSetBlock docIdSetBlock = null;
     if (pos > 0) {
-      docIdSetBlock = new DocIdSetBlock(_docIdArray, pos);
+      docIdSetBlock = new DocIdSetBlock(docIdArray, pos);
     }
     return docIdSetBlock;
   }
