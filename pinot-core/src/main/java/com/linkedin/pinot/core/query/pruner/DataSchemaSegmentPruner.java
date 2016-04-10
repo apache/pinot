@@ -48,7 +48,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
         if (aggregationInfo.getAggregationParams().containsKey(COLUMN_KEY)) {
           String columnName = aggregationInfo.getAggregationParams().get(COLUMN_KEY);
-          if ((!aggregationInfo.getAggregationType().toLowerCase().equals("count")) && (!schema.isExisted(columnName))) {
+          if ((!aggregationInfo.getAggregationType().toLowerCase().equals("count")) && (!schema.hasColumn(columnName))) {
             return true;
           }
         }
@@ -56,7 +56,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
       // Check groupBy columns.
       if ((brokerRequest.getGroupBy() != null) && (brokerRequest.getGroupBy().getColumns() != null)) {
         for (String columnName : brokerRequest.getGroupBy().getColumns()) {
-          if (!schema.isExisted(columnName)) {
+          if (!schema.hasColumn(columnName)) {
             return true;
           }
         }
@@ -67,7 +67,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
     if (brokerRequest.getSelections() != null) {
       if (brokerRequest.getSelections().getSelectionColumns() != null) {
         for (String columnName : brokerRequest.getSelections().getSelectionColumns()) {
-          if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
+          if ((!columnName.equalsIgnoreCase("*")) && (!schema.hasColumn(columnName))) {
             return true;
           }
         }
@@ -75,7 +75,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
       // Check columns to do sorting,
       if (brokerRequest.getSelections().getSelectionSortSequence() != null) {
         for (SelectionSort selectionOrder : brokerRequest.getSelections().getSelectionSortSequence()) {
-          if (!schema.isExisted(selectionOrder.getColumn())) {
+          if (!schema.hasColumn(selectionOrder.getColumn())) {
             return true;
           }
         }
@@ -88,7 +88,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
 
   private boolean filterQueryMatchedSchema(Schema schema, FilterQuery filterQuery, FilterQueryMap filterQueryMap) {
     if (filterQuery.getNestedFilterQueryIds() == null || filterQuery.getNestedFilterQueryIds().isEmpty()) {
-      return schema.isExisted(filterQuery.getColumn());
+      return schema.hasColumn(filterQuery.getColumn());
     } else {
       for (Integer queryId : filterQuery.getNestedFilterQueryIds()) {
         FilterQuery fq = filterQueryMap.getFilterQueryMap().get(queryId);

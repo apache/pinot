@@ -104,7 +104,7 @@ public class DataGenerator {
     final Schema schema = new Schema();
     for (final String column : genSpec.getColumns()) {
       final FieldSpec spec = buildSpec(genSpec, column);
-      schema.addSchema(column, spec);
+      schema.addField(column, spec);
     }
     return schema;
   }

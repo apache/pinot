@@ -52,13 +52,13 @@ public class RealtimeSegmentConverter {
 
     Schema newSchema = new Schema();
     for (String dimension : schema.getDimensionNames()) {
-      newSchema.addSchema(dimension, schema.getFieldSpecFor(dimension));
+      newSchema.addField(dimension, schema.getFieldSpecFor(dimension));
     }
     for (String metic : schema.getMetricNames()) {
-      newSchema.addSchema(metic, schema.getFieldSpecFor(metic));
+      newSchema.addField(metic, schema.getFieldSpecFor(metic));
     }
 
-    newSchema.addSchema(newTimeSpec.getName(), newTimeSpec);
+    newSchema.addField(newTimeSpec.getName(), newTimeSpec);
     this.realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
     this.invertedIndexColumns = invertedIndexColumns;

@@ -129,7 +129,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     for (String column : config.getInvertedIndexCreationColumns()) {
-      if (!schema.isExisted(column)) {
+      if (!schema.hasColumn(column)) {
         LOGGER.warn("Skipping enabling index on column:{} since its missing in schema", column);
         continue;
       }

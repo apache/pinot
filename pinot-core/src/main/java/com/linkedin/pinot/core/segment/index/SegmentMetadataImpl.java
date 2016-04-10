@@ -161,7 +161,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private void setSchema(Schema schema) {
     for (String columnName : schema.getColumnNames()) {
-      _schema.addSchema(columnName, schema.getFieldSpecFor(columnName));
+      _schema.addField(columnName, schema.getFieldSpecFor(columnName));
     }
   }
 

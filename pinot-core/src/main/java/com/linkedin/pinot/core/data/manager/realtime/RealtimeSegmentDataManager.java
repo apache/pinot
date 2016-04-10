@@ -102,7 +102,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       this.sortedColumn = null;
     } else {
       String firstSortedColumn = indexingConfig.getSortedColumn().get(0);
-      if (this.schema.isExisted(firstSortedColumn)) {
+      if (this.schema.hasColumn(firstSortedColumn)) {
         LOGGER.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
             firstSortedColumn, segmentName);
         this.sortedColumn = firstSortedColumn;

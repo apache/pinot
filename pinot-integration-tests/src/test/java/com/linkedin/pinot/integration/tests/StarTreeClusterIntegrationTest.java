@@ -71,7 +71,7 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
   private final int RETENTION_TIME = 3000;
   private static final int SEGMENT_COUNT = 12;
-  private static final long TIMEOUT_IN_MILLISECONDS = 15 * 1000;
+  private static final long TIMEOUT_IN_MILLISECONDS = 30 * 1000;
   private static final long TIMEOUT_IN_SECONDS = 3600;
 
   private final File _tmpDir = new File("/tmp/StarTreeClusterIntegrationTest");

@@ -136,7 +136,7 @@ public class AvroUtils {
       spec.setName(field.name());
       spec.setSingleValueField(AvroRecordReader.isSingleValueField(field));
 
-      pinotSchema.addSchema(spec.getName(), spec);
+      pinotSchema.addField(spec.getName(), spec);
     }
     return pinotSchema;
   }

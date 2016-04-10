@@ -154,7 +154,7 @@ public class AvroRecordReader extends BaseRecordReader {
       try {
         fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(fieldSpec.getName())));
         fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(fieldSpec.getName())));
-        schema.addSchema(fieldSpec.getName(), fieldSpec);
+        schema.addField(fieldSpec.getName(), fieldSpec);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while converting Avro field {} of type {}, field will not be in schema.",
             fieldSpec.getName(), fieldSpec.getDataType());
