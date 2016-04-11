@@ -31,6 +31,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_SEGMENT_COUNT("segments", false),
   REALTIME_ROWS_CONSUMED("rows", true),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
+  REALTIME_CONSUMPTION_MSG_DELAY_IN_SECOND("delaysInSeconds", true),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false);

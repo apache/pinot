@@ -89,6 +89,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Logs the timing.
+   *
+   * @param nanos The number of time unit that the phase execution took to complete
+   */
+  public void addValueToTimer(final String tableName, String timerName, final long duration, final TimeUnit timeUnit) {
+    final String fullTimerName = _metricPrefix + tableName + "." + timerName;
+    final MetricName metricName = new MetricName(_clazz, fullTimerName);
+    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(duration,
+        timeUnit);
+  }
+
+  /**
    * Builds a complete metric name, of the form prefix.resource.metric
    *
    * @param request The broker request containing all the information

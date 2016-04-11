@@ -24,7 +24,8 @@ import com.linkedin.pinot.common.Utils;
 */
 public enum ServerGauge implements AbstractMetrics.Gauge {
   DOCUMENT_COUNT("documents", false),
-  SEGMENT_COUNT("segments", false);
+  SEGMENT_COUNT("segments", false),
+  MAX_MSG_DELAY_IN_SECONDS("maxMsgDelayInSeconds", false);
 
   private final String gaugeName;
   private final String unit;

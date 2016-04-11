@@ -61,7 +61,11 @@ public abstract class FieldSpec {
     dataType = dType;
     isSingleValueField = singleValue;
     delimiter = delimeter;
-    this.defaultNullValue = defaultNullValue;
+    if (defaultNullValue != null) {
+      defaultNullValueFromString(defaultNullValue.toString());
+    } else {
+      this.defaultNullValue = null;
+    }
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
@@ -115,7 +119,11 @@ public abstract class FieldSpec {
   // This method is invoked via ObjectMapper, in Schema.java.
   // Do NOT change the signature or remove it.
   public void setDefaultNullValue(Object value) {
-    this.defaultNullValue = value;
+    if (value != null) {
+      defaultNullValueFromString(value.toString());
+    } else {
+      this.defaultNullValue = null;
+    }
   }
 
   // Called when trying to set a default null value from hadoop.

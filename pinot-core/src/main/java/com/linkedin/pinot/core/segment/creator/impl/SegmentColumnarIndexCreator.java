@@ -150,7 +150,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           throw new RuntimeException("Null value for column:" + column);
         }
         if (schema.getFieldSpecFor(column).isSingleValueField()) {
-          int dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
+          int dictionaryIndex;
+          try {
+            dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(columnValueToIndex);
+          } catch (Exception e) {
+            dictionaryIndex = dictionaryCreatorMap.get(column).indexOfSV(schema.getFieldSpecFor(column).getDefaultNullValue());
+          }
           ((SingleValueForwardIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, dictionaryIndex);
 
           // TODO : {refactor inverted index addition}

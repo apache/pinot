@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentDictionaryCreator implements Closeable {
+  private static final int MAX_BYTES_PER_DICT_SIZE = Integer.MAX_VALUE;
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
   private final Object sortedList;
   private final FieldSpec spec;
@@ -163,7 +164,7 @@ public class SegmentDictionaryCreator implements Closeable {
             stringColumnMaxLength = length;
           }
         }
-
+        stringColumnMaxLength = Math.min(stringColumnMaxLength, MAX_BYTES_PER_DICT_SIZE / rowCount);
         final FixedByteSingleValueMultiColWriter stringDictionaryWrite =
             new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
                 new int[] { stringColumnMaxLength });
@@ -271,7 +272,7 @@ public class SegmentDictionaryCreator implements Closeable {
    */
   public static String getPaddedString(String inputString, int targetLength) {
     if (inputString.length() >= targetLength) {
-      return inputString;
+      return inputString.substring(0, targetLength);
     }
 
     StringBuilder stringBuilder = new StringBuilder(inputString);

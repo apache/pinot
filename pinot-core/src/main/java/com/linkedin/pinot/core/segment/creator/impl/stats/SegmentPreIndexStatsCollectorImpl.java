@@ -67,6 +67,8 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         default:
           break;
       }
+      LOGGER.info("Init columnStatsCollector for column: {}, with default null value: {}", spec.getName(), spec.getDefaultNullValue());
+      columnStatsCollectorMap.get(spec.getName()).collect(spec.getDefaultNullValue());
     }
   }
 

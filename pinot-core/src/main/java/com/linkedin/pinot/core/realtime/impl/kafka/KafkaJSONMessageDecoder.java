@@ -50,12 +50,12 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
         if (message.has(dimensionSpec.getName())) {
           Object entry;
           if (dimensionSpec.isSingleValueField()) {
-            entry = stringToDataType(dimensionSpec, message.getString(dimensionSpec.getName()));
+            entry = stringToDataType(dimensionSpec, message.getString(dimensionSpec.getName()).trim());
           } else {
             JSONArray jsonArray = message.getJSONArray(dimensionSpec.getName());
             Object[] array = new Object[jsonArray.length()];
             for (int i = 0; i < array.length; i++) {
-              array[i] = stringToDataType(dimensionSpec, jsonArray.getString(i));
+              array[i] = stringToDataType(dimensionSpec, jsonArray.getString(i).trim());
             }
             if (array.length == 0) {
               entry = new Object[] { AvroRecordReader.getDefaultNullValue(dimensionSpec) };
@@ -72,7 +72,7 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
 
       for (FieldSpec metricSpec : schema.getMetricFieldSpecs()) {
         if (message.has(metricSpec.getName())) {
-          Object entry = stringToDataType(metricSpec, message.getString(metricSpec.getName()));
+          Object entry = stringToDataType(metricSpec, message.getString(metricSpec.getName()).trim());
           rowEntries.put(metricSpec.getName(), entry);
         } else {
           Object entry = AvroRecordReader.getDefaultNullValue(metricSpec);
@@ -82,7 +82,7 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
 
       TimeFieldSpec timeSpec = schema.getTimeFieldSpec();
       if (message.has(timeSpec.getName())) {
-        Object entry = stringToDataType(timeSpec, message.getString(timeSpec.getName()));
+        Object entry = stringToDataType(timeSpec, message.getString(timeSpec.getName()).trim());
         rowEntries.put(timeSpec.getName(), entry);
       } else {
         Object entry = AvroRecordReader.getDefaultNullValue(timeSpec);

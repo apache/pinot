@@ -15,12 +15,21 @@
  */
 package com.linkedin.pinot.common.utils.time;
 
-import com.linkedin.pinot.common.data.Schema;
+import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
 public class TimeConverterProvider {
 
   public static TimeConverter getTimeConverterFromGranularitySpecs(Schema schema) {
     return new NoOpTimeConverter(schema.getTimeFieldSpec().getIncomingGranularitySpec());
   }
+
+  public static TimeConverter getToSecondsTimeConverterFromGranularitySpecs(Schema schema) {
+    return new GeneralTimeConverter(schema.getTimeFieldSpec().getIncomingGranularitySpec(),
+        new TimeGranularitySpec(DataType.INT, TimeUnit.SECONDS, "toSeconds"));
+  }
+
 }
