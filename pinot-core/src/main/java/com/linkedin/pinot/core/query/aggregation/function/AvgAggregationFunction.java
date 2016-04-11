@@ -164,7 +164,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     return "avg_" + _avgByColumn;
   }
 
-  public class AvgPair extends Pair<Double, Long> implements Comparable<AvgPair>, Serializable {
+  public static class AvgPair extends Pair<Double, Long> implements Comparable<AvgPair>, Serializable {
     public AvgPair(Double first, Long second) {
       super(first, second);
     }

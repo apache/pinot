@@ -168,7 +168,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     return "minMaxRange_" + _minMaxRangeByColumn;
   }
 
-  public class MinMaxRangePair extends Pair<Double, Double>
+  public static class MinMaxRangePair extends Pair<Double, Double>
       implements Comparable<MinMaxRangePair>, Serializable {
     public MinMaxRangePair(Double first, Double second) {
       super(first, second);

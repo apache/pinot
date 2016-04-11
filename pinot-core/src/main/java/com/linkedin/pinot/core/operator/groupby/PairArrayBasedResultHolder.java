@@ -15,44 +15,37 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-import java.util.Arrays;
+import com.linkedin.pinot.core.query.utils.Pair;
 
 
-public class ArrayBasedResultHolder implements ResultHolder {
-  private double[] _resultArray;
+/**
+ * ResultHolder implementation using Pair.
+ */
+public class PairArrayBasedResultHolder implements ResultHolder<Pair> {
+  private ResultArray _resultArray;
   private int _resultHolderCapacity;
   private double _defaultValue;
 
   /**
-   * Constructor for the class.
+   * Constructor for the class, taking ResultArray of type DoubleLongArray.
    *
    * @param resultHolderCapacity
    */
-  public ArrayBasedResultHolder(int resultHolderCapacity, double defaultValue) {
+  public PairArrayBasedResultHolder(DoubleLongArray resultArray, int resultHolderCapacity, double defaultValue) {
     _resultHolderCapacity = resultHolderCapacity;
     _defaultValue = defaultValue;
-
-    _resultArray = new double[resultHolderCapacity];
-    Arrays.fill(_resultArray, defaultValue);
+    _resultArray = resultArray;
   }
 
   /**
-   * {@inheritDoc}
-   * @return
+   * Constructor for the class, taking ResultArray of type DoubleDoubleArray.
+   *
+   * @param resultHolderCapacity
    */
-  @Override
-  public double[] getResultStore() {
-    return _resultArray;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @param groupKey
-   * @return
-   */
-  @Override
-  public double getResultForGroupKey(long groupKey) {
-    return _resultArray[(int) groupKey];
+  public PairArrayBasedResultHolder(DoubleDoubleArray resultArray, int resultHolderCapacity, double defaultValue) {
+    _resultHolderCapacity = resultHolderCapacity;
+    _defaultValue = defaultValue;
+    _resultArray = resultArray;
   }
 
   /**
@@ -63,14 +56,14 @@ public class ArrayBasedResultHolder implements ResultHolder {
   @Override
   public void ensureCapacity(int maxUniqueKeys) {
     if (maxUniqueKeys > _resultHolderCapacity) {
-      double[] tmp = _resultArray;
-
       _resultHolderCapacity = Math.max(_resultHolderCapacity * 2, maxUniqueKeys);
-      _resultArray = new double[_resultHolderCapacity];
-
-      Arrays.fill(_resultArray, _defaultValue);
-      System.arraycopy(tmp, 0, _resultArray, 0, tmp.length);
+      _resultArray.expand(_resultHolderCapacity);
     }
+  }
+
+  @Override
+  public double getDoubleResult(long groupKey) {
+    throw new RuntimeException("Unsupported method 'getDoubleResult' for class " + getClass().getName());
   }
 
   /**
@@ -84,8 +77,8 @@ public class ArrayBasedResultHolder implements ResultHolder {
    * @return
    */
   @Override
-  public double getValueForKey(long groupKey) {
-    return _resultArray[(int) groupKey];
+  public Pair getResult(long groupKey) {
+    return _resultArray.getResult((int) groupKey);
   }
 
   /**
@@ -96,6 +89,11 @@ public class ArrayBasedResultHolder implements ResultHolder {
    */
   @Override
   public void putValueForKey(long groupKey, double newValue) {
-    _resultArray[((int) groupKey)] = newValue;
+    throw new RuntimeException("Unsupported method 'putValueForKey (of double Type) for class " + getClass().getName());
+  }
+
+  @Override
+  public void putValueForKey(long groupKey, Pair pair) {
+    _resultArray.set(pair, (int) groupKey);
   }
 }

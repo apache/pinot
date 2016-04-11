@@ -187,7 +187,7 @@ public class AggregationGroupByOperator extends BaseOperator {
     for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
       String aggregationType = aggregationInfo.getAggregationType();
       if (!aggregationType.equalsIgnoreCase("sum") && !aggregationType.equalsIgnoreCase("min") &&
-          !aggregationType.equalsIgnoreCase("max")) {
+          !aggregationType.equalsIgnoreCase("max") && !aggregationType.equalsIgnoreCase("avg")) {
         return false;
       }
     }

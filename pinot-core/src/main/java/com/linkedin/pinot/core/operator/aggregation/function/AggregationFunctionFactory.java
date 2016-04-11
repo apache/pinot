@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import java.util.List;
+
+
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
@@ -48,6 +52,9 @@ public class AggregationFunctionFactory {
         break;
 
       case AVG_AGGREGATION_FUNCTION:
+        function = new AvgAggregationFunction();
+        break;
+
       default:
         throw new RuntimeException("Unsupported aggregation function: " + functionName);
     }

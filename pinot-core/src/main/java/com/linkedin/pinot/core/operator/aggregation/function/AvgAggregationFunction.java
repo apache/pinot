@@ -17,37 +17,40 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.query.utils.Pair;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.List;
 
 
 /**
- * Class to implement the 'min' aggregation function.
+ * Class to implement the 'avg' aggregation function.
  */
-public class MinAggregationFunction implements AggregationFunction {
-  private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
-  private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
+public class AvgAggregationFunction implements AggregationFunction {
+  private static final double DEFAULT_VALUE = 0.0;
+  private static final AggregationFunction.ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
 
   /**
-   * Performs the 'sum' aggregation function on the input array.
-   * Returns {@value #DEFAULT_VALUE} if input array is empty.
+   * Performs 'sum' aggregation on the input array.
+   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
    *
    * {@inheritDoc}
+   *
    * @param values
    * @return
    */
   @Override
   public double aggregate(double[] values) {
-    double ret = DEFAULT_VALUE;
+    double sum = 0.0;
 
-    for (int i = 0; i < values.length; i++) {
-      ret = Math.min(ret, values[i]);
+    for (double value : values) {
+      sum += value;
     }
-    return ret;
+    return (sum / values.length);
   }
 
   /**
    * {@inheritDoc}
+   *
    * While the interface allows for variable number of valueArrays, we do not support
    * multiple columns within one aggregation function right now.
    *
@@ -62,8 +65,15 @@ public class MinAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.putValueForKey(groupKey, Math.min(oldValue, valueArray[0][i]));
+      Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
+
+      if (avgValue == null) {
+        avgValue = new com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair(0.0, 0L);
+      }
+
+      avgValue.setFirst(avgValue.getFirst() + valueArray[0][i]);
+      avgValue.setSecond(avgValue.getSecond() + 1);
+      resultHolder.putValueForKey(groupKey, avgValue);
     }
   }
 
@@ -84,28 +94,16 @@ public class MinAggregationFunction implements AggregationFunction {
       long[] groupKeys = (long[]) valueArrayIndexToGroupKeys.get(i);
 
       for (long groupKey : groupKeys) {
-        double oldValue = resultHolder.getDoubleResult(groupKey);
-        double newValue = Math.min(oldValue, valueArray[i]);
-        resultHolder.putValueForKey(groupKey, newValue);
+        Pair<Double, Long> avgValue = (Pair<Double, Long>) resultHolder.getResult(groupKey);
+
+        if (avgValue == null) {
+          avgValue = new com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair(0.0, 0L);
+        }
+        avgValue.setFirst(avgValue.getFirst() + valueArray[i]);
+        avgValue.setSecond(avgValue.getSecond() + 1);
+        resultHolder.putValueForKey(groupKey, avgValue);
       }
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
-  @Override
-  public Double reduce(List<Object> combinedResult) {
-    double reducedResult = DEFAULT_VALUE;
-
-    for (Object object : combinedResult) {
-      double result = (Double) object;
-      reducedResult = Math.min(result, reducedResult);
-    }
-    return reducedResult;
   }
 
   /**
@@ -123,7 +121,32 @@ public class MinAggregationFunction implements AggregationFunction {
    * @return
    */
   @Override
-  public ResultDataType getResultDataType() {
-    return _resultDataType;
+  public AggregationFunction.ResultDataType getResultDataType() {
+    return RESULT_DATA_TYPE;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @param combinedResult
+   * @return
+   */
+  @Override
+  public Double reduce(List<Object> combinedResult) {
+    double reducedSumResult = 0;
+    long reducedCntResult = 0;
+
+    for (Object object : combinedResult) {
+      Pair resultPair = (Pair) object;
+      reducedSumResult += (double) resultPair.getFirst();
+      reducedCntResult += (long) resultPair.getSecond();
+    }
+
+    if (reducedCntResult > 0) {
+      double avgResult = reducedSumResult / reducedCntResult;
+      return avgResult;
+    } else {
+      return DEFAULT_VALUE;
+    }
   }
 }

@@ -68,6 +68,14 @@ public class AggregationFunctionContext {
   }
 
   /**
+   * Returns the aggregation function name.
+   * @return
+   */
+  public String getFunctionName() {
+    return _aggFuncName;
+  }
+
+  /**
    * Returns an array of aggregation column names.
    * @return
    */

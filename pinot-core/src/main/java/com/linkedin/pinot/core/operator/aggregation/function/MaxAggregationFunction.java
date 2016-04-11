@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import java.util.List;
 
 
 /**
@@ -25,6 +26,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
  */
 public class MaxAggregationFunction implements AggregationFunction {
   private static final double DEFAULT_VALUE = Double.NEGATIVE_INFINITY;
+  private static final ResultDataType _resultDataType = ResultDataType.DOUBLE;
 
   /**
    * Given an array of double values, returns the max value from the array.
@@ -62,7 +64,7 @@ public class MaxAggregationFunction implements AggregationFunction {
 
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeys[i];
-      double oldValue = resultHolder.getValueForKey(groupKey);
+      double oldValue = resultHolder.getDoubleResult(groupKey);
       resultHolder.putValueForKey(groupKey, Math.max(oldValue, valueArray[0][i]));
     }
   }
@@ -84,7 +86,7 @@ public class MaxAggregationFunction implements AggregationFunction {
       long[] groupKeys = (long[]) valueArrayIndexToGroupKeys.get(i);
 
       for (long groupKey : groupKeys) {
-        double oldValue = resultHolder.getValueForKey(groupKey);
+        double oldValue = resultHolder.getDoubleResult(groupKey);
         double newValue = Math.max(oldValue, valueArray[i]);
         resultHolder.putValueForKey(groupKey, newValue);
       }
@@ -94,11 +96,18 @@ public class MaxAggregationFunction implements AggregationFunction {
   /**
    * {@inheritDoc}
    *
+   * @param combinedResult
    * @return
    */
   @Override
-  public double reduce() {
-    throw new RuntimeException("Unsupported operation.");
+  public Double reduce(List<Object> combinedResult) {
+    double reducedResult = DEFAULT_VALUE;
+
+    for (Object object : combinedResult) {
+      double result = (Double) object;
+      reducedResult = Math.max(result, reducedResult);
+    }
+    return reducedResult;
   }
 
   /**
@@ -109,5 +118,14 @@ public class MaxAggregationFunction implements AggregationFunction {
   @Override
   public double getDefaultValue() {
     return DEFAULT_VALUE;
+  }
+
+  /**
+   * {@inheritDoc}
+   * @return
+   */
+  @Override
+  public ResultDataType getResultDataType() {
+    return _resultDataType;
   }
 }

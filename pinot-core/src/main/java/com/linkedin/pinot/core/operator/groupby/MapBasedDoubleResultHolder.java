@@ -15,35 +15,18 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.linkedin.pinot.core.query.utils.Pair;
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 
 
-public class MapBasedResultHolder implements ResultHolder {
+public class MapBasedDoubleResultHolder implements ResultHolder {
 
   private Long2DoubleOpenHashMap _resultMap;
   private double _defaultValue;
 
-  public MapBasedResultHolder(double defaultValue) {
+  public MapBasedDoubleResultHolder(double defaultValue) {
     _defaultValue = defaultValue;
     _resultMap = new Long2DoubleOpenHashMap();
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public Object getResultStore() {
-    return _resultMap;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @param groupKey
-   * @return
-   */
-  public double getResultForGroupKey(long groupKey) {
-    return _resultMap.get(groupKey);
   }
 
   /**
@@ -63,11 +46,16 @@ public class MapBasedResultHolder implements ResultHolder {
    * @return
    */
   @Override
-  public double getValueForKey(long groupKey) {
+  public double getDoubleResult(long groupKey) {
     if (!_resultMap.containsKey(groupKey)) {
       return _defaultValue;
     }
     return _resultMap.get(groupKey);
+  }
+
+  @Override
+  public Pair getResult(long groupKey) {
+    throw new RuntimeException("Unsupported method 'getResult' (returning Pair) for class " + getClass().getName());
   }
 
   /**
@@ -79,5 +67,11 @@ public class MapBasedResultHolder implements ResultHolder {
   @Override
   public void putValueForKey(long groupKey, double newValue) {
     _resultMap.put(groupKey, newValue);
+  }
+
+  @Override
+  public void putValueForKey(long groupKey, Object newValue) {
+    throw new RuntimeException(
+        "Unsupported method 'putValueForKey' (with Object input) for class " + getClass().getName());
   }
 }

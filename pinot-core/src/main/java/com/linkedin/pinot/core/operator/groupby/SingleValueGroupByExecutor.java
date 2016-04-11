@@ -20,7 +20,9 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.Serializable;
@@ -96,8 +98,11 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
     _resultHolderArray = new ResultHolder[_aggrFuncContextList.size()];
 
     for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-      double defaultValue = _aggrFuncContextList.get(i).getAggregationFunction().getDefaultValue();
-      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(maxNumGroupKeys, defaultValue);
+      AggregationFunctionContext aggregationFunctionContext = _aggrFuncContextList.get(i);
+      String functionName = aggregationFunctionContext.getFunctionName();
+
+      double defaultValue = aggregationFunctionContext.getAggregationFunction().getDefaultValue();
+      _resultHolderArray[i] = ResultHolderFactory.getResultHolder(functionName, maxNumGroupKeys, defaultValue);
     }
 
     _docIdToGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -171,11 +176,42 @@ public class SingleValueGroupByExecutor implements GroupByExecutor {
       String stringGroupKey = idKeyPair.getSecond();
 
       for (int i = 0; i < _aggrFuncContextList.size(); i++) {
-        double resultForGroupKey = _resultHolderArray[i].getResultForGroupKey(idKeyPair.getFirst());
+        AggregationFunction aggregationFunction = _aggrFuncContextList.get(i).getAggregationFunction();
+        AggregationFunction.ResultDataType resultDataType = aggregationFunction.getResultDataType();
+
+        Serializable resultForGroupKey = getResultForKey(idKeyPair, _resultHolderArray[i], resultDataType);
         result.get(i).put(stringGroupKey, resultForGroupKey);
       }
     }
     return result;
+  }
+
+  /**
+   * Returns result for the given key.
+   *
+   * @param idKeyPair
+   * @param resultDataType
+   * @return
+   */
+  private Serializable getResultForKey(Pair<Long, String> idKeyPair, ResultHolder resultHolder,
+      AggregationFunction.ResultDataType resultDataType) {
+
+    Serializable resultForGroupKey;
+    switch (resultDataType) {
+      case DOUBLE:
+        resultForGroupKey = resultHolder.getDoubleResult(idKeyPair.getFirst());
+        break;
+
+      case AVERAGE_PAIR:
+        resultForGroupKey = (AvgAggregationFunction.AvgPair) resultHolder.getResult(idKeyPair.getFirst());
+        break;
+
+      case RANGE_PAIR:
+      default:
+        throw new RuntimeException(
+            "Unsupported result data type RANGE_PAIR in class " + getClass().getName());
+    }
+    return resultForGroupKey;
   }
 
   /**

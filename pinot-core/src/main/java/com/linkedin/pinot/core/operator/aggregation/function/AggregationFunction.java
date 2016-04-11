@@ -16,13 +16,22 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.core.operator.groupby.ResultHolder;
+import com.linkedin.pinot.core.query.utils.Pair;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import java.util.List;
+import java.util.Objects;
 
 
 /**
  * Interface for Aggregation functions.
  */
 public interface AggregationFunction {
+
+  enum ResultDataType {
+    DOUBLE,
+    AVERAGE_PAIR,
+    RANGE_PAIR
+  }
 
   /**
    * Performs aggregation on the input array of values.
@@ -45,6 +54,17 @@ public interface AggregationFunction {
       double[] valueArray);
 
   /**
+   * Perform a group-by aggregation on the given set of values, and the group key to which
+   * each index corresponds to.
+   *
+   * @param length
+   * @param docIdToGroupKey
+   * @param resultHolder
+   * @param valueArray
+   */
+  void apply(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray);
+
+  /**
    * Reduce the aggregation. For example, in case of avg/range being performed
    * for blocks of docIds, the aggregate() function may be maintaining a pair of values
    * (eg, sum and total count). Use the reduce interface to compute the final aggregation
@@ -52,7 +72,7 @@ public interface AggregationFunction {
    *
    * @return
    */
-  double reduce();
+  Double reduce(List<Object> pairs);
 
   /**
    * Return the function specific default value (e.g. 0.0 for sum) for the aggregation function.
@@ -60,5 +80,9 @@ public interface AggregationFunction {
    */
   double getDefaultValue();
 
-  void apply(int length, int[] docIdToGroupKey, ResultHolder resultHolder, double[]... valueArray);
+  /**
+   * Return the data type for the result.
+   * @return
+   */
+  ResultDataType getResultDataType();
 }

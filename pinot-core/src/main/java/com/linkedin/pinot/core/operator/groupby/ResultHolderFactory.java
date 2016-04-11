@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
+import com.linkedin.pinot.core.query.utils.Pair;
+
+
 public class ResultHolderFactory {
   public static final int MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED = 1000000;
 
@@ -28,11 +31,36 @@ public class ResultHolderFactory {
    * @param maxNumResults
    * @return
    */
-  public static ResultHolder getResultHolder(long maxNumResults, double defaultValue) {
+  public static ResultHolder getResultHolder(String functionName, long maxNumResults, double defaultValue) {
+
     if (maxNumResults <= MAX_NUM_GROUP_KEYS_FOR_ARRAY_BASED) {
-      return new ArrayBasedResultHolder((int) maxNumResults, defaultValue);
+      switch (functionName.toLowerCase()) {
+        case "sum":
+        case "min":
+        case "max":
+          DoubleArray doubleArray = new DoubleArray((int) maxNumResults, defaultValue);
+          return new DoubleArrayBasedResultHolder(doubleArray, (int) maxNumResults, defaultValue);
+
+        case "avg":
+          DoubleLongArray doubleLongArray = new DoubleLongArray((int) maxNumResults, new Pair<Double, Long>(0.0, 0L));
+          return new PairArrayBasedResultHolder(doubleLongArray, (int) maxNumResults, defaultValue);
+
+        default:
+          throw new RuntimeException("Aggregation function not implemented in ResultHolder: " + functionName);
+      }
     } else {
-      return new MapBasedResultHolder(defaultValue);
+      switch (functionName.toLowerCase()) {
+        case "sum":
+        case "min":
+        case "max":
+          return new MapBasedDoubleResultHolder(defaultValue);
+
+        case "avg":
+          return new MapBasedPairResultHolder(defaultValue);
+
+        default:
+          throw new RuntimeException("Aggregation function not implemented in ResultHolder: " + functionName);
+      }
     }
   }
 }

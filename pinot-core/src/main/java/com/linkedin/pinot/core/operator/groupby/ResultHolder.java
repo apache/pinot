@@ -15,21 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.groupby;
 
-public interface ResultHolder {
-
-  /**
-   * Returns the handle to the internal result set storage.
-   *
-   * @return
-   */
-  Object getResultStore();
-
-  /**
-   * Return result for the given long group key.
-   * @param groupKey
-   * @return
-   */
-  double getResultForGroupKey(long groupKey);
+public interface ResultHolder<ResultType> {
 
   /**
    * Increase internal storage if needed to store the required number
@@ -40,20 +26,39 @@ public interface ResultHolder {
   void ensureCapacity(int maxUniqueKeys);
 
   /**
-   * Returns the value for the given group by key.
+   * Returns the result (double) for the given group by key.
    * If the group key does not exist in the result holder, returns
-   * the defaultValue it was initialized with.
+   * the defaultValue it was initialized with (default value of the aggregation
+   * function it is holding the result for).
    *
    * @param groupKey
    * @return
    */
-  double getValueForKey(long groupKey);
+  double getDoubleResult(long groupKey);
 
   /**
-   * Stores the given value for the given groupKey.
+   * Returns the result (ResultType) for the given group key.
+   * If the group key does not exist in the result holder, returns the
+   * defaultValue it was initialized with (default value of the aggregation
+   * function it is holding the result for).
+   *
+   * @param groupKey
+   * @return
+   */
+  ResultType getResult(long groupKey);
+
+  /**
+   * Stores the given value (of type double) for the given groupKey.
    *
    * @param groupKey
    * @param newValue
    */
   void putValueForKey(long groupKey, double newValue);
+
+  /**
+   * Store the given value (of type ResultType) for the given groupKey.
+   * @param groupKey
+   * @param newValue
+   */
+  void putValueForKey(long groupKey, ResultType newValue);
 }
