@@ -97,7 +97,9 @@ public class SegmentPreProcessorTest {
   @AfterClass
   public void tearDownClass()
       throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
+    if (INDEX_DIR != null) {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
   }
 
   @Test

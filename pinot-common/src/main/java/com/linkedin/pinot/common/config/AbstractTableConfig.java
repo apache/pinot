@@ -64,13 +64,13 @@ public abstract class AbstractTableConfig {
     TenantConfig tenantConfig = loadTenantsConfig(new ObjectMapper().readTree(o.getJSONObject("tenants").toString()));
     TableCustomConfig customConfig =
         loadCustomConfig(new ObjectMapper().readTree(o.getJSONObject("metadata").toString()));
-    IndexingConfig config =
+    IndexingConfig indexingConfig =
         loadIndexingConfig(new ObjectMapper().readTree(o.getJSONObject("tableIndexConfig").toString()));
 
     if (tableType.equals("offline")) {
-      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
+      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig);
     } else if (tableType.equals(TABLE_TYPE_REALTIME)) {
-      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, config);
+      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig);
     }
     throw new UnsupportedOperationException("unknown tableType : " + tableType);
   }

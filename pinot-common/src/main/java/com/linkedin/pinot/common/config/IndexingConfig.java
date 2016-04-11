@@ -33,6 +33,7 @@ public class IndexingConfig {
   private String loadMode;
   private String lazyLoad;
   private Map<String, String> streamConfigs = new HashMap<String, String>();
+  private String segmentFormatVersion;
 
   public IndexingConfig() {
 
@@ -78,6 +79,14 @@ public class IndexingConfig {
     this.lazyLoad = lazyLoad;
   }
 
+  public void setSegmentFormatVersion(String segmentFormatVersion) {
+    this.segmentFormatVersion = segmentFormatVersion;
+  }
+
+  public String getSegmentFormatVersion() {
+    return segmentFormatVersion;
+  }
+
   @Override
   public String toString() {
     final StringBuilder result = new StringBuilder();
@@ -109,4 +118,6 @@ public class IndexingConfig {
 
     return result.toString();
   }
+
+
 }

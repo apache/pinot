@@ -353,6 +353,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _segmentVersion.toString();
   }
 
+  public SegmentVersion getSegmentVersion() {
+    return _segmentVersion;
+  }
+
   @Override
   public Schema getSchema() {
     return _schema;

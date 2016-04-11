@@ -44,6 +44,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String kEY_OF_TABLE_NAME = "name";
   // Key of instance level segment read mode.
   public static final String READ_MODE = "readMode";
+  // key of the segment format this server can read
+  public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
 
   private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -94,6 +96,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public ReadMode getReadMode() {
     return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
+  }
+
+  @Override
+  public String getSegmentFormatVersion() {
+    return _instanceDataManagerConfiguration.getString(SEGMENT_FORMAT_VERSION);
   }
 
   @Override

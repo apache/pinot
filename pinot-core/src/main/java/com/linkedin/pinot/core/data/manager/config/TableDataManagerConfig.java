@@ -82,6 +82,10 @@ public class TableDataManagerConfig {
     } else {
       defaultConfig.addProperty(READ_MODE, ReadMode.heap);
     }
+    if (_instanceDataManagerConfig.getSegmentFormatVersion() != null) {
+      defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
+          _instanceDataManagerConfig.getSegmentFormatVersion());
+    }
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 
@@ -104,6 +108,8 @@ public class TableDataManagerConfig {
     _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
     _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.getKeyOfLoadingInvertedIndex(),
         tableConfig.getIndexingConfig().getInvertedIndexColumns());
+    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
+        tableConfig.getIndexingConfig().getSegmentFormatVersion());
   }
 
   public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {

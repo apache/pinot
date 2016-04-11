@@ -15,14 +15,12 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-
-import com.linkedin.pinot.common.segment.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +50,8 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   private static final String KEY_OF_TABLE_NAME = "name";
   // Key of instance level segment read mode.
   private static final String READ_MODE = "readMode";
+  // key of the segment format this server can read
+  public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_TABLE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -128,6 +128,11 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
       return null;
     }
 
+  }
+
+  @Override
+  public String getSegmentFormatVersion() {
+    return _instanceDataManagerConfiguration.getString(SEGMENT_FORMAT_VERSION);
   }
 
   @Override

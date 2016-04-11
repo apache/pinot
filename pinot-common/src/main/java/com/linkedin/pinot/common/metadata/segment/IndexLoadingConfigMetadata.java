@@ -30,13 +30,18 @@ import org.apache.commons.configuration.Configuration;
 public class IndexLoadingConfigMetadata {
 
   public static final String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
+  public static final String KEY_OF_SEGMENT_FORMAT_VERSION = "segment.format.version";
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
+  private final String DEFAULT_SEGMENT_FORMAT = "v1";
+  private String segmentVersionToLoad;
 
   public IndexLoadingConfigMetadata(Configuration tableDataManagerConfig) {
     List<String> valueOfLoadingInvertedIndexConfig = tableDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
     if ((valueOfLoadingInvertedIndexConfig != null) && (!valueOfLoadingInvertedIndexConfig.isEmpty())) {
       initLoadingInvertedIndexColumnSet(valueOfLoadingInvertedIndexConfig.toArray(new String[0]));
     }
+
+    segmentVersionToLoad = tableDataManagerConfig.getString(KEY_OF_SEGMENT_FORMAT_VERSION, DEFAULT_SEGMENT_FORMAT);
   }
 
   public void initLoadingInvertedIndexColumnSet(String[] columnCollections) {
@@ -49,6 +54,10 @@ public class IndexLoadingConfigMetadata {
 
   public boolean isLoadingInvertedIndexForColumn(String columnName) {
     return _loadingInvertedIndexColumnSet.contains(columnName);
+  }
+
+  public String segmentVersionToLoad() {
+    return segmentVersionToLoad;
   }
 
   public static String getKeyOfLoadingInvertedIndex() {

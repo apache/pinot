@@ -20,10 +20,17 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 public class SegmentFormatConverterFactory {
 
   public static SegmentFormatConverter getConverter(SegmentVersion from, SegmentVersion to) {
+
     if (from.equals(SegmentVersion.v1) && to.equals(SegmentVersion.v2) ) {
       return new SegmentFormatConverterV1ToV2();
     }
+
+    if ((from.equals(SegmentVersion.v1) || from.equals(SegmentVersion.v2)) &&
+        to.equals(SegmentVersion.v3)) {
+      return new SegmentV1V2ToV3FormatConverter();
+    }
+
     throw new UnsupportedOperationException(
-        "Unable to find a convertor to convert segment from:" + from + " to:" + to);
+        "Unable to find a converter to convert segment from:" + from + " to:" + to);
   }
 }
