@@ -11,6 +11,7 @@
       <module>thirdeye-core</module>
       <module>thirdeye-server</module>
       <module>thirdeye-bootstrap</module>
+      <module>thirdeye-hadoop</module>
       <module>thirdeye-tools</module>
       <module>thirdeye-anomaly</module>
       <module>thirdeye-realtime</module>
