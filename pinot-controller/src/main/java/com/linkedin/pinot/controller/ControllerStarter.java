@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.linkedin.pinot.controller.helix.ControllerExternalViewChangeListener;
 import java.io.File;
 import java.util.concurrent.Callable;
 
@@ -36,6 +35,7 @@ import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
 
@@ -46,6 +46,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
+  private static final String MetricsRegistryName = "pinot.controller.metrics";
   private final ControllerConf config;
 
   private final Component component;
@@ -55,6 +56,7 @@ public class ControllerStarter {
   private final ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
   private final PinotRealtimeSegmentManager realtimeSegmentsManager;
+  private final SegmentStatusChecker segmentStatusChecker;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -66,6 +68,7 @@ public class ControllerStarter {
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
     validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -105,17 +108,12 @@ public class ControllerStarter {
       validationManager.start();
       LOGGER.info("starting realtime segments manager");
       realtimeSegmentsManager.start(controllerMetrics);
+      LOGGER.info("starting segments status manager");
+      segmentStatusChecker.start(controllerMetrics);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while starting controller", e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
-    }
-
-    try {
-      helixResourceManager.getHelixZkManager().addExternalViewChangeListener(
-          new ControllerExternalViewChangeListener(controllerMetrics));
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while adding external view change listener", e);
     }
 
     controllerMetrics.addCallbackGauge(
@@ -162,6 +160,9 @@ public class ControllerStarter {
       LOGGER.info("stopping resource manager");
       helixResourceManager.stop();
 
+      LOGGER.info("stopping segments status manager");
+      segmentStatusChecker.stop();
+
     } catch (final Exception e) {
       LOGGER.error("Caught exception", e);
     }
@@ -192,6 +193,7 @@ public class ControllerStarter {
     conf.setControllerVipProtocol("http");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
+    conf.setStatusCheckerFrequencyInSeconds(5*60);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);
 

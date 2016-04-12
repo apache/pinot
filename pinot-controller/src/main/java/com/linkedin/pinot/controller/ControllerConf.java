@@ -42,8 +42,10 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
+  private static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+  private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
 
   public ControllerConf(File file) throws ConfigurationException {
@@ -164,6 +166,17 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setValidationControllerFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(VALIDATION_MANAGER_FREQUENCY_IN_SECONDS, Integer.toString(validationFrequencyInSeconds));
+  }
+
+  public int getStatusControllerFrequencyInSeconds() {
+    if (containsKey(STATUS_CHECKER_FREQUENCY_IN_SECONDS)) {
+      return Integer.parseInt((String) getProperty(STATUS_CHECKER_FREQUENCY_IN_SECONDS));
+    }
+    return DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS;
+  }
+
+  public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
+    setProperty(STATUS_CHECKER_FREQUENCY_IN_SECONDS, Integer.toString(statusCheckerFrequencyInSeconds));
   }
 
   public long getExternalViewOnlineToOfflineTimeout() {

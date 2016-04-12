@@ -1,0 +1,210 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.linkedin.pinot.controller.helix;
+
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.helix.ControllerChangeListener;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/**
+ * Manages the segment status metrics, regarding tables with fewer replicas than requested
+ * and segments in error state
+ *
+ * May 15, 2016
+*/
+
+public class SegmentStatusChecker {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
+  private static final int SegmentCheckerDefaultIntervalSeconds = 120;
+  private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
+  public static final String ONLINE = "ONLINE";
+  public static final String ERROR = "ERROR";
+  private final ScheduledExecutorService _executorService;
+  ControllerMetrics _metricsRegistry;
+  private ControllerConf _config;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final HelixAdmin _helixAdmin;
+  private final long _segmentStatusIntervalSeconds;
+
+  /**
+   * Constructs the segment status checker.
+   * @param pinotHelixResourceManager The resource checker used to interact with Helix
+   * @param config The controller configuration object
+   */
+  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
+      ControllerConf config) {
+    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
+    _segmentStatusIntervalSeconds = config.getStatusControllerFrequencyInSeconds();
+
+    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+      @Override
+      public Thread newThread(Runnable runnable) {
+        Thread thread = new Thread(runnable);
+        thread.setName("SegStatChecker");
+        return thread;
+      }
+    });
+  }
+
+  /**
+   * Starts the segment status checker.
+   */
+  public void start(ControllerMetrics metricsRegistry) {
+    if (_segmentStatusIntervalSeconds == -1){
+      return;
+    }
+
+    _metricsRegistry = metricsRegistry;
+
+    // Subscribe to leadership changes
+    _pinotHelixResourceManager.getHelixZkManager().addControllerListener(new ControllerChangeListener() {
+      @Override
+      public void onControllerChange(NotificationContext changeContext) {
+        processLeaderChange(CONTROLLER_LEADER_CHANGE);
+      }
+    });
+
+    LOGGER.info("Starting segment status checker");
+
+    // Set up an executor that executes segment status tasks periodically
+    _executorService.scheduleWithFixedDelay(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          runSegmentMetrics();
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while running segment status checker", e);
+        }
+      }
+    }, SegmentCheckerDefaultIntervalSeconds, _segmentStatusIntervalSeconds, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Stops the segment status checker.
+   */
+  public void stop() {
+    // Shut down the executor
+    _executorService.shutdown();
+    try {
+      _executorService.awaitTermination(SegmentCheckerDefaultIntervalSeconds, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   * Runs a segment status pass over the currently loaded tables.
+   */
+  public void runSegmentMetrics() {
+    if (!_pinotHelixResourceManager.isLeader()) {
+      LOGGER.info("Skipping Segment Status check, not leader!");
+      stop();
+      return;
+    }
+
+    long startTime = System.nanoTime();
+
+    LOGGER.info("Starting Segment Status check for metrics");
+    //
+    // Fetch the list of tables
+    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+
+    for (String tableName : allTableNames) {
+      IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
+      ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
+      final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
+      int nReplicasExternal = nReplicasIdeal;
+      int nErrors = 0;
+      for (String partitionName : idealState.getPartitionSet()) {
+        int nReplicas = 0;
+        int nIdeal = 0;
+        // Skip segments not online in ideal state
+        for (Map.Entry<String, String> serverAndState : idealState.getInstanceStateMap(partitionName).entrySet()) {
+          if (serverAndState.getValue().equals(ONLINE)){
+            nIdeal++;
+            break;
+          }
+        }
+        if (nIdeal == 0) {
+          continue;
+        }
+        for (Map.Entry<String, String> serverAndState : externalView.getStateMap(partitionName).entrySet()) {
+          // Count number of online replicas
+          if (serverAndState.getValue().equals(ONLINE)) {
+            nReplicas++;
+          }
+          if (serverAndState.getValue().equals(ERROR)) {
+            nErrors++;
+          }
+        }
+        nReplicasExternal = (nReplicasExternal > nReplicas) ? nReplicas : nReplicasExternal;
+      }
+      _metricsRegistry.setValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS,
+          nReplicasExternal);
+      _metricsRegistry.setValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE,
+          nErrors);
+      if (nReplicasExternal < nReplicasIdeal) {
+        LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", externalView.getResourceName(),
+            nReplicasExternal, nReplicasIdeal);
+      }
+    }
+    long totalNanos = System.nanoTime() - startTime;
+    LOGGER.info("Segment status metrics completed in {}ms",
+        TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
+  }
+
+  private void processLeaderChange(String path) {
+    try {
+      LOGGER.info("Processing change notification for path: {}", path);
+
+       if (!_pinotHelixResourceManager.isLeader()) {
+        if (path.equals(CONTROLLER_LEADER_CHANGE)) {
+          start(_metricsRegistry);
+        }
+      } else {
+        LOGGER.info("Not the leader of this cluster, stopping Status Checker.");
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing leader change for path {}", path, e);
+    }
+  }
+
+  public void setMetricsRegistry(ControllerMetrics metricsRegistry) {
+    _metricsRegistry = metricsRegistry;
+  }
+
+}
