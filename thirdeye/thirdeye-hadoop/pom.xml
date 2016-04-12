@@ -13,7 +13,7 @@
 	<url>http://maven.apache.org</url>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hadoop.version>2.3.0</hadoop.version>
+    <hadoop.version>2.6.4</hadoop.version>
 	</properties>
 	<dependencies>
 		<dependency>
