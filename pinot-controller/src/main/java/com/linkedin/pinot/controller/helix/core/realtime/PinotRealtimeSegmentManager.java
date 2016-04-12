@@ -138,8 +138,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         for (String instanceId : instancesInResource) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
+          String partitionId = instanceZKMetadata.getPartition(resource);
+          AbstractTableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), resource);
+          if (instancesInResource.size() == Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication())) {
+            partitionId = SegmentNameBuilder.Realtime.ALL_PARTITIONS;
+          }
           listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, SegmentNameBuilder.Realtime.ALL_PARTITIONS,
+                  SegmentNameBuilder.Realtime.build(groupId, partitionId,
                       String.valueOf(System.currentTimeMillis())), instanceId));
         }
       } else {
@@ -147,7 +152,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
         instancesToAssignRealtimeSegment
             .addAll(_pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
-
+        int numTotalInstances = instancesToAssignRealtimeSegment.size();
         // Remove server instances that are currently processing a segment
         for (String partition : state.getPartitionSet()) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
@@ -162,8 +167,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         for (String instanceId : instancesToAssignRealtimeSegment) {
           InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
           String groupId = instanceZKMetadata.getGroupId(resource);
+          String partitionId = instanceZKMetadata.getPartition(resource);
+          AbstractTableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), resource);
+          if (numTotalInstances == Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication())) {
+            partitionId = SegmentNameBuilder.Realtime.ALL_PARTITIONS;
+          }
           listOfSegmentsToAddToInstances.add(new Pair<String, String>(
-                  SegmentNameBuilder.Realtime.build(groupId, SegmentNameBuilder.Realtime.ALL_PARTITIONS, String.valueOf(System.currentTimeMillis())), instanceId));
+                  SegmentNameBuilder.Realtime.build(groupId, partitionId, String.valueOf(System.currentTimeMillis())), instanceId));
         }
       }
     }
