@@ -22,6 +22,9 @@ import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.segment.create.SegmentCreationPhaseJob;
 
+/**
+ * Wrapper to manage segment create and segment push jobs for thirdeye
+ */
 public class ThirdEyeJob {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeJob.class);
 
