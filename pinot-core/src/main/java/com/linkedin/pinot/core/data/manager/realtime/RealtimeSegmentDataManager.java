@@ -31,6 +31,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -82,6 +83,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
+  private final StarTreeIndexSpec starTreeIndexSpec;
   private Logger segmentLogger = LOGGER;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
@@ -115,7 +117,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     //inverted index columns
     invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-
+    starTreeIndexSpec = new StarTreeIndexSpec(indexingConfig.getStarTreeIndexSpecConfigs());
     this.segmentMetatdaZk = segmentMetadata;
 
     // create and init stream provider config
@@ -202,7 +204,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns);
+                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns,
+                  starTreeIndexSpec);
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

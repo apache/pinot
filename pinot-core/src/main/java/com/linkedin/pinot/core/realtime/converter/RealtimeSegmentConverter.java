@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -38,9 +39,11 @@ public class RealtimeSegmentConverter {
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
+  private StarTreeIndexSpec starTreeIndexSpec;
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns) {
+      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
+      StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
@@ -66,11 +69,13 @@ public class RealtimeSegmentConverter {
     this.sortedColumn = sortedColumn;
     this.tableName = tableName;
     this.segmentName = segmentName;
+    this.starTreeIndexSpec = starTreeIndexSpec;
   }
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>());
+    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>(),
+        new StarTreeIndexSpec());
   }
 
   public void build() throws Exception {
@@ -88,6 +93,8 @@ public class RealtimeSegmentConverter {
         genConfig.createInvertedIndexForColumn(column);
       }
     }
+    genConfig.setEnableStarTreeIndex(starTreeIndexSpec.enableStarTree());
+    genConfig.setStarTreeIndexSpec(starTreeIndexSpec);
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutGoingTimeColumnName());
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     genConfig.setSegmentVersion(SegmentVersion.v1);

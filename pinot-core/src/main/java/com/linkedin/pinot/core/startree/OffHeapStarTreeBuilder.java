@@ -158,6 +158,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (timeColumnName != null) {
       dimensionNames.add(timeColumnName);
       dimensionTypes.add(schema.getTimeFieldSpec().getDataType());
+      Object starValue = schema.getTimeFieldSpec().getDefaultNullValue();
+      dimensionNameToStarValueMap.put(timeColumnName, starValue);
       int index = dimensionNameToIndexMap.size();
       dimensionNameToIndexMap.put(timeColumnName, index);
       HashBiMap<Object, Integer> dictionary = HashBiMap.create();
@@ -252,6 +254,9 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       Object dimValue = inverseDictionary.get(dimensionKey.getDimension(i));
       if (dimValue == null) {
         dimValue = dimensionNameToStarValueMap.get(dimName);
+        if (dimValue == null) {
+          LOG.info("dimValue = null again: " + dimName);
+        }
       }
       map.put(dimName, dimValue);
     }
