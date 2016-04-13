@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.tools.admin;
 
-import java.lang.reflect.Field;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.SubCommand;
-import org.kohsuke.args4j.spi.SubCommandHandler;
-import org.kohsuke.args4j.spi.SubCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
@@ -45,6 +35,17 @@ import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
 import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
+import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
+import java.lang.reflect.Field;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.SubCommand;
+import org.kohsuke.args4j.spi.SubCommandHandler;
+import org.kohsuke.args4j.spi.SubCommands;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -75,7 +76,8 @@ public class PinotAdministrator {
       @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
       @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
       @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
-      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class)
+      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
+      @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class)
   })
   Command _subCommand;
   // @formatter:on
