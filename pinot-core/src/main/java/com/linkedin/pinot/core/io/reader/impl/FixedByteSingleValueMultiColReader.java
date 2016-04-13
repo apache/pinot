@@ -46,6 +46,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   private int rowSize;
   private PinotDataBuffer indexDataBuffer;
   private final int[] columnSizes;
+  private final long totalSize;
 
   /**
    *
@@ -67,8 +68,8 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
       colOffSets[i] = rowSize;
       rowSize += columnSizes[i];
     }
-    final long totalSize = rowSize * rows;
-    this.indexDataBuffer = pinotDataBuffer.view(0, totalSize);
+    totalSize = rowSize * rows;
+    this.indexDataBuffer = pinotDataBuffer;
   }
 
   /**

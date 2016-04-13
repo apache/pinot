@@ -237,4 +237,10 @@ public class PinotDataBufferTest {
     heapReadBuf.close();
   }
 
+  @Test
+  public void testView() {
+    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(0);
+    PinotDataBuffer view = buffer.view(0, 0);
+    Assert.assertEquals(0, view.size());
+  }
 }
