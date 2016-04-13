@@ -21,6 +21,7 @@ import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.plist.PropertyListConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -82,6 +83,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
+  private final StarTreeIndexSpec starTreeIndexSpec;
   private Logger segmentLogger = LOGGER;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
@@ -116,6 +118,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     //inverted index columns
     invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
 
+    //StarTree index spec
+    starTreeIndexSpec = new StarTreeIndexSpec(indexingConfig.getStarTreeIndexSpecConfigs());
     this.segmentMetatdaZk = segmentMetadata;
 
     // create and init stream provider config
@@ -202,7 +206,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns);
+                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns,
+                  starTreeIndexSpec);
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

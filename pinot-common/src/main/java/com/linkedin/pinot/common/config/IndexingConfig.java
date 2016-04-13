@@ -33,6 +33,7 @@ public class IndexingConfig {
   private String loadMode;
   private String lazyLoad;
   private Map<String, String> streamConfigs = new HashMap<String, String>();
+  private Map<String, String> starTreeIndexSpecConfigs = new HashMap<String, String>();
 
   public IndexingConfig() {
 
@@ -60,6 +61,13 @@ public class IndexingConfig {
 
   public void setInvertedIndexColumns(List<String> invertedIndexColumns) {
     this.invertedIndexColumns = invertedIndexColumns;
+  }
+  public Map<String, String> getStarTreeIndexSpecConfigs() {
+    return starTreeIndexSpecConfigs;
+  }
+
+  public void setStarTreeIndexSpecConfigs(Map<String, String> starTreeIndexSpecConfigs) {
+    this.starTreeIndexSpecConfigs = starTreeIndexSpecConfigs;
   }
 
   public String getLoadMode() {
