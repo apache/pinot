@@ -162,7 +162,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     @Override
     public boolean hasIndexFor(String column, ColumnIndexType type) {
-      return hasIndexFor(column, type);
+      return columnIndexDirectory.hasIndexFor(column, type);
     }
 
     @Override
