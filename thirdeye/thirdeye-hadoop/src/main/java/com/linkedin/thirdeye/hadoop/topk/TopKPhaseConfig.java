@@ -18,6 +18,8 @@ public class TopKPhaseConfig {
   private Map<String, Double> metricThresholds;
   private Map<String, TopKDimensionSpec> topKDimensionSpec;
 
+  private static double DEFAULT_METRIC_THRESHOLD = 0.01;
+
   /**
    *
    */
@@ -81,7 +83,7 @@ public class TopKPhaseConfig {
     }
     for (String metric : metricNames) {
       if (metricThresholds.get(metric) == null) {
-        metricThresholds.put(metric, 1.0);
+        metricThresholds.put(metric, DEFAULT_METRIC_THRESHOLD);
       }
     }
 
