@@ -20,9 +20,6 @@ public class TopKPhaseConfig {
 
   private static double DEFAULT_METRIC_THRESHOLD = 0.01;
 
-  /**
-   *
-   */
   public TopKPhaseConfig() {
 
   }
